@@ -29,6 +29,11 @@ public sealed class ConversationTurnPayload
 {
     public string Kind { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
+    public string InteractionState { get; set; } = string.Empty;
+    public string TurnIntent { get; set; } = string.Empty;
+    public int ClarificationRound { get; set; }
+    public List<string> AskedQuestionFingerprints { get; set; } = new();
+    public List<string> AnsweredClarificationFields { get; set; } = new();
     public string? Reply { get; set; }
     public string? Reasoning { get; set; }
     public List<string> Progress { get; set; } = new();
@@ -615,6 +620,17 @@ public class ConversationalFlowService : IConversationalFlowService
         {
             Kind = payload.Kind,
             Status = payload.Status,
+            InteractionState = payload.InteractionState,
+            TurnIntent = payload.TurnIntent,
+            ClarificationRound = payload.ClarificationRound,
+            AskedQuestionFingerprints = payload.AskedQuestionFingerprints?
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>(),
+            AnsweredClarificationFields = payload.AnsweredClarificationFields?
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>(),
             Reply = payload.Reply,
             Reasoning = payload.Reasoning,
             Progress = payload.Progress?.Where(item => !string.IsNullOrWhiteSpace(item)).ToList() ?? new List<string>(),

@@ -31,6 +31,7 @@ const WORKBENCH_STAGE_ORDER = [
 
 const STAGE_DIAGNOSTIC_LABELS = {
     conversation: '会话准备',
+    turn_router: '回合路由',
     scenario_match: '场景匹配',
     requirement_brief: '需求提炼',
     clarification: '需求澄清',
@@ -863,7 +864,7 @@ export class AiPanel {
         const activeTurn = this.activeAssistantTurn
             || this._startAssistantTurn({ activate: false, statusText: '处理中', statusTone: 'streaming' });
         const isClarification = this._isClarificationResult(payload);
-        this._renderRequirementBrief(payload);
+        const isInteractionOnly = this._isInteractionOnlyResult(payload);
 
         if (isCancelled) {
             this._clearActiveRequestState();
@@ -873,6 +874,39 @@ export class AiPanel {
             this.activeAssistantTurn = null;
             return;
         }
+
+        if (isInteractionOnly) {
+            this._clearActiveRequestState();
+            if (!this.currentResult?.flow) {
+                this._setWorkbenchState(AiWorkbenchStates.IDLE);
+            }
+            this.pendingManualRetry = null;
+            this._renderManualRetryBanner();
+            this._setAssistantTurnStatus(activeTurn, '已回复', 'success');
+            this._setAssistantSectionText(
+                activeTurn,
+                'reply',
+                payload.aiExplanation || payload.AiExplanation || payload.errorMessage || payload.message || '我在。'
+            );
+            if (activeTurn.clarificationSection) {
+                activeTurn.clarificationSection.hidden = true;
+            }
+            this._setResultStatusNote('', '');
+
+            if (this.sessionId) {
+                this._addToHistory({
+                    sessionId: this.sessionId,
+                    lastMessage: this.lastUserPrompt || payload.aiExplanation || '普通对话',
+                    updatedAtUtc: new Date().toISOString(),
+                    turnCount: 0
+                });
+            }
+
+            this.activeAssistantTurn = null;
+            return;
+        }
+
+        this._renderRequirementBrief(payload);
 
         if (!payload.success) {
             this._clearActiveRequestState();
@@ -960,7 +994,12 @@ export class AiPanel {
 
         // Set workbench state based on pending parameters
         const hasPending = (payload.pendingParameters || payload.PendingParameters || []).length > 0;
-        this._setWorkbenchState(hasPending ? AiWorkbenchStates.REVIEWING_PARAMETERS : AiWorkbenchStates.READY_TO_APPLY);
+        const interactionState = this._getInteractionState(payload);
+        this._setWorkbenchState(
+            interactionState === 'reviewing_parameters' || hasPending
+                ? AiWorkbenchStates.REVIEWING_PARAMETERS
+                : AiWorkbenchStates.READY_TO_APPLY
+        );
 
         if (this.sessionId) {
             this._addToHistory({
@@ -974,8 +1013,9 @@ export class AiPanel {
                 applied: false
             });
         }
-        this._setAssistantTurnStatus(activeTurn, '生成成功', 'success');
-        this._setResultStatusNote('', '');
+        const turnIntent = this._getTurnIntent(payload);
+        this._setAssistantTurnStatus(activeTurn, turnIntent === 'modify_flow' ? '微调完成' : '生成成功', 'success');
+        this._setResultStatusNote(turnIntent === 'modify_flow' ? '已基于当前工程完成微调。' : '', turnIntent === 'modify_flow' ? 'info' : '');
         this._displayResult(payload, {
             appendChatMessage: false,
             assistantTurn: activeTurn
@@ -3208,6 +3248,8 @@ export class AiPanel {
             canGenerateDraftNow: Boolean(item.canGenerateDraftNow ?? item.CanGenerateDraftNow),
             draftRiskLevel: String(item.draftRiskLevel ?? item.DraftRiskLevel ?? 'medium').trim() || 'medium',
             requiredFields: normalizeStringList(item.requiredFields ?? item.RequiredFields),
+            blockingClarificationFields: normalizeStringList(item.blockingClarificationFields ?? item.BlockingClarificationFields),
+            nonBlockingMissingFields: normalizeStringList(item.nonBlockingMissingFields ?? item.NonBlockingMissingFields),
             knownFacts: normalizeStringList(item.knownFacts ?? item.KnownFacts),
             missingFacts: normalizeStringList(item.missingFacts ?? item.MissingFacts),
             attachmentFacts: normalizeStringList(item.attachmentFacts ?? item.AttachmentFacts),
@@ -4082,6 +4124,27 @@ export class AiPanel {
         return clarificationRequired
             || status === 'clarification_required'
             || failureType === 'clarification_required';
+    }
+
+    _getTurnIntent(payload) {
+        return String(payload?.turnIntent ?? payload?.TurnIntent ?? '').trim().toLowerCase();
+    }
+
+    _getInteractionState(payload) {
+        return String(payload?.interactionState ?? payload?.InteractionState ?? '').trim().toLowerCase();
+    }
+
+    _isInteractionOnlyResult(payload) {
+        const turnIntent = this._getTurnIntent(payload);
+        const interactionState = this._getInteractionState(payload);
+        const flow = payload?.flow ?? payload?.Flow ?? null;
+        const hasReply = Boolean(payload?.aiExplanation ?? payload?.AiExplanation ?? payload?.message ?? payload?.errorMessage);
+
+        return Boolean(payload?.success ?? payload?.Success)
+            && !flow
+            && !this._isClarificationResult(payload)
+            && hasReply
+            && (turnIntent === 'chat_or_help' || turnIntent === 'unknown' || interactionState === 'idle');
     }
 
     _clearActiveRequestState() {

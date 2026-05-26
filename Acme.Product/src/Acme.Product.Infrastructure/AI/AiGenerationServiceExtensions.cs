@@ -39,6 +39,7 @@ public static class AiGenerationServiceExtensions
         services.AddSingleton<IFlowTemplateService, FlowTemplateService>();
         services.AddScoped<IScenarioMatcher, ScenarioMatcher>();
         services.AddScoped<IRequirementBriefExtractor, RequirementBriefExtractor>();
+        services.AddScoped<IAiTurnRouter, AiTurnRouter>();
         services.AddScoped<IClarificationEngine, ClarificationEngine>();
         services.AddScoped<ITemplateConstraintValidator, TemplateConstraintValidator>();
         services.AddScoped<IAiFlowValidator, AiFlowValidator>();

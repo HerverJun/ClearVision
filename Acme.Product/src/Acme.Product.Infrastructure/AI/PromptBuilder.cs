@@ -200,6 +200,7 @@ public class PromptBuilder
         4. Do not invent hardware addresses, model paths, calibration files, SQL tables, or production thresholds. Put them in parametersNeedingReview.
         5. Every operator except pure source/resource loaders should be connected to the flow. Avoid isolated nodes.
         6. Prefer safe defaults and explain assumptions briefly in explanation.
+        7. When asked to use Chinese text, localize only user-visible displayName, explanation, and notes. Never translate operatorType, port names, parameter names, or runtime JSON keys.
         """;
 
     private string GetParameterInferenceGuide() => """

@@ -96,6 +96,11 @@ public record GenerateFlowResponse
     public string? CompletionStatus { get; init; }
     public int RetryCount { get; init; }
     public List<GenerateFlowKnowledgeDiagnostic>? KnowledgeDiagnostics { get; init; }
+    public string? TurnIntent { get; init; }
+    public string? InteractionState { get; init; }
+    public string? RouterConfidence { get; init; }
+    public List<string> BlockingClarificationFields { get; init; } = new();
+    public List<string> NonBlockingMissingFields { get; init; } = new();
 
     /// <summary>Active prompt template version ID at generation time.</summary>
     public string? PromptVersionId { get; init; }
@@ -217,6 +222,8 @@ public record GenerateFlowRequirementBrief
     public string? DecisionRule { get; init; }
     public string? RoiRequirement { get; init; }
     public string? CalibrationRequirement { get; init; }
+    public List<string> BlockingClarificationFields { get; init; } = new();
+    public List<string> NonBlockingMissingFields { get; init; } = new();
     public List<GenerateFlowClarificationQuestion> ClarificationQuestions { get; init; } = new();
 }
 

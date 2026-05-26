@@ -13,7 +13,8 @@ public sealed record AiPromptRequest(
     string? SessionSummary = null,
     string? RequirementBriefSection = null,
     string? ReferenceFlowSummary = null,
-    string? OutputRequirements = null);
+    string? OutputRequirements = null,
+    string? InteractionInstructions = null);
 
 public static class AiPromptComposer
 {
@@ -31,6 +32,7 @@ public static class AiPromptComposer
         AppendSection(sb, "SessionSummary", request.SessionSummary);
         AppendSection(sb, "RequirementBrief", request.RequirementBriefSection);
         AppendSection(sb, "ReferenceFlowSummary", request.ReferenceFlowSummary);
+        AppendSection(sb, "InteractionInstructions", request.InteractionInstructions);
         AppendSection(sb, "OutputRequirements", request.OutputRequirements ?? BuildDefaultOutputRequirements(request.Mode));
 
         return sb.ToString().Trim();
@@ -97,6 +99,7 @@ public static class AiPromptComposer
         sb.AppendLine("- Use the exact top-level shape: explanation string, operators array, connections array, optional parametersNeedingReview object.");
         sb.AppendLine("- Do not wrap the workflow in workflow/flow/result/data/answer and do not return JSON as an escaped string.");
         sb.AppendLine("- Keep operator ids, port names, and operator types aligned with the supported catalog from the system prompt.");
+        sb.AppendLine("- Chinese localization applies only to displayName, explanation, and other user-visible notes; keep operatorType, port names, parameter keys, and JSON keys unchanged.");
 
         if (mode == GenerateFlowMode.Modify)
         {

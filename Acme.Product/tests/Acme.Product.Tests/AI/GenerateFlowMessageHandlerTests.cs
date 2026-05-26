@@ -33,7 +33,12 @@ public class GenerateFlowMessageHandlerTests
             .Returns(Task.FromResult(new AiFlowGenerationResult
             {
                 Success = true,
-                Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() }
+                Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() },
+                TurnIntent = AiTurnIntents.ModifyFlow,
+                InteractionState = AiInteractionStates.Completed,
+                RouterConfidence = AiRouterConfidence.High,
+                BlockingClarificationFields = ["object_type"],
+                NonBlockingMissingFields = ["model_path"]
             }));
 
         // Act
@@ -57,6 +62,13 @@ public class GenerateFlowMessageHandlerTests
 
         using var doc = JsonDocument.Parse(resultJson);
         doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+        doc.RootElement.GetProperty("turnIntent").GetString().Should().Be(AiTurnIntents.ModifyFlow);
+        doc.RootElement.GetProperty("interactionState").GetString().Should().Be(AiInteractionStates.Completed);
+        doc.RootElement.GetProperty("routerConfidence").GetString().Should().Be(AiRouterConfidence.High);
+        doc.RootElement.GetProperty("blockingClarificationFields").EnumerateArray()
+            .Select(item => item.GetString()).Should().Contain("object_type");
+        doc.RootElement.GetProperty("nonBlockingMissingFields").EnumerateArray()
+            .Select(item => item.GetString()).Should().Contain("model_path");
     }
 
     [Fact(DisplayName = "GenerateFlowMessageHandler should forward mode and debugPrompt")]

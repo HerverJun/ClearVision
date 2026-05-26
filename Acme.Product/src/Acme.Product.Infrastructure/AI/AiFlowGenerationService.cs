@@ -32,6 +32,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly IFlowTemplateService _templateService;
     private readonly IScenarioMatcher _scenarioMatcher;
     private readonly IRequirementBriefExtractor _requirementBriefExtractor;
+    private readonly IAiTurnRouter _turnRouter;
     private readonly ClarificationEngine _clarificationEngine = new();
     private readonly ITemplateConstraintValidator _templateConstraintValidator;
     private readonly IAiFlowResponseParser _responseParser;
@@ -59,6 +60,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IFlowTemplateService templateService,
         IScenarioMatcher scenarioMatcher,
         IRequirementBriefExtractor requirementBriefExtractor,
+        IAiTurnRouter turnRouter,
         ITemplateConstraintValidator templateConstraintValidator,
         IAiFlowResponseParser responseParser,
         DryRunService dryRunService,
@@ -75,6 +77,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _templateService = templateService;
         _scenarioMatcher = scenarioMatcher;
         _requirementBriefExtractor = requirementBriefExtractor;
+        _turnRouter = turnRouter;
         _templateConstraintValidator = templateConstraintValidator;
         _responseParser = responseParser;
         _dryRunService = dryRunService;
@@ -112,9 +115,37 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             () => _conversationalFlowService.PrepareContext(request),
             context => $"session={context.SessionId}, mode={context.Mode.ToWireValue()}");
         var sessionSnapshot = _conversationalFlowService.GetSession(conversationContext.SessionId);
+        var hasExistingFlow = !string.IsNullOrWhiteSpace(conversationContext.ExistingFlowJson);
+        var turnRoute = pipeline.Measure(
+            "turn_router",
+            () => _turnRouter.Route(new AiTurnRouteRequest(
+                request.Description,
+                request.AdditionalContext,
+                request.Mode,
+                sessionSnapshot,
+                hasExistingFlow,
+                request.Attachments)),
+            route => $"intent={route.TurnIntent}, confidence={route.Confidence}",
+            route => new Dictionary<string, string>
+            {
+                ["turnIntent"] = route.TurnIntent,
+                ["interactionState"] = route.InteractionState,
+                ["confidence"] = route.Confidence
+            });
+        if (turnRoute.ShouldShortCircuit)
+        {
+            return CreateInteractionMessageResult(
+                conversationContext.SessionId,
+                turnRoute,
+                progressMessages,
+                pipeline.Timeline.ToList());
+        }
+
         var clarificationHistory = BuildClarificationHistoryContext(
             sessionSnapshot,
             request.Description);
+        var effectiveMode = ResolveEffectiveMode(turnRoute, conversationContext.Mode, clarificationHistory);
+        var detectedIntent = ResolveDetectedIntent(turnRoute, conversationContext.Intent);
         var manualRetryHistory = BuildManualRetryHistoryContext(
             sessionSnapshot,
             request.Description);
@@ -159,7 +190,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     templatePriority.PrimaryMatch);
                 ApplyExplicitCurrentAnswerOverrides(extracted, request.Description, request.AdditionalContext);
                 ApplyAnsweredClarificationFields(extracted, answeredClarificationFields);
-                var evaluated = _clarificationEngine.ApplyPolicy(extracted, conversationContext.Mode, request.RequirementMode);
+                var evaluated = _clarificationEngine.ApplyPolicy(extracted, effectiveMode, request.RequirementMode);
+                evaluated = ApplyBlockingClarificationPolicy(evaluated, templatePriority, clarificationHistory);
+                evaluated = ApplyTurnRoutePolicy(evaluated, turnRoute);
                 evaluated = RelaxClarificationForTemplatePriority(evaluated, templatePriority);
                 evaluated = EnforceClarificationRoundLimit(evaluated, clarificationHistory.ClarificationRounds);
                 return RelaxClarificationForManualRetry(evaluated, manualRetryHistory);
@@ -199,7 +232,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 conversationContext.SessionId,
                 requirementBrief,
                 templatePriority,
-                conversationContext.Intent.ToString().ToUpperInvariant(),
+                detectedIntent,
+                turnRoute,
+                clarificationHistory,
                 progressMessages,
                 promptTrace: null,
                 pipeline.Timeline.ToList());
@@ -215,13 +250,14 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             "prompt_context",
             () => _promptBuilder.BuildSystemPrompt(request.Description, capabilities.SupportsJsonMode),
             prompt => $"system prompt chars={prompt.Length}");
-        var referenceFlowSummary = ShouldIncludeReferenceFlowSummary(conversationContext.Mode)
+        var referenceFlowSummary = ShouldIncludeReferenceFlowSummary(effectiveMode)
             ? AiPromptComposer.BuildReferenceFlowSummary(conversationContext.ExistingFlowJson)
             : string.Empty;
         var userMessage = AiPromptComposer.BuildUserPrompt(new AiPromptRequest(
             Task: request.Description,
-            Mode: conversationContext.Mode,
+            Mode: effectiveMode,
             AdditionalContext: request.AdditionalContext,
+            InteractionInstructions: BuildTurnRoutePromptSection(turnRoute),
             TemplatePriority: BuildTemplatePriorityPromptSection(templatePriority),
             AttachmentContext: attachmentContext,
             SessionSummary: conversationContext.SessionSummary,
@@ -231,7 +267,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         var promptTrace = ShouldIncludePromptTrace(request.DebugPrompt)
             ? new AiPromptTrace
             {
-                Mode = conversationContext.Mode.ToWireValue(),
+                Mode = effectiveMode.ToWireValue(),
                 Provider = options.Provider,
                 Model = options.Model,
                 BaseUrl = options.BaseUrl,
@@ -455,6 +491,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         promptTrace,
                         progressMessages,
                         requirementBrief,
+                        turnRoute,
                         templatePriority.GenerationMode,
                         templatePriority.TemplateLockLevel,
                         BuildTemplateCandidates(templatePriority),
@@ -542,6 +579,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     {
                         Kind = "assistant_result",
                         Status = AiFlowGenerationResult.CompletionStatusCompleted,
+                        InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
+                        TurnIntent = turnRoute.TurnIntent,
                         Reply = assistantReply,
                         Reasoning = ShouldIncludePromptTrace(request.DebugPrompt) ? completionResult.Reasoning : null,
                         Progress = progressMessages.ToList(),
@@ -566,7 +605,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         ParametersNeedingReview = generatedFlow.ParametersNeedingReview,
                         RetryCount = retryCount,
                         SessionId = conversationContext.SessionId,
-                        DetectedIntent = conversationContext.Intent.ToString().ToUpperInvariant(),
+                        DetectedIntent = detectedIntent,
                         DryRunResult = dryRunReport,
                         RecommendedTemplate = recommendedTemplate,
                         GenerationMode = templatePriority.GenerationMode,
@@ -577,7 +616,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         RequirementBrief = requirementBrief,
                         TemplateCandidates = BuildTemplateCandidates(templatePriority),
                         StageTimeline = pipeline.Timeline.ToList(),
-                        KnowledgeDiagnostics = ExtractKnowledgeDiagnostics(lastValidation)
+                        KnowledgeDiagnostics = ExtractKnowledgeDiagnostics(lastValidation),
+                        TurnIntent = turnRoute.TurnIntent,
+                        InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
+                        RouterConfidence = turnRoute.Confidence,
+                        BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+                        NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
                     };
                 }
 
@@ -604,6 +648,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     promptTrace,
                     progressMessages,
                     requirementBrief,
+                    turnRoute,
                     templatePriority.GenerationMode,
                     templatePriority.TemplateLockLevel,
                     BuildTemplateCandidates(templatePriority),
@@ -657,7 +702,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         failureSummary: failureSummary,
                         diagnostics: lastAttemptDiagnostics,
                         progressMessages: progressMessages,
-                        requirementBrief: requirementBrief));
+                        requirementBrief: requirementBrief,
+                        turnRoute: turnRoute));
                 return new AiFlowGenerationResult
                 {
                     Success = false,
@@ -671,7 +717,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     GenerationMode = templatePriority.GenerationMode,
                     TemplateLockLevel = templatePriority.TemplateLockLevel,
                     TemplateCandidates = BuildTemplateCandidates(templatePriority),
-                    StageTimeline = pipeline.Timeline.ToList()
+                    StageTimeline = pipeline.Timeline.ToList(),
+                    TurnIntent = turnRoute.TurnIntent,
+                    InteractionState = AiInteractionStates.Failed,
+                    RouterConfidence = turnRoute.Confidence,
+                    BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+                    NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
                 };
             }
             catch (Exception ex)
@@ -728,7 +779,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         failureSummary: failureSummary,
                         diagnostics: lastAttemptDiagnostics,
                         progressMessages: progressMessages,
-                        requirementBrief: requirementBrief));
+                        requirementBrief: requirementBrief,
+                        turnRoute: turnRoute));
                 return new AiFlowGenerationResult
                 {
                     Success = false,
@@ -742,7 +794,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     GenerationMode = templatePriority.GenerationMode,
                     TemplateLockLevel = templatePriority.TemplateLockLevel,
                     TemplateCandidates = BuildTemplateCandidates(templatePriority),
-                    StageTimeline = pipeline.Timeline.ToList()
+                    StageTimeline = pipeline.Timeline.ToList(),
+                    TurnIntent = turnRoute.TurnIntent,
+                    InteractionState = AiInteractionStates.Failed,
+                    RouterConfidence = turnRoute.Confidence,
+                    BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+                    NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
                 };
             }
         }
@@ -766,7 +823,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 failureSummary: finalFailureSummary,
                 diagnostics: lastAttemptDiagnostics,
                 progressMessages: progressMessages,
-                requirementBrief: requirementBrief));
+                requirementBrief: requirementBrief,
+                turnRoute: turnRoute));
         return new AiFlowGenerationResult
         {
             Success = false,
@@ -781,7 +839,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             TemplateLockLevel = templatePriority.TemplateLockLevel,
             TemplateCandidates = BuildTemplateCandidates(templatePriority),
             StageTimeline = pipeline.Timeline.ToList(),
-            KnowledgeDiagnostics = ExtractKnowledgeDiagnostics(lastValidation)
+            KnowledgeDiagnostics = ExtractKnowledgeDiagnostics(lastValidation),
+            TurnIntent = turnRoute.TurnIntent,
+            InteractionState = AiInteractionStates.Failed,
+            RouterConfidence = turnRoute.Confidence,
+            BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
         };
     }
 
@@ -790,9 +853,134 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return mode is GenerateFlowMode.Modify or GenerateFlowMode.Explain or GenerateFlowMode.ReviewPendingParameters;
     }
 
+    private static GenerateFlowMode ResolveEffectiveMode(
+        AiTurnRoute route,
+        GenerateFlowMode fallbackMode,
+        ClarificationHistoryContext clarificationHistory)
+    {
+        if (route.TurnIntent == AiTurnIntents.ClarificationAnswer)
+        {
+            var clarifiedMode = ResolveModeFromTurnIntent(clarificationHistory.PendingTurnIntent);
+            if (clarifiedMode.HasValue)
+                return clarifiedMode.Value;
+        }
+
+        return route.TurnIntent switch
+        {
+            var intent when intent == AiTurnIntents.ModifyFlow => GenerateFlowMode.Modify,
+            var intent when intent == AiTurnIntents.ExplainFlow => GenerateFlowMode.Explain,
+            var intent when intent == AiTurnIntents.ReviewPendingParameters => GenerateFlowMode.ReviewPendingParameters,
+            var intent when intent == AiTurnIntents.NewFlow => GenerateFlowMode.New,
+            _ => fallbackMode
+        };
+    }
+
+    private static GenerateFlowMode? ResolveModeFromTurnIntent(string? turnIntent)
+    {
+        return turnIntent switch
+        {
+            var intent when string.Equals(intent, AiTurnIntents.ModifyFlow, StringComparison.OrdinalIgnoreCase) => GenerateFlowMode.Modify,
+            var intent when string.Equals(intent, AiTurnIntents.ExplainFlow, StringComparison.OrdinalIgnoreCase) => GenerateFlowMode.Explain,
+            var intent when string.Equals(intent, AiTurnIntents.ReviewPendingParameters, StringComparison.OrdinalIgnoreCase) => GenerateFlowMode.ReviewPendingParameters,
+            var intent when string.Equals(intent, AiTurnIntents.NewFlow, StringComparison.OrdinalIgnoreCase) => GenerateFlowMode.New,
+            _ => null
+        };
+    }
+
+    private static string ResolveDetectedIntent(AiTurnRoute route, ConversationIntent fallbackIntent)
+    {
+        return route.TurnIntent switch
+        {
+            var intent when intent == AiTurnIntents.ModifyFlow => "MODIFY",
+            var intent when intent == AiTurnIntents.ExplainFlow => "EXPLAIN",
+            var intent when intent == AiTurnIntents.ReviewPendingParameters => "REVIEW_PENDING_PARAMETERS",
+            var intent when intent == AiTurnIntents.NewFlow => "NEW",
+            var intent when intent == AiTurnIntents.ClarificationAnswer => "CLARIFICATION_ANSWER",
+            var intent when intent == AiTurnIntents.ManualRetryRepair => "MANUAL_RETRY_REPAIR",
+            _ => fallbackIntent.ToString().ToUpperInvariant()
+        };
+    }
+
+    private static string ResolveCompletedInteractionState(
+        AiTurnRoute route,
+        IReadOnlyCollection<AiPendingParameterInfo>? pendingParameters)
+    {
+        if (pendingParameters is { Count: > 0 })
+            return AiInteractionStates.ReviewingParameters;
+
+        return AiInteractionStates.Completed;
+    }
+
+    private AiFlowGenerationResult CreateInteractionMessageResult(
+        string sessionId,
+        AiTurnRoute turnRoute,
+        IReadOnlyList<string> progressMessages,
+        IReadOnlyList<AiGenerationStageDiagnostic> stageTimeline)
+    {
+        var reply = string.IsNullOrWhiteSpace(turnRoute.Reply)
+            ? "我还不能确定这一轮要做什么。请描述要检测、测量或识别的对象，以及希望输出到哪里。"
+            : turnRoute.Reply.Trim();
+        var assistantPayload = new ConversationTurnPayload
+        {
+            Kind = "assistant_interaction",
+            Status = AiFlowGenerationResult.CompletionStatusCompleted,
+            InteractionState = turnRoute.InteractionState,
+            TurnIntent = turnRoute.TurnIntent,
+            Reply = reply,
+            Progress = progressMessages.Where(item => !string.IsNullOrWhiteSpace(item)).ToList(),
+            ClarificationRequired = false
+        };
+
+        _conversationalFlowService.RecordAssistantResponse(
+            sessionId,
+            reply,
+            null,
+            payload: assistantPayload);
+
+        return new AiFlowGenerationResult
+        {
+            Success = true,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+            AiExplanation = reply,
+            SessionId = sessionId,
+            TurnIntent = turnRoute.TurnIntent,
+            InteractionState = turnRoute.InteractionState,
+            RouterConfidence = turnRoute.Confidence,
+            StageTimeline = stageTimeline.ToList()
+        };
+    }
+
     private bool ShouldIncludePromptTrace(bool debugPrompt)
     {
         return debugPrompt || _hostEnvironment.IsDevelopment() || System.Diagnostics.Debugger.IsAttached;
+    }
+
+    private static string BuildTurnRoutePromptSection(AiTurnRoute route)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"turnIntent={route.TurnIntent}");
+        sb.AppendLine($"routerConfidence={route.Confidence}");
+
+        if (route.TurnIntent == AiTurnIntents.ModifyFlow)
+        {
+            sb.AppendLine("This is an incremental modification of the current workflow.");
+            sb.AppendLine("Only change the user-requested parts. Keep unrelated operators, connections, parameter values, and resource placeholders unchanged.");
+            sb.AppendLine("If the user asks for Chinese localization, localize only user-visible displayName, explanation, and notes. Keep operatorType, port names, parameter keys, and JSON runtime contracts exactly as the catalog defines them.");
+        }
+        else if (route.TurnIntent == AiTurnIntents.ExplainFlow)
+        {
+            sb.AppendLine("Explain the current workflow without changing operators, connections, runtime keys, or parameter values.");
+        }
+        else if (route.TurnIntent == AiTurnIntents.ReviewPendingParameters)
+        {
+            sb.AppendLine("Review and fill only pending parameters or missing resources the user explicitly provides. Keep topology stable.");
+        }
+        else if (route.TurnIntent == AiTurnIntents.ManualRetryRepair)
+        {
+            sb.AppendLine("This is a repair after parser or validator failure. Do not re-enter requirement clarification. Return a complete corrected workflow JSON.");
+        }
+
+        return sb.ToString().Trim();
     }
 
     private static string BuildTemplatePriorityPromptSection(TemplatePriorityContext templatePriority)
@@ -885,6 +1073,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             sb.AppendLine($"requiredResources={string.Join(",", requirementBrief.RequiredResources.Take(6))}");
         if (requirementBrief.RequiredFields.Count > 0)
             sb.AppendLine($"requiredFields={string.Join(",", requirementBrief.RequiredFields.Take(8))}");
+        if (requirementBrief.BlockingClarificationFields.Count > 0)
+            sb.AppendLine($"blockingClarificationFields={string.Join(",", requirementBrief.BlockingClarificationFields.Take(8))}");
+        if (requirementBrief.NonBlockingMissingFields.Count > 0)
+            sb.AppendLine($"nonBlockingMissingFields={string.Join(",", requirementBrief.NonBlockingMissingFields.Take(8))}");
 
         if (requirementBrief.KnownFacts.Count > 0)
         {
@@ -1363,8 +1555,184 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             return false;
 
         return brief.MissingFacts.Any(fact =>
-            string.Equals(MapMissingFactToField(fact), "measurement_target", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(MapMissingFactToField(fact), "calibration", StringComparison.OrdinalIgnoreCase));
+            string.Equals(MapMissingFactToField(fact), "measurement_target", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static AiRequirementBrief ApplyBlockingClarificationPolicy(
+        AiRequirementBrief brief,
+        TemplatePriorityContext templatePriority,
+        ClarificationHistoryContext clarificationHistory)
+    {
+        var allFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var field in brief.RequiredFields.Where(field => !string.IsNullOrWhiteSpace(field)))
+            allFields.Add(field);
+        foreach (var fact in brief.MissingFacts)
+        {
+            var field = MapMissingFactToField(fact);
+            if (!string.IsNullOrWhiteSpace(field))
+                allFields.Add(field);
+        }
+        foreach (var question in brief.ClarificationQuestions)
+        {
+            if (!string.IsNullOrWhiteSpace(question.Field))
+                allFields.Add(question.Field);
+        }
+
+        var blockingFields = allFields
+            .Where(field => IsBlockingClarificationField(field, brief, templatePriority))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var nonBlockingFields = allFields
+            .Where(field => !string.IsNullOrWhiteSpace(field) &&
+                            !blockingFields.Contains(field, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var askedFields = clarificationHistory.PendingQuestions
+            .Select(question => question.Field)
+            .Where(field => !string.IsNullOrWhiteSpace(field))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var askedFingerprints = clarificationHistory.PendingQuestions
+            .Select(BuildQuestionFingerprint)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var activeBlockingFields = blockingFields
+            .Where(field => !askedFields.Contains(field) || clarificationHistory.AnsweredFields.Count > 0)
+            .ToList();
+
+        brief.NonBlockingMissingFields = nonBlockingFields;
+        brief.BlockingClarificationFields = activeBlockingFields;
+        brief.RequiredFields = brief.RequiredFields
+            .Where(field => activeBlockingFields.Contains(field, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        brief.MissingFacts = brief.MissingFacts
+            .Where(fact =>
+            {
+                var field = MapMissingFactToField(fact);
+                return !string.IsNullOrWhiteSpace(field) &&
+                       activeBlockingFields.Contains(field, StringComparer.OrdinalIgnoreCase);
+            })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        brief.ClarificationQuestions = brief.ClarificationQuestions
+            .Where(question => activeBlockingFields.Contains(question.Field, StringComparer.OrdinalIgnoreCase))
+            .Where(question => clarificationHistory.AnsweredFields.Count > 0 ||
+                               !askedFingerprints.Contains(BuildQuestionFingerprint(question)))
+            .GroupBy(question => question.Field, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Take(3)
+            .ToList();
+
+        if (blockingFields.Count > 0 && activeBlockingFields.Count == 0 && clarificationHistory.ClarificationRounds > 0)
+        {
+            brief.ClarificationRequired = false;
+            brief.CanGenerateDraftNow = true;
+            brief.RequirementMode = AiRequirementModes.Draft;
+            brief.DraftRiskLevel = "high";
+            AddKnownFact(brief, "已避免重复澄清同一字段，本轮按高风险草稿继续生成。");
+        }
+        else
+        {
+            brief.ClarificationRequired = activeBlockingFields.Count > 0 &&
+                                          brief.ClarificationQuestions.Count > 0;
+            if (!brief.ClarificationRequired)
+            {
+                brief.CanGenerateDraftNow = true;
+                if (nonBlockingFields.Count > 0)
+                    brief.RequirementMode = AiRequirementModes.Draft;
+                if (nonBlockingFields.Count > 0 &&
+                    string.Equals(brief.DraftRiskLevel, "low", StringComparison.OrdinalIgnoreCase))
+                {
+                    brief.DraftRiskLevel = "medium";
+                }
+            }
+            else
+            {
+                brief.CanGenerateDraftNow = false;
+            }
+        }
+
+        brief.HasOpenQuestions = brief.MissingFacts.Count > 0 || brief.ClarificationQuestions.Count > 0;
+        return brief;
+    }
+
+    private static bool IsBlockingClarificationField(
+        string field,
+        AiRequirementBrief brief,
+        TemplatePriorityContext templatePriority)
+    {
+        if (string.IsNullOrWhiteSpace(field))
+            return false;
+
+        return field switch
+        {
+            "scene" => string.IsNullOrWhiteSpace(brief.IntentType) &&
+                       string.IsNullOrWhiteSpace(brief.ScenarioKey) &&
+                       !templatePriority.IsTemplateFirst &&
+                       brief.Confidence < 0.35,
+            "object_type" => (RequiresInspectionObject(brief) ||
+                              brief.RequiredFields.Contains("object_type", StringComparer.OrdinalIgnoreCase) ||
+                              brief.MissingFacts.Any(fact => string.Equals(MapMissingFactToField(fact), "object_type", StringComparison.OrdinalIgnoreCase))) &&
+                             string.IsNullOrWhiteSpace(brief.ObjectName) &&
+                             brief.ObjectTypes.Count == 0 &&
+                             !templatePriority.IsTemplateFirst,
+            "defect_type" => brief.IntentType.Contains("defect", StringComparison.OrdinalIgnoreCase) &&
+                             brief.DefectTypes.Count == 0 &&
+                             !templatePriority.IsTemplateFirst,
+            "measurement_target" => brief.IntentType.Contains("measurement", StringComparison.OrdinalIgnoreCase) &&
+                                    brief.MeasurementTargets.Count == 0,
+            "ambiguous_negative_signal" => true,
+            _ => false
+        };
+    }
+
+    private static bool RequiresInspectionObject(AiRequirementBrief brief)
+    {
+        if (!string.IsNullOrWhiteSpace(brief.IntentType))
+        {
+            return ContainsAny(
+                brief.IntentType,
+                ["defect", "presence", "sequence", "measurement", "classification", "ocr", "code"]);
+        }
+
+        return brief.RequiredFields.Contains("object_type", StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static AiRequirementBrief ApplyTurnRoutePolicy(
+        AiRequirementBrief brief,
+        AiTurnRoute turnRoute)
+    {
+        if (!turnRoute.ShouldBypassClarification)
+            return brief;
+
+        brief.ClarificationRequired = false;
+        brief.HasOpenQuestions = false;
+        brief.CanGenerateDraftNow = true;
+        brief.RequirementMode = AiRequirementModes.Draft;
+        var bypassedFields = brief.MissingFacts
+            .Select(MapMissingFactToField)
+            .Concat(brief.ClarificationQuestions.Select(question => question.Field))
+            .Concat(brief.RequiredFields)
+            .Where(field => !string.IsNullOrWhiteSpace(field));
+        brief.NonBlockingMissingFields = brief.NonBlockingMissingFields
+            .Concat(bypassedFields)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        brief.BlockingClarificationFields.Clear();
+        brief.RequiredFields.Clear();
+        brief.ClarificationQuestions.Clear();
+        brief.MissingFacts.Clear();
+
+        if (turnRoute.TurnIntent == AiTurnIntents.ModifyFlow)
+        {
+            AddKnownFact(brief, "本轮是对当前工程的增量修改，不重新进入需求澄清。");
+        }
+        else if (turnRoute.TurnIntent == AiTurnIntents.ManualRetryRepair)
+        {
+            AddKnownFact(brief, "本轮是上一轮格式/结构失败后的手动修复，不重新进入需求澄清。");
+        }
+
+        return brief;
     }
 
     private static AiRequirementBrief EnforceClarificationRoundLimit(
@@ -1527,6 +1895,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         var answeredFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pendingQuestions = new List<AiClarificationQuestion>();
         var latestPendingQuestions = new List<AiClarificationQuestion>();
+        var latestPendingTurnIntent = string.Empty;
         var clarificationRounds = 0;
         var normalizedCurrent = NormalizeRequirementContextText(currentDescription);
 
@@ -1539,16 +1908,21 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     ?.Where(question => !string.IsNullOrWhiteSpace(question.Field))
                     .ToList() ?? new List<AiClarificationQuestion>();
                 latestPendingQuestions = pendingQuestions.ToList();
+                latestPendingTurnIntent = ResolveClarificationPayloadIntent(turn.Payload, latestPendingTurnIntent);
                 continue;
             }
 
             if (turn.Role.Equals("assistant", StringComparison.OrdinalIgnoreCase))
             {
+                if (IsIgnorableInteractionTurn(turn))
+                    continue;
+
                 // 一旦出现非澄清助手回复，上一段澄清回合已经结束。
                 clarificationRounds = 0;
                 answeredFields.Clear();
                 pendingQuestions.Clear();
                 latestPendingQuestions.Clear();
+                latestPendingTurnIntent = string.Empty;
                 continue;
             }
 
@@ -1570,6 +1944,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 answeredFields.Clear();
                 pendingQuestions.Clear();
                 latestPendingQuestions.Clear();
+                latestPendingTurnIntent = string.Empty;
                 continue;
             }
 
@@ -1583,7 +1958,17 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             }
         }
 
-        return new ClarificationHistoryContext(clarificationRounds, answeredFields, latestPendingQuestions);
+        return new ClarificationHistoryContext(clarificationRounds, answeredFields, latestPendingQuestions, latestPendingTurnIntent);
+    }
+
+    private static string ResolveClarificationPayloadIntent(
+        ConversationTurnPayload payload,
+        string previousPendingTurnIntent)
+    {
+        return string.Equals(payload.TurnIntent, AiTurnIntents.ClarificationAnswer, StringComparison.OrdinalIgnoreCase) &&
+               !string.IsNullOrWhiteSpace(previousPendingTurnIntent)
+            ? previousPendingTurnIntent
+            : payload.TurnIntent ?? string.Empty;
     }
 
     private static ManualRetryHistoryContext BuildManualRetryHistoryContext(
@@ -1606,6 +1991,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             if (!turn.Role.Equals("assistant", StringComparison.OrdinalIgnoreCase))
                 continue;
 
+            if (IsIgnorableInteractionTurn(turn))
+                continue;
+
             var manualRetry = turn.Payload?.ManualRetry;
             return new ManualRetryHistoryContext(
                 isRepairRequest,
@@ -1614,6 +2002,14 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
 
         return new ManualRetryHistoryContext(isRepairRequest, false);
+    }
+
+    private static bool IsIgnorableInteractionTurn(ConversationTurn turn)
+    {
+        var payload = turn.Payload;
+        return string.Equals(payload?.Kind, "assistant_interaction", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(payload?.TurnIntent, AiTurnIntents.ChatOrHelp, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(payload?.TurnIntent, AiTurnIntents.Unknown, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsManualRetryRepairRequest(string? text)
@@ -2574,10 +2970,11 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private sealed record ClarificationHistoryContext(
         int ClarificationRounds,
         IReadOnlySet<string> AnsweredFields,
-        IReadOnlyList<AiClarificationQuestion> PendingQuestions)
+        IReadOnlyList<AiClarificationQuestion> PendingQuestions,
+        string PendingTurnIntent)
     {
         public static ClarificationHistoryContext Empty { get; } =
-            new(0, new HashSet<string>(StringComparer.OrdinalIgnoreCase), Array.Empty<AiClarificationQuestion>());
+            new(0, new HashSet<string>(StringComparer.OrdinalIgnoreCase), Array.Empty<AiClarificationQuestion>(), string.Empty);
     }
 
     private sealed record ManualRetryHistoryContext(
@@ -2674,6 +3071,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         AiRequirementBrief requirementBrief,
         TemplatePriorityContext templatePriority,
         string detectedIntent,
+        AiTurnRoute turnRoute,
+        ClarificationHistoryContext clarificationHistory,
         IReadOnlyList<string> progressMessages,
         object? promptTrace,
         IReadOnlyList<AiGenerationStageDiagnostic> stageTimeline)
@@ -2685,6 +3084,15 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         {
             Kind = "assistant_clarification",
             Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            InteractionState = AiInteractionStates.Clarifying,
+            TurnIntent = ResolveClarificationPayloadIntent(turnRoute, clarificationHistory),
+            ClarificationRound = clarificationHistory.ClarificationRounds + 1,
+            AskedQuestionFingerprints = requirementBrief.ClarificationQuestions
+                .Select(BuildQuestionFingerprint)
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            AnsweredClarificationFields = clarificationHistory.AnsweredFields.ToList(),
             Reply = summary,
             Progress = progressMessages.Where(item => !string.IsNullOrWhiteSpace(item)).ToList(),
             ClarificationRequired = true,
@@ -2715,7 +3123,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             MissingResources = missingResources,
             PromptTrace = promptTrace,
             TemplateCandidates = BuildTemplateCandidates(templatePriority),
-            StageTimeline = stageTimeline.ToList()
+            StageTimeline = stageTimeline.ToList(),
+            TurnIntent = turnRoute.TurnIntent,
+            InteractionState = AiInteractionStates.Clarifying,
+            RouterConfidence = turnRoute.Confidence,
+            BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
         };
     }
 
@@ -2749,6 +3162,27 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return sb.ToString();
     }
 
+    private static string ResolveClarificationPayloadIntent(
+        AiTurnRoute turnRoute,
+        ClarificationHistoryContext clarificationHistory)
+    {
+        return string.Equals(turnRoute.TurnIntent, AiTurnIntents.ClarificationAnswer, StringComparison.OrdinalIgnoreCase) &&
+               !string.IsNullOrWhiteSpace(clarificationHistory.PendingTurnIntent)
+            ? clarificationHistory.PendingTurnIntent
+            : turnRoute.TurnIntent;
+    }
+
+    private static string BuildQuestionFingerprint(AiClarificationQuestion question)
+    {
+        if (string.IsNullOrWhiteSpace(question.Field))
+            return string.Empty;
+
+        var questionText = string.IsNullOrWhiteSpace(question.Question)
+            ? string.Empty
+            : question.Question.Trim();
+        return $"{question.Field.Trim().ToLowerInvariant()}:{questionText}";
+    }
+
     private AiFlowGenerationResult CreateManualRetryResult(
         string stage,
         string sessionId,
@@ -2760,6 +3194,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         object? promptTrace,
         IReadOnlyList<string> progressMessages,
         AiRequirementBrief? requirementBrief,
+        AiTurnRoute turnRoute,
         string generationMode,
         string templateLockLevel,
         List<AiTemplateCandidateInfo> templateCandidates,
@@ -2794,7 +3229,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 diagnostics: diagnostics,
                 progressMessages: progressMessages,
                 manualRetry: manualRetry,
-                requirementBrief: requirementBrief));
+                requirementBrief: requirementBrief,
+                turnRoute: turnRoute));
 
         return new AiFlowGenerationResult
         {
@@ -2812,7 +3248,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             GenerationMode = generationMode,
             TemplateLockLevel = templateLockLevel,
             TemplateCandidates = templateCandidates,
-            StageTimeline = stageTimeline.ToList()
+            StageTimeline = stageTimeline.ToList(),
+            TurnIntent = AiTurnIntents.ManualRetryRepair,
+            InteractionState = AiInteractionStates.ManualRetry,
+            RouterConfidence = turnRoute.Confidence,
+            BlockingClarificationFields = requirementBrief?.BlockingClarificationFields.ToList() ?? new List<string>(),
+            NonBlockingMissingFields = requirementBrief?.NonBlockingMissingFields.ToList() ?? new List<string>()
         };
     }
 
@@ -3073,12 +3514,19 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IReadOnlyCollection<AiAttemptDiagnostic> diagnostics,
         IReadOnlyList<string> progressMessages,
         AiManualRetryInfo? manualRetry = null,
-        AiRequirementBrief? requirementBrief = null)
+        AiRequirementBrief? requirementBrief = null,
+        AiTurnRoute? turnRoute = null)
     {
         return new ConversationTurnPayload
         {
             Kind = "assistant_failure",
             Status = status,
+            InteractionState = manualRetry?.Required == true
+                ? AiInteractionStates.ManualRetry
+                : AiInteractionStates.Failed,
+            TurnIntent = manualRetry?.Required == true
+                ? AiTurnIntents.ManualRetryRepair
+                : turnRoute?.TurnIntent ?? AiTurnIntents.Unknown,
             Progress = progressMessages.ToList(),
             ClarificationRequired = false,
             RequirementBrief = requirementBrief,

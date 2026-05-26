@@ -119,6 +119,11 @@ public class GenerateFlowMessageHandler
                 CompletionStatus = result.CompletionStatus,
                 RetryCount = result.RetryCount,
                 KnowledgeDiagnostics = MapKnowledgeDiagnostics(result.KnowledgeDiagnostics),
+                TurnIntent = result.TurnIntent,
+                InteractionState = result.InteractionState,
+                RouterConfidence = result.RouterConfidence,
+                BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
+                NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
                 PromptVersionId = result.PromptTrace is AiPromptTrace pt ? pt.PromptVersionId : null,
                 PromptVersionName = result.PromptTrace is AiPromptTrace pt2 ? pt2.PromptVersionName : null
             };
@@ -213,6 +218,11 @@ public class GenerateFlowMessageHandler
             response.CompletionStatus,
             response.RetryCount,
             response.KnowledgeDiagnostics,
+            response.TurnIntent,
+            response.InteractionState,
+            response.RouterConfidence,
+            response.BlockingClarificationFields,
+            response.NonBlockingMissingFields,
             response.PromptVersionId,
             response.PromptVersionName,
             FailureType = failureType
@@ -407,6 +417,8 @@ public class GenerateFlowMessageHandler
             DecisionRule = brief.DecisionRule,
             RoiRequirement = brief.RoiRequirement,
             CalibrationRequirement = brief.CalibrationRequirement,
+            BlockingClarificationFields = brief.BlockingClarificationFields?.ToList() ?? new List<string>(),
+            NonBlockingMissingFields = brief.NonBlockingMissingFields?.ToList() ?? new List<string>(),
             ClarificationQuestions = brief.ClarificationQuestions?
                 .Select(question => new GenerateFlowClarificationQuestion
                 {

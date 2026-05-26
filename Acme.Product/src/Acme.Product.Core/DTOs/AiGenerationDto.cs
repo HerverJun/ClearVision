@@ -212,6 +212,43 @@ public class AiFlowGenerationResult
     /// Filtered from validation diagnostics with category == "knowledge".
     /// </summary>
     public List<AiValidationDiagnostic>? KnowledgeDiagnostics { get; set; }
+
+    public string TurnIntent { get; set; } = AiTurnIntents.Unknown;
+    public string InteractionState { get; set; } = AiInteractionStates.Idle;
+    public string RouterConfidence { get; set; } = AiRouterConfidence.Low;
+    public List<string> BlockingClarificationFields { get; set; } = new();
+    public List<string> NonBlockingMissingFields { get; set; } = new();
+}
+
+public static class AiTurnIntents
+{
+    public const string ManualRetryRepair = "manual_retry_repair";
+    public const string ClarificationAnswer = "clarification_answer";
+    public const string ReviewPendingParameters = "review_pending_parameters";
+    public const string ExplainFlow = "explain_flow";
+    public const string ModifyFlow = "modify_flow";
+    public const string NewFlow = "new_flow";
+    public const string ChatOrHelp = "chat_or_help";
+    public const string Unknown = "unknown";
+}
+
+public static class AiInteractionStates
+{
+    public const string Idle = "idle";
+    public const string Clarifying = "clarifying";
+    public const string Generating = "generating";
+    public const string Modifying = "modifying";
+    public const string ReviewingParameters = "reviewing_parameters";
+    public const string ManualRetry = "manual_retry";
+    public const string Completed = "completed";
+    public const string Failed = "failed";
+}
+
+public static class AiRouterConfidence
+{
+    public const string High = "high";
+    public const string Medium = "medium";
+    public const string Low = "low";
 }
 
 public class AiFailureSummary
@@ -353,6 +390,8 @@ public class AiRequirementBrief
     public string? DecisionRule { get; set; }
     public string? RoiRequirement { get; set; }
     public string? CalibrationRequirement { get; set; }
+    public List<string> BlockingClarificationFields { get; set; } = new();
+    public List<string> NonBlockingMissingFields { get; set; } = new();
     public List<AiClarificationQuestion> ClarificationQuestions { get; set; } = new();
 }
 
