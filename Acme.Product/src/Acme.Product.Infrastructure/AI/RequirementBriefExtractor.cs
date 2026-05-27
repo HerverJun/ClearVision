@@ -76,7 +76,15 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
             if (line.Length == 0)
                 continue;
 
-            if (ContainsAny(line, ["澄清问题", "待确认项", "仍需用户回答", "请先补充以下需求澄清项"]))
+            if (ContainsAny(line,
+                [
+                    "澄清问题",
+                    "待确认项",
+                    "阻断待确认项",
+                    "仍需用户回答",
+                    "请先补充以下需求澄清项",
+                    "请先补充以下阻断澄清项"
+                ]))
             {
                 inQuestionBlock = true;
                 continue;

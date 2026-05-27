@@ -31,6 +31,9 @@ public sealed class ConversationTurnPayload
     public string Status { get; set; } = string.Empty;
     public string InteractionState { get; set; } = string.Empty;
     public string TurnIntent { get; set; } = string.Empty;
+    public string RouterConfidence { get; set; } = string.Empty;
+    public List<string> BlockingClarificationFields { get; set; } = new();
+    public List<string> NonBlockingMissingFields { get; set; } = new();
     public int ClarificationRound { get; set; }
     public List<string> AskedQuestionFingerprints { get; set; } = new();
     public List<string> AnsweredClarificationFields { get; set; } = new();
@@ -622,6 +625,15 @@ public class ConversationalFlowService : IConversationalFlowService
             Status = payload.Status,
             InteractionState = payload.InteractionState,
             TurnIntent = payload.TurnIntent,
+            RouterConfidence = payload.RouterConfidence,
+            BlockingClarificationFields = payload.BlockingClarificationFields?
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>(),
+            NonBlockingMissingFields = payload.NonBlockingMissingFields?
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>(),
             ClarificationRound = payload.ClarificationRound,
             AskedQuestionFingerprints = payload.AskedQuestionFingerprints?
                 .Where(item => !string.IsNullOrWhiteSpace(item))
@@ -762,6 +774,9 @@ public class ConversationalFlowService : IConversationalFlowService
         {
             using var doc = JsonDocument.Parse(flowJson);
             var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return false;
+
             var operators = TryGetArray(root, "operators", "Operators");
             var connections = TryGetArray(root, "connections", "Connections");
             if (operators == null || connections == null)
@@ -815,6 +830,9 @@ public class ConversationalFlowService : IConversationalFlowService
 
     private static JsonElement? TryGetArray(JsonElement root, string camelName, string pascalName)
     {
+        if (root.ValueKind != JsonValueKind.Object)
+            return null;
+
         if (root.TryGetProperty(camelName, out var camel) && camel.ValueKind == JsonValueKind.Array)
             return camel;
 

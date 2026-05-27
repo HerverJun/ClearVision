@@ -81,7 +81,7 @@ public static class AiPromptComposer
         var guidance = mode switch
         {
             GenerateFlowMode.New => "Create a brand-new workflow from scratch.",
-            GenerateFlowMode.Modify => "Apply incremental changes to the reference workflow and keep unrelated structure unchanged.",
+            GenerateFlowMode.Modify => "Apply incremental changes to the reference workflow. Only change the user-requested operators, parameters, display text, or connections; keep every unrelated operator id, operatorType, port name, parameter key, parameter value, and connection unchanged.",
             GenerateFlowMode.Explain => "Keep the workflow structure unchanged and improve only the explanation and rationale.",
             GenerateFlowMode.ReviewPendingParameters => "Review pending parameters and update only parameter values or minimal supporting metadata. Keep workflow structure stable.",
             _ => "Infer the most suitable generation mode from the request and available context."
@@ -104,6 +104,10 @@ public static class AiPromptComposer
         if (mode == GenerateFlowMode.Modify)
         {
             sb.AppendLine("- Preserve already valid workflow structure unless the request explicitly requires a structural change.");
+            sb.AppendLine("- Treat ReferenceFlowSummary as the authoritative baseline. Do not rebuild the workflow when a targeted edit is enough.");
+            sb.AppendLine("- For each operator not mentioned by the user, copy its id/tempId, operatorType, ports, parameters, and connections exactly from the reference workflow.");
+            sb.AppendLine("- If the user asks for Chinese localization, change only displayName, explanation, and user-visible notes. Never translate operatorType, port names, parameter keys, JSON keys, or enum values.");
+            sb.AppendLine("- If the requested modification is ambiguous, keep the existing structure and mark the uncertain value in parametersNeedingReview instead of inventing a new topology.");
         }
         else if (mode == GenerateFlowMode.Explain)
         {

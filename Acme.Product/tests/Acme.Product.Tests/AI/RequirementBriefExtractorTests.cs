@@ -117,6 +117,38 @@ public class RequirementBriefExtractorTests
     }
 
     [Fact]
+    public void Extract_WithBlockingClarificationChecklist_ShouldIgnoreExamplesAsAnswers()
+    {
+        var extractor = new RequirementBriefExtractor();
+        var match = new ScenarioMatchResult
+        {
+            Scenario = new ScenarioDefinition
+            {
+                ScenarioKey = "surface-defect",
+                ScenarioName = "Surface defect inspection",
+                IntentTypes = ["defect_detection"],
+                ObjectTypes = ["metal part"],
+                DefectTypes = ["scratch", "dent", "broken"]
+            },
+            Confidence = 0.84
+        };
+        var queuedHint = """
+            请先补充以下阻断澄清项，再继续生成：
+            阻断待确认项：
+            - 需要确认缺陷类别
+            澄清问题：
+            1. 请补充需要判定的缺陷类别，例如 scratch、dent、broken。可选：scratch / dent / broken
+            非阻断待补：模型资源、ROI范围
+            """;
+
+        var brief = extractor.Extract("Detect defects on metal part.", queuedHint, match);
+
+        brief.DefectTypes.Should().BeEmpty();
+        brief.RequiredFields.Should().Contain("defect_type");
+        brief.KnownFacts.Should().NotContain(fact => fact.Contains("scratch", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void ApplyPolicy_StrictMode_ShouldNotBlockOnRecommendedResourceQuestions()
     {
         var extractor = new RequirementBriefExtractor();

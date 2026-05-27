@@ -74,6 +74,23 @@ public class AiPromptComposerTests
     }
 
     [Fact]
+    public void BuildUserPrompt_ModifyMode_ShouldRequireTargetedEditsAndStableRuntimeKeys()
+    {
+        var prompt = AiPromptComposer.BuildUserPrompt(new AiPromptRequest(
+            Task: "把算子名称改成中文。",
+            Mode: GenerateFlowMode.Modify,
+            ReferenceFlowSummary: "operatorCount=2\n- operatorId=op_1 | operatorType=ImageAcquisition"));
+
+        prompt.Should().Contain("mode=modify");
+        prompt.Should().Contain("Only change the user-requested operators");
+        prompt.Should().Contain("Treat ReferenceFlowSummary as the authoritative baseline");
+        prompt.Should().Contain("copy its id/tempId, operatorType, ports, parameters, and connections exactly");
+        prompt.Should().Contain("change only displayName, explanation, and user-visible notes");
+        prompt.Should().Contain("Never translate operatorType, port names, parameter keys, JSON keys, or enum values");
+        prompt.Should().Contain("parametersNeedingReview");
+    }
+
+    [Fact]
     public void BuildReferenceFlowSummary_WithEmptyFlow_ShouldReturnEmpty()
     {
         const string flowJson = """{"operators":[],"connections":[]}""";

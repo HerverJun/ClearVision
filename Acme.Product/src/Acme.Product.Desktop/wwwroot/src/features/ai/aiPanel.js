@@ -98,6 +98,9 @@ export class AiPanel {
         this.workbenchState = AiWorkbenchStates.IDLE;
         this._lastActiveWorkbenchState = AiWorkbenchStates.IDLE;
         this._workbenchStageTimeline = [];
+        this._lastAgentRuntime = null;
+        this._clarificationSelectionDraft = {};
+        this._lastClarificationDraftText = '';
 
         // 应用预览与撤销
         this._preApplySnapshot = null;
@@ -215,6 +218,7 @@ export class AiPanel {
         this.currentResultVersion = 0;
         this.appliedResultVersion = 0;
         this.appliedCanvasRevision = this.currentCanvasRevision;
+        this._updateApplyButtonState();
     }
 
     _setCurrentResult(payload) {
@@ -222,6 +226,7 @@ export class AiPanel {
         this.currentResultVersion += 1;
         this.appliedResultVersion = 0;
         this.appliedCanvasRevision = 0;
+        this._updateApplyButtonState();
     }
 
     _markCurrentResultAppliedToCanvas() {
@@ -229,10 +234,33 @@ export class AiPanel {
         this.currentCanvasRevision = this.flowCanvas?.getFlowRevision?.() || this.currentCanvasRevision;
         this.appliedResultVersion = this.currentResultVersion;
         this.appliedCanvasRevision = this.currentCanvasRevision;
+        this._updateApplyButtonState();
     }
 
     _isCurrentResultAppliedToCanvas() {
         return Boolean(this.currentResult && this.currentResultVersion > 0 && this.appliedResultVersion === this.currentResultVersion);
+    }
+
+    _updateApplyButtonState() {
+        const button = this.container?.querySelector('#ai-btn-apply');
+        if (!button) return;
+
+        const hasFlow = Boolean(this.currentResult?.flow || this.currentResult?.Flow);
+        const applied = this._isCurrentResultAppliedToCanvas();
+        button.disabled = this.isGenerating || !hasFlow || applied;
+        button.classList.toggle('is-disabled', button.disabled);
+        button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
+        const label = applied
+            ? '已应用到流程草稿'
+            : hasFlow
+                ? '应用到当前流程草稿'
+                : '暂无可应用方案';
+        button.innerHTML = `
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
+                <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+            </svg>
+            ${this._escapeHtml(label)}
+        `;
     }
 
     render() {
@@ -304,6 +332,7 @@ export class AiPanel {
                 </aside>
 
                 <aside class="ai-pane-right" id="ai-result-pane">
+                    <div class="ai-agent-runtime" id="ai-agent-runtime" hidden></div>
                     <div class="ai-workbench-state-bar" id="ai-workbench-state-bar"></div>
                     <div class="ai-result-status-note" id="ai-result-status-note"></div>
                     <div class="ai-results-scroll" id="ai-results-scroll">
@@ -371,7 +400,7 @@ export class AiPanel {
                     </div>
                      
                     <div class="apply-container">
-                        <button class="btn-apply-flow" id="ai-btn-apply">
+                        <button class="btn-apply-flow" id="ai-btn-apply" disabled>
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
                                 <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
                             </svg>
@@ -387,6 +416,7 @@ export class AiPanel {
         const cancelBtn = this.container.querySelector('#ai-btn-cancel');
         this.container.querySelector('#ai-btn-gen').addEventListener('click', this._handleGenerate);
         this.container.querySelector('#ai-btn-apply').addEventListener('click', this._handleApplyFlow);
+        this._updateApplyButtonState();
         if (attachBtn) attachBtn.addEventListener('click', this._handleAttachmentClick);
         if (cancelBtn) cancelBtn.addEventListener('click', this._handleCancelGenerate);
         const newSessionBtn = this.container.querySelector('#ai-btn-new-session');
@@ -522,9 +552,10 @@ export class AiPanel {
         this._startAssistantTurn();
 
         const currentFlowPayload = existingFlowJson ?? this._getCurrentFlowJson();
-        const resolvedMode = this._resolveGenerateRequestMode(explicitMode);
+        const resolvedMode = this._resolveGenerateRequestMode(explicitMode, normalizedDescription, currentFlowPayload);
         const flowPayload = resolvedMode === 'new' ? null : currentFlowPayload;
         const normalizedTemplateSelection = this._normalizeTemplateSelection(templateSelection);
+        this._renderAgentRuntime(this._buildOutgoingRuntimePayload(resolvedMode));
 
         if (this.currentResult?.flow) {
             this._setResultStatusNote('正在生成新一轮方案，右侧暂时保留上一版可应用结果。', 'info');
@@ -533,7 +564,6 @@ export class AiPanel {
         }
 
         try {
-            this._updateProgress('正在连接 AI 助手...');
             webMessageBridge.sendMessage('GenerateFlow', {
                 payload: {
                     description: normalizedDescription,
@@ -562,13 +592,75 @@ export class AiPanel {
         }
     }
 
-    _resolveGenerateRequestMode(explicitMode = '') {
+    _resolveGenerateRequestMode(explicitMode = '', description = '', currentFlowPayload = null) {
         const normalizedExplicitMode = String(explicitMode || '').trim().toLowerCase();
         if (normalizedExplicitMode) {
             return normalizedExplicitMode;
         }
 
+        if (currentFlowPayload && this._looksLikeExistingFlowEditRequest(description)) {
+            return 'modify';
+        }
+
+        if (currentFlowPayload && this._looksLikeExplicitNewFlowRequest(description)) {
+            return 'new';
+        }
+
+        if (currentFlowPayload && this._looksLikeModifyRequest(description)) {
+            return 'modify';
+        }
+
         return 'auto';
+    }
+
+    _looksLikeExplicitNewFlowRequest(description = '') {
+        const text = String(description || '').trim().toLowerCase();
+        if (!text) return false;
+
+        if (this._looksLikeExistingFlowEditRequest(text)) {
+            return false;
+        }
+
+        const hardNewSignals = [
+            '新流程', '新的流程', '重新', '从头', '重做', '重新做', '另一个流程',
+            'new flow', 'new workflow', 'create flow', 'create workflow', 'start over', 'from scratch', 'rebuild'
+        ];
+        if (hardNewSignals.some(signal => text.includes(signal))) {
+            return true;
+        }
+
+        return /(新增|新建|创建|生成|构建|搭建|设计).{0,12}(流程|工程|检测|测量|识别|方案)/.test(text);
+    }
+
+    _looksLikeExistingFlowEditRequest(description = '') {
+        const text = String(description || '').trim().toLowerCase();
+        if (!text) return false;
+
+        const existingFlowAnchors = [
+            '当前流程', '当前工程', '当前方案', '现有流程', '现有工程', '已有流程', '已有工程',
+            '这个流程', '这个工程', '原流程', '原工程', '现在的流程', '现在的工程',
+            'current flow', 'existing flow', 'this flow'
+        ];
+        const flowEditTargets = [
+            '算子', '节点', '参数', '阈值', '连线', '连接', '名称', 'displayname',
+            'operator', 'node', 'parameter', 'threshold', 'connection'
+        ];
+        const anchoredEdit = existingFlowAnchors.some(signal => text.includes(signal)) &&
+            flowEditTargets.some(signal => text.includes(signal));
+
+        return anchoredEdit ||
+            /(新增|新建|增加|添加|删除|移除|修改|调整|改).{0,12}(算子|节点|参数|阈值|连线|连接|名称|displayname)/.test(text);
+    }
+
+    _looksLikeModifyRequest(description = '') {
+        const text = String(description || '').trim().toLowerCase();
+        if (!text) return false;
+
+        return [
+            '改', '修改', '调整', '优化', '调优', '增加', '新增', '新建', '补充', '删除', '删掉', '移除',
+            '替换', '改成', '变成', '中文', '中文化', '阈值', '参数', '算子名称', 'displayname',
+            'change', 'update', 'adjust', 'add', 'remove', 'replace', 'refine'
+        ].some(signal => text.includes(signal));
     }
 
     _shouldRequestPromptTrace() {
@@ -760,7 +852,6 @@ export class AiPanel {
             }
         }
 
-        const msg = typeof data === 'string' ? data : (data.payload?.message || data.message);
         const phase = typeof data === 'string' ? '' : (data.payload?.phase || data.phase || '');
 
         // Map progress phases to workbench states
@@ -772,9 +863,8 @@ export class AiPanel {
             this._setWorkbenchState(AiWorkbenchStates.GENERATING);
         }
 
-        if (msg) {
-            this._appendAssistantProgressStep(msg, phase);
-        }
+        // Progress messages drive the workbench state, but are intentionally
+        // not rendered into each chat turn to keep the conversation focused.
     }
     
     _showPhaseHint() {}
@@ -865,6 +955,7 @@ export class AiPanel {
             || this._startAssistantTurn({ activate: false, statusText: '处理中', statusTone: 'streaming' });
         const isClarification = this._isClarificationResult(payload);
         const isInteractionOnly = this._isInteractionOnlyResult(payload);
+        this._renderAgentRuntime(payload);
 
         if (isCancelled) {
             this._clearActiveRequestState();
@@ -1108,6 +1199,7 @@ export class AiPanel {
         const ops = this._extractOperators(flow);
         const connections = this._extractConnections(flow);
         this._syncPendingParameterDrafts(data, flow);
+        this._renderAgentRuntime(data);
         this._renderRequirementBrief(data);
 
         const clarificationRequired = this._isClarificationResult(data);
@@ -1344,18 +1436,20 @@ export class AiPanel {
         const missing = this._normalizeMissingResources(data?.missingResources ?? data?.MissingResources);
         const recommended = this._normalizeRecommendedTemplate(data?.recommendedTemplate ?? data?.RecommendedTemplate);
         const candidates = this._normalizeTemplateCandidates(data?.templateCandidates ?? data?.TemplateCandidates);
+        const requirementBrief = this._normalizeRequirementBrief(data?.requirementBrief ?? data?.RequirementBrief ?? null);
+        const nonBlockingFields = requirementBrief?.nonBlockingMissingFields || [];
         const generationMode = this._getGenerationMode(data);
         const templateLockLevel = this._getTemplateLockLevel(data);
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
         const hasTemplateStrategy = Boolean(recommended || candidates.length > 0 || generationMode || templateLockLevel);
 
-        if (!hasTemplateStrategy && pending.length === 0 && missing.length === 0) {
+        if (!hasTemplateStrategy && pending.length === 0 && missing.length === 0 && nonBlockingFields.length === 0) {
             container.classList.add('is-empty');
             container.innerHTML = '<div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>';
             return;
         }
 
-        const followupText = this._buildFollowupHintText({ recommended, pending, missing, operators });
+        const followupText = this._buildFollowupHintText({ recommended, pending, missing, operators, nonBlockingFields });
         const strategyText = this._formatTemplateStrategy(generationMode, templateLockLevel);
         const primaryTemplate = recommended || candidates[0] || null;
         const candidatesHtml = candidates.length > 0
@@ -1451,11 +1545,30 @@ export class AiPanel {
             `
             : '';
 
+        const nonBlockingHtml = nonBlockingFields.length > 0
+            ? `
+                <div class="ai-followup-section ai-followup-section-nonblocking">
+                    <div class="ai-followup-section-header">
+                        <div class="ai-followup-section-label">非阻断待补</div>
+                        <div class="ai-followup-section-tip">不阻塞初稿，可在应用前后补齐</div>
+                    </div>
+                    <div class="ai-requirement-brief-tags">
+                        ${nonBlockingFields.map(field => `
+                            <span class="ai-requirement-brief-tag is-nonblocking" title="${this._escapeHtml(field)}">
+                                ${this._escapeHtml(this._getRequirementFieldLabel(field))}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `
+            : '';
+
         container.classList.remove('is-empty');
         container.innerHTML = `
             ${recommendedHtml}
             ${pendingHtml}
             ${missingHtml}
+            ${nonBlockingHtml}
             <div class="ai-followup-actions">
                 <div class="ai-followup-actions-hint">可复制成下一轮补充文本，也可直接挂到下一次生成的 hint。</div>
                 <div class="ai-followup-action-row">
@@ -2921,7 +3034,7 @@ export class AiPanel {
         return this._resolvePendingOperatorContext(operatorId, operators).label;
     }
 
-    _buildFollowupHintText({ recommended, pending, missing, operators }) {
+    _buildFollowupHintText({ recommended, pending, missing, operators, nonBlockingFields = [] }) {
         const lines = ['请基于上一轮流程继续完善，优先补齐待确认参数和缺失资源，不要重建无关结构。'];
 
         if (recommended?.templateName) {
@@ -2964,6 +3077,10 @@ export class AiPanel {
                 const detail = item.description || item.resourceKey || '缺少必要资源';
                 lines.push(`- ${name}${item.resourceKey ? `（${item.resourceKey}）` : ''}：${detail}`);
             });
+        }
+
+        if (Array.isArray(nonBlockingFields) && nonBlockingFields.length > 0) {
+            lines.push(`非阻断待补字段：${nonBlockingFields.map(field => this._getRequirementFieldLabel(field)).join('、')}`);
         }
 
         lines.push('如果仍缺文件、模型、地址或标定数据，请明确告诉我还需要补什么。');
@@ -3012,6 +3129,7 @@ export class AiPanel {
         }
 
         this._setWorkbenchState(AiWorkbenchStates.APPLYING);
+        const applyRisk = this._buildApplyRiskSummary(this.currentResult);
 
         // Compute diff and show preview
         let currentFlow = null;
@@ -3023,11 +3141,16 @@ export class AiPanel {
 
         if (currentFlow) {
             const diff = this._computeFlowDiff(currentFlow, flow);
-            const totalChanges = diff.added.length + diff.removed.length + diff.modified.length;
-            if (totalChanges > 0) {
-                this._showApplyPreview(diff, flow);
+            const totalChanges = this._getApplyPreviewChangeCount(diff);
+            if (totalChanges > 0 || applyRisk.hasWarnings) {
+                this._showApplyPreview(diff, flow, { applyRisk });
                 return;
             }
+        }
+
+        if (applyRisk.hasWarnings) {
+            this._showApplyPreview(this._emptyFlowDiff(), flow, { applyRisk });
+            return;
         }
 
         // No diff or no current flow - apply directly
@@ -3054,7 +3177,7 @@ export class AiPanel {
         return msg;
     }
     
-    _startAssistantTurn({ activate = true, statusText = '生成中', statusTone = 'streaming', openReasoning = true, openReply = true } = {}) {
+    _startAssistantTurn({ activate = true, statusText = '生成中', statusTone = 'streaming', openReasoning = false, openReply = true } = {}) {
         const container = this.container.querySelector('#ai-chat-container');
         if (!container) return null;
 
@@ -3066,12 +3189,8 @@ export class AiPanel {
                     <div class="ai-assistant-card-title">AI 工作流助手</div>
                     <div class="ai-assistant-status is-${this._escapeHtml(statusTone)}">${this._escapeHtml(statusText)}</div>
                 </div>
-                <section class="ai-assistant-progress-panel" hidden>
-                    <div class="ai-assistant-panel-label">生成进度</div>
-                    <div class="ai-assistant-progress-list"></div>
-                </section>
                 <details class="ai-assistant-section ai-assistant-reasoning-section" ${openReasoning ? 'open' : ''} hidden>
-                    <summary>逻辑推演</summary>
+                    <summary>生成诊断</summary>
                     <div class="ai-assistant-section-body ai-assistant-reasoning-body"></div>
                 </details>
                 <details class="ai-assistant-section ai-assistant-reply-section" ${openReply ? 'open' : ''} hidden>
@@ -3094,8 +3213,6 @@ export class AiPanel {
             root: msg,
             card: msg.querySelector('.ai-assistant-card'),
             statusEl: msg.querySelector('.ai-assistant-status'),
-            progressPanelEl: msg.querySelector('.ai-assistant-progress-panel'),
-            progressListEl: msg.querySelector('.ai-assistant-progress-list'),
             reasoningSection: msg.querySelector('.ai-assistant-reasoning-section'),
             reasoningBody: msg.querySelector('.ai-assistant-reasoning-body'),
             replySection: msg.querySelector('.ai-assistant-reply-section'),
@@ -3121,26 +3238,6 @@ export class AiPanel {
         turn.statusEl.textContent = statusText;
         turn.statusEl.className = `ai-assistant-status is-${tone}`;
         turn.card.dataset.turnTone = tone;
-    }
-
-    _appendAssistantProgressStep(message, phase = '') {
-        const turn = this.activeAssistantTurn;
-        if (!turn?.progressListEl || !message) return;
-        if (turn.progressPanelEl) {
-            turn.progressPanelEl.hidden = false;
-        }
-
-        const item = document.createElement('div');
-        item.className = 'ai-assistant-progress-item';
-        item.innerHTML = `
-            <span class="ai-assistant-progress-dot"></span>
-            <div class="ai-assistant-progress-copy">
-                <div class="ai-assistant-progress-text">${this._escapeHtml(String(message))}</div>
-                ${phase ? `<div class="ai-assistant-progress-phase">${this._escapeHtml(String(phase))}</div>` : ''}
-            </div>
-        `;
-        turn.progressListEl.appendChild(item);
-        this._scrollToBottom();
     }
 
     _appendAssistantStreamText(field, text) {
@@ -3279,7 +3376,7 @@ export class AiPanel {
     _buildClarificationFollowupText(brief) {
         if (!brief) return '';
 
-        const lines = ['请先补充以下需求澄清项，再继续生成：'];
+        const lines = ['请先补充以下阻断澄清项，再继续生成：'];
         if (brief.scenarioName) {
             lines.push(`场景：${brief.scenarioName}`);
         }
@@ -3296,8 +3393,12 @@ export class AiPanel {
         }
 
         if (brief.missingFacts.length > 0) {
-            lines.push('待确认项：');
+            lines.push('阻断待确认项：');
             brief.missingFacts.forEach(item => lines.push(`- ${item}`));
+        }
+
+        if (brief.blockingClarificationFields.length > 0) {
+            lines.push(`阻断字段：${brief.blockingClarificationFields.map(field => this._getRequirementFieldLabel(field)).join('、')}`);
         }
 
         if (brief.clarificationQuestions.length > 0) {
@@ -3307,6 +3408,10 @@ export class AiPanel {
                 const options = question.options.length > 0 ? ` 可选：${question.options.join(' / ')}` : '';
                 lines.push(`${index + 1}. ${question.question}${suffix}${options}`);
             });
+        }
+
+        if (brief.nonBlockingMissingFields.length > 0) {
+            lines.push(`非阻断待补：${brief.nonBlockingMissingFields.map(field => this._getRequirementFieldLabel(field)).join('、')}`);
         }
 
         lines.push(brief.canGenerateDraftNow
@@ -3329,8 +3434,36 @@ export class AiPanel {
         if (brief.missingFacts.length > 0) {
             lines.push(`仍缺字段：${brief.missingFacts.join('；')}`);
         }
+        if (brief.blockingClarificationFields.length > 0) {
+            lines.push(`阻断字段：${brief.blockingClarificationFields.map(field => this._getRequirementFieldLabel(field)).join('；')}`);
+        }
+        if (brief.nonBlockingMissingFields.length > 0) {
+            lines.push(`非阻断待补：${brief.nonBlockingMissingFields.map(field => this._getRequirementFieldLabel(field)).join('；')}`);
+        }
         lines.push('请只根据用户下一轮明确补充的信息更新需求，不要把上面的澄清问题或示例选项当作用户答案。');
         return lines.join('\n');
+    }
+
+    _getRequirementFieldLabel(field) {
+        const key = String(field || '').trim();
+        const fieldLabelMap = {
+            scene: '场景类型',
+            object_type: '检测对象',
+            defect_type: '缺陷类别',
+            measurement_target: '测量目标',
+            measurement_unit: '测量单位',
+            sequence_rule: '线序规则',
+            output_target: '输出目标',
+            model_path: '模型资源',
+            roi: 'ROI范围',
+            plc_address: 'PLC地址',
+            database_table: '数据库表',
+            threshold: '阈值',
+            calibration: '标定方式',
+            calibration_file: '标定文件',
+            ambiguous_negative_signal: '歧义信息'
+        };
+        return fieldLabelMap[key] || key || '未命名字段';
     }
 
     _renderRequirementBrief(data = null) {
@@ -3340,11 +3473,13 @@ export class AiPanel {
 
         const brief = this._normalizeRequirementBrief(data?.requirementBrief ?? data?.RequirementBrief ?? null);
         if (!brief) {
+            this._resetClarificationSelectionDraft();
             card.hidden = true;
             container.classList.add('is-empty');
             container.innerHTML = '<div class="ai-followup-empty">当前尚未提炼出需求摘要。</div>';
             return null;
         }
+        this._resetClarificationSelectionDraft();
 
         const confidence = Number.isFinite(brief.confidence) ? brief.confidence : 0;
         const confidenceText = `${Math.max(0, Math.min(100, Math.round(confidence * 100)))}%`;
@@ -3385,6 +3520,21 @@ export class AiPanel {
                 .join('')}</div>`;
         };
 
+        const renderFieldChips = (items, emptyText, tone = '') => {
+            const normalized = this._normalizeRuntimeFieldList(items);
+            if (normalized.length === 0) {
+                return `<div class="ai-requirement-brief-empty">${this._escapeHtml(emptyText)}</div>`;
+            }
+
+            const toneClass = tone ? ` is-${tone}` : '';
+            return `<div class="ai-requirement-brief-tags">${normalized
+                .map(field => `
+                    <span class="ai-requirement-brief-tag${toneClass}" title="${this._escapeHtml(field)}">
+                        ${this._escapeHtml(this._getRequirementFieldLabel(field))}
+                    </span>`)
+                .join('')}</div>`;
+        };
+
         const renderQuestionList = (questions) => {
             if (!Array.isArray(questions) || questions.length === 0) {
                 return '<div class="ai-requirement-brief-empty">当前没有进一步澄清问题。</div>';
@@ -3393,24 +3543,14 @@ export class AiPanel {
             return `<div class="ai-requirement-question-list">${questions.map((question, index) => {
                 const requiredLabel = question.required ? '必填' : '建议';
                 const priority = question.priority ? ` · ${question.priority}` : '';
-                const fieldLabelMap = {
-                    scene: '场景类型',
-                    object_type: '检测对象',
-                    defect_type: '缺陷类别',
-                    measurement_target: '测量目标',
-                    output_target: '输出目标',
-                    model_path: '模型资源',
-                    roi: 'ROI范围',
-                    calibration: '标定方式',
-                    ambiguous_negative_signal: '歧义信息'
-                };
-                const fieldLabel = fieldLabelMap[question.field] || question.field;
+                const fieldLabel = this._getRequirementFieldLabel(question.field);
                 const options = question.options.length > 0
                     ? `
-                        <div class="ai-requirement-question-options-title">参考选项，点击可填入输入框</div>
+                        <div class="ai-requirement-question-options-title">参考选项，点击后生成澄清回答草稿</div>
                         <div class="ai-requirement-question-options">${question.options
                             .map(option => `
                                 <button class="ai-requirement-question-option" type="button"
+                                    aria-pressed="false"
                                     data-clarification-field="${this._escapeHtml(question.field)}"
                                     data-clarification-value="${this._escapeHtml(option)}">
                                     ${this._escapeHtml(option)}
@@ -3446,12 +3586,20 @@ export class AiPanel {
                     ${renderTagList(brief.knownFacts, '当前没有提炼出已知事实。', 'known')}
                 </section>
                 <section class="ai-requirement-brief-section">
-                    <div class="ai-requirement-brief-section-label">待确认项</div>
+                    <div class="ai-requirement-brief-section-label">阻断待确认</div>
                     ${this._renderMissingFactsWithActions(brief.missingFacts)}
+                </section>
+                <section class="ai-requirement-brief-section">
+                    <div class="ai-requirement-brief-section-label">阻断字段</div>
+                    ${renderFieldChips(brief.blockingClarificationFields, '当前没有阻断字段。', 'blocking')}
                 </section>
                 <section class="ai-requirement-brief-section">
                     <div class="ai-requirement-brief-section-label">澄清问题</div>
                     ${renderQuestionList(brief.clarificationQuestions)}
+                </section>
+                <section class="ai-requirement-brief-section">
+                    <div class="ai-requirement-brief-section-label">非阻断待补</div>
+                    ${renderFieldChips(brief.nonBlockingMissingFields, '当前没有非阻断待补字段。', 'nonblocking')}
                 </section>
                 <section class="ai-requirement-brief-section">
                     <div class="ai-requirement-brief-section-label">附件信号</div>
@@ -3463,13 +3611,14 @@ export class AiPanel {
                 <button class="ai-requirement-brief-action" type="button" data-brief-action="insert">插入输入框</button>
                 <button class="ai-requirement-brief-action" type="button" data-brief-action="queue">挂到下一轮</button>
                 <button class="ai-requirement-brief-action" type="button" data-brief-action="draft">切到草稿模式</button>
+                <button class="ai-requirement-brief-action is-primary" type="button" id="ai-btn-send-clarification" data-brief-action="send-clarification" disabled>发送澄清回答</button>
             </div>
         `;
 
         container.querySelectorAll('[data-brief-action]').forEach(button => {
-            button.disabled = this.isGenerating;
+            const action = button.dataset.briefAction;
+            button.disabled = this.isGenerating || action === 'send-clarification';
             button.addEventListener('click', async () => {
-                const action = button.dataset.briefAction;
                 if (action === 'copy') {
                     const copied = await this._copyTextToClipboard(summary);
                     this._addMessage('system', copied ? '澄清清单已复制。' : '复制失败，请手动复制。');
@@ -3491,29 +3640,22 @@ export class AiPanel {
 
                 if (action === 'draft') {
                     this._setRequirementMode('draft');
+                    return;
+                }
+
+                if (action === 'send-clarification') {
+                    const draftText = this._buildClarificationAnswerDraft();
+                    if (!draftText) {
+                        this._addMessage('system', '请先选择澄清选项，或直接在输入框里补充答案。');
+                        return;
+                    }
+                    this._mergeClarificationDraftIntoInput(draftText);
+                    this._handleGenerate();
                 }
             });
         });
 
-        container.querySelectorAll('[data-clarification-field][data-clarification-value]').forEach(button => {
-            button.addEventListener('click', () => {
-                const field = button.getAttribute('data-clarification-field') || '';
-                const value = button.getAttribute('data-clarification-value') || '';
-                const labelMap = {
-                    scene: '场景',
-                    object_type: '检测对象',
-                    defect_type: '缺陷类别',
-                    measurement_target: '测量目标',
-                    output_target: '输出目标',
-                    model_path: '模型资源',
-                    roi: 'ROI',
-                    calibration: '标定'
-                };
-                const label = labelMap[field] || field || '补充信息';
-                this._appendFollowupTextToInput(`${label}：${value}`);
-                this._addMessage('system', `已把「${value}」补入输入框。`);
-            });
-        });
+        this._bindClarificationOptionButtons(container);
 
         return brief;
     }
@@ -3553,12 +3695,19 @@ export class AiPanel {
                         <div class="ai-assistant-clarification-item">
                             <div class="ai-assistant-clarification-item-title">${this._escapeHtml(`${index + 1}. ${question.question}`)}</div>
                             ${question.reason ? `<div class="ai-assistant-clarification-item-hint">${this._escapeHtml(question.reason)}</div>` : ''}
-                            ${question.options.length > 0 ? `<div class="ai-assistant-clarification-options">${question.options.map(option => `<span class="ai-assistant-clarification-option">${this._escapeHtml(option)}</span>`).join('')}</div>` : ''}
+                            ${question.options.length > 0 ? `<div class="ai-assistant-clarification-options">${question.options.map(option => `
+                                <button class="ai-assistant-clarification-option" type="button"
+                                    aria-pressed="false"
+                                    data-clarification-field="${this._escapeHtml(question.field)}"
+                                    data-clarification-value="${this._escapeHtml(option)}">
+                                    ${this._escapeHtml(option)}
+                                </button>`).join('')}</div>` : ''}
                         </div>
                     `).join('')}
                 </div>
             ` : '<div class="ai-assistant-clarification-empty">当前没有更多澄清问题。</div>'}
         `;
+        this._bindClarificationOptionButtons(turn.clarificationBody);
         this._scrollToBottom();
     }
 
@@ -3610,27 +3759,6 @@ export class AiPanel {
             openReply: false
         });
         if (!turn) return null;
-
-        const progressItems = Array.isArray(payload.progress)
-            ? payload.progress
-            : (Array.isArray(payload.Progress) ? payload.Progress : []);
-        progressItems
-            .map(item => String(item || '').trim())
-            .filter(Boolean)
-            .forEach(item => {
-                if (turn.progressPanelEl) {
-                    turn.progressPanelEl.hidden = false;
-                }
-                const node = document.createElement('div');
-                node.className = 'ai-assistant-progress-item';
-                node.innerHTML = `
-                    <span class="ai-assistant-progress-dot"></span>
-                    <div class="ai-assistant-progress-copy">
-                        <div class="ai-assistant-progress-text">${this._escapeHtml(item)}</div>
-                    </div>
-                `;
-                turn.progressListEl?.appendChild(node);
-            });
 
         const reply = String(payload.reply ?? payload.Reply ?? turnData?.message ?? turnData?.Message ?? '').trim();
         const reasoning = String(payload.reasoning ?? payload.Reasoning ?? '').trim();
@@ -3688,6 +3816,7 @@ export class AiPanel {
         if (clearHintBtn) clearHintBtn.disabled = busy;
         const input = this.container.querySelector('#ai-input');
         if(input) input.disabled = busy;
+        this._updateApplyButtonState();
         this._updatePendingDraftSummary();
     }
 
@@ -4023,6 +4152,94 @@ export class AiPanel {
         input.style.height = `${input.scrollHeight}px`;
     }
 
+    _resetClarificationSelectionDraft() {
+        this._clarificationSelectionDraft = {};
+        this._lastClarificationDraftText = '';
+    }
+
+    _buildClarificationAnswerDraft(selection = this._clarificationSelectionDraft) {
+        const entries = Object.entries(selection || {})
+            .map(([field, value]) => [String(field || '').trim(), String(value || '').trim()])
+            .filter(([field, value]) => field && value);
+
+        if (entries.length === 0) return '';
+
+        return [
+            '澄清回答：',
+            ...entries.map(([field, value]) => `${this._getRequirementFieldLabel(field)}：${value}`)
+        ].join('\n');
+    }
+
+    _mergeClarificationDraftIntoInput(draftText) {
+        const input = this.container?.querySelector('#ai-input');
+        if (!input) return;
+
+        const nextDraft = String(draftText || '').trim();
+        if (!nextDraft) return;
+
+        const previousDraft = String(this._lastClarificationDraftText || '').trim();
+        const current = String(input.value || '').trim();
+        const nextValue = previousDraft && current.includes(previousDraft)
+            ? current.replace(previousDraft, nextDraft).trim()
+            : current
+                ? `${current}\n\n${nextDraft}`
+                : nextDraft;
+
+        this._lastClarificationDraftText = nextDraft;
+        input.value = nextValue;
+        input.focus();
+        input.style.height = 'auto';
+        input.style.height = `${input.scrollHeight}px`;
+    }
+
+    _updateClarificationSendButtonState() {
+        const button = this.container?.querySelector('#ai-btn-send-clarification');
+        if (!button) return;
+
+        const hasDraft = Boolean(this._buildClarificationAnswerDraft());
+        button.disabled = this.isGenerating || !hasDraft;
+        button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
+    }
+
+    _syncClarificationOptionPressedStates(field, selectedValue) {
+        if (!this.container?.querySelectorAll) return;
+
+        this.container.querySelectorAll('[data-clarification-field][data-clarification-value]').forEach(button => {
+            const sameField = button.getAttribute('data-clarification-field') === field;
+            const sameValue = button.getAttribute('data-clarification-value') === selectedValue;
+            const selected = sameField && sameValue;
+            button.classList.toggle('is-selected', selected);
+            button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        });
+    }
+
+    _handleClarificationOptionSelection(button) {
+        if (!button) return;
+
+        const field = button.getAttribute('data-clarification-field') || '';
+        const value = button.getAttribute('data-clarification-value') || '';
+        if (!field || !value) return;
+
+        this._clarificationSelectionDraft = {
+            ...(this._clarificationSelectionDraft || {}),
+            [field]: value
+        };
+        this._syncClarificationOptionPressedStates(field, value);
+        const draftText = this._buildClarificationAnswerDraft();
+        this._mergeClarificationDraftIntoInput(draftText);
+        this._updateClarificationSendButtonState();
+        this._addMessage('system', `已选择「${value}」，并生成澄清回答草稿。`);
+    }
+
+    _bindClarificationOptionButtons(root) {
+        if (!root?.querySelectorAll) return;
+
+        root.querySelectorAll('[data-clarification-field][data-clarification-value]').forEach(button => {
+            button.addEventListener('click', () => this._handleClarificationOptionSelection(button));
+        });
+        this._updateClarificationSendButtonState();
+    }
+
     _appendManualRetryDraftToInput(manualRetry) {
         const input = this.container?.querySelector('#ai-input');
         if (!input || !manualRetry) return;
@@ -4134,6 +4351,198 @@ export class AiPanel {
         return String(payload?.interactionState ?? payload?.InteractionState ?? '').trim().toLowerCase();
     }
 
+    _getRouterConfidence(payload) {
+        return String(payload?.routerConfidence ?? payload?.RouterConfidence ?? '').trim().toLowerCase();
+    }
+
+    _buildOutgoingRuntimePayload(resolvedMode) {
+        const normalizedMode = String(resolvedMode || 'auto').trim().toLowerCase();
+        const turnIntent = normalizedMode === 'modify'
+            ? 'modify_flow'
+            : normalizedMode === 'explain'
+                ? 'explain_flow'
+                : normalizedMode === 'review_pending_parameters'
+                    ? 'review_pending_parameters'
+                    : normalizedMode === 'new'
+                        ? 'new_flow'
+                        : 'unknown';
+        const interactionState = turnIntent === 'modify_flow'
+            ? 'modifying'
+            : turnIntent === 'review_pending_parameters'
+                ? 'reviewing_parameters'
+                : 'generating';
+
+        return {
+            turnIntent,
+            interactionState,
+            routerConfidence: '',
+            blockingClarificationFields: [],
+            nonBlockingMissingFields: []
+        };
+    }
+
+    _normalizeRuntimeFieldList(value) {
+        if (!Array.isArray(value)) return [];
+        return [...new Set(value.map(item => String(item || '').trim()).filter(Boolean))];
+    }
+
+    _buildAgentNextAction(meta = {}) {
+        const turnIntent = String(meta.turnIntent || '').trim().toLowerCase();
+        const interactionState = String(meta.interactionState || '').trim().toLowerCase();
+        const blockingCount = Number(meta.blockingCount || 0);
+        const nonBlockingCount = Number(meta.nonBlockingCount || 0);
+        const pendingCount = Number(meta.pendingCount || 0);
+        const missingResourceCount = Number(meta.missingResourceCount || 0);
+        const hasFlow = Boolean(meta.hasFlow);
+        const manualRetryRequired = Boolean(meta.manualRetryRequired);
+
+        if (interactionState === 'clarifying' || blockingCount > 0) {
+            const countText = blockingCount > 0 ? ` ${blockingCount} 个` : '';
+            return `下一步：先回答${countText}阻断问题，系统会在补齐后继续生成。`;
+        }
+
+        if (interactionState === 'manual_retry' || manualRetryRequired || turnIntent === 'manual_retry_repair') {
+            return '下一步：检查已回填的修复草稿并发送，只进入修复链路，不重新澄清需求。';
+        }
+
+        if (interactionState === 'modifying' || turnIntent === 'modify_flow') {
+            return '下一步：等待微调完成，系统只改用户指定部分并保留其它算子和连线。';
+        }
+
+        if (interactionState === 'reviewing_parameters' || turnIntent === 'review_pending_parameters' || pendingCount > 0) {
+            return pendingCount > 0
+                ? `下一步：补齐 ${pendingCount} 组待确认参数，再执行统一确认。`
+                : '下一步：审核待确认参数，流程结构保持不变。';
+        }
+
+        if (interactionState === 'generating') {
+            return '下一步：等待模板匹配、生成、校验和 DryRun 完成。';
+        }
+
+        if (turnIntent === 'chat_or_help') {
+            return hasFlow
+                ? '下一步：可以继续提出微调、解释或参数审核需求。'
+                : '下一步：描述检测、测量或识别目标即可开始生成流程。';
+        }
+
+        if (turnIntent === 'unknown' || interactionState === 'idle') {
+            return hasFlow
+                ? '下一步：说明要修改、解释或审核的具体内容。'
+                : '下一步：补充检测场景、对象和输出目标，系统会进入业务链路。';
+        }
+
+        if (hasFlow) {
+            return nonBlockingCount > 0 || missingResourceCount > 0
+                ? `下一步：可先应用方案，也可以补齐 ${nonBlockingCount || missingResourceCount} 项非阻断信息后再确认。`
+                : '下一步：确认方案后应用到流程草稿，或继续输入微调需求。';
+        }
+
+        return '下一步：继续补充需求，系统会保持业务生成链路稳定。';
+    }
+
+    _renderAgentRuntime(payload = null, { reset = false } = {}) {
+        const el = this.container?.querySelector('#ai-agent-runtime');
+        if (!el) return;
+
+        if (reset) {
+            this._lastAgentRuntime = null;
+            el.hidden = true;
+            el.innerHTML = '';
+            el.className = 'ai-agent-runtime';
+            return;
+        }
+
+        const source = payload || this._lastAgentRuntime;
+        if (!source) {
+            el.hidden = true;
+            el.innerHTML = '';
+            return;
+        }
+
+        this._lastAgentRuntime = source;
+        const brief = this._normalizeRequirementBrief(source.requirementBrief ?? source.RequirementBrief ?? null);
+        const turnIntent = this._getTurnIntent(source) || 'unknown';
+        const interactionState = this._getInteractionState(source) || 'generating';
+        const routerConfidence = this._getRouterConfidence(source);
+        const blockingFields = this._normalizeRuntimeFieldList(source.blockingClarificationFields ?? source.BlockingClarificationFields);
+        const nonBlockingFields = this._normalizeRuntimeFieldList(source.nonBlockingMissingFields ?? source.NonBlockingMissingFields);
+        const effectiveBlockingFields = blockingFields.length > 0 ? blockingFields : (brief?.blockingClarificationFields || []);
+        const effectiveNonBlockingFields = nonBlockingFields.length > 0 ? nonBlockingFields : (brief?.nonBlockingMissingFields || []);
+        const questionCount = brief?.clarificationQuestions?.length || 0;
+        const pendingParameters = this._normalizePendingParameters(source.pendingParameters ?? source.PendingParameters);
+        const missingResources = this._normalizeMissingResources(source.missingResources ?? source.MissingResources);
+        const flow = source.flow ?? source.Flow ?? this.currentResult?.flow ?? this.currentResult?.Flow ?? null;
+        const manualRetry = source.manualRetry ?? source.ManualRetry ?? null;
+
+        const intentLabels = {
+            manual_retry_repair: '修复草稿',
+            clarification_answer: '补充澄清',
+            review_pending_parameters: '审核参数',
+            explain_flow: '解释工程',
+            modify_flow: '增量微调',
+            new_flow: '新建流程',
+            chat_or_help: '普通对话',
+            unknown: '待判定'
+        };
+        const stateLabels = {
+            idle: '待机',
+            clarifying: '待澄清',
+            generating: '生成中',
+            modifying: '微调中',
+            reviewing_parameters: '审核中',
+            manual_retry: '修复中',
+            completed: '已完成',
+            failed: '失败'
+        };
+        const confidenceLabels = {
+            high: '高',
+            medium: '中',
+            low: '低'
+        };
+        const summary = interactionState === 'clarifying'
+            ? `${effectiveBlockingFields.length || questionCount} 项阻断澄清`
+            : interactionState === 'modifying'
+                ? '基于当前工程增量修改'
+                : interactionState === 'reviewing_parameters'
+                    ? '只审核待确认参数'
+                    : turnIntent === 'chat_or_help'
+                        ? '普通回复，不进入澄清'
+                        : turnIntent === 'unknown'
+                            ? '正在判定本轮意图'
+                        : effectiveNonBlockingFields.length > 0
+                            ? `${effectiveNonBlockingFields.length} 项非阻断缺项`
+                            : '业务链路就绪';
+        const blockingCount = effectiveBlockingFields.length || questionCount;
+        const nextAction = this._buildAgentNextAction({
+            turnIntent,
+            interactionState,
+            blockingCount,
+            nonBlockingCount: effectiveNonBlockingFields.length,
+            pendingCount: pendingParameters.length,
+            missingResourceCount: missingResources.length,
+            hasFlow: Boolean(flow),
+            manualRetryRequired: Boolean(manualRetry?.required ?? manualRetry?.Required)
+        });
+
+        const stateClass = String(interactionState || 'idle').replace(/[^a-z0-9_-]/gi, '') || 'idle';
+        el.hidden = false;
+        el.className = `ai-agent-runtime is-${stateClass}`;
+        el.innerHTML = `
+            <div class="ai-agent-runtime-main">
+                <span class="ai-agent-runtime-kicker">Agent 状态机</span>
+                <strong>${this._escapeHtml(stateLabels[interactionState] || interactionState || '待机')}</strong>
+                <span>${this._escapeHtml(summary)}</span>
+            </div>
+            <div class="ai-agent-runtime-metrics">
+                <span>意图 ${this._escapeHtml(intentLabels[turnIntent] || turnIntent)}</span>
+                <span>置信度 ${this._escapeHtml(confidenceLabels[routerConfidence] || routerConfidence || '--')}</span>
+                <span>阻断 ${blockingCount}</span>
+                <span>待补 ${effectiveNonBlockingFields.length}</span>
+            </div>
+            <div class="ai-agent-runtime-next">${this._escapeHtml(nextAction)}</div>
+        `;
+    }
+
     _isInteractionOnlyResult(payload) {
         const turnIntent = this._getTurnIntent(payload);
         const interactionState = this._getInteractionState(payload);
@@ -4178,6 +4587,8 @@ export class AiPanel {
         const promptTrace = this.container.querySelector('#ai-result-prompt-trace');
         if (promptTraceCard) promptTraceCard.hidden = true;
         if (promptTrace) promptTrace.innerHTML = '';
+        this._resetClarificationSelectionDraft();
+        this._renderAgentRuntime(null, { reset: true });
         this._setResultStatusNote('', '');
         this._streamBuffer = { thinking: '', content: '' };
         this._streamFlushPending = false;
@@ -4428,6 +4839,11 @@ export class AiPanel {
             pendingParameters: followupSource?.pendingParameters ?? followupSource?.PendingParameters ?? [],
             missingResources: followupSource?.missingResources ?? followupSource?.MissingResources ?? [],
             requirementBrief: followupSource?.requirementBrief ?? followupSource?.RequirementBrief ?? latestAssistantPayload?.requirementBrief ?? latestAssistantPayload?.RequirementBrief ?? null,
+            turnIntent: latestAssistantPayload?.turnIntent ?? latestAssistantPayload?.TurnIntent ?? '',
+            interactionState: latestAssistantPayload?.interactionState ?? latestAssistantPayload?.InteractionState ?? '',
+            routerConfidence: latestAssistantPayload?.routerConfidence ?? latestAssistantPayload?.RouterConfidence ?? '',
+            blockingClarificationFields: latestAssistantPayload?.blockingClarificationFields ?? latestAssistantPayload?.BlockingClarificationFields ?? [],
+            nonBlockingMissingFields: latestAssistantPayload?.nonBlockingMissingFields ?? latestAssistantPayload?.NonBlockingMissingFields ?? [],
             clarificationRequired: Boolean(
                 followupSource?.clarificationRequired ??
                 followupSource?.ClarificationRequired ??
@@ -4936,17 +5352,17 @@ export class AiPanel {
         const currentConns = this._extractConnections(currentFlow);
         const newConns = this._extractConnections(newFlow);
 
-        const opDiffKey = op => {
-            const tid = op.tempId || op.TempId || '';
-            if (tid) return `tid:${tid}`;
-            return `type:${op.operatorType || op.OperatorType || ''}::${op.displayName || op.DisplayName || op.name || op.Name || ''}`;
+        const opDiffKey = (op, index) => {
+            const id = op.tempId || op.TempId || op.id || op.Id || '';
+            if (id) return `id:${id}`;
+            return `idx:${index}::type:${op.operatorType || op.OperatorType || op.type || op.Type || ''}`;
         };
 
         const currentOpMap = new Map();
-        currentOps.forEach(op => { currentOpMap.set(opDiffKey(op), op); });
+        currentOps.forEach((op, index) => { currentOpMap.set(opDiffKey(op, index), op); });
 
         const newOpMap = new Map();
-        newOps.forEach(op => { newOpMap.set(opDiffKey(op), op); });
+        newOps.forEach((op, index) => { newOpMap.set(opDiffKey(op, index), op); });
 
         const added = [];
         const removed = [];
@@ -4960,9 +5376,23 @@ export class AiPanel {
                 const currentParams = currentOp.parameters || currentOp.Parameters || {};
                 const newParams = newOp.parameters || newOp.Parameters || {};
                 const paramChanges = [];
-                for (const [pName, pVal] of Object.entries(newParams)) {
-                    if (String(currentParams[pName] ?? '') !== String(pVal ?? '')) {
-                        paramChanges.push({ name: pName, old: currentParams[pName], new: pVal });
+                const currentDisplayName = currentOp.displayName || currentOp.DisplayName || currentOp.name || currentOp.Name || '';
+                const newDisplayName = newOp.displayName || newOp.DisplayName || newOp.name || newOp.Name || '';
+                const currentOperatorType = currentOp.operatorType || currentOp.OperatorType || currentOp.type || currentOp.Type || '';
+                const newOperatorType = newOp.operatorType || newOp.OperatorType || newOp.type || newOp.Type || '';
+                if (String(currentDisplayName) !== String(newDisplayName)) {
+                    paramChanges.push({ name: 'displayName', old: currentDisplayName, new: newDisplayName });
+                }
+                if (String(currentOperatorType) !== String(newOperatorType)) {
+                    paramChanges.push({ name: 'operatorType', old: currentOperatorType, new: newOperatorType });
+                }
+                const parameterNames = new Set([
+                    ...Object.keys(currentParams),
+                    ...Object.keys(newParams)
+                ]);
+                for (const pName of parameterNames) {
+                    if (String(currentParams[pName] ?? '') !== String(newParams[pName] ?? '')) {
+                        paramChanges.push({ name: pName, old: currentParams[pName], new: newParams[pName] });
                     }
                 }
                 if (paramChanges.length > 0) {
@@ -4977,7 +5407,26 @@ export class AiPanel {
             }
         }
 
-        const connKey = c => `${c.sourceTempId || c.SourceTempId || ''}::${c.sourcePortName || c.SourcePortName || ''}::${c.targetTempId || c.TargetTempId || ''}::${c.targetPortName || c.TargetPortName || ''}`;
+        const readConnEndpoint = (c, role) => {
+            const prefix = role === 'source' ? 'source' : 'target';
+            const pascalPrefix = role === 'source' ? 'Source' : 'Target';
+            const operatorId = c[`${prefix}TempId`]
+                || c[`${pascalPrefix}TempId`]
+                || c[`${prefix}OperatorId`]
+                || c[`${pascalPrefix}OperatorId`]
+                || c[`${prefix}Id`]
+                || c[`${pascalPrefix}Id`]
+                || '';
+            const portId = c[`${prefix}PortName`]
+                || c[`${pascalPrefix}PortName`]
+                || c[`${prefix}PortId`]
+                || c[`${pascalPrefix}PortId`]
+                || c[`${prefix}Port`]
+                || c[`${pascalPrefix}Port`]
+                || '';
+            return `${operatorId}.${portId}`;
+        };
+        const connKey = c => `${readConnEndpoint(c, 'source')}::${readConnEndpoint(c, 'target')}`;
         const currentConnSet = new Set(currentConns.map(connKey));
         const newConnSet = new Set(newConns.map(connKey));
         const addedConnections = newConns.filter(c => !currentConnSet.has(connKey(c)));
@@ -4986,9 +5435,133 @@ export class AiPanel {
         return { added, removed, modified, addedConnections, removedConnections };
     }
 
-    _showApplyPreview(diff, newFlow) {
-        const totalChanges = diff.added.length + diff.removed.length + diff.modified.length;
-        if (totalChanges === 0) {
+    _emptyFlowDiff() {
+        return {
+            added: [],
+            removed: [],
+            modified: [],
+            addedConnections: [],
+            removedConnections: []
+        };
+    }
+
+    _getApplyPreviewChangeCount(diff = {}) {
+        return (diff.added?.length || 0)
+            + (diff.removed?.length || 0)
+            + (diff.modified?.length || 0)
+            + (diff.addedConnections?.length || 0)
+            + (diff.removedConnections?.length || 0);
+    }
+
+    _buildApplyRiskSummary(result = this.currentResult) {
+        const pending = this._normalizePendingParameters(result?.pendingParameters ?? result?.PendingParameters);
+        const missing = this._normalizeMissingResources(result?.missingResources ?? result?.MissingResources);
+        const brief = this._normalizeRequirementBrief(result?.requirementBrief ?? result?.RequirementBrief ?? null);
+        const nonBlockingFields = this._normalizeRuntimeFieldList(
+            result?.nonBlockingMissingFields
+            ?? result?.NonBlockingMissingFields
+            ?? brief?.nonBlockingMissingFields
+            ?? []
+        );
+
+        return {
+            pending,
+            missing,
+            nonBlockingFields,
+            hasWarnings: pending.length > 0 || missing.length > 0 || nonBlockingFields.length > 0,
+            totalCount: pending.length + missing.length + nonBlockingFields.length
+        };
+    }
+
+    _formatApplyPendingItem(item) {
+        const operatorLabel = item.actualOperatorId || item.operatorId || '未定位算子';
+        const names = item.parameterNames?.length > 0 ? item.parameterNames.join('、') : '待确认参数';
+        return `${operatorLabel}：${names}`;
+    }
+
+    _renderApplyRiskSummary(applyRisk) {
+        if (!applyRisk?.hasWarnings) return '';
+
+        const pendingItems = (applyRisk.pending || [])
+            .slice(0, 4)
+            .map(item => `<li>${this._escapeHtml(this._formatApplyPendingItem(item))}</li>`)
+            .join('');
+        const missingItems = (applyRisk.missing || [])
+            .slice(0, 4)
+            .map(item => `<li>${this._escapeHtml(item.description || item.resourceKey || item.resourceType || '缺失资源')}</li>`)
+            .join('');
+        const nonBlockingItems = (applyRisk.nonBlockingFields || [])
+            .slice(0, 6)
+            .map(field => `<li>${this._escapeHtml(this._getRequirementFieldLabel(field))}</li>`)
+            .join('');
+
+        return `
+            <section class="ai-apply-preview-risk">
+                <div class="ai-apply-preview-risk-title">应用前检查</div>
+                <div class="ai-apply-preview-risk-copy">
+                    当前方案仍有 ${this._escapeHtml(String(applyRisk.totalCount))} 项上线前信息需要复核。可以先应用草稿，但运行前应补齐。
+                </div>
+                ${pendingItems ? `
+                    <div class="ai-apply-preview-risk-group">
+                        <div class="ai-apply-preview-risk-label">待确认参数</div>
+                        <ul>${pendingItems}</ul>
+                    </div>
+                ` : ''}
+                ${missingItems ? `
+                    <div class="ai-apply-preview-risk-group">
+                        <div class="ai-apply-preview-risk-label">缺失资源</div>
+                        <ul>${missingItems}</ul>
+                    </div>
+                ` : ''}
+                ${nonBlockingItems ? `
+                    <div class="ai-apply-preview-risk-group">
+                        <div class="ai-apply-preview-risk-label">非阻断待补</div>
+                        <ul>${nonBlockingItems}</ul>
+                    </div>
+                ` : ''}
+            </section>
+        `;
+    }
+
+    _formatConnectionPreview(connection) {
+        if (!connection) return '未知连线';
+
+        const source = connection.sourceTempId
+            || connection.SourceTempId
+            || connection.sourceOperatorId
+            || connection.SourceOperatorId
+            || connection.sourceId
+            || connection.SourceId
+            || '?';
+        const sourcePort = connection.sourcePortName
+            || connection.SourcePortName
+            || connection.sourcePortId
+            || connection.SourcePortId
+            || connection.sourcePort
+            || connection.SourcePort
+            || 'Output';
+        const target = connection.targetTempId
+            || connection.TargetTempId
+            || connection.targetOperatorId
+            || connection.TargetOperatorId
+            || connection.targetId
+            || connection.TargetId
+            || '?';
+        const targetPort = connection.targetPortName
+            || connection.TargetPortName
+            || connection.targetPortId
+            || connection.TargetPortId
+            || connection.targetPort
+            || connection.TargetPort
+            || 'Input';
+
+        return `${source}.${sourcePort} -> ${target}.${targetPort}`;
+    }
+
+    _showApplyPreview(diff, newFlow, options = {}) {
+        const totalChanges = this._getApplyPreviewChangeCount(diff);
+        const applyRisk = options.applyRisk || this._buildApplyRiskSummary(this.currentResult);
+        if (totalChanges === 0 && !applyRisk.hasWarnings) {
             this._executeApplyFlow(newFlow);
             return;
         }
@@ -5003,9 +5576,11 @@ export class AiPanel {
             <div class="ai-apply-preview-dialog">
                 <div class="ai-apply-preview-header">
                     <span>应用预览</span>
+                    <small>${this._escapeHtml(String(totalChanges))} 项变更 · ${this._escapeHtml(String(applyRisk.totalCount || 0))} 项待复核</small>
                     <button class="ai-apply-preview-close" type="button">&times;</button>
                 </div>
                 <div class="ai-apply-preview-body">
+                    ${this._renderApplyRiskSummary(applyRisk)}
                     ${diff.added.length > 0 ? `
                         <div class="ai-apply-preview-section">
                             <div class="ai-apply-preview-section-title is-add">新增算子 (${diff.added.length})</div>
@@ -5032,11 +5607,13 @@ export class AiPanel {
                     ${diff.addedConnections.length > 0 ? `
                         <div class="ai-apply-preview-section">
                             <div class="ai-apply-preview-section-title is-add">新增连线 (${diff.addedConnections.length})</div>
+                            ${diff.addedConnections.slice(0, 6).map(conn => `<div class="ai-apply-preview-item is-add">+ ${this._escapeHtml(this._formatConnectionPreview(conn))}</div>`).join('')}
                         </div>
                     ` : ''}
                     ${diff.removedConnections.length > 0 ? `
                         <div class="ai-apply-preview-section">
                             <div class="ai-apply-preview-section-title is-remove">删除连线 (${diff.removedConnections.length})</div>
+                            ${diff.removedConnections.slice(0, 6).map(conn => `<div class="ai-apply-preview-item is-remove">- ${this._escapeHtml(this._formatConnectionPreview(conn))}</div>`).join('')}
                         </div>
                     ` : ''}
                 </div>
@@ -5049,8 +5626,12 @@ export class AiPanel {
 
         this.container.appendChild(overlay);
 
-        overlay.querySelector('.ai-apply-preview-close').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('.ai-apply-preview-cancel').addEventListener('click', () => overlay.remove());
+        const cancelPreview = () => {
+            overlay.remove();
+            this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
+        };
+        overlay.querySelector('.ai-apply-preview-close').addEventListener('click', cancelPreview);
+        overlay.querySelector('.ai-apply-preview-cancel').addEventListener('click', cancelPreview);
         overlay.querySelector('.ai-apply-preview-confirm').addEventListener('click', () => {
             overlay.remove();
             this._executeApplyFlow(newFlow);
@@ -5088,7 +5669,10 @@ export class AiPanel {
             }
         } catch (err) {
             console.error('应用流程失败:', err);
-            alert('应用流程失败: ' + err.message);
+            const message = err?.message || '未知错误';
+            this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
+            this._setResultStatusNote(`应用流程失败：${message}`, 'warning');
+            this._addMessage('system', `应用流程失败：${message}`);
         }
     }
 
@@ -5113,6 +5697,7 @@ export class AiPanel {
             this._preApplySnapshot = null;
             this._preApplySnapshotVersion = 0;
             this._preApplyCanvasRevision = 0;
+            this._updateApplyButtonState();
             this.options.onCanvasChanged?.({
                 source: 'ai',
                 action: 'undo-apply',

@@ -610,6 +610,10 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         result.InteractionState.Should().Be(AiInteractionStates.Idle);
         result.Flow.Should().BeNull();
         result.AiExplanation.Should().Contain("我在");
+        var persistedPayload = conversationService.GetSession("chat-short-circuit")!.History.Last().Payload;
+        persistedPayload.Should().NotBeNull();
+        persistedPayload!.RouterConfidence.Should().Be(AiRouterConfidence.High);
+        persistedPayload.TurnIntent.Should().Be(AiTurnIntents.ChatOrHelp);
 
         requirementBriefExtractor.DidNotReceive().Extract(
             Arg.Any<string?>(),
@@ -687,6 +691,90 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         answer.RequirementBrief.Should().NotBeNull();
         answer.RequirementBrief!.ClarificationQuestions.Should().ContainSingle();
         answer.RequirementBrief.ClarificationQuestions[0].Field.Should().Be("defect_type");
+
+        await connector.DidNotReceive().StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GenerateFlowAsync_VagueNewRequestAfterClarification_ShouldClarifyInsteadOfForcingDraft()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var validator = Substitute.For<IAiFlowValidator>();
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        _ = conversationService.GetOrCreateSession("vague-new-request-after-clarification");
+        conversationService.RecordAssistantResponse(
+            "vague-new-request-after-clarification",
+            "please clarify scene and object",
+            null,
+            payload: new ConversationTurnPayload
+            {
+                Kind = "assistant_clarification",
+                Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                ClarificationRequired = true,
+                RequirementBrief = new AiRequirementBrief
+                {
+                    ClarificationRequired = true,
+                    ClarificationQuestions =
+                    [
+                        BuildQuestion("scene"),
+                        BuildQuestion("object_type")
+                    ]
+                }
+            });
+        conversationService.RecordAssistantResponse(
+            "vague-new-request-after-clarification",
+            "please clarify again",
+            null,
+            payload: new ConversationTurnPayload
+            {
+                Kind = "assistant_clarification",
+                Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                ClarificationRequired = true,
+                RequirementBrief = new AiRequirementBrief
+                {
+                    ClarificationRequired = true,
+                    ClarificationQuestions =
+                    [
+                        BuildQuestion("scene"),
+                        BuildQuestion("object_type")
+                    ]
+                }
+            });
+
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            new AiRequirementBrief
+            {
+                Confidence = 0,
+                CanGenerateDraftNow = false,
+                DraftRiskLevel = "high",
+                RequiredFields = ["scene", "object_type"],
+                MissingFacts = ["需要确认具体场景", "需要确认检测对象"],
+                ClarificationQuestions =
+                [
+                    BuildQuestion("scene"),
+                    BuildQuestion("object_type")
+                ],
+                ClarificationRequired = true
+            });
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "帮我构建一个流程",
+            SessionId: "vague-new-request-after-clarification"));
+
+        result.Success.Should().BeFalse();
+        result.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+        result.ClarificationRequired.Should().BeTrue();
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.ClarificationQuestions.Should().NotBeEmpty();
+        result.RequirementBrief.KnownFacts.Should().NotContain(fact =>
+            fact.Contains("已避免重复澄清同一字段", StringComparison.Ordinal));
 
         await connector.DidNotReceive().StreamCompleteAsync(
             Arg.Any<string>(),
@@ -847,6 +935,156 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         result.RequirementBrief.ClarificationQuestions.Select(question => question.Field)
             .Should().OnlyContain(field => field == "object_type" || field == "defect_type");
         result.RequirementBrief.NonBlockingMissingFields.Should().Contain("scene");
+
+        await connector.DidNotReceive().StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GenerateFlowAsync_GenericWorkflowRequestAfterGreeting_ShouldClarifyWithoutCallingModel()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var validator = Substitute.For<IAiFlowValidator>();
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            requirementBriefExtractor: new RequirementBriefExtractor());
+
+        var greeting = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "hi",
+            SessionId: "generic-workflow-after-greeting"));
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "帮我构建一个流程",
+            SessionId: "generic-workflow-after-greeting"));
+
+        greeting.Success.Should().BeTrue();
+        greeting.TurnIntent.Should().Be(AiTurnIntents.ChatOrHelp);
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.BlockingClarificationFields.Should().Contain(["scene", "object_type"]);
+        result.RequirementBrief.ClarificationQuestions.Select(question => question.Field)
+            .Should().Contain(["scene", "object_type"]);
+
+        await connector.DidNotReceive().StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(AiRequirementModes.Strict)]
+    [InlineData(AiRequirementModes.Draft)]
+    public async Task GenerateFlowAsync_GenericWorkflowRequest_ShouldClarifyBeforeModel(string requirementMode)
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var validator = Substitute.For<IAiFlowValidator>();
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            requirementBriefExtractor: new RequirementBriefExtractor());
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "帮我构建一个流程",
+            SessionId: $"generic-workflow-direct-{requirementMode}")
+        {
+            RequirementMode = requirementMode
+        });
+
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.InteractionState.Should().Be(AiInteractionStates.Clarifying);
+        result.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.BlockingClarificationFields.Should().Contain(["scene", "object_type"]);
+        result.RequirementBrief.ClarificationQuestions.Select(question => question.Field)
+            .Should().Contain(["scene", "object_type"]);
+
+        await connector.DidNotReceive().StreamCompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<Action<AiStreamChunk>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GenerateFlowAsync_GenericWorkflowRequestAfterStaleClarification_ShouldResetContextAndClarify()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var validator = Substitute.For<IAiFlowValidator>();
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        _ = conversationService.GetOrCreateSession("generic-workflow-stale-clarification");
+        conversationService.RecordAssistantResponse(
+            "generic-workflow-stale-clarification",
+            "please clarify scene and object",
+            null,
+            payload: new ConversationTurnPayload
+            {
+                Kind = "assistant_clarification",
+                Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                InteractionState = AiInteractionStates.Clarifying,
+                TurnIntent = AiTurnIntents.NewFlow,
+                ClarificationRequired = true,
+                RequirementBrief = new AiRequirementBrief
+                {
+                    ClarificationRequired = true,
+                    ClarificationQuestions =
+                    [
+                        BuildQuestion("scene"),
+                        BuildQuestion("object_type")
+                    ]
+                }
+            });
+        conversationService.RecordAssistantResponse(
+            "generic-workflow-stale-clarification",
+            "please clarify scene and object again",
+            null,
+            payload: new ConversationTurnPayload
+            {
+                Kind = "assistant_clarification",
+                Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                InteractionState = AiInteractionStates.Clarifying,
+                TurnIntent = AiTurnIntents.ClarificationAnswer,
+                ClarificationRequired = true,
+                RequirementBrief = new AiRequirementBrief
+                {
+                    ClarificationRequired = true,
+                    ClarificationQuestions =
+                    [
+                        BuildQuestion("scene"),
+                        BuildQuestion("object_type")
+                    ]
+                }
+            });
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            requirementBriefExtractor: new RequirementBriefExtractor());
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest(
+            "帮我构建一个流程",
+            SessionId: "generic-workflow-stale-clarification")
+        {
+            RequirementMode = AiRequirementModes.Draft
+        });
+
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.InteractionState.Should().Be(AiInteractionStates.Clarifying);
+        result.RequirementBrief.Should().NotBeNull();
+        result.RequirementBrief!.ClarificationQuestions.Should().NotBeEmpty();
+        result.RequirementBrief.KnownFacts.Should().NotContain(fact =>
+            fact.Contains("已避免重复澄清同一字段", StringComparison.Ordinal));
 
         await connector.DidNotReceive().StreamCompleteAsync(
             Arg.Any<string>(),

@@ -581,6 +581,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         Status = AiFlowGenerationResult.CompletionStatusCompleted,
                         InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
                         TurnIntent = turnRoute.TurnIntent,
+                        RouterConfidence = turnRoute.Confidence,
+                        BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+                        NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
                         Reply = assistantReply,
                         Reasoning = ShouldIncludePromptTrace(request.DebugPrompt) ? completionResult.Reasoning : null,
                         Progress = progressMessages.ToList(),
@@ -926,6 +929,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             Status = AiFlowGenerationResult.CompletionStatusCompleted,
             InteractionState = turnRoute.InteractionState,
             TurnIntent = turnRoute.TurnIntent,
+            RouterConfidence = turnRoute.Confidence,
             Reply = reply,
             Progress = progressMessages.Where(item => !string.IsNullOrWhiteSpace(item)).ToList(),
             ClarificationRequired = false
@@ -1595,8 +1599,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             .Select(BuildQuestionFingerprint)
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var reachedClarificationLimit = clarificationHistory.ClarificationRounds >= 2;
         var activeBlockingFields = blockingFields
-            .Where(field => !askedFields.Contains(field) || clarificationHistory.AnsweredFields.Count > 0)
+            .Where(field =>
+                !askedFields.Contains(field) ||
+                clarificationHistory.AnsweredFields.Count > 0 ||
+                !reachedClarificationLimit)
             .ToList();
 
         brief.NonBlockingMissingFields = nonBlockingFields;
@@ -1617,6 +1625,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         brief.ClarificationQuestions = brief.ClarificationQuestions
             .Where(question => activeBlockingFields.Contains(question.Field, StringComparer.OrdinalIgnoreCase))
             .Where(question => clarificationHistory.AnsweredFields.Count > 0 ||
+                               !reachedClarificationLimit ||
                                !askedFingerprints.Contains(BuildQuestionFingerprint(question)))
             .GroupBy(question => question.Field, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
@@ -1936,9 +1945,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 NormalizeRequirementContextText(turn.Message),
                 normalizedCurrent,
                 StringComparison.OrdinalIgnoreCase);
-            if (isCurrentUserTurn &&
-                IsSelfContainedNewRequirement(turn.Message) &&
-                !pendingQuestions.Any(question => LooksLikeAnswerForField(turn.Message, question)))
+            if (isCurrentUserTurn && ShouldResetClarificationHistoryForCurrentTurn(turn.Message, pendingQuestions))
             {
                 clarificationRounds = 0;
                 answeredFields.Clear();
@@ -1958,7 +1965,41 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             }
         }
 
+        if (ShouldResetClarificationHistoryForCurrentTurn(currentDescription, latestPendingQuestions))
+            return ClarificationHistoryContext.Empty;
+
         return new ClarificationHistoryContext(clarificationRounds, answeredFields, latestPendingQuestions, latestPendingTurnIntent);
+    }
+
+    private static bool ShouldResetClarificationHistoryForCurrentTurn(
+        string? currentDescription,
+        IReadOnlyList<AiClarificationQuestion> pendingQuestions)
+    {
+        var text = currentDescription ?? string.Empty;
+        if (!LooksLikeNewRequirementTurn(text))
+            return false;
+
+        var answersPendingQuestion = pendingQuestions.Any(question => LooksLikeAnswerForField(text, question));
+        if (answersPendingQuestion && !LooksLikeExplicitNewFlowCommand(text))
+            return false;
+
+        if (IsSelfContainedNewRequirement(text))
+            return true;
+
+        return pendingQuestions.Count == 0 ||
+               !answersPendingQuestion;
+    }
+
+    private static bool LooksLikeExplicitNewFlowCommand(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        return ContainsAny(text,
+        [
+            "生成", "创建", "新建", "构建", "搭建", "做一个", "做套", "帮我做", "帮我构建", "帮我搭建",
+            "重新做", "重做", "从头", "new flow", "create", "build", "generate", "start over", "from scratch"
+        ]);
     }
 
     private static string ResolveClarificationPayloadIntent(
@@ -2173,6 +2214,20 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             return false;
 
         return clarificationHistory.PendingQuestions.Any(question => LooksLikeAnswerForField(current, question));
+    }
+
+    private static bool LooksLikeNewRequirementTurn(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        return text.Trim().Length >= 4 &&
+               ContainsAny(text,
+               [
+                   "生成", "创建", "新建", "构建", "搭建", "做一个", "帮我做", "帮我构建", "帮我搭建",
+                   "流程", "检测", "测量", "识别", "判断", "读取", "定位",
+                   "new flow", "create", "build", "generate", "measure", "detect", "inspect"
+               ]);
     }
 
     private static bool IsSelfContainedNewRequirement(string text)
@@ -3086,6 +3141,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
             InteractionState = AiInteractionStates.Clarifying,
             TurnIntent = ResolveClarificationPayloadIntent(turnRoute, clarificationHistory),
+            RouterConfidence = turnRoute.Confidence,
+            BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
             ClarificationRound = clarificationHistory.ClarificationRounds + 1,
             AskedQuestionFingerprints = requirementBrief.ClarificationQuestions
                 .Select(BuildQuestionFingerprint)
@@ -3527,6 +3585,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             TurnIntent = manualRetry?.Required == true
                 ? AiTurnIntents.ManualRetryRepair
                 : turnRoute?.TurnIntent ?? AiTurnIntents.Unknown,
+            RouterConfidence = turnRoute?.Confidence ?? string.Empty,
+            BlockingClarificationFields = requirementBrief?.BlockingClarificationFields.ToList() ?? new List<string>(),
+            NonBlockingMissingFields = requirementBrief?.NonBlockingMissingFields.ToList() ?? new List<string>(),
             Progress = progressMessages.ToList(),
             ClarificationRequired = false,
             RequirementBrief = requirementBrief,

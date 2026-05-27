@@ -169,6 +169,30 @@ public class ConversationalFlowServiceTests : IDisposable
         context.ExistingFlowJson.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("\"null\"")]
+    public void PrepareContext_WithNonObjectFlowPayload_ShouldTreatAsNewAndClearExistingFlow(string existingFlowJson)
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+
+        service.PrepareContext(new AiFlowGenerationRequest(
+            "先生成一个流程",
+            SessionId: "session-non-object-flow",
+            ExistingFlowJson: """{"operators":[{"id":"op-1","type":"Thresholding"}],"connections":[]}"""));
+
+        var context = service.PrepareContext(new AiFlowGenerationRequest(
+            "修改一下",
+            SessionId: "session-non-object-flow",
+            ExistingFlowJson: existingFlowJson,
+            Mode: GenerateFlowMode.Auto));
+
+        context.Mode.Should().Be(GenerateFlowMode.New);
+        context.Intent.Should().Be(ConversationIntent.New);
+        context.ExistingFlowJson.Should().BeNull();
+    }
+
     [Fact]
     public void PrepareContext_ShouldBuildSessionSummaryWithoutWorkflowJson()
     {
@@ -209,6 +233,11 @@ public class ConversationalFlowServiceTests : IDisposable
             {
                 Kind = "assistant_failure",
                 Status = AiFlowGenerationResult.FailureTypeManualRetryRequired,
+                InteractionState = AiInteractionStates.ManualRetry,
+                TurnIntent = AiTurnIntents.ManualRetryRepair,
+                RouterConfidence = AiRouterConfidence.High,
+                BlockingClarificationFields = ["object_type", "object_type"],
+                NonBlockingMissingFields = ["model_path", "roi", "model_path"],
                 Reply = "请确认后手动发送纠错草稿。",
                 Reasoning = "模型输出缺少 ResultOutput 参数。",
                 Progress = ["正在分析需求", "正在校验生成结果"],
@@ -259,6 +288,11 @@ public class ConversationalFlowServiceTests : IDisposable
         assistantTurn.Payload.Should().NotBeNull();
         assistantTurn.Payload!.Kind.Should().Be("assistant_failure");
         assistantTurn.Payload.Status.Should().Be(AiFlowGenerationResult.FailureTypeManualRetryRequired);
+        assistantTurn.Payload.InteractionState.Should().Be(AiInteractionStates.ManualRetry);
+        assistantTurn.Payload.TurnIntent.Should().Be(AiTurnIntents.ManualRetryRepair);
+        assistantTurn.Payload.RouterConfidence.Should().Be(AiRouterConfidence.High);
+        assistantTurn.Payload.BlockingClarificationFields.Should().BeEquivalentTo(["object_type"]);
+        assistantTurn.Payload.NonBlockingMissingFields.Should().BeEquivalentTo(["model_path", "roi"]);
         assistantTurn.Payload.Progress.Should().ContainInOrder("正在分析需求", "正在校验生成结果");
         assistantTurn.Payload.Failure.Should().NotBeNull();
         assistantTurn.Payload.Failure!.FailureSummary!.Code.Should().Be("missing_parameter");

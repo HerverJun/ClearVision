@@ -339,11 +339,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var requirementMode = TryGetMessageString(payload, "requirementMode")
                 ?? TryGetMessageString(doc.RootElement, "requirementMode");
             var templateSelection = TryGetTemplateSelection(payload);
-            var existingFlowJson = payload.TryGetProperty("existingFlowJson", out var flowElement)
-                ? flowElement.ValueKind == JsonValueKind.String
-                    ? flowElement.GetString()
-                    : flowElement.GetRawText()
-                : null;
+            var existingFlowJson = TryGetExistingFlowJson(payload);
             var attachments = payload.TryGetProperty("attachments", out var attachmentElement) &&
                               attachmentElement.ValueKind == JsonValueKind.Array
                 ? attachmentElement.EnumerateArray()
@@ -456,6 +452,25 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             Mode = mode ?? string.Empty,
             TemplateId = templateId,
             ScenarioKey = scenarioKey
+        };
+    }
+
+    private static string? TryGetExistingFlowJson(JsonElement payload)
+    {
+        if (payload.ValueKind != JsonValueKind.Object)
+            return null;
+
+        if (!payload.TryGetProperty("existingFlowJson", out var flowElement) &&
+            !payload.TryGetProperty("ExistingFlowJson", out flowElement))
+        {
+            return null;
+        }
+
+        return flowElement.ValueKind switch
+        {
+            JsonValueKind.String => string.IsNullOrWhiteSpace(flowElement.GetString()) ? null : flowElement.GetString(),
+            JsonValueKind.Object or JsonValueKind.Array => flowElement.GetRawText(),
+            _ => null
         };
     }
 

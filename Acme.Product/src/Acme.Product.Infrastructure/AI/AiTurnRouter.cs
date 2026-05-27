@@ -1,4 +1,5 @@
 using Acme.Product.Core.DTOs;
+using System.Text.RegularExpressions;
 
 namespace Acme.Product.Infrastructure.AI;
 
@@ -42,15 +43,31 @@ public sealed class AiTurnRouter : IAiTurnRouter
 
     private static readonly string[] NewFlowSignals =
     [
-        "生成", "创建", "新建", "做一个", "帮我做", "搭一个", "设计", "配置", "从头", "重新做",
-        "new flow", "create", "build", "generate"
+        "生成", "创建", "新建", "新增", "构建", "搭建", "做一个", "帮我做", "搭一个", "设计", "配置", "从头", "重新", "重新做", "重做",
+        "新流程", "新的流程", "另一个流程", "new flow", "new workflow", "create", "build", "generate", "start over", "from scratch"
     ];
 
     private static readonly string[] ModifySignals =
     [
-        "改", "修改", "调整", "优化", "调优", "增加", "新增", "补充", "删除", "删掉", "移除",
+        "改", "修改", "调整", "优化", "调优", "增加", "新增", "新建", "补充", "删除", "删掉", "移除",
         "替换", "改成", "变成", "中文", "中文化", "阈值", "参数", "算子名称", "displayName",
         "change", "update", "adjust", "add", "remove", "replace", "refine"
+    ];
+
+    private static readonly string[] NewFlowScopeSignals =
+    [
+        "流程", "工程", "检测", "测量", "识别", "方案", "workflow", "flow", "inspection", "detection", "measurement"
+    ];
+
+    private static readonly string[] ExistingFlowAnchors =
+    [
+        "当前流程", "当前工程", "当前方案", "现有流程", "现有工程", "已有流程", "已有工程", "这个流程", "这个工程",
+        "原流程", "原工程", "现在的流程", "现在的工程", "current flow", "existing flow", "this flow"
+    ];
+
+    private static readonly string[] FlowEditTargets =
+    [
+        "算子", "节点", "参数", "阈值", "连线", "连接", "名称", "displayName", "operator", "node", "parameter", "threshold", "connection"
     ];
 
     private static readonly string[] ExplainSignals =
@@ -90,6 +107,8 @@ public sealed class AiTurnRouter : IAiTurnRouter
         var pendingClarification = latestPendingClarificationPayload?.ClarificationRequired == true;
         var pendingManualRetry = latestManualRetryPayload != null;
         var hasBusinessSignal = ContainsAny(text, BusinessSignals);
+        var looksLikeExplicitNewFlow = LooksLikeExplicitNewFlowRequest(text);
+        var looksLikeExistingFlowEdit = LooksLikeExistingFlowEditRequest(text);
 
         if (pendingManualRetry && (ContainsAny(text, RepairSignals) || IsManualRetryRepairDraft(text)))
         {
@@ -141,6 +160,12 @@ public sealed class AiTurnRouter : IAiTurnRouter
         if (request.RequestedMode == GenerateFlowMode.Explain ||
             (request.HasExistingFlow && ContainsAny(text, ExplainSignals)))
         {
+            if (!request.HasExistingFlow)
+            {
+                return BuildNoFlowRoute(
+                    "当前没有可解释的工程。请先描述要新建的视觉流程，或应用一版工程后再让我解释。");
+            }
+
             return new AiTurnRoute(
                 AiTurnIntents.ExplainFlow,
                 AiInteractionStates.Generating,
@@ -148,7 +173,18 @@ public sealed class AiTurnRouter : IAiTurnRouter
                 ShouldBypassClarification: true);
         }
 
-        if ((request.RequestedMode == GenerateFlowMode.Modify || ContainsAny(text, ModifySignals)) &&
+        if (request.RequestedMode == GenerateFlowMode.New ||
+            (request.HasExistingFlow &&
+             looksLikeExplicitNewFlow &&
+             !looksLikeExistingFlowEdit &&
+             request.RequestedMode != GenerateFlowMode.Modify))
+        {
+            return AiTurnRoute.NewFlow(AiRouterConfidence.High);
+        }
+
+        if ((request.RequestedMode == GenerateFlowMode.Modify ||
+             ContainsAny(text, ModifySignals) ||
+             looksLikeExistingFlowEdit) &&
             request.HasExistingFlow)
         {
             return new AiTurnRoute(
@@ -159,15 +195,17 @@ public sealed class AiTurnRouter : IAiTurnRouter
         }
 
         if (!request.HasExistingFlow &&
-            (request.RequestedMode == GenerateFlowMode.Modify || ContainsAny(text, ModifySignals)) &&
-            !ContainsAny(text, NewFlowSignals))
+            (request.RequestedMode == GenerateFlowMode.Modify ||
+             ContainsAny(text, ModifySignals) ||
+             looksLikeExistingFlowEdit) &&
+            !looksLikeExplicitNewFlow)
         {
             return BuildNoFlowRoute(
                 "当前没有可修改的工程。请先描述要新建的视觉流程，或应用一版工程后再提出微调。");
         }
 
-        if (request.RequestedMode == GenerateFlowMode.New ||
-            (ContainsAny(text, NewFlowSignals) && hasBusinessSignal) ||
+        if ((ContainsAny(text, NewFlowSignals) && hasBusinessSignal) ||
+            looksLikeExplicitNewFlow ||
             (!request.HasExistingFlow &&
              hasBusinessSignal &&
              !ContainsAny(text, ExplainSignals) &&
@@ -335,6 +373,36 @@ public sealed class AiTurnRouter : IAiTurnRouter
 
         return ContainsAny(text, NewFlowSignals) &&
                ContainsAny(text, BusinessSignals);
+    }
+
+    private static bool LooksLikeExplicitNewFlowRequest(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        if (LooksLikeExistingFlowEditRequest(text))
+            return false;
+
+        if (ContainsAny(text, ["从头", "重新", "重做", "重新做", "另一个流程", "新流程", "新的流程", "start over", "from scratch", "new flow", "new workflow"]))
+            return true;
+
+        if (!ContainsAny(text, NewFlowSignals))
+            return false;
+
+        if (ContainsAny(text, NewFlowScopeSignals))
+            return true;
+
+        return Regex.IsMatch(text, "(新增|新建|创建|生成|构建|搭建|设计).{0,12}(流程|工程|检测|测量|识别|方案)", RegexOptions.IgnoreCase);
+    }
+
+    private static bool LooksLikeExistingFlowEditRequest(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        var anchoredEdit = ContainsAny(text, ExistingFlowAnchors) && ContainsAny(text, FlowEditTargets);
+        var directEditTarget = Regex.IsMatch(text, "(新增|新建|增加|添加|删除|移除|修改|调整|改).{0,12}(算子|节点|参数|阈值|连线|连接|名称|displayName)", RegexOptions.IgnoreCase);
+        return anchoredEdit || directEditTarget;
     }
 
     private static bool LooksLikeAnswerForField(string message, AiClarificationQuestion question)

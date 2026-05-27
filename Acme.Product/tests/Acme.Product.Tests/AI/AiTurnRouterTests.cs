@@ -59,6 +59,97 @@ public class AiTurnRouterTests
     }
 
     [Fact]
+    public void Route_WithExistingFlowAndExplicitNewMode_ShouldCreateNewFlow()
+    {
+        var route = _router.Route(new AiTurnRouteRequest(
+            "新增一个缺陷检测流程",
+            null,
+            GenerateFlowMode.New,
+            Session: null,
+            HasExistingFlow: true,
+            Attachments: null));
+
+        route.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+        route.ShouldBypassClarification.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Route_WithExistingFlowAndExplicitNewFlowText_ShouldCreateNewFlow()
+    {
+        var route = _router.Route(new AiTurnRouteRequest(
+            "新增一个缺陷检测流程",
+            null,
+            GenerateFlowMode.Auto,
+            Session: null,
+            HasExistingFlow: true,
+            Attachments: null));
+
+        route.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+    }
+
+    [Fact]
+    public void Route_WithExistingFlowAndOperatorAddText_ShouldModifyFlow()
+    {
+        var route = _router.Route(new AiTurnRouteRequest(
+            "新增一个过滤算子到当前流程",
+            null,
+            GenerateFlowMode.Auto,
+            Session: null,
+            HasExistingFlow: true,
+            Attachments: null));
+
+        route.TurnIntent.Should().Be(AiTurnIntents.ModifyFlow);
+        route.ShouldBypassClarification.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Route_WithExistingFlowAndRestartWordingForCurrentFlowEdit_ShouldModifyFlow()
+    {
+        var route = _router.Route(new AiTurnRouteRequest(
+            "重新调整当前流程阈值",
+            null,
+            GenerateFlowMode.Auto,
+            Session: null,
+            HasExistingFlow: true,
+            Attachments: null));
+
+        route.TurnIntent.Should().Be(AiTurnIntents.ModifyFlow);
+        route.ShouldBypassClarification.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Route_WithNoFlowAndExplicitNewFlowText_ShouldCreateNewFlow()
+    {
+        var route = _router.Route(new AiTurnRouteRequest(
+            "新增一个缺陷检测流程",
+            null,
+            GenerateFlowMode.Auto,
+            Session: null,
+            HasExistingFlow: false,
+            Attachments: null));
+
+        route.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+        route.ShouldShortCircuit.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Route_WithNoFlowAndExplicitExplainMode_ShouldGuideInsteadOfBypassingClarification()
+    {
+        var route = _router.Route(new AiTurnRouteRequest(
+            "解释当前流程",
+            null,
+            GenerateFlowMode.Explain,
+            Session: null,
+            HasExistingFlow: false,
+            Attachments: null));
+
+        route.TurnIntent.Should().Be(AiTurnIntents.Unknown);
+        route.ShouldShortCircuit.Should().BeTrue();
+        route.ShouldBypassClarification.Should().BeFalse();
+        route.Reply.Should().Contain("当前没有可解释");
+    }
+
+    [Fact]
     public void Route_WithPendingClarificationAnswer_ShouldClassifyClarificationAnswer()
     {
         var session = BuildPendingClarificationSession();
@@ -185,6 +276,23 @@ public class AiTurnRouterTests
             Attachments: null));
 
         route.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+    }
+
+    [Fact]
+    public void Route_WithPendingClarificationAndVagueNewFlowRequest_ShouldResetToNewFlow()
+    {
+        var session = BuildPendingClarificationSession();
+
+        var route = _router.Route(new AiTurnRouteRequest(
+            "帮我构建一个流程",
+            null,
+            GenerateFlowMode.Auto,
+            session,
+            HasExistingFlow: false,
+            Attachments: null));
+
+        route.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+        route.ShouldShortCircuit.Should().BeFalse();
     }
 
     [Fact]
