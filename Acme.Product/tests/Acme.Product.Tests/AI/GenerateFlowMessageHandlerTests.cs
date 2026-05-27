@@ -223,11 +223,58 @@ public class GenerateFlowMessageHandlerTests
         var progressPayload = receivedMessages.Last(message => message.Type == "GenerateFlowProgress").Payload;
         using var progressDoc = JsonDocument.Parse(progressPayload);
         progressDoc.RootElement.GetProperty("requestId").GetString().Should().Be("req-stream-1");
+        progressDoc.RootElement.GetProperty("phase").GetString().Should().Be("prompt_context");
 
         var streamPayload = receivedMessages.Single(message => message.Type == "GenerateFlowStreamChunk").Payload;
         using var streamDoc = JsonDocument.Parse(streamPayload);
         streamDoc.RootElement.GetProperty("requestId").GetString().Should().Be("req-stream-1");
         streamDoc.RootElement.GetProperty("chunkType").GetString().Should().Be("thinking");
+    }
+
+    [Fact(DisplayName = "GenerateFlowMessageHandler should include performance budget summary")]
+    public async Task HandleAsync_ShouldIncludePerformanceBudgetSummary()
+    {
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var handler = new GenerateFlowMessageHandler(generationService, logger);
+
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.AiStreamChunk>>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<Acme.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
+            .Returns(Task.FromResult(new AiFlowGenerationResult
+            {
+                Success = true,
+                Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() },
+                RetryCount = 1,
+                PromptTrace = new AiPromptTrace
+                {
+                    EstimatedInputTokens = 19_000,
+                    EstimatedOutputTokens = 7_000
+                },
+                StageTimeline =
+                [
+                    new AiGenerationStageDiagnostic { Stage = "prompt_context", DurationMs = 120 },
+                    new AiGenerationStageDiagnostic { Stage = "llm", DurationMs = 46_000 }
+                ]
+            }));
+
+        var resultJson = await handler.HandleAsync("demo");
+
+        using var doc = JsonDocument.Parse(resultJson);
+        var budget = doc.RootElement.GetProperty("performanceBudget");
+        budget.GetProperty("budgetStatus").GetString().Should().Be("warning");
+        budget.GetProperty("totalDurationMs").GetInt64().Should().Be(46_120);
+        budget.GetProperty("retryCount").GetInt32().Should().Be(1);
+        budget.GetProperty("estimatedInputTokens").GetInt32().Should().Be(19_000);
+        budget.GetProperty("estimatedOutputTokens").GetInt32().Should().Be(7_000);
+        budget.GetProperty("slowestStage").GetString().Should().Be("llm");
+        budget.GetProperty("warnings").EnumerateArray()
+            .Select(item => item.GetString()).Should().Contain("auto_retry_used");
+        budget.GetProperty("warnings").EnumerateArray()
+            .Select(item => item.GetString()).Should().Contain("token_estimate_over_24k");
     }
 
     [Fact(DisplayName = "GenerateFlowMessageHandler should serialize OperatorType as string")]

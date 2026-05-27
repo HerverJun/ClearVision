@@ -75,6 +75,7 @@ public class GenerateFlowMessageHandler
                     JsonSerializer.Serialize(new
                     {
                         message = progressMsg,
+                        phase = InferProgressPhase(progressMsg),
                         requestId
                     }, _jsonOptions)),
                 chunk => onMessage?.Invoke(
@@ -116,6 +117,7 @@ public class GenerateFlowMessageHandler
                 ManualRetry = MapManualRetry(result.ManualRetry),
                 PromptTrace = result.PromptTrace is AiPromptTrace trace ? trace.Desensitize() : result.PromptTrace,
                 StageTimeline = MapStageTimeline(result.StageTimeline),
+                PerformanceBudget = BuildPerformanceBudget(result.StageTimeline, result.RetryCount, result.PromptTrace),
                 CompletionStatus = result.CompletionStatus,
                 RetryCount = result.RetryCount,
                 KnowledgeDiagnostics = MapKnowledgeDiagnostics(result.KnowledgeDiagnostics),
@@ -215,6 +217,7 @@ public class GenerateFlowMessageHandler
             response.ManualRetry,
             response.PromptTrace,
             response.StageTimeline,
+            response.PerformanceBudget,
             response.CompletionStatus,
             response.RetryCount,
             response.KnowledgeDiagnostics,
@@ -251,6 +254,36 @@ public class GenerateFlowMessageHandler
         return string.IsNullOrWhiteSpace(fallbackMessage)
             ? null
             : fallbackMessage;
+    }
+
+    private static string InferProgressPhase(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return string.Empty;
+
+        if (ContainsAny(message, ["澄清", "缺少关键字段"]))
+            return "clarification";
+        if (ContainsAny(message, ["场景", "模板"]))
+            return "matching_template";
+        if (ContainsAny(message, ["提示词", "需求", "Prompt", "prompt"]))
+            return "prompt_context";
+        if (ContainsAny(message, ["请求 AI", "AI 模型", "模型生成", "备用模型", "调用失败"]))
+            return "calling_ai";
+        if (ContainsAny(message, ["解析", "JSON 数据"]))
+            return "parsing";
+        if (ContainsAny(message, ["校验", "算子和参数", "结构校验"]))
+            return "validating";
+        if (ContainsAny(message, ["Dry-Run", "DryRun", "沙箱"]))
+            return "dryrun";
+        if (ContainsAny(message, ["布局", "layout"]))
+            return "layouting";
+
+        return string.Empty;
+    }
+
+    private static bool ContainsAny(string text, IEnumerable<string> terms)
+    {
+        return terms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
 
     private static GenerateFlowTemplateRecommendation? MapRecommendedTemplate(AiRecommendedTemplateInfo? template)
@@ -364,6 +397,88 @@ public class GenerateFlowMessageHandler
             DurationMs = stage.DurationMs,
             Metadata = stage.Metadata ?? new Dictionary<string, string>()
         }).ToList();
+    }
+
+    private static GenerateFlowPerformanceBudget? BuildPerformanceBudget(
+        IReadOnlyList<AiGenerationStageDiagnostic>? timeline,
+        int retryCount,
+        object? promptTrace)
+    {
+        if ((timeline == null || timeline.Count == 0) && promptTrace is not AiPromptTrace)
+        {
+            return null;
+        }
+
+        var stages = timeline ?? Array.Empty<AiGenerationStageDiagnostic>();
+        var totalDurationMs = stages.Sum(stage => Math.Max(0, stage.DurationMs));
+        var slowestStage = stages
+            .OrderByDescending(stage => Math.Max(0, stage.DurationMs))
+            .FirstOrDefault();
+        var (inputTokens, outputTokens) = ResolveTokenEstimates(stages, promptTrace);
+
+        var warnings = new List<string>();
+        if (totalDurationMs > 45_000)
+        {
+            warnings.Add("total_latency_over_45s");
+        }
+
+        if ((slowestStage?.DurationMs ?? 0) > 30_000)
+        {
+            warnings.Add($"slow_stage:{slowestStage!.Stage}");
+        }
+
+        if (retryCount > 0)
+        {
+            warnings.Add("auto_retry_used");
+        }
+
+        if (inputTokens + outputTokens > 24_000)
+        {
+            warnings.Add("token_estimate_over_24k");
+        }
+
+        return new GenerateFlowPerformanceBudget
+        {
+            TotalDurationMs = totalDurationMs,
+            StageCount = stages.Count,
+            RetryCount = retryCount,
+            EstimatedInputTokens = inputTokens,
+            EstimatedOutputTokens = outputTokens,
+            BudgetStatus = warnings.Count == 0 ? "ok" : "warning",
+            SlowestStage = slowestStage?.Stage ?? string.Empty,
+            SlowestStageDurationMs = Math.Max(0, slowestStage?.DurationMs ?? 0),
+            Warnings = warnings
+        };
+    }
+
+    private static (int InputTokens, int OutputTokens) ResolveTokenEstimates(
+        IReadOnlyList<AiGenerationStageDiagnostic> stages,
+        object? promptTrace)
+    {
+        if (promptTrace is AiPromptTrace trace)
+        {
+            return (trace.EstimatedInputTokens ?? 0, trace.EstimatedOutputTokens ?? 0);
+        }
+
+        var llmStage = stages
+            .LastOrDefault(stage => string.Equals(stage.Stage, "llm", StringComparison.OrdinalIgnoreCase));
+        if (llmStage?.Metadata == null)
+        {
+            return (0, 0);
+        }
+
+        return (
+            TryReadInt(llmStage.Metadata, "estimatedInputTokens"),
+            TryReadInt(llmStage.Metadata, "estimatedOutputTokens"));
+    }
+
+    private static int TryReadInt(IReadOnlyDictionary<string, string> metadata, string key)
+    {
+        return metadata.TryGetValue(key, out var raw) &&
+               int.TryParse(raw, out var value) &&
+               value > 0
+            ? value
+            : 0;
     }
 
     private static List<GenerateFlowKnowledgeDiagnostic>? MapKnowledgeDiagnostics(IReadOnlyList<AiValidationDiagnostic>? diagnostics)

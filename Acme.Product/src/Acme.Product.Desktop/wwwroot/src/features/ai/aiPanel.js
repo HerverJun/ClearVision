@@ -551,9 +551,20 @@ export class AiPanel {
         this._addMessage('user', userMessage || normalizedDescription);
         this._startAssistantTurn();
 
-        const currentFlowPayload = existingFlowJson ?? this._getCurrentFlowJson();
-        const resolvedMode = this._resolveGenerateRequestMode(explicitMode, normalizedDescription, currentFlowPayload);
-        const flowPayload = resolvedMode === 'new' ? null : currentFlowPayload;
+        const hasExistingFlowOverride = existingFlowJson !== null && existingFlowJson !== undefined;
+        const hasCurrentFlowContext = hasExistingFlowOverride
+            ? this._hasMeaningfulFlowPayload(existingFlowJson)
+            : this._hasCurrentFlowContext();
+        const resolvedMode = this._resolveGenerateRequestMode(explicitMode, normalizedDescription, hasCurrentFlowContext);
+        const shouldIncludeFlowPayload = this._shouldIncludeCurrentFlowPayload(
+            resolvedMode,
+            normalizedDescription,
+            hasCurrentFlowContext
+        );
+        const currentFlowPayload = shouldIncludeFlowPayload
+            ? (hasExistingFlowOverride ? existingFlowJson : this._getCurrentFlowJson())
+            : null;
+        const flowPayload = shouldIncludeFlowPayload ? currentFlowPayload : null;
         const normalizedTemplateSelection = this._normalizeTemplateSelection(templateSelection);
         this._renderAgentRuntime(this._buildOutgoingRuntimePayload(resolvedMode));
 
@@ -592,22 +603,79 @@ export class AiPanel {
         }
     }
 
-    _resolveGenerateRequestMode(explicitMode = '', description = '', currentFlowPayload = null) {
+    _hasCurrentFlowContext() {
+        if (this._hasMeaningfulFlowPayload(this.currentResult?.flow || this.currentResult?.Flow || null)) {
+            return true;
+        }
+
+        if (this.flowCanvas?.nodes instanceof Map && this.flowCanvas.nodes.size > 0) {
+            return true;
+        }
+
+        if (Array.isArray(this.flowCanvas?.connections) && this.flowCanvas.connections.length > 0) {
+            return true;
+        }
+
+        return false;
+    }
+
+    _hasMeaningfulFlowPayload(flow) {
+        if (!flow) return false;
+
+        let parsed = flow;
+        if (typeof flow === 'string') {
+            try {
+                parsed = JSON.parse(flow);
+            } catch {
+                return false;
+            }
+        }
+
+        const operators = parsed?.operators || parsed?.Operators || parsed?.nodes || parsed?.Nodes || [];
+        const connections = parsed?.connections || parsed?.Connections || [];
+        return (Array.isArray(operators) && operators.length > 0) ||
+            (Array.isArray(connections) && connections.length > 0);
+    }
+
+    _shouldIncludeCurrentFlowPayload(resolvedMode = '', description = '', hasCurrentFlowContext = false) {
+        if (!hasCurrentFlowContext) return false;
+
+        const normalizedMode = String(resolvedMode || '').trim().toLowerCase();
+        if (normalizedMode === 'new') return false;
+
+        if (['modify', 'explain', 'review_pending_parameters'].includes(normalizedMode)) {
+            return true;
+        }
+
+        return this._looksLikeExistingFlowEditRequest(description) ||
+            this._looksLikeModifyRequest(description) ||
+            this._looksLikeExplainRequest(description);
+    }
+
+    _resolveGenerateRequestMode(explicitMode = '', description = '', hasCurrentFlowContext = false) {
         const normalizedExplicitMode = String(explicitMode || '').trim().toLowerCase();
         if (normalizedExplicitMode) {
             return normalizedExplicitMode;
         }
 
-        if (currentFlowPayload && this._looksLikeExistingFlowEditRequest(description)) {
+        if (hasCurrentFlowContext && this._looksLikeExistingFlowEditRequest(description)) {
             return 'modify';
         }
 
-        if (currentFlowPayload && this._looksLikeExplicitNewFlowRequest(description)) {
+        if (hasCurrentFlowContext && this._looksLikeExplicitNewFlowRequest(description)) {
             return 'new';
         }
 
-        if (currentFlowPayload && this._looksLikeModifyRequest(description)) {
+        if (hasCurrentFlowContext && this._looksLikeExplainRequest(description)) {
+            return 'explain';
+        }
+
+        if (hasCurrentFlowContext && this._looksLikeModifyRequest(description)) {
             return 'modify';
+        }
+
+        if (hasCurrentFlowContext && this._looksLikeStandaloneVisionRequest(description)) {
+            return 'new';
         }
 
         return 'auto';
@@ -658,8 +726,40 @@ export class AiPanel {
 
         return [
             '改', '修改', '调整', '优化', '调优', '增加', '新增', '新建', '补充', '删除', '删掉', '移除',
+            '追加', '再加', '继续加', '加一个算子', '加个算子', '基于当前', '在当前', '沿用当前',
             '替换', '改成', '变成', '中文', '中文化', '阈值', '参数', '算子名称', 'displayname',
             'change', 'update', 'adjust', 'add', 'remove', 'replace', 'refine'
+        ].some(signal => text.includes(signal));
+    }
+
+    _looksLikeExplainRequest(description = '') {
+        const text = String(description || '').trim().toLowerCase();
+        if (!text) return false;
+
+        return [
+            '解释', '说明', '讲解', '为什么', '什么意思', '含义', '原理', '思路',
+            'explain', 'why', 'reason', 'meaning'
+        ].some(signal => text.includes(signal));
+    }
+
+    _looksLikeStandaloneVisionRequest(description = '') {
+        const text = String(description || '').trim().toLowerCase();
+        if (!text) return false;
+
+        const currentFlowAnchors = [
+            '当前流程', '当前工程', '当前方案', '现有流程', '现有工程', '已有流程', '已有工程',
+            '这个流程', '这个工程', '原流程', '原工程', '现在的流程', '现在的工程',
+            'current flow', 'existing flow', 'this flow'
+        ];
+        if (currentFlowAnchors.some(signal => text.includes(signal))) {
+            return false;
+        }
+
+        return [
+            '检测', '测量', '识别', '缺陷', '外观', '表面', '划伤', '划痕', '裂纹', '破损',
+            '压痕', '凹坑', '脏污', '污渍', '漏装', '有无', '线序', '端子', '孔距',
+            '圆心距', '尺寸', '宽度', '高度', '直径', '角度', '面积', '二维码', '条码',
+            'datamatrix', 'ocr', '字符', 'scratch', 'dent', 'defect', 'barcode', 'measure'
         ].some(signal => text.includes(signal));
     }
 
@@ -859,6 +959,12 @@ export class AiPanel {
             this._setWorkbenchState(AiWorkbenchStates.VALIDATING);
         } else if (phase === 'layouting' || phase === 'dryrun') {
             this._setWorkbenchState(AiWorkbenchStates.DRY_RUNNING);
+        } else if (phase === 'matching_template' || phase === 'scenario_match' || phase === 'prompt_context') {
+            this._setWorkbenchState(AiWorkbenchStates.MATCHING_TEMPLATE);
+        } else if (phase === 'parsing') {
+            this._setWorkbenchState(AiWorkbenchStates.PARSING);
+        } else if (phase === 'clarification') {
+            this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
         } else if (phase === 'calling_ai' || phase === 'connecting') {
             this._setWorkbenchState(AiWorkbenchStates.GENERATING);
         }
@@ -4386,6 +4492,50 @@ export class AiPanel {
         return [...new Set(value.map(item => String(item || '').trim()).filter(Boolean))];
     }
 
+    _normalizePerformanceBudget(value) {
+        if (!value || typeof value !== 'object') return null;
+
+        const readNumber = (...keys) => {
+            for (const key of keys) {
+                const raw = value?.[key];
+                const numeric = Number(raw);
+                if (Number.isFinite(numeric)) return numeric;
+            }
+            return 0;
+        };
+
+        const warnings = Array.isArray(value.warnings || value.Warnings)
+            ? [...new Set((value.warnings || value.Warnings)
+                .map(item => String(item || '').trim())
+                .filter(Boolean))]
+            : [];
+
+        return {
+            totalDurationMs: readNumber('totalDurationMs', 'TotalDurationMs'),
+            stageCount: readNumber('stageCount', 'StageCount'),
+            retryCount: readNumber('retryCount', 'RetryCount'),
+            estimatedInputTokens: readNumber('estimatedInputTokens', 'EstimatedInputTokens'),
+            estimatedOutputTokens: readNumber('estimatedOutputTokens', 'EstimatedOutputTokens'),
+            budgetStatus: String(value.budgetStatus || value.BudgetStatus || '').trim().toLowerCase(),
+            slowestStage: String(value.slowestStage || value.SlowestStage || '').trim(),
+            slowestStageDurationMs: readNumber('slowestStageDurationMs', 'SlowestStageDurationMs'),
+            warnings
+        };
+    }
+
+    _formatDuration(ms) {
+        const value = Number(ms);
+        if (!Number.isFinite(value) || value <= 0) return '--';
+        if (value >= 1000) return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}s`;
+        return `${Math.round(value)}ms`;
+    }
+
+    _formatTokenEstimate(inputTokens = 0, outputTokens = 0) {
+        const total = Number(inputTokens || 0) + Number(outputTokens || 0);
+        if (!Number.isFinite(total) || total <= 0) return '--';
+        return total >= 1000 ? `~${(total / 1000).toFixed(total >= 10_000 ? 0 : 1)}k` : `~${Math.round(total)}`;
+    }
+
     _buildAgentNextAction(meta = {}) {
         const turnIntent = String(meta.turnIntent || '').trim().toLowerCase();
         const interactionState = String(meta.interactionState || '').trim().toLowerCase();
@@ -4473,6 +4623,7 @@ export class AiPanel {
         const missingResources = this._normalizeMissingResources(source.missingResources ?? source.MissingResources);
         const flow = source.flow ?? source.Flow ?? this.currentResult?.flow ?? this.currentResult?.Flow ?? null;
         const manualRetry = source.manualRetry ?? source.ManualRetry ?? null;
+        const performanceBudget = this._normalizePerformanceBudget(source.performanceBudget ?? source.PerformanceBudget);
 
         const intentLabels = {
             manual_retry_repair: '修复草稿',
@@ -4523,10 +4674,28 @@ export class AiPanel {
             hasFlow: Boolean(flow),
             manualRetryRequired: Boolean(manualRetry?.required ?? manualRetry?.Required)
         });
+        const perfStatusText = performanceBudget?.budgetStatus === 'warning' ? '预警' : '正常';
+        const perfWarningText = performanceBudget?.warnings?.length > 0
+            ? `性能提示：${performanceBudget.warnings.slice(0, 2).join('、')}`
+            : '';
+        const runtimeMetrics = [
+            `意图 ${intentLabels[turnIntent] || turnIntent}`,
+            `置信度 ${confidenceLabels[routerConfidence] || routerConfidence || '--'}`,
+            `阻断 ${blockingCount}`,
+            `待补 ${effectiveNonBlockingFields.length}`
+        ];
+        if (performanceBudget) {
+            runtimeMetrics.push(`耗时 ${this._formatDuration(performanceBudget.totalDurationMs)}`);
+            runtimeMetrics.push(`Token ${this._formatTokenEstimate(performanceBudget.estimatedInputTokens, performanceBudget.estimatedOutputTokens)}`);
+            runtimeMetrics.push(`预算 ${perfStatusText}`);
+        }
 
         const stateClass = String(interactionState || 'idle').replace(/[^a-z0-9_-]/gi, '') || 'idle';
         el.hidden = false;
         el.className = `ai-agent-runtime is-${stateClass}`;
+        if (performanceBudget?.budgetStatus === 'warning') {
+            el.classList.add('has-budget-warning');
+        }
         el.innerHTML = `
             <div class="ai-agent-runtime-main">
                 <span class="ai-agent-runtime-kicker">Agent 状态机</span>
@@ -4534,12 +4703,12 @@ export class AiPanel {
                 <span>${this._escapeHtml(summary)}</span>
             </div>
             <div class="ai-agent-runtime-metrics">
-                <span>意图 ${this._escapeHtml(intentLabels[turnIntent] || turnIntent)}</span>
-                <span>置信度 ${this._escapeHtml(confidenceLabels[routerConfidence] || routerConfidence || '--')}</span>
-                <span>阻断 ${blockingCount}</span>
-                <span>待补 ${effectiveNonBlockingFields.length}</span>
+                ${runtimeMetrics.map(metric => `<span>${this._escapeHtml(String(metric))}</span>`).join('')}
             </div>
-            <div class="ai-agent-runtime-next">${this._escapeHtml(nextAction)}</div>
+            <div class="ai-agent-runtime-next">
+                ${this._escapeHtml(nextAction)}
+                ${perfWarningText ? `<span class="ai-agent-runtime-budget-note">${this._escapeHtml(perfWarningText)}</span>` : ''}
+            </div>
         `;
     }
 

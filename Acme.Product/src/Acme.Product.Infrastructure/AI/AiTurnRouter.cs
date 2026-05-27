@@ -35,10 +35,13 @@ public sealed class AiTurnRouter : IAiTurnRouter
         "检测", "测量", "识别", "流程", "算子", "参数", "阈值", "模型", "PLC", "plc", "数据库",
         "中文", "中文化", "修改", "调整", "改成", "增加", "新增", "删除", "移除", "解释",
         "缺陷", "外观", "线序", "端子", "ROI", "roi", "标定", "输出", "模板", "工程",
+        "表面", "划伤", "划痕", "裂纹", "破损", "压痕", "凹坑", "脏污", "污渍", "漏装", "缺件",
+        "孔距", "圆心距", "尺寸", "宽度", "高度", "直径", "角度", "面积", "二维码", "条码",
+        "DataMatrix", "OCR", "字符", "金属件", "包装箱", "连接器", "标签",
         "缺资源", "待确认", "DryRun", "dryrun", "校验",
         "inspect", "inspection", "detect", "detection", "measure", "measurement", "workflow", "flow",
         "operator", "parameter", "threshold", "database", "chinese", "defect", "sequence", "calibration",
-        "output", "template", "validate", "validation"
+        "output", "template", "validate", "validation", "scratch", "dent", "barcode", "datamatrix", "ocr"
     ];
 
     private static readonly string[] NewFlowSignals =

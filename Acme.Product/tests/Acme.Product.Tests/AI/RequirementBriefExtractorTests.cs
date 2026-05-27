@@ -89,6 +89,20 @@ public class RequirementBriefExtractorTests
     }
 
     [Fact]
+    public void Extract_WithStandaloneMetalScratchText_ShouldRecognizeVisionFacts()
+    {
+        var extractor = new RequirementBriefExtractor();
+
+        var brief = extractor.Extract("金属表面划痕", null, scenarioMatch: null);
+
+        brief.IntentType.Should().Be("defect_detection");
+        brief.ObjectName.Should().Be("金属件");
+        brief.DefectTypes.Should().Contain("划伤");
+        brief.KnownFacts.Should().Contain(fact => fact.Contains("金属件", StringComparison.Ordinal));
+        brief.KnownFacts.Should().Contain(fact => fact.Contains("划伤", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Extract_WithQueuedClarificationQuestions_ShouldIgnoreExamplesAsAnswers()
     {
         var extractor = new RequirementBriefExtractor();

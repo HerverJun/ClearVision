@@ -93,6 +93,7 @@ public record GenerateFlowResponse
     public GenerateFlowManualRetry? ManualRetry { get; init; }
     public object? PromptTrace { get; init; }
     public List<GenerateFlowStageDiagnostic>? StageTimeline { get; init; }
+    public GenerateFlowPerformanceBudget? PerformanceBudget { get; init; }
     public string? CompletionStatus { get; init; }
     public int RetryCount { get; init; }
     public List<GenerateFlowKnowledgeDiagnostic>? KnowledgeDiagnostics { get; init; }
@@ -244,6 +245,19 @@ public record GenerateFlowStageDiagnostic
     public string Summary { get; init; } = string.Empty;
     public long DurationMs { get; init; }
     public Dictionary<string, string> Metadata { get; init; } = new();
+}
+
+public record GenerateFlowPerformanceBudget
+{
+    public long TotalDurationMs { get; init; }
+    public int StageCount { get; init; }
+    public int RetryCount { get; init; }
+    public int EstimatedInputTokens { get; init; }
+    public int EstimatedOutputTokens { get; init; }
+    public string BudgetStatus { get; init; } = "ok";
+    public string SlowestStage { get; init; } = string.Empty;
+    public long SlowestStageDurationMs { get; init; }
+    public List<string> Warnings { get; init; } = new();
 }
 
 public record GenerateFlowKnowledgeDiagnostic

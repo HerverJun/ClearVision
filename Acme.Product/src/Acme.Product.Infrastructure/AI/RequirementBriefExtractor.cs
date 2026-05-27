@@ -126,8 +126,10 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
             return "presence_check";
         if (ContainsAny(text, ["线序", "端子", "顺序", "wire sequence", "terminal order"]))
             return "sequence_check";
-        if (ContainsAny(text, ["缺陷", "划伤", "破损", "外观", "defect", "scratch", "damage", "dent"]))
+        if (ContainsAny(text, ["缺陷", "划伤", "划痕", "裂纹", "破损", "压痕", "凹坑", "外观", "defect", "scratch", "damage", "dent"]))
             return "defect_detection";
+        if (ContainsAny(text, ["二维码", "条码", "DataMatrix", "OCR", "字符识别", "barcode", "code recognition"]))
+            return "code_recognition";
 
         return string.Empty;
     }
@@ -192,10 +194,16 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
 
         if (ContainsAny(text, ["包装箱", "纸箱", "箱体"]))
             return "包装箱";
+        if (ContainsAny(text, ["金属件", "金属零件", "金属表面", "金属"]))
+            return "金属件";
+        if (ContainsAny(text, ["连接器", "端子"]))
+            return "连接器/端子";
         if (ContainsAny(text, ["空调内机", "内机", "面板"]))
             return "空调内机";
         if (ContainsAny(text, ["遥控器", "remote"]))
             return "遥控器";
+        if (ContainsAny(text, ["二维码", "条码", "DataMatrix", "OCR", "标签"]))
+            return "标签/二维码";
         if (ContainsAny(text, ["圆形孔位", "圆形孔", "圆孔", "孔位"]))
             return "圆孔/孔位";
         if (ContainsAny(text, ["铜孔", "孔距", "间距", "圆心距离"]))

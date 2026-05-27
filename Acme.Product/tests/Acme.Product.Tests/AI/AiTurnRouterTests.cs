@@ -43,6 +43,23 @@ public class AiTurnRouterTests
         route.ShouldShortCircuit.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData("这个产品怎么用")]
+    [InlineData("介绍一下产品")]
+    public void Route_WithGenericProductQuestion_ShouldNotCreateNewFlow(string text)
+    {
+        var route = _router.Route(new AiTurnRouteRequest(
+            text,
+            null,
+            GenerateFlowMode.Auto,
+            Session: null,
+            HasExistingFlow: false,
+            Attachments: null));
+
+        route.TurnIntent.Should().Be(AiTurnIntents.Unknown);
+        route.ShouldShortCircuit.Should().BeTrue();
+    }
+
     [Fact]
     public void Route_WithExistingFlowAndChineseDisplayRequest_ShouldModifyFlow()
     {
@@ -85,6 +102,24 @@ public class AiTurnRouterTests
             Attachments: null));
 
         route.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+    }
+
+    [Theory]
+    [InlineData("金属表面划痕")]
+    [InlineData("二维码读取")]
+    [InlineData("两个圆孔孔距")]
+    public void Route_WithExistingFlowAndStandaloneVisionNeed_ShouldCreateNewFlow(string text)
+    {
+        var route = _router.Route(new AiTurnRouteRequest(
+            text,
+            null,
+            GenerateFlowMode.Auto,
+            Session: null,
+            HasExistingFlow: true,
+            Attachments: null));
+
+        route.TurnIntent.Should().Be(AiTurnIntents.NewFlow);
+        route.ShouldShortCircuit.Should().BeFalse();
     }
 
     [Fact]

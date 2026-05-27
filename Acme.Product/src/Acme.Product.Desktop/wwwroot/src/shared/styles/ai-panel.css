@@ -23,7 +23,7 @@
 /* ---- Workspace 2-Column Layout ---- */
 .ai-workspace {
     display: grid;
-    grid-template-columns: 1fr minmax(320px, 460px);
+    grid-template-columns: minmax(0, 1.15fr) minmax(360px, 520px);
     align-items: stretch;
     flex: 1;
     overflow: hidden;
@@ -39,7 +39,7 @@
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
+    border-radius: 8px;
     box-shadow: var(--shadow-md), var(--shadow-inset), 0 18px 36px -18px rgba(0, 0, 0, 0.38), inset 0 1px 1px rgba(255, 255, 255, 0.10);
     display: flex;
     flex-direction: column;
@@ -124,7 +124,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .pane-title {
     font-size: var(--font-size-xs);
     font-weight: 600;
-    color: #8b7355;
+    color: #f1d29a;
     text-transform: uppercase;
     letter-spacing: 1.5px;
 }
@@ -902,7 +902,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-requirement-mode-label {
     font-size: 11px;
     font-weight: 700;
-    color: #8b7355;
+    color: #f1d29a;
     letter-spacing: 1.1px;
     text-transform: uppercase;
 }
@@ -968,7 +968,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .icon-btn {
     background: none;
     border: none;
-    color: var(--ink-gray);
+    color: #d9e4ee;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -976,6 +976,9 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     padding: 6px;
     border-radius: var(--radius-sm);
     transition: color var(--duration-instant);
+    min-width: 32px;
+    min-height: 32px;
+    line-height: 1;
 }
 
 .icon-btn:hover {
@@ -1705,6 +1708,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     display: inline-flex;
     align-items: center;
     min-height: 22px;
+    max-width: 180px;
     padding: 3px 8px;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1713,6 +1717,8 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     font-size: 11px;
     line-height: 1;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .ai-agent-runtime-next {
@@ -1722,6 +1728,12 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     color: var(--paper-dim);
     font-size: 12px;
     line-height: 1.5;
+}
+
+.ai-agent-runtime-budget-note {
+    display: block;
+    margin-top: 4px;
+    color: #fff2c7;
 }
 
 .ai-agent-runtime.is-clarifying {
@@ -1739,6 +1751,21 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-agent-runtime.is-manual_retry {
     border-color: rgba(248, 113, 113, 0.30);
     background: rgba(248, 113, 113, 0.08);
+}
+
+.ai-agent-runtime.has-budget-warning {
+    border-color: rgba(249, 214, 107, 0.38);
+    background: rgba(249, 214, 107, 0.09);
+}
+
+.ai-agent-runtime.has-budget-warning .ai-agent-runtime-kicker {
+    color: #ffe4a3;
+}
+
+.ai-agent-runtime.has-budget-warning .ai-agent-runtime-metrics span:last-child {
+    color: #fff2c7;
+    border-color: rgba(249, 214, 107, 0.28);
+    background: rgba(249, 214, 107, 0.10);
 }
 
 .ai-results-scroll {
@@ -2753,6 +2780,10 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     background: #f1f5f9;
 }
 
+[data-theme="light"] .icon-btn {
+    color: #475569;
+}
+
 [data-theme="light"] .ai-tag {
     background: rgba(241, 245, 249, 0.8) !important;
     border-color: #e2e8f0 !important;
@@ -2948,6 +2979,22 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     border-color: #fecaca;
 }
 
+[data-theme="light"] .ai-agent-runtime.has-budget-warning {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+[data-theme="light"] .ai-agent-runtime.has-budget-warning .ai-agent-runtime-kicker,
+[data-theme="light"] .ai-agent-runtime-budget-note,
+[data-theme="light"] .ai-agent-runtime.has-budget-warning .ai-agent-runtime-metrics span:last-child {
+    color: #92400e;
+}
+
+[data-theme="light"] .ai-agent-runtime.has-budget-warning .ai-agent-runtime-metrics span:last-child {
+    background: #fff7ed;
+    border-color: #fed7aa;
+}
+
 [data-theme="light"] .ai-history-search { background: #f1f5f9; color: #1e293b; }
 [data-theme="light"] .ai-history-item { background: rgba(241, 245, 249, 0.75); }
 [data-theme="light"] .ai-history-item:hover { background: rgba(241, 245, 249, 0.9); }
@@ -3054,6 +3101,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     align-items: center;
     gap: 4px;
     padding: 8px 12px;
+    min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
 }
@@ -3064,15 +3112,18 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 
 .wb-stage {
     flex-shrink: 0;
+    max-width: 140px;
     padding: 3px 10px;
     border-radius: 10px;
     font-size: 11px;
     font-weight: 500;
     background: rgba(255, 255, 255, 0.06);
-    color: var(--text-muted, #888);
+    color: #cbd5e1;
     border: 1px solid transparent;
     transition: all 0.25s ease;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .wb-stage.completed {
     background: rgba(52, 211, 153, 0.15);
@@ -3128,7 +3179,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-stage-timeline-details > summary {
     cursor: pointer;
     font-size: 12px;
-    color: var(--text-muted, #888);
+    color: var(--paper-dim);
     padding: 4px 0;
 }
 
@@ -3161,8 +3212,8 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-stage-timeline-item.is-warning .ai-stage-icon { color: #fbbf24; }
 
 .ai-stage-label { flex-shrink: 0; min-width: 80px; font-weight: 500; }
-.ai-stage-summary { flex: 1; color: var(--text-muted, #888); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ai-stage-duration { flex-shrink: 0; color: var(--text-muted, #888); font-family: monospace; font-size: 11px; }
+.ai-stage-summary { flex: 1; min-width: 0; color: var(--paper-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-stage-duration { flex-shrink: 0; color: var(--paper-dim); font-family: monospace; font-size: 11px; }
 
 /* ── 校验与 DryRun 控制台 ──────────────────────────────────── */
 
@@ -3311,7 +3362,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     border-radius: 12px;
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-    width: min(480px, 90vw);
+    width: min(560px, calc(100vw - 32px));
     max-height: 80vh;
     display: flex;
     flex-direction: column;
@@ -3319,6 +3370,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-apply-preview-header {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
     padding: 14px 18px;
     font-weight: 600;
@@ -3327,12 +3379,14 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 }
 .ai-apply-preview-header span {
     flex: 1;
+    min-width: 180px;
 }
 .ai-apply-preview-header small {
     color: var(--text-muted, #888);
     font-size: 11px;
     font-weight: 500;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 .ai-apply-preview-close {
     background: none;
