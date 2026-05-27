@@ -691,6 +691,12 @@ export class FlowEditorInteraction {
         debugLogger.debug('[DEBUG endConnection] === START CONNECTION ===');
         debugLogger.debug('[DEBUG endConnection] connectionStart:', JSON.stringify(this.connectionStart));
 
+        if (!this.connectionStart) {
+            console.warn('[DEBUG endConnection] connectionStart is null, cancelling connection cleanup');
+            this.cancelConnection();
+            return;
+        }
+
         let x = null;
         let y = null;
         let endPort = overrideEndPort;
