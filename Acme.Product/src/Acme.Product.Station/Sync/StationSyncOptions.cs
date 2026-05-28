@@ -1,3 +1,5 @@
+using Acme.Product.Runtime.Abstractions;
+
 namespace Acme.Product.Station.Sync;
 
 public sealed class StationSyncOptions
@@ -44,23 +46,7 @@ public sealed class StationSyncOptions
 
     public string PackageDirectory { get; set; } = "%LocalAppData%\\ClearVisionStation\\packages";
 
-    public string ResolvedStudioHubUrl
-    {
-        get
-        {
-            if (!string.IsNullOrWhiteSpace(StudioHubUrl))
-            {
-                return StudioHubUrl.Trim();
-            }
-
-            if (!string.IsNullOrWhiteSpace(StudioBaseUrl))
-            {
-                return StudioBaseUrl.Trim().TrimEnd('/') + "/hubs/station-ingest";
-            }
-
-            return string.Empty;
-        }
-    }
+    public string ResolvedStudioHubUrl => ResolveStudioHubUrl(StudioBaseUrl, StudioHubUrl);
 
     public string ResolvedSpoolDirectory
     {
@@ -88,5 +74,26 @@ public sealed class StationSyncOptions
 
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         return path.Replace("%LocalAppData%", localAppData, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static string ResolveStudioHubUrl(string? studioBaseUrl, string? studioHubUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(studioHubUrl))
+        {
+            return studioHubUrl.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(studioBaseUrl))
+        {
+            return string.Empty;
+        }
+
+        var normalizedBaseUrl = studioBaseUrl.Trim().TrimEnd('/');
+        if (normalizedBaseUrl.EndsWith(StationSyncContractDefaults.HubPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return normalizedBaseUrl;
+        }
+
+        return normalizedBaseUrl + StationSyncContractDefaults.HubPath;
     }
 }

@@ -12,6 +12,8 @@ public sealed class StationHubClient : IAsyncDisposable
     private readonly ILogger<StationHubClient> _logger;
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private HubConnection? _connection;
+    private ConnectionSignature? _connectionSignature;
+    private bool _disposed;
 
     public StationHubClient(
         IOptions<StationSyncOptions> options,
@@ -23,9 +25,17 @@ public sealed class StationHubClient : IAsyncDisposable
 
     public bool IsConnected => _connection?.State == HubConnectionState.Connected;
 
+    public string CurrentHubUrl => _connectionSignature?.HubUrl ?? _options.ResolvedStudioHubUrl;
+
+    public string LastErrorMessage { get; private set; } = string.Empty;
+
+    public DateTimeOffset? LastConnectedAtUtc { get; private set; }
+
+    public string ConnectionState => _connection?.State.ToString() ?? "Disconnected";
+
     public async Task<bool> EnsureConnectedAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_options.ResolvedStudioHubUrl))
+        if (_disposed)
         {
             return false;
         }
@@ -33,7 +43,24 @@ public sealed class StationHubClient : IAsyncDisposable
         await _connectionGate.WaitAsync(cancellationToken);
         try
         {
-            _connection ??= BuildConnection();
+            var desiredSignature = BuildConnectionSignature();
+            if (desiredSignature == null)
+            {
+                await DisposeConnectionCoreAsync();
+                return false;
+            }
+
+            if (_connection != null && !desiredSignature.Equals(_connectionSignature))
+            {
+                _logger.LogInformation(
+                    "Station sync connection settings changed. Reconnecting Studio Station hub from {OldHubUrl} to {NewHubUrl}.",
+                    _connectionSignature?.HubUrl ?? "none",
+                    desiredSignature.HubUrl);
+                await DisposeConnectionCoreAsync();
+            }
+
+            _connection ??= BuildConnection(desiredSignature);
+            _connectionSignature ??= desiredSignature;
             if (_connection.State == HubConnectionState.Connected ||
                 _connection.State == HubConnectionState.Connecting ||
                 _connection.State == HubConnectionState.Reconnecting)
@@ -42,11 +69,14 @@ public sealed class StationHubClient : IAsyncDisposable
             }
 
             await _connection.StartAsync(cancellationToken);
-            _logger.LogInformation("Connected to Studio Station hub at {HubUrl}", _connection?.State == HubConnectionState.Connected ? BuildHubUrl() : "unknown");
+            LastConnectedAtUtc = DateTimeOffset.UtcNow;
+            LastErrorMessage = string.Empty;
+            _logger.LogInformation("Connected to Studio Station hub at {HubUrl}", desiredSignature.HubUrl);
             return true;
         }
         catch (Exception ex)
         {
+            LastErrorMessage = ex.Message;
             _logger.LogWarning(ex, "Failed to connect to Studio Station hub.");
             return false;
         }
@@ -131,6 +161,49 @@ public sealed class StationHubClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        await _connectionGate.WaitAsync();
+        try
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            await DisposeConnectionCoreAsync();
+            _disposed = true;
+        }
+        finally
+        {
+            _connectionGate.Release();
+            _connectionGate.Dispose();
+        }
+    }
+
+    public async Task DisconnectAsync(CancellationToken cancellationToken)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        await _connectionGate.WaitAsync(cancellationToken);
+        try
+        {
+            await DisposeConnectionCoreAsync();
+        }
+        finally
+        {
+            _connectionGate.Release();
+        }
+    }
+
+    private async Task DisposeConnectionCoreAsync()
+    {
         if (_connection != null)
         {
             try
@@ -142,20 +215,21 @@ public sealed class StationHubClient : IAsyncDisposable
             }
         }
 
-        _connectionGate.Dispose();
+        _connection = null;
+        _connectionSignature = null;
     }
 
-    private HubConnection BuildConnection()
+    private HubConnection BuildConnection(ConnectionSignature signature)
     {
-        var hubUrl = BuildHubUrl();
         var connection = new HubConnectionBuilder()
             .WithUrl(
-                hubUrl,
+                signature.HubUrl,
                 options =>
                 {
                     options.Transports = HttpTransportType.WebSockets | HttpTransportType.LongPolling;
-                    options.AccessTokenProvider = () => Task.FromResult<string?>(_options.SharedToken);
-                    options.Headers[StationSyncContractDefaults.StationTokenHeaderName] = _options.SharedToken;
+                    options.AccessTokenProvider = () => Task.FromResult<string?>(signature.SharedToken);
+                    options.Headers[StationSyncContractDefaults.StationTokenHeaderName] = signature.SharedToken;
+                    options.Headers["X-Station-Token"] = signature.SharedToken;
                 })
             .WithAutomaticReconnect()
             .Build();
@@ -164,6 +238,7 @@ public sealed class StationHubClient : IAsyncDisposable
         {
             if (error != null)
             {
+                LastErrorMessage = error.Message;
                 _logger.LogWarning(error, "Studio Station hub connection closed.");
             }
 
@@ -174,6 +249,7 @@ public sealed class StationHubClient : IAsyncDisposable
         {
             if (error != null)
             {
+                LastErrorMessage = error.Message;
                 _logger.LogWarning(error, "Reconnecting to Studio Station hub.");
             }
 
@@ -182,6 +258,8 @@ public sealed class StationHubClient : IAsyncDisposable
 
         connection.Reconnected += connectionId =>
         {
+            LastConnectedAtUtc = DateTimeOffset.UtcNow;
+            LastErrorMessage = string.Empty;
             _logger.LogInformation("Reconnected to Studio Station hub. ConnectionId={ConnectionId}", connectionId);
             return Task.CompletedTask;
         };
@@ -202,13 +280,36 @@ public sealed class StationHubClient : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            LastErrorMessage = ex.Message;
             _logger.LogWarning(ex, "Studio Station hub invocation failed: {MethodName}", methodName);
             return default;
         }
     }
 
-    private string BuildHubUrl()
+    private ConnectionSignature? BuildConnectionSignature()
     {
-        return _options.ResolvedStudioHubUrl;
+        if (!_options.Enabled)
+        {
+            LastErrorMessage = "Station sync is disabled.";
+            return null;
+        }
+
+        var hubUrl = _options.ResolvedStudioHubUrl;
+        if (string.IsNullOrWhiteSpace(hubUrl))
+        {
+            LastErrorMessage = "Station sync is enabled but StudioHubUrl is empty.";
+            return null;
+        }
+
+        var sharedToken = _options.SharedToken ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(sharedToken))
+        {
+            LastErrorMessage = "Station sync is enabled but SharedToken is empty.";
+            return null;
+        }
+
+        return new ConnectionSignature(hubUrl.Trim(), sharedToken.Trim());
     }
+
+    private sealed record ConnectionSignature(string HubUrl, string SharedToken);
 }

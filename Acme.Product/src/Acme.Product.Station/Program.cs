@@ -34,6 +34,8 @@ internal static class Program
                 services.AddSingleton<StationLocalSettingsStore>();
                 services.AddSingleton<StationSiteProfileStore>();
                 services.Configure<Sync.StationSyncOptions>(context.Configuration.GetSection(Sync.StationSyncOptions.SectionName));
+                services.AddSingleton<Sync.StationSyncSettingsStore>();
+                services.AddSingleton<Sync.StationStudioConnectionTester>();
                 services.AddSingleton<Sync.StationIdentityResolver>();
                 services.AddSingleton<Sync.StationSpoolStore>();
                 services.AddSingleton<Sync.StationCommandResultSpoolStore>();

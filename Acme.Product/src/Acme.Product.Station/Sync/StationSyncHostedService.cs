@@ -23,6 +23,7 @@ public sealed class StationSyncHostedService : BackgroundService
     private readonly StationPackageDeploymentService _packageDeploymentService;
     private readonly StationLogRelayService _logRelayService;
     private readonly StationLocalSettingsStore _settingsStore;
+    private readonly StationSyncSettingsStore _syncSettingsStore;
     private readonly StationSyncOptions _options;
     private readonly ILogger<StationSyncHostedService> _logger;
     private readonly Channel<StationResultSummaryDto> _resultIngressChannel;
@@ -45,6 +46,7 @@ public sealed class StationSyncHostedService : BackgroundService
     private long _resultBackpressureWaits;
     private long _droppedResultSummaries;
     private long _overwrittenSnapshots;
+    private string? _lastSyncBlockReason;
 
     public StationSyncHostedService(
         RuntimeHost runtimeHost,
@@ -55,6 +57,7 @@ public sealed class StationSyncHostedService : BackgroundService
         StationPackageDeploymentService packageDeploymentService,
         StationLogRelayService logRelayService,
         StationLocalSettingsStore settingsStore,
+        StationSyncSettingsStore syncSettingsStore,
         IOptions<StationSyncOptions> options,
         ILogger<StationSyncHostedService> logger)
     {
@@ -66,6 +69,7 @@ public sealed class StationSyncHostedService : BackgroundService
         _packageDeploymentService = packageDeploymentService;
         _logRelayService = logRelayService;
         _settingsStore = settingsStore;
+        _syncSettingsStore = syncSettingsStore;
         _options = options.Value;
         _logger = logger;
         _resultIngressChannel = Channel.CreateBounded<StationResultSummaryDto>(
@@ -82,17 +86,13 @@ public sealed class StationSyncHostedService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!CanRunSync())
-        {
-            return;
-        }
-
         _snapshotDebounceTimer = new System.Threading.Timer(
             static state => ((StationSyncHostedService)state!).FlushDebouncedSnapshot(),
             this,
             Timeout.Infinite,
             Timeout.Infinite);
 
+        _syncSettingsStore.ConnectionSettingsChanged += HandleConnectionSettingsChanged;
         BindRuntimeEvents();
         HandleSnapshotChanged(_runtimeHost.GetSnapshot());
 
@@ -104,7 +104,12 @@ public sealed class StationSyncHostedService : BackgroundService
             while (!stoppingToken.IsCancellationRequested)
             {
                 var didWork = false;
-                if (!await _hubClient.EnsureConnectedAsync(stoppingToken))
+                if (!CanRunSync())
+                {
+                    _isRegistered = false;
+                    await _hubClient.DisconnectAsync(stoppingToken);
+                }
+                else if (!await _hubClient.EnsureConnectedAsync(stoppingToken))
                 {
                     _isRegistered = false;
                 }
@@ -129,6 +134,7 @@ public sealed class StationSyncHostedService : BackgroundService
         }
         finally
         {
+            _syncSettingsStore.ConnectionSettingsChanged -= HandleConnectionSettingsChanged;
             UnbindRuntimeEvents();
             _snapshotDebounceTimer?.Dispose();
             _resultIngressChannel.Writer.TryComplete();
@@ -148,25 +154,52 @@ public sealed class StationSyncHostedService : BackgroundService
 
     private bool CanRunSync()
     {
+        string? blockReason = null;
         if (!_options.Enabled)
         {
-            _logger.LogInformation("Station sync is disabled.");
-            return false;
+            blockReason = "Station sync is disabled.";
         }
-
-        if (string.IsNullOrWhiteSpace(_options.ResolvedStudioHubUrl))
+        else if (string.IsNullOrWhiteSpace(_options.ResolvedStudioHubUrl))
         {
-            _logger.LogWarning("Station sync is enabled but StudioHubUrl is empty.");
-            return false;
+            blockReason = "Station sync is enabled but StudioHubUrl is empty.";
         }
-
-        if (string.IsNullOrWhiteSpace(_options.SharedToken))
+        else if (string.IsNullOrWhiteSpace(_options.SharedToken))
         {
-            _logger.LogWarning("Station sync is enabled but SharedToken is empty.");
-            return false;
+            blockReason = "Station sync is enabled but SharedToken is empty.";
         }
 
-        return true;
+        if (blockReason == null)
+        {
+            _lastSyncBlockReason = null;
+            return true;
+        }
+
+        if (!string.Equals(_lastSyncBlockReason, blockReason, StringComparison.Ordinal))
+        {
+            if (_options.Enabled)
+            {
+                _logger.LogWarning("{Reason}", blockReason);
+            }
+            else
+            {
+                _logger.LogInformation("{Reason}", blockReason);
+            }
+
+            _lastSyncBlockReason = blockReason;
+        }
+
+        return false;
+    }
+
+    private void HandleConnectionSettingsChanged(object? sender, StationSyncConnectionSettings settings)
+    {
+        _isRegistered = false;
+        if (settings.Enabled)
+        {
+            HandleSnapshotChanged(_runtimeHost.GetSnapshot());
+        }
+
+        SignalSync();
     }
 
     private void BindRuntimeEvents()
@@ -185,6 +218,11 @@ public sealed class StationSyncHostedService : BackgroundService
 
     private void HandleResultAvailable(RuntimeNormalizedResult result)
     {
+        if (!_options.Enabled)
+        {
+            return;
+        }
+
         try
         {
             var identity = _identityResolver.GetOrCreate();
@@ -231,6 +269,11 @@ public sealed class StationSyncHostedService : BackgroundService
 
     private void HandleSnapshotChanged(RuntimeHostSnapshot snapshot)
     {
+        if (!_options.Enabled)
+        {
+            return;
+        }
+
         try
         {
             lock (_snapshotGate)
@@ -249,6 +292,11 @@ public sealed class StationSyncHostedService : BackgroundService
 
     private void HandleRuntimeLogMessage(string message)
     {
+        if (!_options.Enabled)
+        {
+            return;
+        }
+
         try
         {
             if (_logRelayService.TryEnqueue(DetectLogLevel(message), "RuntimeHost", message))

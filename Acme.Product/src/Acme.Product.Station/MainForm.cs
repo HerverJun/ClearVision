@@ -3,6 +3,7 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Infrastructure.Operators;
 using Acme.Product.Runtime;
 using Acme.Product.Runtime.Abstractions;
+using Acme.Product.Station.Sync;
 
 namespace Acme.Product.Station;
 
@@ -11,6 +12,9 @@ public sealed class MainForm : Form
     private readonly RuntimeHost _runtimeHost;
     private readonly StationLocalSettingsStore _settingsStore;
     private readonly StationSiteProfileStore _siteProfileStore;
+    private readonly StationSyncSettingsStore _syncSettingsStore;
+    private readonly StationHubClient _stationHubClient;
+    private readonly StationStudioConnectionTester _studioConnectionTester;
     private readonly ICameraManager _cameraManager;
     private readonly System.Windows.Forms.Timer _statusRefreshTimer = new();
     private readonly Label _selectedPathLabel = new();
@@ -44,6 +48,7 @@ public sealed class MainForm : Form
     private readonly Button _chooseFolderButton = new();
     private readonly Button _runFolderButton = new();
     private readonly Button _stopButton = new();
+    private readonly Button _studioConnectionButton = new();
     private readonly PictureBox _previewBox = new();
     private readonly ListView _recentResultsView = new();
     private readonly TextBox _logTextBox = new();
@@ -68,11 +73,17 @@ public sealed class MainForm : Form
         RuntimeHost runtimeHost,
         StationLocalSettingsStore settingsStore,
         StationSiteProfileStore siteProfileStore,
+        StationSyncSettingsStore syncSettingsStore,
+        StationHubClient stationHubClient,
+        StationStudioConnectionTester studioConnectionTester,
         ICameraManager cameraManager)
     {
         _runtimeHost = runtimeHost;
         _settingsStore = settingsStore;
         _siteProfileStore = siteProfileStore;
+        _syncSettingsStore = syncSettingsStore;
+        _stationHubClient = stationHubClient;
+        _studioConnectionTester = studioConnectionTester;
         _cameraManager = cameraManager;
 
         Text = "ClearVision 工作站";
@@ -465,6 +476,7 @@ public sealed class MainForm : Form
         ConfigureButton(_runSingleButton, "单张测试", async (_, _) => await RunSingleAsync());
         ConfigureButton(_runFolderButton, "启动系统", async (_, _) => await RunFolderAsync());
         ConfigureButton(_stopButton, "停止", async (_, _) => await StopAsync());
+        ConfigureButton(_studioConnectionButton, "Studio 连接", (_, _) => ShowStudioConnectionDialog());
 
         _selectedPathLabel.AutoSize = false;
         _selectedPathLabel.Dock = DockStyle.Fill;
@@ -481,7 +493,8 @@ public sealed class MainForm : Form
             _chooseImageButton,
             _runSingleButton,
             _runFolderButton,
-            _stopButton
+            _stopButton,
+            _studioConnectionButton
         ]);
 
         layout.Controls.Add(buttonPanel, 0, 0);
@@ -1431,6 +1444,15 @@ public sealed class MainForm : Form
     private void PersistStationIdentity()
     {
         _settingsStore.UpdateStationIdentity(_stationIdTextBox.Text, _lineNameTextBox.Text);
+    }
+
+    private void ShowStudioConnectionDialog()
+    {
+        using var dialog = new StudioConnectionDialog(
+            _syncSettingsStore,
+            _stationHubClient,
+            _studioConnectionTester);
+        dialog.ShowDialog(this);
     }
 
     private void ConfigureButton(Button button, string text, EventHandler onClick)
