@@ -1,7 +1,17 @@
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text.Json;
+using Acme.Product.Application.DTOs;
+using Acme.Product.Core.Enums;
+using Acme.Product.Core.Services;
+using Acme.Product.Runtime;
+using Acme.Product.Runtime.Abstractions;
+using Acme.Product.Station;
 using Acme.Product.Station.Sync;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using NSubstitute;
 
 namespace Acme.Product.Desktop.Tests;
 
@@ -107,5 +117,110 @@ public sealed class StationPackageDeploymentServiceTests
         result.Should().NotContain(Path.DirectorySeparatorChar.ToString());
         result.Should().NotContain(Path.AltDirectorySeparatorChar.ToString());
         result.Should().Be("_pkg_evil");
+    }
+
+    [Fact]
+    public async Task LoadPackageWithLocalProfileAsync_ShouldApplyPersistedSiteProfile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionPackageProfileLoadTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var operatorId = Guid.NewGuid();
+            var exporter = new RuntimePackageExporter(
+                new Acme.Product.Infrastructure.Services.OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                TargetRootDirectory = root,
+                Project = new ProjectDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "profile-load",
+                    Flow = new OperatorFlowDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "main",
+                        Operators =
+                        [
+                            new OperatorDto
+                            {
+                                Id = operatorId,
+                                Name = "TemplateMatch",
+                                Type = OperatorType.TemplateMatching,
+                                Parameters =
+                                [
+                                    new ParameterDto
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        Name = "threshold",
+                                        DisplayName = "Match threshold",
+                                        DataType = "double",
+                                        Value = 0.8d,
+                                        DefaultValue = 0.8d,
+                                        MinValue = 0.0d,
+                                        MaxValue = 1.0d,
+                                        IsRequired = true
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            });
+
+            var loader = new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance);
+            var package = await loader.LoadAsync(export.PackageRootPath);
+            var siteProfileStore = new StationSiteProfileStore(Path.Combine(root, "station"));
+            var parameterId = $"node.{operatorId:D}.threshold";
+            siteProfileStore.Save(package, new RuntimeSiteProfile
+            {
+                PackageId = package.Manifest.PackageId,
+                FlowHash = package.Manifest.FlowHash,
+                Overrides =
+                [
+                    new RuntimeParameterOverride
+                    {
+                        ParameterId = parameterId,
+                        Value = JsonSerializer.SerializeToElement(0.9d)
+                    }
+                ]
+            });
+
+            await using var runtimeHost = new RuntimeHost(
+                Substitute.For<IFlowExecutionService>(),
+                loader,
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+            var service = new StationPackageDeploymentService(
+                Options.Create(new StationSyncOptions
+                {
+                    PackageDirectory = Path.Combine(root, "packages"),
+                    StudioHubUrl = "http://localhost/hubs/station-ingest"
+                }),
+                runtimeHost,
+                new StationLocalSettingsStore(Path.Combine(root, "settings")),
+                siteProfileStore,
+                NullLogger<StationPackageDeploymentService>.Instance);
+
+            var method = typeof(StationPackageDeploymentService).GetMethod(
+                "LoadPackageWithLocalProfileAsync",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            method.Should().NotBeNull();
+            await ((Task)method!.Invoke(service, [export.PackageRootPath, CancellationToken.None])!);
+
+            var activeProfile = runtimeHost.ActiveSiteProfile;
+            activeProfile.Should().NotBeNull();
+            activeProfile!.Overrides.Should().ContainSingle();
+            activeProfile.Overrides.Single().ParameterId.Should().Be(parameterId);
+            activeProfile.Overrides.Single().Value.GetDouble().Should().Be(0.9d);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 }

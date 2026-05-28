@@ -146,6 +146,24 @@ public sealed class RuntimeHost : IAsyncDisposable
         string imagePath,
         CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(imagePath))
+        {
+            throw new RuntimePackageException("Input image path is required.");
+        }
+
+        return await RunSingleCoreWithStateAsync(imagePath, cancellationToken);
+    }
+
+    public async Task<RuntimeNormalizedResult> RunPackageConfiguredSingleAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await RunSingleCoreWithStateAsync(null, cancellationToken);
+    }
+
+    private async Task<RuntimeNormalizedResult> RunSingleCoreWithStateAsync(
+        string? imagePath,
+        CancellationToken cancellationToken)
+    {
         CancellationTokenSource runCts;
         Task<RuntimeNormalizedResult> backgroundRunTask;
         long runGeneration;
@@ -416,16 +434,23 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
     }
 
-    private async Task<RuntimeNormalizedResult> ExecuteSingleCoreAsync(string imagePath, CancellationToken cancellationToken)
+    private async Task<RuntimeNormalizedResult> ExecuteSingleCoreAsync(string? imagePath, CancellationToken cancellationToken)
     {
         var package = _loadedPackage ?? throw new RuntimePackageException("当前尚未加载运行包。");
-        if (!File.Exists(imagePath))
+        byte[]? sourceImageBytes = null;
+        if (!string.IsNullOrWhiteSpace(imagePath) && !File.Exists(imagePath))
         {
             throw new RuntimePackageException($"输入图片不存在：{imagePath}");
         }
 
-        var sourceImageBytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
-        var imageId = BuildImageId(imagePath);
+        if (!string.IsNullOrWhiteSpace(imagePath))
+        {
+            sourceImageBytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
+        }
+
+        var imageId = string.IsNullOrWhiteSpace(imagePath)
+            ? BuildGeneratedImageId()
+            : BuildImageId(imagePath);
         var startedAt = DateTimeOffset.UtcNow;
         var runId = Guid.NewGuid().ToString("N");
         _currentRunId = runId;
@@ -459,10 +484,7 @@ public sealed class RuntimeHost : IAsyncDisposable
 
             var flowResult = await _flowExecutionService.ExecuteFlowAsync(
                 flow,
-                new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["Image"] = sourceImageBytes
-                },
+                BuildFlowInputData(sourceImageBytes),
                 cancellationToken: timeoutCts.Token);
 
             var normalizedResult = _resultNormalizer.Normalize(
@@ -648,6 +670,24 @@ public sealed class RuntimeHost : IAsyncDisposable
         return RuntimePathGuard.SanitizeFileName(fileName, Guid.NewGuid().ToString("N"));
     }
 
+    private static string BuildGeneratedImageId()
+    {
+        return $"package-configured-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}";
+    }
+
+    private static Dictionary<string, object>? BuildFlowInputData(byte[]? sourceImageBytes)
+    {
+        if (sourceImageBytes is not { Length: > 0 })
+        {
+            return null;
+        }
+
+        return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Image"] = sourceImageBytes
+        };
+    }
+
     private static IEnumerable<string> EnumerateReplayFiles(string folderPath, RuntimeProfile profile)
     {
         if (!Directory.Exists(folderPath))
@@ -738,8 +778,8 @@ public sealed class RuntimeResultNormalizer
         RuntimePackage package,
         string runId,
         string imageId,
-        string imagePath,
-        byte[] sourceImageBytes,
+        string? imagePath,
+        byte[]? sourceImageBytes,
         FlowExecutionResult flowResult,
         DateTimeOffset startedAtUtc,
         DateTimeOffset completedAtUtc,
@@ -789,8 +829,8 @@ public sealed class RuntimeResultNormalizer
         RuntimePackage package,
         string runId,
         string imageId,
-        string imagePath,
-        byte[] sourceImageBytes,
+        string? imagePath,
+        byte[]? sourceImageBytes,
         FlowValidationResult validation,
         DateTimeOffset startedAtUtc,
         DateTimeOffset completedAtUtc)
@@ -813,8 +853,8 @@ public sealed class RuntimeResultNormalizer
         RuntimePackage package,
         string runId,
         string imageId,
-        string imagePath,
-        byte[] sourceImageBytes,
+        string? imagePath,
+        byte[]? sourceImageBytes,
         DateTimeOffset startedAtUtc,
         DateTimeOffset completedAtUtc)
     {
@@ -836,8 +876,8 @@ public sealed class RuntimeResultNormalizer
         RuntimePackage package,
         string runId,
         string imageId,
-        string imagePath,
-        byte[] sourceImageBytes,
+        string? imagePath,
+        byte[]? sourceImageBytes,
         Exception exception,
         DateTimeOffset startedAtUtc,
         DateTimeOffset completedAtUtc)
@@ -860,8 +900,8 @@ public sealed class RuntimeResultNormalizer
         RuntimePackage package,
         string runId,
         string imageId,
-        string imagePath,
-        byte[] sourceImageBytes,
+        string? imagePath,
+        byte[]? sourceImageBytes,
         RuntimeRunOutcome outcome,
         InspectionStatus? inspectionStatus,
         string diagnosticCode,

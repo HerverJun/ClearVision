@@ -1025,8 +1025,38 @@ public sealed class MainForm : Form
         UpdateButtonStates();
     }
 
+    private void SyncLoadedPackageFromRuntimeHost()
+    {
+        var hostPackage = _runtimeHost.LoadedPackage;
+        if (hostPackage == null)
+        {
+            if (_loadedPackage != null || _activeSiteProfile != null)
+            {
+                _loadedPackage = null;
+                _activeSiteProfile = null;
+                _runtimeParameterPanel.LoadPackage(null, null);
+            }
+
+            return;
+        }
+
+        var hostProfile = _runtimeHost.ActiveSiteProfile ?? _siteProfileStore.LoadOrCreate(hostPackage);
+        var packageChanged = !ReferenceEquals(hostPackage, _loadedPackage);
+        var profileChanged = !ProfilesMatch(hostProfile, _activeSiteProfile);
+        if (!packageChanged && !profileChanged)
+        {
+            return;
+        }
+
+        _loadedPackage = hostPackage;
+        _activeSiteProfile = hostProfile;
+        _runtimeParameterPanel.LoadPackage(_loadedPackage, _activeSiteProfile);
+    }
+
     private void ApplySnapshot(RuntimeHostSnapshot snapshot)
     {
+        SyncLoadedPackageFromRuntimeHost();
+
         _statusValueLabel.Text = snapshot.State switch
         {
             RuntimeHostState.Running => "运行中",
@@ -1368,6 +1398,29 @@ public sealed class MainForm : Form
             ? "单张图片运行"
             : (_selectedFolderPath != null ? "批量文件夹运行" : "请选择图片或文件夹");
         _taskDetailLabel.Text = taskSource;
+    }
+
+    private static bool ProfilesMatch(RuntimeSiteProfile? left, RuntimeSiteProfile? right)
+    {
+        if (left == null || right == null)
+        {
+            return left == null && right == null;
+        }
+
+        return string.Equals(left.ProfileId, right.ProfileId, StringComparison.Ordinal) &&
+               string.Equals(left.PackageId, right.PackageId, StringComparison.Ordinal) &&
+               string.Equals(left.FlowHash, right.FlowHash, StringComparison.OrdinalIgnoreCase) &&
+               left.Revision == right.Revision &&
+               left.UpdatedAtUtc == right.UpdatedAtUtc &&
+               left.Overrides.Count == right.Overrides.Count &&
+               left.Overrides
+                   .OrderBy(item => item.ParameterId, StringComparer.Ordinal)
+                   .Zip(
+                       right.Overrides.OrderBy(item => item.ParameterId, StringComparer.Ordinal),
+                       (leftOverride, rightOverride) =>
+                           string.Equals(leftOverride.ParameterId, rightOverride.ParameterId, StringComparison.Ordinal) &&
+                           string.Equals(leftOverride.Value.GetRawText(), rightOverride.Value.GetRawText(), StringComparison.Ordinal))
+                   .All(match => match);
     }
 
     private static string GetParameterString(Acme.Product.Application.DTOs.OperatorDto op, string parameterName, string fallback)

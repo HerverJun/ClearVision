@@ -99,6 +99,8 @@ public sealed class RuntimeParameterDefinition
 
     public double? Step { get; set; }
 
+    public bool RequiresInteger { get; set; }
+
     public bool SiteTunable { get; set; } = true;
 
     public bool RequiresEngineerMode { get; set; } = true;

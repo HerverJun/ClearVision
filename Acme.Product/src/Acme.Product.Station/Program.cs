@@ -61,6 +61,7 @@ internal static class Program
         {
             host.StopAsync().GetAwaiter().GetResult();
             host.Services.GetRequiredService<RuntimeHost>().DisposeAsync().AsTask().GetAwaiter().GetResult();
+            Acme.Product.Infrastructure.Operators.PlcCommunicationOperatorBase.StopHeartbeat();
         }
     }
 

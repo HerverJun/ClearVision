@@ -104,6 +104,11 @@ public static class RuntimeParameterValidator
             return;
         }
 
+        if (definition.RequiresInteger && !IsWholeNumber(number))
+        {
+            result.Errors.Add($"Runtime parameter '{definition.Id}' value {number} must be an integer.");
+        }
+
         if (definition.Min.HasValue && number < definition.Min.Value)
         {
             result.Errors.Add($"Runtime parameter '{definition.Id}' value {number} is below min {definition.Min.Value}.");
@@ -113,5 +118,10 @@ public static class RuntimeParameterValidator
         {
             result.Errors.Add($"Runtime parameter '{definition.Id}' value {number} is above max {definition.Max.Value}.");
         }
+    }
+
+    private static bool IsWholeNumber(double number)
+    {
+        return double.IsFinite(number) && Math.Abs(number - Math.Round(number)) <= 0.000_000_1d;
     }
 }

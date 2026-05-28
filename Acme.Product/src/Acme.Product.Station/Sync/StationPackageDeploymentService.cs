@@ -14,6 +14,7 @@ public sealed class StationPackageDeploymentService
     private readonly StationSyncOptions _options;
     private readonly RuntimeHost _runtimeHost;
     private readonly StationLocalSettingsStore _settingsStore;
+    private readonly StationSiteProfileStore _siteProfileStore;
     private readonly ILogger<StationPackageDeploymentService> _logger;
     private readonly HttpClient _httpClient = new();
 
@@ -21,11 +22,13 @@ public sealed class StationPackageDeploymentService
         IOptions<StationSyncOptions> options,
         RuntimeHost runtimeHost,
         StationLocalSettingsStore settingsStore,
+        StationSiteProfileStore siteProfileStore,
         ILogger<StationPackageDeploymentService> logger)
     {
         _options = options.Value;
         _runtimeHost = runtimeHost;
         _settingsStore = settingsStore;
+        _siteProfileStore = siteProfileStore;
         _logger = logger;
     }
 
@@ -90,7 +93,7 @@ public sealed class StationPackageDeploymentService
                 throw new InvalidOperationException("Package is missing runtime package.json.");
             }
 
-            await _runtimeHost.LoadPackageAsync(activeRoot, cancellationToken);
+            await LoadPackageWithLocalProfileAsync(activeRoot, cancellationToken);
             _settingsStore.UpdateLastGoodPackage(activeRoot);
             return $"Package {payload.PackageId} deployed.";
         }
@@ -141,6 +144,13 @@ public sealed class StationPackageDeploymentService
         }
 
         return new Uri(baseUri, downloadUrl);
+    }
+
+    private async Task LoadPackageWithLocalProfileAsync(string packageRoot, CancellationToken cancellationToken)
+    {
+        var package = await _runtimeHost.LoadPackageAsync(packageRoot, cancellationToken);
+        var profile = _siteProfileStore.LoadOrCreate(package);
+        _runtimeHost.SetActiveSiteProfile(profile);
     }
 
     private static bool IsSameOrigin(Uri expectedOrigin, Uri candidate)

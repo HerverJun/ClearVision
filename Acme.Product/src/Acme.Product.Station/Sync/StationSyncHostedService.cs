@@ -23,6 +23,7 @@ public sealed class StationSyncHostedService : BackgroundService
     private readonly StationPackageDeploymentService _packageDeploymentService;
     private readonly StationLogRelayService _logRelayService;
     private readonly StationLocalSettingsStore _settingsStore;
+    private readonly StationSiteProfileStore _siteProfileStore;
     private readonly StationSyncSettingsStore _syncSettingsStore;
     private readonly StationSyncOptions _options;
     private readonly ILogger<StationSyncHostedService> _logger;
@@ -57,6 +58,7 @@ public sealed class StationSyncHostedService : BackgroundService
         StationPackageDeploymentService packageDeploymentService,
         StationLogRelayService logRelayService,
         StationLocalSettingsStore settingsStore,
+        StationSiteProfileStore siteProfileStore,
         StationSyncSettingsStore syncSettingsStore,
         IOptions<StationSyncOptions> options,
         ILogger<StationSyncHostedService> logger)
@@ -69,6 +71,7 @@ public sealed class StationSyncHostedService : BackgroundService
         _packageDeploymentService = packageDeploymentService;
         _logRelayService = logRelayService;
         _settingsStore = settingsStore;
+        _siteProfileStore = siteProfileStore;
         _syncSettingsStore = syncSettingsStore;
         _options = options.Value;
         _logger = logger;
@@ -648,6 +651,9 @@ public sealed class StationSyncHostedService : BackgroundService
                 case StationCommandType.Ping:
                     await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, "Pong", stoppingToken);
                     break;
+                case StationCommandType.StartRuntime:
+                    await StartRuntimeAsync(command, stoppingToken);
+                    break;
                 case StationCommandType.StopRuntime:
                     await _runtimeHost.StopAsync(stoppingToken);
                     await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, "Runtime stop requested.", stoppingToken);
@@ -659,12 +665,15 @@ public sealed class StationSyncHostedService : BackgroundService
                     var message = await _packageDeploymentService.DeployAsync(command.PayloadJson, stoppingToken);
                     await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, message, stoppingToken);
                     break;
+                case StationCommandType.ApplySiteProfile:
+                    await ApplySiteProfileAsync(command, stoppingToken);
+                    break;
                 case StationCommandType.CollectLogs:
                     var collectMessage = await CollectLogsAsync(command, stoppingToken);
                     await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, collectMessage, stoppingToken);
                     break;
                 default:
-                    await ReportCommandAsync(command, StationCommandStatus.Rejected, 0, $"{command.CommandType} is not supported by this Station build.", stoppingToken, "NotSupported");
+                    await ReportCommandAsync(command, StationCommandStatus.Failed, 100, $"{command.CommandType} is not supported by this Station build.", stoppingToken, "NotSupported");
                     break;
             }
         }
@@ -676,6 +685,56 @@ public sealed class StationSyncHostedService : BackgroundService
         }
 
         return true;
+    }
+
+    private async Task StartRuntimeAsync(StationCommandDto command, CancellationToken cancellationToken)
+    {
+        var payload = JsonSerializer.Deserialize<StartRuntimePayload>(
+            string.IsNullOrWhiteSpace(command.PayloadJson) ? "{}" : command.PayloadJson,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new StartRuntimePayload();
+
+        if (!string.IsNullOrWhiteSpace(payload.FolderPath))
+        {
+            await _runtimeHost.StartFolderRunAsync(payload.FolderPath, cancellationToken);
+            await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, "Folder runtime started.", cancellationToken);
+            return;
+        }
+
+        var result = !string.IsNullOrWhiteSpace(payload.ImagePath)
+            ? await _runtimeHost.RunSingleAsync(payload.ImagePath, cancellationToken)
+            : await _runtimeHost.RunPackageConfiguredSingleAsync(cancellationToken);
+
+        await ReportCommandAsync(
+            command,
+            result.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled
+                ? StationCommandStatus.Failed
+                : StationCommandStatus.Succeeded,
+            100,
+            $"Runtime completed: {result.Outcome}, runId={result.RunId}, diagnostic={result.DiagnosticCode}.",
+            cancellationToken,
+            result.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled ? result.DiagnosticCode : null,
+            result.DiagnosticMessage);
+    }
+
+    private async Task ApplySiteProfileAsync(StationCommandDto command, CancellationToken cancellationToken)
+    {
+        var package = _runtimeHost.LoadedPackage;
+        if (package == null)
+        {
+            await ReportCommandAsync(command, StationCommandStatus.Failed, 100, "No active package is loaded.", cancellationToken, "NoActivePackage");
+            return;
+        }
+
+        var profile = DeserializeSiteProfilePayload(command.PayloadJson);
+        var savedProfile = _siteProfileStore.Save(package, profile);
+        _runtimeHost.SetActiveSiteProfile(savedProfile);
+
+        await ReportCommandAsync(
+            command,
+            StationCommandStatus.Succeeded,
+            100,
+            $"Site profile applied: revision={savedProfile.Revision}, overrides={savedProfile.Overrides.Count}.",
+            cancellationToken);
     }
 
     private async Task<string> CollectLogsAsync(StationCommandDto command, CancellationToken cancellationToken)
@@ -754,11 +813,13 @@ public sealed class StationSyncHostedService : BackgroundService
         var packageRoot = _runtimeHost.LoadedPackage?.RootPath;
         if (string.IsNullOrWhiteSpace(packageRoot))
         {
-            await ReportCommandAsync(command, StationCommandStatus.Rejected, 0, "No active package is loaded.", cancellationToken, "NoActivePackage");
+            await ReportCommandAsync(command, StationCommandStatus.Failed, 100, "No active package is loaded.", cancellationToken, "NoActivePackage");
             return;
         }
 
-        await _runtimeHost.LoadPackageAsync(packageRoot, cancellationToken);
+        var package = await _runtimeHost.LoadPackageAsync(packageRoot, cancellationToken);
+        var profile = _siteProfileStore.LoadOrCreate(package);
+        _runtimeHost.SetActiveSiteProfile(profile);
         await ReportCommandAsync(command, StationCommandStatus.Succeeded, 100, "Runtime package reloaded.", cancellationToken);
     }
 
@@ -1026,6 +1087,38 @@ public sealed class StationSyncHostedService : BackgroundService
             RuntimeHostState.Running or RuntimeHostState.Idle => "Ready: PLC status is reported by PLC operators when configured.",
             _ => $"Disconnected: runtime host state is {snapshot.State}."
         };
+    }
+
+    private static RuntimeSiteProfile DeserializeSiteProfilePayload(string? payloadJson)
+    {
+        if (string.IsNullOrWhiteSpace(payloadJson))
+        {
+            throw new InvalidOperationException("ApplySiteProfile payload is empty.");
+        }
+
+        using var document = JsonDocument.Parse(payloadJson);
+        var root = document.RootElement;
+        foreach (var propertyName in new[] { "profile", "siteProfile" })
+        {
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty(propertyName, out var profileElement))
+            {
+                return profileElement.Deserialize<RuntimeSiteProfile>(
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                    ?? throw new InvalidOperationException("ApplySiteProfile profile is invalid.");
+            }
+        }
+
+        return root.Deserialize<RuntimeSiteProfile>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidOperationException("ApplySiteProfile payload is invalid.");
+    }
+
+    private sealed class StartRuntimePayload
+    {
+        public string? ImagePath { get; set; }
+
+        public string? FolderPath { get; set; }
     }
 
     private sealed class CollectLogsPayload

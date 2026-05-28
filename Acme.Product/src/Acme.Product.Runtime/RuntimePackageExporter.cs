@@ -267,7 +267,212 @@ public sealed class RuntimePackageExporter
             order += 10;
         }
 
+        foreach (var op in flow.Operators)
+        {
+            if (!op.IsEnabled)
+            {
+                continue;
+            }
+
+            foreach (var parameter in op.Parameters)
+            {
+                var parameterId = BuildParameterId(op.Id, parameter.Name);
+                if (schema.Parameters.Any(existing => existing.Id.Equals(parameterId, StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+
+                if (!TryBuildRuntimeParameterDefinition(op, parameter, order, out var definition))
+                {
+                    continue;
+                }
+
+                schema.Parameters.Add(definition);
+                order += 10;
+            }
+        }
+
         return schema;
+    }
+
+    private static bool TryBuildRuntimeParameterDefinition(
+        OperatorDto op,
+        ParameterDto parameter,
+        int order,
+        out RuntimeParameterDefinition definition)
+    {
+        definition = null!;
+        if (!ShouldExposeRuntimeParameter(op, parameter))
+        {
+            return false;
+        }
+
+        var defaultValue = TryReadDouble(parameter.Value, out var current)
+            ? current
+            : (TryReadDouble(parameter.DefaultValue, out var fallback) ? fallback : 0.0d);
+
+        if (!TryInferRuntimeParameterBounds(parameter, defaultValue, out var min, out var max))
+        {
+            return false;
+        }
+
+        var displayName = !string.IsNullOrWhiteSpace(parameter.DisplayName)
+            ? parameter.DisplayName.Trim()
+            : $"{ResolveOperatorName(op)}.{parameter.Name}";
+
+        definition = new RuntimeParameterDefinition
+        {
+            Id = BuildParameterId(op.Id, parameter.Name),
+            OperatorId = op.Id,
+            OperatorName = op.Name,
+            OperatorType = op.Type.ToString(),
+            ParameterName = parameter.Name,
+            DisplayName = displayName,
+            Description = parameter.Description,
+            GroupName = ResolveOperatorName(op),
+            ValueType = RuntimeParameterValueType.Number,
+            UiKind = RuntimeParameterUiKind.NumericInput,
+            DefaultValue = JsonSerializer.SerializeToElement(defaultValue, RuntimeJson.SerializerOptions),
+            Min = min,
+            Max = max,
+            Step = InferRuntimeParameterStep(parameter, min, max),
+            RequiresInteger = IsIntegerParameterType(parameter.DataType),
+            SiteTunable = true,
+            RequiresEngineerMode = true,
+            ApplyMode = RuntimeParameterApplyMode.NextRun,
+            Order = order
+        };
+        return true;
+    }
+
+    private static bool ShouldExposeRuntimeParameter(OperatorDto op, ParameterDto parameter)
+    {
+        if (!op.IsEnabled ||
+            string.IsNullOrWhiteSpace(parameter.Name) ||
+            LooksLikeFileParameter(parameter) ||
+            LooksLikeSecretParameter(parameter) ||
+            !IsNumericParameterType(parameter.DataType))
+        {
+            return false;
+        }
+
+        if (!TryReadDouble(parameter.Value, out _) &&
+            !TryReadDouble(parameter.DefaultValue, out _))
+        {
+            return false;
+        }
+
+        if (TryReadDouble(parameter.MinValue, out _) ||
+            TryReadDouble(parameter.MaxValue, out _))
+        {
+            return true;
+        }
+
+        return LooksLikeCoordinateParameter(parameter.Name) ||
+               LooksLikeNormalizedParameter(parameter.Name) ||
+               LooksLikeByteThresholdParameter(parameter.Name);
+    }
+
+    private static bool TryInferRuntimeParameterBounds(
+        ParameterDto parameter,
+        double defaultValue,
+        out double min,
+        out double max)
+    {
+        var hasMin = TryReadDouble(parameter.MinValue, out min);
+        var hasMax = TryReadDouble(parameter.MaxValue, out max);
+
+        if (!hasMin && !hasMax)
+        {
+            if (LooksLikeNormalizedParameter(parameter.Name) && defaultValue is >= 0.0d and <= 1.0d)
+            {
+                min = 0.0d;
+                max = 1.0d;
+            }
+            else if (LooksLikeByteThresholdParameter(parameter.Name))
+            {
+                min = 0.0d;
+                max = 255.0d;
+            }
+            else if (LooksLikeCoordinateParameter(parameter.Name))
+            {
+                min = 0.0d;
+                max = 10_000.0d;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        else if (!hasMin)
+        {
+            min = Math.Min(0.0d, defaultValue);
+        }
+        else if (!hasMax)
+        {
+            if (LooksLikeNormalizedParameter(parameter.Name) && defaultValue is >= 0.0d and <= 1.0d)
+            {
+                max = 1.0d;
+            }
+            else
+            {
+                var spanSeed = Math.Max(1.0d, Math.Max(Math.Abs(defaultValue), Math.Abs(defaultValue - min)));
+                max = min + spanSeed * 10.0d;
+            }
+        }
+
+        if (double.IsNaN(min) || double.IsNaN(max) || double.IsInfinity(min) || double.IsInfinity(max))
+        {
+            return false;
+        }
+
+        if (max < min)
+        {
+            (min, max) = (max, min);
+        }
+
+        if (Math.Abs(max - min) < double.Epsilon)
+        {
+            max = min + 1.0d;
+        }
+
+        if (defaultValue < min)
+        {
+            min = defaultValue;
+        }
+
+        if (defaultValue > max)
+        {
+            max = defaultValue;
+        }
+
+        return true;
+    }
+
+    private static double InferRuntimeParameterStep(ParameterDto parameter, double min, double max)
+    {
+        if (IsIntegerParameterType(parameter.DataType))
+        {
+            return 1.0d;
+        }
+
+        var range = Math.Abs(max - min);
+        if (range <= 1.0d || LooksLikeNormalizedParameter(parameter.Name))
+        {
+            return 0.01d;
+        }
+
+        if (range <= 10.0d)
+        {
+            return 0.1d;
+        }
+
+        return 1.0d;
+    }
+
+    private static string ResolveOperatorName(OperatorDto op)
+    {
+        return string.IsNullOrWhiteSpace(op.Name) ? op.Type.ToString() : op.Name.Trim();
     }
 
     private static OperatorFlowDto CloneFlow(OperatorFlowDto flow)
@@ -643,6 +848,59 @@ public sealed class RuntimePackageExporter
         return parameter.Name.EndsWith("Path", StringComparison.OrdinalIgnoreCase) ||
                parameter.Name.EndsWith("Directory", StringComparison.OrdinalIgnoreCase) ||
                parameter.Name.EndsWith("Folder", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeSecretParameter(ParameterDto parameter)
+    {
+        return SecretLikeTokens.Any(token =>
+            parameter.Name.Contains(token, StringComparison.OrdinalIgnoreCase) ||
+            parameter.DataType.Contains(token, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsNumericParameterType(string? dataType)
+    {
+        return dataType is not null &&
+               (dataType.Equals("int", StringComparison.OrdinalIgnoreCase) ||
+                dataType.Equals("integer", StringComparison.OrdinalIgnoreCase) ||
+                dataType.Equals("long", StringComparison.OrdinalIgnoreCase) ||
+                dataType.Equals("float", StringComparison.OrdinalIgnoreCase) ||
+                dataType.Equals("double", StringComparison.OrdinalIgnoreCase) ||
+                dataType.Equals("decimal", StringComparison.OrdinalIgnoreCase) ||
+                dataType.Equals("number", StringComparison.OrdinalIgnoreCase) ||
+                dataType.Equals("numeric", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsIntegerParameterType(string? dataType)
+    {
+        return dataType is not null &&
+               (dataType.Equals("int", StringComparison.OrdinalIgnoreCase) ||
+                dataType.Equals("integer", StringComparison.OrdinalIgnoreCase) ||
+                dataType.Equals("long", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool LooksLikeNormalizedParameter(string parameterName)
+    {
+        return parameterName.Contains("confidence", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Contains("score", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Contains("iou", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Contains("ratio", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeByteThresholdParameter(string parameterName)
+    {
+        return parameterName.Contains("threshold", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeCoordinateParameter(string parameterName)
+    {
+        return parameterName.Equals("x", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Equals("y", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Equals("x1", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Equals("y1", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Equals("x2", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Equals("y2", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.EndsWith("X", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.EndsWith("Y", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? NormalizeScalar(object? value)

@@ -315,6 +315,110 @@ public sealed class StationRegistryServiceTests
     }
 
     [Fact]
+    public async Task CentralStore_ShouldPersistStartRuntimeAndApplySiteProfileCommandLifecycle()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCommandLifecycleTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var store = CreateCentralStore(provider);
+            var start = store.CreateCommand(
+                "station-command",
+                StationCommandType.StartRuntime,
+                """{"imagePath":"D:\\station\\samples\\a.png"}""",
+                "unit-test",
+                TimeSpan.FromMinutes(5));
+            var deliveredStart = store.PollCommand("station-command");
+
+            deliveredStart.Should().NotBeNull();
+            deliveredStart!.CommandId.Should().Be(start.CommandId);
+            deliveredStart.CommandType.Should().Be(StationCommandType.StartRuntime);
+
+            store.ReportCommandResult(new StationCommandResultDto
+            {
+                CommandId = start.CommandId,
+                StationId = "station-command",
+                Status = StationCommandStatus.Accepted,
+                ProgressPercent = 0,
+                Message = "Accepted"
+            });
+            store.ReportCommandResult(new StationCommandResultDto
+            {
+                CommandId = start.CommandId,
+                StationId = "station-command",
+                Status = StationCommandStatus.Succeeded,
+                ProgressPercent = 100,
+                Message = "Runtime completed: Ok"
+            });
+
+            var apply = store.CreateCommand(
+                "station-command",
+                StationCommandType.ApplySiteProfile,
+                """{"profile":{"packageId":"pkg-1","flowHash":"sha256:abc","overrides":[]}}""",
+                "unit-test",
+                TimeSpan.FromMinutes(5));
+            var deliveredApply = store.PollCommand("station-command");
+
+            deliveredApply.Should().NotBeNull();
+            deliveredApply!.CommandId.Should().Be(apply.CommandId);
+            deliveredApply.CommandType.Should().Be(StationCommandType.ApplySiteProfile);
+            store.ReportCommandResult(new StationCommandResultDto
+            {
+                CommandId = apply.CommandId,
+                StationId = "station-command",
+                Status = StationCommandStatus.Accepted,
+                ProgressPercent = 0,
+                Message = "Accepted"
+            });
+            store.ReportCommandResult(new StationCommandResultDto
+            {
+                CommandId = apply.CommandId,
+                StationId = "station-command",
+                Status = StationCommandStatus.Succeeded,
+                ProgressPercent = 100,
+                Message = "Site profile applied"
+            });
+
+            await using var verifyScope = provider.CreateAsyncScope();
+            var db = verifyScope.ServiceProvider.GetRequiredService<VisionDbContext>();
+            var commands = await db.StationCommandRecords
+                .Where(item => item.StationId == "station-command")
+                .ToListAsync();
+            commands.Should().HaveCount(2);
+            commands.Should().OnlyContain(item => item.Status == StationCommandStatus.Succeeded.ToString());
+
+            var audits = await db.StationAuditRecords
+                .Where(item => item.TargetStationId == "station-command")
+                .ToListAsync();
+            audits.Select(item => item.Action).Should().Contain(StationCommandType.StartRuntime.ToString());
+            audits.Select(item => item.Action).Should().Contain(StationCommandType.ApplySiteProfile.ToString());
+            audits.Count(item => item.Action == "CommandCompleted").Should().Be(2);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
     public async Task CentralStore_ShouldRedeliverStaleDeliveredCommand()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCommandRedeliveryTests", Guid.NewGuid().ToString("N"));

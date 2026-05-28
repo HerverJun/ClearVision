@@ -113,6 +113,107 @@ public sealed class RuntimePackageExporterTests
             RuntimeParameterTestData.SafeDeleteDirectory(root);
         }
     }
+
+    [Fact]
+    public async Task ExportAsync_ShouldExposeBoundedTraditionalVisionRuntimeParameters()
+    {
+        var root = RuntimeParameterTestData.CreateTempDirectory("ClearVisionTraditionalRuntimeParameterExporterTests");
+        try
+        {
+            var templateOperatorId = Guid.NewGuid();
+            var blobOperatorId = Guid.NewGuid();
+            var exporter = new RuntimePackageExporter(
+                new Acme.Product.Infrastructure.Services.OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance);
+
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                TargetRootDirectory = root,
+                Project = new ProjectDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "traditional-runtime-parameters",
+                    Flow = new OperatorFlowDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "main",
+                        Operators =
+                        [
+                            new OperatorDto
+                            {
+                                Id = templateOperatorId,
+                                Name = "TemplateMatch",
+                                Type = OperatorType.TemplateMatching,
+                                Parameters =
+                                [
+                                    new ParameterDto
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        Name = "threshold",
+                                        DisplayName = "Match threshold",
+                                        DataType = "double",
+                                        Value = 0.82d,
+                                        DefaultValue = 0.8d,
+                                        MinValue = 0.0d,
+                                        MaxValue = 1.0d,
+                                        IsRequired = true
+                                    }
+                                ]
+                            },
+                            new OperatorDto
+                            {
+                                Id = blobOperatorId,
+                                Name = "BlobFilter",
+                                Type = OperatorType.BlobAnalysis,
+                                Parameters =
+                                [
+                                    new ParameterDto
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        Name = "maxArea",
+                                        DisplayName = "Max area",
+                                        DataType = "int",
+                                        Value = 100_000,
+                                        DefaultValue = 100_000,
+                                        MinValue = 0,
+                                        IsRequired = true
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            });
+
+            var schema = JsonSerializer.Deserialize<RuntimeParameterSchema>(
+                await File.ReadAllTextAsync(Path.Combine(export.PackageRootPath, "field", "runtime-parameters.json")),
+                RuntimeParameterTestData.JsonOptions)!;
+
+            var threshold = schema.Parameters.Should()
+                .ContainSingle(parameter => parameter.OperatorId == templateOperatorId && parameter.ParameterName == "threshold")
+                .Subject;
+            threshold.OperatorType.Should().Be(nameof(OperatorType.TemplateMatching));
+            threshold.DefaultValue.GetDouble().Should().Be(0.82d);
+            threshold.Min.Should().Be(0.0d);
+            threshold.Max.Should().Be(1.0d);
+            threshold.Step.Should().Be(0.01d);
+            threshold.RequiresInteger.Should().BeFalse();
+
+            var maxArea = schema.Parameters.Should()
+                .ContainSingle(parameter => parameter.OperatorId == blobOperatorId && parameter.ParameterName == "maxArea")
+                .Subject;
+            maxArea.OperatorType.Should().Be(nameof(OperatorType.BlobAnalysis));
+            maxArea.DefaultValue.GetDouble().Should().Be(100_000d);
+            maxArea.Min.Should().Be(0.0d);
+            maxArea.Max.Should().Be(1_000_000d);
+            maxArea.Step.Should().Be(1.0d);
+            maxArea.RequiresInteger.Should().BeTrue();
+        }
+        finally
+        {
+            RuntimeParameterTestData.SafeDeleteDirectory(root);
+        }
+    }
 }
 
 public sealed class RuntimePackageLoaderTests
@@ -192,6 +293,24 @@ public sealed class RuntimeParameterValidatorTests
                     "sha256:abc",
                     RuntimeParameterTestData.CreateOverride(parameterId, 1.2d)))
             .Errors.Should().Contain(error => error.Contains("above max", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Validate_ShouldRejectFractionalOverrideForIntegerParameters()
+    {
+        var operatorId = Guid.NewGuid();
+        var parameterId = RuntimeParameterTestData.ParameterId(operatorId);
+        var schema = RuntimeParameterTestData.CreateSchema("pkg-1", "sha256:abc", operatorId, parameterId);
+        schema.Parameters.Single().RequiresInteger = true;
+
+        var validation = RuntimeParameterValidator.Validate(
+            schema,
+            RuntimeParameterTestData.CreateProfile(
+                "pkg-1",
+                "sha256:abc",
+                RuntimeParameterTestData.CreateOverride(parameterId, 0.7d)));
+
+        validation.Errors.Should().Contain(error => error.Contains("must be an integer", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

@@ -126,6 +126,47 @@ public class RuntimeMvpTests
     }
 
     [Fact]
+    public async Task RuntimeHost_RunPackageConfiguredSingleAsync_ShouldUsePackageConfiguredInputs()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreatePackageConfiguredImageProject("package-configured");
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            var flowExecutionService = CreateFlowExecutionService(
+                new PackageConfiguredImageAcquisitionExecutor([4, 2, 1]),
+                new DeterministicJudgmentExecutor());
+
+            await using var runtimeHost = new RuntimeHost(
+                flowExecutionService,
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+
+            var result = await runtimeHost.RunPackageConfiguredSingleAsync();
+
+            result.Outcome.Should().Be(RuntimeRunOutcome.Ok);
+            result.SourceImagePath.Should().BeNull();
+            result.ImageId.Should().StartWith("package-configured-");
+            result.PrimaryOutputs["DecisionByte"]?.ToString().Should().Be("4");
+            result.SourceImageBytes.Should().BeNull();
+            result.OutputImageBytes.Should().Equal([4, 2, 1]);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task RuntimeHost_StopAsync_ShouldCancelFolderReplayAndBeIdempotent()
     {
         var root = CreateTempDirectory();
@@ -269,10 +310,10 @@ public class RuntimeMvpTests
         }
     }
 
-    private static IFlowExecutionService CreateFlowExecutionService(IOperatorExecutor executor)
+    private static IFlowExecutionService CreateFlowExecutionService(params IOperatorExecutor[] executors)
     {
         return new FlowExecutionService(
-            new[] { executor },
+            executors,
             NullLogger<FlowExecutionService>.Instance,
             new VariableContext());
     }
@@ -342,6 +383,70 @@ public class RuntimeMvpTests
                         Type = OperatorType.ResultOutput,
                         X = 0,
                         Y = 0
+                    }
+                ]
+            }
+        };
+    }
+
+    private static ProjectDto CreatePackageConfiguredImageProject(string name)
+    {
+        var acquisitionId = Guid.NewGuid();
+        var acquisitionOutputPortId = Guid.NewGuid();
+        var resultId = Guid.NewGuid();
+        var resultInputPortId = Guid.NewGuid();
+        return new ProjectDto
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Flow = new OperatorFlowDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "package-configured-flow",
+                Operators =
+                [
+                    new OperatorDto
+                    {
+                        Id = acquisitionId,
+                        Name = "PackageConfiguredImage",
+                        Type = OperatorType.ImageAcquisition,
+                        OutputPorts =
+                        [
+                            new PortDto
+                            {
+                                Id = acquisitionOutputPortId,
+                                Name = "Image",
+                                DataType = PortDataType.Image,
+                                IsRequired = true
+                            }
+                        ]
+                    },
+                    new OperatorDto
+                    {
+                        Id = resultId,
+                        Name = "ResultOutput",
+                        Type = OperatorType.ResultOutput,
+                        InputPorts =
+                        [
+                            new PortDto
+                            {
+                                Id = resultInputPortId,
+                                Name = "Image",
+                                DataType = PortDataType.Image,
+                                IsRequired = false
+                            }
+                        ]
+                    }
+                ],
+                Connections =
+                [
+                    new OperatorConnectionDto
+                    {
+                        Id = Guid.NewGuid(),
+                        SourceOperatorId = acquisitionId,
+                        SourcePortId = acquisitionOutputPortId,
+                        TargetOperatorId = resultId,
+                        TargetPortId = resultInputPortId
                     }
                 ]
             }
@@ -424,6 +529,39 @@ public class RuntimeMvpTests
                 ["DecisionByte"] = decisionByte,
                 ["Image"] = imageBytes
             });
+        }
+
+        public ValidationResult ValidateParameters(Operator @operator)
+        {
+            return ValidationResult.Valid();
+        }
+    }
+
+    private sealed class PackageConfiguredImageAcquisitionExecutor : IOperatorExecutor
+    {
+        private readonly byte[] _imageBytes;
+
+        public PackageConfiguredImageAcquisitionExecutor(byte[] imageBytes)
+        {
+            _imageBytes = imageBytes;
+        }
+
+        public OperatorType OperatorType => OperatorType.ImageAcquisition;
+
+        public Task<OperatorExecutionOutput> ExecuteAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (inputs?.ContainsKey("Image") == true)
+            {
+                throw new InvalidOperationException("Package-configured runs must not inject an external image.");
+            }
+
+            return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Image"] = _imageBytes
+            }));
         }
 
         public ValidationResult ValidateParameters(Operator @operator)
