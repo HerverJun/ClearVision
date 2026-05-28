@@ -19,8 +19,24 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "stop-clearvision-debug-process",
+            "command": "powershell",
+            "type": "process",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/scripts/stop-clearvision-debug-process.ps1"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "build",
-            "dependsOn": "restore-product",
+            "dependsOn": [
+                "stop-clearvision-debug-process",
+                "restore-product"
+            ],
             "dependsOrder": "sequence",
             "command": "powershell",
             "type": "process",
