@@ -103,6 +103,22 @@ public class RequirementBriefExtractorTests
     }
 
     [Fact]
+    public void Extract_WithTraditionalTemplateMatchingText_ShouldPreferTemplateMatchingIntent()
+    {
+        var extractor = new RequirementBriefExtractor();
+
+        var brief = extractor.Extract(
+            "传统视觉模板匹配，上传标准模板图，后续产品图片与参考图对比判断合格与否。",
+            null,
+            scenarioMatch: null);
+
+        brief.IntentType.Should().Be("template_matching_inspection");
+        brief.ObjectName.Should().Be("产品/标准模板");
+        brief.DecisionRule.Should().Be("OK/NG");
+        brief.RequiredResources.Should().NotContain("DeepLearning.ModelPath");
+    }
+
+    [Fact]
     public void Extract_WithQueuedClarificationQuestions_ShouldIgnoreExamplesAsAnswers()
     {
         var extractor = new RequirementBriefExtractor();

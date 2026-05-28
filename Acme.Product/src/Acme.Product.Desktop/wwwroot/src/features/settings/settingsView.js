@@ -508,6 +508,20 @@ class SettingsView {
         this._aiReasoningSupportRequestId += 1;
     }
 
+    getAiPerformanceModelLabel() {
+        const active = this.aiModels.find(m => m.id === this.activeAiModelId)
+            || this.aiModels.find(m => m.isActive)
+            || this.aiModels[0]
+            || null;
+        return active?.model || active?.name || '当前激活模型';
+    }
+
+    refreshAiPerformanceOverview() {
+        const modelNameEl = this.container?.querySelector('#ai-performance-model-name');
+        if (!modelNameEl) return;
+        modelNameEl.textContent = this.getAiPerformanceModelLabel();
+    }
+
     /**
      * 基于两栏结构生成主 HTML
      */
@@ -1316,7 +1330,7 @@ class SettingsView {
             this.stationTokenValue = '';
             this.refreshStationCommunicationPanel();
             if (!silent) {
-                showToast('Station 设置已保存，按提示重启后生效。', 'success');
+                showToast(this.getStationCommunicationSaveMessage(this.stationCommunicationSettings), 'success');
             }
             return { success: true, settings: this.stationCommunicationSettings };
         } catch (error) {
@@ -1330,6 +1344,23 @@ class SettingsView {
                 saveButton.disabled = false;
             }
         }
+    }
+
+    getStationCommunicationSaveMessage(settings) {
+        const restart = settings?.requiresRestart || {};
+        if (restart.studio && restart.localStation) {
+            return 'Station 设置已保存。请重启本机 Studio 和本机 Station 后生效。';
+        }
+
+        if (restart.studio) {
+            return 'Station 设置已保存。请重启本机 Studio 后生效。';
+        }
+
+        if (restart.localStation) {
+            return 'Station 设置已保存。请重启本机 Station 后生效。';
+        }
+
+        return 'Station 设置已保存，当前本机已按这些设置运行。';
     }
 
     async revealStationToken() {
@@ -1850,6 +1881,7 @@ class SettingsView {
                 </tr>
             `;
         }).join('');
+        this.refreshAiPerformanceOverview();
     }
     
     refreshAiTableAndForm() {
@@ -3626,13 +3658,14 @@ class SettingsView {
             : (settings.token?.hasToken ? settings.token.mask : '未生成');
         const restartMessages = [];
         if (settings.requiresRestart?.studio) {
-            restartMessages.push('Studio 需要重启后才会按新监听模式和端口启动。');
+            restartMessages.push('需要重启本机 Studio：新的监听模式、端口或 token 才会生效。');
         }
         if (settings.requiresRestart?.localStation) {
-            restartMessages.push('本机 Station 需要重启后才会读取新的同步地址和 token。');
+            restartMessages.push('需要重启本机 Station：它才会重新读取本机 Station 配置文件。');
         }
         if (restartMessages.length === 0) {
-            restartMessages.push('当前保存值与已知运行值一致。');
+            restartMessages.push('本机 Studio 已按当前保存的设置运行，不需要重启。');
+            restartMessages.push('如果是另一台电脑的 Station，请在那台电脑填右侧“远端 Station”片段并重启 Station。');
         }
 
         const modeButton = (value) => {
@@ -3674,7 +3707,7 @@ class SettingsView {
         return `
             <div class="settings-section-title">
                 <h2>Station 通讯设置</h2>
-                <p>管理本机 Studio 与本机 Station 的同步入口，保存后按提示重启生效。</p>
+                <p>本机 Studio 作为监控服务端；另一台电脑的 Station 主动连接这里。保存后只按下方明确提示重启。</p>
             </div>
 
             <div class="settings-modern-card">
@@ -4192,7 +4225,7 @@ class SettingsView {
     }
 
     renderAiTab() {
-        const aiInfo = "DeepSeek-V3";
+        const aiInfo = this.getAiPerformanceModelLabel();
         return `
             <div class="settings-section-title">
                 <h2>AI & LLM 模型管理</h2>
@@ -4284,7 +4317,7 @@ class SettingsView {
 
                         <div style="background:#ecfdf5; border:1px solid #d1fae5; border-radius:8px; padding:12px; margin-top:24px; text-align:left; font-size:12px; color:#065f46; display:flex; gap:8px;">
                             <svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:#10b981; flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-                            DeepSeek-V3 连接稳定，当前延迟适合非实时分析任务。
+                            当前激活模型：<span id="ai-performance-model-name">${this.escapeHtml(aiInfo)}</span>。连接健康状态以测试连接与最近一次生成诊断为准。
                         </div>
                     </div>
                 </div>

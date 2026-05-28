@@ -23,6 +23,7 @@ public sealed class OperatorKnowledgeGraphService : IOperatorKnowledgeGraphServi
         new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
             ["DeepLearning"] = ["YOLO", "目标检测", "缺陷检测", "AI检测"],
+            ["TemplateMatching"] = ["传统视觉", "模板匹配", "标准模板", "参考图", "基准图", "找图", "TemplateMatch"],
             ["SemanticSegmentation"] = ["语义分割", "像素级分割"],
             ["AnomalyDetection"] = ["异常检测", "无监督缺陷检测"],
             ["SurfaceDefectDetection"] = ["表面缺陷", "外观缺陷", "瑕疵检测"],

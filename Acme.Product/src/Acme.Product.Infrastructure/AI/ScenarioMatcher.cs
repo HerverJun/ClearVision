@@ -69,6 +69,18 @@ public sealed class ScenarioMatcher : IScenarioMatcher
         {
             BuildDefinition(
                 byScenario,
+                key: "classic-template-matching-inspection",
+                templateName: "传统模板匹配检测",
+                industry: "通用制造",
+                keywords: ["传统视觉", "传统模板匹配", "模板匹配", "标准模板", "标准图", "参考图", "基准图", "template matching", "reference image", "golden sample"],
+                synonyms: ["上传模板", "模板图", "标准样", "样板", "对比", "比对", "合格与否", "OK/NG"],
+                negativeKeywords: [],
+                intentTypes: ["template_matching_inspection", "appearance_inspection"],
+                objectTypes: ["产品", "standard_template", "reference_image"],
+                defectTypes: [],
+                measurementTargets: []),
+            BuildDefinition(
+                byScenario,
                 key: "wire-sequence-terminal",
                 templateName: "端子线序检测",
                 industry: "线束装配",
@@ -86,7 +98,7 @@ public sealed class ScenarioMatcher : IScenarioMatcher
                 industry: "包装终检",
                 keywords: ["包装箱", "纸箱", "箱体", "外观", "carton", "box", "package"],
                 synonyms: ["包装", "箱面", "封箱", "标签", "终检"],
-                negativeKeywords: ["空调", "内机", "外机", "遥控器", "铜孔", "端子"],
+                negativeKeywords: ["空调", "内机", "外机", "遥控器", "铜孔", "端子", "传统视觉", "传统模板匹配", "模板匹配", "标准模板", "标准图", "参考图", "基准图", "上传模板", "reference image", "golden sample"],
                 intentTypes: ["defect_detection", "appearance_inspection"],
                 objectTypes: ["carton", "package", "label"],
                 defectTypes: ["破损", "压痕", "脏污", "封箱异常", "标签异常", "damage", "dent", "stain"],
@@ -98,7 +110,7 @@ public sealed class ScenarioMatcher : IScenarioMatcher
                 industry: "空调制造",
                 keywords: ["空调内机", "内机", "面板", "室内机", "indoor unit", "panel"],
                 synonyms: ["空调面板", "内机面板", "总装", "终检"],
-                negativeKeywords: ["外机", "室外机", "遥控器", "包装箱", "铜孔", "端子"],
+                negativeKeywords: ["外机", "室外机", "遥控器", "包装箱", "铜孔", "端子", "传统视觉", "传统模板匹配", "模板匹配", "标准模板", "标准图", "参考图", "基准图", "上传模板", "reference image", "golden sample"],
                 intentTypes: ["defect_detection", "appearance_inspection"],
                 objectTypes: ["aircon_indoor", "panel"],
                 defectTypes: ["划伤", "缝隙", "污渍", "磕碰", "scratch", "gap", "stain"],
@@ -110,7 +122,7 @@ public sealed class ScenarioMatcher : IScenarioMatcher
                 industry: "空调制造",
                 keywords: ["空调外机", "外机", "室外机", "翅片", "护网", "outdoor unit", "condenser"],
                 synonyms: ["外机外观", "冷凝器", "总装", "终检"],
-                negativeKeywords: ["内机", "室内机", "遥控器", "包装箱", "铜孔", "端子"],
+                negativeKeywords: ["内机", "室内机", "遥控器", "包装箱", "铜孔", "端子", "传统视觉", "传统模板匹配", "模板匹配", "标准模板", "标准图", "参考图", "基准图", "上传模板", "reference image", "golden sample"],
                 intentTypes: ["defect_detection", "appearance_inspection"],
                 objectTypes: ["aircon_outdoor", "fin", "guard"],
                 defectTypes: ["变形", "破损", "凹陷", "缺件", "deform", "dent", "missing"],
@@ -122,7 +134,7 @@ public sealed class ScenarioMatcher : IScenarioMatcher
                 industry: "空调制造",
                 keywords: ["遥控器", "漏装", "附件", "有无", "remote", "missing", "accessory"],
                 synonyms: ["附件区", "配件", "是否存在", "少装"],
-                negativeKeywords: ["包装箱破损", "铜孔", "线序", "端子"],
+                negativeKeywords: ["包装箱破损", "铜孔", "线序", "端子", "传统视觉", "传统模板匹配", "模板匹配", "标准模板", "标准图", "参考图", "基准图", "上传模板", "reference image", "golden sample"],
                 intentTypes: ["presence_check", "object_detection"],
                 objectTypes: ["remote_controller", "accessory"],
                 defectTypes: ["missing_part", "漏装", "缺失"],
@@ -285,6 +297,7 @@ public sealed class ScenarioMatcher : IScenarioMatcher
 
         return template.Name switch
         {
+            "传统模板匹配检测" => "classic-template-matching-inspection",
             "包装箱外观检测" => "carton-appearance-inspection",
             "空调内机外观检测" => "aircon-indoor-appearance-inspection",
             "空调外机外观检测" => "aircon-outdoor-appearance-inspection",

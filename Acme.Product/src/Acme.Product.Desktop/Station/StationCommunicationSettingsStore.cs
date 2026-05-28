@@ -571,38 +571,38 @@ public sealed class StationCommunicationSettingsStore
         var diagnostics = new List<string>();
         if (mode == StationCommunicationMode.Disabled)
         {
-            diagnostics.Add("Station communication is disabled.");
+            diagnostics.Add("Station 通讯已关闭：本机 Studio 不接收 Station 注册，本机 Station 也不会主动同步。");
         }
         else
         {
             diagnostics.Add(requiresStudioRestart
-                ? "Restart Studio for listener changes to take effect."
-                : "Studio listener settings match the current known runtime values.");
+                ? "需要重启本机 Studio：保存的监听模式、端口或 token 尚未被当前 Studio 进程读取。"
+                : "本机 Studio 已按当前保存的监听模式、端口和 token 运行。");
             diagnostics.Add(requiresLocalStationRestart
-                ? "Restart local Station for sync changes to take effect."
-                : "Local Station sync settings have been applied by the latest known Station startup.");
+                ? "需要重启本机 Station：保存的本机 Station 同步地址或 token 尚未被本机 Station 读取。"
+                : "本机 Station 配置文件已被最近一次本机 Station 启动读取。");
         }
 
         if (mode == StationCommunicationMode.Disabled && (requiresStudioRestart || requiresLocalStationRestart))
         {
-            diagnostics.Add("Restart Studio or local Station where indicated to fully stop communication.");
+            diagnostics.Add("要完全停止通讯，请按上面的提示重启对应进程。");
         }
 
         if (mode == StationCommunicationMode.LanController)
         {
             diagnostics.Add(string.IsNullOrWhiteSpace(remoteBaseUrl)
-                ? "LAN controller mode needs a reachable LAN host address."
-                : $"Remote Stations should use {remoteBaseUrl} with the shared token.");
+                ? "局域网总控模式需要填写一个其他电脑能访问到的本机局域网 IP。"
+                : $"另一台电脑的 Station 应填写 StudioBaseUrl={remoteBaseUrl}，并使用同一个 token。");
         }
 
         if (mode != StationCommunicationMode.Disabled && string.IsNullOrWhiteSpace(token))
         {
-            diagnostics.Add("A shared token is required before LAN Station communication can be used.");
+            diagnostics.Add("必须先生成共享 token，Station 才能注册到 Studio。");
         }
 
         if (!requiresStudioRestart && !requiresLocalStationRestart)
         {
-            diagnostics.Add("Saved settings match the current known runtime values.");
+            diagnostics.Add("当前页面保存值与本机已知运行值一致；这不代表远端 Station 已连接成功。");
         }
 
         return diagnostics;

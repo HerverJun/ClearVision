@@ -597,6 +597,7 @@ public class FlowTemplateService : IFlowTemplateService
                 }, _jsonOptions),
                 CreatedAt = DateTime.UtcNow
             },
+            CreateClassicTemplateMatchingTemplate(),
             CreateAiInspectionTemplate(
                 name: "包装箱外观检测",
                 scenarioKey: "carton-appearance-inspection",
@@ -650,6 +651,98 @@ public class FlowTemplateService : IFlowTemplateService
                 judgmentExpectValue: "1",
                 includeTargetClassesInReview: false),
             CreateCopperHoleSpacingTemplate()
+        };
+    }
+
+    private static FlowTemplate CreateClassicTemplateMatchingTemplate()
+    {
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "传统模板匹配检测",
+            Description = "适合用标准模板图与待检图像做传统视觉模板匹配的 OK/NG 检测；不依赖深度学习模型，需人工确认模板图、待检图来源与匹配阈值。",
+            Industry = "通用制造",
+            Tags = ["传统视觉", "模板匹配", "标准模板", "OK/NG"],
+            TemplateVersion = "1.0.0",
+            ScenarioKey = "classic-template-matching-inspection",
+            ScenarioPackage = new ScenarioPackageBinding
+            {
+                PackageKey = "classic-template-matching-inspection",
+                PackageVersion = "1.0.0",
+                AssetVersionIds =
+                [
+                    "template:classic-template-matching-inspection@1.0.0",
+                    "rule:template-match-okng@1.0.0"
+                ],
+                RequiredResources = []
+            },
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "使用传统模板匹配：读取待检图像和标准模板图，TemplateMatching 输出匹配结果，再按 IsMatch 做 OK/NG 判定。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "TemplateMatching.Threshold",
+                    "TemplateMatching.Domain",
+                    "TemplateMatching.UseRoi",
+                    "TemplateMatching.EnablePoseSearch"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "待检图像", new Dictionary<string, string>
+                    {
+                        ["SourceType"] = "File",
+                        ["FilePath"] = ""
+                    }),
+                    Node("op_2", "ImageAcquisition", "标准模板图", new Dictionary<string, string>
+                    {
+                        ["SourceType"] = "File",
+                        ["FilePath"] = ""
+                    }),
+                    Node("op_3", "TemplateMatching", "传统模板匹配", new Dictionary<string, string>
+                    {
+                        ["Method"] = "CCoeffNormed",
+                        ["Domain"] = "Gray",
+                        ["Threshold"] = "0.8",
+                        ["MaxMatches"] = "1",
+                        ["UseRoi"] = "false",
+                        ["RoiX"] = "0",
+                        ["RoiY"] = "0",
+                        ["RoiWidth"] = "0",
+                        ["RoiHeight"] = "0",
+                        ["EnablePoseSearch"] = "false"
+                    }),
+                    Node("op_4", "ResultJudgment", "合格判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "Equal",
+                        ["ExpectValue"] = "True",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_5", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_3", "Image"),
+                    Link("op_2", "Image", "op_3", "Template"),
+                    Link("op_3", "IsMatch", "op_4", "Value"),
+                    Link("op_3", "Image", "op_5", "Image"),
+                    Link("op_3", "Matches", "op_5", "Data"),
+                    Link("op_4", "JudgmentResult", "op_5", "Result"),
+                    Link("op_4", "Details", "op_5", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["SourceType", "FilePath", "CameraId"],
+                    ["op_2"] = ["FilePath"],
+                    ["op_3"] = ["Threshold", "Domain", "UseRoi", "RoiX", "RoiY", "RoiWidth", "RoiHeight", "EnablePoseSearch"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
         };
     }
 

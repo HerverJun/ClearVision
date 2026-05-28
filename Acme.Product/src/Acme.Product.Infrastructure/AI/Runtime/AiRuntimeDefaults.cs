@@ -143,6 +143,7 @@ public sealed class RoleAwareAiModelSelector : IAiModelSelector
             .Where(m => m.RoleBindings != null
                 && m.RoleBindings.Contains(role, StringComparer.OrdinalIgnoreCase))
             .OrderBy(m => m.Priority ?? 100)
+            .ThenByDescending(m => m.IsActive)
             .ToList();
 
         if (candidates.Count > 0)

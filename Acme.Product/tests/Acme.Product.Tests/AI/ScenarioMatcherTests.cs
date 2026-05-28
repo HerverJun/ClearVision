@@ -7,6 +7,7 @@ public sealed class ScenarioMatcherTests
 {
     [Theory(DisplayName = "ScenarioMatcher should route golden prompts to the expected template")]
     [InlineData("检测包装箱破损、压痕、标签异常", "carton-appearance-inspection", "包装箱外观检测")]
+    [InlineData("我希望构建一个传统视觉的模板匹配工程，支持用户上传标准模板，然后之后的图片与该模板对比进行合格与否的判断。", "classic-template-matching-inspection", "传统模板匹配检测")]
     [InlineData("空调内机面板划伤和缝隙检测", "aircon-indoor-appearance-inspection", "空调内机外观检测")]
     [InlineData("空调外机冷凝器护网凹陷检测", "aircon-outdoor-appearance-inspection", "空调外机外观检测")]
     [InlineData("附件区域判断遥控器有没有漏装", "remote-controller-missing-inspection", "遥控器漏装检测")]
@@ -53,6 +54,31 @@ public sealed class ScenarioMatcherTests
             matches.Should().NotBeEmpty();
             matches[0].Scenario.ScenarioKey.Should().Be("wire-sequence-terminal");
             matches[0].Confidence.Should().BeGreaterThan(0.75);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact(DisplayName = "ScenarioMatcher should prefer classic template matching over generic appearance templates")]
+    public async Task MatchAsync_TraditionalTemplatePrompt_ShouldNotRouteToDeepLearningAppearanceTemplate()
+    {
+        var tempRoot = CreateTempRoot();
+        try
+        {
+            var matcher = new ScenarioMatcher(new FlowTemplateService(tempRoot));
+
+            var matches = await matcher.MatchAsync(
+                "传统视觉模板匹配，上传标准模板图，后续产品图片与参考图对比判断OK/NG；场景类型：外观缺陷，检测对象：产品。");
+
+            matches.Should().NotBeEmpty();
+            var top = matches[0];
+            top.Scenario.ScenarioKey.Should().Be("classic-template-matching-inspection");
+            top.Scenario.TemplateName.Should().Be("传统模板匹配检测");
+            top.Scenario.RequiredResources.Should().NotContain("DeepLearning.ModelPath");
+            top.Template.Should().NotBeNull();
+            top.Template!.ScenarioPackage!.RequiredResources.Should().BeEmpty();
         }
         finally
         {

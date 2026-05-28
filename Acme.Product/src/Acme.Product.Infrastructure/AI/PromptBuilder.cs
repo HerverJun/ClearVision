@@ -80,10 +80,13 @@ public class PromptBuilder
            inspection result -> ConditionalBranch -> Modbus/S7/MC/FINS communication -> ResultOutput
         6. Runtime evidence:
            include ResultOutput or DatabaseWrite when the request mentions traceability, reporting, or production records.
+        7. Traditional template matching:
+           ImageAcquisition(current image) + ImageAcquisition(reference template) -> TemplateMatching -> ResultJudgment -> ResultOutput
 
         ## Practical defaults
         - Start with ImageAcquisition unless the user explicitly says the image already exists in the flow.
         - Prefer ResultJudgment before hardware output so OK/NG semantics are explicit.
+        - If the user asks for traditional vision, template matching, a standard template, reference image, or golden sample comparison, use TemplateMatching and do not use DeepLearning unless the user explicitly requests an AI model.
         - Add parametersNeedingReview when thresholds, calibration files, PLC addresses, model paths, or table names cannot be inferred safely.
         - Use calibration resources for pixel-to-world conversion; do not invent millimeter values from pixel coordinates.
         - For ONNX detection models exported with candidate suppression or NMS, trust the model output: set DeepLearning.OutputFormat=EndToEndNms and do not add BoxNms.
@@ -126,6 +129,7 @@ public class PromptBuilder
         - "remove duplicate boxes / NMS" => prefer DeepLearning.OutputFormat=EndToEndNms; use BoxNms only for explicit platform-side raw candidate suppression
         - "filter detections by class/area/score" => BoxFilter
         - "wire sequence / terminal order / connector order" => DetectionSequenceJudge
+        - "traditional template matching / standard template / reference image / golden sample comparison" => TemplateMatching
         - "is image sharp / focus check / blur" => SharpnessEvaluation
         - "correct ROI position / offset compensation" => PositionCorrection
         - "N-point calibration / affine calibration" => NPointCalibration
@@ -523,6 +527,7 @@ public class PromptBuilder
         AddIntentTokensIfMatched(keywords, normalized, ["ocr", "barcode", "recognition", "code"], ["ocr", "code", "barcode", "recognition"]);
         AddIntentTokensIfMatched(keywords, normalized, ["ai", "yolo", "deeplearning", "inference"], ["ai", "deeplearning", "inference"]);
         AddIntentTokensIfMatched(keywords, normalized, ["calibration", "undistort", "coordinate"], ["calibration", "undistort", "coordinate"]);
+        AddIntentTokensIfMatched(keywords, normalized, ["传统视觉", "模板匹配", "标准模板", "参考图", "基准图", "template matching", "reference image", "golden sample"], ["模板匹配", "template", "match", "locate"]);
 
         return keywords;
     }
@@ -601,6 +606,13 @@ public class PromptBuilder
             keyword.Contains("coordinate", StringComparison.OrdinalIgnoreCase))
         {
             return "calibration";
+        }
+
+        if (keyword.Contains("template", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("match", StringComparison.OrdinalIgnoreCase) ||
+            keyword.Contains("模板", StringComparison.OrdinalIgnoreCase))
+        {
+            return "匹配";
         }
 
         return null;

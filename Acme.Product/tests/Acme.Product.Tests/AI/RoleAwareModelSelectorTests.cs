@@ -59,6 +59,19 @@ public sealed class RoleAwareModelSelectorTests
     }
 
     [Fact]
+    public void SelectGenerationModel_WhenGenerationBindingsHaveSamePriority_PrefersActiveModel()
+    {
+        var oldModel = CreateModel("old", isActive: false, priority: 100, roleBindings: new[] { "generation" });
+        var activeModel = CreateModel("active", isActive: true, priority: 100, roleBindings: new[] { "generation" });
+        var registry = new FakeModelRegistry(oldModel, activeModel);
+        var sut = new RoleAwareAiModelSelector(registry);
+
+        var result = sut.SelectGenerationModel();
+
+        result.Id.Should().Be("active");
+    }
+
+    [Fact]
     public void ActiveAiModelSelector_SelectModelForRole_AlwaysReturnsActive()
     {
         var activeModel = CreateModel("active", isActive: true, priority: 10, roleBindings: new[] { "generation" });

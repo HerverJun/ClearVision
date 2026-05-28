@@ -117,6 +117,9 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
 
     private static string ResolveIntentType(ScenarioDefinition? scenario, string text)
     {
+        if (ContainsAny(text, TemplateMatchingTerms))
+            return "template_matching_inspection";
+
         if (scenario?.IntentTypes.Count > 0)
             return scenario.IntentTypes[0];
 
@@ -208,6 +211,8 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
             return "圆孔/孔位";
         if (ContainsAny(text, ["铜孔", "孔距", "间距", "圆心距离"]))
             return "铜孔";
+        if (ContainsAny(text, TemplateMatchingTerms))
+            return "产品/标准模板";
 
         return string.Empty;
     }
@@ -238,7 +243,7 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
 
     private static string ResolveDecisionRule(string text)
     {
-        if (ContainsAny(text, ["OK/NG", "OK NG", "合格/不合格", "良品/不良品", "发NG", "发OK"]))
+        if (ContainsAny(text, ["OK/NG", "OK NG", "合格/不合格", "良品/不良品", "发NG", "发OK", "合格与否", "是否合格", "合格判断"]))
             return "OK/NG";
         if (ContainsAny(text, ["数量", "有无", "存在", "漏装"]))
             return "presence";
@@ -452,7 +457,7 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Required = true,
                 Reason = "场景未明确时无法安全生成流程。",
                 Priority = "high",
-                Options = ["外观缺陷", "漏装有无", "线序判定", "尺寸测量"]
+                Options = ["传统模板匹配", "外观缺陷", "漏装有无", "线序判定", "尺寸测量"]
             },
             "object_type" => new AiClarificationQuestion
             {
@@ -463,7 +468,7 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
                 Priority = "high",
                 Options = BuildReferenceOptions(
                     (scenario?.ObjectTypes.AsEnumerable() ?? Enumerable.Empty<string>()).Concat(brief.ObjectTypes),
-                    ["产品", "包装箱/纸箱", "金属件", "连接器/端子", "圆孔/孔位", "标签/二维码"])
+                    ["产品", "标准模板/参考图", "包装箱/纸箱", "金属件", "连接器/端子", "圆孔/孔位", "标签/二维码"])
             },
             "defect_type" => new AiClarificationQuestion
             {
@@ -576,6 +581,8 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
             "gap_width" => "缝隙宽度",
             "diameter" => "直径",
             "angle" => "角度",
+            "standard_template" => "标准模板",
+            "reference_image" => "参考图",
             _ => option
         };
     }
@@ -605,6 +612,23 @@ public sealed class RequirementBriefExtractor : IRequirementBriefExtractor
     {
         return terms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static readonly string[] TemplateMatchingTerms =
+    [
+        "传统视觉",
+        "传统模板匹配",
+        "模板匹配",
+        "标准模板",
+        "标准图",
+        "参考图",
+        "基准图",
+        "上传模板",
+        "模板图",
+        "样板",
+        "template matching",
+        "reference image",
+        "golden sample"
+    ];
 
     private static readonly IReadOnlyDictionary<string, string[]> KnownDefectTerms =
         new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)

@@ -257,11 +257,12 @@ public class Sprint7_AiEvolutionTests
             var templates = await service.GetTemplatesAsync();
             var currentAirConditioningTemplates = await service.GetTemplatesAsync("空调制造");
 
-            templates.Should().HaveCount(7);
+            templates.Should().HaveCount(8);
             templates.Select(t => t.ScenarioKey).Should().Contain(new[]
             {
                 "wire-sequence-terminal",
                 "wire-sequence-terminal-video-stream",
+                "classic-template-matching-inspection",
                 "carton-appearance-inspection",
                 "aircon-indoor-appearance-inspection",
                 "aircon-outdoor-appearance-inspection",
@@ -290,6 +291,62 @@ public class Sprint7_AiEvolutionTests
                 "遥控器漏装检测",
                 "两器铜孔间距检测");
             File.Exists(Path.Combine(tempRoot, "templates", "flow_templates.json")).Should().BeTrue();
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact(DisplayName = "FlowTemplateService - 传统模板匹配模板应使用 TemplateMatching 骨架")]
+    public async Task FlowTemplateService_ClassicTemplateMatchingTemplate_ShouldUseTraditionalSkeleton()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), "clearvision-template-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var service = new FlowTemplateService(tempRoot);
+
+            var template = (await service.GetTemplatesAsync())
+                .Single(item => item.ScenarioKey == "classic-template-matching-inspection");
+
+            template.Name.Should().Be("传统模板匹配检测");
+            template.ScenarioPackage.Should().NotBeNull();
+            template.ScenarioPackage!.RequiredResources.Should().BeEmpty();
+
+            using var document = JsonDocument.Parse(template.FlowJson);
+            var root = document.RootElement;
+            root.GetProperty("requiredResources").EnumerateArray().Should().BeEmpty();
+
+            var operators = root.GetProperty("operators").EnumerateArray().ToList();
+            operators.Select(item => item.GetProperty("operatorType").GetString()).Should().Equal(
+                "ImageAcquisition",
+                "ImageAcquisition",
+                "TemplateMatching",
+                "ResultJudgment",
+                "ResultOutput");
+            operators.Select(item => item.GetProperty("operatorType").GetString()).Should().NotContain("DeepLearning");
+
+            var matchParams = operators.Single(item => item.GetProperty("tempId").GetString() == "op_3")
+                .GetProperty("parameters");
+            matchParams.GetProperty("Threshold").GetString().Should().Be("0.8");
+            matchParams.GetProperty("EnablePoseSearch").GetString().Should().Be("false");
+
+            var connections = root.GetProperty("connections").EnumerateArray().ToList();
+            connections.Should().Contain(item =>
+                item.GetProperty("sourceTempId").GetString() == "op_2" &&
+                item.GetProperty("sourcePortName").GetString() == "Image" &&
+                item.GetProperty("targetTempId").GetString() == "op_3" &&
+                item.GetProperty("targetPortName").GetString() == "Template");
+            connections.Should().Contain(item =>
+                item.GetProperty("sourceTempId").GetString() == "op_3" &&
+                item.GetProperty("sourcePortName").GetString() == "IsMatch" &&
+                item.GetProperty("targetTempId").GetString() == "op_4" &&
+                item.GetProperty("targetPortName").GetString() == "Value");
+
+            root.GetProperty("parametersNeedingReview").GetProperty("op_3")
+                .EnumerateArray().Select(item => item.GetString())
+                .Should().Contain("Threshold");
         }
         finally
         {
@@ -340,10 +397,11 @@ public class Sprint7_AiEvolutionTests
 
             var templates = await service.GetTemplatesAsync();
 
-            templates.Should().HaveCount(8);
+            templates.Should().HaveCount(9);
             templates.Select(item => item.Name).Should().Contain("我的自定义模板");
             templates.Select(item => item.Name).Should().Contain("端子线序检测");
             templates.Select(item => item.Name).Should().Contain("端子线序检测-视频流版");
+            templates.Select(item => item.Name).Should().Contain("传统模板匹配检测");
             templates.Select(item => item.Name).Should().Contain("包装箱外观检测");
             templates.Select(item => item.Name).Should().Contain("空调内机外观检测");
             templates.Select(item => item.Name).Should().Contain("空调外机外观检测");
@@ -360,6 +418,7 @@ public class Sprint7_AiEvolutionTests
             persisted!.Select(item => item.Name).Should().Contain("端子线序检测");
             persisted.Select(item => item.Name).Should().Contain("端子线序检测-视频流版");
             persisted.Select(item => item.Name).Should().Contain("我的自定义模板");
+            persisted.Select(item => item.Name).Should().Contain("传统模板匹配检测");
             persisted.Select(item => item.Name).Should().Contain("包装箱外观检测");
             persisted.Select(item => item.Name).Should().Contain("空调内机外观检测");
             persisted.Select(item => item.Name).Should().Contain("空调外机外观检测");
