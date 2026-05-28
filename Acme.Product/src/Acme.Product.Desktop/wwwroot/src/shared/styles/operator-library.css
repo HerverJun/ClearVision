@@ -110,6 +110,10 @@
     border-top: 1px solid var(--glass-border);
     padding: 16px;
     min-height: 120px;
+    max-height: 42%;
+    overflow-y: auto;
+    flex-shrink: 0;
+    background: rgba(15, 36, 53, 0.92);
 }
 
 .operator-preview .preview-content {
@@ -185,8 +189,47 @@
 /* 树形列表样式优化 */
 .library-tree {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 8px;
+}
+
+.operator-library-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.operator-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.detail-section h5,
+.detail-params h5,
+.detail-ports h5 {
+    margin: 0 0 6px;
+    font-size: var(--font-size-xs);
+    color: var(--gold-accent);
+}
+
+.detail-section p {
+    margin: 0;
+    color: var(--paper-dim);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
+.param-note {
+    color: var(--ink-gray);
+    font-size: 11px;
+}
+
+.required-tag {
+    border-color: rgba(231, 76, 60, 0.38);
+    color: #ffb4a8;
 }
 
 .library-tree .tree-node {

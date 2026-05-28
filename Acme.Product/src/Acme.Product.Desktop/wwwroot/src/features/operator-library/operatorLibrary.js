@@ -11,6 +11,7 @@
 
 import TreeView from '../../shared/components/treeView.js';
 import httpClient from '../../core/messaging/httpClient.js';
+import debugLogger from '../../core/logging/debugLogger.js';
 import { showToast, createInput } from '../../shared/components/uiComponents.js';
 import {
     applyFeatureToButton,
@@ -134,7 +135,7 @@ export class OperatorLibraryPanel {
             renderNode: (node, element) => {
                 // 自定义渲染算子节点
                 if (node.type === 'operator') {
-                    console.log('[OperatorLibrary] renderNode 渲染算子:', node.label);
+                    debugLogger.debug('[OperatorLibrary] renderNode 渲染算子:', node.label);
                     const operator = node.data || {};
                     const content = document.createElement('div');
                     content.className = 'operator-item-content';
@@ -172,7 +173,7 @@ export class OperatorLibraryPanel {
                         element.classList.remove('dragging-shadow');
                     });
                     
-                    console.log('[OperatorLibrary] 算子元素设置完成, draggable:', element.draggable, 'classList:', element.className);
+                    debugLogger.debug('[OperatorLibrary] 算子元素设置完成, draggable:', element.draggable, 'classList:', element.className);
                 } else {
                     // 【新增】分类节点 - 自定义渲染包含展开/收起按钮
                     const hasChildren = node.children && node.children.length > 0;
@@ -226,28 +227,28 @@ export class OperatorLibraryPanel {
                         const toggleHandler = (e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            console.log('[OperatorLibrary] Toggle clicked, node.id:', node.id);
+                            debugLogger.debug('[OperatorLibrary] Toggle clicked, node.id:', node.id);
                             
                             // 通过 id 查找正确的节点对象
                             const actualNode = this.treeView.findNode(node.id);
                             
                             if (actualNode) {
                                 this.treeView.toggleNode(actualNode);
-                                console.log('[OperatorLibrary] After toggle, expandedNodes:', Array.from(this.treeView.expandedNodes));
+                                debugLogger.debug('[OperatorLibrary] After toggle, expandedNodes:', Array.from(this.treeView.expandedNodes));
                             }
                             return false;
                         };
                         
                         if (toggle) {
                             toggle.onclick = toggleHandler;
-                            console.log('[OperatorLibrary] Toggle onclick bound for:', node.id);
+                            debugLogger.debug('[OperatorLibrary] Toggle onclick bound for:', node.id);
                         }
                         
                         // 点击分类内容也可以展开/收起
                         if (wrapper) {
                             wrapper.style.cursor = 'pointer';
                             wrapper.onclick = toggleHandler;
-                            console.log('[OperatorLibrary] Wrapper onclick bound for:', node.id);
+                            debugLogger.debug('[OperatorLibrary] Wrapper onclick bound for:', node.id);
                         }
                     }
                 }
@@ -259,27 +260,27 @@ export class OperatorLibraryPanel {
         // 使用事件委托处理拖拽 - 修复拖拽失效问题
         // 事件绑定在容器上，TreeView 重绘不会导致事件丢失
         treeContainer.addEventListener('dragstart', (e) => {
-            console.log('[OperatorLibrary] dragstart 事件触发', e.target);
+            debugLogger.debug('[OperatorLibrary] dragstart 事件触发', e.target);
             
             const operatorEl = e.target.closest('.operator-draggable');
             if (!operatorEl) {
-                console.log('[OperatorLibrary] 未找到 .operator-draggable 元素');
+                debugLogger.debug('[OperatorLibrary] 未找到 .operator-draggable 元素');
                 return;
             }
-            console.log('[OperatorLibrary] 找到算子元素:', operatorEl);
+            debugLogger.debug('[OperatorLibrary] 找到算子元素:', operatorEl);
             
             // 从父级 li 元素获取节点 ID
             const li = operatorEl.closest('[data-id]');
             if (!li) {
-                console.log('[OperatorLibrary] 未找到父级 li 元素');
+                debugLogger.debug('[OperatorLibrary] 未找到父级 li 元素');
                 return;
             }
-            console.log('[OperatorLibrary] 找到 li 元素, data-id:', li.dataset.id);
+            debugLogger.debug('[OperatorLibrary] 找到 li 元素, data-id:', li.dataset.id);
             
             const nodeId = li.dataset.id;
             // 从 treeView 中查找对应的节点数据
             const node = this.treeView.findNode(nodeId);
-            console.log('[OperatorLibrary] 查找节点结果:', node);
+            debugLogger.debug('[OperatorLibrary] 查找节点结果:', node);
             
             if (node && node.data) {
                 // 设置数据传递
@@ -288,7 +289,7 @@ export class OperatorLibraryPanel {
                 
                 // 【修复】备份数据到全局变量，防止 WebView2 环境下 dataTransfer 数据丢失
                 window.__draggingOperatorData = node.data;
-                console.log('[OperatorLibrary] 开始拖拽算子:', node.data.type);
+                debugLogger.debug('[OperatorLibrary] 开始拖拽算子:', node.data.type);
 
                 operatorEl.classList.add('dragging');
                 
@@ -325,7 +326,7 @@ export class OperatorLibraryPanel {
             this.renderOperatorTree();
             showToast(`已加载 ${operators.length} 个算子`, 'success');
         } catch (error) {
-            console.error('[OperatorLibraryPanel] 加载算子失败:', error);
+            debugLogger.warn('[OperatorLibraryPanel] 加载算子失败:', error);
             this.operators = [];
             this.filteredOperators = [];
             this.operatorLoadState = 'unavailable';
@@ -337,36 +338,43 @@ export class OperatorLibraryPanel {
 
     async loadOperatorsFromMetadata() {
         try {
-            const types = await httpClient.get('/operators/types');
-            if (Array.isArray(types) && types.length > 0) {
-                const operators = await Promise.all(types.map(async (type) => {
-                    const typeIdentifier = typeof type === 'string'
-                        ? type
-                        : (type?.name || type?.Name || type?.type || type?.Type || String(type));
-                    try {
-                        const metadata = await httpClient.get(`/operators/${encodeURIComponent(typeIdentifier)}/metadata`);
-                        const normalized = this.normalizeOperatorMetadata(metadata, typeIdentifier);
-                        if (normalized) {
-                            this.metadataByType.set(normalized.type, normalized);
-                        }
-                        return normalized;
-                    } catch (error) {
-                        console.warn('[OperatorLibraryPanel] 加载算子元数据失败:', typeIdentifier, error);
-                        return null;
-                    }
-                }));
-
-                const validOperators = operators.filter(Boolean);
-                if (validOperators.length > 0) {
-                    return validOperators;
+            const operators = await httpClient.get('/operators/library');
+            if (Array.isArray(operators) && operators.length > 0) {
+                const normalizedOperators = operators
+                    .map(operator => this.normalizeOperatorMetadata(operator, operator.type || operator.Type))
+                    .filter(Boolean);
+                normalizedOperators.forEach(operator => this.metadataByType.set(operator.type, operator));
+                if (normalizedOperators.length > 0) {
+                    return normalizedOperators;
                 }
             }
         } catch (error) {
-            console.warn('[OperatorLibraryPanel] 获取算子类型失败，回退到算子库接口:', error);
+            debugLogger.warn('[OperatorLibraryPanel] 获取算子库接口失败，回退到类型元数据接口:', error);
         }
 
-        const operators = await httpClient.get('/operators/library');
-        return operators.map(operator => this.normalizeOperatorMetadata(operator, operator.type || operator.Type)).filter(Boolean);
+        const types = await httpClient.get('/operators/types');
+        if (!Array.isArray(types) || types.length === 0) {
+            return [];
+        }
+
+        const operators = await Promise.all(types.map(async (type) => {
+            const typeIdentifier = typeof type === 'string'
+                ? type
+                : (type?.name || type?.Name || type?.type || type?.Type || String(type));
+            try {
+                const metadata = await httpClient.get(`/operators/${encodeURIComponent(typeIdentifier)}/metadata`);
+                const normalized = this.normalizeOperatorMetadata(metadata, typeIdentifier);
+                if (normalized) {
+                    this.metadataByType.set(normalized.type, normalized);
+                }
+                return normalized;
+            } catch (error) {
+                debugLogger.warn('[OperatorLibraryPanel] 加载算子元数据失败:', typeIdentifier, error);
+                return null;
+            }
+        }));
+
+        return operators.filter(Boolean);
     }
 
     normalizeOperatorMetadata(metadata, fallbackType = '') {
@@ -384,6 +392,8 @@ export class OperatorLibraryPanel {
         const parameters = metadata.parameters || metadata.Parameters || [];
         const inputPorts = metadata.inputPorts || metadata.InputPorts || [];
         const outputPorts = metadata.outputPorts || metadata.OutputPorts || [];
+        const tags = metadata.tags || metadata.Tags || [];
+        const keywords = metadata.keywords || metadata.Keywords || [];
         const iconName = normalizeOperatorIconName(metadata);
 
         return {
@@ -396,6 +406,8 @@ export class OperatorLibraryPanel {
             parameters,
             inputPorts,
             outputPorts,
+            tags: Array.isArray(tags) ? tags : [],
+            keywords: Array.isArray(keywords) ? keywords : [],
             inputType: metadata.inputType || metadata.InputType || (inputPorts[0]?.dataType || inputPorts[0]?.DataType || '图像'),
             outputType: metadata.outputType || metadata.OutputType || (outputPorts[0]?.dataType || outputPorts[0]?.DataType || '图像/数据')
         };
@@ -471,7 +483,7 @@ export class OperatorLibraryPanel {
         this.loadExpandedState(treeData);
         
         // 【调试】打印展开状态
-        console.log('[OperatorLibrary] After setData, expandedNodes:', Array.from(this.treeView.expandedNodes));
+        debugLogger.debug('[OperatorLibrary] After setData, expandedNodes:', Array.from(this.treeView.expandedNodes));
     }
 
     /**
@@ -498,7 +510,7 @@ export class OperatorLibraryPanel {
                 .filter(id => categoryIds.has(id));
             localStorage.setItem(this.storageKey, JSON.stringify(expandedIds));
         } catch (e) {
-            console.warn('[OperatorLibrary] Failed to save expanded state:', e);
+            debugLogger.warn('[OperatorLibrary] Failed to save expanded state:', e);
         }
     }
 
@@ -508,7 +520,7 @@ export class OperatorLibraryPanel {
     loadExpandedState(treeData = []) {
         try {
             const saved = localStorage.getItem(this.storageKey);
-            console.log('[OperatorLibrary] Loading expanded state from localStorage:', saved);
+            debugLogger.debug('[OperatorLibrary] Loading expanded state from localStorage:', saved);
             this.treeView.expandedNodes.clear();
 
             if (!saved) {
@@ -517,7 +529,7 @@ export class OperatorLibraryPanel {
             }
 
             const expandedIds = JSON.parse(saved);
-            console.log('[OperatorLibrary] Parsed expandedIds:', expandedIds);
+            debugLogger.debug('[OperatorLibrary] Parsed expandedIds:', expandedIds);
             if (!Array.isArray(expandedIds)) {
                 localStorage.removeItem(this.storageKey);
                 this.treeView.render();
@@ -529,11 +541,11 @@ export class OperatorLibraryPanel {
                 .filter(id => categoryIds.has(id))
                 .forEach(id => this.treeView.expandedNodes.add(id));
 
-            console.log('[OperatorLibrary] After loading, expandedNodes:', Array.from(this.treeView.expandedNodes));
+            debugLogger.debug('[OperatorLibrary] After loading, expandedNodes:', Array.from(this.treeView.expandedNodes));
             // 加载状态后重新渲染
             this.treeView.render();
         } catch (e) {
-            console.warn('[OperatorLibrary] Failed to load expanded state:', e);
+            debugLogger.warn('[OperatorLibrary] Failed to load expanded state:', e);
             this.treeView.expandedNodes.clear();
             this.treeView.render();
         }
@@ -570,10 +582,8 @@ export class OperatorLibraryPanel {
             this.filteredOperators = this.operators;
         } else {
             const lowerKeyword = keyword.toLowerCase();
-            this.filteredOperators = this.operators.filter(op => 
-                (op.displayName || op.name).toLowerCase().includes(lowerKeyword) ||
-                (op.description && op.description.toLowerCase().includes(lowerKeyword)) ||
-                (op.category && op.category.toLowerCase().includes(lowerKeyword))
+            this.filteredOperators = this.operators.filter(op =>
+                this.buildOperatorSearchText(op).includes(lowerKeyword)
             );
         }
         
@@ -583,6 +593,50 @@ export class OperatorLibraryPanel {
         if (keyword.trim()) {
             showToast(`找到 ${this.filteredOperators.length} 个算子`, 'info');
         }
+    }
+
+    buildOperatorSearchText(operator) {
+        const collectPortText = port => [
+            port?.name,
+            port?.Name,
+            port?.displayName,
+            port?.DisplayName,
+            port?.dataType,
+            port?.DataType,
+            port?.type,
+            port?.Type,
+            port?.description,
+            port?.Description
+        ].filter(Boolean).join(' ');
+        const collectParameterText = param => [
+            param?.name,
+            param?.Name,
+            param?.displayName,
+            param?.DisplayName,
+            param?.description,
+            param?.Description,
+            param?.dataType,
+            param?.DataType,
+            param?.type,
+            param?.Type,
+            ...((Array.isArray(param?.options || param?.Options) ? (param.options || param.Options) : [])
+                .map(option => typeof option === 'string'
+                    ? option
+                    : `${option?.label || option?.Label || ''} ${option?.value ?? option?.Value ?? ''}`))
+        ].filter(Boolean).join(' ');
+
+        return [
+            operator?.displayName,
+            operator?.name,
+            operator?.type,
+            operator?.description,
+            operator?.category,
+            ...(operator?.tags || []),
+            ...(operator?.keywords || []),
+            ...(operator?.inputPorts || []).map(collectPortText),
+            ...(operator?.outputPorts || []).map(collectPortText),
+            ...(operator?.parameters || []).map(collectParameterText)
+        ].filter(Boolean).join(' ').toLowerCase();
     }
 
     /**
@@ -624,12 +678,16 @@ export class OperatorLibraryPanel {
         const description = this.escapeHtml(resolvedOperator.description || '暂无描述');
         const inputType = this.escapeHtml(resolvedOperator.inputType || '图像');
         const outputType = this.escapeHtml(resolvedOperator.outputType || '图像/数据');
+        const usage = this.escapeHtml(resolvedOperator.usage || resolvedOperator.Usage || resolvedOperator.purpose || resolvedOperator.Purpose || resolvedOperator.description || '用于流程中的图像处理、检测或数据转换步骤。');
+        const scenario = this.escapeHtml(resolvedOperator.scenario || resolvedOperator.Scenario || resolvedOperator.typicalScenario || resolvedOperator.TypicalScenario || '根据输入/输出端口接入合适的上游图像或结构化数据。');
+        const notes = this.escapeHtml(resolvedOperator.notes || resolvedOperator.Notes || resolvedOperator.attention || resolvedOperator.Attention || '请确认必填参数、端口类型和上游图像来源后再运行。');
         const featureBadge = this.escapeHtml(getFeatureBadge('operator.autotuneStrategies'));
         const featureDescription = this.escapeHtml(getFeatureDescription('operator.autotuneStrategies'));
-        const renderPortLabel = (port, fallbackName = '未命名') => {
+        const renderPortLabel = (port, fallbackName = '未命名', direction = 'output') => {
             const name = port.displayName || port.DisplayName || port.name || port.Name || fallbackName;
             const dataType = port.dataType || port.DataType || 'Any';
-            return `${this.escapeHtml(name)} (${this.escapeHtml(dataType)})`;
+            const required = direction === 'input' && Boolean(port.isRequired ?? port.IsRequired);
+            return `${this.escapeHtml(name)}${required ? ' *' : ''} (${this.escapeHtml(dataType)})`;
         };
         
         preview.innerHTML = `
@@ -643,9 +701,26 @@ export class OperatorLibraryPanel {
                     <span class="detail-type">${type}</span>
                 </div>
                 <p class="detail-description">${description}</p>
+
+                <div class="detail-section">
+                    <h5>用途</h5>
+                    <p>${usage}</p>
+                </div>
+                <div class="detail-section">
+                    <h5>典型场景</h5>
+                    <p>${scenario}</p>
+                </div>
+                <div class="detail-section">
+                    <h5>注意事项</h5>
+                    <p>${notes}</p>
+                </div>
+                <div class="detail-section">
+                    <h5>必填项</h5>
+                    <div class="preview-params">${this.renderRequiredList(resolvedOperator.parameters)}</div>
+                </div>
                 
                 <div class="detail-params">
-                    <h5>参数配置</h5>
+                    <h5>关键参数</h5>
                     ${this.renderParameterList(resolvedOperator.parameters)}
                 </div>
                 
@@ -656,7 +731,7 @@ export class OperatorLibraryPanel {
                             ? inputPorts.map(port => `
                                 <div class="port-item input">
                                     <span class="port-dot input"></span>
-                                    <span>输入: ${renderPortLabel(port)}</span>
+                                    <span>输入: ${renderPortLabel(port, '未命名', 'input')}</span>
                                 </div>
                             `).join('')
                             : `
@@ -669,7 +744,7 @@ export class OperatorLibraryPanel {
                             ? outputPorts.map(port => `
                                 <div class="port-item output">
                                     <span class="port-dot output"></span>
-                                    <span>输出: ${renderPortLabel(port)}</span>
+                                    <span>输出: ${renderPortLabel(port, '未命名', 'output')}</span>
                                 </div>
                             `).join('')
                             : `
@@ -728,7 +803,7 @@ export class OperatorLibraryPanel {
                     </div>
                 `;
             } catch (error) {
-                console.error('[OperatorLibraryPanel] 获取自动调参策略失败:', error);
+                debugLogger.warn('[OperatorLibraryPanel] 获取自动调参策略失败:', error);
                 panel.innerHTML = `<div class="params-empty">加载失败：${this.escapeHtml(error.message)}</div>`;
             }
         });
@@ -744,15 +819,47 @@ export class OperatorLibraryPanel {
         
         return `
             <ul class="params-list">
-                ${parameters.map(param => `
-                    <li class="param-item">
-                        <span class="param-name">${this.escapeHtml(param.name)}</span>
-                        <span class="param-type">${this.escapeHtml(param.type)}</span>
-                        <span class="param-default">默认: ${this.escapeHtml(param.defaultValue)}</span>
-                    </li>
-                `).join('')}
+                ${parameters.map(param => {
+                    const name = param.displayName || param.DisplayName || param.name || param.Name || '参数';
+                    const internalName = param.name || param.Name || '';
+                    const type = param.dataType || param.DataType || param.type || param.Type || 'Any';
+                    const defaultValue = param.defaultValue ?? param.DefaultValue ?? param.value ?? param.Value ?? '';
+                    const min = param.min ?? param.Min ?? param.minValue ?? param.MinValue;
+                    const max = param.max ?? param.Max ?? param.maxValue ?? param.MaxValue;
+                    const options = param.options || param.Options || [];
+                    const required = Boolean(param.isRequired ?? param.IsRequired);
+                    const rangeText = min !== undefined || max !== undefined
+                        ? `范围: ${min ?? '-∞'} ~ ${max ?? '+∞'}`
+                        : '';
+                    const optionsText = Array.isArray(options) && options.length > 0
+                        ? `可选: ${options.map(option => typeof option === 'string'
+                            ? option
+                            : (option.label || option.Label || option.value || option.Value || '')).filter(Boolean).join(' / ')}`
+                        : '';
+                    return `
+                        <li class="param-item">
+                            <span class="param-name">${this.escapeHtml(name)}${required ? ' *' : ''}</span>
+                            <span class="param-type">${this.escapeHtml(type)}</span>
+                            <span class="param-default">${defaultValue === '' ? '无默认值' : `默认: ${this.escapeHtml(defaultValue)}`}</span>
+                            ${internalName && internalName !== name ? `<span class="param-note">${this.escapeHtml(internalName)}</span>` : ''}
+                            ${rangeText ? `<span class="param-note">${this.escapeHtml(rangeText)}</span>` : ''}
+                            ${optionsText ? `<span class="param-note">${this.escapeHtml(optionsText)}</span>` : ''}
+                        </li>
+                    `;
+                }).join('')}
             </ul>
         `;
+    }
+
+    renderRequiredList(parameters) {
+        const required = (parameters || [])
+            .filter(param => Boolean(param.isRequired ?? param.IsRequired))
+            .map(param => param.displayName || param.DisplayName || param.name || param.Name)
+            .filter(Boolean);
+
+        return required.length > 0
+            ? required.map(item => `<span class="param-tag required-tag">${this.escapeHtml(item)}</span>`).join('')
+            : '<span class="params-empty">无必填参数</span>';
     }
 
     escapeHtml(value) {
