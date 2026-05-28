@@ -21,6 +21,7 @@ export class PreviewPanel {
         this.onOpenImage = options.onOpenImage ?? (() => {});
         this.onAnalyzePreview = options.onAnalyzePreview ?? null;
         this.onAutoTune = options.onAutoTune ?? null;
+        this.validateBeforePreview = options.validateBeforePreview ?? (() => true);
         this.debounceMs = options.debounceMs ?? 500;
 
         this.autoPreviewEnabled = true;
@@ -145,20 +146,30 @@ export class PreviewPanel {
             return;
         }
 
+        if (this.validateBeforePreview({ trigger: 'auto', showToast: false }) === false) {
+            return;
+        }
+
         const debounceMs = options.debounceMs ?? this.debounceMs;
         const force = Boolean(options.force);
         this.previewCoordinator?.requestActivePreview?.({
             immediate: false,
             force,
-            debounceMs
+            debounceMs,
+            trigger: 'auto'
         });
     }
 
     refresh() {
+        if (this.validateBeforePreview({ trigger: 'manual', showToast: true }) === false) {
+            return;
+        }
+
         this.analysisResult = null;
         this.previewCoordinator?.requestActivePreview?.({
             immediate: true,
-            force: true
+            force: true,
+            trigger: 'manual'
         });
     }
 
@@ -219,7 +230,9 @@ export class PreviewPanel {
             return;
         }
 
-        image.src = imageSource;
+        if (image.getAttribute('src') !== imageSource) {
+            image.src = imageSource;
+        }
         image.style.display = 'block';
         placeholder.style.display = 'none';
     }

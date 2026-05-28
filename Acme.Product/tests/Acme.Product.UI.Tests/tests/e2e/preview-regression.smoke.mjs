@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
   NodePreviewCoordinator,
   getCanvasPreviewEligibility,
+  getOperatorPreviewCostPolicy,
   resolvePreviewInputImageBase64,
 } from '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/previewCoordinator.js';
 import ResultPanel from '../../../../src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js';
@@ -107,7 +108,15 @@ async function runPreviewCoordinatorChecks() {
 
   cameraCoordinator.setActiveNode(cameraNode);
   await sleep(30);
-  assert.equal(cameraPreviewCalls, 1, 'camera acquisition should execute preview with a selected camera');
+  assert.equal(cameraPreviewCalls, 0, 'camera acquisition should not auto-preview by default');
+  assert.equal(
+    getOperatorPreviewCostPolicy(cameraNode).autoPreviewAllowed,
+    false,
+    'live camera acquisition should require manual preview'
+  );
+  cameraCoordinator.requestActivePreview({ immediate: true, force: true, trigger: 'manual' });
+  await sleep(30);
+  assert.equal(cameraPreviewCalls, 1, 'manual camera preview should still execute with a selected camera');
   assert.equal(cameraPreviewOptions.inputImageBase64, null, 'camera acquisition should not receive stale external images');
   assert.equal(cameraCoordinator.getState().status, 'success');
   cameraCoordinator.destroy();
@@ -312,9 +321,10 @@ function runSourceWiringChecks() {
   assert.match(appSource, /previewCoordinator:\s*nodePreviewCoordinator/);
 
   const notifyMatches = flowEditorSource.match(/notifyViewStateChanged\?\.\(\)/g) || [];
+  assert.match(flowEditorSource, /scheduleViewStateNotification/);
   assert.ok(
-    notifyMatches.length >= 4,
-    'flow editor interaction should notify view-state changes during pan/drag lifecycle'
+    notifyMatches.length >= 2,
+    'flow editor interaction should notify view-state changes at commit points and throttle high-frequency updates'
   );
 }
 

@@ -4,6 +4,36 @@ import {
 } from './previewOutputFormatter.mjs';
 
 const DEFAULT_DEBOUNCE_MS = 500;
+const DEFAULT_PREVIEW_TIMEOUT_MS = 15000;
+const HIGH_COST_PREVIEW_TIMEOUT_MS = 30000;
+const MAX_PREVIEW_INPUT_BASE64_CHARS = 24 * 1024 * 1024;
+const MAX_CACHE_IMAGE_BASE64_CHARS = 6 * 1024 * 1024;
+const HIGH_COST_OPERATOR_TYPE_HINTS = [
+    'DeepLearning',
+    'OnnxInference',
+    'OcrRecognition',
+    'TemplateMatch',
+    'TemplateMatching',
+    'ShapeMatching',
+    'PlanarMatching',
+    'AkazeFeatureMatch',
+    'FeatureMatch',
+    'SemanticSegmentation',
+    'SurfaceDefectDetection',
+    'AnomalyDetection'
+];
+const HIGH_COST_TEXT_HINTS = [
+    'ai',
+    'deep learning',
+    'onnx',
+    'ocr',
+    'yolo',
+    'template',
+    'matching',
+    'feature',
+    'segmentation',
+    'defect'
+];
 const IMAGE_NODE_TYPE_FALLBACKS = new Set([
     'ImageAcquisition'
 ]);
@@ -81,6 +111,10 @@ function normalizeBase64Image(imageValue) {
     }
 
     return trimmed;
+}
+
+function isPreviewPayloadTooLarge(imageBase64) {
+    return typeof imageBase64 === 'string' && imageBase64.length > MAX_PREVIEW_INPUT_BASE64_CHARS;
 }
 
 export function extractPreviewImageBase64(result) {
@@ -179,6 +213,74 @@ export function getCanvasPreviewEligibility(node, metadata = null) {
         eligible: false,
         reason: 'no-image-output',
         source: null
+    };
+}
+
+function normalizeText(value) {
+    return String(value ?? '').trim().toLowerCase();
+}
+
+function containsAnyHint(value, hints) {
+    const text = normalizeText(value);
+    return Boolean(text) && hints.some(hint => text.includes(normalizeText(hint)));
+}
+
+function getMetadataText(metadata) {
+    const tags = metadata?.tags || metadata?.Tags || [];
+    const keywords = metadata?.keywords || metadata?.Keywords || [];
+    return [
+        metadata?.type,
+        metadata?.Type,
+        metadata?.displayName,
+        metadata?.DisplayName,
+        metadata?.description,
+        metadata?.Description,
+        metadata?.category,
+        metadata?.Category,
+        ...(Array.isArray(tags) ? tags : []),
+        ...(Array.isArray(keywords) ? keywords : [])
+    ].join(' ');
+}
+
+export function getOperatorPreviewCostPolicy(node, metadata = null) {
+    if (!node) {
+        return {
+            level: 'light',
+            autoPreviewAllowed: true,
+            reason: null,
+            timeoutMs: DEFAULT_PREVIEW_TIMEOUT_MS
+        };
+    }
+
+    if (isLiveCameraAcquisitionNode(node)) {
+        return {
+            level: 'high',
+            autoPreviewAllowed: false,
+            reason: '相机采集会触发真实取帧，请点击“刷新预览”手动执行。',
+            timeoutMs: HIGH_COST_PREVIEW_TIMEOUT_MS
+        };
+    }
+
+    const type = String(node.type || metadata?.type || metadata?.Type || '');
+    const normalizedType = normalizeText(type);
+    const metadataText = getMetadataText(metadata);
+    const isHighCost = HIGH_COST_OPERATOR_TYPE_HINTS.some(hint => normalizedType.includes(normalizeText(hint))) ||
+        containsAnyHint(metadataText || type, HIGH_COST_TEXT_HINTS);
+
+    if (isHighCost) {
+        return {
+            level: 'high',
+            autoPreviewAllowed: false,
+            reason: '该算子可能执行 AI、OCR、模板或特征匹配等高成本计算，请点击“刷新预览”手动执行。',
+            timeoutMs: HIGH_COST_PREVIEW_TIMEOUT_MS
+        };
+    }
+
+    return {
+        level: 'light',
+        autoPreviewAllowed: true,
+        reason: null,
+        timeoutMs: DEFAULT_PREVIEW_TIMEOUT_MS
     };
 }
 
@@ -347,6 +449,12 @@ function createEmptyState() {
         inputImageBase64: null,
         outputImageBase64: null,
         outputData: null,
+        previewCost: {
+            level: 'light',
+            autoPreviewAllowed: true,
+            reason: null,
+            timeoutMs: DEFAULT_PREVIEW_TIMEOUT_MS
+        },
         presenter: null
     };
 
@@ -375,7 +483,9 @@ function parsePreviewResponse(response) {
         outputData: readFirstDefined(response, ['outputData', 'OutputData']) || null,
         executionTimeMs: readFirstDefined(response, ['executionTimeMs', 'ExecutionTimeMs']) ?? null,
         errorMessage: readFirstDefined(response, ['errorMessage', 'ErrorMessage']) || null,
-        failedOperatorName: readFirstDefined(response, ['failedOperatorName', 'FailedOperatorName']) || null
+        failedOperatorId: readFirstDefined(response, ['failedOperatorId', 'FailedOperatorId']) || null,
+        failedOperatorName: readFirstDefined(response, ['failedOperatorName', 'FailedOperatorName']) || null,
+        failedOperatorType: readFirstDefined(response, ['failedOperatorType', 'FailedOperatorType']) || null
     };
 }
 
@@ -487,15 +597,17 @@ export class NodePreviewCoordinator {
         }
 
         const metadata = this.getOperatorMetadata(node.type);
+        const previewCost = getOperatorPreviewCostPolicy(node, metadata);
         this.updateState({
             ...createEmptyState(),
             activeNodeId: node.id,
             nodeType: node.type,
             title: node.title || metadata?.displayName || node.type,
-            canvasEligibility: getCanvasPreviewEligibility(node, metadata)
+            canvasEligibility: getCanvasPreviewEligibility(node, metadata),
+            previewCost
         });
 
-        this.requestActivePreview();
+        this.requestActivePreview({ trigger: 'auto' });
     }
 
     invalidateActivePreview(options = {}) {
@@ -506,7 +618,13 @@ export class NodePreviewCoordinator {
     }
 
     requestActivePreview(options = {}) {
-        const { immediate = false, force = false, debounceMs = this.debounceMs } = options;
+        const {
+            immediate = false,
+            force = false,
+            debounceMs = this.debounceMs,
+            trigger = 'auto',
+            timeoutMs = null
+        } = options;
         if (!this.state.activeNodeId) {
             return;
         }
@@ -529,6 +647,21 @@ export class NodePreviewCoordinator {
                 return;
             }
 
+            const metadata = this.getOperatorMetadata(activeNode.type);
+            const previewCost = getOperatorPreviewCostPolicy(activeNode, metadata);
+            if (trigger === 'auto' && !previewCost.autoPreviewAllowed) {
+                this.updateState({
+                    status: 'idle',
+                    executionTimeMs: null,
+                    errorMessage: previewCost.reason,
+                    inputImageBase64: null,
+                    outputImageBase64: null,
+                    outputData: null,
+                    previewCost
+                });
+                return;
+            }
+
             const projectId = this.getProjectId();
             if (!projectId) {
                 this.debugSessionId = null;
@@ -540,6 +673,7 @@ export class NodePreviewCoordinator {
                     inputImageBase64: null,
                     outputImageBase64: null,
                     outputData: null,
+                    previewCost,
                     request: buildPreviewRequestKey({
                         projectId: null,
                         nodeId: activeNode.id,
@@ -554,6 +688,30 @@ export class NodePreviewCoordinator {
             const inputImageBase64 = shouldUseExternalInputImage(activeNode)
                 ? await Promise.resolve(this.getInputImageBase64())
                 : null;
+            if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
+                return;
+            }
+
+            if (isPreviewPayloadTooLarge(inputImageBase64)) {
+                this.updateState({
+                    status: 'idle',
+                    executionTimeMs: null,
+                    errorMessage: '输入图像过大，已跳过预览。请先缩小图像或执行完整检测。',
+                    inputImageBase64: null,
+                    outputImageBase64: null,
+                    outputData: null,
+                    previewCost,
+                    request: buildPreviewRequestKey({
+                        projectId,
+                        nodeId: activeNode.id,
+                        flowRevision: this.getFlowRevision(),
+                        parameterSnapshot: buildParameterSnapshot(activeNode.parameters),
+                        inputImageBase64: null
+                    })
+                });
+                return;
+            }
+
             const prerequisiteError = validatePreviewPrerequisites(activeNode, inputImageBase64);
             if (prerequisiteError) {
                 this.updateState({
@@ -563,6 +721,7 @@ export class NodePreviewCoordinator {
                     inputImageBase64: inputImageBase64 || null,
                     outputImageBase64: null,
                     outputData: null,
+                    previewCost,
                     request: buildPreviewRequestKey({
                         projectId,
                         nodeId: activeNode.id,
@@ -599,20 +758,34 @@ export class NodePreviewCoordinator {
                 errorMessage: null,
                 executionTimeMs: null,
                 request,
-                inputImageBase64: inputImageBase64 || null
+                inputImageBase64: inputImageBase64 || null,
+                previewCost
             });
 
             const abortController = typeof AbortController !== 'undefined'
                 ? new AbortController()
                 : null;
             this.activeAbortController = abortController;
+            const requestedTimeoutMs = Number(timeoutMs || previewCost.timeoutMs || DEFAULT_PREVIEW_TIMEOUT_MS);
+            const effectiveTimeoutMs = Number.isFinite(requestedTimeoutMs)
+                ? Math.max(1000, requestedTimeoutMs)
+                : DEFAULT_PREVIEW_TIMEOUT_MS;
+            let timeoutId = null;
+            let timedOut = false;
+            if (abortController && Number.isFinite(effectiveTimeoutMs)) {
+                timeoutId = setTimeout(() => {
+                    timedOut = true;
+                    abortController.abort();
+                }, effectiveTimeoutMs);
+            }
 
             try {
                 const response = await this.previewExecutor(activeNode.id, {
                     debugSessionId: this.getDebugSessionId(projectId, activeNode.id),
                     inputImageBase64,
                     parameters: null,
-                    signal: abortController?.signal
+                    signal: abortController?.signal,
+                    timeoutMs: effectiveTimeoutMs
                 });
 
                 if (scheduledVersion !== this.requestVersion || this.state.activeNodeId !== activeNode.id) {
@@ -620,6 +793,16 @@ export class NodePreviewCoordinator {
                 }
 
                 const parsed = parsePreviewResponse(response);
+                const outputData = parsed.outputData && typeof parsed.outputData === 'object'
+                    ? { ...parsed.outputData }
+                    : parsed.outputData;
+                if (parsed.outputImageBase64 && isPreviewPayloadTooLarge(parsed.outputImageBase64)) {
+                    parsed.outputImageBase64 = null;
+                    if (outputData && typeof outputData === 'object') {
+                        outputData._previewWarning = '输出图像过大，已省略图像，仅保留结构化摘要。';
+                    }
+                }
+
                 const nextState = {
                     activeNodeId: activeNode.id,
                     nodeType: activeNode.type,
@@ -635,16 +818,19 @@ export class NodePreviewCoordinator {
                     request,
                     inputImageBase64: parsed.inputImageBase64 || inputImageBase64 || null,
                     outputImageBase64: parsed.outputImageBase64,
-                    outputData: parsed.outputData
+                    outputData,
+                    previewCost
                 };
 
-                if (!bypassCache) {
+                const cacheableImage = !nextState.outputImageBase64 ||
+                    nextState.outputImageBase64.length <= MAX_CACHE_IMAGE_BASE64_CHARS;
+                if (!bypassCache && cacheableImage) {
                     this.setCacheEntry(request.requestKey, nextState);
                 }
 
                 this.updateState(nextState);
             } catch (error) {
-                if (isAbortError(error)) {
+                if (isAbortError(error) && !timedOut) {
                     return;
                 }
 
@@ -655,13 +841,19 @@ export class NodePreviewCoordinator {
                 this.updateState({
                     status: 'error',
                     executionTimeMs: null,
-                    errorMessage: error?.message || '预览请求失败',
+                    errorMessage: timedOut
+                        ? `预览超时（${Math.round(effectiveTimeoutMs / 1000)} 秒），已取消本次请求。`
+                        : (error?.message || '预览请求失败'),
                     request,
                     inputImageBase64: inputImageBase64 || null,
                     outputImageBase64: null,
-                    outputData: null
+                    outputData: null,
+                    previewCost
                 });
             } finally {
+                if (timeoutId !== null) {
+                    clearTimeout(timeoutId);
+                }
                 if (this.activeAbortController === abortController) {
                     this.activeAbortController = null;
                 }

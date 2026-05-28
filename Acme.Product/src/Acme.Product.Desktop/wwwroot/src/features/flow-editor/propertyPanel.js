@@ -8,6 +8,56 @@ import { resolvePreviewInputImageBase64 } from './previewCoordinator.js';
 import { buildWireSequenceFollowupHint, createWireSequenceParameterPatch } from './wireSequenceAssist.js';
 import { getOperatorRoiConfig } from './roiEditorSupport.mjs';
 
+function normalizeParameterName(name) {
+    return String(name || '').trim().toLowerCase();
+}
+
+function isEmptyValue(value) {
+    return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+}
+
+function isParameterRequired(param) {
+    return Boolean(param?.isRequired ?? param?.IsRequired);
+}
+
+function getParameterLabel(param, fallbackName = '') {
+    return param?.displayName || param?.DisplayName || param?.name || param?.Name || fallbackName || '参数';
+}
+
+function getParameterDataType(param, fallbackType = '') {
+    return String(param?.dataType || param?.DataType || param?.type || param?.Type || fallbackType || '').trim();
+}
+
+function getParameterEffectiveValue(param) {
+    return param?.value ?? param?.Value ?? param?.defaultValue ?? param?.DefaultValue ?? null;
+}
+
+function getParameterRangeValue(param, ...keys) {
+    for (const key of keys) {
+        if (param?.[key] !== undefined && param?.[key] !== null && param?.[key] !== '') {
+            const parsed = Number(param[key]);
+            if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+        }
+    }
+
+    return null;
+}
+
+function parseNumericValue(rawValue) {
+    if (isEmptyValue(rawValue)) {
+        return { empty: true, valid: false, value: null };
+    }
+
+    const value = Number(String(rawValue).trim());
+    return {
+        empty: false,
+        valid: Number.isFinite(value),
+        value: Number.isFinite(value) ? value : null
+    };
+}
+
 class PropertyPanel {
     constructor(containerId, options = {}) {
         this.container = document.getElementById(containerId);
@@ -640,6 +690,12 @@ class PropertyPanel {
         return (separatorIndex >= 0 ? raw.substring(0, separatorIndex) : raw).trim().toLowerCase();
     }
 
+    getParameterByName(name, operator = this.currentOperator) {
+        const normalizedName = normalizeParameterName(name);
+        return (operator?.parameters || []).find(param =>
+            normalizeParameterName(param?.name || param?.Name) === normalizedName) || null;
+    }
+
     findParamInput(...names) {
         const form = document.getElementById('property-form');
         if (!form) return null;
@@ -727,13 +783,19 @@ class PropertyPanel {
             switch (type) {
                 case 'int':
                     // 【修复】处理空或非数字情况
-                    const intVal = parseInt(input.value, 10);
-                    values[name] = isNaN(intVal) ? 0 : intVal;
+                    {
+                        const raw = String(input.value || '').trim();
+                        const parsed = parseNumericValue(raw);
+                        values[name] = parsed.empty ? null : (parsed.valid && Number.isInteger(parsed.value) ? parsed.value : raw);
+                    }
                     break;
                 case 'double':
                 case 'float':
-                    const floatVal = parseFloat(input.value);
-                    values[name] = isNaN(floatVal) ? 0.0 : floatVal;
+                    {
+                        const raw = String(input.value || '').trim();
+                        const parsed = parseNumericValue(raw);
+                        values[name] = parsed.empty ? null : (parsed.valid ? parsed.value : raw);
+                    }
                     break;
                 case 'boolean':
                 case 'bool':
@@ -750,11 +812,254 @@ class PropertyPanel {
     /**
      * 应用更改
      */
-    applyChanges() {
+    clearValidationErrors() {
+        this.container?.querySelectorAll('.form-group.invalid').forEach(group => {
+            group.classList.remove('invalid');
+        });
+        this.container?.querySelectorAll('[data-validation-error]').forEach(element => {
+            element.remove();
+        });
+    }
+
+    validateCurrentOperator(options = {}) {
+        const {
+            showToast = true,
+            markFields = showToast,
+            scrollToFirst = showToast
+        } = options;
+
+        const errors = this.collectCurrentOperatorValidationErrors();
+        if (markFields) {
+            this.renderValidationErrors(errors, { scrollToFirst });
+        }
+
+        if (errors.length > 0) {
+            if (showToast) {
+                this.showToast(errors[0].message, 'error');
+            }
+            return false;
+        }
+
+        if (markFields) {
+            this.clearValidationErrors();
+        }
+        return true;
+    }
+
+    collectCurrentOperatorValidationErrors() {
+        const form = document.getElementById('property-form');
+        if (!form || !this.currentOperator) {
+            return [];
+        }
+
+        const errors = [];
+        const inputs = Array.from(form.querySelectorAll('input[name], select[name]'))
+            .filter(input => input.type !== 'range');
+
+        inputs.forEach(input => {
+            const param = this.getParameterByName(input.name);
+            const dataType = String(input.dataset.type || getParameterDataType(param)).toLowerCase();
+            const label = getParameterLabel(param, input.name);
+            const rawValue = input.type === 'checkbox' ? input.checked : input.value;
+
+            if (isParameterRequired(param) && isEmptyValue(rawValue)) {
+                errors.push({ name: input.name, message: `${label} 为必填项` });
+                return;
+            }
+
+            if (['int', 'integer', 'double', 'float', 'number'].includes(dataType) && !isEmptyValue(rawValue)) {
+                const parsed = parseNumericValue(rawValue);
+                if (!parsed.valid) {
+                    errors.push({ name: input.name, message: `${label} 必须是有效数字` });
+                    return;
+                }
+
+                if ((dataType === 'int' || dataType === 'integer') && !Number.isInteger(parsed.value)) {
+                    errors.push({ name: input.name, message: `${label} 必须是整数` });
+                    return;
+                }
+
+                const min = getParameterRangeValue(param, 'min', 'Min', 'minValue', 'MinValue');
+                const max = getParameterRangeValue(param, 'max', 'Max', 'maxValue', 'MaxValue');
+                if (min !== null && parsed.value < min) {
+                    errors.push({ name: input.name, message: `${label} 不能小于 ${min}` });
+                    return;
+                }
+                if (max !== null && parsed.value > max) {
+                    errors.push({ name: input.name, message: `${label} 不能大于 ${max}` });
+                }
+            }
+        });
+
+        this.collectImageAcquisitionValidationErrors(this.currentOperator, errors);
+        return errors;
+    }
+
+    collectImageAcquisitionValidationErrors(operator, errors) {
+        if (operator?.type !== 'ImageAcquisition') {
+            return;
+        }
+
+        const params = operator.parameters || [];
+        const readParamValue = (...names) => {
+            for (const name of names) {
+                const input = this.currentOperator?.id === operator.id ? this.findParamInput(name) : null;
+                if (input) {
+                    return input.value;
+                }
+
+                const param = params.find(item => normalizeParameterName(item?.name || item?.Name) === normalizeParameterName(name));
+                if (param) {
+                    return getParameterEffectiveValue(param);
+                }
+            }
+
+            return null;
+        };
+
+        const sourceType = this.normalizeSourceTypeValue(readParamValue('SourceType', 'sourceType'));
+        const filePath = String(readParamValue('FilePath', 'filePath') || '').trim();
+        const cameraId = String(readParamValue('CameraId', 'cameraId') || '').trim();
+
+        if (sourceType === 'camera') {
+            if (!cameraId) {
+                errors.push({ name: 'CameraId', message: '相机采集模式必须选择相机' });
+            }
+            return;
+        }
+
+        if (!filePath) {
+            errors.push({ name: 'FilePath', message: '文件采集模式必须选择图像文件' });
+        }
+    }
+
+    renderValidationErrors(errors, options = {}) {
+        this.clearValidationErrors();
+        if (!Array.isArray(errors) || errors.length === 0) {
+            return;
+        }
+
+        errors.forEach(error => {
+            const input = this.findParamInput(error.name);
+            const group = input?.closest('.form-group');
+            if (!group) {
+                return;
+            }
+
+            group.classList.add('invalid');
+            const message = document.createElement('p');
+            message.className = 'form-description validation-error';
+            message.dataset.validationError = 'true';
+            message.textContent = error.message;
+            group.appendChild(message);
+        });
+
+        if (options.scrollToFirst !== false) {
+            const firstInvalid = this.container?.querySelector('.form-group.invalid');
+            firstInvalid?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
+
+    validateOperatorModel(operator) {
+        const errors = [];
+        if (!operator) {
+            return errors;
+        }
+
+        const nodeTitle = operator.title || operator.name || operator.Name || operator.type || '算子';
+        (operator.parameters || []).forEach(param => {
+            const name = param?.name || param?.Name;
+            const label = getParameterLabel(param, name);
+            const dataType = getParameterDataType(param).toLowerCase();
+            const value = getParameterEffectiveValue(param);
+
+            if (isParameterRequired(param) && isEmptyValue(value)) {
+                errors.push({ nodeId: operator.id, name, message: `${nodeTitle}：${label} 为必填项` });
+                return;
+            }
+
+            if (['int', 'integer', 'double', 'float', 'number'].includes(dataType) && !isEmptyValue(value)) {
+                const parsed = parseNumericValue(value);
+                if (!parsed.valid) {
+                    errors.push({ nodeId: operator.id, name, message: `${nodeTitle}：${label} 必须是有效数字` });
+                    return;
+                }
+
+                if ((dataType === 'int' || dataType === 'integer') && !Number.isInteger(parsed.value)) {
+                    errors.push({ nodeId: operator.id, name, message: `${nodeTitle}：${label} 必须是整数` });
+                    return;
+                }
+
+                const min = getParameterRangeValue(param, 'min', 'Min', 'minValue', 'MinValue');
+                const max = getParameterRangeValue(param, 'max', 'Max', 'maxValue', 'MaxValue');
+                if (min !== null && parsed.value < min) {
+                    errors.push({ nodeId: operator.id, name, message: `${nodeTitle}：${label} 不能小于 ${min}` });
+                    return;
+                }
+                if (max !== null && parsed.value > max) {
+                    errors.push({ nodeId: operator.id, name, message: `${nodeTitle}：${label} 不能大于 ${max}` });
+                }
+            }
+        });
+
+        this.collectImageAcquisitionValidationErrors(operator, errors);
+        return errors;
+    }
+
+    validateFlowForAction(flowCanvas, options = {}) {
+        const {
+            showToast = true,
+            action = '执行'
+        } = options;
+
+        if (this.currentOperator && this.validateCurrentOperator({
+            showToast,
+            markFields: showToast,
+            scrollToFirst: showToast
+        }) === false) {
+            return false;
+        }
+
+        const nodes = flowCanvas?.nodes instanceof Map
+            ? Array.from(flowCanvas.nodes.values())
+            : [];
+        const errors = [];
+        nodes.forEach(node => {
+            if (node?.id === this.currentOperator?.id) {
+                return;
+            }
+            errors.push(...this.validateOperatorModel(node));
+        });
+
+        if (errors.length > 0) {
+            const first = errors[0];
+            if (first.nodeId && flowCanvas?.nodes?.has?.(first.nodeId)) {
+                flowCanvas.selectedNode = first.nodeId;
+                flowCanvas.onNodeSelected?.(flowCanvas.nodes.get(first.nodeId));
+                flowCanvas.invalidate?.();
+            }
+            if (showToast) {
+                this.showToast(`${action}前请先修正参数：${first.message}`, 'error');
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    applyChanges(options = {}) {
+        const { showToast = true } = options;
+        if (this.validateCurrentOperator({ showToast, markFields: showToast }) === false) {
+            return false;
+        }
+
         this._notifyValueChanged();
 
         // 显示成功提示
-        this.showToast('参数已应用', 'success');
+        if (showToast) {
+            this.showToast('参数已应用', 'success');
+        }
+        return true;
     }
 
     /**
@@ -780,6 +1085,11 @@ class PropertyPanel {
             onOpenImage: this.onOpenPreviewImage,
             onAnalyzePreview: async payload => this.handleWireSequenceAnalyze(payload),
             onAutoTune: async payload => this.handleWireSequenceAutoTune(payload),
+            validateBeforePreview: options => this.validateCurrentOperator({
+                showToast: options?.showToast === true,
+                markFields: options?.showToast === true,
+                scrollToFirst: options?.showToast === true
+            }),
             debounceMs: 500
         });
 
@@ -1019,13 +1329,15 @@ class PropertyPanel {
         }
 
         if (type === 'int') {
-            const value = parseInt(input.value, 10);
-            return Number.isNaN(value) ? 0 : value;
+            const raw = String(input.value || '').trim();
+            const parsed = parseNumericValue(raw);
+            return parsed.empty ? null : (parsed.valid && Number.isInteger(parsed.value) ? parsed.value : raw);
         }
 
         if (type === 'double' || type === 'float') {
-            const value = parseFloat(input.value);
-            return Number.isNaN(value) ? 0 : value;
+            const raw = String(input.value || '').trim();
+            const parsed = parseNumericValue(raw);
+            return parsed.empty ? null : (parsed.valid ? parsed.value : raw);
         }
 
         return input.value;
@@ -1039,10 +1351,11 @@ class PropertyPanel {
         }
 
         if (type === 'int') {
-            input.value = `${parseInt(rawValue, 10) || 0}`;
+            const parsed = parseNumericValue(rawValue);
+            input.value = parsed.empty ? '' : (parsed.valid && Number.isInteger(parsed.value) ? `${parsed.value}` : `${rawValue}`);
         } else if (type === 'double' || type === 'float') {
-            const parsed = parseFloat(rawValue);
-            input.value = `${Number.isNaN(parsed) ? 0 : parsed}`;
+            const parsed = parseNumericValue(rawValue);
+            input.value = parsed.empty ? '' : (parsed.valid ? `${parsed.value}` : `${rawValue}`);
         } else {
             input.value = rawValue ?? '';
         }

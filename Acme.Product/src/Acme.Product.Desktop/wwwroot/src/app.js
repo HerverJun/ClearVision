@@ -123,6 +123,8 @@ let statusBarStarted = false;
 let themeUpdateInFlight = false;
 let projectFlowSyncSuppressionDepth = 0;
 let studioPerformanceGuardsInitialized = false;
+let activeSubgraphNodeId = null;
+let subgraphBreadcrumbBound = false;
 
 let projectViewModulePromise = null;
 let resultPanelModulePromise = null;
@@ -324,6 +326,44 @@ function getAiGenerationController() {
     }
 
     return aiGenerationController;
+}
+
+function isSubgraphHostNode(node) {
+    return String(node?.type || '').toLowerCase() === 'foreach';
+}
+
+function bindSubgraphBreadcrumb() {
+    if (subgraphBreadcrumbBound) {
+        return;
+    }
+
+    const rootLink = document.getElementById('breadcrumb-root');
+    const exitButton = document.getElementById('btn-exit-subgraph');
+    const exitSubgraph = () => closeSubgraphBreadcrumb();
+
+    rootLink?.addEventListener('click', exitSubgraph);
+    exitButton?.addEventListener('click', exitSubgraph);
+    subgraphBreadcrumbBound = true;
+}
+
+function openSubgraphBreadcrumb(node) {
+    if (!isSubgraphHostNode(node)) {
+        return false;
+    }
+
+    activeSubgraphNodeId = node.id;
+    const breadcrumb = document.getElementById('subgraph-breadcrumb');
+    const current = document.getElementById('breadcrumb-current');
+    if (current) {
+        current.textContent = node.title || node.displayName || node.type || 'ForEach';
+    }
+    breadcrumb?.classList.remove('hidden');
+    return true;
+}
+
+function closeSubgraphBreadcrumb() {
+    activeSubgraphNodeId = null;
+    document.getElementById('subgraph-breadcrumb')?.classList.add('hidden');
 }
 
 function handleFeatureLoadError(featureName, error) {
@@ -930,6 +970,7 @@ function initializeFlowEditor() {
         }
     ]);
     initializeNodePreviewExperience();
+    bindSubgraphBreadcrumb();
 
     flowCanvas.onNodeSelected = (node) => {
         if (node) {
@@ -955,6 +996,7 @@ function initializeFlowEditor() {
     flowCanvas.onNodeDoubleClicked = (node) => {
         if (node) {
             nodePreviewCoordinator?.setActiveNode(node);
+            openSubgraphBreadcrumb(node);
         }
     };
 
@@ -1410,6 +1452,19 @@ function syncCurrentProjectFlowFromCanvas() {
     return flow;
 }
 
+function validateCurrentFlowForAction(action) {
+    const panel = propertyPanel || serviceRegistry.get('propertyPanel');
+    if (panel?.validateFlowForAction?.(flowCanvas, { action, showToast: true }) === false) {
+        return false;
+    }
+
+    if (panel?.currentOperator && panel.applyChanges?.({ showToast: false }) === false) {
+        return false;
+    }
+
+    return true;
+}
+
 function startAutoSave() {
     stopAutoSave();
 
@@ -1521,6 +1576,12 @@ async function resolveProjectExportSource(projectId = null) {
 }
 
 async function exportProjectToJson(projectId = null) {
+    const currentProject = getCurrentProject();
+    const targetProjectId = projectId || currentProject?.id || null;
+    if (currentProject && currentProject.id === targetProjectId && !validateCurrentFlowForAction('导出')) {
+        return;
+    }
+
     const exportSource = await resolveProjectExportSource(projectId);
     if (!exportSource?.project) {
         showToast('没有可导出的工程', 'warning');
@@ -1561,6 +1622,9 @@ async function exportRuntimePackage(projectId = null) {
     const targetProjectId = projectId || currentProject?.id || null;
     if (!targetProjectId) {
         showToast('没有可导出的工程', 'warning');
+        return;
+    }
+    if (currentProject && currentProject.id === targetProjectId && !validateCurrentFlowForAction('导出运行包')) {
         return;
     }
     try {

@@ -19,6 +19,18 @@ function bindButton(documentRef, id, handler, cleanup) {
     });
 }
 
+function validateFlowBeforeAction(propertyPanel, flowCanvas, action) {
+    if (propertyPanel?.validateFlowForAction?.(flowCanvas, { action, showToast: true }) === false) {
+        return false;
+    }
+
+    if (propertyPanel?.currentOperator && propertyPanel.applyChanges?.({ showToast: false }) === false) {
+        return false;
+    }
+
+    return true;
+}
+
 /**
  * @typedef {Object} ToolbarCommandOptions
  * @property {Document} documentRef
@@ -70,12 +82,12 @@ export function bindToolbarCommands(options) {
     bindButton(documentRef, 'btn-save', async () => {
         try {
             const propertyPanel = getPropertyPanel?.() || serviceRegistry?.get?.('propertyPanel');
-            if (propertyPanel?.currentOperator) {
-                propertyPanel.applyChanges();
+            const flowCanvas = getFlowCanvas();
+            if (!validateFlowBeforeAction(propertyPanel, flowCanvas, '保存')) {
+                return;
             }
 
             const project = getCurrentProject();
-            const flowCanvas = getFlowCanvas();
             if (project) {
                 if (flowCanvas) {
                     const flow = flowCanvas.serialize();
@@ -131,6 +143,11 @@ export function bindToolbarCommands(options) {
             const flowCanvas = getFlowCanvas();
             if (!flowCanvas || flowCanvas.nodes?.size === 0) {
                 showToast('请先在流程中添加至少一个算子', 'warning');
+                return;
+            }
+
+            const propertyPanel = getPropertyPanel?.() || serviceRegistry?.get?.('propertyPanel');
+            if (!validateFlowBeforeAction(propertyPanel, flowCanvas, '运行')) {
                 return;
             }
 

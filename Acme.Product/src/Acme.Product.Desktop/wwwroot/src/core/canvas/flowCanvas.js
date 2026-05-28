@@ -138,6 +138,13 @@ class FlowCanvas {
         this._subGraphNodeCountCache = new WeakMap();
         this._nodesBoundsCache = null;
         this._nodesBoundsDirty = true;
+        this._minimapStructureDirty = true;
+        this._minimapViewportDirty = true;
+        this._minimapLastDrawTime = 0;
+        this._minimapStaticCache = null;
+        this._minimapClickHandler = null;
+        this._minimapToggleHandler = null;
+        this._minimapCollapsed = false;
 
         // 鍙抽敭鑿滃崟
         this.contextMenu = null;
@@ -249,10 +256,21 @@ class FlowCanvas {
         this.structureStateListeners.clear();
         this._particleSprite = null;
 
+        if (this.minimapCanvas && this._minimapClickHandler) {
+            this.minimapCanvas.removeEventListener('click', this._minimapClickHandler);
+            this._minimapClickHandler = null;
+        }
+        if (this.minimapToggle && this._minimapToggleHandler) {
+            this.minimapToggle.removeEventListener('click', this._minimapToggleHandler);
+            this._minimapToggleHandler = null;
+        }
+
         if (this.minimap) {
             this.minimap.remove();
             this.minimap = null;
             this.minimapCanvas = null;
+            this.minimapToggle = null;
+            this._minimapStaticCache = null;
         }
 
         this.hideContextMenu();
@@ -456,9 +474,26 @@ class FlowCanvas {
             }
 
             visited.add(current);
-            for (const conn of this.connections) {
-                if (conn.source === current && !visited.has(conn.target)) {
-                    stack.push(conn.target);
+            const outgoing = this._connectionsByOutputPort.get(portKey(current, 0));
+            if (outgoing) {
+                for (const conn of outgoing) {
+                    if (!visited.has(conn.target)) {
+                        stack.push(conn.target);
+                    }
+                }
+            }
+
+            const node = this.nodes.get(current);
+            const outputCount = Math.max(0, node?.outputs?.length || 0);
+            for (let portIndex = 1; portIndex < outputCount; portIndex += 1) {
+                const portConnections = this._connectionsByOutputPort.get(portKey(current, portIndex));
+                if (!portConnections) {
+                    continue;
+                }
+                for (const conn of portConnections) {
+                    if (!visited.has(conn.target)) {
+                        stack.push(conn.target);
+                    }
                 }
             }
         }
@@ -561,6 +596,7 @@ class FlowCanvas {
     }
 
     notifyViewStateChanged() {
+        this._minimapViewportDirty = true;
         const state = this.getViewportState();
         this.viewStateListeners.forEach(listener => {
             try {
@@ -595,6 +631,7 @@ class FlowCanvas {
     _markNodesBoundsDirty() {
         this._nodesBoundsDirty = true;
         this._nodesBoundsCache = null;
+        this._minimapStructureDirty = true;
     }
 
     _isSamePortState(left, right) {
@@ -1103,7 +1140,7 @@ class FlowCanvas {
         const targetPort = targetNode.inputs[portIndex];
 
         if (!this.checkTypeCompatibility(sourcePort.type, targetPort.type)) {
-            const incompatibilityMessage = `[FlowCanvas] Incompatible connection: ${sourcePort.type} -> ${targetPort.type}`;
+            const incompatibilityMessage = `端口类型不匹配：${sourcePort.type} -> ${targetPort.type}`;
             console.warn(incompatibilityMessage);
             if (window.showToast) window.showToast(incompatibilityMessage, 'warning');
             this.cancelConnection();
@@ -1111,7 +1148,8 @@ class FlowCanvas {
         }
 
         if (this.connectingFrom.nodeId === nodeId) {
-            console.warn('[FlowCanvas] Cannot connect a node to itself.');
+            console.warn('[FlowCanvas] 不能连接到同一节点。');
+            if (window.showToast) window.showToast('不能连接到同一节点', 'warning');
             this.cancelConnection();
             return;
         }
@@ -1124,7 +1162,8 @@ class FlowCanvas {
         );
 
         if (existingConn) {
-            console.warn('[FlowCanvas] Connection already exists.');
+            console.warn('[FlowCanvas] 连接已存在。');
+            if (window.showToast) window.showToast('连接已存在', 'warning');
             this.cancelConnection();
             return;
         }
@@ -1135,14 +1174,15 @@ class FlowCanvas {
         );
 
         if (targetPortOccupied) {
-            console.warn('[FlowCanvas] Target port is already occupied.');
+            console.warn('[FlowCanvas] 目标输入端口已被占用。');
+            if (window.showToast) window.showToast('目标输入端口已被占用', 'warning');
             this.cancelConnection();
             return;
         }
 
         if (this.wouldCreateCycle(this.connectingFrom.nodeId, nodeId)) {
-            console.warn('Connection would create a cycle');
-            if (window.showToast) window.showToast('Connection would create a cycle', 'warning');
+            console.warn('[FlowCanvas] 该连接会形成环路。');
+            if (window.showToast) window.showToast('该连接会形成环路', 'warning');
             this.cancelConnection();
             return;
         }
@@ -1173,7 +1213,7 @@ class FlowCanvas {
         this.isConnecting = false;
         this.connectingFrom = null;
         this.canvas.style.cursor = 'default';
-        this.render(); // 鍒锋柊浠ユ竻闄ら珮浜?
+        this.invalidate(); // 鍒锋柊浠ユ竻闄ら珮浜?
     }
 
     /**
@@ -1648,7 +1688,7 @@ class FlowCanvas {
                 name: p.name,
                 dataType: this.normalizePortType(p.type), // PortDataType enum
                 direction: 0, // Input
-                isRequired: false
+                isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false)
             })),
             outputPorts: (node.outputs || []).map(p => ({
                 id: p.id || p.Id || this.generateUUID(), // 閵嗘劒鎱ㄦ径宥冣偓鎴濇倱閺冭埖顥呴弻銉ャ亣鐏忓繐鍟?
@@ -1658,9 +1698,17 @@ class FlowCanvas {
                 isRequired: false
             })),
             parameters: (node.parameters || []).map(p => ({
+                id: p.id || p.Id || this.generateUUID(),
                 name: p.name,
+                displayName: p.displayName || p.DisplayName || p.name,
+                description: p.description || p.Description || null,
                 value: p.value !== undefined ? p.value : p.defaultValue,
-                dataType: p.dataType || p.type
+                defaultValue: p.defaultValue ?? p.DefaultValue ?? null,
+                minValue: p.minValue ?? p.MinValue ?? p.min ?? p.Min ?? null,
+                maxValue: p.maxValue ?? p.MaxValue ?? p.max ?? p.Max ?? null,
+                dataType: p.dataType || p.DataType || p.type || p.Type,
+                isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false),
+                options: p.options || p.Options || null
             })),
             isEnabled: node.disabled !== true
         }));
@@ -1775,7 +1823,11 @@ class FlowCanvas {
                 const normalizePort = (p) => ({
                     id: p.id || p.Id || this.generateUUID(),
                     name: p.name || p.Name,
-                    type: p.type || p.Type || p.dataType || p.DataType || 0
+                    displayName: p.displayName || p.DisplayName || p.name || p.Name,
+                    description: p.description || p.Description || '',
+                    type: p.type || p.Type || p.dataType || p.DataType || 0,
+                    dataType: p.dataType || p.DataType || p.type || p.Type || 0,
+                    isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false)
                 });
 
                 const inputs = (op.inputPorts || op.InputPorts || op.inputs || []).map(normalizePort);
@@ -1921,8 +1973,8 @@ class FlowCanvas {
                     });
                     if (window.showToast) {
                         const msg = existingConns.length === 1
-                            ? 'Connection removed for this port'
-                            : 'Removed ' + existingConns.length + ' existing connections';
+                            ? '已断开该端口的连接'
+                            : `已断开 ${existingConns.length} 条连接`;
                         window.showToast(msg, 'info');
                     }
                     if (flowDebugEnabled()) {
@@ -1945,7 +1997,7 @@ class FlowCanvas {
                     // 閺傤厼绱戠拠銉ㄧ翻閸忋儳顏崣锝囨畱鏉╃偞甯?
                     this.removeConnection(existingConn.id);
                     if (window.showToast) {
-                        window.showToast('Connection removed', 'info');
+                        window.showToast('连接已断开', 'info');
                     }
                     if (flowDebugEnabled()) {
                         console.log('[FlowCanvas] Removed existing connection:', existingConn.id);
@@ -2195,11 +2247,11 @@ class FlowCanvas {
 
         if (e.key === 'Delete' || e.key === 'Backspace') {
             if (this.selectedNode) {
-                if (confirm('Delete selected node?')) {
+                if (confirm('确定删除选中的节点吗？')) {
                     this.removeNode(this.selectedNode);
                 }
             } else if (this.selectedConnection) {
-                if (confirm('Delete selected connection?')) {
+                if (confirm('确定删除选中的连接吗？')) {
                     this.removeConnection(this.selectedConnection.id);
                 }
             }
@@ -2214,7 +2266,7 @@ class FlowCanvas {
         const node = this.nodes.get(nodeId);
         if (node && node.status !== status) {
             node.status = status;
-            this.render();
+            this.invalidate();
         }
     }
 
@@ -2230,7 +2282,7 @@ class FlowCanvas {
             node.status = 'idle';
         });
         if (changed) {
-            this.render();
+            this.invalidate();
         }
     }
 
@@ -2253,7 +2305,7 @@ class FlowCanvas {
             this.selectedNode = null;
             this.selectedConnection = connection;
 
-            if (confirm('Delete selected connection?')) {
+            if (confirm('确定删除选中的连接吗？')) {
                 this.removeConnection(connection.id);
             }
             return;
@@ -2303,11 +2355,11 @@ class FlowCanvas {
         menu.style.animation = 'contextMenuFadeIn 0.15s ease-out';
 
         const menuItems = [
-            { icon: '>', label: 'Run', action: () => this.runNode(nodeId) },
-            { icon: '+', label: 'Duplicate', action: () => this.duplicateNode(nodeId) },
-            { icon: 'x', label: 'Delete', action: () => this.removeNode(nodeId), danger: true },
-            { icon: '!', label: node.disabled ? 'Enable' : 'Disable', action: () => this.toggleNodeDisabled(nodeId) },
-            { icon: '?', label: 'Help', action: () => this.showNodeHelp(node) }
+            { icon: '>', label: '运行到此节点/调试预览', action: () => this.runNode(nodeId) },
+            { icon: '+', label: '复制节点', action: () => this.duplicateNode(nodeId) },
+            { icon: 'x', label: '删除节点', action: () => this.removeNode(nodeId), danger: true },
+            { icon: '!', label: node.disabled ? '启用节点' : '禁用节点', action: () => this.toggleNodeDisabled(nodeId) },
+            { icon: '?', label: '查看帮助', action: () => this.showNodeHelp(node) }
         ];
 
         menuItems.forEach(item => {
@@ -2386,11 +2438,24 @@ class FlowCanvas {
         if (flowDebugEnabled()) {
             console.log('[FlowCanvas] Run node:', nodeId);
         }
-        this.setNodeStatus(nodeId, 'running');
-        // 鏉╂瑩鍣烽崣顖欎簰鐟欙箑褰傜€圭偤妾惃鍕Ν閻愯澧界悰宀勨偓鏄忕帆
-        setTimeout(() => {
-            this.setNodeStatus(nodeId, 'success');
-        }, 1000);
+        const node = this.nodes.get(nodeId);
+        const coordinator = window.nodePreviewCoordinator;
+        if (!node || !coordinator?.setActiveNode || !coordinator?.requestActivePreview) {
+            if (window.showToast) {
+                window.showToast('当前环境未启用节点调试预览', 'warning');
+            }
+            return;
+        }
+
+        coordinator.setActiveNode(node);
+        coordinator.requestActivePreview({
+            immediate: true,
+            force: true,
+            trigger: 'manual'
+        });
+        if (window.showToast) {
+            window.showToast('已开始运行到此节点的调试预览', 'info');
+        }
     }
 
     /**
@@ -2405,7 +2470,11 @@ class FlowCanvas {
             id: this.generateUUID(),
             x: node.x + 30,
             y: node.y + 30,
-            title: node.title + ' (副本)'
+            title: `${node.title} (副本)`,
+            inputs: (node.inputs || []).map(port => ({ ...port, id: this.generateUUID() })),
+            outputs: (node.outputs || []).map(port => ({ ...port, id: this.generateUUID() })),
+            parameters: (node.parameters || []).map(param => ({ ...param })),
+            metadata: node.metadata ? { ...node.metadata } : node.metadata
         };
 
         this.nodes.set(newNode.id, newNode);
@@ -2437,7 +2506,33 @@ class FlowCanvas {
      * 閺勫墽銇氶懞鍌滃仯鐢喖濮?
      */
     showNodeHelp(node) {
-        alert('Node type: ' + node.type + '\nName: ' + node.title + '\n\nThis is a ' + node.type + ' operator node.');
+        const metadata = window.operatorLibraryPanel?.metadataByType?.get?.(node.type)
+            || window.operatorLibraryPanel?.getOperators?.()?.find?.(operator => operator?.type === node.type)
+            || {};
+        const displayName = metadata.displayName || metadata.DisplayName || node.title || node.type;
+        const description = metadata.description || metadata.Description || '暂无说明';
+        const category = metadata.category || metadata.Category || '未分类';
+        const inputs = metadata.inputPorts || metadata.InputPorts || node.inputs || [];
+        const outputs = metadata.outputPorts || metadata.OutputPorts || node.outputs || [];
+        const parameters = metadata.parameters || metadata.Parameters || node.parameters || [];
+        const summarizePorts = ports => ports.length > 0
+            ? ports.map(port => `${port.displayName || port.DisplayName || port.name || port.Name || '端口'}(${port.dataType || port.DataType || port.type || port.Type || 'Any'})`).join('，')
+            : '无';
+        const requiredParams = parameters
+            .filter(param => Boolean(param.isRequired ?? param.IsRequired))
+            .map(param => param.displayName || param.DisplayName || param.name || param.Name)
+            .filter(Boolean);
+        const content = [
+            `算子：${displayName}`,
+            `类型：${node.type}`,
+            `分类：${category}`,
+            `用途：${description}`,
+            `输入：${summarizePorts(inputs)}`,
+            `输出：${summarizePorts(outputs)}`,
+            `必填参数：${requiredParams.length > 0 ? requiredParams.join('，') : '无'}`
+        ].join('\n');
+
+        alert(content);
     }
 
     // ==========================================================================
@@ -2464,15 +2559,49 @@ class FlowCanvas {
         this.minimap.style.zIndex = '100';
         this.minimap.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.3)';
 
+        this.minimapToggle = document.createElement('button');
+        this.minimapToggle.type = 'button';
+        this.minimapToggle.title = '折叠/展开小地图';
+        this.minimapToggle.textContent = '-';
+        this.minimapToggle.style.position = 'absolute';
+        this.minimapToggle.style.right = '4px';
+        this.minimapToggle.style.top = '4px';
+        this.minimapToggle.style.zIndex = '2';
+        this.minimapToggle.style.width = '22px';
+        this.minimapToggle.style.height = '22px';
+        this.minimapToggle.style.border = '1px solid rgba(255,255,255,0.16)';
+        this.minimapToggle.style.borderRadius = '4px';
+        this.minimapToggle.style.background = 'rgba(15, 36, 53, 0.82)';
+        this.minimapToggle.style.color = '#fff';
+        this.minimapToggle.style.cursor = 'pointer';
+        this.minimap.appendChild(this.minimapToggle);
+
         this.minimapCanvas = document.createElement('canvas');
-        this.minimapCanvas.width = 200;
-        this.minimapCanvas.height = 150;
+        this.minimapCanvas.style.width = '200px';
+        this.minimapCanvas.style.height = '150px';
         this.minimap.appendChild(this.minimapCanvas);
+        this.resizeMinimapCanvas();
 
         this.canvas.parentElement.appendChild(this.minimap);
 
+        this._minimapToggleHandler = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this._minimapCollapsed = !this._minimapCollapsed;
+            this.minimap.style.width = this._minimapCollapsed ? '32px' : '200px';
+            this.minimap.style.height = this._minimapCollapsed ? '32px' : '150px';
+            this.minimapCanvas.style.display = this._minimapCollapsed ? 'none' : 'block';
+            this.minimapToggle.textContent = this._minimapCollapsed ? '+' : '-';
+            this._minimapViewportDirty = true;
+            this.invalidate();
+        };
+        this.minimapToggle.addEventListener('click', this._minimapToggleHandler);
+
         // Click minimap to navigate
-        this.minimapCanvas.addEventListener('click', (e) => {
+        this._minimapClickHandler = (e) => {
+            if (this._minimapCollapsed) {
+                return;
+            }
             const rect = this.minimapCanvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width;
             const y = (e.clientY - rect.top) / rect.height;
@@ -2487,7 +2616,8 @@ class FlowCanvas {
                 this.invalidate();
                 this.notifyViewStateChanged();
             }
-        });
+        };
+        this.minimapCanvas.addEventListener('click', this._minimapClickHandler);
     }
 
     getNodesBounds() {
@@ -2517,62 +2647,123 @@ class FlowCanvas {
     }
 
     /**
-     * 缂佹ê鍩楃亸蹇撴勾閸?
+     * 鏇存柊娓叉煋寰幆浠ュ寘鍚皬鍦板浘
      */
-    drawMinimap() {
-        if (!this.minimapCanvas) return;
-        
-        const ctx = this.minimapCanvas.getContext('2d');
-        const width = this.minimapCanvas.width;
-        const height = this.minimapCanvas.height;
-        
-        // 濞撳懐鈹?
-        ctx.clearRect(0, 0, width, height);
-        
-        const bounds = this.getNodesBounds();
-        if (!bounds) return;
-        
-        // 濞ｈ濮為崘鍛扮珶鐠?
+    resizeMinimapCanvas() {
+        if (!this.minimapCanvas) {
+            return { width: 0, height: 0, dpr: 1 };
+        }
+
+        const width = 200;
+        const height = 150;
+        const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+        const backingWidth = Math.max(1, Math.round(width * dpr));
+        const backingHeight = Math.max(1, Math.round(height * dpr));
+        if (this.minimapCanvas.width !== backingWidth || this.minimapCanvas.height !== backingHeight) {
+            this.minimapCanvas.width = backingWidth;
+            this.minimapCanvas.height = backingHeight;
+            this._minimapStructureDirty = true;
+        }
+
+        return { width, height, dpr };
+    }
+
+    buildMinimapLayout(bounds, width, height) {
         const padding = 20;
-        const scaleX = width / (bounds.width + padding * 2);
-        const scaleY = height / (bounds.height + padding * 2);
+        const safeWidth = Math.max(bounds.width, 1);
+        const safeHeight = Math.max(bounds.height, 1);
+        const scaleX = width / (safeWidth + padding * 2);
+        const scaleY = height / (safeHeight + padding * 2);
         const scale = Math.min(scaleX, scaleY);
-        
-        const offsetX = (width - (bounds.width + padding * 2) * scale) / 2 + padding * scale;
-        const offsetY = (height - (bounds.height + padding * 2) * scale) / 2 + padding * scale;
-        
-        // 缂佹ê鍩楅懞鍌滃仯
+
+        return {
+            scale,
+            offsetX: (width - (safeWidth + padding * 2) * scale) / 2 + padding * scale,
+            offsetY: (height - (safeHeight + padding * 2) * scale) / 2 + padding * scale
+        };
+    }
+
+    rebuildMinimapStaticCache(bounds, width, height, dpr) {
+        const cacheCanvas = this._minimapStaticCache || document.createElement('canvas');
+        const backingWidth = Math.max(1, Math.round(width * dpr));
+        const backingHeight = Math.max(1, Math.round(height * dpr));
+        if (cacheCanvas.width !== backingWidth || cacheCanvas.height !== backingHeight) {
+            cacheCanvas.width = backingWidth;
+            cacheCanvas.height = backingHeight;
+        }
+
+        const cacheCtx = cacheCanvas.getContext('2d');
+        cacheCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        cacheCtx.clearRect(0, 0, width, height);
+
+        const layout = this.buildMinimapLayout(bounds, width, height);
         this.nodes.forEach(node => {
-            const x = offsetX + (node.x - bounds.minX) * scale;
-            const y = offsetY + (node.y - bounds.minY) * scale;
-            const w = Math.max(4, node.width * scale);
-            const h = Math.max(3, node.height * scale);
-            
-            ctx.fillStyle = node.disabled ? '#666' : (node.color || '#1890ff');
-            ctx.fillRect(x, y, w, h);
-            
-            // 闁鑵戞妯瑰瘨
+            const x = layout.offsetX + (node.x - bounds.minX) * layout.scale;
+            const y = layout.offsetY + (node.y - bounds.minY) * layout.scale;
+            const w = Math.max(4, node.width * layout.scale);
+            const h = Math.max(3, node.height * layout.scale);
+
+            cacheCtx.fillStyle = node.disabled ? '#666' : (node.color || '#1890ff');
+            cacheCtx.fillRect(x, y, w, h);
+
             if (node.id === this.selectedNode) {
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+                cacheCtx.strokeStyle = '#fff';
+                cacheCtx.lineWidth = 2;
+                cacheCtx.strokeRect(x - 1, y - 1, w + 2, h + 2);
             }
         });
-        
-        // 缂佹ê鍩楃憴鍡楀經濡楀棴绱欐担璺ㄦ暏闁槒绶亸鍝勵嚟閿涘矂浼╅崗?DPR 鐎佃壈鍤у鍡曠秼缂堣鈧稄绱?
-        const viewportX = offsetX + (this.offset.x - bounds.minX) * scale;
-        const viewportY = offsetY + (this.offset.y - bounds.minY) * scale;
-        const viewportW = (this._logicalWidth / this.scale) * scale;
-        const viewportH = (this._logicalHeight / this.scale) * scale;
-        
+
+        this._minimapStaticCache = cacheCanvas;
+        this._minimapStaticLayout = { bounds, ...layout };
+        this._minimapStructureDirty = false;
+    }
+
+    drawMinimap() {
+        if (!this.minimapCanvas || this._minimapCollapsed) return;
+
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (this._minimapSelectedNodeId !== this.selectedNode) {
+            this._minimapSelectedNodeId = this.selectedNode;
+            this._minimapStructureDirty = true;
+        }
+        if (!this._minimapStructureDirty && !this._minimapViewportDirty) {
+            return;
+        }
+        if (!this._minimapStructureDirty && now - this._minimapLastDrawTime < 80) {
+            return;
+        }
+
+        const { width, height, dpr } = this.resizeMinimapCanvas();
+        const ctx = this.minimapCanvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+
+        const bounds = this.getNodesBounds();
+        if (!bounds) {
+            this._minimapStructureDirty = false;
+            this._minimapViewportDirty = false;
+            return;
+        }
+
+        if (this._minimapStructureDirty || !this._minimapStaticCache) {
+            this.rebuildMinimapStaticCache(bounds, width, height, dpr);
+        }
+
+        ctx.drawImage(this._minimapStaticCache, 0, 0, width, height);
+        const layout = this._minimapStaticLayout || this.buildMinimapLayout(bounds, width, height);
+        const viewportX = layout.offsetX + (this.offset.x - bounds.minX) * layout.scale;
+        const viewportY = layout.offsetY + (this.offset.y - bounds.minY) * layout.scale;
+        const viewportW = (this._logicalWidth / this.scale) * layout.scale;
+        const viewportH = (this._logicalHeight / this.scale) * layout.scale;
+
         ctx.strokeStyle = 'rgba(231, 76, 60, 0.8)';
         ctx.lineWidth = 2;
         ctx.strokeRect(viewportX, viewportY, viewportW, viewportH);
+
+        this._minimapViewportDirty = false;
+        this._minimapLastDrawTime = now;
     }
 
-    /**
-     * 鏇存柊娓叉煋寰幆浠ュ寘鍚皬鍦板浘
-     */
     renderWithMinimap() {
         this.render();
         this.drawMinimap();

@@ -357,7 +357,7 @@ test('FlowCanvas serialize does not throw when DEBUG_FLOW_CANVAS is false', asyn
     outputs: [{ id: 'o1', name: 'out', type: 'Image' }]
   });
   const n2 = fc.addNode('ResultOutput', 200, 200, {
-    inputs: [{ id: 'i2', name: 'in', type: 'Image' }],
+    inputs: [{ id: 'i2', name: 'in', type: 'Image', isRequired: true }],
     outputs: []
   });
   fc.addConnection(n1.id, 0, n2.id, 0);
@@ -368,6 +368,8 @@ test('FlowCanvas serialize does not throw when DEBUG_FLOW_CANVAS is false', asyn
   assert.ok(Array.isArray(result.connections));
   assert.equal(result.connections.length, 1);
   assert.equal(result.connections[0].sourceOperatorId, n1.id);
+  assert.equal(result.operators[1].inputPorts[0].isRequired, true);
+  assert.equal(result.operators[0].outputPorts[0].isRequired, false);
 
   fc.destroy();
 });

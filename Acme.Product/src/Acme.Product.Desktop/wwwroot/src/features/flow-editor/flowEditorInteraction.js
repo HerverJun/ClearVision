@@ -33,6 +33,9 @@ export class FlowEditorInteraction {
         this.historyIndex = -1;
         this.maxHistorySize = 50;
         this.templateSelector = null;
+        this.cleanup = [];
+        this.originalCanvasHandlers = null;
+        this.viewStateNotifyRaf = null;
 
         this.initialize();
     }
@@ -48,6 +51,41 @@ export class FlowEditorInteraction {
         this.initializeTemplateSelector();
         // 初始化历史记录
         this.saveState();
+    }
+
+    destroy() {
+        if (this.viewStateNotifyRaf !== null) {
+            cancelAnimationFrame(this.viewStateNotifyRaf);
+            this.viewStateNotifyRaf = null;
+        }
+
+        this.cleanup.splice(0).forEach(dispose => {
+            try {
+                dispose();
+            } catch (error) {
+                debugLogger.warn('[FlowEditorInteraction] 清理事件监听失败:', error);
+            }
+        });
+
+        if (this.originalCanvasHandlers) {
+            this.canvas.handleMouseDown = this.originalCanvasHandlers.mouseDown;
+            this.canvas.handleMouseMove = this.originalCanvasHandlers.mouseMove;
+            this.canvas.handleMouseUp = this.originalCanvasHandlers.mouseUp;
+            this.originalCanvasHandlers = null;
+        }
+
+        this.templateSelector?.destroy?.();
+    }
+
+    scheduleViewStateNotification() {
+        if (this.viewStateNotifyRaf !== null) {
+            return;
+        }
+
+        this.viewStateNotifyRaf = requestAnimationFrame(() => {
+            this.viewStateNotifyRaf = null;
+            this.canvas.notifyViewStateChanged?.();
+        });
     }
 
     /**
@@ -81,13 +119,18 @@ export class FlowEditorInteraction {
         }
 
         templateButton.dataset.boundTemplateSelector = 'true';
-        templateButton.addEventListener('click', async () => {
+        const templateClickHandler = async () => {
             try {
                 await this.templateSelector.open();
             } catch (error) {
                 console.error('[FlowEditorInteraction] 打开模板选择器失败:', error);
                 showToast(`打开模板选择器失败: ${error.message}`, 'error');
             }
+        };
+        templateButton.addEventListener('click', templateClickHandler);
+        this.cleanup.push(() => {
+            templateButton.removeEventListener('click', templateClickHandler);
+            delete templateButton.dataset.boundTemplateSelector;
         });
     }
 
@@ -110,6 +153,11 @@ export class FlowEditorInteraction {
         const originalMouseDown = this.canvas.handleMouseDown.bind(this.canvas);
         const originalMouseMove = this.canvas.handleMouseMove.bind(this.canvas);
         const originalMouseUp = this.canvas.handleMouseUp.bind(this.canvas);
+        this.originalCanvasHandlers = {
+            mouseDown: originalMouseDown,
+            mouseMove: originalMouseMove,
+            mouseUp: originalMouseUp
+        };
 
         // 重写鼠标按下事件
         this.canvas.handleMouseDown = (e) => {
@@ -243,6 +291,22 @@ export class FlowEditorInteraction {
             this.canvas.canvas.addEventListener('mousedown', this.canvas._mouseDownHandler);
             this.canvas.canvas.addEventListener('mousemove', this.canvas._mouseMoveHandler);
             this.canvas.canvas.addEventListener('mouseup', this.canvas._mouseUpHandler);
+            this.cleanup.push(() => {
+                this.canvas.canvas.removeEventListener('mousedown', this.canvas._mouseDownHandler);
+                this.canvas.canvas.removeEventListener('mousemove', this.canvas._mouseMoveHandler);
+                this.canvas.canvas.removeEventListener('mouseup', this.canvas._mouseUpHandler);
+
+                this.canvas.handleMouseDown = originalMouseDown;
+                this.canvas.handleMouseMove = originalMouseMove;
+                this.canvas.handleMouseUp = originalMouseUp;
+                this.canvas._mouseDownHandler = originalMouseDown;
+                this.canvas._mouseMoveHandler = originalMouseMove;
+                this.canvas._mouseUpHandler = originalMouseUp;
+
+                this.canvas.canvas.addEventListener('mousedown', this.canvas._mouseDownHandler);
+                this.canvas.canvas.addEventListener('mousemove', this.canvas._mouseMoveHandler);
+                this.canvas.canvas.addEventListener('mouseup', this.canvas._mouseUpHandler);
+            });
         }
     }
 
@@ -331,8 +395,8 @@ export class FlowEditorInteraction {
         this.canvas.offset.x = this.panStartOffset.x - deltaX;
         this.canvas.offset.y = this.panStartOffset.y - deltaY;
         this.canvas.canvas.style.cursor = 'move';
-        this.canvas.render();
-        this.canvas.notifyViewStateChanged?.();
+        this.canvas.invalidate?.();
+        this.scheduleViewStateNotification();
     }
 
     /**
@@ -344,7 +408,7 @@ export class FlowEditorInteraction {
         this.panStart = null;
         this.panStartOffset = null;
         this.syncCursorToPointer(e);
-        this.canvas.render();
+        this.canvas.invalidate?.();
         this.canvas.notifyViewStateChanged?.();
     }
 
@@ -400,8 +464,9 @@ export class FlowEditorInteraction {
         }
 
         this.canvas.canvas.style.cursor = 'grabbing';
-        this.canvas.render();
-        this.canvas.notifyViewStateChanged?.();
+        this.canvas._markNodesBoundsDirty?.();
+        this.canvas.invalidate?.();
+        this.scheduleViewStateNotification();
     }
 
     /**
@@ -418,7 +483,8 @@ export class FlowEditorInteraction {
         this.hasNodeDragMoved = false;
         this.canvas.draggedNode = null;
         this.syncCursorToPointer(e);
-        this.canvas.render();
+        this.canvas._markNodesBoundsDirty?.();
+        this.canvas.invalidate?.();
         this.canvas.notifyViewStateChanged?.();
 
         if (shouldSave) {
@@ -450,7 +516,7 @@ export class FlowEditorInteraction {
      * 绑定键盘快捷键
      */
     bindKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
+        const keydownHandler = (e) => {
             // 复制
             if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
                 e.preventDefault();
@@ -499,7 +565,9 @@ export class FlowEditorInteraction {
                 this.clearSelection();
                 this.cancelConnection();
             }
-        });
+        };
+        document.addEventListener('keydown', keydownHandler);
+        this.cleanup.push(() => document.removeEventListener('keydown', keydownHandler));
     }
 
     /**
@@ -509,7 +577,7 @@ export class FlowEditorInteraction {
         const library = document.getElementById('operator-library');
         if (!library) return;
 
-        library.addEventListener('dragstart', (e) => {
+        const libraryDragStartHandler = (e) => {
             if (e.target.classList.contains('operator-item')) {
                 const operatorType = e.target.dataset.type;
                 const operatorName = e.target.dataset.name || operatorType;
@@ -518,14 +586,16 @@ export class FlowEditorInteraction {
                     name: operatorName
                 }));
             }
-        });
+        };
+        library.addEventListener('dragstart', libraryDragStartHandler);
 
-        this.canvas.canvas.addEventListener('dragover', (e) => {
+        const canvasDragOverHandler = (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
-        });
+        };
+        this.canvas.canvas.addEventListener('dragover', canvasDragOverHandler);
 
-        this.canvas.canvas.addEventListener('drop', (e) => {
+        const canvasDropHandler = (e) => {
             e.preventDefault();
             
             let operator = null;
@@ -562,6 +632,12 @@ export class FlowEditorInteraction {
                     console.error('添加算子失败:', err);
                 }
             }
+        };
+        this.canvas.canvas.addEventListener('drop', canvasDropHandler);
+        this.cleanup.push(() => {
+            library.removeEventListener('dragstart', libraryDragStartHandler);
+            this.canvas.canvas.removeEventListener('dragover', canvasDragOverHandler);
+            this.canvas.canvas.removeEventListener('drop', canvasDropHandler);
         });
     }
 
@@ -659,7 +735,7 @@ export class FlowEditorInteraction {
         };
         this.canvas.mousePosition = { ...this.connectionEnd };
         this.canvas.hoveredPort = null;
-        this.canvas.render();
+        this.canvas.invalidate?.();
     }
 
     /**     * 更新连线预览
@@ -682,7 +758,7 @@ export class FlowEditorInteraction {
 
         this.canvas.canvas.style.cursor = 'crosshair';
         this.canvas.mousePosition = { ...this.connectionEnd };
-        this.canvas.render();
+        this.canvas.invalidate?.();
     }
 
     /**     * 结束连线
@@ -726,7 +802,7 @@ export class FlowEditorInteraction {
                 );
 
             if (!isTypeCompatible) {
-                showToast(`Type mismatch: ${sourceType} -> ${targetType}`, 'warning');
+                showToast(`端口类型不匹配：${sourceType} -> ${targetType}`, 'warning');
                 this.cancelConnection();
                 return;
             }
@@ -752,17 +828,19 @@ export class FlowEditorInteraction {
                 const connection = this.canvas.addConnection(source.nodeId, source.portIndex, target.nodeId, target.portIndex);
                 if (connection) {
                     this.saveState();
-                    showToast('Connected', 'success');
+                    showToast('连接已建立', 'success');
                 } else {
-                    showToast('Connection already exists or invalid', 'warning');
+                    showToast('连接已存在或无效', 'warning');
                 }
             } else {
                 debugLogger.debug('[DEBUG endConnection] Connection skipped - exists or invalid');
                 const message = validationError === 'input-port-occupied'
-                    ? 'Target input port already has a connection'
+                    ? '目标输入端口已被占用'
                     : (validationError === 'cycle'
-                        ? 'Connection would create a cycle'
-                        : 'Connection already exists or invalid');
+                        ? '该连接会形成环路'
+                        : (validationError === 'self-connection'
+                            ? '不能连接到同一节点'
+                            : '连接已存在或无效'));
                 showToast(message, 'warning');
             }
         } else {
@@ -785,7 +863,7 @@ export class FlowEditorInteraction {
         this.canvas.connectingFrom = null;
         this.canvas.hoveredPort = null;
         this.canvas.canvas.style.cursor = 'default';
-        this.canvas.render();
+        this.canvas.invalidate?.();
     }
 
     /**     * 开始框选
@@ -910,7 +988,18 @@ export class FlowEditorInteraction {
      * 更新选择显示
      */
     updateSelection() {
-        this.canvas.render();
+        this.canvas.invalidate?.();
+    }
+
+    cloneNodeForClipboard(node) {
+        const clone = typeof structuredClone === 'function'
+            ? structuredClone(node)
+            : JSON.parse(JSON.stringify(node));
+        clone.inputs = (node.inputs || []).map(port => ({ ...port }));
+        clone.outputs = (node.outputs || []).map(port => ({ ...port }));
+        clone.parameters = (node.parameters || []).map(param => ({ ...param }));
+        clone.metadata = node.metadata ? { ...node.metadata } : node.metadata;
+        return clone;
     }
 
     /**
@@ -923,7 +1012,7 @@ export class FlowEditorInteraction {
         for (const nodeId of this.multiSelectedNodes) {
             const node = this.canvas.nodes.get(nodeId);
             if (node) {
-                this.copiedNodes.push({ ...node });
+                this.copiedNodes.push(this.cloneNodeForClipboard(node));
             }
         }
 
@@ -943,11 +1032,19 @@ export class FlowEditorInteraction {
         this.clearSelection();
 
         this.copiedNodes.forEach(node => {
+            const clonedNode = this.cloneNodeForClipboard(node);
+            const { id: _copiedId, x: _copiedX, y: _copiedY, ...nodeConfig } = clonedNode;
             const newNode = this.canvas.addNode(node.type, node.x + offset, node.y + offset, {
-                title: node.title,
-                color: node.color,
-                inputs: node.inputs,
-                outputs: node.outputs
+                ...nodeConfig,
+                title: clonedNode.title,
+                color: clonedNode.color,
+                icon: clonedNode.icon,
+                iconPath: clonedNode.iconPath,
+                metadata: clonedNode.metadata,
+                disabled: clonedNode.disabled,
+                parameters: clonedNode.parameters,
+                inputs: (clonedNode.inputs || []).map(port => ({ ...port, id: this.canvas.generateUUID?.() || undefined })),
+                outputs: (clonedNode.outputs || []).map(port => ({ ...port, id: this.canvas.generateUUID?.() || undefined }))
             });
             this.multiSelectedNodes.add(newNode.id);
         });

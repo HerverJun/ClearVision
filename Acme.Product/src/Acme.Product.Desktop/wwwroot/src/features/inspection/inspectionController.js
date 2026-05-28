@@ -628,7 +628,8 @@ class InspectionController {
                 flowData: flowData,
                 inputImageBase64: options.inputImageBase64,
                 parameters: options.parameters,
-                imageFormat: options.imageFormat || '.png'
+                imageFormat: options.imageFormat || '.png',
+                timeoutMs: options.timeoutMs
             }, {
                 signal: options.signal
             });

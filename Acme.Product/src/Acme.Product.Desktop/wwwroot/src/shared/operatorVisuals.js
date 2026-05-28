@@ -540,8 +540,13 @@ function clonePorts(ports, fallbackName) {
     }
 
     return ports.map((port, index) => ({
+        id: port.id || port.Id,
         name: port.name || port.Name || `${fallbackName}${index + 1}`,
-        type: port.dataType || port.DataType || port.type || port.Type || 'Any'
+        displayName: port.displayName || port.DisplayName || port.name || port.Name || `${fallbackName}${index + 1}`,
+        description: port.description || port.Description || '',
+        type: port.dataType || port.DataType || port.type || port.Type || 'Any',
+        dataType: port.dataType || port.DataType || port.type || port.Type || 'Any',
+        isRequired: Boolean(port.isRequired ?? port.IsRequired ?? false)
     }));
 }
 
