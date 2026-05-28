@@ -26,6 +26,11 @@ namespace Acme.Product.Desktop.Endpoints;
 /// </summary>
 public static class PreviewNodeEndpoints
 {
+    private const int DefaultPreviewTimeoutMs = 30_000;
+    private const int MinPreviewTimeoutMs = 1_000;
+    private const int MaxPreviewTimeoutMs = 120_000;
+    private const int MaxPreviewImageBytes = 8 * 1024 * 1024;
+
     private static readonly JsonSerializerOptions FlowJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -117,12 +122,16 @@ public static class PreviewNodeEndpoints
                     };
                 }
 
+                var timeoutMs = NormalizePreviewTimeoutMs(request.TimeoutMs);
+                using var previewCancellation = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+                previewCancellation.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
+
                 // 执行调试流程（自动执行上游子图到目标节点）
                 var result = await flowService.ExecuteFlowDebugAsync(
                     flow,
                     debugOptions,
                     inputData,
-                    context.RequestAborted);
+                    previewCancellation.Token);
 
                 // 获取目标节点的输出
                 if (!result.IntermediateResults.TryGetValue(request.TargetNodeId, out var nodeOutput))
@@ -133,15 +142,19 @@ public static class PreviewNodeEndpoints
 
                 if (nodeOutput == null)
                 {
-                    return Results.Ok(BuildFailureResponse(request, flow, result, request.TargetNodeId, externalInputImageBase64));
+                    return Results.Ok(BuildFailureResponse(request, flow, result, request.TargetNodeId, externalInputImageBase64, logger));
                 }
 
                 // 提取输出图像
-                var outputImageBytes = TryGetOutputImageBytes(nodeOutput);
+                var sanitizedOutputData = BuildResponseOutputData(nodeOutput);
+                var outputImageBytes = LimitPreviewImageBytes(
+                    TryGetOutputImageBytes(nodeOutput),
+                    sanitizedOutputData,
+                    "输出图像",
+                    logger);
                 var outputImageBase64 = outputImageBytes != null
                     ? Convert.ToBase64String(outputImageBytes)
                     : null;
-                var sanitizedOutputData = BuildResponseOutputData(nodeOutput);
                 var metrics = BuildPreviewMetrics(sanitizedOutputData, outputImageBytes, result.ErrorMessage);
 
                 logger.LogInformation(
@@ -149,8 +162,14 @@ public static class PreviewNodeEndpoints
                     request.ProjectId, request.TargetNodeId, result.IsSuccess);
 
                 var targetDebugResult = result.DebugOperatorResults.FirstOrDefault(r => r.OperatorId == request.TargetNodeId);
-                var inputImageBytes = ResolveInputImageBytes(flow, request.TargetNodeId, result, targetDebugResult, externalInputImageBase64);
+                var inputImageBytes = LimitPreviewImageBytes(
+                    ResolveInputImageBytes(flow, request.TargetNodeId, result, targetDebugResult, externalInputImageBase64),
+                    sanitizedOutputData,
+                    "输入图像",
+                    logger);
                 var inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
+
+                var failedOperator = FindFailedOperator(result, request.TargetNodeId);
 
                 return Results.Ok(new PreviewNodeResponse
                 {
@@ -163,6 +182,9 @@ public static class PreviewNodeEndpoints
                     OutputImageBase64 = outputImageBase64,
                     ExecutionTimeMs = result.ExecutionTimeMs,
                     ErrorMessage = result.ErrorMessage,
+                    FailedOperatorId = failedOperator?.OperatorId,
+                    FailedOperatorName = failedOperator?.OperatorName,
+                    FailedOperatorType = ResolveOperatorTypeName(flow, failedOperator?.OperatorId),
                     Metrics = metrics,
                     ExecutedOperators = result.DebugOperatorResults.Select(r => new ExecutedOperatorInfo
                     {
@@ -173,6 +195,19 @@ public static class PreviewNodeEndpoints
                         IsSuccess = r.IsSuccess
                     }).ToList()
                 });
+            }
+            catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException) when (!context.RequestAborted.IsCancellationRequested)
+            {
+                logger.LogWarning(
+                    "[PreviewNode] 预览超时: Project={ProjectId}, Node={NodeId}, TimeoutMs={TimeoutMs}",
+                    request.ProjectId, request.TargetNodeId, request.TimeoutMs);
+                return Results.Problem(
+                    detail: "节点预览超时，已取消本次调试执行。",
+                    statusCode: StatusCodes.Status504GatewayTimeout);
             }
             catch (Exception ex)
             {
@@ -236,6 +271,55 @@ public static class PreviewNodeEndpoints
     private static bool HasExecutableFlow(Acme.Product.Core.Entities.OperatorFlow? flow)
     {
         return flow?.Operators?.Count > 0;
+    }
+
+    private static int NormalizePreviewTimeoutMs(int? requestedTimeoutMs)
+    {
+        var timeoutMs = requestedTimeoutMs ?? DefaultPreviewTimeoutMs;
+        return Math.Clamp(timeoutMs, MinPreviewTimeoutMs, MaxPreviewTimeoutMs);
+    }
+
+    private static byte[]? LimitPreviewImageBytes(
+        byte[]? imageBytes,
+        Dictionary<string, object> outputData,
+        string label,
+        ILogger logger)
+    {
+        if (imageBytes == null || imageBytes.Length <= MaxPreviewImageBytes)
+        {
+            return imageBytes;
+        }
+
+        logger.LogWarning(
+            "[PreviewNode] {Label} exceeds preview payload limit. Bytes={Bytes}, Limit={Limit}",
+            label,
+            imageBytes.Length,
+            MaxPreviewImageBytes);
+        outputData["_previewWarning"] = $"{label}过大，已省略图像载荷，仅保留结构化摘要。";
+        return null;
+    }
+
+    private static OperatorDebugResult? FindFailedOperator(
+        FlowDebugExecutionResult result,
+        Guid targetNodeId)
+    {
+        var targetResult = result.DebugOperatorResults
+            .FirstOrDefault(item => item.OperatorId == targetNodeId);
+        return targetResult?.IsSuccess == false
+            ? targetResult
+            : result.DebugOperatorResults.FirstOrDefault(item => !item.IsSuccess);
+    }
+
+    private static string? ResolveOperatorTypeName(
+        Acme.Product.Core.Entities.OperatorFlow flow,
+        Guid? operatorId)
+    {
+        if (!operatorId.HasValue)
+        {
+            return null;
+        }
+
+        return flow.Operators.FirstOrDefault(item => item.Id == operatorId.Value)?.Type.ToString();
     }
 
     private static Dictionary<string, object> BuildResponseOutputData(Dictionary<string, object> nodeOutput)
@@ -381,7 +465,8 @@ public static class PreviewNodeEndpoints
         Acme.Product.Core.Entities.OperatorFlow flow,
         FlowDebugExecutionResult result,
         Guid targetNodeId,
-        string? externalInputImageBase64)
+        string? externalInputImageBase64,
+        ILogger logger)
     {
         var targetResult = result.DebugOperatorResults
             .FirstOrDefault(item => item.OperatorId == targetNodeId);
@@ -390,9 +475,17 @@ public static class PreviewNodeEndpoints
             : result.DebugOperatorResults.FirstOrDefault(item => !item.IsSuccess);
 
         var failureMessage = BuildMissingNodeOutputDetail(result, targetNodeId);
-        var inputImageBytes = TryGetImageBytesFromSnapshot(targetResult?.InputSnapshot)
-            ?? TryGetImageBytesFromSnapshot(failedOperator?.InputSnapshot)
-            ?? ResolveInputImageBytes(flow, targetNodeId, result, targetResult, externalInputImageBase64);
+        var failureOutputData = targetResult?.OutputSnapshot ?? failedOperator?.OutputSnapshot;
+        var sanitizedOutputData = failureOutputData != null
+            ? BuildResponseOutputData(failureOutputData)
+            : new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        var inputImageBytes = LimitPreviewImageBytes(
+            TryGetImageBytesFromSnapshot(targetResult?.InputSnapshot)
+                ?? TryGetImageBytesFromSnapshot(failedOperator?.InputSnapshot)
+                ?? ResolveInputImageBytes(flow, targetNodeId, result, targetResult, externalInputImageBase64),
+            sanitizedOutputData,
+            "输入图像",
+            logger);
         var inputImageBase64 = inputImageBytes != null ? Convert.ToBase64String(inputImageBytes) : null;
 
         return new PreviewNodeResponse
@@ -402,13 +495,13 @@ public static class PreviewNodeEndpoints
             TargetNodeId = request.TargetNodeId,
             DebugSessionId = request.DebugSessionId,
             InputImageBase64 = inputImageBase64,
-            OutputData = targetResult?.OutputSnapshot ?? failedOperator?.OutputSnapshot,
+            OutputData = sanitizedOutputData.Count > 0 ? sanitizedOutputData : null,
             OutputImageBase64 = null,
             ExecutionTimeMs = result.ExecutionTimeMs,
             ErrorMessage = failureMessage,
             FailedOperatorId = failedOperator?.OperatorId,
             FailedOperatorName = failedOperator?.OperatorName,
-            FailedOperatorType = null,
+            FailedOperatorType = ResolveOperatorTypeName(flow, failedOperator?.OperatorId),
             Metrics = null,
             ExecutedOperators = result.DebugOperatorResults.Select(r => new ExecutedOperatorInfo
             {
@@ -867,6 +960,11 @@ public class PreviewNodeRequest
     /// 输出图像格式，默认 .png
     /// </summary>
     public string? ImageFormat { get; set; }
+
+    /// <summary>
+    /// 预览超时（毫秒）
+    /// </summary>
+    public int? TimeoutMs { get; set; }
 }
 
 /// <summary>

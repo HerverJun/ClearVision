@@ -913,6 +913,158 @@ public class PreviewNodeEndpointsTests
         document.RootElement.GetProperty("inputImageBase64").GetString().Should().Be(Convert.ToBase64String(transformedImage));
     }
 
+    [Fact]
+    public async Task PreviewNode_ShouldReturnGatewayTimeout_WhenPreviewExecutionExceedsTimeout()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var cancellationObserved = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(async callInfo =>
+                {
+                    var token = callInfo.ArgAt<CancellationToken>(3);
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(10), token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        cancellationObserved.TrySetResult(null);
+                        throw;
+                    }
+
+                    return new FlowDebugExecutionResult { IsSuccess = true };
+                });
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            TimeoutMs = 1,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.GatewayTimeout);
+        await cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task PreviewNode_ShouldOmitLargeOutputImagePayload_AndKeepStructuredSummary()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var largeImage = new byte[(8 * 1024 * 1024) + 1];
+        largeImage[0] = 1;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = true,
+                    DebugSessionId = Guid.NewGuid(),
+                    ExecutionTimeMs = 5,
+                    IntermediateResults = new Dictionary<Guid, Dictionary<string, object>>
+                    {
+                        [targetNodeId] = new()
+                        {
+                            ["Image"] = largeImage,
+                            ["Score"] = 0.98
+                        }
+                    }
+                }));
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
+        document.RootElement.GetProperty("outputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
+        var outputData = document.RootElement.GetProperty("outputData");
+        outputData.GetProperty("Score").GetDouble().Should().BeApproximately(0.98d, 0.001d);
+        outputData.GetProperty("_previewWarning").GetString().Should().Contain("过大");
+    }
+
+    [Fact]
+    public async Task PreviewNode_ShouldOmitLargeFailureInputImagePayload_AndKeepStructuredSummary()
+    {
+        var projectId = Guid.NewGuid();
+        var targetNodeId = Guid.NewGuid();
+        var largeInputImage = new byte[(8 * 1024 * 1024) + 1];
+        largeInputImage[0] = 1;
+
+        await using var host = await PreviewNodeTestHost.CreateAsync(flowExecution =>
+        {
+            flowExecution.ExecuteFlowDebugAsync(
+                    Arg.Any<OperatorFlow>(),
+                    Arg.Any<DebugOptions>(),
+                    Arg.Any<Dictionary<string, object>?>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult(new FlowDebugExecutionResult
+                {
+                    IsSuccess = false,
+                    DebugSessionId = Guid.NewGuid(),
+                    ExecutionTimeMs = 7,
+                    ErrorMessage = "Target failed",
+                    DebugOperatorResults = new List<OperatorDebugResult>
+                    {
+                        new()
+                        {
+                            OperatorId = targetNodeId,
+                            OperatorName = "Threshold",
+                            IsSuccess = false,
+                            ExecutionOrder = 0,
+                            ErrorMessage = "Target failed",
+                            InputSnapshot = new Dictionary<string, object>
+                            {
+                                ["Image"] = largeInputImage
+                            },
+                            OutputSnapshot = new Dictionary<string, object>
+                            {
+                                ["Score"] = 0.42
+                            }
+                        }
+                    }
+                }));
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = targetNodeId,
+            FlowData = CreateUpdateFlowRequest(
+                CreateOperatorDto(targetNodeId, "Threshold", OperatorType.Thresholding))
+        });
+
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("success").GetBoolean().Should().BeFalse();
+        document.RootElement.GetProperty("inputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
+        var outputData = document.RootElement.GetProperty("outputData");
+        outputData.GetProperty("Score").GetDouble().Should().BeApproximately(0.42d, 0.001d);
+        outputData.GetProperty("_previewWarning").GetString().Should().Contain("过大");
+    }
+
     private static int ReadIntValue(object? value)
     {
         return value switch
