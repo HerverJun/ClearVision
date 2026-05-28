@@ -750,30 +750,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 _logger.LogWarning(ex, "[WebMessageHandler] 解析 AnalysisDataJson 失败: ResultId={ResultId}", result.Id);
             }
 
-            var message = new
-            {
-                type = "inspectionCompleted",
-                messageType = "inspectionCompleted",
-                resultId = result.Id,
-                projectId,
-                status = result.Status.ToString(),
-                defects = result.Defects.Select(d => new
-                {
-                    type = d.Type.ToString(),
-                    x = d.X,
-                    y = d.Y,
-                    width = d.Width,
-                    height = d.Height,
-                    confidence = d.ConfidenceScore,
-                    description = d.Description ?? string.Empty
-                }).ToList(),
-                processingTimeMs = result.ProcessingTimeMs,
-                outputImage = result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null,
-                outputData,
-                outputDataJson = result.OutputDataJson,
-                analysisData,
-                analysisDataJson = result.AnalysisDataJson
-            };
+            var message = CreateInspectionCompletedMessage(result, projectId, outputData, analysisData);
 
             PostWebMessageJson(JsonSerializer.Serialize(message, _jsonOptions));
         }
@@ -781,6 +758,36 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         {
             _logger.LogError(ex, "[WebMessageHandler] 推送检测结果失败: ResultId={ResultId}", result.Id);
         }
+    }
+
+    internal static object CreateInspectionCompletedMessage(
+        InspectionResult result,
+        Guid projectId,
+        Dictionary<string, object>? outputData,
+        Dictionary<string, object>? analysisData)
+    {
+        return new
+        {
+            type = "inspectionCompleted",
+            messageType = "inspectionCompleted",
+            resultId = result.Id,
+            projectId,
+            status = result.Status.ToString(),
+            defects = result.Defects.Select(d => new
+            {
+                type = d.Type.ToString(),
+                x = d.X,
+                y = d.Y,
+                width = d.Width,
+                height = d.Height,
+                confidence = d.ConfidenceScore,
+                description = d.Description ?? string.Empty
+            }).ToList(),
+            processingTimeMs = result.ProcessingTimeMs,
+            outputImage = result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null,
+            outputData,
+            analysisData
+        };
     }
 
     /// <summary>

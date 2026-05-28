@@ -153,6 +153,36 @@ public class WebMessageHandlerTests
     }
 
     [Fact]
+    public void CreateInspectionCompletedMessage_ShouldAvoidDuplicatingRawJsonPayloads()
+    {
+        var projectId = Guid.NewGuid();
+        var result = new InspectionResult(projectId);
+        result.SetResult(InspectionStatus.OK, processingTimeMs: 42);
+        result.SetOutputDataJson("{\"BlobCount\":3}");
+        result.SetAnalysisDataJson("{\"Cards\":[{\"Title\":\"ok\"}]}");
+        result.SetOutputImage(new byte[] { 1, 2, 3 });
+
+        var outputData = new Dictionary<string, object> { ["BlobCount"] = 3 };
+        var analysisData = new Dictionary<string, object> { ["Summary"] = "OK" };
+
+        var message = WebMessageHandler.CreateInspectionCompletedMessage(
+            result,
+            projectId,
+            outputData,
+            analysisData);
+
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(message));
+        var root = doc.RootElement;
+
+        root.GetProperty("messageType").GetString().Should().Be("inspectionCompleted");
+        root.GetProperty("outputImage").GetString().Should().Be(Convert.ToBase64String(new byte[] { 1, 2, 3 }));
+        root.GetProperty("outputData").GetProperty("BlobCount").GetInt32().Should().Be(3);
+        root.GetProperty("analysisData").GetProperty("Summary").GetString().Should().Be("OK");
+        root.TryGetProperty("outputDataJson", out _).Should().BeFalse();
+        root.TryGetProperty("analysisDataJson", out _).Should().BeFalse();
+    }
+
+    [Fact]
     public async Task CancelGenerateFlow_ShouldCancelActiveGenerateToken()
     {
         var operatorFactory = new OperatorFactory();

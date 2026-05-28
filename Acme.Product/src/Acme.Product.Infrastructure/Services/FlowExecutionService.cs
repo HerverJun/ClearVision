@@ -30,7 +30,6 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private static readonly TimeSpan DebugSessionTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ExecutionStatusTtl = TimeSpan.FromSeconds(30);
     private const string OperatorCanceledErrorMessage = "Operator execution was canceled.";
-    private static readonly ConcurrentDictionary<Type, bool> JsonSerializableTypes = new();
     private static readonly ConditionalWeakTable<OperatorFlow, FlowExecutionPlanCache> FlowExecutionPlanCaches = new();
     private static readonly ConditionalWeakTable<Operator, ParameterFingerprintOrderCache> FingerprintParameterOrderCaches = new();
     private static readonly HashSet<OperatorType> AutoParallelBlockedOperatorTypes =
@@ -1257,9 +1256,9 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             return true;
         }
 
-        if (CanSerializeJsonValue(value))
+        if (TrySerializeJsonValue(value, out var jsonElement))
         {
-            normalized = value;
+            normalized = jsonElement;
             return true;
         }
 
@@ -1267,23 +1266,16 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         return normalized != null;
     }
 
-    private static bool CanSerializeJsonValue(object value)
+    private static bool TrySerializeJsonValue(object value, out JsonElement jsonElement)
     {
-        var type = value.GetType();
-        if (JsonSerializableTypes.TryGetValue(type, out var cached))
-        {
-            return cached;
-        }
-
         try
         {
-            JsonSerializer.Serialize(value);
-            JsonSerializableTypes[type] = true;
+            jsonElement = JsonSerializer.SerializeToElement(value, value.GetType());
             return true;
         }
         catch
         {
-            JsonSerializableTypes[type] = false;
+            jsonElement = default;
             return false;
         }
     }
