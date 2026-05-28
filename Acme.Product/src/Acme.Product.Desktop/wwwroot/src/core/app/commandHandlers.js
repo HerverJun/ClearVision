@@ -87,14 +87,21 @@ export function bindToolbarCommands(options) {
                 }
 
                 await projectManager.saveProject(projectManager?.getCurrentProject?.() || project);
-                try {
-                    const rawBackup = localStorage.getItem('cv_autosave_backup');
-                    const backup = rawBackup ? JSON.parse(rawBackup) : null;
-                    if (!backup?.projectId || backup.projectId === project.id) {
-                        localStorage.removeItem('cv_autosave_backup');
+                const storage = typeof localStorage !== 'undefined' ? localStorage : null;
+                if (storage) {
+                    try {
+                        const rawBackup = storage.getItem('cv_autosave_backup');
+                        const backup = rawBackup ? JSON.parse(rawBackup) : null;
+                        if (!backup?.projectId || backup.projectId === project.id) {
+                            storage.removeItem('cv_autosave_backup');
+                        }
+                    } catch {
+                        try {
+                            storage.removeItem('cv_autosave_backup');
+                        } catch {
+                            // Saving already succeeded; ignore unavailable backup storage.
+                        }
                     }
-                } catch {
-                    localStorage.removeItem('cv_autosave_backup');
                 }
 
                 showToast(`工程已保存到服务端工程库（版本 v${project.version || '1.0.0'}）`, 'success');

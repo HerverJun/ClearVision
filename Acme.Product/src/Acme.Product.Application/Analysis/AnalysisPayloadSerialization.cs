@@ -198,23 +198,34 @@ public static class AnalysisPayloadSerialization
             return true;
         }
 
+        if (TrySerializeJsonValue(value, out var serializedJsonElement))
+        {
+            converted = serializedJsonElement;
+            return true;
+        }
+
+        var text = value.ToString();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            converted = null;
+            return false;
+        }
+
+        converted = text;
+        return true;
+    }
+
+    private static bool TrySerializeJsonValue(object value, out JsonElement jsonElement)
+    {
         try
         {
-            JsonSerializer.Serialize(value);
-            converted = value;
+            jsonElement = JsonSerializer.SerializeToElement(value, value.GetType());
             return true;
         }
         catch
         {
-            var text = value.ToString();
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                converted = null;
-                return false;
-            }
-
-            converted = text;
-            return true;
+            jsonElement = default;
+            return false;
         }
     }
 

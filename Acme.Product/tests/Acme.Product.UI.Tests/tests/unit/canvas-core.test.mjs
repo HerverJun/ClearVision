@@ -431,6 +431,36 @@ test('FlowCanvas persists disabled node state through serialize and deserialize'
   restored.destroy();
 });
 
+test('FlowCanvas handleMouseMove skips redraws when hover state does not change', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const rafSpy = installRafSpy();
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  try {
+    const fc = new FlowCanvas('canvas');
+    clearPendingFrame(fc, rafSpy);
+
+    let invalidations = 0;
+    fc.invalidate = () => {
+      invalidations += 1;
+    };
+
+    fc.handleMouseMove({ clientX: 100, clientY: 120 });
+    fc.handleMouseMove({ clientX: 100, clientY: 120 });
+
+    assert.equal(invalidations, 1);
+
+    fc.destroy();
+  } finally {
+    rafSpy.restore();
+  }
+});
+
 test('FlowCanvas expands node height for multi-port operators', async () => {
   const { FlowCanvas } = await import(
     '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
@@ -561,8 +591,8 @@ test('lintPanel render uses textContent for issue fields', async () => {
     '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/lintPanel.js'
   );
 
+  global.document = createMockDocument(createMockCanvas());
   const container = document.createElement('div');
-  global.document = createMockDocument(container);
 
   const panel = new LintPanel('lint-panel');
   // Inject container manually since getElementById may have returned a different mock

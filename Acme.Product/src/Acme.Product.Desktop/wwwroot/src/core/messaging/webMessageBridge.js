@@ -1,6 +1,46 @@
 /**
  * WebMessage bridge for WebView2 host communication.
  */
+const canCaptureEarlyWindowErrors = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
+
+if (typeof window !== 'undefined' && !window._errorLogs) {
+    window._errorLogs = [];
+}
+
+if (canCaptureEarlyWindowErrors && !window.__cvEarlyErrorCaptureInstalled) {
+    window.__cvEarlyErrorCaptureInstalled = true;
+    window.addEventListener('error', (event) => {
+        const errorRecord = {
+            type: 'Error',
+            message: event?.message || event?.error?.message || 'Unknown error',
+            source: event?.filename || event?.error?.fileName || '',
+            line: event?.lineno || event?.error?.lineNumber || 0,
+            column: event?.colno || event?.error?.columnNumber || 0,
+            stack: event?.error?.stack || '',
+            time: new Date().toLocaleTimeString()
+        };
+        window._errorLogs.push(errorRecord);
+        if (window._errorLogs.length > 100) {
+            window._errorLogs.shift();
+        }
+        console.error('[WebMessageBridge] Early error capture:', JSON.stringify(errorRecord));
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+        const reason = event?.reason;
+        const errorRecord = {
+            type: 'Promise',
+            message: reason?.message || String(reason || 'Unknown rejection'),
+            stack: reason?.stack || '',
+            time: new Date().toLocaleTimeString()
+        };
+        window._errorLogs.push(errorRecord);
+        if (window._errorLogs.length > 100) {
+            window._errorLogs.shift();
+        }
+        console.error('[WebMessageBridge] Early rejection capture:', JSON.stringify(errorRecord));
+    });
+}
+
 function debugWebMessageLog(...args) {
     if (globalThis.CV_DEBUG_WEBMESSAGE === true || globalThis.CV_DEBUG_INSPECTION === true) {
         console.debug(...args);

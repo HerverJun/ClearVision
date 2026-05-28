@@ -1,6 +1,6 @@
 /**
- * 主应用入口 - S4-006: 端到端集成
- * Sprint 4: 前后端集成与用户体验闭环
+ * 涓诲簲鐢ㄥ叆鍙?- S4-006: 绔埌绔泦鎴?
+ * Sprint 4: 鍓嶅悗绔泦鎴愪笌鐢ㄦ埛浣撻獙闂幆
  */
 
 import { Dialog } from './shared/components/dialog.js';
@@ -58,7 +58,7 @@ window.addEventListener('unhandledrejection', function(event) {
 debugLogger.debug(`[App] ${t('app.startingImports', 'Starting module imports')}...`);
 
 // ============================================
-// 认证检查 - 未登录则跳转
+// 璁よ瘉妫€鏌?- 鏈櫥褰曞垯璺宠浆
 // ============================================
 import { bootstrapAuthSession, logout } from './features/auth/auth.js';
 
@@ -85,7 +85,7 @@ import projectManager, {
     subscribeProject
 } from './features/project/projectManager.js';
 
-// 全局状态
+// 鍏ㄥ眬鐘舵€?
 const [getCurrentView, setCurrentView, subscribeView] = createSignal('flow');
 const [getSelectedOperator, setSelectedOperator, subscribeSelectedOperator] = createSignal(null);
 const [getOperatorLibrary, setOperatorLibrary, subscribeOperatorLibrary] = createSignal([]);
@@ -100,7 +100,7 @@ function trackedSubscribe(subscribeFn, callback) {
     return unsubscribe;
 }
 
-// 组件实例
+// 缁勪欢瀹炰緥
 let imageViewer = null;
 let operatorLibraryPanel = null;
 let flowCanvas = null;
@@ -120,7 +120,6 @@ let aiGenerationController = null;
 let appInitialized = false;
 let appBootstrapPromise = null;
 let statusBarStarted = false;
-let fpsAnimationFrameId = null;
 let themeUpdateInFlight = false;
 let projectFlowSyncSuppressionDepth = 0;
 let studioPerformanceGuardsInitialized = false;
@@ -170,11 +169,12 @@ function isInspectionActiveForBackgroundWork() {
 }
 let aiPanelModulePromise = null;
 
-// 本机草稿备份定时器
+// 鏈満鑽夌澶囦唤瀹氭椂鍣?
 let autoSaveInterval = null;
 const AUTO_SAVE_DELAY = 5 * 60 * 1000;
 const LOCAL_DRAFT_BACKUP_KEY = 'cv_autosave_backup';
 const promptedLocalDraftKeys = new Set();
+let lastLocalDraftBackupSignature = null;
 
 function getFlowNodeCount(flow) {
     const nodes = flow?.nodes || flow?.Nodes || [];
@@ -187,6 +187,13 @@ function getFlowNodeCount(flow) {
     }
 
     return 0;
+}
+
+function getLocalDraftBackupSignature(project, flow) {
+    const projectId = project?.id || '';
+    const modifiedAt = project?.modifiedAt || project?.ModifiedAt || '';
+    const flowRevision = flow?.flowRevision ?? flow?.FlowRevision ?? '';
+    return `${projectId}:${modifiedAt}:${flowRevision}`;
 }
 
 function readLocalDraftBackup() {
@@ -214,6 +221,7 @@ function saveLocalDraftBackup(project, flow, source = 'timer') {
     };
 
     localStorage.setItem(LOCAL_DRAFT_BACKUP_KEY, JSON.stringify(backup));
+    lastLocalDraftBackupSignature = getLocalDraftBackupSignature(project, flow);
     return backup;
 }
 
@@ -318,54 +326,18 @@ function getAiGenerationController() {
     return aiGenerationController;
 }
 
-async function handleProjectChange(project) {
-    eventBus.emit('project:changed', { project });
-    if (!project?.id) {
-        inspectionController.setProject(null);
-        inspectionPanel?.setProjectContext?.(null);
-        resultPanel?.setProjectContext?.(null);
-        resultPanel?.clear?.();
-        return;
-    }
-
-    inspectionController.setProject(project.id);
-    inspectionPanel?.setProjectContext?.(project.id);
-
-    if (flowCanvas) {
-        withProjectFlowSyncSuppressed(() => {
-            if (project.flow) {
-                debugLogger.debug('[App] 当前工程已切换，加载流程数据:', project.flow);
-                flowCanvas.deserialize(project.flow);
-            } else {
-                debugLogger.debug('[App] 当前工程没有流程数据，清空画布');
-                flowCanvas.clear();
-            }
-        });
-    }
-
-    resultPanel?.setProjectContext?.(project.id);
-    resultPanel?.clear?.();
-
-    promptLocalDraftRestore(project);
-
-    setCurrentView('flow');
-    syncActiveNavButton('flow');
-    await switchView('flow');
+function handleFeatureLoadError(featureName, error) {
+    console.error(`[App] ${featureName} 初始化失败:`, error);
+    showToast(`${featureName} 初始化失败，请刷新后重试`, 'error');
 }
 
-function syncCurrentProjectFlowFromCanvas() {
-    if (projectFlowSyncSuppressionDepth > 0) {
-        return null;
+function withProjectFlowSyncSuppressed(action) {
+    projectFlowSyncSuppressionDepth += 1;
+    try {
+        return action();
+    } finally {
+        projectFlowSyncSuppressionDepth = Math.max(0, projectFlowSyncSuppressionDepth - 1);
     }
-
-    const project = getCurrentProject();
-    if (!project || !flowCanvas || typeof flowCanvas.serialize !== 'function') {
-        return null;
-    }
-
-    const flow = flowCanvas.serialize();
-    projectManager.updateFlow(flow);
-    return flow;
 }
 
 function promptLocalDraftRestore(project) {
@@ -412,15 +384,6 @@ function promptLocalDraftRestore(project) {
     showToast('已恢复本机草稿；请点击“保存工程”写入正式工程库。', 'warning');
 }
 
-function withProjectFlowSyncSuppressed(action) {
-    projectFlowSyncSuppressionDepth += 1;
-    try {
-        return action();
-    } finally {
-        projectFlowSyncSuppressionDepth = Math.max(0, projectFlowSyncSuppressionDepth - 1);
-    }
-}
-
 function initializeProjectFlowCanvasSync() {
     if (!flowCanvas || typeof flowCanvas.subscribeStructureState !== 'function') {
         return;
@@ -453,282 +416,6 @@ function initializeStudioPerformanceGuards() {
     });
 
     subscriptions.push(unsubscribe);
-}
-
-/**
- * 初始化应用
- */
-async function initializeApp() {
-    if (appInitialized) {
-        return true;
-    }
-
-    debugLogger.debug('[App] 初始化应用...');
-    showLoadingScreen();
-
-    const authState = await bootstrapAuthSession();
-    if (!authState.ok) {
-        debugLogger.warn(`[App] 认证启动失败: ${authState.reason}`);
-        return false;
-    }
-
-    updateAuthenticatedUserDisplay();
-    initializeNavigation();
-    initializeOperatorLibraryPanel();
-    initializeFlowEditor();
-    initializeImageViewer();
-    initializeInspectionController();
-    initializePropertyPanel();
-    initializePropertySidebarController();
-    initializeTheme();
-    initializeToolbar();
-    startStatusBarUpdates();
-    initializeStudioPerformanceGuards();
-    trackedSubscribe(subscribeProject, (project) => {
-        window.setTimeout(() => {
-            void handleProjectChange(project).catch(error => {
-                handleFeatureLoadError('工程切换', error);
-            });
-        }, 0);
-    });
-
-    appInitialized = true;
-
-    debugLogger.debug('[App] 应用初始化完成');
-    showToast('ClearVision 已就绪', 'success');
-    return true;
-}
-
-async function bootstrapApp() {
-    if (appBootstrapPromise) {
-        return appBootstrapPromise;
-    }
-
-    appBootstrapPromise = (async () => {
-        const initialized = await initializeApp();
-        if (!initialized) {
-            hideLoadingScreen();
-            return false;
-        }
-
-        setTimeout(() => {
-            hideLoadingScreen();
-            showWelcomeScreen();
-        }, 500);
-
-        return true;
-    })();
-
-    return appBootstrapPromise;
-}
-
-/**
- * 初始化导航
- */
-function initializeNavigation() {
-    getViewManager().bindNavigation();
-    document.querySelectorAll('[data-open-view]').forEach((button) => {
-        if (button.dataset.cvOpenViewBound) {
-            return;
-        }
-
-        button.dataset.cvOpenViewBound = 'true';
-        button.addEventListener('click', () => {
-            const view = button.dataset.openView;
-            if (!view) {
-                return;
-            }
-
-            setCurrentView(view);
-            syncActiveNavButton(view);
-            void switchView(view).catch(error => handleFeatureLoadError('视图切换', error));
-        });
-    });
-}
-
-function handleFeatureLoadError(featureName, error) {
-    console.error(`[App] ${featureName} 初始化失败:`, error);
-    showToast(`${featureName} 初始化失败，请刷新后重试`, 'error');
-}
-
-async function ensureProjectView() {
-    if (projectView) {
-        return projectView;
-    }
-
-    const container = document.getElementById('project-view');
-    if (!container) {
-        debugLogger.warn('[App] 工程视图容器未找到，将在首次切换到工程视图时初始化');
-        return null;
-    }
-
-    const { ProjectView } = await loadProjectViewModule();
-    projectView = new ProjectView('project-view');
-
-    debugLogger.debug('[App] 工程视图初始化完成');
-    return projectView;
-}
-
-async function ensureResultPanel() {
-    if (resultPanel) {
-        return resultPanel;
-    }
-
-    const container = document.getElementById('results-list-container');
-    if (!container) {
-        debugLogger.warn('[App] 结果视图容器未找到');
-        return null;
-    }
-
-    const { ResultPanel } = await loadResultPanelModule();
-    resultPanel = new ResultPanel('results-list-container');
-    serviceRegistry.register('resultPanel', resultPanel);
-    resultPanel.setProjectContext(getCurrentProject()?.id || null);
-    resultPanel.setHistoryLoader(loadInspectionHistory);
-
-    resultPanel.onResultClick = (result) => {
-        debugLogger.debug('[App] 点击结果:', result);
-        if (resultPanel && result) {
-            resultPanel.showResultDetail(result);
-        }
-    };
-
-    const clearBtn = document.getElementById('btn-clear-results');
-    if (clearBtn && !clearBtn.dataset.cvBound) {
-        clearBtn.dataset.cvBound = 'true';
-        clearBtn.addEventListener('click', () => {
-            if (confirm('确定要清空当前结果视图吗？此操作不会删除后端历史记录。')) {
-                resultPanel.clear();
-                showToast('当前结果视图已清空，历史记录未删除', 'success');
-            }
-        });
-    }
-
-    debugLogger.debug('[App] 结果面板初始化完成（现代化仪表盘）');
-    return resultPanel;
-}
-
-async function ensureInspectionPanelReady() {
-    const container = document.getElementById('inspection-control-panel');
-    if (!container) {
-        debugLogger.warn('[App] 检测控制面板容器未找到');
-        return null;
-    }
-
-    if (inspectionPanel) {
-        inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
-        return inspectionPanel;
-    }
-
-    const { InspectionPanel } = await loadInspectionPanelModule();
-
-    const existingInspectionPanel = serviceRegistry.get('inspectionPanel');
-    if (existingInspectionPanel && typeof existingInspectionPanel.dispose === 'function') {
-        debugLogger.warn('[App] 发现残留的 InspectionPanel 实例，正在销毁...');
-        existingInspectionPanel.dispose();
-    }
-
-    inspectionPanel = new InspectionPanel('inspection-control-panel');
-    serviceRegistry.register('inspectionPanel', inspectionPanel);
-    inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
-    debugLogger.debug('[App] 检测控制面板初始化完成');
-    return inspectionPanel;
-}
-
-async function ensureStationMonitorView() {
-    if (stationMonitorView) {
-        return stationMonitorView;
-    }
-
-    const container = document.getElementById('stations-view');
-    if (!container) {
-        debugLogger.warn('[App] Station monitor container not found.');
-        return null;
-    }
-
-    const { StationMonitorView } = await loadStationMonitorModule();
-    stationMonitorView = new StationMonitorView('stations-view');
-    serviceRegistry.register('stationMonitorView', stationMonitorView);
-    debugLogger.debug('[App] Station monitor view initialized.');
-    return stationMonitorView;
-}
-
-async function ensureAiPanel() {
-    if (aiPanel) {
-        return aiPanel;
-    }
-
-    const flowCanvasService = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
-    if (!flowCanvasService) {
-        debugLogger.warn('[App] FlowCanvas 未就绪，无法初始化 AI 面板');
-        return null;
-    }
-
-    const { AiPanel } = await loadAiPanelModule();
-    aiPanel = new AiPanel('ai-view', flowCanvasService, {
-        getOperators: () => operatorLibraryPanel?.getOperators?.() || [],
-        showToast,
-        onApplied: (flow) => {
-            const syncedFlow = syncCurrentProjectFlowFromCanvas() || flow;
-            getAiGenerationController().publishApplied(syncedFlow);
-        },
-        onCanvasChanged: ({ flow } = {}) => {
-            const syncedFlow = syncCurrentProjectFlowFromCanvas() || flow || null;
-            if (syncedFlow) {
-                getAiGenerationController().publishApplied(syncedFlow);
-            }
-        }
-    });
-    serviceRegistry.register('aiPanel', aiPanel);
-    debugLogger.debug('[App] AI 面板初始化完成');
-    return aiPanel;
-}
-
-async function switchView(view) {
-    return getViewManager().switchView(view);
-}
-
-/**
- * 初始化检测图像查看器
- */
-function initializeInspectionImageViewer() {
-    const container = document.getElementById('inspection-image-area');
-    if (!container) {
-        debugLogger.warn('[App] 检测图像查看器容器未找到');
-        return;
-    }
-    
-    // 如果查看器已存在且已初始化，只需调整大小
-    const existingInspectionImageViewer = serviceRegistry.get('inspectionImageViewer');
-    if (existingInspectionImageViewer) {
-        requestAnimationFrame(() => {
-            existingInspectionImageViewer.imageCanvas?.resize();
-        });
-        return;
-    }
-    
-    try {
-        // 复用现有的 ImageViewerComponent
-        const inspectionImageViewer = new ImageViewerComponent('inspection-image-area');
-        serviceRegistry.register('inspectionImageViewer', inspectionImageViewer);
-        
-        // 【关键修复】移除重复的回调设置，避免覆盖 initializeInspectionController 中设置的回调
-        // 检测完成逻辑统一在 initializeInspectionController 中处理
-        
-        debugLogger.debug('[App] 检测图像查看器初始化完成');
-    } catch (error) {
-        console.error('[App] 检测图像查看器初始化失败:', error);
-    }
-}
-
-
-/**
- * 更新检测视图结果面板
- */
-function updateInspectionResultsPanel(result) {
-    // 旧的实时结果面板已移除（inspection-ok-count, inspection-ng-count, inspection-results-detail）
-    // 现在由 inspectionPanel.js 的 updateCounters() 和 renderRecentResults() 处理
-    // 保留空函数以兼容 initializeInspectionController 中的调用
 }
 
 function tryParseJsonPayload(payload) {
@@ -877,65 +564,87 @@ function normalizeInspectionResultRecord(result, fallbackProjectId = null) {
     return normalized;
 }
 
-/**
- * 初始化算子库面板
- */
+function updateInspectionResultsPanel(result) {
+    return result;
+}
+
 function initializeOperatorLibraryPanel() {
     const container = document.getElementById('operator-library');
     if (!container) {
         console.error('[App] 找不到算子库容器');
         return;
     }
-    
+
     operatorLibraryPanel = new OperatorLibraryPanel('operator-library');
     serviceRegistry.register('operatorLibraryPanel', operatorLibraryPanel);
-    
-    // 设置拖拽回调
+
     operatorLibraryPanel.onOperatorDragStart = (operatorData) => {
         debugLogger.debug('[App] 开始拖拽算子:', operatorData.type);
     };
-    
-    // 设置选中回调
+
     operatorLibraryPanel.onOperatorSelected = (operatorData) => {
         debugLogger.debug('[App] 选中算子:', operatorData.type);
-        // 【修复】创建浅拷贝确保 Signal 能检测到变化（Signal 使用 !== 严格相等）
-        // 同时补全 title 字段，确保 PropertyPanel 能正确显示标题
         const operatorCopy = {
             ...operatorData,
             title: operatorData.title || operatorData.displayName || operatorData.type,
-            parameters: operatorData.parameters ? operatorData.parameters.map(p => ({...p})) : []
+            parameters: operatorData.parameters ? operatorData.parameters.map(p => ({ ...p })) : []
         };
         setSelectedOperator(operatorCopy);
     };
-    
+
     debugLogger.debug('[App] 算子库面板初始化完成');
 }
 
-/**
- * 初始化图像查看器
- */
 function initializeImageViewer() {
     const container = document.getElementById('image-viewer');
     if (!container) {
         console.error('[App] 找不到图像查看器容器');
         return;
     }
-    
-    // 清空容器并初始化图像查看器组件
+
     imageViewer = new ImageViewerComponent('image-viewer');
     serviceRegistry.register('imageViewer', imageViewer);
-    
-    // 设置图像加载回调
+
     imageViewer.onImageLoaded = (img) => {
         debugLogger.debug('[App] 图像已加载:', img.width, 'x', img.height);
     };
-    
-    // 设置标注点击回调
+
     imageViewer.onAnnotationClicked = (annotation) => {
         debugLogger.debug('[App] 点击标注:', annotation);
     };
-    
+
     debugLogger.debug('[App] 图像查看器初始化完成');
+}
+
+function initializeInspectionImageViewer() {
+    const container = document.getElementById('inspection-image-area');
+    if (!container) {
+        debugLogger.warn('[App] 检测图像查看器容器未找到');
+        return;
+    }
+
+    const existingInspectionImageViewer = serviceRegistry.get('inspectionImageViewer');
+    if (existingInspectionImageViewer) {
+        requestAnimationFrame(() => {
+            existingInspectionImageViewer.imageCanvas?.resize();
+        });
+        return;
+    }
+
+    try {
+        const inspectionImageViewer = new ImageViewerComponent('inspection-image-area');
+        serviceRegistry.register('inspectionImageViewer', inspectionImageViewer);
+
+        const lastResult = inspectionController.getLastResult?.();
+        const lastImage = getInlineResultImageBase64(lastResult);
+        if (lastImage) {
+            loadViewerImageSilently(inspectionImageViewer, `data:image/png;base64,${lastImage}`);
+        }
+
+        debugLogger.debug('[App] 检测图像查看器初始化完成');
+    } catch (error) {
+        console.error('[App] 检测图像查看器初始化失败:', error);
+    }
 }
 
 function openImageViewerFromPreview(imageSource) {
@@ -989,12 +698,8 @@ function initializeNodePreviewExperience() {
     }
 }
 
-/**
- * 初始化检测控制器
- */
 function initializeInspectionController() {
-    // 设置检测完成回调（调用方法注册回调，而非覆盖方法）
-    inspectionController.onInspectionCompleted((result) => {
+    const unsubscribeCompleted = inspectionController.onInspectionCompleted((result) => {
         const currentProjectId = getCurrentProject()?.id || null;
         const normalizedResult = normalizeInspectionResultRecord(result, currentProjectId);
         if (!normalizedResult) {
@@ -1009,113 +714,70 @@ function initializeInspectionController() {
             return;
         }
 
-        result = normalizedResult;
-        eventBus.emit('inspection:result', result);
-        debugLogger.debug('[App] 检测完成:', result);
+        eventBus.emit('inspection:result', normalizedResult);
+        serviceRegistry.register('lastInspectionResult', normalizedResult);
+        window._lastInspectionResult = normalizedResult;
 
-        // 【关键修复】保存最新的检测结果，以便切换视图时显示
-        serviceRegistry.register('lastInspectionResult', result);
-        window._lastInspectionResult = result;
         const isRealtimeResult = inspectionController.getState?.().isRealtime === true;
 
-        // 如果在检测视图，立即更新检测面板和图像查看器
         if (getCurrentView() === 'inspection') {
-            // 显示处理后的图像
-            const outputImage = getInlineResultImageBase64(result);
+            const outputImage = getInlineResultImageBase64(normalizedResult);
             const inspectionImageViewerService = serviceRegistry.get('inspectionImageViewer');
             if (outputImage && inspectionImageViewerService) {
-                const imageData = `data:image/png;base64,${outputImage}`;
-                loadViewerImageSilently(inspectionImageViewerService, imageData);
+                loadViewerImageSilently(inspectionImageViewerService, `data:image/png;base64,${outputImage}`);
             }
 
-
-
-            // 更新结果面板
-            updateInspectionResultsPanel(result);
-        } else {
-            // 【关键修复】如果不在检测视图，显示提示引导用户切换
-            debugLogger.debug('[App] 检测完成但不在检测视图，已保存结果');
+            updateInspectionResultsPanel(normalizedResult);
         }
 
-        const appendResultToPanel = (panel) => {
-            if (!panel) {
-                return;
-            }
-
-            const normalizedDefects = buildResultDefects(result);
-            panel.setProjectContext(currentProjectId);
-            panel.addResult({
-                id: result.id,
-                projectId: result.projectId,
-                status: result.status,
+        if (resultPanel && isResultPanelVisible()) {
+            resultPanel.setProjectContext(currentProjectId);
+            const normalizedDefects = buildResultDefects(normalizedResult);
+            resultPanel.addResult({
+                id: normalizedResult.id,
+                projectId: normalizedResult.projectId,
+                status: normalizedResult.status,
                 defects: normalizedDefects,
-                defectCount: result.defectCount,
-                processingTime: result.processingTime ?? result.processingTimeMs,
-                processingTimeMs: result.processingTimeMs,
-                timestamp: result.timestamp || result.inspectionTime || new Date().toISOString(),
-                confidenceScore: result.confidenceScore,
-                imageId: result.imageId || result.ImageId,
-                imageData: getInlineResultImageBase64(result),
-                outputImage: result.outputImage || result.OutputImage || null,
-                outputImageBase64: result.outputImageBase64 || result.OutputImageBase64 || null,
-                resultImageBase64: result.resultImageBase64 || result.ResultImageBase64 || null,
-                outputData: normalizeOutputData(result),
-                analysisData: normalizeAnalysisData(result),
-                errorMessage: result.errorMessage
+                defectCount: normalizedResult.defectCount,
+                processingTime: normalizedResult.processingTime ?? normalizedResult.processingTimeMs,
+                processingTimeMs: normalizedResult.processingTimeMs,
+                timestamp: normalizedResult.timestamp || new Date().toISOString(),
+                confidenceScore: normalizedResult.confidenceScore,
+                imageId: normalizedResult.imageId,
+                imageData: getInlineResultImageBase64(normalizedResult),
+                outputImage: normalizedResult.outputImage || null,
+                outputImageBase64: normalizedResult.outputImageBase64 || null,
+                resultImageBase64: normalizedResult.resultImageBase64 || null,
+                outputData: normalizedResult.outputData || {},
+                analysisData: normalizedResult.analysisData || null,
+                errorMessage: normalizedResult.errorMessage
             }, {
                 isRealtime: isRealtimeResult
             });
 
-            if (!panel.serverPaged) {
-                scheduleResultPanelAnalyticsRefresh(panel, currentProjectId, isRealtimeResult);
+            if (!resultPanel.serverPaged) {
+                scheduleResultPanelAnalyticsRefresh(resultPanel, currentProjectId, isRealtimeResult);
             }
-        };
-
-        if (resultPanel && isResultPanelVisible()) {
-            appendResultToPanel(resultPanel);
         }
 
-        // 显示结果提示
-        let status = 'info';
-        let message = '';
-
-        if (result.status === 'OK') {
-            status = 'success';
-            message = '检测通过 (OK)';
-        } else if (result.status === 'Error') {
-            status = 'error';
-            message = `检测错误: ${result.errorMessage || '未知错误'}`;
-        } else {
-            const defectCount = result.defectCount ?? result.DefectCount ?? buildResultDefects(result).length;
-            status = 'warning';
-            message = `检测到 ${defectCount} 个目标`;
-        }
-
-        // 检测节拍里的 OK/NG 属于高频生产状态，面板和结果列表已经承载；Toast 只保留异常。
-        if (status === 'error') {
-            showToast(message, status, { minIntervalMs: 5000, key: 'inspection-result-error' });
+        if (normalizedResult.status === 'Error') {
+            showToast(`检测错误: ${normalizedResult.errorMessage || '未知错误'}`, 'error', {
+                minIntervalMs: 5000,
+                key: 'inspection-result-error'
+            });
         }
     });
-    
-    // 设置检测错误回调
-    inspectionController.onInspectionError((error) => {
+
+    const unsubscribeError = inspectionController.onInspectionError((error) => {
         eventBus.emit('inspection:error', error);
         console.error('[App] 检测错误:', error);
         showToast('检测失败: ' + error.message, 'error');
-        
-        // 更新检测面板状态
-        if (inspectionPanel) {
-            inspectionPanel.updateStatus('error', '检测错误');
-            inspectionPanel.setButtonsState(false);
-        }
     });
-    
+
+    subscriptions.push(unsubscribeCompleted, unsubscribeError);
     debugLogger.debug('[App] 检测控制器初始化完成');
 }
 
-/**
- * 初始化属性面板
- */
 function initializePropertyPanel() {
     const container = document.getElementById('property-panel');
     if (!container) {
@@ -1129,7 +791,6 @@ function initializePropertyPanel() {
     });
     serviceRegistry.register('propertyPanel', propertyPanel);
 
-    // 【修复】订阅选中算子变化，使用trackedSubscribe防止内存泄漏
     trackedSubscribe(subscribeSelectedOperator, (operator) => {
         if (operator) {
             debugLogger.debug('[App] 选中算子变化:', operator.title || operator.type);
@@ -1139,10 +800,8 @@ function initializePropertyPanel() {
         }
     });
 
-    // 设置参数变更回调
     propertyPanel.onChange((values) => {
         debugLogger.debug('[App] 算子参数变更:', values);
-        // 更新流程图中对应节点的参数
         const operator = getSelectedOperator();
         if (operator && flowCanvas) {
             const node = flowCanvas.nodes.get(operator.id);
@@ -1157,9 +816,6 @@ function initializePropertyPanel() {
     debugLogger.debug('[App] 属性面板初始化完成');
 }
 
-/**
- * 加载检测历史数据
- */
 function initializePropertySidebarController() {
     const handle = document.querySelector('[data-sidebar-resizer="property"]');
     if (!handle) {
@@ -1175,9 +831,6 @@ function initializePropertySidebarController() {
     });
 }
 
-/**
- * 加载检测历史数据
- */
 async function loadInspectionHistory({
     pageIndex = 0,
     pageSize = resultPanel?.pageSize ?? 12,
@@ -1246,121 +899,18 @@ async function loadInspectionHistory({
     }
 }
 
-/**
- * 初始化算子库
- */
-async function initializeOperatorLibrary() {
-    try {
-        // 从后端获取算子库
-        const operators = await httpClient.get('/operators/library');
-        setOperatorLibrary(operators);
-        renderOperatorLibrary(operators);
-    } catch (error) {
-        console.error('[App] 加载算子库失败:', error);
-        renderOperatorLibrary([]);
-        showToast('算子库服务不可用，未展示默认演示算子', 'warning');
-    }
-}
-
-/**
- * 渲染算子库
- */
-function renderOperatorLibrary(operators) {
-    const container = document.getElementById('operator-library');
-    if (!container) {
-        return;
-    }
-
-    const categories = groupByCategory(Array.isArray(operators) ? operators : []);
-    const fragment = document.createDocumentFragment();
-
-    if (Object.keys(categories).length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-text';
-        empty.textContent = '算子库暂无可用数据，请检查服务连接后刷新。';
-        container.replaceChildren(empty);
-        return;
-    }
-
-    Object.entries(categories).forEach(([category, items]) => {
-        const categoryElement = document.createElement('div');
-        categoryElement.className = 'operator-category';
-
-        const title = document.createElement('div');
-        title.className = 'category-title';
-        title.textContent = category;
-        categoryElement.appendChild(title);
-
-        items.forEach((op) => {
-            const normalizedOperator = {
-                ...op,
-                type: op?.type || op?.Type || '',
-                category: op?.category || op?.Category || category
-            };
-
-            const item = document.createElement('div');
-            item.className = 'operator-item';
-            item.draggable = true;
-            item.dataset.type = normalizedOperator.type;
-
-            const icon = createOperatorIconElement(normalizedOperator, 'operator-icon');
-
-            const name = document.createElement('span');
-            name.className = 'operator-name';
-            name.textContent = normalizedOperator.displayName ||
-                normalizedOperator.DisplayName ||
-                normalizedOperator.name ||
-                normalizedOperator.Name ||
-                normalizedOperator.type;
-
-            item.append(icon, name);
-            item.addEventListener('dragstart', handleDragStart);
-            categoryElement.appendChild(item);
-        });
-
-        fragment.appendChild(categoryElement);
-    });
-
-    container.replaceChildren(fragment);
-}
-
-/**
- * 按类别分组
- */
-function groupByCategory(operators) {
-    return operators.reduce((acc, op) => {
-        const category = op?.category || op?.Category || '其他';
-        if (!acc[category]) {
-            acc[category] = [];
-        }
-        acc[category].push(op);
-        return acc;
-    }, {});
-}
-
-/**
- * 处理拖拽开始
- */
-function handleDragStart(event) {
-    const operatorType = event.currentTarget?.dataset.type || event.target?.dataset.type || '';
-    event.dataTransfer.setData('operatorType', operatorType);
-}
-
-/**
- * 初始化流程编辑器
- */
 function initializeFlowEditor() {
     const canvas = document.getElementById('flow-canvas');
     if (!canvas) {
         console.error('[App] 找不到流程编辑器画布');
         return;
     }
-    
-    // 使用 FlowCanvas 类初始化
+
     flowCanvas = new FlowCanvas('flow-canvas');
     const flowCanvasAdapter = createFlowCanvasAdapter(flowCanvas, { eventBus });
     serviceRegistry.register('flowCanvas', flowCanvas);
     serviceRegistry.register('flowCanvasAdapter', flowCanvasAdapter);
+
     initializeProjectFlowCanvasSync();
     inspectionController.setFlowProvider?.(() => flowCanvasAdapter.serialize());
     inspectionController.setImageSinks?.([
@@ -1380,12 +930,9 @@ function initializeFlowEditor() {
         }
     ]);
     initializeNodePreviewExperience();
-    
-    // 设置节点选中回调
+
     flowCanvas.onNodeSelected = (node) => {
         if (node) {
-            debugLogger.debug('[App] 节点选中:', node.title || node.type);
-            // 【修复】构造算子数据传递给属性面板 —— 使用算子库定义补全信息
             const operatorDef = findOperatorDefinition(node.type);
             setSelectedOperator({
                 id: node.id,
@@ -1404,205 +951,54 @@ function initializeFlowEditor() {
             nodePreviewCoordinator?.setActiveNode(null);
         }
     };
-    
-    // 保存到全局以便其他函数使用
-    serviceRegistry.register('flowCanvas', flowCanvas);
-    
-    // 【阶段B】支持 ForEach 子图双击进入与退出
-    const breadcrumbContainer = document.getElementById('subgraph-breadcrumb');
-    const breadcrumbCurrent = document.getElementById('breadcrumb-current');
-    const btnExitSubgraph = document.getElementById('btn-exit-subgraph');
-    
-    window._mainFlowState = null;
-    window._currentSubgraphNodeId = null;
 
     flowCanvas.onNodeDoubleClicked = (node) => {
-        if (node.type === 'ForEach') {
-            debugLogger.debug('[App] 进入 ForEach 子图:', node.id);
-            // 序列化主图状态并挂载到临时全局变量
-            window._mainFlowState = flowCanvas.serialize();
-            window._currentSubgraphNodeId = node.id;
-            
-            // 读取 IoMode
-            const ioModeParam = node.parameters?.find(p => p.name === 'IoMode' || p.Name === 'IoMode');
-            const ioMode = ioModeParam?.value || 'Parallel';
-            
-            // 从 ForEach 参数中获取内部流程数据
-            let subGraphData = null;
-            const flowParam = node.parameters?.find(p => p.name === 'SubGraph' || p.Name === 'SubGraph');
-            if (flowParam && flowParam.value) {
-                try {
-                    subGraphData = typeof flowParam.value === 'string' ? JSON.parse(flowParam.value) : flowParam.value;
-                } catch (e) {
-                    console.error('[App] 解析子图失败:', e);
-                }
-            }
-            
-            withProjectFlowSyncSuppressed(() => {
-                flowCanvas.clear();
-                if (subGraphData) {
-                    flowCanvas.deserialize(subGraphData);
-                }
-
-                // 注入 CurrentItem 系统源节点（如果不存在）
-                const existingCurrentItem = Array.from(flowCanvas.nodes.values()).find(n => n.type === 'CurrentItem');
-                if (!existingCurrentItem) {
-                    flowCanvas.addNode('CurrentItem', 50, 100, {
-                        title: '📦 CurrentItem',
-                        color: '#722ed1',
-                        outputs: [{ name: 'Item', type: 'Any' }, { name: 'Index', type: 'Integer' }, { name: 'Total', type: 'Integer' }],
-                        _systemNode: true  // 标记为系统节点，不可删除
-                    });
-                    debugLogger.debug('[App] 已注入 CurrentItem 系统源节点');
-                }
-            });
-            
-            if (breadcrumbContainer) {
-                breadcrumbContainer.classList.remove('hidden');
-                const ioLabel = ioMode === 'Sequential' ? '🔗 串行' : '⚡ 并行';
-                breadcrumbCurrent.textContent = `${node.title || 'ForEach'} [${ioLabel}]`;
-            }
+        if (node) {
+            nodePreviewCoordinator?.setActiveNode(node);
         }
     };
 
-    if (btnExitSubgraph) {
-        btnExitSubgraph.addEventListener('click', () => {
-            if (window._mainFlowState && window._currentSubgraphNodeId) {
-                debugLogger.debug('[App] 退出并保存 ForEach 子图');
-                const subFlowData = flowCanvas.serialize();
-                let mainData = window._mainFlowState;
-                
-                // 将子图数据写回主图节点中
-                try {
-                    let mainObj = typeof mainData === 'string' ? JSON.parse(mainData) : mainData;
-                    let targetNode = mainObj.nodes.find(n => n.id === window._currentSubgraphNodeId);
-                    if (targetNode) {
-                        if (!targetNode.parameters) targetNode.parameters = [];
-                        let flowParam = targetNode.parameters.find(p => p.name === 'SubGraph' || p.Name === 'SubGraph');
-                        
-                        let subDataStr = typeof subFlowData === 'string' ? subFlowData : JSON.stringify(subFlowData);
-                        
-                        // 保留原有参数逻辑并更新或插入
-                        if (flowParam) {
-                            flowParam.value = subDataStr;
-                        } else {
-                            targetNode.parameters.push({
-                                name: 'SubGraph',
-                                value: subDataStr,
-                                type: 'string'
-                            });
-                        }
-                    }
-                    mainData = typeof mainData === 'string' ? JSON.stringify(mainObj) : mainObj;
-                } catch(e) { 
-                    console.error('[App] 保存子图失败:', e); 
-                }
-
-                withProjectFlowSyncSuppressed(() => {
-                    flowCanvas.clear();
-                    flowCanvas.deserialize(mainData);
-                });
-                flowEditorInteraction?.saveState?.();
-                if (!flowEditorInteraction) {
-                    syncCurrentProjectFlowFromCanvas();
-                }
-                
-                window._mainFlowState = null;
-                window._currentSubgraphNodeId = null;
-                
-                if (breadcrumbContainer) {
-                    breadcrumbContainer.classList.add('hidden');
-                }
-            }
-        });
-    }
-    
-    // 【阶段B】初始化流程编辑器交互增强（撤销/重做/复制/粘贴/框选）
     flowEditorInteraction = new FlowEditorInteraction(flowCanvas, { projectManager });
     serviceRegistry.register('flowEditorInteraction', flowEditorInteraction);
-    debugLogger.debug('[App] 流程编辑器交互增强已启用');
-    
-    // 【阶段B】启动本机草稿备份
     startAutoSave();
-    
+
     debugLogger.debug('[App] 流程编辑器初始化完成');
 }
 
-
-/**
- * 添加算子到流程（保留作为备用入口）
- */
-function addOperatorToFlow(type, x, y, data = null) {
-    debugLogger.debug('[App] 添加算子:', type, '位置:', x, y);
-    
-    if (!flowCanvas) {
-        console.error('[App] FlowCanvas 未初始化');
-        return;
-    }
-    
-    const nodeConfig = buildOperatorNodeConfig(type, data);
-    
-    // 添加节点到画布
-    const node = flowCanvas.addNode(type, x, y, nodeConfig);
-    
-    debugLogger.debug('[App] 算子已添加:', node);
-    
-    // 选中该节点
-    flowCanvas.selectedNode = node.id;
-    flowCanvas.render();
-}
-
-/**
- * 初始化 WebMessage 通信
- */
-function initializeWebMessage() {
-    // Legacy no-op. Realtime events are routed through InspectionController and eventBus.
-}
-
-/**
- * 处理新建工程
- */
 function handleNewProject(options = {}) {
     const { preserveCanvas = false } = options;
-    const nameInput = createLabeledInput({ label: '工程名称', required: true, placeholder: 'Project_' + Date.now() });
+    const nameInput = createLabeledInput({ label: '工程名称', required: true, placeholder: `Project_${Date.now()}` });
     const descInput = createLabeledInput({ label: '描述', placeholder: '工程描述...' });
-    
+
     const content = document.createElement('div');
     content.appendChild(nameInput);
     content.appendChild(descInput);
-    
-    let modalOverlay = null;
 
-    const btnCancel = createButton({ 
-        text: '取消', 
-        type: 'secondary', 
-        onClick: () => closeModal(modalOverlay) 
+    let modalOverlay = null;
+    const btnCancel = createButton({
+        text: '取消',
+        type: 'secondary',
+        onClick: () => closeModal(modalOverlay)
     });
-    
-    const btnCreate = createButton({ 
-        text: '创建', 
+
+    const btnCreate = createButton({
+        text: preserveCanvas ? '保存' : '创建',
         onClick: () => {
-            const name = nameInput.querySelector('input').value;
-            const desc = descInput.querySelector('input').value;
-            
-            if (!name) { 
-                showToast('请输入工程名称', 'warning'); 
-                return; 
+            const name = nameInput.querySelector('input').value.trim();
+            const desc = descInput.querySelector('input').value.trim();
+
+            if (!name) {
+                showToast('请输入工程名称', 'warning');
+                return;
             }
-            
-            createProject(name, desc, preserveCanvas)
-                .then(() => {
-                    closeModal(modalOverlay);
-                    // 切换到流程视图
-                    switchView('flow'); 
-                    document.querySelector('[data-view="flow"]')?.click();
-                })
-                .catch(err => {
-                    // error handled in createProject
-                });
-        } 
+
+            void createProject(name, desc, preserveCanvas).then(() => {
+                closeModal(modalOverlay);
+                void switchView('flow');
+            }).catch(() => {});
+        }
     });
-    
+
     modalOverlay = createModal({
         title: preserveCanvas ? '保存为新工程' : '新建工程',
         content,
@@ -1611,73 +1007,9 @@ function handleNewProject(options = {}) {
     });
 }
 
-
-/**
- * 初始化工具栏按钮
- */
-function initializeToolbar() {
-    if (toolbarCommandDisposer) {
-        return;
-    }
-
-    toolbarCommandDisposer = bindToolbarCommands({
-        documentRef: document,
-        serviceRegistry,
-        getPropertyPanel: () => propertyPanel,
-        getCurrentProject,
-        getFlowCanvas: () => flowCanvas,
-        getImageViewer: () => imageViewer,
-        projectManager,
-        inspectionController,
-        showToast,
-        handleNewProject,
-        setCurrentView,
-        syncActiveNavButton,
-        switchView,
-        ensureInspectionPanelReady,
-        initializeInspectionImageViewer,
-        logout
-    });
-}
-
-/**
- * 初始化 AI 生成对话框
- */
-function initializeAiGeneration() {
-    getAiGenerationController();
-    debugLogger.debug('[App] AI 生成功能已升级为独立面板');
-}
-
-/**
- * 加载工程
- */
 async function loadProject(projectId) {
     try {
-        // 委托给 projectManager（内部会设置信号 + 更新状态栏）
         const project = await projectManager.openProject(projectId);
-        
-        // 加载流程到画布
-        if (flowCanvas) {
-            withProjectFlowSyncSuppressed(() => {
-                if (project.flow) {
-                    debugLogger.debug('[App] 加载流程数据:', project.flow);
-                    flowCanvas.deserialize(project.flow);
-                } else {
-                    // 【修复】如果没有流程数据，清空画布
-                    debugLogger.debug('[App] 工程没有流程数据，清空画布');
-                    flowCanvas.clear();
-                }
-            });
-        }
-        
-        // 设置检测控制器和结果页上下文
-        inspectionController.setProject(projectId);
-        inspectionPanel?.setProjectContext?.(projectId);
-        if (resultPanel) {
-            resultPanel.setProjectContext(projectId);
-            resultPanel.clear();
-        }
-        
         showToast(`工程 "${project.name}" 已加载`, 'success');
         return project;
     } catch (error) {
@@ -1687,49 +1019,29 @@ async function loadProject(projectId) {
     }
 }
 
-/**
- * 创建新工程
- */
 async function createProject(name, description = '', preserveCanvas = false) {
     try {
-        // 委托给 projectManager（内部会设置信号 + 更新状态栏）
+        const preservedFlow = preserveCanvas && flowCanvas && typeof flowCanvas.serialize === 'function'
+            ? flowCanvas.serialize()
+            : null;
         const project = await projectManager.createProject(name, description);
-        
-        if (preserveCanvas) {
-            // 保留画布内容，直接将当前流程保存到新工程
-            if (flowCanvas) {
-                projectManager.updateFlow(flowCanvas.serialize());
-                await projectManager.saveProject(projectManager.getCurrentProject?.() || project);
-                debugLogger.debug('[App] 画布内容已保存到新工程:', project.name);
-            }
-        } else {
-            // 新建空工程，清空画布
-            if (flowCanvas) {
-                withProjectFlowSyncSuppressed(() => flowCanvas.clear());
-            }
+
+        if (preserveCanvas && preservedFlow && flowCanvas) {
+            withProjectFlowSyncSuppressed(() => flowCanvas.deserialize(preservedFlow));
+            projectManager.updateFlow(flowCanvas.serialize());
+            await projectManager.saveProject(projectManager.getCurrentProject?.() || project);
+            debugLogger.debug('[App] 画布内容已保存到新工程:', project.name);
+        } else if (flowCanvas && !preserveCanvas) {
+            withProjectFlowSyncSuppressed(() => flowCanvas.clear());
         }
-        
-        // 设置检测控制器和结果页上下文
-        inspectionController.setProject(project.id);
-        inspectionPanel?.setProjectContext?.(project.id);
-        if (resultPanel) {
-            resultPanel.setProjectContext(project.id);
-            resultPanel.clear();
-        }
-        
+
         showToast(`工程 "${name}" 已创建`, 'success');
         return project;
     } catch (error) {
         console.error('[App] 创建工程失败:', error);
-
-        // 处理连接错误，提供更友好的提示
-        let errorMsg = error.message;
+        const errorMsg = error?.message || String(error);
         if (errorMsg.includes('无法连接到后端服务')) {
-            Dialog.alert(
-                '连接失败',
-                errorMsg.replace(/\n/g, '<br>'),
-                null
-            );
+            Dialog.alert('连接失败', errorMsg.replace(/\n/g, '<br>'), null);
         } else {
             showToast('创建工程失败: ' + errorMsg, 'error');
         }
@@ -1737,14 +1049,8 @@ async function createProject(name, description = '', preserveCanvas = false) {
     }
 }
 
-/**
- * 初始化主题
- */
 function initializeTheme() {
-    // 读取保存的主题
     const initialTheme = bootstrapTheme();
-
-    // 绑定切换按钮
     const themeToggle = document.getElementById('btn-theme-toggle');
     bindThemeToggle(themeToggle, handleThemeChanged);
 
@@ -1759,9 +1065,6 @@ async function persistThemePreference(theme) {
     return result?.theme || theme;
 }
 
-/**
- * 切换主题
- */
 async function handleThemeChanged({ previousTheme, nextTheme }) {
     if (themeUpdateInFlight) {
         return;
@@ -1789,10 +1092,7 @@ async function handleThemeChanged({ previousTheme, nextTheme }) {
         return;
     }
 
-    const next = persistedTheme;
-
-    // 显示提示
-    const message = next === 'dark' ? '已切换到暗色模式' : '已切换到亮色模式';
+    const message = persistedTheme === 'dark' ? '已切换到暗色模式' : '已切换到亮色模式';
     showToast(message, 'info');
     themeUpdateInFlight = false;
     if (themeToggle) {
@@ -1800,14 +1100,319 @@ async function handleThemeChanged({ previousTheme, nextTheme }) {
     }
 }
 
-/**
- * 【阶段B-B4】启动本机草稿备份
- * 【修复】防止重复启动定时器
- */
+function initializeNavigation() {
+    getViewManager().bindNavigation();
+    document.querySelectorAll('[data-open-view]').forEach((button) => {
+        if (button.dataset.cvOpenViewBound) {
+            return;
+        }
+
+        button.dataset.cvOpenViewBound = 'true';
+        button.addEventListener('click', () => {
+            const view = button.dataset.openView;
+            if (!view) {
+                return;
+            }
+
+            setCurrentView(view);
+            syncActiveNavButton(view);
+            void switchView(view).catch(error => handleFeatureLoadError('视图切换', error));
+        });
+    });
+
+    syncActiveNavButton(getCurrentView());
+}
+
+async function ensureProjectView() {
+    if (projectView) {
+        return projectView;
+    }
+
+    const container = document.getElementById('project-view');
+    if (!container) {
+        debugLogger.warn('[App] 工程视图容器未找到，将在首次切换到工程视图时初始化');
+        return null;
+    }
+
+    const { ProjectView } = await loadProjectViewModule();
+    projectView = new ProjectView('project-view');
+
+    debugLogger.debug('[App] 工程视图初始化完成');
+    return projectView;
+}
+
+async function ensureResultPanel() {
+    if (resultPanel) {
+        return resultPanel;
+    }
+
+    const container = document.getElementById('results-list-container');
+    if (!container) {
+        debugLogger.warn('[App] 结果视图容器未找到');
+        return null;
+    }
+
+    const { ResultPanel } = await loadResultPanelModule();
+    resultPanel = new ResultPanel('results-list-container');
+    serviceRegistry.register('resultPanel', resultPanel);
+    resultPanel.setProjectContext(getCurrentProject()?.id || null);
+    resultPanel.setHistoryLoader(loadInspectionHistory);
+
+    resultPanel.onResultClick = (result) => {
+        debugLogger.debug('[App] 点击结果:', result);
+        if (resultPanel && result) {
+            resultPanel.showResultDetail(result);
+        }
+    };
+
+    const clearBtn = document.getElementById('btn-clear-results');
+    if (clearBtn && !clearBtn.dataset.cvBound) {
+        clearBtn.dataset.cvBound = 'true';
+        clearBtn.addEventListener('click', () => {
+            if (confirm('确定要清空当前结果视图吗？此操作不会删除后端历史记录。')) {
+                resultPanel.clear();
+                showToast('当前结果视图已清空，历史记录未删除', 'success');
+            }
+        });
+    }
+
+    debugLogger.debug('[App] 结果面板初始化完成（现代化仪表盘）');
+    return resultPanel;
+}
+
+async function ensureInspectionPanelReady() {
+    const container = document.getElementById('inspection-control-panel');
+    if (!container) {
+        debugLogger.warn('[App] 检测控制面板容器未找到');
+        return null;
+    }
+
+    if (inspectionPanel) {
+        inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
+        return inspectionPanel;
+    }
+
+    const { InspectionPanel } = await loadInspectionPanelModule();
+
+    const existingInspectionPanel = serviceRegistry.get('inspectionPanel');
+    if (existingInspectionPanel && typeof existingInspectionPanel.dispose === 'function') {
+        debugLogger.warn('[App] 发现残留的 InspectionPanel 实例，正在销毁...');
+        existingInspectionPanel.dispose();
+    }
+
+    inspectionPanel = new InspectionPanel('inspection-control-panel');
+    serviceRegistry.register('inspectionPanel', inspectionPanel);
+    inspectionPanel.setProjectContext(getCurrentProject()?.id || null);
+
+    const lastResult = inspectionController.getLastResult?.();
+    if (lastResult) {
+        inspectionPanel.handleInspectionResult(lastResult);
+    }
+
+    debugLogger.debug('[App] 检测控制面板初始化完成');
+    return inspectionPanel;
+}
+
+async function ensureStationMonitorView() {
+    if (stationMonitorView) {
+        return stationMonitorView;
+    }
+
+    const container = document.getElementById('stations-view');
+    if (!container) {
+        debugLogger.warn('[App] Station monitor container not found.');
+        return null;
+    }
+
+    const { StationMonitorView } = await loadStationMonitorModule();
+    stationMonitorView = new StationMonitorView('stations-view');
+    serviceRegistry.register('stationMonitorView', stationMonitorView);
+    debugLogger.debug('[App] Station monitor view initialized.');
+    return stationMonitorView;
+}
+
+async function ensureAiPanel() {
+    if (aiPanel) {
+        return aiPanel;
+    }
+
+    const flowCanvasService = serviceRegistry.get('flowCanvasAdapter') || serviceRegistry.get('flowCanvas');
+    if (!flowCanvasService) {
+        debugLogger.warn('[App] FlowCanvas 未就绪，无法初始化 AI 面板');
+        return null;
+    }
+
+    const { AiPanel } = await loadAiPanelModule();
+    aiPanel = new AiPanel('ai-view', flowCanvasService, {
+        getOperators: () => operatorLibraryPanel?.getOperators?.() || [],
+        showToast,
+        onApplied: (flow) => {
+            const syncedFlow = syncCurrentProjectFlowFromCanvas() || flow;
+            getAiGenerationController().publishApplied(syncedFlow);
+        },
+        onCanvasChanged: ({ flow } = {}) => {
+            const syncedFlow = syncCurrentProjectFlowFromCanvas() || flow || null;
+            if (syncedFlow) {
+                getAiGenerationController().publishApplied(syncedFlow);
+            }
+        }
+    });
+    serviceRegistry.register('aiPanel', aiPanel);
+    debugLogger.debug('[App] AI 面板初始化完成');
+    return aiPanel;
+}
+
+async function switchView(view) {
+    return getViewManager().switchView(view);
+}
+
+function initializeToolbar() {
+    if (toolbarCommandDisposer) {
+        return;
+    }
+
+    toolbarCommandDisposer = bindToolbarCommands({
+        documentRef: document,
+        serviceRegistry,
+        getPropertyPanel: () => propertyPanel,
+        getCurrentProject,
+        getFlowCanvas: () => flowCanvas,
+        getImageViewer: () => imageViewer,
+        projectManager,
+        inspectionController,
+        showToast,
+        handleNewProject,
+        setCurrentView,
+        syncActiveNavButton,
+        switchView,
+        ensureInspectionPanelReady,
+        initializeInspectionImageViewer,
+        logout
+    });
+}
+
+function initializeAiGeneration() {
+    getAiGenerationController();
+    debugLogger.debug('[App] AI 生成功能已升级为独立面板');
+}
+
+async function initializeApp() {
+    if (appInitialized) {
+        return true;
+    }
+
+    debugLogger.debug('[App] 初始化应用...');
+    showLoadingScreen();
+
+    const authState = await bootstrapAuthSession();
+    if (!authState.ok) {
+        debugLogger.warn(`[App] 认证启动失败: ${authState.reason}`);
+        return false;
+    }
+
+    updateAuthenticatedUserDisplay();
+    initializeNavigation();
+    initializeOperatorLibraryPanel();
+    initializeFlowEditor();
+    initializeImageViewer();
+    initializeInspectionController();
+    initializePropertyPanel();
+    initializePropertySidebarController();
+    initializeTheme();
+    initializeToolbar();
+    startStatusBarUpdates();
+    initializeStudioPerformanceGuards();
+    trackedSubscribe(subscribeProject, (project) => {
+        window.setTimeout(() => {
+            void handleProjectChange(project).catch(error => {
+                handleFeatureLoadError('工程切换', error);
+            });
+        }, 0);
+    });
+
+    appInitialized = true;
+
+    debugLogger.debug('[App] 应用初始化完成');
+    showToast('ClearVision 已就绪', 'success');
+    return true;
+}
+
+async function bootstrapApp() {
+    if (appBootstrapPromise) {
+        return appBootstrapPromise;
+    }
+
+    appBootstrapPromise = (async () => {
+        const initialized = await initializeApp();
+        if (!initialized) {
+            hideLoadingScreen();
+            return false;
+        }
+
+        setTimeout(() => {
+            hideLoadingScreen();
+            showWelcomeScreen();
+        }, 500);
+
+        return true;
+    })();
+
+    return appBootstrapPromise;
+}
+
+async function handleProjectChange(project) {
+    eventBus.emit('project:changed', { project });
+    if (!project?.id) {
+        inspectionController.setProject(null);
+        inspectionPanel?.setProjectContext?.(null);
+        resultPanel?.setProjectContext?.(null);
+        resultPanel?.clear?.();
+        return;
+    }
+
+    inspectionController.setProject(project.id);
+    inspectionPanel?.setProjectContext?.(project.id);
+
+    if (flowCanvas) {
+        withProjectFlowSyncSuppressed(() => {
+            if (project.flow) {
+                debugLogger.debug('[App] 当前工程已切换，加载流程数据:', project.flow);
+                flowCanvas.deserialize(project.flow);
+            } else {
+                debugLogger.debug('[App] 当前工程没有流程数据，清空画布');
+                flowCanvas.clear();
+            }
+        });
+    }
+
+    resultPanel?.setProjectContext?.(project.id);
+    resultPanel?.clear?.();
+
+    promptLocalDraftRestore(project);
+
+    setCurrentView('flow');
+    syncActiveNavButton('flow');
+    await switchView('flow');
+}
+
+function syncCurrentProjectFlowFromCanvas() {
+    if (projectFlowSyncSuppressionDepth > 0) {
+        return null;
+    }
+
+    const project = getCurrentProject();
+    if (!project || !flowCanvas || typeof flowCanvas.serialize !== 'function') {
+        return null;
+    }
+
+    const flow = flowCanvas.serialize();
+    projectManager.updateFlow(flow);
+    return flow;
+}
+
 function startAutoSave() {
-    // 【修复】确保先停止现有的定时器
     stopAutoSave();
-    
+
     autoSaveInterval = setInterval(async () => {
         if (isInspectionActiveForBackgroundWork()) {
             debugLogger.debug('[LocalDraftBackup] 检测运行中，跳过本轮本机草稿备份');
@@ -1815,34 +1420,42 @@ function startAutoSave() {
         }
 
         const project = getCurrentProject();
-        if (project && flowCanvas && flowCanvas.nodes.size > 0) {
+        if (project && projectManager.hasUnsavedChanges?.()) {
             try {
-                // 更新流程数据
-                project.flow = flowCanvas.serialize();
-                saveLocalDraftBackup(project, project.flow, 'timer');
+                const flow = project.flow || (flowCanvas && typeof flowCanvas.serialize === 'function' ? flowCanvas.serialize() : null);
+                if (!flow) {
+                    return;
+                }
+
+                const signature = getLocalDraftBackupSignature(project, flow);
+                if (signature === lastLocalDraftBackupSignature) {
+                    return;
+                }
+
+                saveLocalDraftBackup(project, flow, 'timer');
                 debugLogger.debug('[LocalDraftBackup] 本机草稿备份完成:', new Date().toLocaleTimeString());
             } catch (err) {
                 console.error('[LocalDraftBackup] 本机草稿备份失败:', err);
             }
         }
     }, AUTO_SAVE_DELAY);
-    
+
     debugLogger.debug('[LocalDraftBackup] 本机草稿备份已启动，间隔:', AUTO_SAVE_DELAY / 1000 / 60, '分钟');
 }
 
 /**
- * 【阶段B-B4】停止本机草稿备份
+ * 銆愰樁娈礏-B4銆戝仠姝㈡湰鏈鸿崏绋垮浠?
  */
 function stopAutoSave() {
     if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
-        debugLogger.debug('[LocalDraftBackup] 本机草稿备份已停止');
+        debugLogger.debug('[LocalDraftBackup] 鏈満鑽夌澶囦唤宸插仠姝?');
     }
 }
 
 /**
- * 【阶段B-B4】立即执行本机草稿备份
+ * 銆愰樁娈礏-B4銆戠珛鍗虫墽琛屾湰鏈鸿崏绋垮浠?
  */
 async function triggerAutoSave() {
     const project = getCurrentProject();
@@ -1851,7 +1464,7 @@ async function triggerAutoSave() {
             project.flow = flowCanvas.serialize();
             saveLocalDraftBackup(project, project.flow, 'manual');
             debugLogger.debug('[LocalDraftBackup] 手动触发本机草稿备份完成');
-            showToast('本机草稿备份已更新；正式工程仍需点击“保存工程”。', 'success');
+            showToast('本机草稿已更新；正式工程仍需点击“保存工程”。', 'success');
         } catch (err) {
             console.error('[LocalDraftBackup] 手动备份失败:', err);
             showToast('本机草稿备份失败', 'error');
@@ -1915,7 +1528,6 @@ async function exportProjectToJson(projectId = null) {
     }
     
     try {
-        // 准备导出数据
         const { project, flow } = exportSource;
         const exportData = {
             version: '1.0',
@@ -1930,7 +1542,6 @@ async function exportProjectToJson(projectId = null) {
             }
         };
         
-        // 创建下载链接
         triggerDownload(
             JSON.stringify(exportData, null, 2),
             createProjectExportFilename(project.name),
@@ -1938,7 +1549,7 @@ async function exportProjectToJson(projectId = null) {
         );
         
         showToast('工程导出成功', 'success');
-        debugLogger.debug('[Export] 工程已导出:', project.name);
+        debugLogger.debug('[Export] 工程已导出', project.name);
     } catch (err) {
         console.error('[Export] 导出失败:', err);
         showToast('工程导出失败', 'error');
@@ -2001,7 +1612,7 @@ function showProjectExportDialog() {
             </div>
             <div style="padding:12px; border:1px solid var(--border-color); border-radius:6px;">
                 <div style="font-weight:600; margin-bottom:4px;">运行包</div>
-                <div style="color:var(--text-muted); font-size:12px;">导出可供工站使用的运行包；如果选中当前已打开工程，会带上画布上的最新修改。</div>
+                <div style="color:var(--text-muted); font-size:12px;">导出可供工站使用的运行包；选择当前打开工程时会带上画布上的最新修改。</div>
             </div>
         </div>
     `;
@@ -2106,7 +1717,7 @@ function showProjectExportDialog() {
                 ? '已默认选中当前打开工程，你也可以切换为工程库里的其他工程。'
                 : '请选择工程库中的已有工程进行导出。';
         } catch (error) {
-            console.error('[Export] 加载工程库失败:', error);
+            console.error('[Export] 加载工程库失败', error);
 
             if (currentProject?.id) {
                 populateProjectOptions([currentProject]);
@@ -2123,7 +1734,7 @@ function showProjectExportDialog() {
 }
 
 /**
- * 【修复】根据算子类型查找算子库中的定义数据
+ * 銆愪慨澶嶃€戞牴鎹畻瀛愮被鍨嬫煡鎵剧畻瀛愬簱涓殑瀹氫箟鏁版嵁
  * @param {string} type - 算子类型
  * @returns {Object|null} 算子定义数据
  */
@@ -2134,16 +1745,16 @@ function findOperatorDefinition(type) {
 }
 
 /**
- * 【修复】合并参数定义与参数值
- * @param {Array} defParams - 算子库中的参数定义（基准）
- * @param {Array} nodeParams - 画布节点保存的参数值
- * @returns {Array} 合并后的参数列表
+ * 銆愪慨澶嶃€戝悎骞跺弬鏁板畾涔変笌鍙傛暟鍊?
+ * @param {Array} defParams - 绠楀瓙搴撲腑鐨勫弬鏁板畾涔夛紙鍩哄噯锛?
+ * @param {Array} nodeParams - 鐢诲竷鑺傜偣淇濆瓨鐨勫弬鏁板€?
+ * @returns {Array} 鍚堝苟鍚庣殑鍙傛暟鍒楄〃
  */
 function mergeParameters(defParams, nodeParams) {
     if (!defParams || defParams.length === 0) return nodeParams || [];
     
     return defParams.map(defP => {
-        // [修复] 不区分大小写匹配，解决前端 (camelCase) 与后端 (PascalCase) 的差异
+        // [淇] 涓嶅尯鍒嗗ぇ灏忓啓鍖归厤锛岃В鍐冲墠绔?(camelCase) 涓庡悗绔?(PascalCase) 鐨勫樊寮?
         const nodeP = (nodeParams || []).find(np => 
             (np.name && defP.name && np.name.toLowerCase() === defP.name.toLowerCase()) ||
             (np.Name && defP.name && np.Name.toLowerCase() === defP.name.toLowerCase())
@@ -2151,7 +1762,7 @@ function mergeParameters(defParams, nodeParams) {
         
         const mergedParam = { 
             ...defP,
-            // 优先使用节点保存的值 (Value 或 value)
+            // 浼樺厛浣跨敤鑺傜偣淇濆瓨鐨勫€?(Value 鎴?value)
             value: nodeP !== undefined ? (nodeP.value ?? nodeP.Value ?? nodeP.defaultValue ?? nodeP.DefaultValue) : defP.defaultValue
         };
         
@@ -2161,7 +1772,7 @@ function mergeParameters(defParams, nodeParams) {
 
 /**
  * 【阶段B-B5】从JSON文件导入工程
- * @param {File} file - 用户选择的文件
+ * @param {File} file - 鐢ㄦ埛閫夋嫨鐨勬枃浠?
  */
 async function importProjectFromJson(file) {
     if (!file) return;
@@ -2170,32 +1781,32 @@ async function importProjectFromJson(file) {
         const content = await file.text();
         const importData = JSON.parse(content);
         
-        // 验证文件格式
+        // 楠岃瘉鏂囦欢鏍煎紡
         if (!importData.project || !importData.project.flow) {
             throw new Error('无效的工程文件格式');
         }
         
-        // 确认导入
+        // 纭瀵煎叆
         const confirmed = confirm(`确定要导入工程 "${importData.project.name || '未命名'}" 吗？\n当前未保存的更改将会丢失。`);
         if (!confirmed) return;
         
-        // 通过 projectManager 创建新工程（由后端生成 ID）
+        // 閫氳繃 projectManager 鍒涘缓鏂板伐绋嬶紙鐢卞悗绔敓鎴?ID锛?
         const importName = (importData.project.name || '未命名') + ' (导入)';
         const importDesc = importData.project.description || '';
         const project = await projectManager.createProject(importName, importDesc);
         
-        // 加载流程到画布
+        // 鍔犺浇娴佺▼鍒扮敾甯?
         if (flowCanvas && importData.project.flow) {
             withProjectFlowSyncSuppressed(() => flowCanvas.deserialize(importData.project.flow));
-            // 将流程数据保存到后端
+            // 灏嗘祦绋嬫暟鎹繚瀛樺埌鍚庣
             projectManager.updateFlow(flowCanvas.serialize());
             await projectManager.saveProject(projectManager.getCurrentProject?.() || project);
         }
         
-        // 设置检测控制器的工程
+        // 璁剧疆妫€娴嬫帶鍒跺櫒鐨勫伐绋?
         inspectionController.setProject(project.id);
         
-        // 切换到流程视图
+        // 鍒囨崲鍒版祦绋嬭鍥?
         switchView('flow');
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.classList.remove('active');
@@ -2203,9 +1814,9 @@ async function importProjectFromJson(file) {
         });
         
         showToast('工程导入成功', 'success');
-        debugLogger.debug('[Import] 工程已导入:', project.name);
+        debugLogger.debug('[Import] 工程已导入', project.name);
         
-        // 刷新工程列表
+        // 鍒锋柊宸ョ▼鍒楄〃
         if (projectView) {
             projectView.refresh();
         }
@@ -2238,72 +1849,107 @@ window.exportRuntimePackage = exportRuntimePackage;
 window.showProjectExportDialog = showProjectExportDialog;
 
 // ==========================================================================
-// 阶段五：状态栏更新功能
+// 闃舵浜旓細鐘舵€佹爮鏇存柊鍔熻兘
 // ==========================================================================
 
 /**
- * 更新状态栏指标
+ * 鏇存柊鐘舵€佹爮鎸囨爣
  */
 function updateStatusBar() {
-    // 更新内存使用
-    if (performance && performance.memory) {
-        const memoryMB = Math.round(performance.memory.usedJSHeapSize / 1024 / 1024);
-        const memoryEl = document.querySelector('#memory-usage .metric-value');
+    if (window.performance?.memory) {
+        const memoryMB = Math.round(window.performance.memory.usedJSHeapSize / 1024 / 1024);
+        const memoryEl = getStatusBarMetricElement('#memory-usage .metric-value', 'memory');
         if (memoryEl) memoryEl.textContent = `${memoryMB} MB`;
     }
 }
 
 /**
- * FPS 计数器
+ * FPS 璁℃暟鍣?
  */
 let fpsCounter = {
     frames: 0,
     lastTime: performance.now()
 };
 let statusBarInterval = null;
+let fpsFrameTrackerInstalled = false;
+let memoryMetricElement = null;
+let fpsMetricElement = null;
+
+function installFpsFrameTracker() {
+    if (fpsFrameTrackerInstalled || typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+        return;
+    }
+
+    const originalRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (callback) => originalRequestAnimationFrame((timestamp) => {
+        fpsCounter.frames++;
+        callback(timestamp);
+    });
+    fpsFrameTrackerInstalled = true;
+}
+
+function getStatusBarMetricElement(selector, cacheName) {
+    if (cacheName === 'memory') {
+        if (!memoryMetricElement) {
+            memoryMetricElement = document.querySelector(selector);
+        }
+        return memoryMetricElement;
+    }
+
+    if (!fpsMetricElement) {
+        fpsMetricElement = document.querySelector(selector);
+    }
+    return fpsMetricElement;
+}
 
 function updateFPS() {
     if (!statusBarStarted) {
-        fpsAnimationFrameId = null;
         return;
     }
 
     const now = performance.now();
-    fpsCounter.frames++;
-    
-    if (now - fpsCounter.lastTime >= 1000) {
-        const fps = Math.round(fpsCounter.frames * 1000 / (now - fpsCounter.lastTime));
-        const fpsEl = document.querySelector('#fps-counter .metric-value');
+    const elapsed = now - fpsCounter.lastTime;
+
+    if (elapsed >= 1000) {
+        const fps = Math.round(fpsCounter.frames * 1000 / elapsed);
+        const fpsEl = getStatusBarMetricElement('#fps-counter .metric-value', 'fps');
         if (fpsEl) fpsEl.textContent = `${fps} FPS`;
         
         fpsCounter.frames = 0;
         fpsCounter.lastTime = now;
     }
-    
-    fpsAnimationFrameId = requestAnimationFrame(updateFPS);
 }
 
-// 启动状态栏更新
+// 鍚姩鐘舵€佹爮鏇存柊
 function startStatusBarUpdates() {
     if (statusBarStarted) {
         return;
     }
 
     statusBarStarted = true;
-    statusBarInterval = setInterval(updateStatusBar, 1000);
-    updateStatusBar();
-
-    if (fpsAnimationFrameId === null) {
-        fpsAnimationFrameId = requestAnimationFrame(updateFPS);
+    installFpsFrameTracker();
+    memoryMetricElement = document.querySelector('#memory-usage .metric-value');
+    fpsMetricElement = document.querySelector('#fps-counter .metric-value');
+    fpsCounter.frames = 0;
+    fpsCounter.lastTime = performance.now();
+    if (fpsMetricElement) {
+        fpsMetricElement.textContent = '0 FPS';
     }
+
+    statusBarInterval = setInterval(() => {
+        updateStatusBar();
+        updateFPS();
+    }, 1000);
+    updateStatusBar();
+    updateFPS();
 }
 
 // ==========================================================================
-// 阶段五：视图切换过渡动画
+// 闃舵浜旓細瑙嗗浘鍒囨崲杩囨浮鍔ㄧ敾
 // ==========================================================================
 
 /**
- * 切换视图（带过渡动画）
+ * 鍒囨崲瑙嗗浘锛堝甫杩囨浮鍔ㄧ敾锛?
  */
 function switchViewWithTransition(view) {
     const views = ['flow', 'inspection', 'results', 'project'];
@@ -2311,20 +1957,20 @@ function switchViewWithTransition(view) {
     
     if (currentView === view) return;
     
-    // 获取当前显示的视图容器
+    // 鑾峰彇褰撳墠鏄剧ず鐨勮鍥惧鍣?
     const currentContainer = document.getElementById(`${currentView}-view`) || 
                             document.getElementById(`${currentView}-editor`) ||
                             document.getElementById('flow-editor');
     
     if (currentContainer) {
-        // 添加退出动画
+        // 娣诲姞閫€鍑哄姩鐢?
         currentContainer.classList.add('view-exit');
         
         setTimeout(() => {
             currentContainer.classList.remove('view-exit');
             currentContainer.classList.add('hidden');
             
-            // 显示新视图
+            // 鏄剧ず鏂拌鍥?
             switchView(view);
             
             const newContainer = document.getElementById(`${view}-view`) || 
@@ -2341,17 +1987,17 @@ function switchViewWithTransition(view) {
             }
         }, 300);
     } else {
-        // 无动画直接切换
+        // 鏃犲姩鐢荤洿鎺ュ垏鎹?
         switchView(view);
     }
 }
 
 // ==========================================================================
-// 阶段五：加载骨架屏
+// 闃舵浜旓細鍔犺浇楠ㄦ灦灞?
 // ==========================================================================
 
 /**
- * 显示加载骨架屏
+ * 鏄剧ず鍔犺浇楠ㄦ灦灞?
  */
 function showLoadingScreen() {
     if (document.getElementById('loading-screen')) {
@@ -2370,7 +2016,7 @@ function showLoadingScreen() {
 }
 
 /**
- * 隐藏加载骨架屏
+ * 闅愯棌鍔犺浇楠ㄦ灦灞?
  */
 function hideLoadingScreen() {
     const loadingScreen = document.getElementById('loading-screen');
@@ -2381,11 +2027,11 @@ function hideLoadingScreen() {
 }
 
 // ==========================================================================
-// 阶段五：欢迎/引导页
+// 闃舵浜旓細娆㈣繋/寮曞椤?
 // ==========================================================================
 
 /**
- * 显示欢迎页
+ * 鏄剧ず娆㈣繋椤?
  */
 function showWelcomeScreen() {
     // 检查是否首次运行
@@ -2397,18 +2043,18 @@ function showWelcomeScreen() {
     welcomeOverlay.innerHTML = `
         <div class="welcome-content">
             <h2 class="welcome-title">欢迎使用 ClearVision</h2>
-            <p class="welcome-desc">打开最近工程，确认设备连接，继续现场检测任务</p>
+            <p class="welcome-desc">打开最近工程，确认设备连接，继续现场检测任务。</p>
             <div class="welcome-features">
                 <div class="welcome-feature">
-                    <div class="welcome-feature-icon">📁</div>
+                    <div class="welcome-feature-icon">1</div>
                     <div class="welcome-feature-title">打开或创建工程</div>
                 </div>
                 <div class="welcome-feature">
-                    <div class="welcome-feature-icon">🔌</div>
+                    <div class="welcome-feature-icon">2</div>
                     <div class="welcome-feature-title">确认设备连接</div>
                 </div>
                 <div class="welcome-feature">
-                    <div class="welcome-feature-icon">📊</div>
+                    <div class="welcome-feature-icon">3</div>
                     <div class="welcome-feature-title">查看最近异常</div>
                 </div>
             </div>
@@ -2439,8 +2085,6 @@ export {
     setCurrentView, 
     getSelectedOperator, 
     setSelectedOperator,
-    loadProject,
-    createProject,
     imageViewer,
     operatorLibraryPanel,
     flowCanvas,

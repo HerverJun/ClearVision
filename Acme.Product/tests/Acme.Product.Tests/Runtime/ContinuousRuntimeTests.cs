@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Cameras;
 using Acme.Product.Core.Continuous;
@@ -201,6 +202,11 @@ public class ContinuousRuntimeTests
         writer.Results.Should().ContainSingle();
         writer.Results[0].Status.Should().Be(InspectionStatus.OK);
         eventBus.Results.Should().ContainSingle();
+        eventBus.Results[0].OutputData.Should().ContainKey("ContinuousInspection");
+        eventBus.Results[0].AnalysisData.Should().ContainKey("continuousInspection");
+        writer.Results[0].AnalysisDataJson.Should().NotBeNullOrWhiteSpace();
+        using var analysisDoc = JsonDocument.Parse(writer.Results[0].AnalysisDataJson!);
+        analysisDoc.RootElement.GetProperty("continuousInspection").GetProperty("Mode").GetString().Should().Be("Primary");
         flow.InputFrames.Should().ContainSingle();
         flow.InputFrames[0].Sequence.Should().Be(2);
     }
@@ -248,6 +254,11 @@ public class ContinuousRuntimeTests
 
         writer.Results.Should().ContainSingle();
         writer.Results[0].Status.Should().Be(InspectionStatus.NG);
+        eventBus.Results.Should().ContainSingle();
+        eventBus.Results[0].OutputImageBase64.Should().Be(Convert.ToBase64String(outputImage));
+        eventBus.Results[0].OutputData.Should().NotContainKey("Image");
+        eventBus.Results[0].OutputData.Should().ContainKey("JudgmentResult");
+        eventBus.Results[0].OutputData.Should().ContainKey("ContinuousInspection");
         await imagePersistence.Received(1).PersistAsync(
             Arg.Is<InspectionResult>(item =>
                 item.Status == InspectionStatus.NG &&

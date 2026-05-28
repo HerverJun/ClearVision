@@ -1,10 +1,11 @@
 // FlowExecutionService.cs
 // 流程执行服务实现
-// 作者：蘅芜君
+// 浣滆€咃細铇呰姕鍚?
 
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -29,6 +30,9 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private static readonly TimeSpan DebugSessionTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ExecutionStatusTtl = TimeSpan.FromSeconds(30);
     private const string OperatorCanceledErrorMessage = "Operator execution was canceled.";
+    private static readonly ConcurrentDictionary<Type, bool> JsonSerializableTypes = new();
+    private static readonly ConditionalWeakTable<OperatorFlow, FlowExecutionPlanCache> FlowExecutionPlanCaches = new();
+    private static readonly ConditionalWeakTable<Operator, ParameterFingerprintOrderCache> FingerprintParameterOrderCaches = new();
     private static readonly HashSet<OperatorType> AutoParallelBlockedOperatorTypes =
     [
         OperatorType.ImageAcquisition,
@@ -70,7 +74,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _executionCancellations = new();
     private readonly IVariableContext _variableContext;
 
-    // 调试模式：缓存中间结果 - Key: (DebugSessionId, OperatorId)
+    // 璋冭瘯妯″紡锛氱紦瀛樹腑闂寸粨鏋?- Key: (DebugSessionId, OperatorId)
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), Dictionary<string, object>> _debugCache = new();
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), string> _debugCacheFingerprints = new();
     private readonly ConcurrentDictionary<Guid, DebugOptions> _debugOptions = new();
@@ -78,12 +82,251 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private readonly Timer _debugCacheCleanupTimer;
     private bool _disposed;
 
-    private sealed class FlowInputPreparationIndex
+    private readonly record struct FlowExecutionPlanStamp(
+        DateTime? FlowModifiedAt,
+        int OperatorCount,
+        int ConnectionCount,
+        int TopologyHash);
+
+    private sealed class FlowExecutionPlan
+    {
+        private FlowExecutionPlan(
+            OperatorFlow flow,
+            FlowExecutionPlanStamp stamp,
+            FlowTopologyIndex topology,
+            List<Operator> executionOrder,
+            List<List<Operator>> executionLayers,
+            Dictionary<(Guid OperatorId, Guid PortId), int> fanOutDegrees)
+        {
+            Flow = flow;
+            Stamp = stamp;
+            Topology = topology;
+            ExecutionOrder = executionOrder;
+            ExecutionLayers = executionLayers;
+            FanOutDegrees = fanOutDegrees;
+            ResultOutputCandidates = BuildReverseCandidates(executionOrder, op => op.Type == OperatorType.ResultOutput);
+            ResultJudgmentCandidates = BuildReverseCandidates(executionOrder, op => op.Type == OperatorType.ResultJudgment);
+            ReverseExecutionOrder = BuildReverseCandidates(executionOrder, _ => true);
+        }
+
+        public OperatorFlow Flow { get; }
+        public FlowExecutionPlanStamp Stamp { get; }
+        public FlowTopologyIndex Topology { get; }
+        public List<Operator> ExecutionOrder { get; }
+        public List<List<Operator>> ExecutionLayers { get; }
+        public Dictionary<(Guid OperatorId, Guid PortId), int> FanOutDegrees { get; }
+        public List<Operator> ResultOutputCandidates { get; }
+        public List<Operator> ResultJudgmentCandidates { get; }
+        public List<Operator> ReverseExecutionOrder { get; }
+
+        public static FlowExecutionPlan Build(OperatorFlow flow, FlowExecutionPlanStamp stamp)
+        {
+            var topology = FlowTopologyIndex.Build(flow);
+            var executionOrder = topology.BuildExecutionOrder(flow.Operators);
+            var executionLayers = BuildExecutionLayers(executionOrder, topology);
+            var fanOutDegrees = AnalyzeFanOutDegrees(flow.Connections);
+            return new FlowExecutionPlan(flow, stamp, topology, executionOrder, executionLayers, fanOutDegrees);
+        }
+
+        public FlowInputPreparationIndex CreateInputPreparationIndex() => new(Topology);
+
+        private static List<Operator> BuildReverseCandidates(
+            IReadOnlyList<Operator> executionOrder,
+            Func<Operator, bool> predicate)
+        {
+            var candidates = new List<Operator>();
+            for (var index = executionOrder.Count - 1; index >= 0; index--)
+            {
+                var op = executionOrder[index];
+                if (predicate(op))
+                {
+                    candidates.Add(op);
+                }
+            }
+
+            return candidates;
+        }
+    }
+
+    private sealed class FlowExecutionPlanCache
+    {
+        private readonly object _gate = new();
+        private FlowExecutionPlan? _plan;
+
+        public FlowExecutionPlan GetOrBuild(OperatorFlow flow, FlowExecutionPlanStamp stamp)
+        {
+            var cached = _plan;
+            if (cached != null && cached.Stamp.Equals(stamp))
+            {
+                return cached;
+            }
+
+            lock (_gate)
+            {
+                cached = _plan;
+                if (cached != null && cached.Stamp.Equals(stamp))
+                {
+                    return cached;
+                }
+
+                var rebuilt = FlowExecutionPlan.Build(flow, stamp);
+                _plan = rebuilt;
+                return rebuilt;
+            }
+        }
+    }
+
+    private sealed class FlowTopologyIndex
     {
         private readonly Dictionary<Guid, Operator> _operatorsById;
         private readonly Dictionary<Guid, List<OperatorConnection>> _incomingConnectionsByTargetId;
+        private readonly Dictionary<Guid, List<OperatorConnection>> _outgoingConnectionsBySourceId;
         private readonly Dictionary<(Guid OperatorId, Guid PortId), Port> _outputPortsByOperatorPortId;
         private readonly Dictionary<(Guid OperatorId, Guid PortId), Port> _inputPortsByOperatorPortId;
+        private readonly Dictionary<(Guid OperatorId, string PortName), Port> _outputPortsByOperatorName;
+
+        private FlowTopologyIndex(
+            Dictionary<Guid, Operator> operatorsById,
+            Dictionary<Guid, List<OperatorConnection>> incomingConnectionsByTargetId,
+            Dictionary<Guid, List<OperatorConnection>> outgoingConnectionsBySourceId,
+            Dictionary<(Guid OperatorId, Guid PortId), Port> outputPortsByOperatorPortId,
+            Dictionary<(Guid OperatorId, Guid PortId), Port> inputPortsByOperatorPortId,
+            Dictionary<(Guid OperatorId, string PortName), Port> outputPortsByOperatorName)
+        {
+            _operatorsById = operatorsById;
+            _incomingConnectionsByTargetId = incomingConnectionsByTargetId;
+            _outgoingConnectionsBySourceId = outgoingConnectionsBySourceId;
+            _outputPortsByOperatorPortId = outputPortsByOperatorPortId;
+            _inputPortsByOperatorPortId = inputPortsByOperatorPortId;
+            _outputPortsByOperatorName = outputPortsByOperatorName;
+        }
+
+        public static FlowTopologyIndex Build(OperatorFlow flow)
+        {
+            var operatorsById = new Dictionary<Guid, Operator>(flow.Operators.Count);
+            var incomingConnectionsByTargetId = new Dictionary<Guid, List<OperatorConnection>>();
+            var outgoingConnectionsBySourceId = new Dictionary<Guid, List<OperatorConnection>>();
+            var outputPortsByOperatorPortId = new Dictionary<(Guid OperatorId, Guid PortId), Port>();
+            var inputPortsByOperatorPortId = new Dictionary<(Guid OperatorId, Guid PortId), Port>();
+            var outputPortsByOperatorName = new Dictionary<(Guid OperatorId, string PortName), Port>();
+
+            foreach (var op in flow.Operators)
+            {
+                operatorsById[op.Id] = op;
+
+                foreach (var outputPort in op.OutputPorts)
+                {
+                    outputPortsByOperatorPortId[(op.Id, outputPort.Id)] = outputPort;
+                    outputPortsByOperatorName.TryAdd((op.Id, outputPort.Name), outputPort);
+                }
+
+                foreach (var inputPort in op.InputPorts)
+                {
+                    inputPortsByOperatorPortId[(op.Id, inputPort.Id)] = inputPort;
+                }
+            }
+
+            foreach (var connection in flow.Connections)
+            {
+                if (!incomingConnectionsByTargetId.TryGetValue(connection.TargetOperatorId, out var list))
+                {
+                    list = new List<OperatorConnection>();
+                    incomingConnectionsByTargetId[connection.TargetOperatorId] = list;
+                }
+
+                // Keep original flow connection order to preserve merge/override semantics.
+                list.Add(connection);
+
+                if (!outgoingConnectionsBySourceId.TryGetValue(connection.SourceOperatorId, out var outgoingList))
+                {
+                    outgoingList = new List<OperatorConnection>();
+                    outgoingConnectionsBySourceId[connection.SourceOperatorId] = outgoingList;
+                }
+
+                outgoingList.Add(connection);
+            }
+
+            return new FlowTopologyIndex(
+                operatorsById,
+                incomingConnectionsByTargetId,
+                outgoingConnectionsBySourceId,
+                outputPortsByOperatorPortId,
+                inputPortsByOperatorPortId,
+                outputPortsByOperatorName);
+        }
+
+        public List<Operator> BuildExecutionOrder(IReadOnlyList<Operator> operators)
+        {
+            var visited = new HashSet<Guid>();
+            var result = new List<Operator>(operators.Count);
+
+            foreach (var op in operators)
+            {
+                VisitOperator(op, visited, result);
+            }
+
+            return result;
+        }
+
+        public IReadOnlyList<OperatorConnection> GetIncomingConnections(Guid targetOperatorId) =>
+            _incomingConnectionsByTargetId.TryGetValue(targetOperatorId, out var list)
+                ? list
+                : [];
+
+        public IReadOnlyList<OperatorConnection> GetOutgoingConnections(Guid sourceOperatorId) =>
+            _outgoingConnectionsBySourceId.TryGetValue(sourceOperatorId, out var list)
+                ? list
+                : [];
+
+        public Operator? GetOperator(Guid operatorId)
+        {
+            _operatorsById.TryGetValue(operatorId, out var op);
+            return op;
+        }
+
+        public Port? GetSourcePort(Guid sourceOperatorId, Guid sourcePortId)
+        {
+            _outputPortsByOperatorPortId.TryGetValue((sourceOperatorId, sourcePortId), out var sourcePort);
+            return sourcePort;
+        }
+
+        public Port? GetTargetPort(Guid targetOperatorId, Guid targetPortId)
+        {
+            _inputPortsByOperatorPortId.TryGetValue((targetOperatorId, targetPortId), out var targetPort);
+            return targetPort;
+        }
+
+        public Port? GetOutputPortByName(Guid operatorId, string portName)
+        {
+            _outputPortsByOperatorName.TryGetValue((operatorId, portName), out var port);
+            return port;
+        }
+
+        private void VisitOperator(Operator op, HashSet<Guid> visited, List<Operator> result)
+        {
+            if (!visited.Add(op.Id))
+            {
+                return;
+            }
+
+            if (_incomingConnectionsByTargetId.TryGetValue(op.Id, out var dependencies))
+            {
+                foreach (var connection in dependencies)
+                {
+                    if (_operatorsById.TryGetValue(connection.SourceOperatorId, out var dependency))
+                    {
+                        VisitOperator(dependency, visited, result);
+                    }
+                }
+            }
+
+            result.Add(op);
+        }
+    }
+
+    private sealed class FlowInputPreparationIndex
+    {
+        private readonly FlowTopologyIndex _topology;
 
         public int IncomingConnectionLookupCount { get; private set; }
         public int SourceOperatorLookupCount { get; private set; }
@@ -91,71 +334,97 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         public int TargetPortLookupCount { get; private set; }
 
         public FlowInputPreparationIndex(OperatorFlow flow)
+            : this(FlowTopologyIndex.Build(flow))
         {
-            _operatorsById = flow.Operators.ToDictionary(item => item.Id);
-            _incomingConnectionsByTargetId = new Dictionary<Guid, List<OperatorConnection>>();
-            _outputPortsByOperatorPortId = new Dictionary<(Guid OperatorId, Guid PortId), Port>();
-            _inputPortsByOperatorPortId = new Dictionary<(Guid OperatorId, Guid PortId), Port>();
+        }
 
-            foreach (var op in flow.Operators)
-            {
-                foreach (var outputPort in op.OutputPorts)
-                {
-                    _outputPortsByOperatorPortId[(op.Id, outputPort.Id)] = outputPort;
-                }
-
-                foreach (var inputPort in op.InputPorts)
-                {
-                    _inputPortsByOperatorPortId[(op.Id, inputPort.Id)] = inputPort;
-                }
-            }
-
-            foreach (var connection in flow.Connections)
-            {
-                if (!_incomingConnectionsByTargetId.TryGetValue(connection.TargetOperatorId, out var list))
-                {
-                    list = new List<OperatorConnection>();
-                    _incomingConnectionsByTargetId[connection.TargetOperatorId] = list;
-                }
-
-                // Keep original flow connection order to preserve merge/override semantics.
-                list.Add(connection);
-            }
+        public FlowInputPreparationIndex(FlowTopologyIndex topology)
+        {
+            _topology = topology;
         }
 
         public IReadOnlyList<OperatorConnection> GetIncomingConnections(Guid targetOperatorId)
         {
             IncomingConnectionLookupCount++;
-            return _incomingConnectionsByTargetId.TryGetValue(targetOperatorId, out var list)
-                ? list
-                : [];
+            return _topology.GetIncomingConnections(targetOperatorId);
         }
 
         public Operator? GetSourceOperator(Guid sourceOperatorId)
         {
             SourceOperatorLookupCount++;
-            _operatorsById.TryGetValue(sourceOperatorId, out var sourceOperator);
-            return sourceOperator;
+            return _topology.GetOperator(sourceOperatorId);
         }
 
         public Port? GetSourcePort(Guid sourceOperatorId, Guid sourcePortId)
         {
             SourcePortLookupCount++;
-            _outputPortsByOperatorPortId.TryGetValue((sourceOperatorId, sourcePortId), out var sourcePort);
-            return sourcePort;
+            return _topology.GetSourcePort(sourceOperatorId, sourcePortId);
         }
 
         public Port? GetTargetPort(Guid targetOperatorId, Guid targetPortId)
         {
             TargetPortLookupCount++;
-            _inputPortsByOperatorPortId.TryGetValue((targetOperatorId, targetPortId), out var targetPort);
-            return targetPort;
+            return _topology.GetTargetPort(targetOperatorId, targetPortId);
         }
     }
 
+    private sealed record ParameterFingerprintOrderCache(
+        DateTime? ModifiedAt,
+        int ParameterCount,
+        Parameter[] Parameters);
+
     private static FlowInputPreparationIndex BuildFlowInputPreparationIndex(OperatorFlow flow)
     {
-        return new FlowInputPreparationIndex(flow);
+        return GetFlowExecutionPlan(flow).CreateInputPreparationIndex();
+    }
+
+    private static FlowExecutionPlan GetFlowExecutionPlan(OperatorFlow flow)
+    {
+        var stamp = CreateFlowExecutionPlanStamp(flow);
+        return FlowExecutionPlanCaches
+            .GetValue(flow, _ => new FlowExecutionPlanCache())
+            .GetOrBuild(flow, stamp);
+    }
+
+    private static FlowExecutionPlanStamp CreateFlowExecutionPlanStamp(OperatorFlow flow)
+    {
+        var hash = new HashCode();
+
+        foreach (var op in flow.Operators)
+        {
+            hash.Add(op.Id);
+            hash.Add(op.Type);
+            hash.Add(op.IsEnabled);
+            hash.Add(op.InputPorts.Count);
+            foreach (var inputPort in op.InputPorts)
+            {
+                hash.Add(inputPort.Id);
+                hash.Add(inputPort.Name, StringComparer.Ordinal);
+                hash.Add(inputPort.DataType);
+            }
+
+            hash.Add(op.OutputPorts.Count);
+            foreach (var outputPort in op.OutputPorts)
+            {
+                hash.Add(outputPort.Id);
+                hash.Add(outputPort.Name, StringComparer.Ordinal);
+                hash.Add(outputPort.DataType);
+            }
+        }
+
+        foreach (var connection in flow.Connections)
+        {
+            hash.Add(connection.SourceOperatorId);
+            hash.Add(connection.SourcePortId);
+            hash.Add(connection.TargetOperatorId);
+            hash.Add(connection.TargetPortId);
+        }
+
+        return new FlowExecutionPlanStamp(
+            flow.ModifiedAt,
+            flow.Operators.Count,
+            flow.Connections.Count,
+            hash.ToHashCode());
     }
 
     private static bool IsFlowSafeForAutoParallelization(OperatorFlow flow)
@@ -212,29 +481,29 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             Guid.NewGuid(),
             enableParallel ? "parallel-flow-run" : "sequential-flow-run"));
 
-        // 【第三优先级】递增循环计数器
+        // 銆愮涓変紭鍏堢骇銆戦€掑寰幆璁℃暟鍣?
         _variableContext.IncrementCycleCount();
-        _logger.LogDebug("[FlowExecution] 循环计数: {CycleCount}", _variableContext.CycleCount);
+        _logger.LogDebug("[FlowExecution] 寰幆璁℃暟: {CycleCount}", _variableContext.CycleCount);
 
         // Each ExecuteFlowAsync call owns its own FlowExecutionResult instance.
         var result = new FlowExecutionResult();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         ConcurrentDictionary<Guid, Dictionary<string, object>>? operatorOutputs = null;
 
-        // 创建链接的 CancellationTokenSource
+        // 鍒涘缓閾炬帴鐨?CancellationTokenSource
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _executionCancellations[flow.Id] = cts;
 
         try
         {
-            // Sprint 1 Task 1.1: 预分析扇出度，为 ImageWrapper 引用计数做准备
-            var fanOutDegrees = AnalyzeFanOutDegrees(flow);
+            // Sprint 1 Task 1.1: 棰勫垎鏋愭墖鍑哄害锛屼负 ImageWrapper 寮曠敤璁℃暟鍋氬噯澶?
+            var plan = GetFlowExecutionPlan(flow);
 
             // 获取执行顺序（拓扑排序）
-            var executionOrder = flow.GetExecutionOrder().ToList();
-            var inputPreparationIndex = BuildFlowInputPreparationIndex(flow);
+            var executionOrder = plan.ExecutionOrder;
+            var inputPreparationIndex = plan.CreateInputPreparationIndex();
 
-            // 初始化执行状态
+            // 鍒濆鍖栨墽琛岀姸鎬?
             var status = new FlowExecutionStatus
             {
                 FlowId = flow.Id,
@@ -244,10 +513,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             };
             _executionStatuses[flow.Id] = status;
 
-            // 存储每个算子的输出 - 使用 ConcurrentDictionary 支持并行执行
+            // 瀛樺偍姣忎釜绠楀瓙鐨勮緭鍑?- 浣跨敤 ConcurrentDictionary 鏀寔骞惰鎵ц
             operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
 
-            // 设置初始输入数据
+            // 璁剧疆鍒濆杈撳叆鏁版嵁
             if (inputData != null)
             {
                 ApplyInitialInputRefCounts(inputData, executionOrder, inputPreparationIndex);
@@ -257,18 +526,18 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (enableParallel && executionOrder.Count > 1)
             {
                 // 并行执行模式
-                await ExecuteFlowParallelAsync(flow, executionOrder, operatorOutputs, result, status, cts.Token, inputPreparationIndex, fanOutDegrees);
+                await ExecuteFlowParallelAsync(plan, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
             }
             else
             {
                 // 顺序执行模式
-                await ExecuteFlowSequentialAsync(flow, executionOrder, operatorOutputs, result, status, cts.Token, inputPreparationIndex, fanOutDegrees);
+                await ExecuteFlowSequentialAsync(flow, plan, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
             }
 
             stopwatch.Stop();
             result.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
 
-            // 检查是否因为取消而中断
+            // 妫€鏌ユ槸鍚﹀洜涓哄彇娑堣€屼腑鏂?
             if (cts.Token.IsCancellationRequested)
             {
                 result.IsSuccess = false;
@@ -286,7 +555,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             if (result.IsSuccess)
             {
-                var flowOutputOperator = ResolveFlowOutputOperator(executionOrder, operatorOutputs);
+                var flowOutputOperator = ResolveFlowOutputOperator(plan, operatorOutputs);
                 if (flowOutputOperator != null)
                 {
                     result.OutputData = ConvertImageWrappersToBytes(operatorOutputs[flowOutputOperator.Id]);
@@ -318,7 +587,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
         finally
         {
-            // 清理 CancellationTokenSource
+            // 娓呯悊 CancellationTokenSource
             if (_executionCancellations.TryRemove(flow.Id, out var removedCts))
             {
                 removedCts.Dispose();
@@ -343,18 +612,18 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     /// </summary>
     private async Task ExecuteFlowSequentialAsync(
         OperatorFlow flow,
-        List<Operator> executionOrder,
+        FlowExecutionPlan plan,
         ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs,
         FlowExecutionResult result,
         FlowExecutionStatus status,
         CancellationToken cancellationToken,
-        FlowInputPreparationIndex inputPreparationIndex,
-        Dictionary<string, int>? fanOutDegrees = null)
+        FlowInputPreparationIndex inputPreparationIndex)
     {
+        var executionOrder = plan.ExecutionOrder;
         int completedCount = 0;
         foreach (var op in executionOrder)
         {
-            // 检查取消
+            // 妫€鏌ュ彇娑?
             if (cancellationToken.IsCancellationRequested)
             {
                 break;
@@ -382,11 +651,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 continue;
             }
 
-            // 更新当前执行状态
+            // 鏇存柊褰撳墠鎵ц鐘舵€?
             status.CurrentOperatorId = op.Id;
             status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
-            // 准备输入数据
+            // 鍑嗗杈撳叆鏁版嵁
             var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
 
             // 执行算子
@@ -404,10 +673,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             operatorOutputs[op.Id] = outputs;
 
             // Sprint 1 Task 1.1: 应用扇出引用计数
-            if (fanOutDegrees != null)
-            {
-                ApplyFanOutRefCounts(op, outputs, fanOutDegrees);
-            }
+            ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
 
             completedCount++;
 
@@ -422,20 +688,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    /// 并行执行流程 - 按层级并行执行无依赖的算子
+    /// 骞惰鎵ц娴佺▼ - 鎸夊眰绾у苟琛屾墽琛屾棤渚濊禆鐨勭畻瀛?
     /// </summary>
     private async Task ExecuteFlowParallelAsync(
-        OperatorFlow flow,
-        List<Operator> executionOrder,
+        FlowExecutionPlan plan,
         ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs,
         FlowExecutionResult result,
         FlowExecutionStatus status,
         CancellationToken cancellationToken,
-        FlowInputPreparationIndex inputPreparationIndex,
-        Dictionary<string, int>? fanOutDegrees = null)
+        FlowInputPreparationIndex inputPreparationIndex)
     {
         // 构建执行层级（哪些算子可以并行执行）
-        var executionLayers = BuildExecutionLayers(flow, executionOrder);
+        var executionOrder = plan.ExecutionOrder;
+        var executionLayers = plan.ExecutionLayers;
         var completedOperators = new HashSet<Guid>();
         var failed = false;
 
@@ -444,20 +709,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (failed || cancellationToken.IsCancellationRequested)
                 break;
 
-            // 更新状态
+            // 鏇存柊鐘舵€?
             status.CurrentOperatorId = layer.First().Id;
             status.ProgressPercentage = (double)completedOperators.Count / executionOrder.Count * 100;
 
             using var layerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             OperatorExecutionResult? primaryLayerFailure = null;
 
-            // 并行执行当前层的所有算子
+            // 骞惰鎵ц褰撳墠灞傜殑鎵€鏈夌畻瀛?
             var layerTasks = layer.Select(op => ExecuteParallelLayerOperatorAsync(
-                flow,
+                plan,
                 op,
                 operatorOutputs,
                 inputPreparationIndex,
-                fanOutDegrees,
                 cancellationToken,
                 layerCts,
                 failedResult => Interlocked.CompareExchange(ref primaryLayerFailure, failedResult, null) is null)).ToList();
@@ -466,7 +730,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             var layerResults = await Task.WhenAll(layerTasks);
             result.OperatorResults.AddRange(layerResults);
 
-            // 检查是否有失败的算子
+            // 妫€鏌ユ槸鍚︽湁澶辫触鐨勭畻瀛?
             if (layerResults.Any(r => !r.IsSuccess))
             {
                 failed = true;
@@ -492,11 +756,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     private async Task<OperatorExecutionResult> ExecuteParallelLayerOperatorAsync(
-        OperatorFlow flow,
+        FlowExecutionPlan plan,
         Operator op,
         ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs,
         FlowInputPreparationIndex inputPreparationIndex,
-        Dictionary<string, int>? fanOutDegrees,
         CancellationToken cancellationToken,
         CancellationTokenSource layerCts,
         Func<OperatorExecutionResult, bool> signalLayerFailure)
@@ -529,7 +792,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             return missingExecutorResult;
         }
 
-        var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+        var inputs = PrepareOperatorInputs(plan.Flow, op, operatorOutputs, inputPreparationIndex);
         var opResult = await ExecuteOperatorInternalAsync(op, executor, inputs, layerCts.Token);
 
         if (opResult.IsSuccess)
@@ -537,10 +800,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             var outputs = opResult.OutputData ?? new Dictionary<string, object>();
             operatorOutputs[op.Id] = outputs;
 
-            if (fanOutDegrees != null)
-            {
-                ApplyFanOutRefCounts(op, outputs, fanOutDegrees);
-            }
+            ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
 
             if (opResult.ShortCircuitedFlow)
             {
@@ -570,50 +830,81 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     /// <summary>
     /// 构建执行层级 - 将算子分组，同一层的算子可以并行执行
     /// </summary>
-    private List<List<Operator>> BuildExecutionLayers(OperatorFlow flow, List<Operator> executionOrder)
+    private static List<List<Operator>> BuildExecutionLayers(
+        IReadOnlyList<Operator> executionOrder,
+        FlowTopologyIndex topology)
     {
         var layers = new List<List<Operator>>();
-        var executed = new HashSet<Guid>();
-        var remaining = new HashSet<Operator>(executionOrder);
+        var inDegreeByOperatorId = new Dictionary<Guid, int>(executionOrder.Count);
+        var scheduled = new HashSet<Guid>();
 
-        while (remaining.Any())
+        foreach (var op in executionOrder)
         {
-            // 找出当前可以执行的算子（所有依赖都已执行）
-            var currentLayer = remaining.Where(op =>
-            {
-                // 获取该算子的所有依赖（输入连接）
-                var dependencies = flow.Connections
-                    .Where(c => c.TargetOperatorId == op.Id)
-                    .Select(c => c.SourceOperatorId);
+            inDegreeByOperatorId[op.Id] = topology.GetIncomingConnections(op.Id).Count;
+        }
 
-                // 检查所有依赖是否已执行
-                return dependencies.All(depId => executed.Contains(depId));
-            }).ToList();
+        var currentLayer = executionOrder
+            .Where(op => inDegreeByOperatorId[op.Id] == 0)
+            .ToList();
+        if (currentLayer.Count == 0)
+        {
+            currentLayer = executionOrder.ToList();
+        }
 
-            if (!currentLayer.Any())
-            {
-                // 如果没有可以执行的算子，说明有循环依赖或其他问题
-                // 将剩余的算子作为一个层级执行
-                currentLayer = remaining.ToList();
-            }
-
+        while (currentLayer.Count > 0)
+        {
             layers.Add(currentLayer);
 
             foreach (var op in currentLayer)
             {
-                executed.Add(op.Id);
-                remaining.Remove(op);
+                scheduled.Add(op.Id);
             }
+
+            var nextLayer = new List<Operator>();
+            foreach (var op in currentLayer)
+            {
+                foreach (var connection in topology.GetOutgoingConnections(op.Id))
+                {
+                    if (!inDegreeByOperatorId.TryGetValue(connection.TargetOperatorId, out var inDegree))
+                    {
+                        continue;
+                    }
+
+                    inDegree--;
+                    inDegreeByOperatorId[connection.TargetOperatorId] = inDegree;
+                    if (inDegree == 0 &&
+                        !scheduled.Contains(connection.TargetOperatorId) &&
+                        topology.GetOperator(connection.TargetOperatorId) is { } nextOperator)
+                    {
+                        nextLayer.Add(nextOperator);
+                    }
+                }
+            }
+
+            if (nextLayer.Count == 0)
+            {
+                var remaining = executionOrder
+                    .Where(op => !scheduled.Contains(op.Id))
+                    .ToList();
+                if (remaining.Count == 0)
+                {
+                    break;
+                }
+
+                nextLayer = remaining;
+            }
+
+            currentLayer = nextLayer;
         }
 
         return layers;
     }
 
-    // 默认算子执行超时时间（30秒）
+    // 榛樿绠楀瓙鎵ц瓒呮椂鏃堕棿锛?0绉掞級
     private const int DefaultOperatorTimeoutMs = 30000;
 
     /// <summary>
-    /// 内部执行单个算子（带超时保护）
+    /// 鍐呴儴鎵ц鍗曚釜绠楀瓙锛堝甫瓒呮椂淇濇姢锛?
     /// </summary>
     private async Task<OperatorExecutionResult> ExecuteOperatorInternalAsync(
         Operator op,
@@ -626,11 +917,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         try
         {
-            // 为算子执行添加全局超时保护
+            // 涓虹畻瀛愭墽琛屾坊鍔犲叏灞€瓒呮椂淇濇姢
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(DefaultOperatorTimeoutMs));
 
-            // O1.3: 传递 CancellationToken 给算子执行器，支持取消操作
+            // O1.3: 浼犻€?CancellationToken 缁欑畻瀛愭墽琛屽櫒锛屾敮鎸佸彇娑堟搷浣?
             var opResult = await executor.ExecuteAsync(op, inputs, timeoutCts.Token);
             opStopwatch.Stop();
 
@@ -742,30 +1033,22 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     {
         var result = new FlowValidationResult();
 
-        // 检查是否有算子
-        if (!flow.Operators.Any())
+        // 妫€鏌ユ槸鍚︽湁绠楀瓙
+        if (flow.Operators.Count == 0)
         {
-            result.Errors.Add("流程中没有任何算子");
+            result.Errors.Add("Flow contains no operators.");
             return result;
         }
 
-        // 检查是否有图像采集算子作为输入
-        var hasInputOperator = flow.Operators.Any(o => o.Type == OperatorType.ImageAcquisition);
-        if (!hasInputOperator)
-        {
-            result.Warnings.Add("流程缺少图像采集算子作为输入");
-        }
+        var hasInputOperator = false;
+        var hasOutputOperator = false;
 
-        // 检查是否有结果输出算子
-        var hasOutputOperator = flow.Operators.Any(o => o.Type == OperatorType.ResultOutput);
-        if (!hasOutputOperator)
-        {
-            result.Warnings.Add("流程缺少结果输出算子");
-        }
-
-        // 验证每个算子的参数
+        // 楠岃瘉姣忎釜绠楀瓙鐨勫弬鏁?
         foreach (var op in flow.Operators)
         {
+            hasInputOperator |= op.Type == OperatorType.ImageAcquisition;
+            hasOutputOperator |= op.Type == OperatorType.ResultOutput;
+
             if (TryResolveExecutor(op.Type, out var executor))
             {
                 var validation = executor.ValidateParameters(op);
@@ -779,7 +1062,17 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
         }
 
-        result.IsValid = !result.Errors.Any();
+        if (!hasInputOperator)
+        {
+            result.Warnings.Add("流程缺少图像采集算子作为输入");
+        }
+
+        if (!hasOutputOperator)
+        {
+            result.Warnings.Add("流程缺少结果输出算子");
+        }
+
+        result.IsValid = result.Errors.Count == 0;
         return result;
     }
 
@@ -816,7 +1109,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
             catch (ObjectDisposedException)
             {
-                // 忽略已释放的对象异常
+                // 蹇界暐宸查噴鏀剧殑瀵硅薄寮傚父
             }
         }
 
@@ -830,8 +1123,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    /// 规范化流程输出，避免将 OpenCvSharp.Mat 等非 JSON 安全对象直接暴露到上层。
-    /// 图像类型会被快照化为 byte[]，因此上层不能假设结果仍然是 live Mat。
+    /// 瑙勮寖鍖栨祦绋嬭緭鍑猴紝閬垮厤灏?OpenCvSharp.Mat 绛夐潪 JSON 瀹夊叏瀵硅薄鐩存帴鏆撮湶鍒颁笂灞傘€?
+    /// 鍥惧儚绫诲瀷浼氳蹇収鍖栦负 byte[]锛屽洜姝や笂灞備笉鑳藉亣璁剧粨鏋滀粛鐒舵槸 live Mat銆?
     /// </summary>
     private Dictionary<string, object> ConvertImageWrappersToBytes(Dictionary<string, object>? outputData)
     {
@@ -850,29 +1143,34 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     private static Operator? ResolveFlowOutputOperator(
-        IReadOnlyList<Operator> executionOrder,
+        FlowExecutionPlan plan,
         ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs)
     {
-        if (executionOrder.Count == 0)
+        foreach (var op in plan.ResultOutputCandidates)
         {
-            return null;
+            if (operatorOutputs.ContainsKey(op.Id))
+            {
+                return op;
+            }
         }
 
-        var resultOutput = executionOrder.LastOrDefault(op =>
-            op.Type == OperatorType.ResultOutput && operatorOutputs.ContainsKey(op.Id));
-        if (resultOutput != null)
+        foreach (var op in plan.ResultJudgmentCandidates)
         {
-            return resultOutput;
+            if (operatorOutputs.ContainsKey(op.Id))
+            {
+                return op;
+            }
         }
 
-        var resultJudgment = executionOrder.LastOrDefault(op =>
-            op.Type == OperatorType.ResultJudgment && operatorOutputs.ContainsKey(op.Id));
-        if (resultJudgment != null)
+        foreach (var op in plan.ReverseExecutionOrder)
         {
-            return resultJudgment;
+            if (operatorOutputs.ContainsKey(op.Id))
+            {
+                return op;
+            }
         }
 
-        return executionOrder.LastOrDefault(op => operatorOutputs.ContainsKey(op.Id));
+        return null;
     }
 
     private static bool TryNormalizeOutputValue(object? value, out object? normalized, int depth = 0)
@@ -959,16 +1257,34 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             return true;
         }
 
+        if (CanSerializeJsonValue(value))
+        {
+            normalized = value;
+            return true;
+        }
+
+        normalized = value.ToString();
+        return normalized != null;
+    }
+
+    private static bool CanSerializeJsonValue(object value)
+    {
+        var type = value.GetType();
+        if (JsonSerializableTypes.TryGetValue(type, out var cached))
+        {
+            return cached;
+        }
+
         try
         {
             JsonSerializer.Serialize(value);
-            normalized = value;
+            JsonSerializableTypes[type] = true;
             return true;
         }
         catch
         {
-            normalized = value.ToString();
-            return normalized != null;
+            JsonSerializableTypes[type] = false;
+            return false;
         }
     }
 
@@ -1054,15 +1370,16 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     #region Sprint 1 Task 1.1: 扇出预分析与引用计数管理
 
     /// <summary>
-    /// 预分析 DAG 中每个输出端口的扇出度（下游连接数）。
-    /// 用于决定 ImageWrapper 的引用计数初始值。
+    /// 棰勫垎鏋?DAG 涓瘡涓緭鍑虹鍙ｇ殑鎵囧嚭搴︼紙涓嬫父杩炴帴鏁帮級銆?
+    /// 鐢ㄤ簬鍐冲畾 ImageWrapper 鐨勫紩鐢ㄨ鏁板垵濮嬪€笺€?
     /// </summary>
-    private Dictionary<string, int> AnalyzeFanOutDegrees(OperatorFlow flow)
+    private static Dictionary<(Guid OperatorId, Guid PortId), int> AnalyzeFanOutDegrees(
+        IReadOnlyCollection<OperatorConnection> connections)
     {
-        var targetsBySourcePort = new Dictionary<string, HashSet<Guid>>();
-        foreach (var conn in flow.Connections)
+        var targetsBySourcePort = new Dictionary<(Guid OperatorId, Guid PortId), HashSet<Guid>>();
+        foreach (var conn in connections)
         {
-            var key = $"{conn.SourceOperatorId}:{conn.SourcePortId}";
+            var key = (conn.SourceOperatorId, conn.SourcePortId);
             if (!targetsBySourcePort.TryGetValue(key, out var targets))
             {
                 targets = new HashSet<Guid>();
@@ -1078,13 +1395,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    /// 根据扇出度为算子输出的 ImageWrapper 设置引用计数。
-    /// 扇出度为 N 时，AddRef (N-1) 次，使总引用计数为 N。
+    /// 鏍规嵁鎵囧嚭搴︿负绠楀瓙杈撳嚭鐨?ImageWrapper 璁剧疆寮曠敤璁℃暟銆?
+    /// 鎵囧嚭搴︿负 N 鏃讹紝AddRef (N-1) 娆★紝浣挎€诲紩鐢ㄨ鏁颁负 N銆?
     /// </summary>
     private void ApplyFanOutRefCounts(
         Operator op,
         Dictionary<string, object> outputs,
-        Dictionary<string, int> fanOutDegrees)
+        IReadOnlyDictionary<(Guid OperatorId, Guid PortId), int> fanOutDegrees,
+        FlowTopologyIndex topology)
     {
         foreach (var (portName, value) in outputs)
         {
@@ -1092,19 +1410,17 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 continue;
 
             // 尝试通过名称查找端口 ID，以匹配扇出度分析使用的 Key
-            var port = op.OutputPorts.FirstOrDefault(p => p.Name == portName);
+            var port = topology.GetOutputPortByName(op.Id, portName);
             if (port == null && op.OutputPorts.Count == 1 && IsStandardImageOutputKey(portName))
             {
                 port = op.OutputPorts[0];
             }
 
-            var portKey = port != null
-                ? $"{op.Id}:{port.Id}"
-                : $"{op.Id}:{portName}";
+            int fanOut = port != null
+                ? fanOutDegrees.GetValueOrDefault((op.Id, port.Id), 1)
+                : 1;
 
-            int fanOut = fanOutDegrees.GetValueOrDefault(portKey, 1);
-
-            // 引用计数初始为 1，每多一个下游消费者 AddRef 一次
+            // 寮曠敤璁℃暟鍒濆涓?1锛屾瘡澶氫竴涓笅娓告秷璐硅€?AddRef 涓€娆?
             for (int i = 1; i < fanOut; i++)
             {
                 img.AddRef();
@@ -1181,8 +1497,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         var inputs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         inputPreparationIndex ??= BuildFlowInputPreparationIndex(flow);
 
-        // 1. 【基础注入】首先将算子自身的参数合并到输入中作为默认值。
-        // 这确保了如果没有外部连线，算子依然能拿到 UI 属性面板设置的参数（例如 filePath）。
+        // 1. 銆愬熀纭€娉ㄥ叆銆戦鍏堝皢绠楀瓙鑷韩鐨勫弬鏁板悎骞跺埌杈撳叆涓綔涓洪粯璁ゅ€笺€?
+        // 杩欑‘淇濅簡濡傛灉娌℃湁澶栭儴杩炵嚎锛岀畻瀛愪緷鐒惰兘鎷垮埌 UI 灞炴€ч潰鏉胯缃殑鍙傛暟锛堜緥濡?filePath锛夈€?
         foreach (var param in op.Parameters)
         {
             if (param.Value != null)
@@ -1191,7 +1507,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
         }
 
-        // 查找连接到该算子的所有连线
+        // 鏌ユ壘杩炴帴鍒拌绠楀瓙鐨勬墍鏈夎繛绾?
         var incomingConnections = inputPreparationIndex.GetIncomingConnections(op.Id);
 
         // 如果没有输入连接，尝试从初始输入数据获取 (Guid.Empty)
@@ -1215,19 +1531,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             {
                 if (operatorOutputs.TryGetValue(connection.SourceOperatorId, out var sourceOutputs))
                 {
-                    // 【条件分支路由修复】检查源算子是否为条件分支算子
+                    // 銆愭潯浠跺垎鏀矾鐢变慨澶嶃€戞鏌ユ簮绠楀瓙鏄惁涓烘潯浠跺垎鏀畻瀛?
                     var sourceOperator = inputPreparationIndex.GetSourceOperator(connection.SourceOperatorId);
 
                     if (sourceOperator?.Type == OperatorType.ConditionalBranch)
                     {
-                        // 对于条件分支算子，只传递与连接端口名称匹配的数据
-                        // 获取源端口名称（True / False）
+                        // 瀵逛簬鏉′欢鍒嗘敮绠楀瓙锛屽彧浼犻€掍笌杩炴帴绔彛鍚嶇О鍖归厤鐨勬暟鎹?
+                        // 鑾峰彇婧愮鍙ｅ悕绉帮紙True / False锛?
                         var sourcePort = inputPreparationIndex.GetSourcePort(connection.SourceOperatorId, connection.SourcePortId);
                         if (sourcePort != null)
                         {
                             var portName = sourcePort.Name;
                             var targetPort = inputPreparationIndex.GetTargetPort(op.Id, connection.TargetPortId);
-                            // 检查输出数据中是否有对应端口的数据且不为null
+                            // 妫€鏌ヨ緭鍑烘暟鎹腑鏄惁鏈夊搴旂鍙ｇ殑鏁版嵁涓斾笉涓簄ull
                             if (sourceOutputs.TryGetValue(portName, out var portData) && portData != null)
                             {
                                 if (targetPort != null)
@@ -1239,7 +1555,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 {
                                     inputs[portName] = portData;
                                 }
-                                // 同时传递判断结果等通用信息
+                                // 鍚屾椂浼犻€掑垽鏂粨鏋滅瓑閫氱敤淇℃伅
                                 if (sourceOutputs.TryGetValue("Result", out var result))
                                     inputs["ConditionResult"] = result;
                                 if (sourceOutputs.TryGetValue("Condition", out var condition))
@@ -1247,36 +1563,38 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 if (sourceOutputs.TryGetValue("ActualValue", out var actualValue))
                                     inputs["ActualValue"] = actualValue;
                             }
-                            // 如果端口数据为 null，说明条件分支走的是另一分支，不传递任何数据
+                            // 濡傛灉绔彛鏁版嵁涓?null锛岃鏄庢潯浠跺垎鏀蛋鐨勬槸鍙︿竴鍒嗘敮锛屼笉浼犻€掍换浣曟暟鎹?
                         }
                     }
                     else
                     {
-                        // 普通算子：执行增强的端口映射逻辑
+                        // 鏅€氱畻瀛愶細鎵ц澧炲己鐨勭鍙ｆ槧灏勯€昏緫
 
-                        // 尝试获取连线两端的端口定义
-                        // 注意：SourceOperator 可能不在当前上下文（虽然不太可能），但我们要防御性编程
+                        // 灏濊瘯鑾峰彇杩炵嚎涓ょ鐨勭鍙ｅ畾涔?
+                        // 娉ㄦ剰锛歋ourceOperator 鍙兘涓嶅湪褰撳墠涓婁笅鏂囷紙铏界劧涓嶅お鍙兘锛夛紝浣嗘垜浠闃插尽鎬х紪绋?
+                        Port? sourcePort = null;
+                        Port? targetPort = null;
                         if (sourceOperator != null)
                         {
-                            var sourcePort = inputPreparationIndex.GetSourcePort(connection.SourceOperatorId, connection.SourcePortId);
-                            var targetPort = inputPreparationIndex.GetTargetPort(op.Id, connection.TargetPortId);
+                            sourcePort = inputPreparationIndex.GetSourcePort(connection.SourceOperatorId, connection.SourcePortId);
+                            targetPort = inputPreparationIndex.GetTargetPort(op.Id, connection.TargetPortId);
 
                             // 【Bug 4 修复】基于端口名称的精确映射
                             if (sourcePort != null && targetPort != null)
                             {
-                                // 尝试从源输出中获取与源端口名匹配的数据
+                                // 灏濊瘯浠庢簮杈撳嚭涓幏鍙栦笌婧愮鍙ｅ悕鍖归厤鐨勬暟鎹?
                                 if (sourceOutputs.TryGetValue(sourcePort.Name, out var data))
                                 {
-                                    // 将数据映射到目标端口
+                                    // 灏嗘暟鎹槧灏勫埌鐩爣绔彛
                                     // 例如：源输出 "Image" -> 目标输入 "Background"
                                     inputs[targetPort.Name] = data;
                                 }
                             }
                         }
 
-                        // 【兼容性兜底】
-                        // 如果没有通过端口成功映射（可能是旧版数据、端口名未定义、或旨在传递隐式数据）
-                        // 或者为了向后兼容（防止某些未走端口定义的隐式数据丢失，避免 ResultOutput 所需的额外信息缺失）
+                        // 銆愬吋瀹规€у厹搴曘€?
+                        // 濡傛灉娌℃湁閫氳繃绔彛鎴愬姛鏄犲皠锛堝彲鑳芥槸鏃х増鏁版嵁銆佺鍙ｅ悕鏈畾涔夈€佹垨鏃ㄥ湪浼犻€掗殣寮忔暟鎹級
+                        // 鎴栬€呬负浜嗗悜鍚庡吋瀹癸紙闃叉鏌愪簺鏈蛋绔彛瀹氫箟鐨勯殣寮忔暟鎹涪澶憋紝閬垮厤 ResultOutput 鎵€闇€鐨勯澶栦俊鎭己澶憋級
                         // 我们依然执行全量合并，但跳过已存在的键（避免覆盖精确映射的结果）
                         foreach (var kvp in sourceOutputs)
                         {
@@ -1285,7 +1603,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 // Never implicitly propagate reference-counted image payloads across
                                 // unrelated ports. This avoids hidden ImageWrapper consumers that are
                                 // invisible to fan-out analysis and can cause premature disposal.
-                                if (ShouldSkipImplicitFallbackValue(kvp.Key, kvp.Value, sourceOperator, connection.SourcePortId))
+                                if (ShouldSkipImplicitFallbackValue(kvp.Key, kvp.Value, sourceOperator, sourcePort))
                                 {
                                     _logger.LogDebug(
                                         "[FlowExecution] Skip implicit fallback key '{Key}' from {SourceOperator} to {TargetOperator} to avoid hidden ImageWrapper propagation.",
@@ -1310,7 +1628,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         string key,
         object? value,
         Operator? sourceOperator,
-        Guid sourcePortId)
+        Port? connectedSourcePort)
     {
         if (!ContainsImageWrapperReference(value))
             return false;
@@ -1318,7 +1636,6 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         if (sourceOperator == null)
             return true;
 
-        var connectedSourcePort = sourceOperator.OutputPorts.FirstOrDefault(p => p.Id == sourcePortId);
         if (connectedSourcePort == null)
             return true;
 
@@ -1361,7 +1678,13 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         if (value is IDictionary<string, object> typedDict)
         {
-            return typedDict.Values.Any(child => ContainsImageWrapperReference(child, depth + 1));
+            foreach (var child in typedDict.Values)
+            {
+                if (ContainsImageWrapperReference(child, depth + 1))
+                    return true;
+            }
+
+            return false;
         }
 
         if (value is IDictionary dict)
@@ -1389,7 +1712,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     #region 调试功能实现
 
     /// <summary>
-    /// 调试执行流程 - 支持断点和单步执行
+    /// 璋冭瘯鎵ц娴佺▼ - 鏀寔鏂偣鍜屽崟姝ユ墽琛?
     /// </summary>
     public async Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(
         OperatorFlow flow,
@@ -1409,18 +1732,18 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         _debugOptions[options.DebugSessionId] = options;
         TouchDebugSession(options.DebugSessionId);
 
-        // 创建链接的 CancellationTokenSource
+        // 鍒涘缓閾炬帴鐨?CancellationTokenSource
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _executionCancellations[flow.Id] = cts;
 
         try
         {
             // 获取执行顺序（拓扑排序）
-            var executionOrder = flow.GetExecutionOrder().ToList();
-            var inputPreparationIndex = BuildFlowInputPreparationIndex(flow);
-            var fanOutDegrees = AnalyzeFanOutDegrees(flow);
+            var plan = GetFlowExecutionPlan(flow);
+            var executionOrder = plan.ExecutionOrder;
+            var inputPreparationIndex = plan.CreateInputPreparationIndex();
 
-            // 初始化执行状态
+            // 鍒濆鍖栨墽琛岀姸鎬?
             var status = new FlowExecutionStatus
             {
                 FlowId = flow.Id,
@@ -1430,29 +1753,29 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             };
             _executionStatuses[flow.Id] = status;
 
-            // 存储每个算子的输出
+            // 瀛樺偍姣忎釜绠楀瓙鐨勮緭鍑?
             operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
 
-            // 设置初始输入数据
+            // 璁剧疆鍒濆杈撳叆鏁版嵁
             if (inputData != null)
             {
                 ApplyInitialInputRefCounts(inputData, executionOrder, inputPreparationIndex);
                 operatorOutputs[Guid.Empty] = inputData;
             }
 
-            // 顺序执行（调试模式不支持并行）
+            // 椤哄簭鎵ц锛堣皟璇曟ā寮忎笉鏀寔骞惰锛?
             int completedCount = 0;
             Guid? pausedOperatorId = null;
 
             foreach (var op in executionOrder)
             {
-                // 检查取消
+                // 妫€鏌ュ彇娑?
                 if (cts.Token.IsCancellationRequested)
                 {
                     break;
                 }
 
-                // 检查是否命中断点
+                // 妫€鏌ユ槸鍚﹀懡涓柇鐐?
                 if (options.Breakpoints.Contains(op.Id))
                 {
                     pausedOperatorId = op.Id;
@@ -1462,7 +1785,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
                     if (options.StepMode)
                     {
-                        // 单步模式：暂停执行
+                        // 鍗曟妯″紡锛氭殏鍋滄墽琛?
                         break;
                     }
                 }
@@ -1504,11 +1827,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     continue;
                 }
 
-                // 更新当前执行状态
+                // 鏇存柊褰撳墠鎵ц鐘舵€?
                 status.CurrentOperatorId = op.Id;
                 status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
-                // 准备输入数据
+                // 鍑嗗杈撳叆鏁版嵁
                 var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
                 var normalizedInputSnapshot = ConvertImageWrappersToBytes(inputs);
                 var cacheKey = (options.DebugSessionId, op.Id);
@@ -1551,7 +1874,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     {
                         pausedOperatorId = op.Id;
                         result.PausedOperatorId = pausedOperatorId;
-                        _logger.LogInformation("[调试] 复用缓存并停在断点算子: {OperatorName} ({OperatorId})", op.Name, op.Id);
+                        _logger.LogInformation("[璋冭瘯] 澶嶇敤缂撳瓨骞跺仠鍦ㄦ柇鐐圭畻瀛? {OperatorName} ({OperatorId})", op.Name, op.Id);
                         break;
                     }
 
@@ -1590,12 +1913,12 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     break;
                 }
 
-                // 保存输出
+                // 淇濆瓨杈撳嚭
                 var outputs = opResult.OutputData ?? new Dictionary<string, object>();
                 operatorOutputs[op.Id] = outputs;
-                ApplyFanOutRefCounts(op, outputs, fanOutDegrees);
+                ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
 
-                // 调试模式：缓存中间结果
+                // 璋冭瘯妯″紡锛氱紦瀛樹腑闂寸粨鏋?
                 if (options.EnableIntermediateCache && normalizedOutputData.Count > 0)
                 {
                     _debugCache[cacheKey] = normalizedOutputData;
@@ -1617,7 +1940,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 {
                     pausedOperatorId = op.Id;
                     result.PausedOperatorId = pausedOperatorId;
-                    _logger.LogInformation("[调试] 到达断点算子: {OperatorName} ({OperatorId})，停止执行", op.Name, op.Id);
+                    _logger.LogInformation("[Debug] Reached breakpoint operator: {OperatorName} ({OperatorId}), stopping execution.", op.Name, op.Id);
                     break;
                 }
             }
@@ -1625,7 +1948,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             stopwatch.Stop();
             result.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
 
-            // 检查是否因为取消而中断
+            // 妫€鏌ユ槸鍚﹀洜涓哄彇娑堣€屼腑鏂?
             if (cts.Token.IsCancellationRequested)
             {
                 result.IsSuccess = false;
@@ -1640,7 +1963,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             if (result.IsSuccess)
             {
-                var flowOutputOperator = ResolveFlowOutputOperator(executionOrder, operatorOutputs);
+                var flowOutputOperator = ResolveFlowOutputOperator(plan, operatorOutputs);
                 if (flowOutputOperator != null)
                 {
                     result.OutputData = ConvertImageWrappersToBytes(operatorOutputs[flowOutputOperator.Id]);
@@ -1709,7 +2032,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     /// </summary>
     public Task ClearDebugCacheAsync(Guid debugSessionId)
     {
-        // 清除该会话的所有缓存
+        // 娓呴櫎璇ヤ細璇濈殑鎵€鏈夌紦瀛?
         var keysToRemove = _debugCache.Keys.Where(k => k.DebugSessionId == debugSessionId).ToList();
         foreach (var key in keysToRemove)
         {
@@ -1756,7 +2079,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         AppendFingerprintString(hasher, op.Id.ToString("D"));
         AppendFingerprintString(hasher, op.Type.ToString());
 
-        foreach (var parameter in op.Parameters.OrderBy(parameter => parameter.Name, StringComparer.Ordinal))
+        foreach (var parameter in GetFingerprintParameters(op))
         {
             AppendFingerprintString(hasher, parameter.Name);
             AppendFingerprintValue(hasher, parameter.GetValue());
@@ -1769,6 +2092,29 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
 
         return Convert.ToHexString(hasher.GetHashAndReset());
+    }
+
+    private static IReadOnlyList<Parameter> GetFingerprintParameters(Operator op)
+    {
+        if (FingerprintParameterOrderCaches.TryGetValue(op, out var cache) &&
+            cache.ModifiedAt == op.ModifiedAt &&
+            cache.ParameterCount == op.Parameters.Count)
+        {
+            return cache.Parameters;
+        }
+
+        var parameters = op.Parameters
+            .OrderBy(parameter => parameter.Name, StringComparer.Ordinal)
+            .ToArray();
+
+        var newCache = new ParameterFingerprintOrderCache(op.ModifiedAt, op.Parameters.Count, parameters);
+        lock (FingerprintParameterOrderCaches)
+        {
+            FingerprintParameterOrderCaches.Remove(op);
+            FingerprintParameterOrderCaches.Add(op, newCache);
+        }
+
+        return parameters;
     }
 
     private static void AppendFingerprintValue(IncrementalHash hasher, object? value)

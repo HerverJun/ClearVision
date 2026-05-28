@@ -129,31 +129,54 @@ public class OperatorFlow : Entity
     {
         var visited = new HashSet<Guid>();
         var result = new List<Operator>();
+        var operatorsById = new Dictionary<Guid, Operator>();
+        var dependenciesByTargetId = new Dictionary<Guid, List<Operator>>();
 
         foreach (var op in Operators)
         {
-            VisitOperator(op, visited, result);
+            operatorsById[op.Id] = op;
+        }
+
+        foreach (var connection in Connections)
+        {
+            if (!operatorsById.TryGetValue(connection.SourceOperatorId, out var sourceOperator))
+            {
+                continue;
+            }
+
+            if (!dependenciesByTargetId.TryGetValue(connection.TargetOperatorId, out var dependencies))
+            {
+                dependencies = new List<Operator>();
+                dependenciesByTargetId[connection.TargetOperatorId] = dependencies;
+            }
+
+            dependencies.Add(sourceOperator);
+        }
+
+        foreach (var op in Operators)
+        {
+            VisitOperator(op, dependenciesByTargetId, visited, result);
         }
 
         return result;
     }
 
-    private void VisitOperator(Operator op, HashSet<Guid> visited, List<Operator> result)
+    private void VisitOperator(
+        Operator op,
+        IReadOnlyDictionary<Guid, List<Operator>> dependenciesByTargetId,
+        HashSet<Guid> visited,
+        List<Operator> result)
     {
-        if (visited.Contains(op.Id))
+        if (!visited.Add(op.Id))
             return;
 
-        visited.Add(op.Id);
-
         // 先访问依赖的算子
-        var dependencies = Connections
-            .Where(c => c.TargetOperatorId == op.Id)
-            .Select(c => Operators.FirstOrDefault(o => o.Id == c.SourceOperatorId))
-            .Where(o => o != null);
-
-        foreach (var dep in dependencies)
+        if (dependenciesByTargetId.TryGetValue(op.Id, out var dependencies))
         {
-            VisitOperator(dep!, visited, result);
+            foreach (var dep in dependencies)
+            {
+                VisitOperator(dep, dependenciesByTargetId, visited, result);
+            }
         }
 
         result.Add(op);

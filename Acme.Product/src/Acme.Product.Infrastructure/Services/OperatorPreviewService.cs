@@ -3,6 +3,7 @@
 // 提供算子预览执行与结果格式化输出能力
 // 作者：蘅芜君
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
@@ -18,6 +19,7 @@ namespace Acme.Product.Infrastructure.Services;
 /// </summary>
 public sealed class OperatorPreviewService
 {
+    private static readonly ConcurrentDictionary<Type, bool> SerializableTypes = new();
     private readonly IOperatorFactory _operatorFactory;
     private readonly IFlowExecutionService _flowExecutionService;
     private readonly ILogger<OperatorPreviewService> _logger;
@@ -101,25 +103,35 @@ public sealed class OperatorPreviewService
         if (parameters == null || parameters.Count == 0)
             return;
 
+        var parameterLookup = new Dictionary<string, Core.ValueObjects.Parameter>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in previewOperator.Parameters)
+        {
+            if (existing?.Name == null || parameterLookup.ContainsKey(existing.Name))
+            {
+                continue;
+            }
+
+            parameterLookup[existing.Name] = existing;
+        }
+
         foreach (var (name, rawValue) in parameters)
         {
             var normalizedValue = NormalizeInputValue(rawValue);
-            var existing = previewOperator.Parameters
-                .FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-
-            if (existing != null)
+            if (parameterLookup.TryGetValue(name, out var existing))
             {
                 existing.SetValue(normalizedValue);
                 continue;
             }
 
-            previewOperator.AddParameter(new Core.ValueObjects.Parameter(
+            var newParameter = new Core.ValueObjects.Parameter(
                 Guid.NewGuid(),
                 name,
                 name,
                 string.Empty,
                 "string",
-                normalizedValue));
+                normalizedValue);
+            previewOperator.AddParameter(newParameter);
+            parameterLookup[name] = newParameter;
         }
     }
 
@@ -305,14 +317,29 @@ public sealed class OperatorPreviewService
             return true;
         }
 
+        var valueType = value.GetType();
+        if (SerializableTypes.TryGetValue(valueType, out var cached))
+        {
+            if (cached)
+            {
+                normalized = value;
+                return true;
+            }
+
+            normalized = value.ToString();
+            return normalized != null;
+        }
+
         try
         {
             JsonSerializer.Serialize(value);
+            SerializableTypes[valueType] = true;
             normalized = value;
             return true;
         }
         catch
         {
+            SerializableTypes[valueType] = false;
             normalized = value.ToString();
             return normalized != null;
         }

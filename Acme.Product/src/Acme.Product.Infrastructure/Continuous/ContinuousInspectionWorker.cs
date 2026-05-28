@@ -89,7 +89,12 @@ public sealed class ContinuousInspectionWorker
             await PersistReplayIfNeededAsync(streamCoordinator, cameraId, config, replay, decision, cancellationToken);
 
             var result = BuildInspectionResult(projectId, sessionId, scheduled, decision, evaluation, mode);
-            AppendRuntimeMetrics(result, outputData, metrics.Snapshot(), scheduler.Snapshot(), streamCoordinator.SnapshotFrameBufferStats(cameraId));
+            AppendRuntimeMetrics(
+                result,
+                outputData,
+                metrics.Snapshot(),
+                scheduler.Snapshot(),
+                streamCoordinator.SnapshotFrameBufferStats(cameraId));
             if (mode == ContinuousInspectionMode.Primary)
             {
                 await imagePersistenceService.PersistAsync(result, cancellationToken);
@@ -231,22 +236,34 @@ public sealed class ContinuousInspectionWorker
         ContinuousInspectionConfig config,
         CancellationToken cancellationToken)
     {
-        var frames = streamCoordinator
-            .GetFrameEnvelopeWindow(cameraId, centerFrame.Sequence, config.PreEventFrames, 0)
-            .ToDictionary(frame => frame.Sequence);
-        frames[centerFrame.Sequence] = centerFrame;
+        var frames = new List<Acme.Product.Core.Streaming.FrameEnvelope>(config.PreEventFrames + config.PostEventFrames + 1);
+        var windowFrames = streamCoordinator.GetFrameEnvelopeWindow(cameraId, centerFrame.Sequence, config.PreEventFrames, 0);
+        var hasCenterFrame = false;
+
+        foreach (var frame in windowFrames)
+        {
+            if (frame.Sequence == centerFrame.Sequence)
+            {
+                hasCenterFrame = true;
+            }
+
+            frames.Add(frame);
+        }
+
+        if (!hasCenterFrame)
+        {
+            frames.Add(centerFrame);
+        }
 
         var lastSequence = centerFrame.Sequence;
         for (var index = 0; index < config.PostEventFrames; index++)
         {
             var postFrame = await streamCoordinator.WaitForNextFrameEnvelopeAsync(lease, lastSequence, cancellationToken);
             lastSequence = postFrame.Sequence;
-            frames[postFrame.Sequence] = postFrame;
+            frames.Add(postFrame);
         }
 
-        return frames.Values
-            .OrderBy(frame => frame.Sequence)
-            .ToList();
+        return frames;
     }
 
     private static async Task PersistReplayIfNeededAsync(
@@ -309,12 +326,6 @@ public sealed class ContinuousInspectionWorker
         {
             result.SetOutputImage(imageBytes);
         }
-
-        AnalysisPayloadSerialization.TrySetOutputDataJson(result, outputData, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
-        result.SetAnalysisDataJson(JsonSerializer.Serialize(new Dictionary<string, object?>
-        {
-            ["continuousInspection"] = outputData["ContinuousInspection"]
-        }, JsonOptions));
         return result;
     }
 
@@ -337,10 +348,13 @@ public sealed class ContinuousInspectionWorker
         }
 
         AnalysisPayloadSerialization.TrySetOutputDataJson(result, outputData, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
-        result.SetAnalysisDataJson(JsonSerializer.Serialize(new Dictionary<string, object?>
+        var analysisData = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        if (outputData.TryGetValue("ContinuousInspection", out var continuousInspection))
         {
-            ["continuousInspection"] = outputData.GetValueOrDefault("ContinuousInspection")
-        }, JsonOptions));
+            analysisData["continuousInspection"] = continuousInspection;
+        }
+
+        result.SetAnalysisDataJson(JsonSerializer.Serialize(analysisData, JsonOptions));
     }
 
     private static async Task PublishResultEventAsync(

@@ -28,12 +28,13 @@ public static class SerilogConfiguration
         Directory.CreateDirectory(logsPath);
 
         var loggerConfiguration = new LoggerConfiguration()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Information()
             .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
             .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .Enrich.WithExceptionDetails()
             .WriteTo.Console(
+                restrictedToMinimumLevel: LogEventLevel.Warning,
                 outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}"
             )
             .WriteTo.File(
@@ -82,12 +83,24 @@ public static class LoggingExtensions
         long executionTimeMs,
         bool isSuccess)
     {
-        logger.LogInformation(
-            "算子执行完成: {OperatorName} ({OperatorId}), 耗时: {ExecutionTimeMs}ms, 结果: {Result}",
+        if (isSuccess)
+        {
+            logger.LogDebug(
+                "算子执行完成: {OperatorName} ({OperatorId}), 耗时: {ExecutionTimeMs}ms, 结果: {Result}",
+                operatorName,
+                operatorId,
+                executionTimeMs,
+                "成功"
+            );
+            return;
+        }
+
+        logger.LogWarning(
+            "算子执行失败: {OperatorName} ({OperatorId}), 耗时: {ExecutionTimeMs}ms, 结果: {Result}",
             operatorName,
             operatorId,
             executionTimeMs,
-            isSuccess ? "成功" : "失败"
+            "失败"
         );
     }
 
@@ -120,12 +133,24 @@ public static class LoggingExtensions
         long totalExecutionTimeMs,
         bool isSuccess)
     {
-        logger.LogInformation(
-            "流程执行完成: {FlowId}, 算子数: {OperatorCount}, 总耗时: {TotalExecutionTimeMs}ms, 结果: {Result}",
+        if (isSuccess)
+        {
+            logger.LogDebug(
+                "流程执行完成: {FlowId}, 算子数: {OperatorCount}, 总耗时: {TotalExecutionTimeMs}ms, 结果: {Result}",
+                flowId,
+                operatorCount,
+                totalExecutionTimeMs,
+                "成功"
+            );
+            return;
+        }
+
+        logger.LogWarning(
+            "流程执行失败: {FlowId}, 算子数: {OperatorCount}, 总耗时: {TotalExecutionTimeMs}ms, 结果: {Result}",
             flowId,
             operatorCount,
             totalExecutionTimeMs,
-            isSuccess ? "成功" : "失败"
+            "失败"
         );
     }
 }

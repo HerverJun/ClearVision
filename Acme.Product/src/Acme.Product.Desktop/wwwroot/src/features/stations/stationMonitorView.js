@@ -1,4 +1,4 @@
-import httpClient from '../../core/messaging/httpClient.js';
+﻿import httpClient from '../../core/messaging/httpClient.js';
 import { getStoredToken } from '../auth/authStorage.js';
 import { buildSseHeaders, parseSseFrame } from '../inspection/inspectionSseClient.mjs';
 import {
@@ -38,8 +38,19 @@ class StationMonitorView {
         this.sseReconnectAttempt = 0;
         this.sseReconnectBaseDelayMs = 1000;
         this.sseReconnectMaxDelayMs = 10000;
+        this._renderDirty = true;
+        this._resultsDirty = true;
+        this._renderQueued = false;
+        this._renderContextActive = false;
+        this._renderNowMs = 0;
+        this._stationEntriesCache = null;
+        this._stationRenderSnapshot = null;
+        this._onlineCache = new Map();
+        this._relativeTimeCache = new Map();
         this.renderShell();
         this.bindEvents();
+        this._visibilityHandler = this.handleVisibilityChange.bind(this);
+        document.addEventListener('visibilitychange', this._visibilityHandler);
     }
 
     async activate() {
@@ -56,10 +67,7 @@ class StationMonitorView {
 
     deactivate() {
         this.isActive = false;
-        if (this.refreshTimer) {
-            clearInterval(this.refreshTimer);
-            this.refreshTimer = null;
-        }
+        this.stopRefreshTimer();
 
         if (this.eventSource) {
             this.eventSource.close();
@@ -69,6 +77,7 @@ class StationMonitorView {
 
     dispose() {
         this.deactivate();
+        document.removeEventListener('visibilitychange', this._visibilityHandler);
     }
 
     focusResultsWorkbench() {
@@ -234,6 +243,53 @@ class StationMonitorView {
         });
     }
 
+    handleVisibilityChange() {
+        if (!this.isActive) {
+            return;
+        }
+
+        if (document.hidden) {
+            this.stopRefreshTimer();
+            return;
+        }
+
+        this.startRefreshTimer();
+        this.markDirty();
+        this.requestRender();
+    }
+
+    stopRefreshTimer() {
+        if (!this.refreshTimer) {
+            return;
+        }
+
+        clearInterval(this.refreshTimer);
+        this.refreshTimer = null;
+    }
+
+    markDirty() {
+        this._renderDirty = true;
+    }
+
+    markResultsDirty() {
+        this._renderDirty = true;
+        this._resultsDirty = true;
+    }
+
+    requestRender() {
+        if (!this.isActive || document.hidden || this._renderQueued || !this._renderDirty) {
+            return;
+        }
+
+        this._renderQueued = true;
+        window.requestAnimationFrame(() => {
+            this._renderQueued = false;
+            if (this.isActive && !document.hidden && this._renderDirty) {
+                this.render();
+            }
+        });
+    }
+
     async loadInitialData() {
         try {
             const [summary, stations, packages] = await Promise.all([
@@ -253,9 +309,11 @@ class StationMonitorView {
             });
 
             await this.loadResultsPage(0, { renderAfter: false });
+            this.markDirty();
             this.updateSyncState('实时', 'live');
         } catch (error) {
             console.error('[StationMonitorView] Failed to load initial data:', error);
+            this.markDirty();
             this.resultLoadError = error?.message || '加载监控数据失败';
             this.updateSyncState('重连中', 'retrying');
         }
@@ -273,6 +331,7 @@ class StationMonitorView {
         this.selectedStationId = null;
         this.selectedStationDetail = null;
         this.scopeAllButton?.classList.add('is-active');
+        this.markDirty();
         await this.loadResultsPage(0);
         this.render();
     }
@@ -280,6 +339,7 @@ class StationMonitorView {
     async selectStation(stationId) {
         this.selectedStationId = stationId;
         this.scopeAllButton?.classList.remove('is-active');
+        this.markDirty();
         await this.loadStationDetail(stationId);
         await this.loadResultsPage(0, { renderAfter: false });
         this.render();
@@ -295,6 +355,7 @@ class StationMonitorView {
             const detail = await httpClient.get(`/stations/${encodeURIComponent(stationId)}`);
             this.selectedStationDetail = this.normalizeDetail(detail);
             this.stations.set(this.selectedStationDetail.stationId, this.selectedStationDetail);
+            this.markDirty();
         } catch (error) {
             console.error('[StationMonitorView] Failed to load station detail:', error);
         }
@@ -304,6 +365,7 @@ class StationMonitorView {
         this.resultLoading = true;
         this.resultLoadError = '';
         this.monitorPageIndex = Math.max(0, Number(pageIndex) || 0);
+        this.markResultsDirty();
         if (renderAfter) {
             this.renderResultsWorkbench();
         }
@@ -332,9 +394,11 @@ class StationMonitorView {
             this.monitorTotalCount = page.totalCount;
             this.monitorPageIndex = page.pageIndex;
             this.monitorPageSize = page.pageSize;
+            this.markResultsDirty();
         } catch (error) {
             console.error('[StationMonitorView] Failed to load station results:', error);
             this.resultLoadError = error?.message || '结果查询失败';
+            this.markResultsDirty();
         } finally {
             this.resultLoading = false;
             if (renderAfter) {
@@ -458,6 +522,7 @@ class StationMonitorView {
             case 'summaryUpdated':
                 this.summary = this.normalizeSummary(payload);
                 this.offlineThresholdSeconds = this.summary?.offlineThresholdSeconds || this.offlineThresholdSeconds;
+                this.markDirty();
                 break;
             case 'heartbeat':
                 break;
@@ -466,7 +531,7 @@ class StationMonitorView {
                 break;
         }
 
-        this.render();
+        this.requestRender();
     }
 
     applyInitialSnapshot(payload) {
@@ -492,6 +557,9 @@ class StationMonitorView {
             this.monitorResults = scoped.slice(0, this.monitorPageSize);
             this.monitorTotalCount = scoped.length;
         }
+
+        this.markDirty();
+        this.markResultsDirty();
     }
 
     upsertStation(station) {
@@ -508,6 +576,8 @@ class StationMonitorView {
                 ...normalized
             };
         }
+
+        this.markDirty();
     }
 
     applyResultEvent(payload) {
@@ -550,6 +620,9 @@ class StationMonitorView {
                 recentResults: this.dedupeResults(recentResults).slice(0, 25)
             };
         }
+
+        this.markResultsDirty();
+        this.markDirty();
     }
 
     applyHealthEvent(payload) {
@@ -573,6 +646,8 @@ class StationMonitorView {
                 recentHealth: recentHealth.slice(0, 20)
             };
         }
+
+        this.markDirty();
     }
 
     applyLogEvent(payload) {
@@ -601,6 +676,8 @@ class StationMonitorView {
                 recentLogs: recentLogs.slice(0, 30)
             };
         }
+
+        this.markDirty();
     }
 
     applyCommandEvent(payload) {
@@ -627,6 +704,8 @@ class StationMonitorView {
                 recentCommands: commands.slice(0, 30)
             };
         }
+
+        this.markDirty();
     }
 
     isActiveConnection(connectionId) {
@@ -682,6 +761,7 @@ class StationMonitorView {
         this.commandBusy = true;
         this.commandStatusMessage = this.getActionBusyMessage(action);
         this.commandStatusLevel = 'busy';
+        this.markDirty();
         this.render();
         let actionResult = null;
         try {
@@ -708,12 +788,15 @@ class StationMonitorView {
             await this.loadStationDetail(this.selectedStationId);
             this.commandStatusMessage = this.getActionSuccessMessage(action, actionResult);
             this.commandStatusLevel = 'success';
+            this.markDirty();
         } catch (error) {
             console.error('[StationMonitorView] Station action failed:', error);
             this.commandStatusMessage = error?.message || '工站命令下发失败。';
             this.commandStatusLevel = 'error';
+            this.markDirty();
         } finally {
             this.commandBusy = false;
+            this.markDirty();
             this.render();
         }
     }
@@ -856,24 +939,39 @@ class StationMonitorView {
     }
 
     startRefreshTimer() {
-        if (!this.isActive || this.refreshTimer) {
+        if (!this.isActive || this.refreshTimer || document.hidden) {
             return;
         }
 
         this.refreshTimer = window.setInterval(() => {
-            if (this.isActive) {
-                this.render();
+            if (this.isActive && !document.hidden) {
+                this.markDirty();
+                this.requestRender();
             }
-        }, 1000);
+        }, 5000);
     }
 
     render() {
+        this._renderContextActive = true;
+        this._renderNowMs = Date.now();
+        this._stationEntriesCache = null;
+        this._stationRenderSnapshot = null;
+        this._onlineCache.clear();
+        this._relativeTimeCache.clear();
         this.scopeAllButton?.classList.toggle('is-active', !this.selectedStationId);
-        this.renderSummary();
-        this.renderMatrix();
-        this.renderFocus();
-        this.renderStream();
-        this.renderResultsWorkbench();
+        this._renderDirty = false;
+        try {
+            this.renderSummary();
+            this.renderMatrix();
+            this.renderFocus();
+            this.renderStream();
+            if (this._resultsDirty) {
+                this.renderResultsWorkbench();
+                this._resultsDirty = false;
+            }
+        } finally {
+            this._renderContextActive = false;
+        }
     }
 
     renderSummary() {
@@ -881,20 +979,18 @@ class StationMonitorView {
             return;
         }
 
-        const stations = this.getSortedStations();
-        const onlineStations = stations.filter((station) => this.computeIsOnline(station));
-        const alerts = stations.filter((station) => !this.computeIsOnline(station) || station.state === 'Faulted');
-        const totalOk = this.summary?.totalOkCount ?? stations.reduce((sum, station) => sum + Number(station.sessionOkCount || 0), 0);
-        const totalNg = this.summary?.totalNgCount ?? stations.reduce((sum, station) => sum + Number(station.sessionNgCount || 0), 0);
-        const totalError = this.summary?.totalErrorCount ?? stations.reduce((sum, station) => sum + Number(station.sessionErrorCount || 0), 0);
+        const snapshot = this.getStationRenderSnapshot();
+        const totalOk = this.summary?.totalOkCount ?? snapshot.totalOk;
+        const totalNg = this.summary?.totalNgCount ?? snapshot.totalNg;
+        const totalError = this.summary?.totalErrorCount ?? snapshot.totalError;
         const avgExecutionTime = this.summary?.averageExecutionTimeMs ??
-            stations.reduce((sum, station) => sum + Number(station.averageExecutionTimeMs || 0), 0) / Math.max(stations.length, 1);
+            snapshot.averageExecutionTimeMs;
         const totalInspections = totalOk + totalNg + totalError;
         const yieldRate = totalInspections === 0 ? '--' : `${Math.round((totalOk / totalInspections) * 1000) / 10}%`;
 
         const cards = [
-            { label: '在线', value: `${onlineStations.length}/${stations.length || 0}`, meta: `${stations.length - onlineStations.length} 个离线`, tone: 'success' },
-            { label: '告警', value: String(alerts.length), meta: '故障或超时', tone: alerts.length > 0 ? 'warning' : 'default' },
+            { label: '在线', value: `${snapshot.onlineCount}/${snapshot.stations.length || 0}`, meta: `${snapshot.stations.length - snapshot.onlineCount} 个离线`, tone: 'success' },
+            { label: '告警', value: String(snapshot.alertCount), meta: '故障或超时', tone: snapshot.alertCount > 0 ? 'warning' : 'default' },
             { label: '良率', value: yieldRate, meta: `${totalOk} OK / ${totalNg} NG / ${totalError} ERR`, tone: 'accent' },
             { label: '平均节拍', value: this.formatMilliseconds(avgExecutionTime), meta: `${this.offlineThresholdSeconds} 秒后判定超时`, tone: 'info' }
         ];
@@ -915,9 +1011,9 @@ class StationMonitorView {
             return;
         }
 
-        const stations = this.getSortedStations();
-        const onlineCount = stations.filter((station) => this.computeIsOnline(station)).length;
-        this.matrixMeta.textContent = `${onlineCount}/${stations.length} 在线`;
+        const snapshot = this.getStationRenderSnapshot();
+        const stations = snapshot.stations;
+        this.matrixMeta.textContent = `${snapshot.onlineCount}/${stations.length} 在线`;
 
         if (stations.length === 0) {
             this.matrix.innerHTML = `
@@ -1410,36 +1506,146 @@ class StationMonitorView {
     }
 
     getSortedStations() {
-        return [...this.stations.values()].sort((left, right) => {
-            const leftOnline = this.computeIsOnline(left) ? 1 : 0;
-            const rightOnline = this.computeIsOnline(right) ? 1 : 0;
+        return this.getStationRenderEntries().map((entry) => entry.station);
+    }
+
+    getStationRenderSnapshot() {
+        if (this._renderContextActive && this._stationRenderSnapshot) {
+            return this._stationRenderSnapshot;
+        }
+
+        const entries = this.getStationRenderEntries();
+        let onlineCount = 0;
+        let alertCount = 0;
+        let totalOk = 0;
+        let totalNg = 0;
+        let totalError = 0;
+        let totalExecutionTime = 0;
+
+        for (const entry of entries) {
+            const station = entry.station;
+            if (entry.isOnline) {
+                onlineCount += 1;
+            }
+            if (!entry.isOnline || station.state === 'Faulted') {
+                alertCount += 1;
+            }
+            totalOk += Number(station.sessionOkCount || 0);
+            totalNg += Number(station.sessionNgCount || 0);
+            totalError += Number(station.sessionErrorCount || 0);
+            totalExecutionTime += Number(station.averageExecutionTimeMs || 0);
+        }
+
+        const snapshot = {
+            stations: entries.map((entry) => entry.station),
+            onlineCount,
+            alertCount,
+            totalOk,
+            totalNg,
+            totalError,
+            averageExecutionTimeMs: entries.length === 0 ? 0 : totalExecutionTime / entries.length
+        };
+
+        if (this._renderContextActive) {
+            this._stationRenderSnapshot = snapshot;
+        }
+
+        return snapshot;
+    }
+
+    getStationRenderEntries() {
+        if (this._renderContextActive && this._stationEntriesCache) {
+            return this._stationEntriesCache;
+        }
+
+        const entries = [...this.stations.values()].map((station) => ({
+            station,
+            isOnline: this.computeIsOnline(station)
+        }));
+
+        entries.sort((left, right) => {
+            const leftOnline = left.isOnline ? 1 : 0;
+            const rightOnline = right.isOnline ? 1 : 0;
             if (leftOnline !== rightOnline) {
                 return rightOnline - leftOnline;
             }
 
-            if (left.state !== right.state) {
-                return String(left.state || '').localeCompare(String(right.state || ''));
+            if (left.station.state !== right.station.state) {
+                return String(left.station.state || '').localeCompare(String(right.station.state || ''));
             }
 
-            return String(left.stationId || '').localeCompare(String(right.stationId || ''));
+            return String(left.station.stationId || '').localeCompare(String(right.station.stationId || ''));
         });
+
+        if (this._renderContextActive) {
+            this._stationEntriesCache = entries;
+        }
+
+        return entries;
     }
 
     computeIsOnline(station) {
+        if (this._renderContextActive && station) {
+            const cacheKey = [
+                station.stationId || '',
+                station.lastSeenAtUtc || '',
+                station.isEnabled === false ? '0' : '1',
+                station.isOnline ? '1' : '0'
+            ].join('|');
+            if (this._onlineCache.has(cacheKey)) {
+                return this._onlineCache.get(cacheKey);
+            }
+        }
+
         if (station?.isEnabled === false) {
+            if (this._renderContextActive && station) {
+                this._onlineCache.set([
+                    station.stationId || '',
+                    station.lastSeenAtUtc || '',
+                    '0',
+                    station.isOnline ? '1' : '0'
+                ].join('|'), false);
+            }
             return false;
         }
 
         if (!station?.lastSeenAtUtc) {
-            return Boolean(station?.isOnline);
+            const result = Boolean(station?.isOnline);
+            if (this._renderContextActive && station) {
+                this._onlineCache.set([
+                    station.stationId || '',
+                    '',
+                    station.isEnabled === false ? '0' : '1',
+                    station.isOnline ? '1' : '0'
+                ].join('|'), result);
+            }
+            return result;
         }
 
         const lastSeen = new Date(station.lastSeenAtUtc).getTime();
         if (!Number.isFinite(lastSeen)) {
-            return Boolean(station?.isOnline);
+            const result = Boolean(station?.isOnline);
+            if (this._renderContextActive && station) {
+                this._onlineCache.set([
+                    station.stationId || '',
+                    station.lastSeenAtUtc || '',
+                    station.isEnabled === false ? '0' : '1',
+                    station.isOnline ? '1' : '0'
+                ].join('|'), result);
+            }
+            return result;
         }
 
-        return Date.now() - lastSeen <= this.offlineThresholdSeconds * 1000;
+        const result = (this._renderNowMs || Date.now()) - lastSeen <= this.offlineThresholdSeconds * 1000;
+        if (this._renderContextActive && station) {
+            this._onlineCache.set([
+                station.stationId || '',
+                station.lastSeenAtUtc || '',
+                station.isEnabled === false ? '0' : '1',
+                station.isOnline ? '1' : '0'
+            ].join('|'), result);
+        }
+        return result;
     }
 
     normalizeSummary(summary) {
@@ -1860,32 +2066,41 @@ class StationMonitorView {
             return '--';
         }
 
+        if (this._renderContextActive && this._relativeTimeCache.has(value)) {
+            return this._relativeTimeCache.get(value);
+        }
+
         const timestamp = new Date(value).getTime();
         if (!Number.isFinite(timestamp)) {
             return '--';
         }
 
-        const deltaSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+        const deltaSeconds = Math.max(0, Math.floor(((this._renderNowMs || Date.now()) - timestamp) / 1000));
+        let result;
         if (deltaSeconds < 5) {
-            return '刚刚';
+            result = '刚刚';
+        } else if (deltaSeconds < 60) {
+            result = `${deltaSeconds} 秒前`;
+        } else {
+            const minutes = Math.floor(deltaSeconds / 60);
+            if (minutes < 60) {
+                result = `${minutes} 分钟前`;
+            } else {
+                const hours = Math.floor(minutes / 60);
+                if (hours < 24) {
+                    result = `${hours} 小时前`;
+                } else {
+                    const days = Math.floor(hours / 24);
+                    result = `${days} 天前`;
+                }
+            }
         }
 
-        if (deltaSeconds < 60) {
-            return `${deltaSeconds} 秒前`;
+        if (this._renderContextActive) {
+            this._relativeTimeCache.set(value, result);
         }
 
-        const minutes = Math.floor(deltaSeconds / 60);
-        if (minutes < 60) {
-            return `${minutes} 分钟前`;
-        }
-
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) {
-            return `${hours} 小时前`;
-        }
-
-        const days = Math.floor(hours / 24);
-        return `${days} 天前`;
+        return result;
     }
 
     formatHourBucket(value) {

@@ -1,6 +1,6 @@
 /**
- * 调试开关：默认关闭。开启后 serialize/deserialize 会打印详细日志。
- * 需要排查时通过 `window.__FLOW_CANVAS_DEBUG__ = true` 或修改此常量启用。
+ * 鐠嬪啳鐦鈧崗绛圭窗姒涙顓婚崗鎶芥４閵嗗倸绱戦崥顖氭倵 serialize/deserialize 娴兼碍澧﹂崡鎷岊嚊缂佸棙妫╄箛妞尖偓?
+ * 闂団偓鐟曚焦甯撻弻銉︽闁俺绻?`window.__FLOW_CANVAS_DEBUG__ = true` 閹存牔鎱ㄩ弨瑙勵劃鐢悂鍣洪崥顖滄暏閵?
  */
 const DEBUG_FLOW_CANVAS = false;
 function flowDebugEnabled() {
@@ -8,24 +8,24 @@ function flowDebugEnabled() {
 }
 
 /**
- * 端口类型颜色映射表 (模块级常量，提高兼容性)
+ * 缁旑垰褰涚猾璇茬€锋０婊嗗閺勭姴鐨犵悰?(濡€虫健缁狙冪埗闁插骏绱濋幓鎰扮彯閸忕厧顔愰幀?
  */
 const PORT_TYPE_COLORS = {
-    'Image':           '#52c41a',  // 绿色 - 图像
-    'String':          '#1890ff',  // 蓝色 - 字符串
-    'Integer':         '#fa8c16',  // 橙色 - 整数
-    'Float':           '#fa8c16',  // 橙色 - 浮点
-    'Boolean':         '#f5222d',  // 红色 - 布尔值
-    'Point':           '#eb2f96',  // 粉色 - 坐标
-    'Rectangle':       '#eb2f96',  // 粉色 - 矩形
-    'Contour':         '#722ed1',  // 紫色 - 轮廓/区域
-    'PointList':       '#eb2f96',  // 粉色 - 点列表 (Sprint 1.2)
-    'DetectionResult': '#13c2c2',  // 青色 - 检测结果 (Sprint 1.2)
-    'DetectionList':   '#13c2c2',  // 青色 - 检测列表 (Sprint 1.2)
-    'CircleData':      '#2f54eb',  // 靛蓝 - 圆数据 (Sprint 1.2)
-    'LineData':        '#2f54eb',  // 靛蓝 - 直线数据 (Sprint 1.2)
-    'Any':             '#bfbfbf',  // 灰色 - 任意
-    // 兼容枚举数字值
+    'Image':           '#52c41a',  // 缂佽儻澹?- 閸ユ儳鍎?
+    'String':          '#1890ff',  // 閽冩繆澹?- 鐎涙顑佹稉?
+    'Integer':         '#fa8c16',  // 濮楁瑨澹?- 閺佸瓨鏆?
+    'Float':           '#fa8c16',  // 濮楁瑨澹?- 濞搭喚鍋?
+    'Boolean':         '#f5222d',  // 缁俱垼澹?- 鐢啫鐨甸崐?
+    'Point':           '#eb2f96',  // 缁澹?- 閸ф劖鐖?
+    'Rectangle':       '#eb2f96',  // 缁澹?- 閻晛鑸?
+    'Contour':         '#722ed1',  // 缁鳖偉澹?- 鏉烆喖绮?閸栧搫鐓?
+    'PointList':       '#eb2f96',  // 缁澹?- 閻愮懓鍨悰?(Sprint 1.2)
+    'DetectionResult': '#13c2c2',  // 闂堟帟澹?- 濡偓濞村绮ㄩ弸?(Sprint 1.2)
+    'DetectionList':   '#13c2c2',  // 闂堟帟澹?- 濡偓濞村鍨悰?(Sprint 1.2)
+    'CircleData':      '#2f54eb',  // 闂堟稖鎽?- 閸﹀棙鏆熼幑?(Sprint 1.2)
+    'LineData':        '#2f54eb',  // 闂堟稖鎽?- 閻╁鍤庨弫鐗堝祦 (Sprint 1.2)
+    'Any':             '#bfbfbf',  // 閻忔媽澹?- 娴犵粯鍓?
+    // 鍏煎鏋氫妇鏁板瓧鍊?
     0: '#52c41a',
     1: '#fa8c16', 2: '#fa8c16', 3: '#f5222d',
     4: '#1890ff', 5: '#eb2f96', 6: '#eb2f96', 7: '#722ed1',
@@ -34,7 +34,7 @@ const PORT_TYPE_COLORS = {
 };
 
 /**
- * 通信类算子类型集合 - Sprint 4 Task 4.3 安全提示
+ * 闁矮淇婄猾鑽ょ暬鐎涙劗琚崹瀣肠閸?- Sprint 4 Task 4.3 鐎瑰鍙忛幓鎰仛
  */
 const COMM_OPERATOR_TYPES = new Set([
     'HttpRequest', 'MqttPublish', 'ModbusCommunication',
@@ -49,9 +49,9 @@ const LEGACY_OPERATOR_TYPE_ALIASES = {
     'ModbusRtuCommunication': 'ModbusCommunication'
 };
 
-const PORT_HIT_RADIUS_PX = 12;       // 端口屏幕命中半径
-const CONNECTION_HIT_RADIUS_PX = 10; // 连线屏幕命中半径
-const CONNECTION_HIT_SAMPLES = 16;   // 贝塞尔曲线采样点数
+const PORT_HIT_RADIUS_PX = 12;       // 绔彛灞忓箷鍛戒腑鍗婂緞
+const CONNECTION_HIT_RADIUS_PX = 10; // 杩炵嚎灞忓箷鍛戒腑鍗婂緞
+const CONNECTION_HIT_SAMPLES = 16;   // 鐠愭繂顢ｇ亸鏃€娲哥痪鍧楀櫚閺嶉鍋ｉ弫?
 const NODE_DEFAULT_WIDTH = 140;
 const NODE_MIN_HEIGHT = 60;
 const NODE_HEADER_HEIGHT = 24;
@@ -80,27 +80,27 @@ class FlowCanvas {
         this.viewStateListeners = new Set();
         this.structureStateListeners = new Set();
 
-        // 逻辑尺寸（CSS 像素）与 DPR：所有绘制坐标在逻辑像素空间，通过 setTransform 缩放到 backing store
+        // 閫昏緫灏哄锛圕SS 鍍忕礌锛変笌 DPR锛氭墍鏈夌粯鍒跺潗鏍囧湪閫昏緫鍍忕礌绌洪棿锛岄€氳繃 setTransform 缂╂斁鍒?backing store
         this._dpr = 1;
         this._logicalWidth = 0;
         this._logicalHeight = 0;
 
-        // 画布对齐与点阵背景设置
+        // 閻㈣绔风€靛綊缍堟稉搴ｅ仯闂冧絻鍎楅弲顖濐啎缂?
         this.gridSize = 20;
         this.gridColor = 'rgba(48, 71, 62, 0.16)';
         this.gridDotRadius = 1.05;
 
-        // 事件回调
+        // 浜嬩欢鍥炶皟
         this.onNodeSelected = null;
         this.onConnectionCreated = null;
 
-        // 连线状态管理
+        // 鏉╃偟鍤庨悩鑸碘偓浣侯吀閻?
         this.isConnecting = false;
         this.connectingFrom = null;  // { nodeId, portIndex, isOutput }
         this.mousePosition = { x: 0, y: 0 };
         this.hoveredPort = null;  // { nodeId, portIndex, isOutput }
 
-        // 事件处理器引用（用于销毁时移除）
+        // 娴滃娆㈡径鍕倞閸ｃ劌绱╅悽顭掔礄閻劋绨柨鈧В浣规缁夊娅庨敍?
         this._resizeHandler = this.resize.bind(this);
         this._mouseDownHandler = this.handleMouseDown.bind(this);
         this._mouseMoveHandler = this.handleMouseMove.bind(this);
@@ -112,32 +112,34 @@ class FlowCanvas {
         this._visibilityHandler = this.handleVisibilityChange.bind(this);
         this._drawFrameBound = this._drawFrame.bind(this);
 
-        // 渲染调度状态（脏标记 + 单一 RAF）
+        // 濞撳弶鐓嬬拫鍐ㄥ閻樿埖鈧緤绱欓懘蹇旂垼鐠?+ 閸楁洑绔?RAF閿?
         this._animationFrameId = null;
-        this._dirty = true;          // 是否需要重绘
-        this._lastFrameTime = 0;     // 上一帧时间戳，用于 dt 推进动画
-        this._isPaused = false;      // 页面隐藏时暂停
+        this._dirty = true;          // 閺勵垰鎯侀棁鈧憰渚€鍣哥紒?
+        this._lastFrameTime = 0;     // 娑撳﹣绔寸敮褎妞傞梻瀛樺煈閿涘瞼鏁ゆ禍?dt 閹恒劏绻橀崝銊ф暰
+        this._isPaused = false;      // 妞ょ敻娼伴梾鎰閺冭埖娈忛崑?
 
-        // ResizeObserver 与节流
+        // ResizeObserver 娑撳氦濡ù?
         this._resizeObserver = null;
         this._resizeRafId = null;
 
-        // 选中的连接
+        // 闁鑵戦惃鍕箾閹?
         this.selectedConnection = null;
 
-        // 连接索引：用于 O(1) 查找，避免每帧 mousemove 上的 .find/.filter 全表扫描
+        // 鏉╃偞甯寸槐銏犵穿閿涙氨鏁ゆ禍?O(1) 閺屻儲澹橀敍宀勪缉閸忓秵鐦＄敮?mousemove 娑撳﹦娈?.find/.filter 閸忋劏銆冮幍顐ｅ伎
         this._connectionById = new Map();
         this._connectionsByOutputPort = new Map();  // key=portKey -> Set<connection>
-        this._connectionByInputPort = new Map();    // key=portKey -> connection（输入端口仅允许 1 条）
+        this._connectionByInputPort = new Map();    // key=portKey -> connection閿涘牐绶崗銉ь伂閸欙絼绮庨崗浣筋啅 1 閺夆槄绱?
 
-        // 粒子精灵缓存（避免每帧 createRadialGradient）
+        // 缁帒鐡欑划鍓т紥缂傛挸鐡ㄩ敍鍫ヤ缉閸忓秵鐦＄敮?createRadialGradient閿?
         this._particleSprite = null;
         this._particleSpriteSize = 0;
 
-        // ForEach 子图节点数解析缓存
+        // ForEach 鐎涙劕娴橀懞鍌滃仯閺佹媽袙閺嬫劗绱︾€?
         this._subGraphNodeCountCache = new WeakMap();
+        this._nodesBoundsCache = null;
+        this._nodesBoundsDirty = true;
 
-        // 右键菜单
+        // 鍙抽敭鑿滃崟
         this.contextMenu = null;
         this._clickOutsideHandler = this.hideContextMenu.bind(this);
 
@@ -145,12 +147,12 @@ class FlowCanvas {
     }
 
     /**
-     * 初始化画布
+     * 閸掓繂顫愰崠鏍暰鐢?
      */
     initialize() {
         this.resize();
 
-        // 使用 ResizeObserver 替代 window.resize；用 RAF 合帧，防止拖拽窗口连续触发
+        // 娴ｈ法鏁?ResizeObserver 閺囧じ鍞?window.resize閿涙稓鏁?RAF 閸氬牆鎶氶敍宀勬Щ濮濄垺瀚嬮幏鐣岀崶閸欙綀绻涚紒顓⌒曢崣?
         const ResizeObserverCtor = window.ResizeObserver;
         if (ResizeObserverCtor) {
             this._resizeObserver = new ResizeObserverCtor(entries => {
@@ -171,7 +173,7 @@ class FlowCanvas {
             window.addEventListener('resize', this._resizeHandler);
         }
 
-        // 绑定事件
+        // 缂佹垵鐣炬禍瀣╂
         this.canvas.addEventListener('mousedown', this._mouseDownHandler);
         this.canvas.addEventListener('mousemove', this._mouseMoveHandler);
         this.canvas.addEventListener('mouseup', this._mouseUpHandler);
@@ -182,15 +184,15 @@ class FlowCanvas {
 
         document.addEventListener('visibilitychange', this._visibilityHandler);
 
-        // 启动渲染（请求一次重绘，后续根据脏标记/动画状态决定是否继续 RAF）
+        // 閸氼垰濮╁〒鍙夌厠閿涘牐顕Ч鍌欑濞嗭繝鍣哥紒姗堢礉閸氬海鐢婚弽瑙勫祦閼村繑鐖ｇ拋?閸斻劎鏁鹃悩鑸碘偓浣稿枀鐎规碍妲搁崥锔炬埛缂?RAF閿?
         this.invalidate();
 
-        // 初始化小地图
+        // 閸掓繂顫愰崠鏍х毈閸︽澘娴?
         this.initMinimap();
     }
 
     /**
-     * 处理页面可见性变化：后台暂停 RAF，回前台立即调度一次重绘
+     * 澶勭悊椤甸潰鍙鎬у彉鍖栵細鍚庡彴鏆傚仠 RAF锛屽洖鍓嶅彴绔嬪嵆璋冨害涓€娆￠噸缁?
      */
     handleVisibilityChange() {
         if (document.hidden) {
@@ -206,7 +208,7 @@ class FlowCanvas {
     }
 
     /**
-     * 销毁画布，清理所有事件监听和动画循环
+     * 闁库偓濮ｄ胶鏁剧敮鍐跨礉濞撳懐鎮婇幍鈧張澶夌皑娴犲墎娲冮崥顒€鎷伴崝銊ф暰瀵邦亞骞?
      */
     destroy() {
         if (this._animationFrameId !== null) {
@@ -257,10 +259,10 @@ class FlowCanvas {
     }
 
     /**
-     * 调整画布大小，支持 devicePixelRatio。
-     * - canvas.width/height（backing store）使用 dpr 放大
-     * - canvas.style.width/height 保持 CSS 像素
-     * - ctx.setTransform(dpr,0,0,dpr,0,0) 让所有绘制坐标使用逻辑像素
+     * 鐠嬪啯鏆ｉ悽璇茬婢堆冪毈閿涘本鏁幐?devicePixelRatio閵?
+     * - canvas.width/height閿涘潌acking store閿涘濞囬悽?dpr 閺€鎯с亣
+     * - canvas.style.width/height 娣囨繃瀵?CSS 閸嶅繒绀?
+     * - ctx.setTransform(dpr,0,0,dpr,0,0) 鐠佲晜澧嶉張澶岀帛閸掕泛娼楅弽鍥﹀▏閻劑鈧槒绶崓蹇曠
      */
     resize() {
         const container = this.canvas.parentElement;
@@ -290,7 +292,7 @@ class FlowCanvas {
     }
 
     /**
-     * 生成UUID
+     * 閻㈢喐鍨歎UID
      */
     generateUUID() {
         if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -303,7 +305,7 @@ class FlowCanvas {
     }
 
     /**
-     * 添加节点
+     * 濞ｈ濮為懞鍌滃仯
      */
     addNode(type, x, y, config = {}) {
         const canonicalType = this.normalizeOperatorType(type);
@@ -340,8 +342,8 @@ class FlowCanvas {
     }
 
     /**
-     * 删除节点（同时清理相关连接与索引）。
-     * 系统节点 (_systemNode) 受保护，不可删除。
+     * 閸掔娀娅庨懞鍌滃仯閿涘牆鎮撻弮鑸电閻炲棛娴夐崗瀹犵箾閹恒儰绗岀槐銏犵穿閿涘鈧?
+     * 缁崵绮洪懞鍌滃仯 (_systemNode) 閸欐ぞ绻氶幎銈忕礉娑撳秴褰查崚鐘绘珟閵?
      */
     removeNode(nodeId) {
         const node = this.nodes.get(nodeId);
@@ -349,11 +351,11 @@ class FlowCanvas {
             return;
         }
         if (node._systemNode) {
-            console.warn('[FlowCanvas] 系统节点不可删除:', node.title || node.type);
+            console.warn('[FlowCanvas] System node cannot be removed:', node.title || node.type);
             return;
         }
 
-        // 清理与本节点相关的连接（同时同步索引）
+        // 娓呯悊涓庢湰鑺傜偣鐩稿叧鐨勮繛鎺ワ紙鍚屾椂鍚屾绱㈠紩锛?
         const remaining = [];
         for (const conn of this.connections) {
             if (conn.source === nodeId || conn.target === nodeId) {
@@ -376,7 +378,7 @@ class FlowCanvas {
     }
 
     /**
-     * 添加连接
+     * 濞ｈ濮炴潻鐐村复
      */
     addConnection(sourceId, sourcePort, targetId, targetPort) {
         const validationError = this.getConnectionValidationError(sourceId, sourcePort, targetId, targetPort);
@@ -513,7 +515,7 @@ class FlowCanvas {
                 x: this.offset.x,
                 y: this.offset.y
             },
-            // 逻辑像素（CSS 像素），便于消费者按 getBoundingClientRect 等价对比
+            // 闁槒绶崓蹇曠閿涘湑SS 閸嶅繒绀岄敍澶涚礉娓氬じ绨☉鍫ｅ瀭閼板懏瀵?getBoundingClientRect 缁涘鐜€佃鐦?
             canvasWidth: this._logicalWidth,
             canvasHeight: this._logicalHeight,
             flowRevision: this.flowRevision
@@ -526,7 +528,7 @@ class FlowCanvas {
             return null;
         }
 
-        // 返回逻辑像素坐标，与 nodePreviewOverlay 等基于 CSS 容器尺寸的逻辑保持一致
+        // 鏉╂柨娲栭柅鏄忕帆閸嶅繒绀岄崸鎰垼閿涘奔绗?nodePreviewOverlay 缁涘鐔€娴?CSS 鐎圭懓娅掔亸鍝勵嚟閻ㄥ嫰鈧槒绶穱婵囧瘮娑撯偓閼?
         return {
             x: (node.x - this.offset.x) * this.scale,
             y: (node.y - this.offset.y) * this.scale,
@@ -571,6 +573,7 @@ class FlowCanvas {
 
     markFlowStructureChanged(reason = 'unknown') {
         this.flowRevision += 1;
+        this._markNodesBoundsDirty();
         const payload = {
             flowRevision: this.flowRevision,
             reason
@@ -585,12 +588,24 @@ class FlowCanvas {
         });
 
         this.notifyViewStateChanged();
-        // 结构变化时清除 SubGraph 解析缓存（WeakMap 无法批量清，但重赋引用可释放旧键）
+        // 缁撴瀯鍙樺寲鏃舵竻闄?SubGraph 瑙ｆ瀽缂撳瓨锛圵eakMap 鏃犳硶鎵归噺娓咃紝浣嗛噸璧嬪紩鐢ㄥ彲閲婃斁鏃ч敭锛?
         this._subGraphNodeCountCache = new WeakMap();
     }
 
+    _markNodesBoundsDirty() {
+        this._nodesBoundsDirty = true;
+        this._nodesBoundsCache = null;
+    }
+
+    _isSamePortState(left, right) {
+        return left?.nodeId === right?.nodeId &&
+            left?.portIndex === right?.portIndex &&
+            Boolean(left?.isOutput) === Boolean(right?.isOutput) &&
+            Boolean(left?.hasConnection) === Boolean(right?.hasConnection);
+    }
+
     /**
-     * 绘制点阵背景
+     * 缂佹ê鍩楅悙褰掓█閼冲本娅?
      */
     drawGrid() {
         const width = this._logicalWidth;
@@ -606,7 +621,7 @@ class FlowCanvas {
         const startX = Math.floor(this.offset.x / dotStep) * dotStep;
         const startY = Math.floor(this.offset.y / dotStep) * dotStep;
 
-        // 可视区域使用逻辑尺寸，避免 DPR 导致重复绘制
+        // 閸欘垵顫嬮崠鍝勭厵娴ｈ法鏁ら柅鏄忕帆鐏忓搫顕敍宀勪缉閸?DPR 鐎佃壈鍤ч柌宥咁槻缂佹ê鍩?
         const visibleWidth = width / this.scale;
         const visibleHeight = height / this.scale;
 
@@ -634,8 +649,8 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制节点 - 阶段四增强版
-     * 渐变填充 + 图标 + 状态发光效果
+     * 缂佹ê鍩楅懞鍌滃仯 - 闂冭埖顔岄崶娑橆杻瀵櫣澧?
+     * 濞撴劕褰夋繅顐㈠帠 + 閸ョ偓鐖?+ 閻樿埖鈧礁褰傞崗澶嬫櫏閺?
      */
     drawNode(node) {
         const x = (node.x - this.offset.x) * this.scale;
@@ -644,17 +659,17 @@ class FlowCanvas {
         const h = node.height * this.scale;
         const isSelected = this.selectedNode === node.id;
 
-        // === ForEach 容器节点判定 ===
+        // === ForEach 鐎圭懓娅掗懞鍌滃仯閸掋倕鐣?===
         const isForEach = node.type === 'ForEach';
         const ioMode = isForEach ? (node.parameters?.find(p => p.name === 'IoMode' || p.Name === 'IoMode')?.value || 'Parallel') : null;
         const isSequential = ioMode === 'Sequential';
 
-        // 根据状态调整边框颜色和发光效果
+        // 閺嶈宓侀悩鑸碘偓浣界殶閺佺绔熷鍡涱杹閼规彃鎷伴崣鎴濆帨閺佸牊鐏?
         let borderColor = isSelected ? node.color : 'rgba(255, 255, 255, 0.1)';
         let borderWidth = isSelected ? 3 : 1;
         let glowColor = null;
 
-        // === Sprint 4 Task 4.3: 安全提示层 ===
+        // === Sprint 4 Task 4.3: 鐎瑰鍙忛幓鎰仛鐏?===
         const isCommunicationOp = COMM_OPERATOR_TYPES.has(node.type);
         const hasFileParam = node.parameters && node.parameters.some(
             p => p.dataType === 'file' && p.value
@@ -671,29 +686,29 @@ class FlowCanvas {
             borderColor = '#e74c3c';
             glowColor = 'rgba(231, 76, 60, 0.5)';
         } else if (isForEach && isSequential) {
-            // ForEach Sequential 模式：橙色边框
+            // ForEach Sequential 濡€崇础閿涙碍顭堕懝鑼剁珶濡?
             borderColor = '#fa8c16';
             borderWidth = 2;
             glowColor = 'rgba(250, 140, 22, 0.3)';
         } else if (isForEach) {
-            // ForEach Parallel 模式：青色虚线边框
+            // ForEach Parallel 濡€崇础閿涙岸娼氶懝鑼舵珓缁捐儻绔熷?
             borderColor = '#13c2c2';
             borderWidth = 2;
             glowColor = 'rgba(19, 194, 194, 0.2)';
         } else if (isCommunicationOp) {
-            // 通信算子：红色警戒边框
+            // 闁矮淇婄粻妤€鐡欓敍姘卞閼硅尪顒熼幋鎺曠珶濡?
             borderColor = '#f5222d';
             borderWidth = 2;
             glowColor = 'rgba(245, 34, 45, 0.3)';
         } else if (hasFileParam) {
-            // 含 file 参数的算子：橙色提示边框
+            // 閸?file 閸欏倹鏆熼惃鍕暬鐎涙劧绱板娆掑閹绘劗銇氭潏瑙勵攱
             borderColor = '#fa8c16';
             borderWidth = 2;
         } else if (isSelected) {
             glowColor = `${node.color}80`; // 50% opacity
         }
 
-        // 状态发光效果（save/restore 包裹避免阴影泄漏到后续绘制）
+        // 閻樿埖鈧礁褰傞崗澶嬫櫏閺嬫粣绱檚ave/restore 閸栧懓锛欓柆鍨帳闂冩潙濂栧▔鍕础閸掓澘鎮楃紒顓犵帛閸掕绱?
         this.ctx.save();
         if (glowColor) {
             this.ctx.shadowColor = glowColor;
@@ -707,7 +722,7 @@ class FlowCanvas {
             this.ctx.shadowOffsetY = 2;
         }
 
-        // 节点背景 - 渐变填充
+        // 閼哄倻鍋ｉ懗灞炬珯 - 濞撴劕褰夋繅顐㈠帠
         const gradient = this.ctx.createLinearGradient(x, y, x, y + h);
         gradient.addColorStop(0, isSelected ? 'rgba(45, 74, 94, 0.9)' : 'rgba(26, 58, 82, 0.8)');
         gradient.addColorStop(1, isSelected ? 'rgba(26, 58, 82, 0.95)' : 'rgba(13, 27, 42, 0.9)');
@@ -716,24 +731,24 @@ class FlowCanvas {
         this.ctx.strokeStyle = borderColor;
         this.ctx.lineWidth = borderWidth;
 
-        // ForEach 节点使用虚线边框
+        // ForEach 閼哄倻鍋ｆ担璺ㄦ暏閾忔氨鍤庢潏瑙勵攱
         if (isForEach) {
             this.ctx.setLineDash([6, 4]);
         }
 
-        // 绘制圆角矩形
+        // 缂佹ê鍩楅崷鍡氼潡閻晛鑸?
         this.roundRect(x, y, w, h, 8);
         this.ctx.fill();
         this.ctx.stroke();
 
-        // 恢复实线
+        // 閹垹顦茬€圭偟鍤?
         if (isForEach) {
             this.ctx.setLineDash([]);
         }
 
         this.ctx.restore();
 
-        // 标题栏 - 渐变
+        // 閺嶅洭顣介弽?- 濞撴劕褰?
         const headerGradient = this.ctx.createLinearGradient(x, y, x + w, y);
         headerGradient.addColorStop(0, node.color);
         headerGradient.addColorStop(1, this.adjustColor(node.color, -20));
@@ -741,7 +756,7 @@ class FlowCanvas {
         this.roundRect(x, y, w, 24 * this.scale, { tl: 8, tr: 8, bl: 0, br: 0 });
         this.ctx.fill();
 
-        // 图标
+        // 閸ョ偓鐖?
         if (node.iconPath) {
             const targetSize = 16 * this.scale;
             const scaleFactor = targetSize / 24; // ViewBox 24x24
@@ -749,7 +764,7 @@ class FlowCanvas {
             this.ctx.save();
             this.ctx.translate(x + 8 * this.scale, y + 4 * this.scale);
             this.ctx.scale(scaleFactor, scaleFactor);
-            this.ctx.fillStyle = '#ffffff'; // 图标永远白色
+            this.ctx.fillStyle = '#ffffff'; // 閸ョ偓鐖ｅ姝岀箼閻у€熷
             const path = new Path2D(node.iconPath);
             this.ctx.fill(path);
             this.ctx.restore();
@@ -761,7 +776,7 @@ class FlowCanvas {
             this.ctx.fillText(node.icon, x + 8 * this.scale, y + 12 * this.scale);
         }
 
-        // 标题文字
+        // 閺嶅洭顣介弬鍥х摟
         this.ctx.fillStyle = '#ffffff';
         this.ctx.font = `bold ${11 * this.scale}px sans-serif`;
         this.ctx.textAlign = 'left';
@@ -769,17 +784,16 @@ class FlowCanvas {
         const titleX = (node.icon || node.iconPath) ? x + 28 * this.scale : x + 10 * this.scale;
         this.ctx.fillText(node.title, titleX, y + 12 * this.scale);
 
-        // === ForEach IoMode 标签 ===
+        // === ForEach IoMode 閺嶅洨顒?===
         if (isForEach && ioMode) {
-            const ioLabel = isSequential ? '🔗 串行' : '⚡ 并行';
+            const ioLabel = isSequential ? 'SEQ' : 'PAR';
             const labelColor = isSequential ? '#fa8c16' : '#13c2c2';
             this.ctx.fillStyle = labelColor;
             this.ctx.font = `bold ${9 * this.scale}px sans-serif`;
             this.ctx.textAlign = 'right';
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText(ioLabel, x + w - 6 * this.scale, y + 12 * this.scale);
-            
-            // 显示子图内算子数量提示（带缓存，避免每帧重复 JSON.parse）
+
             let subNodeCount = 0;
             if (this._subGraphNodeCountCache.has(node)) {
                 subNodeCount = this._subGraphNodeCountCache.get(node);
@@ -792,7 +806,7 @@ class FlowCanvas {
                             subNodeCount = subGraphData.nodes.length;
                         }
                     } catch (e) {
-                        // 静默忽略解析失败，不污染控制台
+                        // Ignore malformed subgraph payloads.
                     }
                 }
                 this._subGraphNodeCountCache.set(node, subNodeCount);
@@ -801,31 +815,30 @@ class FlowCanvas {
             this.ctx.font = `${10 * this.scale}px sans-serif`;
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'bottom';
-            this.ctx.fillText(`[内含 ${subNodeCount} 个算子]`, x + w / 2, y + h - 8 * this.scale);
+            this.ctx.fillText(`[${subNodeCount} nodes]`, x + w / 2, y + h - 8 * this.scale);
         }
 
-        // 绘制状态指示器
         if (node.status) {
             const indicatorY = y + 40 * this.scale;
             this.drawStatusIndicator(x + w - 12 * this.scale, indicatorY, node.status);
         }
 
-        // 绘制端口
+        // 缂佹ê鍩楃粩顖氬經
         this.drawPorts(node, x, y, w, h);
 
-        // === Sprint 4 Task 4.3: 绘制安全标记 ===
+        // === Sprint 4 Task 4.3: 缂佹ê鍩楃€瑰鍙忛弽鍥唶 ===
         if (isCommunicationOp) {
-            // 通信算子：右上角绘制 ⚠ 图标
+            // 闁矮淇婄粻妤€鐡欓敍姘礁娑撳﹨顫楃紒妯哄煑 閳?閸ョ偓鐖?
             this.ctx.fillStyle = '#f5222d';
             this.ctx.font = `bold ${14 * this.scale}px sans-serif`;
             this.ctx.textAlign = 'right';
             this.ctx.textBaseline = 'top';
-            this.ctx.fillText('⚠', x + w - 4 * this.scale, y + 2 * this.scale);
+            this.ctx.fillText('COM', x + w - 4 * this.scale, y + 2 * this.scale);
         }
     }
 
     /**
-     * 调整颜色亮度
+     * 鐠嬪啯鏆ｆ０婊嗗娴滎喖瀹?
      */
     adjustColor(color, amount) {
         const hex = color.replace('#', '');
@@ -836,10 +849,10 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制状态指示器
-     * @param {number} x - 中心X坐标
-     * @param {number} y - 中心Y坐标
-     * @param {string} status - 状态
+     * 缂佹ê鍩楅悩鑸碘偓浣瑰瘹缁€鍝勬珤
+     * @param {number} x - 娑擃厼绺綳閸ф劖鐖?
+     * @param {number} y - 娑擃厼绺綴閸ф劖鐖?
+     * @param {string} status - 閻樿埖鈧?
      */
     drawStatusIndicator(x, y, status) {
         const radius = 6 * this.scale;
@@ -851,7 +864,7 @@ class FlowCanvas {
             case 'running':
                 this.ctx.fillStyle = '#1890ff';
                 this.ctx.fill();
-                // 绘制旋转的进度环
+                // 缂佹ê鍩楅弮瀣祮閻ㄥ嫯绻樻惔锔惧箚
                 this.ctx.beginPath();
                 this.ctx.arc(x, y, radius + 2 * this.scale, 0, Math.PI * 2);
                 this.ctx.strokeStyle = 'rgba(24, 144, 255, 0.5)';
@@ -861,7 +874,7 @@ class FlowCanvas {
             case 'success':
                 this.ctx.fillStyle = '#52c41a';
                 this.ctx.fill();
-                // 绘制对勾
+                // 缂佹ê鍩楃€电懓瀣€
                 this.ctx.strokeStyle = '#ffffff';
                 this.ctx.lineWidth = 2 * this.scale;
                 this.ctx.beginPath();
@@ -873,7 +886,7 @@ class FlowCanvas {
             case 'error':
                 this.ctx.fillStyle = '#f5222d';
                 this.ctx.fill();
-                // 绘制X
+                // 缂佹ê鍩梄
                 this.ctx.strokeStyle = '#ffffff';
                 this.ctx.lineWidth = 2 * this.scale;
                 this.ctx.beginPath();
@@ -887,12 +900,12 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制端口
+     * 缂佹ê鍩楃粩顖氬經
      */
     drawPorts(node, x, y, w, h) {
         const portRadius = 5 * this.scale;
         
-        // 渲染输入端口 - 垂直均分
+        // 濞撳弶鐓嬫潏鎾冲弳缁旑垰褰?- 閸ㄥ倻娲块崸鍥у瀻
         node.inputs.forEach((input, index) => {
             const portY = this.getPortYInScreen(y, h, index, node.inputs.length);
             const color = PORT_TYPE_COLORS[input.type] || PORT_TYPE_COLORS['Any'];
@@ -905,7 +918,7 @@ class FlowCanvas {
             this.ctx.lineWidth = 1;
             this.ctx.stroke();
 
-            // 绘制类型名 (靠近端口的小标签)
+            // 缂佹ê鍩楃猾璇茬€烽崥?(闂堢姾绻庣粩顖氬經閻ㄥ嫬鐨弽鍥╊劮)
             if (this.scale > 0.8) {
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
                 this.ctx.font = `${8 * this.scale}px sans-serif`;
@@ -915,7 +928,7 @@ class FlowCanvas {
             }
         });
         
-        // 渲染输出端口 - 垂直均分
+        // 濞撳弶鐓嬫潏鎾冲毉缁旑垰褰?- 閸ㄥ倻娲块崸鍥у瀻
         node.outputs.forEach((output, index) => {
             const portY = this.getPortYInScreen(y, h, index, node.outputs.length);
             const color = PORT_TYPE_COLORS[output.type] || PORT_TYPE_COLORS['Any'];
@@ -928,7 +941,7 @@ class FlowCanvas {
             this.ctx.lineWidth = 1;
             this.ctx.stroke();
 
-            // 绘制类型名
+            // 缂佹ê鍩楃猾璇茬€烽崥?
             if (this.scale > 0.8) {
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
                 this.ctx.font = `${8 * this.scale}px sans-serif`;
@@ -960,11 +973,11 @@ class FlowCanvas {
     }
 
     /**
-     * 获取端口在屏幕上的坐标
-     * @param {string} nodeId - 节点ID
-     * @param {number} portIndex - 端口索引
-     * @param {boolean} isOutput - 是否是输出端口
-     * @returns {{x: number, y: number}} 端口坐标
+     * 鑾峰彇绔彛鍦ㄥ睆骞曚笂鐨勫潗鏍?
+     * @param {string} nodeId - 閼哄倻鍋D
+     * @param {number} portIndex - 缁旑垰褰涚槐銏犵穿
+     * @param {boolean} isOutput - 鏄惁鏄緭鍑虹鍙?
+     * @returns {{x: number, y: number}} 缁旑垰褰涢崸鎰垼
      */
     getPortPosition(nodeId, portIndex, isOutput) {
         const node = this.nodes.get(nodeId);
@@ -986,15 +999,15 @@ class FlowCanvas {
     }
 
     /**
-     * 检测鼠标位置是否在端口上
-     * @param {number} x - 鼠标X坐标（世界坐标）
-     * @param {number} y - 鼠标Y坐标（世界坐标）
+     * 濡偓濞村绱堕弽鍥︾秴缂冾喗妲搁崥锕€婀粩顖氬經娑?
+     * @param {number} x - 榧犳爣X鍧愭爣锛堜笘鐣屽潗鏍囷級
+     * @param {number} y - 榧犳爣Y鍧愭爣锛堜笘鐣屽潗鏍囷級
      * @returns {{nodeId: string, portIndex: number, isOutput: boolean}|null}
      */
     getPortAt(x, y) {
         const screenX = (x - this.offset.x) * this.scale;
         const screenY = (y - this.offset.y) * this.scale;
-        const hitRadiusSq = (PORT_HIT_RADIUS_PX * this.scale) ** 2; // 使用距离平方，避免 Math.sqrt
+        const hitRadiusSq = (PORT_HIT_RADIUS_PX * this.scale) ** 2; // 娴ｈ法鏁ょ捄婵堫瀲楠炶櫕鏌熼敍宀勪缉閸?Math.sqrt
 
         for (const [nodeId, node] of this.nodes) {
             const nodeScreenX = (node.x - this.offset.x) * this.scale;
@@ -1002,7 +1015,7 @@ class FlowCanvas {
             const w = node.width * this.scale;
             const h = node.height * this.scale;
 
-            // 检测输入端口 (垂直分布)
+            // 濡偓濞村绶崗銉ь伂閸?(閸ㄥ倻娲块崚鍡楃)
             for (let i = 0; i < node.inputs.length; i++) {
                 const portY = this.getPortYInScreen(nodeScreenY, h, i, node.inputs.length);
                 const dx = screenX - nodeScreenX;
@@ -1012,7 +1025,7 @@ class FlowCanvas {
                 }
             }
 
-            // 检测输出端口 (垂直分布)
+            // 濡偓濞村绶崙铏诡伂閸?(閸ㄥ倻娲块崚鍡楃)
             for (let i = 0; i < node.outputs.length; i++) {
                 const portY = this.getPortYInScreen(nodeScreenY, h, i, node.outputs.length);
                 const dx = screenX - (nodeScreenX + w);
@@ -1027,24 +1040,24 @@ class FlowCanvas {
     }
 
     /**
-     * 获取指定端口上的连接（O(1) 查找）
-     * @param {string} nodeId - 节点ID
-     * @param {number} portIndex - 端口索引
-     * @param {boolean} isOutput - 是否是输出端口
-     * @returns {Object|null} 连接对象或null
+     * 閼惧嘲褰囬幐鍥х暰缁旑垰褰涙稉濠勬畱鏉╃偞甯撮敍鍦?1) 閺屻儲澹橀敍?
+     * @param {string} nodeId - 閼哄倻鍋D
+     * @param {number} portIndex - 缁旑垰褰涚槐銏犵穿
+     * @param {boolean} isOutput - 鏄惁鏄緭鍑虹鍙?
+     * @returns {Object|null} 鏉╃偞甯寸€电钖勯幋鏉梪ll
      */
     getConnectionAtPort(nodeId, portIndex, isOutput) {
         if (isOutput) {
             const set = this._connectionsByOutputPort.get(portKey(nodeId, portIndex));
             if (!set || set.size === 0) return null;
-            // 输出端口可能有多条连接，返回第一条
+            // 杈撳嚭绔彛鍙兘鏈夊鏉¤繛鎺ワ紝杩斿洖绗竴鏉?
             return set.values().next().value;
         }
         return this._connectionByInputPort.get(portKey(nodeId, portIndex)) || null;
     }
 
     /**
-     * 获取指定端口上的所有连接（用于输出端口）
+     * 閼惧嘲褰囬幐鍥х暰缁旑垰褰涙稉濠勬畱閹碘偓閺堝绻涢幒銉礄閻劋绨潏鎾冲毉缁旑垰褰涢敍?
      */
     getConnectionsAtPort(nodeId, portIndex, isOutput) {
         if (isOutput) {
@@ -1056,30 +1069,31 @@ class FlowCanvas {
     }
 
     /**
-     * 开始创建连接
-     * @param {string} nodeId - 起始节点ID
-     * @param {number} portIndex - 起始端口索引
+     * 瀵偓婵鍨卞楦跨箾閹?
+     * @param {string} nodeId - 璧峰鑺傜偣ID
+     * @param {number} portIndex - 鐠у嘲顫愮粩顖氬經缁便垹绱?
      */
     startConnection(nodeId, portIndex) {
         this.isConnecting = true;
         this.connectingFrom = { nodeId, portIndex, isOutput: true };
         this.canvas.style.cursor = 'crosshair';
         this.invalidate();
-        console.log('[FlowCanvas] 开始连线，从节点:', nodeId, '端口:', portIndex);
+        if (flowDebugEnabled()) {
+            console.log('[FlowCanvas] Start connection:', nodeId, 'port', portIndex);
+        }
     }
 
     /**
-     * 完成连接创建
-     * @param {string} nodeId - 目标节点ID
-     * @param {number} portIndex - 目标端口索引
+     * 鐎瑰本鍨氭潻鐐村复閸掓稑缂?
+     * @param {string} nodeId - 閻╊喗鐖ｉ懞鍌滃仯ID
+     * @param {number} portIndex - 閻╊喗鐖ｇ粩顖氬經缁便垹绱?
      */
     finishConnection(nodeId, portIndex) {
         if (!this.isConnecting || !this.connectingFrom) return;
 
-        // 检查类型兼容性
         const sourceNode = this.nodes.get(this.connectingFrom.nodeId);
         const targetNode = this.nodes.get(nodeId);
-        
+
         if (!sourceNode || !targetNode || !sourceNode.outputs[this.connectingFrom.portIndex]) {
             this.cancelConnection();
             return;
@@ -1089,20 +1103,19 @@ class FlowCanvas {
         const targetPort = targetNode.inputs[portIndex];
 
         if (!this.checkTypeCompatibility(sourcePort.type, targetPort.type)) {
-            console.warn(`[FlowCanvas] 类型不匹配: ${sourcePort.type} -> ${targetPort.type}`);
-            if (window.showToast) window.showToast(`类型不匹配: ${sourcePort.type} -> ${targetPort.type}`, 'warning');
+            const incompatibilityMessage = `[FlowCanvas] Incompatible connection: ${sourcePort.type} -> ${targetPort.type}`;
+            console.warn(incompatibilityMessage);
+            if (window.showToast) window.showToast(incompatibilityMessage, 'warning');
             this.cancelConnection();
             return;
         }
 
-        // 检查连接有效性
         if (this.connectingFrom.nodeId === nodeId) {
-            console.warn('[FlowCanvas] 不能连接到自己');
+            console.warn('[FlowCanvas] Cannot connect a node to itself.');
             this.cancelConnection();
             return;
         }
 
-        // 检查是否已存在相同连接
         const existingConn = this.connections.find(conn =>
             conn.source === this.connectingFrom.nodeId &&
             conn.sourcePort === this.connectingFrom.portIndex &&
@@ -1111,26 +1124,24 @@ class FlowCanvas {
         );
 
         if (existingConn) {
-            console.warn('[FlowCanvas] 连接已存在');
+            console.warn('[FlowCanvas] Connection already exists.');
             this.cancelConnection();
             return;
         }
 
-        // 检查输入端口是否已被占用（一个输入端口只能有一个连接）
         const targetPortOccupied = this.connections.find(conn =>
             conn.target === nodeId &&
             conn.targetPort === portIndex
         );
 
         if (targetPortOccupied) {
-            console.warn('[FlowCanvas] 目标输入端口已被占用');
+            console.warn('[FlowCanvas] Target port is already occupied.');
             this.cancelConnection();
             return;
         }
 
-        // 创建连接
         if (this.wouldCreateCycle(this.connectingFrom.nodeId, nodeId)) {
-            console.warn('[FlowCanvas] Connection would create a cycle');
+            console.warn('Connection would create a cycle');
             if (window.showToast) window.showToast('Connection would create a cycle', 'warning');
             this.cancelConnection();
             return;
@@ -1147,9 +1158,10 @@ class FlowCanvas {
             return;
         }
 
-        console.log('[FlowCanvas] 连接已创建:', connection);
+        if (flowDebugEnabled()) {
+            console.log('[FlowCanvas] Connection created:', connection);
+        }
 
-        // 触发回调
         if (this.onConnectionCreated) {
             this.onConnectionCreated(connection);
         }
@@ -1157,21 +1169,18 @@ class FlowCanvas {
         this.cancelConnection();
     }
 
-    /**
-     * 取消当前连接操作
-     */
     cancelConnection() {
         this.isConnecting = false;
         this.connectingFrom = null;
         this.canvas.style.cursor = 'default';
-        this.render(); // 刷新以清除高亮
+        this.render(); // 鍒锋柊浠ユ竻闄ら珮浜?
     }
 
     /**
-     * 检查类型兼容性
+     * 濡偓閺屻儳琚崹瀣悑鐎硅鈧?
      */
     checkTypeCompatibility(sourceType, targetType) {
-        // 枚举转换映射 (兼容数字和字符串)
+        // 閺嬫矮濡囨潪顒佸床閺勭姴鐨?(閸忕厧顔愰弫鏉跨摟閸滃苯鐡х粭锔胯)
         const normalize = (t) => {
             if (t === 'Any' || t === 99) return 'Any';
             if (t === 'Image' || t === 0) return 'Image';
@@ -1194,7 +1203,7 @@ class FlowCanvas {
     }
 
     /**
-     * 连线时高亮兼容的端口
+     * 鏉╃偟鍤庨弮鍫曠彯娴滎喖鍚嬬€瑰湱娈戠粩顖氬經
      */
     highlightCompatiblePorts() {
         if (!this.isConnecting || !this.connectingFrom) return;
@@ -1231,8 +1240,8 @@ class FlowCanvas {
     }
 
     /**
-     * 删除连接
-     * @param {string} connectionId - 连接ID
+     * 鍒犻櫎杩炴帴
+     * @param {string} connectionId - 鏉╃偞甯碔D
      */
     removeConnection(connectionId) {
         const connection = this._connectionById.get(connectionId);
@@ -1249,7 +1258,7 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制临时连线（拖拽过程中）
+     * 缂佹ê鍩楁稉瀛樻鏉╃偟鍤庨敍鍫熷珛閹峰€熺箖缁嬪鑵戦敍?
      */
     drawTempConnection() {
         if (!this.isConnecting || !this.connectingFrom) return;
@@ -1262,13 +1271,13 @@ class FlowCanvas {
 
         if (!startPos) return;
 
-        // 【新增】连线时高亮兼容端口
+        // 銆愭柊澧炪€戣繛绾挎椂楂樹寒鍏煎绔彛
         this.highlightCompatiblePorts();
 
         const endX = (this.mousePosition.x - this.offset.x) * this.scale;
         const endY = (this.mousePosition.y - this.offset.y) * this.scale;
 
-        // 绘制虚线
+        // 缂佹ê鍩楅搹姘卞殠
         this.ctx.beginPath();
         this.ctx.moveTo(startPos.x, startPos.y);
 
@@ -1289,7 +1298,7 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制连接线 - 阶段四增强版，带数据流动粒子动画
+     * 缂佹ê鍩楁潻鐐村复缁?- 闂冭埖顔岄崶娑橆杻瀵櫣澧楅敍灞界敨閺佺増宓佸ù浣稿З缁帒鐡欓崝銊ф暰
      */
     drawConnection(connection, dt) {
         const sourceNode = this.nodes.get(connection.source);
@@ -1297,7 +1306,7 @@ class FlowCanvas {
 
         if (!sourceNode || !targetNode) return;
 
-        // 【修正】使用 getPortPosition 以支持垂直分布
+        // 閵嗘劒鎱ㄥ锝冣偓鎴滃▏閻?getPortPosition 娴犮儲鏁幐浣哥€惄鏉戝瀻鐢?
         const start = this.getPortPosition(connection.source, connection.sourcePort, true);
         const end = this.getPortPosition(connection.target, connection.targetPort, false);
 
@@ -1319,7 +1328,7 @@ class FlowCanvas {
             end.x, end.y
         );
 
-        // 根据连接状态设置样式
+        // 閺嶈宓佹潻鐐村复閻樿埖鈧浇顔曠純顔界壉瀵?
         if (connection.status === 'active') {
             this.ctx.strokeStyle = '#34c759';
             this.ctx.shadowColor = 'rgba(46, 204, 113, 0.5)';
@@ -1338,7 +1347,7 @@ class FlowCanvas {
         this.ctx.stroke();
         this.ctx.restore();
 
-        // 绘制数据流动粒子动画
+        // 缂佹ê鍩楅弫鐗堝祦濞翠礁濮╃划鎺戠摍閸斻劎鏁?
         if (connection.status === 'active' || connection.status === 'flowing') {
             this.drawFlowParticles(start.x, start.y, controlPoint1X, start.y,
                                    controlPoint2X, end.y, end.x, end.y, connection, dt);
@@ -1346,11 +1355,11 @@ class FlowCanvas {
     }
     
     /**
-     * 绘制数据流动粒子 - 阶段四增强
-     * @param {number} dt - 距上一帧的毫秒数，用于基于时间的平滑推进
+     * 缂佹ê鍩楅弫鐗堝祦濞翠礁濮╃划鎺戠摍 - 闂冭埖顔岄崶娑橆杻瀵?
+     * @param {number} dt - 鐠烘繀绗傛稉鈧敮褏娈戝В顐ゎ潡閺佸府绱濋悽銊ょ艾閸╄桨绨弮鍫曟？閻ㄥ嫬閽╁鎴炲腹鏉?
      */
     drawFlowParticles(startX, startY, cp1x, cp1y, cp2x, cp2y, endX, endY, connection, dt) {
-        // 初始化粒子系统
+        // 鍒濆鍖栫矑瀛愮郴缁?
         if (!connection.particles) {
             connection.particles = [];
             for (let i = 0; i < 5; i++) {
@@ -1361,7 +1370,7 @@ class FlowCanvas {
             }
         }
 
-        // 缓存粒子发光精灵（按当前 scale 只创建一次）
+        // 缂傛挸鐡ㄧ划鎺戠摍閸欐垵鍘滅划鍓т紥閿涘牊瀵滆ぐ鎾冲 scale 閸欘亜鍨卞杞扮濞嗏槄绱?
         const spriteRadius = 6 * this.scale;
         const spriteKey = `particle_${spriteRadius.toFixed(1)}`;
         if (!this._particleSprite || this._particleSprite.key !== spriteKey) {
@@ -1380,14 +1389,14 @@ class FlowCanvas {
         }
 
         const sprite = this._particleSprite;
-        const timeScale = dt / 16; // 以 60fps 为基准归一化
+        const timeScale = dt / 16; // 娴?60fps 娑撳搫鐔€閸戝棗缍婃稉鈧崠?
 
         connection.particles.forEach(particle => {
-            // 【修复】基于 dt 推进，避免帧率波动导致速度不均
+            // 閵嗘劒鎱ㄦ径宥冣偓鎴濈唨娴?dt 閹恒劏绻橀敍宀勪缉閸忓秴鎶氶悳鍥ㄥ皾閸斻劌顕遍懛鎾偓鐔峰娑撳秴娼?
             particle.t += particle.speed * timeScale;
             if (particle.t > 1) particle.t = 0;
 
-            // 计算贝塞尔曲线上的点
+            // 鐠侊紕鐣荤拹婵嗩敚鐏忔梹娲哥痪澶哥瑐閻ㄥ嫮鍋?
             const t = particle.t;
             const mt = 1 - t;
             const x = mt * mt * mt * startX +
@@ -1399,18 +1408,18 @@ class FlowCanvas {
                      3 * mt * t * t * cp2y +
                      t * t * t * endY;
 
-            // 绘制缓存的发光粒子
+            // 缂佹ê鍩楃紓鎾崇摠閻ㄥ嫬褰傞崗澶岀煈鐎?
             this.ctx.drawImage(sprite.canvas, x - sprite.size / 2, y - sprite.size / 2, sprite.size, sprite.size);
         });
     }
 
     /**
-     * 绘制圆角矩形
+     * 缂佹ê鍩楅崷鍡氼潡閻晛鑸?
      * @param {number} x
      * @param {number} y
      * @param {number} w
      * @param {number} h
-     * @param {number|{tl?:number,tr?:number,bl?:number,br?:number}} r 半径，可统一传入或按角分别指定
+     * @param {number|{tl?:number,tr?:number,bl?:number,br?:number}} r 閸楀﹤绶為敍灞藉讲缂佺喍绔存导鐘插弳閹存牗瀵滅憴鎺戝瀻閸掝偅瀵氱€?
      */
     roundRect(x, y, w, h, r) {
         let tl;
@@ -1428,7 +1437,7 @@ class FlowCanvas {
             tl = tr = br = bl = 0;
         }
 
-        // 限制半径，防止 w/h 较小时出现交叉
+        // 闂勬劕鍩楅崡濠傜窞閿涘矂妲诲?w/h 鏉堝啫鐨弮璺哄毉閻滈姘﹂崣?
         const maxR = Math.min(w, h) / 2;
         tl = Math.min(tl, maxR);
         tr = Math.min(tr, maxR);
@@ -1449,8 +1458,8 @@ class FlowCanvas {
     }
 
     /**
-     * 请求重绘：标记画布为脏，并调度一次 RAF。
-     * 这是新代码推荐使用的入口；render() 保留为兼容别名。
+     * 鐠囬攱鐪伴柌宥囩帛閿涙碍鐖ｇ拋鎵暰鐢啩璐熼懘蹇ョ礉楠炴儼鐨熸惔锔跨濞?RAF閵?
+     * 鏉╂瑦妲搁弬棰佸敩閻焦甯归懡鎰▏閻劎娈戦崗銉ュ經閿涙硜ender() 娣囨繄鏆€娑撳搫鍚嬬€圭懓鍩嗛崥宥冣偓?
      */
     invalidate() {
         this._dirty = true;
@@ -1458,9 +1467,9 @@ class FlowCanvas {
     }
 
     /**
-     * 兼容入口：等价于 invalidate()。
-     * 历史调用大量 `this.render()`，保留语义不变（请求一次重绘），
-     * 但不再创建无限循环。
+     * 閸忕厧顔愰崗銉ュ經閿涙氨鐡戞禒铚傜艾 invalidate()閵?
+     * 鍘嗗彶璋冪敤澶ч噺 `this.render()`锛屼繚鐣欒涔変笉鍙橈紙璇锋眰涓€娆￠噸缁橈級锛?
+     * 娴ｅ棔绗夐崘宥呭灡瀵ょ儤妫ら梽鎰儕閻滎垬鈧?
      */
     render() {
         this.invalidate();
@@ -1477,7 +1486,7 @@ class FlowCanvas {
     }
 
     /**
-     * 当前帧是否需要持续动画（连线拖拽、活跃数据流粒子、运行中节点等）。
+     * 褰撳墠甯ф槸鍚﹂渶瑕佹寔缁姩鐢伙紙杩炵嚎鎷栨嫿銆佹椿璺冩暟鎹祦绮掑瓙銆佽繍琛屼腑鑺傜偣绛夛級銆?
      */
     _hasAnimation() {
         if (this.isConnecting) return true;
@@ -1495,7 +1504,7 @@ class FlowCanvas {
     }
 
     /**
-     * 视口裁剪：判断节点是否在当前可视区域内（含一点缓冲）。
+     * 鐟欏棗褰涚憗浣稿閿涙艾鍨介弬顓″Ν閻愯妲搁崥锕€婀ぐ鎾冲閸欘垵顫嬮崠鍝勭厵閸愬拑绱欓崥顐＄閻愬湱绱﹂崘璇х礆閵?
      * @private
      */
     _isNodeInViewport(node) {
@@ -1503,13 +1512,13 @@ class FlowCanvas {
         const vh = this._logicalHeight / this.scale;
         const vx = this.offset.x;
         const vy = this.offset.y;
-        // 留 100px 缓冲，避免边缘裁切突兀
+        // 閻?100px 缂傛挸鍟块敍宀勪缉閸忓秷绔熺紓妯款梿閸掑洨鐛婇崗鈧?
         return node.x + node.width >= vx - 100 && node.x <= vx + vw + 100 &&
                node.y + node.height >= vy - 100 && node.y <= vy + vh + 100;
     }
 
     /**
-     * 视口裁剪：判断连接是否至少有一个端点在可视区域内。
+     * 瑙嗗彛瑁佸壀锛氬垽鏂繛鎺ユ槸鍚﹁嚦灏戞湁涓€涓鐐瑰湪鍙鍖哄煙鍐呫€?
      * @private
      */
     _isConnectionVisible(conn) {
@@ -1519,7 +1528,7 @@ class FlowCanvas {
     }
 
     /**
-     * 实际绘制一帧。决定是否继续 RAF 循环。
+     * 鐎圭偤妾紒妯哄煑娑撯偓鐢佲偓鍌氬枀鐎规碍妲搁崥锔炬埛缂?RAF 瀵邦亞骞嗛妴?
      */
     _drawFrame(now) {
         this._animationFrameId = null;
@@ -1532,42 +1541,42 @@ class FlowCanvas {
         const dt = this._lastFrameTime > 0 ? Math.max(0, timestamp - this._lastFrameTime) : 16;
         this._lastFrameTime = timestamp;
 
-        // 清空画布（逻辑像素）
+        // 濞撳懐鈹栭悽璇茬閿涘牓鈧槒绶崓蹇曠閿?
         this.ctx.clearRect(0, 0, this._logicalWidth, this._logicalHeight);
 
-        // 绘制网格
+        // 缂佹ê鍩楃純鎴炵壐
         this.drawGrid();
 
-        // 绘制连接线（dt 用于粒子动画）
+        // 缂佹ê鍩楁潻鐐村复缁惧尅绱檇t 閻劋绨划鎺戠摍閸斻劎鏁鹃敍?
         for (const conn of this.connections) {
             if (this._isConnectionVisible(conn)) {
                 this.drawConnection(conn, dt);
             }
         }
 
-        // 绘制临时连线
+        // 缂佹ê鍩楁稉瀛樻鏉╃偟鍤?
         if (this.isConnecting) {
             this.drawTempConnection();
         }
 
-        // 绘制节点（视口裁剪）
+        // 缂佹ê鍩楅懞鍌滃仯閿涘牐顫嬮崣锝堫梿閸擃亷绱?
         for (const node of this.nodes.values()) {
             if (this._isNodeInViewport(node)) {
                 this.drawNode(node);
             }
         }
 
-        // 绘制悬停端口高亮
+        // 缂佹ê鍩楅幃顒€浠犵粩顖氬經妤傛ü瀵?
         if (this.hoveredPort && !this.isConnecting) {
             this.drawPortHighlight(this.hoveredPort);
         }
 
-        // 绘制小地图
+        // 缂佹ê鍩楃亸蹇撴勾閸?
         this.drawMinimap();
 
         this._dirty = false;
 
-        // 如果有活动动画，继续 RAF；否则等待下一次 invalidate()
+        // 濡傛灉鏈夋椿鍔ㄥ姩鐢伙紝缁х画 RAF锛涘惁鍒欑瓑寰呬笅涓€娆?invalidate()
         if (this._hasAnimation()) {
             this._scheduleFrame();
         } else {
@@ -1576,11 +1585,11 @@ class FlowCanvas {
     }
 
     /**
-     * 规范化端口类型，确保其符合后端枚举名称 (PascalCase)
+     * 瑙勮寖鍖栫鍙ｇ被鍨嬶紝纭繚鍏剁鍚堝悗绔灇涓惧悕绉?(PascalCase)
      */
     normalizePortType(type) {
         if (!type) return 'Any';
-        // 如果后端传过来的是枚举数字，则保持不变，后端 JsonStringEnumConverter 可以解析
+        // 婵″倹鐏夐崥搴ｎ伂娴肩姾绻冮弶銉ф畱閺勵垱鐏囨稉鐐殶鐎涙绱濋崚娆庣箽閹镐椒绗夐崣姗堢礉閸氬海顏?JsonStringEnumConverter 閸欘垯浜掔憴锝嗙€?
         if (typeof type === 'number') return type;
         
         const map = {
@@ -1604,12 +1613,12 @@ class FlowCanvas {
     }
 
     /**
-     * 序列化流程数据 - 适配后端 DTO (camelCase)
-     * 后端 Program.cs 配置 JsonNamingPolicy.CamelCase，所以必须使用小驼峰
+     * 鎼村繐鍨崠鏍ㄧウ缁嬪鏆熼幑?- 闁倿鍘ら崥搴ｎ伂 DTO (camelCase)
+     * 閸氬海顏?Program.cs 闁板秶鐤?JsonNamingPolicy.CamelCase閿涘本澧嶆禒銉ョ箑妞よ濞囬悽銊ョ毈妞圭厧鍢?
      */
     serialize() {
-        // 【修复】先确保所有节点的端口都有稳定的 ID
-        // 这样 operators 和 connections 都会使用相同的 ID
+        // 閵嗘劒鎱ㄦ径宥冣偓鎴濆帥绾喕绻氶幍鈧張澶庡Ν閻愬湱娈戠粩顖氬經闁姤婀佺粙鍐茬暰閻?ID
+        // 鏉╂瑦鐗?operators 閸?connections 闁垝绱版担璺ㄦ暏閻╃鎮撻惃?ID
         for (const node of this.nodes.values()) {
             if (node.inputs) {
                 for (const port of node.inputs) {
@@ -1627,7 +1636,7 @@ class FlowCanvas {
             }
         }
 
-        // 构建 Operators 列表 (camelCase)
+        // 閺嬪嫬缂?Operators 閸掓銆?(camelCase)
         const operators = Array.from(this.nodes.values()).map(node => ({
             id: node.id,
             name: node.title,
@@ -1635,14 +1644,14 @@ class FlowCanvas {
             x: node.x,
             y: node.y,
             inputPorts: (node.inputs || []).map(p => ({
-                id: p.id || p.Id || this.generateUUID(), // 【修复】同时检查大小写
+                id: p.id || p.Id || this.generateUUID(), // 閵嗘劒鎱ㄦ径宥冣偓鎴濇倱閺冭埖顥呴弻銉ャ亣鐏忓繐鍟?
                 name: p.name,
                 dataType: this.normalizePortType(p.type), // PortDataType enum
                 direction: 0, // Input
                 isRequired: false
             })),
             outputPorts: (node.outputs || []).map(p => ({
-                id: p.id || p.Id || this.generateUUID(), // 【修复】同时检查大小写
+                id: p.id || p.Id || this.generateUUID(), // 閵嗘劒鎱ㄦ径宥冣偓鎴濇倱閺冭埖顥呴弻銉ャ亣鐏忓繐鍟?
                 name: p.name,
                 dataType: this.normalizePortType(p.type),
                 direction: 1, // Output
@@ -1656,7 +1665,7 @@ class FlowCanvas {
             isEnabled: node.disabled !== true
         }));
 
-        // 构建 Connections 列表 (camelCase)
+        // 閺嬪嫬缂?Connections 閸掓銆?(camelCase)
         const debug = flowDebugEnabled();
         if (debug) {
             console.log('[FlowCanvas serialize] === START ===');
@@ -1666,11 +1675,11 @@ class FlowCanvas {
 
         const connections = this.connections
             .filter(conn => {
-                // 过滤掉无效的连接（source 或 target 为空、undefined 或空GUID）
+                // 鏉╁洦鎶ら幒澶嬫￥閺佸牏娈戞潻鐐村复閿涘澃ource 閹?target 娑撹櫣鈹栭妴涔絥defined 閹存牜鈹朑UID閿?
                 const isValidSource = conn.source && conn.source !== '00000000-0000-0000-0000-000000000000';
                 const isValidTarget = conn.target && conn.target !== '00000000-0000-0000-0000-000000000000';
                 if (!isValidSource || !isValidTarget) {
-                    console.warn(`[FlowCanvas serialize] 过滤掉无效连接: source=${conn.source}, target=${conn.target}`);
+                    console.warn(`[FlowCanvas serialize] Skipping invalid connection: source=${conn.source}, target=${conn.target}`);
                 }
                 return isValidSource && isValidTarget;
             })
@@ -1678,7 +1687,7 @@ class FlowCanvas {
                 const sourceNode = this.nodes.get(conn.source);
                 const targetNode = this.nodes.get(conn.target);
 
-                // 【修复】添加端口索引边界检查，并同时检查 id/Id 属性
+                // 閵嗘劒鎱ㄦ径宥冣偓鎴炲潑閸旂姷顏崣锝囧偍瀵洝绔熼悾灞绢梾閺屻儻绱濋獮璺烘倱閺冭埖顥呴弻?id/Id 鐏炵偞鈧?
                 let sourcePortId = null;
                 let targetPortId = null;
 
@@ -1690,7 +1699,7 @@ class FlowCanvas {
                         sourcePortId = port.id;
                     }
                 } else if (debug) {
-                    console.warn(`[FlowCanvas serialize] 源端口索引越界: ${conn.sourcePort}, 可用端口数: ${sourceNode?.outputs?.length || 0}`);
+                    console.warn(`[FlowCanvas serialize] Invalid source port index ${conn.sourcePort}, output count ${sourceNode?.outputs?.length || 0}`);
                 }
 
                 if (targetNode && conn.targetPort >= 0 && conn.targetPort < targetNode.inputs.length) {
@@ -1701,13 +1710,13 @@ class FlowCanvas {
                         targetPortId = port.id;
                     }
                 } else if (debug) {
-                    console.warn(`[FlowCanvas serialize] 目标端口索引越界: ${conn.targetPort}, 可用端口数: ${targetNode?.inputs?.length || 0}`);
+                    console.warn(`[FlowCanvas serialize] Invalid target port index ${conn.targetPort}, input count ${targetNode?.inputs?.length || 0}`);
                 }
 
-                // 【修复】如果无法获取端口ID，跳过此连接而不是生成错误的UUID
+                // 銆愪慨澶嶃€戝鏋滄棤娉曡幏鍙栫鍙D锛岃烦杩囨杩炴帴鑰屼笉鏄敓鎴愰敊璇殑UUID
                 if (!sourcePortId || !targetPortId) {
                     if (debug) {
-                        console.warn(`[FlowCanvas serialize] 跳过无效连接: sourcePortId=${sourcePortId}, targetPortId=${targetPortId}`);
+                        console.warn(`[FlowCanvas serialize] Skipping connection with missing port ids: sourcePortId=${sourcePortId}, targetPortId=${targetPortId}`);
                     }
                     return null;
                 }
@@ -1720,9 +1729,9 @@ class FlowCanvas {
                     targetPortId: targetPortId
                 };
             })
-            .filter(conn => conn !== null); // 过滤掉无效的连接
+            .filter(conn => conn !== null); // 鏉╁洦鎶ら幒澶嬫￥閺佸牏娈戞潻鐐村复
 
-        // UpdateFlowRequest 期望的结构 (camelCase 会被后端自动映射)
+        // UpdateFlowRequest 閺堢喐婀滈惃鍕波閺?(camelCase 娴兼俺顫﹂崥搴ｎ伂閼奉亜濮╅弰鐘茬殸)
         const result = {
             operators: operators,
             connections: connections
@@ -1738,31 +1747,31 @@ class FlowCanvas {
     }
 
     /**
-     * 反序列化流程数据
+     * 閸欏秴绨崚妤€瀵插ù浣衡柤閺佺増宓?
      */
     deserialize(data) {
         if (!data) return;
         this.clear(true);
 
-        // 支持多种嵌套结构 (后端 DTO 可能包装在 project.flow 中)
+        // 閺€顖涘瘮婢舵氨顫掑畵灞筋殰缂佹挻鐎?(閸氬海顏?DTO 閸欘垵鍏橀崠鍛邦棅閸?project.flow 娑?
         const flowData = data.project?.flow || data.flow || data;
 
-        // 处理列表属性 (驼峰/帕斯卡/旧版 nodes 键)
+        // 婢跺嫮鎮婇崚妤勩€冪仦鐐粹偓?(妞圭厧鍢?鐢洘鏌夐崡?閺冄呭 nodes 闁?
         const operators = flowData.operators || flowData.Operators || flowData.nodes || [];
         const connections = flowData.connections || flowData.Connections || [];
 
         if (flowDebugEnabled()) {
-            console.log('[FlowCanvas] 开始反序列化. 算子数:', operators.length, '连接数:', connections.length);
+            console.log('[FlowCanvas] Deserialize start: operators', operators.length, 'connections', connections.length);
         }
 
         if (operators) {
             operators.forEach(op => {
-                // 适配后端 DTO (PascalCase) 或前端 (camelCase)
+                // 闁倿鍘ら崥搴ｎ伂 DTO (PascalCase) 閹存牕澧犵粩?(camelCase)
                 const id = op.id ?? op.Id;
                 const type = this.normalizeOperatorType(op.type ?? op.Type);
                 const title = op.name ?? op.Name ?? op.title ?? type;
 
-                // 【修复】标准化端口数据，统一使用小写属性名（id/name/type）
+                // 閵嗘劒鎱ㄦ径宥冣偓鎴炵垼閸戝棗瀵茬粩顖氬經閺佺増宓侀敍宀€绮烘稉鈧担璺ㄦ暏鐏忓繐鍟撶仦鐐粹偓褍鎮曢敍鍧昫/name/type閿?
                 const normalizePort = (p) => ({
                     id: p.id || p.Id || this.generateUUID(),
                     name: p.name || p.Name,
@@ -1834,16 +1843,16 @@ class FlowCanvas {
                     targetPort: targetPortIndex
                 };
             }).filter(conn => {
-                // 过滤掉无效的连接（source 或 target 为空、undefined 或空GUID）
+                // 鏉╁洦鎶ら幒澶嬫￥閺佸牏娈戞潻鐐村复閿涘澃ource 閹?target 娑撹櫣鈹栭妴涔絥defined 閹存牜鈹朑UID閿?
                 const isValidSource = conn.source && conn.source !== '00000000-0000-0000-0000-000000000000';
                 const isValidTarget = conn.target && conn.target !== '00000000-0000-0000-0000-000000000000';
                 if (!isValidSource || !isValidTarget) {
-                    console.warn('[FlowCanvas] 过滤掉无效连接:', conn);
+                    console.warn('[FlowCanvas] Skipping invalid connection:', conn);
                 }
                 return isValidSource && isValidTarget;
             });
 
-            // 反序列化后必须重建连线索引，否则后续 O(1) 查询失效
+            // 閸欏秴绨崚妤€瀵查崥搴＄箑妞ゅ鍣稿楦跨箾缁捐法鍌ㄥ鏇礉閸氾箑鍨崥搴ｇ敾 O(1) 閺屻儴顕楁径杈ㄦ櫏
             this._rebuildConnectionIndex();
         }
 
@@ -1852,21 +1861,21 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制端口高亮效果
+     * 缂佹ê鍩楃粩顖氬經妤傛ü瀵掗弫鍫熺亯
      * @param {{nodeId: string, portIndex: number, isOutput: boolean, hasConnection: boolean}} port
      */
     drawPortHighlight(port) {
         const pos = this.getPortPosition(port.nodeId, port.portIndex, port.isOutput);
         if (!pos) return;
 
-        // 绘制高亮圆环
+        // 缂佹ê鍩楁妯瑰瘨閸﹀棛骞?
         this.ctx.beginPath();
         this.ctx.arc(pos.x, pos.y, 8 * this.scale, 0, Math.PI * 2);
         this.ctx.strokeStyle = port.isOutput ? '#1890ff' : '#52c41a';
         this.ctx.lineWidth = 2 * this.scale;
         this.ctx.stroke();
 
-        // 绘制发光效果
+        // 缂佹ê鍩楅崣鎴濆帨閺佸牊鐏?
         this.ctx.beginPath();
         this.ctx.arc(pos.x, pos.y, 12 * this.scale, 0, Math.PI * 2);
         this.ctx.fillStyle = port.isOutput
@@ -1874,12 +1883,12 @@ class FlowCanvas {
             : 'rgba(82, 196, 26, 0.2)';
         this.ctx.fill();
 
-        // 【新增】如果端口已连接，绘制断开指示
+        // 閵嗘劖鏌婃晶鐐偓鎴濐洤閺嬫粎顏崣锝呭嚒鏉╃偞甯撮敍宀€绮崚鑸垫焽瀵偓閹稿洨銇?
         if (port.hasConnection) {
-            // 绘制红色虚线圆环表示可断开
+            // 缂佹ê鍩楃痪銏ｅ閾忔氨鍤庨崷鍡欏箚鐞涖劎銇氶崣顖涙焽瀵偓
             this.ctx.beginPath();
             this.ctx.arc(pos.x, pos.y, 14 * this.scale, 0, Math.PI * 2);
-            this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.6)'; // 红色半透明
+            this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.6)'; // 缁俱垼澹婇崡濠団偓蹇旀
             this.ctx.lineWidth = 2 * this.scale;
             this.ctx.setLineDash([4 * this.scale, 2 * this.scale]);
             this.ctx.stroke();
@@ -1888,78 +1897,82 @@ class FlowCanvas {
     }
 
     /**
-     * 处理鼠标按下
+     * 婢跺嫮鎮婃Η鐘崇垼閹稿绗?
      */
     handleMouseDown(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) / this.scale + this.offset.x;
         const y = (e.clientY - rect.top) / this.scale + this.offset.y;
 
-        // 更新鼠标位置
+        // 閺囧瓨鏌婃Η鐘崇垼娴ｅ秶鐤?
         this.mousePosition = { x, y };
 
-        // 首先检测是否点击了端口
+        // 妫ｆ牕鍘涘Λ鈧ù瀣Ц閸氾妇鍋ｉ崙璁崇啊缁旑垰褰?
         const port = this.getPortAt(x, y);
         if (port) {
             if (port.isOutput) {
-                // 【新增】检查输出端口是否已有连接
+                // 閵嗘劖鏌婃晶鐐偓鎴烆梾閺屻儴绶崙铏诡伂閸欙絾妲搁崥锕€鍑￠張澶庣箾閹?
                 const existingConns = this.getConnectionsAtPort(port.nodeId, port.portIndex, true);
                 
                 if (existingConns.length > 0) {
-                    // 断开该端口的所有连接
+                    // 閺傤厼绱戠拠銉ь伂閸欙絿娈戦幍鈧張澶庣箾閹?
                     existingConns.forEach(conn => {
                         this.removeConnection(conn.id);
                     });
                     if (window.showToast) {
-                        const msg = existingConns.length === 1 
-                            ? '连接已断开' 
-                            : `已断开 ${existingConns.length} 个连接`;
+                        const msg = existingConns.length === 1
+                            ? 'Connection removed for this port'
+                            : 'Removed ' + existingConns.length + ' existing connections';
                         window.showToast(msg, 'info');
                     }
-                    console.log('[FlowCanvas] 已断开连接:', existingConns.map(c => c.id));
+                    if (flowDebugEnabled()) {
+                        console.log('[FlowCanvas] Removed existing connections:', existingConns.map(c => c.id));
+                    }
                 } else {
-                    // 没有连接，从输出端口开始连线
+                    // 濞屸剝婀佹潻鐐村复閿涘奔绮犳潏鎾冲毉缁旑垰褰涘鈧慨瀣箾缁?
                     this.startConnection(port.nodeId, port.portIndex);
                 }
                 return;
             } else if (this.isConnecting) {
-                // 从输入端口完成连线
+                // 娴犲氦绶崗銉ь伂閸欙絽鐣幋鎰箾缁?
                 this.finishConnection(port.nodeId, port.portIndex);
                 return;
             } else {
-                // 【新增】点击输入端口时检查是否已有连接
+                // 閵嗘劖鏌婃晶鐐偓鎴犲仯閸戞槒绶崗銉ь伂閸欙絾妞傚Λ鈧弻銉︽Ц閸氾箑鍑￠張澶庣箾閹?
                 const existingConn = this.getConnectionAtPort(port.nodeId, port.portIndex, false);
                 
                 if (existingConn) {
-                    // 断开该输入端口的连接
+                    // 閺傤厼绱戠拠銉ㄧ翻閸忋儳顏崣锝囨畱鏉╃偞甯?
                     this.removeConnection(existingConn.id);
                     if (window.showToast) {
-                        window.showToast('连接已断开', 'info');
+                        window.showToast('Connection removed', 'info');
                     }
-                    console.log('[FlowCanvas] 已断开连接:', existingConn.id);
+                    if (flowDebugEnabled()) {
+                        console.log('[FlowCanvas] Removed existing connection:', existingConn.id);
+                    }
                     return;
                 }
             }
         }
 
-        // 如果在连线状态但点击了空白处，取消连线
+        // 婵″倹鐏夐崷銊ㄧ箾缁捐法濮搁幀浣风稻閻愮懓鍤禍鍡欌敄閻ц棄顦╅敍灞藉絿濞戝牐绻涚痪?
         if (this.isConnecting) {
             this.cancelConnection();
             return;
         }
 
-        // 查找点击的节点
+        // 閺屻儲澹橀悙鐟板毊閻ㄥ嫯濡悙?
         for (const [id, node] of this.nodes) {
             if (x >= node.x && x <= node.x + node.width &&
                 y >= node.y && y <= node.y + node.height) {
                 this.selectedNode = id;
-                // 仅左键启动节点拖拽，避免右键菜单期间触发意外拖拽
+                // 娴犲懎涔忛柨顔兼儙閸斻劏濡悙瑙勫珛閹锋枻绱濋柆鍨帳閸欐娊鏁懣婊冨礋閺堢喖妫跨憴锕€褰傞幇蹇擃樆閹锋牗瀚?
                 if (e.button === 0) {
                     this.draggedNode = id;
                     this.dragOffset = { x: x - node.x, y: y - node.y };
                 }
 
-                // 触发节点选中回调
+                // 鐟欙箑褰傞懞鍌滃仯闁鑵戦崶鐐剁殶
                 if (this.onNodeSelected) {
                     this.onNodeSelected(node);
                 }
@@ -1971,7 +1984,7 @@ class FlowCanvas {
 
         this.selectedNode = null;
 
-        // 触发取消选中回调
+        // 鐟欙箑褰傞崣鏍ㄧХ闁鑵戦崶鐐剁殶
         if (this.onNodeSelected) {
             this.onNodeSelected(null);
         }
@@ -1980,19 +1993,19 @@ class FlowCanvas {
     }
 
     /**
-     * 处理双击事件（主要用于子图展开等高级交互）
+     * 婢跺嫮鎮婇崣灞藉毊娴滃娆㈤敍鍫滃瘜鐟曚胶鏁ゆ禍搴＄摍閸ユ儳鐫嶅鈧粵澶愮彯缁狙傛唉娴滄帪绱?
      */
     handleDoubleClick(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) / this.scale + this.offset.x;
         const y = (e.clientY - rect.top) / this.scale + this.offset.y;
 
-        // 查找双击的节点
+        // 閺屻儲澹橀崣灞藉毊閻ㄥ嫯濡悙?
         for (const [id, node] of this.nodes) {
             if (x >= node.x && x <= node.x + node.width &&
                 y >= node.y && y <= node.y + node.height) {
                 
-                // 触发双击事件回调
+                // 瑙﹀彂鍙屽嚮浜嬩欢鍥炶皟
                 if (this.onNodeDoubleClicked) {
                     this.onNodeDoubleClicked(node);
                 }
@@ -2002,75 +2015,74 @@ class FlowCanvas {
     }
 
     /**
-     * 处理鼠标移动
+     * 婢跺嫮鎮婃Η鐘崇垼缁夎濮?
      */
     handleMouseMove(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) / this.scale + this.offset.x;
         const y = (e.clientY - rect.top) / this.scale + this.offset.y;
 
-        // 更新鼠标位置
         this.mousePosition = { x, y };
 
-        // 处理连线状态
         if (this.isConnecting) {
-            // 检测悬停的端口
             const port = this.getPortAt(x, y);
-            if (port && !port.isOutput && port.nodeId !== this.connectingFrom?.nodeId) {
-                // 悬停在有效的输入端口上
-                this.hoveredPort = port;
-                this.canvas.style.cursor = 'pointer';
-            } else {
-                this.hoveredPort = null;
-                this.canvas.style.cursor = 'crosshair';
+            const nextHoveredPort = port && !port.isOutput && port.nodeId !== this.connectingFrom?.nodeId
+                ? port
+                : null;
+            const nextCursor = nextHoveredPort ? 'pointer' : 'crosshair';
+            if (!this._isSamePortState(this.hoveredPort, nextHoveredPort) || this.canvas.style.cursor !== nextCursor) {
+                this.hoveredPort = nextHoveredPort;
+                this.canvas.style.cursor = nextCursor;
             }
             this.invalidate();
             return;
         }
 
-        // 处理节点拖拽
         if (this.draggedNode) {
             const dragX = x - this.dragOffset.x;
             const dragY = y - this.dragOffset.y;
 
             const node = this.nodes.get(this.draggedNode);
             if (node) {
-                // 【修复】使用 this.gridSize 对齐网格，而非硬编码 10
-                node.x = Math.round(dragX / this.gridSize) * this.gridSize;
-                node.y = Math.round(dragY / this.gridSize) * this.gridSize;
+                const snappedX = Math.round(dragX / this.gridSize) * this.gridSize;
+                const snappedY = Math.round(dragY / this.gridSize) * this.gridSize;
+                if (node.x !== snappedX || node.y !== snappedY) {
+                    node.x = snappedX;
+                    node.y = snappedY;
+                    this._markNodesBoundsDirty();
+                    this.invalidate();
+                }
             }
             this.canvas.style.cursor = 'grabbing';
             this.hoveredPort = null;
-            this.invalidate();
             return;
         }
 
-        // 检测端口悬停（改变光标）。getPortAt 内部已遍历所有节点/端口，
-        // 此处不再重复遍历节点列表做 body hover，避免每帧双次 O(n)。
         const port = this.getPortAt(x, y);
+        let nextHoveredPort = null;
+        let nextCursor = 'default';
         if (port) {
             const hasConnection = this.getConnectionAtPort(port.nodeId, port.portIndex, port.isOutput) !== null;
 
             if (hasConnection && !this.isConnecting) {
-                this.canvas.style.cursor = 'pointer';
-                this.hoveredPort = { ...port, hasConnection: true };
+                nextCursor = 'pointer';
+                nextHoveredPort = { ...port, hasConnection: true };
             } else if (this.isConnecting) {
-                this.canvas.style.cursor = 'crosshair';
-                this.hoveredPort = port;
+                nextCursor = 'crosshair';
+                nextHoveredPort = port;
             } else {
-                this.canvas.style.cursor = 'pointer';
-                this.hoveredPort = port;
+                nextCursor = 'pointer';
+                nextHoveredPort = port;
             }
-        } else {
-            this.hoveredPort = null;
-            this.canvas.style.cursor = 'default';
         }
-        this.invalidate();
+
+        if (!this._isSamePortState(this.hoveredPort, nextHoveredPort) || this.canvas.style.cursor !== nextCursor) {
+            this.hoveredPort = nextHoveredPort;
+            this.canvas.style.cursor = nextCursor;
+            this.invalidate();
+        }
     }
 
-    /**
-     * 处理鼠标释放
-     */
     handleMouseUp() {
         this.draggedNode = null;
         if (!this.isConnecting) {
@@ -2079,13 +2091,13 @@ class FlowCanvas {
     }
 
     /**
-     * 处理滚轮缩放
+     * 婢跺嫮鎮婂姘崇枂缂傗晜鏂?
      */
     handleWheel(e) {
         e.preventDefault();
         
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        // 调整缩放范围：0.2 (20%) - 2.0 (200%) - 用户反馈缩放过小不方便定位
+        // 鐠嬪啯鏆ｇ紓鈺傛杹閼煎啫娲块敍?.2 (20%) - 2.0 (200%) - 閻劍鍩涢崣宥夘洯缂傗晜鏂佹潻鍥х毈娑撳秵鏌熸笟鍨暰娴?
         const newScale = Math.max(0.2, Math.min(2.0, this.scale * delta));
         
         if (newScale !== this.scale) {
@@ -2093,7 +2105,7 @@ class FlowCanvas {
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
             
-            // 以鼠标为中心缩放
+            // 浠ラ紶鏍囦负涓績缂╂斁
             this.offset.x += mouseX / this.scale - mouseX / newScale;
             this.offset.y += mouseY / this.scale - mouseY / newScale;
             this.scale = newScale;
@@ -2103,17 +2115,17 @@ class FlowCanvas {
     }
 
     /**
-     * 清空画布
+     * 濞撳懐鈹栭悽璇茬
      */
     /**
-     * 检测鼠标位置是否在连接线上
-     * @param {number} x - 鼠标X坐标（世界坐标）
-     * @param {number} y - 鼠标Y坐标（世界坐标）
-     * @param {Object} connection - 连接线对象
+     * 濡偓濞村绱堕弽鍥︾秴缂冾喗妲搁崥锕€婀潻鐐村复缁惧じ绗?
+     * @param {number} x - 榧犳爣X鍧愭爣锛堜笘鐣屽潗鏍囷級
+     * @param {number} y - 榧犳爣Y鍧愭爣锛堜笘鐣屽潗鏍囷級
+     * @param {Object} connection - 鏉╃偞甯寸痪鍨嚠鐠?
      * @returns {boolean}
      */
     isPointOnConnection(x, y, connection) {
-        // 使用 getPortPosition 获得准确端口位置，而不是用节点中心近似
+        // 娴ｈ法鏁?getPortPosition 閼惧嘲绶遍崙鍡欌€樼粩顖氬經娴ｅ秶鐤嗛敍宀冣偓灞肩瑝閺勵垳鏁ら懞鍌滃仯娑擃厼绺炬潻鎴滄妧
         const start = this.getPortPosition(connection.source, connection.sourcePort, true);
         const end = this.getPortPosition(connection.target, connection.targetPort, false);
 
@@ -2152,13 +2164,13 @@ class FlowCanvas {
     }
 
     /**
-     * 获取鼠标位置下的连接线
-     * @param {number} x - 鼠标X坐标（世界坐标）
-     * @param {number} y - 鼠标Y坐标（世界坐标）
+     * 鑾峰彇榧犳爣浣嶇疆涓嬬殑杩炴帴绾?
+     * @param {number} x - 榧犳爣X鍧愭爣锛堜笘鐣屽潗鏍囷級
+     * @param {number} y - 榧犳爣Y鍧愭爣锛堜笘鐣屽潗鏍囷級
      * @returns {Object|null}
      */
     getConnectionAt(x, y) {
-        // 倒序遍历，优先选择最上面的连接线
+        // 閸婃帒绨柆宥呭坊閿涘奔绱崗鍫モ偓澶嬪閺堚偓娑撳﹪娼伴惃鍕箾閹恒儳鍤?
         for (let i = this.connections.length - 1; i >= 0; i--) {
             if (this.isPointOnConnection(x, y, this.connections[i])) {
                 return this.connections[i];
@@ -2168,68 +2180,66 @@ class FlowCanvas {
     }
 
     /**
-     * 处理右键菜单
+     * 婢跺嫮鎮婇崣鎶芥暛閼挎粌宕?
      */
     /**
-     * 处理键盘事件
+     * 婢跺嫮鎮婇柨顔炬磸娴滃娆?
      */
     handleKeyDown(e) {
-        // 如果焦点在输入框、文本区域或可编辑元素中，不拦截快捷键
-        if (e.target.tagName === 'INPUT' || 
-            e.target.tagName === 'TEXTAREA' || 
-            e.target.tagName === 'SELECT' || 
+        if (e.target.tagName === 'INPUT' ||
+            e.target.tagName === 'TEXTAREA' ||
+            e.target.tagName === 'SELECT' ||
             e.target.isContentEditable) {
             return;
         }
 
-        // Delete 键或 Backspace 键删除选中的节点或连接线
         if (e.key === 'Delete' || e.key === 'Backspace') {
             if (this.selectedNode) {
-                if (confirm('确定要删除选中的节点吗？')) {
+                if (confirm('Delete selected node?')) {
                     this.removeNode(this.selectedNode);
                 }
             } else if (this.selectedConnection) {
-                if (confirm('确定要删除选中的连接线吗？')) {
+                if (confirm('Delete selected connection?')) {
                     this.removeConnection(this.selectedConnection.id);
                 }
             }
         }
 
-        // Escape 键取消连线
         if (e.key === 'Escape' && this.isConnecting) {
             this.cancelConnection();
         }
     }
 
-    /**
-     * 设置节点状态
-     * @param {string} nodeId - 节点ID
-     * @param {string} status - 状态: 'idle' | 'running' | 'success' | 'error'
-     */
     setNodeStatus(nodeId, status) {
         const node = this.nodes.get(nodeId);
-        if (node) {
+        if (node && node.status !== status) {
             node.status = status;
             this.render();
         }
     }
 
     /**
-     * 重置所有节点状态
+     * 閲嶇疆鎵€鏈夎妭鐐圭姸鎬?
      */
     resetAllStatus() {
+        let changed = false;
         this.nodes.forEach(node => {
+            if (node.status !== 'idle') {
+                changed = true;
+            }
             node.status = 'idle';
         });
-        this.render();
+        if (changed) {
+            this.render();
+        }
     }
 
     // ==========================================================================
-    // 阶段四增强：右键菜单功能
+    // 闂冭埖顔岄崶娑橆杻瀵尨绱伴崣鎶芥暛閼挎粌宕熼崝鐔诲厴
     // ==========================================================================
 
     /**
-     * 处理右键菜单事件
+     * 澶勭悊鍙抽敭鑿滃崟浜嬩欢
      */
     handleContextMenu(e) {
         e.preventDefault();
@@ -2243,7 +2253,7 @@ class FlowCanvas {
             this.selectedNode = null;
             this.selectedConnection = connection;
 
-            if (confirm('确定要删除这条连接线吗？')) {
+            if (confirm('Delete selected connection?')) {
                 this.removeConnection(connection.id);
             }
             return;
@@ -2269,53 +2279,49 @@ class FlowCanvas {
     }
 
     /**
-     * 显示节点右键菜单
+     * 鏄剧ず鑺傜偣鍙抽敭鑿滃崟
      */
     showNodeContextMenu(x, y, nodeId) {
         this.hideContextMenu();
-        
+
         const node = this.nodes.get(nodeId);
         if (!node) return;
-        
+
         const menu = document.createElement('div');
         menu.className = 'flow-context-menu';
-        menu.style.cssText = `
-            position: fixed;
-            left: ${x}px;
-            top: ${y}px;
-            background: rgba(15, 36, 53, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 8px 0;
-            min-width: 160px;
-            z-index: 1000;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            animation: contextMenuFadeIn 0.15s ease-out;
-        `;
-        
+        menu.style.position = 'fixed';
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.style.background = 'rgba(15, 36, 53, 0.95)';
+        menu.style.backdropFilter = 'blur(10px)';
+        menu.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+        menu.style.borderRadius = '8px';
+        menu.style.padding = '8px 0';
+        menu.style.minWidth = '160px';
+        menu.style.zIndex = '1000';
+        menu.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.3)';
+        menu.style.animation = 'contextMenuFadeIn 0.15s ease-out';
+
         const menuItems = [
-            { icon: '▶️', label: '运行', action: () => this.runNode(nodeId) },
-            { icon: '📋', label: '复制', action: () => this.duplicateNode(nodeId) },
-            { icon: '❌', label: '删除', action: () => this.removeNode(nodeId), danger: true },
-            { icon: '🚫', label: node.disabled ? '启用' : '禁用', action: () => this.toggleNodeDisabled(nodeId) },
-            { icon: '❓', label: '查看帮助', action: () => this.showNodeHelp(node) }
+            { icon: '>', label: 'Run', action: () => this.runNode(nodeId) },
+            { icon: '+', label: 'Duplicate', action: () => this.duplicateNode(nodeId) },
+            { icon: 'x', label: 'Delete', action: () => this.removeNode(nodeId), danger: true },
+            { icon: '!', label: node.disabled ? 'Enable' : 'Disable', action: () => this.toggleNodeDisabled(nodeId) },
+            { icon: '?', label: 'Help', action: () => this.showNodeHelp(node) }
         ];
-        
+
         menuItems.forEach(item => {
             const menuItem = document.createElement('div');
             menuItem.className = 'context-menu-item';
-            menuItem.style.cssText = `
-                padding: 8px 16px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 13px;
-                color: ${item.danger ? '#e74c3c' : '#eceef2'};
-                transition: all 0.2s;
-            `;
-            menuItem.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;
+            menuItem.style.padding = '8px 16px';
+            menuItem.style.cursor = 'pointer';
+            menuItem.style.display = 'flex';
+            menuItem.style.alignItems = 'center';
+            menuItem.style.gap = '8px';
+            menuItem.style.fontSize = '13px';
+            menuItem.style.color = item.danger ? '#e74c3c' : '#eceef2';
+            menuItem.style.transition = 'all 0.2s';
+            menuItem.innerHTML = '<span>' + item.icon + '</span><span>' + item.label + '</span>';
             menuItem.addEventListener('mouseenter', () => {
                 menuItem.style.background = item.danger ? 'rgba(231, 76, 60, 0.2)' : 'rgba(255, 255, 255, 0.1)';
             });
@@ -2328,32 +2334,24 @@ class FlowCanvas {
             });
             menu.appendChild(menuItem);
         });
-        
+
         document.body.appendChild(menu);
         this.contextMenu = menu;
-        
-        // 添加动画样式
+
         if (!document.getElementById('contextMenuStyles')) {
             const style = document.createElement('style');
             style.id = 'contextMenuStyles';
-            style.textContent = `
-                @keyframes contextMenuFadeIn {
-                    from { opacity: 0; transform: scale(0.95); }
-                    to { opacity: 1; transform: scale(1); }
-                }
-            `;
+            style.textContent = '@keyframes contextMenuFadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }' +
+                '\n.flow-context-menu .context-menu-item:hover { background: rgba(255, 255, 255, 0.08); }';
             document.head.appendChild(style);
         }
-        
-        // 点击外部关闭菜单
+
+        // Click outside to close the menu
         setTimeout(() => {
             document.addEventListener('click', this._clickOutsideHandler);
         }, 0);
     }
 
-    /**
-     * 隐藏右键菜单
-     */
     hideContextMenu() {
         if (this.contextMenu) {
             this.contextMenu.remove();
@@ -2363,7 +2361,7 @@ class FlowCanvas {
     }
 
     /**
-     * 清空画布
+     * 濞撳懐鈹栭悽璇茬
      */
     clear(silent = false) {
         this.nodes.clear();
@@ -2374,6 +2372,7 @@ class FlowCanvas {
         this.selectedNode = null;
         this.draggedNode = null;
         this.selectedConnection = null;
+        this._markNodesBoundsDirty();
         this.invalidate();
         if (!silent) {
             this.markFlowStructureChanged('clear');
@@ -2381,19 +2380,21 @@ class FlowCanvas {
     }
 
     /**
-     * 运行单个节点
+     * 鏉╂劘顢戦崡鏇氶嚋閼哄倻鍋?
      */
     runNode(nodeId) {
-        console.log('[FlowCanvas] 运行节点:', nodeId);
+        if (flowDebugEnabled()) {
+            console.log('[FlowCanvas] Run node:', nodeId);
+        }
         this.setNodeStatus(nodeId, 'running');
-        // 这里可以触发实际的节点执行逻辑
+        // 鏉╂瑩鍣烽崣顖欎簰鐟欙箑褰傜€圭偤妾惃鍕Ν閻愯澧界悰宀勨偓鏄忕帆
         setTimeout(() => {
             this.setNodeStatus(nodeId, 'success');
         }, 1000);
     }
 
     /**
-     * 复制节点
+     * 澶嶅埗鑺傜偣
      */
     duplicateNode(nodeId) {
         const node = this.nodes.get(nodeId);
@@ -2414,14 +2415,14 @@ class FlowCanvas {
     }
 
     /**
-     * 删除节点（右键菜单及 API 兼容入口）。委托给 removeNode 以保留 _systemNode 保护与索引同步。
+     * 閸掔娀娅庨懞鍌滃仯閿涘牆褰搁柨顔垮綅閸楁洖寮?API 閸忕厧顔愰崗銉ュ經閿涘鈧倸顫欓幍妯肩舶 removeNode 娴犮儰绻氶悾?_systemNode 娣囨繃濮㈡稉搴ｅ偍瀵洖鎮撳銉ｂ偓?
      */
     deleteNode(nodeId) {
         this.removeNode(nodeId);
     }
 
     /**
-     * 切换节点禁用状态
+     * 鍒囨崲鑺傜偣绂佺敤鐘舵€?
      */
     toggleNodeDisabled(nodeId) {
         const node = this.nodes.get(nodeId);
@@ -2433,55 +2434,51 @@ class FlowCanvas {
     }
 
     /**
-     * 显示节点帮助
+     * 閺勫墽銇氶懞鍌滃仯鐢喖濮?
      */
     showNodeHelp(node) {
-        alert(`节点类型: ${node.type}\n名称: ${node.title}\n\n这是一个 ${node.type} 算子节点。`);
+        alert('Node type: ' + node.type + '\nName: ' + node.title + '\n\nThis is a ' + node.type + ' operator node.');
     }
 
     // ==========================================================================
-    // 阶段四增强：小地图功能
+    // 闃舵鍥涘寮猴細灏忓湴鍥惧姛鑳?
     // ==========================================================================
 
     /**
-     * 初始化小地图
+     * 閸掓繂顫愰崠鏍х毈閸︽澘娴?
      */
     initMinimap() {
         if (this.minimap) return;
-        
+
         this.minimap = document.createElement('div');
         this.minimap.className = 'flow-minimap';
-        this.minimap.style.cssText = `
-            position: absolute;
-            right: 20px;
-            bottom: 20px;
-            width: 200px;
-            height: 150px;
-            background: rgba(15, 36, 53, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            overflow: hidden;
-            z-index: 100;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-        `;
-        
+        this.minimap.style.position = 'absolute';
+        this.minimap.style.right = '20px';
+        this.minimap.style.bottom = '20px';
+        this.minimap.style.width = '200px';
+        this.minimap.style.height = '150px';
+        this.minimap.style.background = 'rgba(15, 36, 53, 0.9)';
+        this.minimap.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+        this.minimap.style.borderRadius = '8px';
+        this.minimap.style.overflow = 'hidden';
+        this.minimap.style.zIndex = '100';
+        this.minimap.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.3)';
+
         this.minimapCanvas = document.createElement('canvas');
         this.minimapCanvas.width = 200;
         this.minimapCanvas.height = 150;
         this.minimap.appendChild(this.minimapCanvas);
-        
+
         this.canvas.parentElement.appendChild(this.minimap);
-        
-        // 点击小地图导航
+
+        // Click minimap to navigate
         this.minimapCanvas.addEventListener('click', (e) => {
             const rect = this.minimapCanvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width;
             const y = (e.clientY - rect.top) / rect.height;
 
-            // 计算视口中心位置
             const bounds = this.getNodesBounds();
             if (bounds) {
-                // 【修复】bounds.width 已是 maxX-minX，不应再加一次
                 const targetX = bounds.minX + x * bounds.width;
                 const targetY = bounds.minY + y * bounds.height;
 
@@ -2493,11 +2490,16 @@ class FlowCanvas {
         });
     }
 
-    /**
-     * 获取所有节点的边界
-     */
     getNodesBounds() {
-        if (this.nodes.size === 0) return null;
+        if (this.nodes.size === 0) {
+            this._nodesBoundsDirty = false;
+            this._nodesBoundsCache = null;
+            return null;
+        }
+
+        if (!this._nodesBoundsDirty && this._nodesBoundsCache) {
+            return this._nodesBoundsCache;
+        }
         
         let minX = Infinity, minY = Infinity;
         let maxX = -Infinity, maxY = -Infinity;
@@ -2509,11 +2511,13 @@ class FlowCanvas {
             maxY = Math.max(maxY, node.y + node.height);
         });
         
-        return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+        this._nodesBoundsCache = { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+        this._nodesBoundsDirty = false;
+        return this._nodesBoundsCache;
     }
 
     /**
-     * 绘制小地图
+     * 缂佹ê鍩楃亸蹇撴勾閸?
      */
     drawMinimap() {
         if (!this.minimapCanvas) return;
@@ -2522,13 +2526,13 @@ class FlowCanvas {
         const width = this.minimapCanvas.width;
         const height = this.minimapCanvas.height;
         
-        // 清空
+        // 濞撳懐鈹?
         ctx.clearRect(0, 0, width, height);
         
         const bounds = this.getNodesBounds();
         if (!bounds) return;
         
-        // 添加内边距
+        // 濞ｈ濮為崘鍛扮珶鐠?
         const padding = 20;
         const scaleX = width / (bounds.width + padding * 2);
         const scaleY = height / (bounds.height + padding * 2);
@@ -2537,7 +2541,7 @@ class FlowCanvas {
         const offsetX = (width - (bounds.width + padding * 2) * scale) / 2 + padding * scale;
         const offsetY = (height - (bounds.height + padding * 2) * scale) / 2 + padding * scale;
         
-        // 绘制节点
+        // 缂佹ê鍩楅懞鍌滃仯
         this.nodes.forEach(node => {
             const x = offsetX + (node.x - bounds.minX) * scale;
             const y = offsetY + (node.y - bounds.minY) * scale;
@@ -2547,7 +2551,7 @@ class FlowCanvas {
             ctx.fillStyle = node.disabled ? '#666' : (node.color || '#1890ff');
             ctx.fillRect(x, y, w, h);
             
-            // 选中高亮
+            // 闁鑵戞妯瑰瘨
             if (node.id === this.selectedNode) {
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 2;
@@ -2555,7 +2559,7 @@ class FlowCanvas {
             }
         });
         
-        // 绘制视口框（使用逻辑尺寸，避免 DPR 导致框体翻倍）
+        // 缂佹ê鍩楃憴鍡楀經濡楀棴绱欐担璺ㄦ暏闁槒绶亸鍝勵嚟閿涘矂浼╅崗?DPR 鐎佃壈鍤у鍡曠秼缂堣鈧稄绱?
         const viewportX = offsetX + (this.offset.x - bounds.minX) * scale;
         const viewportY = offsetY + (this.offset.y - bounds.minY) * scale;
         const viewportW = (this._logicalWidth / this.scale) * scale;
@@ -2567,7 +2571,7 @@ class FlowCanvas {
     }
 
     /**
-     * 更新渲染循环以包含小地图
+     * 鏇存柊娓叉煋寰幆浠ュ寘鍚皬鍦板浘
      */
     renderWithMinimap() {
         this.render();

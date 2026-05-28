@@ -1,6 +1,22 @@
 const TOKEN_KEY = 'cv_auth_token';
 const USER_KEY = 'cv_current_user';
 
+function safeParseJson(value, fallback = null) {
+    if (!value) {
+        return fallback;
+    }
+
+    try {
+        return JSON.parse(value);
+    } catch {
+        const sessionStore = getSessionStore();
+        const localStore = getLocalStore();
+        sessionStore?.removeItem(USER_KEY);
+        localStore?.removeItem(USER_KEY);
+        return fallback;
+    }
+}
+
 function getSessionStore() {
     try {
         return window.sessionStorage;
@@ -42,7 +58,7 @@ export function getStoredToken() {
 
 export function getStoredUser() {
     const userJson = migrateLegacyValue(USER_KEY);
-    return userJson ? JSON.parse(userJson) : null;
+    return safeParseJson(userJson);
 }
 
 export function storeAuthSession(token, user) {
