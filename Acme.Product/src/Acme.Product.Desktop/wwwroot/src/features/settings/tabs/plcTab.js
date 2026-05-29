@@ -1,4 +1,5 @@
 import settingsApi from '../settingsApi.js';
+import { validatePlcConnectionDraft, assertValidation } from '../settingsValidators.js';
 import { showToast } from '../../../shared/components/uiComponents.js';
 
 export function installPlcTab(SettingsView) {
@@ -304,17 +305,15 @@ export function installPlcTab(SettingsView) {
         }
         ,
         validateActivePlcConnectionForm() {
+            const protocol = this.getActivePlcProtocol();
             const ipAddress = String(this.container?.querySelector('#cfg-plcIpAddress')?.value || '').trim();
-            if (!ipAddress) {
-                throw new Error('请填写 PLC IP 地址。');
-            }
-
-            this.readIntegerSetting('#cfg-plcPort', 'PLC 端口', { min: 1, max: 65535 });
-
-            if (this.getActivePlcProtocol() === 'S7') {
-                this.readIntegerSetting('#cfg-s7-rack', 'S7 Rack', { min: 0, max: 15 });
-                this.readIntegerSetting('#cfg-s7-slot', 'S7 Slot', { min: 0, max: 15 });
-            }
+            assertValidation(validatePlcConnectionDraft({
+                protocol,
+                ipAddress,
+                port: this.container?.querySelector('#cfg-plcPort')?.value || '',
+                rack: this.container?.querySelector('#cfg-s7-rack')?.value || '',
+                slot: this.container?.querySelector('#cfg-s7-slot')?.value || ''
+            }));
         }
         ,
         async savePlcSettings({ silent = false, persistAllProfiles = false } = {}) {

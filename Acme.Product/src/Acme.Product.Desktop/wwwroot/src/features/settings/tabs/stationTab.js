@@ -1,4 +1,5 @@
 import settingsApi from '../settingsApi.js';
+import { validateStationCommunicationDraft, assertValidation } from '../settingsValidators.js';
 import { showToast } from '../../../shared/components/uiComponents.js';
 
 export function installStationTab(SettingsView) {
@@ -216,24 +217,17 @@ export function installStationTab(SettingsView) {
             this.syncStationCommunicationDraftFromForm();
             const settings = this.normalizeStationCommunicationSettings(this.stationCommunicationSettings);
             const portInput = this.container?.querySelector('#cfg-station-port')?.value;
-            const parsedPort = Number.parseInt(`${portInput ?? settings.port}`, 10);
-            if (!Number.isFinite(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
-                throw new Error('端口必须是 1-65535 之间的整数');
-            }
-
             const lanHost = this.container?.querySelector('#cfg-station-lan-host')?.value?.trim() || settings.lanHost;
-            if (settings.mode !== 'Disabled' && lanHost && (
-                /^https?:\/\//i.test(lanHost) ||
-                /\s/.test(lanHost) ||
-                /[\\/?#@]/.test(lanHost)
-            )) {
-                throw new Error('LAN 主机名/IP 只能填写主机名或 IP，不要包含 http://、路径、空格或特殊符号。');
-            }
+            const validated = assertValidation(validateStationCommunicationDraft({
+                mode: settings.mode,
+                port: portInput ?? settings.port,
+                lanHost
+            }));
 
             return {
                 mode: settings.mode,
-                port: parsedPort,
-                lanHost,
+                port: validated.port,
+                lanHost: validated.lanHost,
                 localStationSyncEnabled: settings.mode !== 'Disabled'
                     && (this.container?.querySelector('#cfg-station-local-sync')?.checked ?? settings.localStationSyncEnabled)
             };

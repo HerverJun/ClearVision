@@ -1,4 +1,5 @@
 import settingsApi from '../settingsApi.js';
+import { validateCameraParameterDraft } from '../settingsValidators.js';
 import { showToast, closeModal } from '../../../shared/components/uiComponents.js';
 import inspectionController from '../../inspection/inspectionController.js';
 
@@ -128,10 +129,6 @@ export function installCameraTab(SettingsView) {
             return '软件触发';
         }
 
-        /**
-         * 初始化或重新加载视图
-         * app.js 在切换到 settings 视图时调用
-         */
         ,
         bindCameraManagementEvents() {
             const section = this.container.querySelector('[data-section="cameras"]');
@@ -143,7 +140,6 @@ export function installCameraTab(SettingsView) {
             const discoverHikvisionBtn = section.querySelector('#btn-discover-hikvision-cameras');
             discoverHikvisionBtn?.addEventListener('click', () => this.discoverCameras('hikvision', discoverHikvisionBtn));
 
-            // 兼容旧按钮 ID，避免历史页面缓存导致按钮失效。
             const discoverBtn = section.querySelector('#btn-discover-cameras');
             discoverBtn?.addEventListener('click', () => this.discoverCameras('all', discoverBtn));
 
@@ -407,17 +403,22 @@ export function installCameraTab(SettingsView) {
                 </p>
             `;
 
+            const eventCleanups = [];
+            const cleanupModalEvents = () => {
+                eventCleanups.splice(0).forEach(cleanup => cleanup());
+            };
+
             const modal = this.createTrackedModal({
                 title: `配置向导：发现${vendorText}相机`,
                 content: contentDiv,
-                width: '920px'
+                width: '920px',
+                onClose: cleanupModalEvents
             });
             modal.querySelector('.cv-modal')?.style.setProperty('max-width', '95vw');
 
-            // 绑定点击事件
             const bindBtns = contentDiv.querySelectorAll('.btn-bind-camera');
             bindBtns.forEach(btn => {
-                btn.addEventListener('click', async () => {
+                eventCleanups.push(this.lifecycle.trackEvent(btn, 'click', async () => {
                     const sn = btn.dataset.sn;
                     const manufacturer = btn.dataset.man;
                     const model = btn.dataset.model;
@@ -479,7 +480,7 @@ export function installCameraTab(SettingsView) {
                     if (selectedRow) {
                         this.selectCameraRow(selectedRow);
                     }
-                });
+                }));
             });
         }
         ,
@@ -1058,11 +1059,17 @@ export function installCameraTab(SettingsView) {
                 sessionId = null;
             };
 
+            const eventCleanups = [];
+            const cleanupPreviewEvents = () => {
+                eventCleanups.splice(0).forEach(cleanup => cleanup());
+            };
+
             const modal = this.createTrackedModal({
                 title: `相机预览 - ${binding.displayName || binding.serialNumber || binding.id}`,
                 content,
                 width: '960px',
                 onClose: async () => {
+                    cleanupPreviewEvents();
                     await stopPreview();
                     cleanupPreviewUrl();
                 }
@@ -1157,7 +1164,7 @@ export function installCameraTab(SettingsView) {
                 }
             };
 
-            toggleBtn.addEventListener('click', async () => {
+            eventCleanups.push(this.lifecycle.trackEvent(toggleBtn, 'click', async () => {
                 if (previewActive) {
                     await stopPreview();
                     toggleBtn.textContent = '继续预览';
@@ -1168,7 +1175,7 @@ export function installCameraTab(SettingsView) {
                 }
 
                 await startPreview();
-            });
+            }));
 
             await startPreview();
         }
@@ -1242,11 +1249,17 @@ export function installCameraTab(SettingsView) {
                 activePreviewAbortController = null;
             };
 
+            const eventCleanups = [];
+            const cleanupPreviewEvents = () => {
+                eventCleanups.splice(0).forEach(cleanup => cleanup());
+            };
+
             const modal = this.createTrackedModal({
                 title: `相机预览 - ${binding.displayName || binding.serialNumber || binding.id}`,
                 content,
                 width: '960px',
                 onClose: () => {
+                    cleanupPreviewEvents();
                     previewClosed = true;
                     previewRequestId += 1;
                     cancelActivePreviewRequest();
@@ -1270,7 +1283,7 @@ export function installCameraTab(SettingsView) {
             };
 
             if (isEnterPhotoelectric) {
-                content.addEventListener('keydown', event => {
+                eventCleanups.push(this.lifecycle.trackEvent(content, 'keydown', event => {
                     if (event.key !== 'Enter') {
                         return;
                     }
@@ -1284,7 +1297,7 @@ export function installCameraTab(SettingsView) {
                     event.preventDefault();
                     event.stopPropagation();
                     focusPreviewSurface();
-                }, true);
+                }, true));
             }
 
             const buildPreviewMetaText = (preview, waitingForNext = false) => {
@@ -1406,11 +1419,11 @@ export function installCameraTab(SettingsView) {
                 }
             };
 
-            refreshBtn.addEventListener('click', event => {
+            eventCleanups.push(this.lifecycle.trackEvent(refreshBtn, 'click', event => {
                 event.preventDefault();
                 focusPreviewSurface();
                 void loadPreview();
-            });
+            }));
 
             focusPreviewSurface();
             void loadPreview();
@@ -1466,40 +1479,21 @@ export function installCameraTab(SettingsView) {
             const ignoreSerialPhotoelectricTriggerWhileBusy = ignoreSerialBusyInput.checked !== false;
             const targetFrameRateFps = Number.parseInt(String(frameRateInput.value ?? ''), 10);
 
-            if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
-                showToast('曝光时间需在 10 - 1000000 µs 范围内', 'warning');
-                return false;
-            }
-            if (!Number.isFinite(gainDb) || gainDb < 0 || gainDb > 24) {
-                showToast('增益需在 0.0 - 24.0 dB 范围内', 'warning');
-                return false;
-            }
-            if (!Number.isInteger(enterPhotoelectricDebounceMs) || enterPhotoelectricDebounceMs < 0 || enterPhotoelectricDebounceMs > 5000) {
-                showToast('回车防抖时间需在 0 - 5000 ms 范围内', 'warning');
-                return false;
-            }
-            if (!Number.isInteger(enterPhotoelectricTimeoutMs) || enterPhotoelectricTimeoutMs < 100 || enterPhotoelectricTimeoutMs > 600000) {
-                showToast('回车等待超时需在 100 - 600000 ms 范围内', 'warning');
-                return false;
-            }
-            if (!Number.isInteger(serialPhotoelectricBaudRate) || serialPhotoelectricBaudRate <= 0) {
-                showToast('串口波特率必须是大于 0 的整数', 'warning');
-                return false;
-            }
-            if (!Number.isInteger(serialPhotoelectricDebounceMs) || serialPhotoelectricDebounceMs < 0 || serialPhotoelectricDebounceMs > 5000) {
-                showToast('串口防抖时间需在 0 - 5000 ms 范围内', 'warning');
-                return false;
-            }
-            if (!Number.isInteger(serialPhotoelectricTimeoutMs) || serialPhotoelectricTimeoutMs < 100 || serialPhotoelectricTimeoutMs > 600000) {
-                showToast('串口等待超时需在 100 - 600000 ms 范围内', 'warning');
-                return false;
-            }
-            if (softwareTriggerSource === 'SerialPhotoelectric' && !/^COM\d+$/i.test(serialPhotoelectricPortName)) {
-                showToast('串口光电触发需要填写类似 COM3 的串口号', 'warning');
-                return false;
-            }
-            if (triggerMode !== 'Software' && (!Number.isInteger(targetFrameRateFps) || targetFrameRateFps < 1 || targetFrameRateFps > 120)) {
-                showToast('采集帧率需在 1 - 120 fps 范围内', 'warning');
+            const validation = validateCameraParameterDraft({
+                exposureTimeUs,
+                gainDb,
+                enterPhotoelectricDebounceMs,
+                enterPhotoelectricTimeoutMs,
+                serialPhotoelectricBaudRate,
+                serialPhotoelectricDebounceMs,
+                serialPhotoelectricTimeoutMs,
+                softwareTriggerSource,
+                serialPhotoelectricPortName,
+                triggerMode,
+                targetFrameRateFps
+            });
+            if (!validation.ok) {
+                showToast(validation.message, 'warning');
                 return false;
             }
 
@@ -1539,8 +1533,6 @@ export function installCameraTab(SettingsView) {
             return true;
         }
 
-        // （演示用空壳。需要配合 Modal使用，这里只挂载入口）
-        // ----- UI 渲染块（为了测试顺利，简化版） -----
         ,
         renderCameraTab() {
             return `
