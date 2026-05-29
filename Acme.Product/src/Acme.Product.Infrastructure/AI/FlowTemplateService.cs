@@ -598,6 +598,15 @@ public class FlowTemplateService : IFlowTemplateService
                 CreatedAt = DateTime.UtcNow
             },
             CreateClassicTemplateMatchingTemplate(),
+            CreateGradientShapeMatchPositioningTemplate(),
+            CreatePlanarFeatureMatchingTemplate(),
+            CreateBlobDefectRegionAnalysisTemplate(),
+            CreateCaliperWidthMeasurementTemplate(),
+            CreateCircularHoleMeasurementTemplate(),
+            CreateColorDeltaEInspectionTemplate(),
+            CreateCodeTraceabilityTemplate(),
+            CreateSurfaceReferenceDefectTemplate(),
+            CreateSharpnessFocusGateTemplate(),
             CreateAiInspectionTemplate(
                 name: "包装箱外观检测",
                 scenarioKey: "carton-appearance-inspection",
@@ -651,6 +660,23 @@ public class FlowTemplateService : IFlowTemplateService
                 judgmentExpectValue: "1",
                 includeTargetClassesInReview: false),
             CreateCopperHoleSpacingTemplate()
+        };
+    }
+
+    private static ScenarioPackageBinding CreateRuleOnlyPackage(
+        string scenarioKey,
+        string templateVersion)
+    {
+        return new ScenarioPackageBinding
+        {
+            PackageKey = scenarioKey,
+            PackageVersion = "1.0.0",
+            AssetVersionIds =
+            [
+                $"template:{scenarioKey}@{templateVersion}",
+                $"rule:{scenarioKey}-rule@1.0.0"
+            ],
+            RequiredResources = []
         };
     }
 
@@ -740,6 +766,798 @@ public class FlowTemplateService : IFlowTemplateService
                     ["op_1"] = ["SourceType", "FilePath", "CameraId"],
                     ["op_2"] = ["FilePath"],
                     ["op_3"] = ["Threshold", "Domain", "UseRoi", "RoiX", "RoiY", "RoiWidth", "RoiHeight", "EnablePoseSearch"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static FlowTemplate CreateGradientShapeMatchPositioningTemplate()
+    {
+        const string scenarioKey = "gradient-shape-match-positioning";
+        const string templateVersion = "1.0.0";
+
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "梯度形状匹配定位检测",
+            Description = "适合轮廓清晰、允许小角度旋转的工件定位与有无检测；使用梯度方向形状匹配，建议现场用 ROI 限定搜索区并开启模板缓存。",
+            Industry = "通用制造",
+            Tags = ["传统视觉", "形状匹配", "定位", "旋转鲁棒"],
+            TemplateVersion = templateVersion,
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = CreateRuleOnlyPackage(scenarioKey, templateVersion),
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "用于边缘轮廓稳定、纹理不明显但姿态会轻微变化的工件定位。梯度形状匹配比灰度相关匹配更抗光照波动；ROI 和 TopK 保持较小可降低节拍压力。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "GradientShapeMatch.MinScore",
+                    "GradientShapeMatch.AngleRange",
+                    "GradientShapeMatch.AngleStep",
+                    "GradientShapeMatch.UseRoi",
+                    "GradientShapeMatch.RoiX",
+                    "GradientShapeMatch.RoiY",
+                    "GradientShapeMatch.RoiWidth",
+                    "GradientShapeMatch.RoiHeight"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "待检图像", CameraAcquisitionParameters()),
+                    Node("op_2", "ImageAcquisition", "标准轮廓模板", FileAcquisitionParameters()),
+                    Node("op_3", "GradientShapeMatch", "梯度形状匹配", new Dictionary<string, string>
+                    {
+                        ["TemplatePath"] = "",
+                        ["MinScore"] = "80",
+                        ["TopK"] = "1",
+                        ["AngleRange"] = "30",
+                        ["AngleStep"] = "2",
+                        ["MagnitudeThreshold"] = "30",
+                        ["EnableCache"] = "true",
+                        ["UseRoi"] = "true",
+                        ["RoiX"] = "0",
+                        ["RoiY"] = "0",
+                        ["RoiWidth"] = TemplateDefaultRegionExtent,
+                        ["RoiHeight"] = TemplateDefaultRegionExtent
+                    }),
+                    Node("op_4", "ResultJudgment", "匹配判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "Equal",
+                        ["ExpectValue"] = "True",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_5", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_3", "Image"),
+                    Link("op_2", "Image", "op_3", "Template"),
+                    Link("op_3", "IsMatch", "op_4", "Value"),
+                    Link("op_3", "Image", "op_5", "Image"),
+                    Link("op_3", "Matches", "op_5", "Data"),
+                    Link("op_4", "JudgmentResult", "op_5", "Result"),
+                    Link("op_4", "Details", "op_5", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["CameraId", "ExposureTime", "Gain"],
+                    ["op_2"] = ["FilePath"],
+                    ["op_3"] = ["MinScore", "AngleRange", "AngleStep", "UseRoi", "RoiX", "RoiY", "RoiWidth", "RoiHeight"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static FlowTemplate CreatePlanarFeatureMatchingTemplate()
+    {
+        const string scenarioKey = "planar-feature-label-positioning";
+        const string templateVersion = "1.0.0";
+
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "平面特征匹配定位检测",
+            Description = "适合铭牌、标签、印刷件等有纹理平面目标的定位和贴附验证；用 ORB/AKAZE 特征匹配加单应性校验，能处理透视变化。",
+            Industry = "包装追溯",
+            Tags = ["传统视觉", "特征匹配", "平面定位", "透视校验"],
+            TemplateVersion = templateVersion,
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = CreateRuleOnlyPackage(scenarioKey, templateVersion),
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "用于带文字、图案、二维码背景或铭牌纹理的平面目标。PlanarMatching 使用特征点匹配和 RANSAC 单应性验证，比普通模板匹配更适合透视、尺度和轻微旋转变化。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "PlanarMatching.DetectorType",
+                    "PlanarMatching.MatchRatio",
+                    "PlanarMatching.MinInliers",
+                    "PlanarMatching.ScoreThreshold",
+                    "PlanarMatching.UseRoi"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "待检图像", CameraAcquisitionParameters()),
+                    Node("op_2", "ImageAcquisition", "标准平面模板", FileAcquisitionParameters()),
+                    Node("op_3", "PlanarMatching", "平面特征匹配", new Dictionary<string, string>
+                    {
+                        ["TemplatePath"] = "",
+                        ["DetectorType"] = "ORB",
+                        ["MaxFeatures"] = "1200",
+                        ["ScaleFactor"] = "1.2",
+                        ["NLevels"] = "8",
+                        ["MatchRatio"] = "0.75",
+                        ["RansacThreshold"] = "3",
+                        ["MinMatchCount"] = "12",
+                        ["MinInliers"] = "8",
+                        ["MinInlierRatio"] = "0.3",
+                        ["ScoreThreshold"] = "0.55",
+                        ["AllowCenterOnlyProjection"] = "false",
+                        ["UseRoi"] = "false",
+                        ["RoiX"] = "0",
+                        ["RoiY"] = "0",
+                        ["RoiWidth"] = "0",
+                        ["RoiHeight"] = "0",
+                        ["EnableMultiScale"] = "true",
+                        ["ScaleRange"] = "0.2",
+                        ["EnableEarlyExit"] = "true"
+                    }),
+                    Node("op_4", "ResultJudgment", "单应性判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "Equal",
+                        ["ExpectValue"] = "True",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_5", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_3", "Image"),
+                    Link("op_2", "Image", "op_3", "Template"),
+                    Link("op_3", "VerificationPassed", "op_4", "Value"),
+                    Link("op_3", "Image", "op_5", "Image"),
+                    Link("op_3", "MatchResult", "op_5", "Data"),
+                    Link("op_4", "JudgmentResult", "op_5", "Result"),
+                    Link("op_4", "Details", "op_5", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["CameraId", "ExposureTime", "Gain"],
+                    ["op_2"] = ["FilePath"],
+                    ["op_3"] = ["DetectorType", "MatchRatio", "MinInliers", "MinInlierRatio", "ScoreThreshold", "UseRoi", "RoiX", "RoiY", "RoiWidth", "RoiHeight"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static FlowTemplate CreateBlobDefectRegionAnalysisTemplate()
+    {
+        const string scenarioKey = "blob-defect-region-analysis";
+        const string templateVersion = "1.0.0";
+
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Blob缺陷区域分析",
+            Description = "适合黑点、白点、脏污、缺料、毛刺等高对比缺陷；采用光照校正、阈值分割、形态学清理和连通域面积/形状过滤。",
+            Industry = "通用制造",
+            Tags = ["传统视觉", "Blob", "连通域", "缺陷区域"],
+            TemplateVersion = templateVersion,
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = CreateRuleOnlyPackage(scenarioKey, templateVersion),
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "用于高对比、可二值化的区域缺陷。先做光照校正，再用 Otsu 阈值和形态学开运算清理噪点，最后按面积、圆度、凸度等 Blob 特征输出缺陷数量。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "Thresholding.UseOtsu",
+                    "MorphologicalOperation.KernelWidth",
+                    "MorphologicalOperation.KernelHeight",
+                    "BlobAnalysis.MinArea",
+                    "BlobAnalysis.MaxArea",
+                    "BlobAnalysis.MinCircularity"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "图像采集", CameraAcquisitionParameters()),
+                    Node("op_2", "ShadingCorrection", "光照校正", new Dictionary<string, string>
+                    {
+                        ["Method"] = "GaussianModel",
+                        ["KernelSize"] = "51",
+                        ["ColorMode"] = "LumaOnly"
+                    }),
+                    Node("op_3", "Thresholding", "自适应阈值", new Dictionary<string, string>
+                    {
+                        ["Threshold"] = "0",
+                        ["MaxValue"] = "255",
+                        ["Type"] = "8",
+                        ["UseOtsu"] = "true"
+                    }),
+                    Node("op_4", "MorphologicalOperation", "形态学去噪", new Dictionary<string, string>
+                    {
+                        ["Operation"] = "Open",
+                        ["KernelShape"] = "Ellipse",
+                        ["KernelWidth"] = "3",
+                        ["KernelHeight"] = "3",
+                        ["Iterations"] = "1",
+                        ["AnchorX"] = "-1",
+                        ["AnchorY"] = "-1"
+                    }),
+                    Node("op_5", "BlobAnalysis", "连通域缺陷分析", new Dictionary<string, string>
+                    {
+                        ["MinArea"] = "20",
+                        ["MaxArea"] = "20000",
+                        ["Color"] = "White",
+                        ["MinCircularity"] = "0.0",
+                        ["MinConvexity"] = "0.0",
+                        ["MinInertiaRatio"] = "0.0",
+                        ["MinRectangularity"] = "0.0",
+                        ["MinEccentricity"] = "0.0",
+                        ["OutputDetailedFeatures"] = "true",
+                        ["FeatureFilter"] = "",
+                        ["EnableColorFilter"] = "false",
+                        ["HueLow"] = "0",
+                        ["HueHigh"] = "180",
+                        ["SatLow"] = "50",
+                        ["SatHigh"] = "255",
+                        ["ValLow"] = "50",
+                        ["ValHigh"] = "255"
+                    }),
+                    Node("op_6", "ResultJudgment", "缺陷数量判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "Equal",
+                        ["ExpectValue"] = "0",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_7", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_2", "Image"),
+                    Link("op_2", "Image", "op_3", "Image"),
+                    Link("op_3", "Image", "op_4", "Image"),
+                    Link("op_4", "Image", "op_5", "Image"),
+                    Link("op_2", "Image", "op_5", "SourceImage"),
+                    Link("op_5", "BlobCount", "op_6", "Value"),
+                    Link("op_5", "Image", "op_7", "Image"),
+                    Link("op_5", "BlobFeatures", "op_7", "Data"),
+                    Link("op_6", "JudgmentResult", "op_7", "Result"),
+                    Link("op_6", "Details", "op_7", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["CameraId", "ExposureTime", "Gain"],
+                    ["op_2"] = ["Method", "KernelSize"],
+                    ["op_3"] = ["UseOtsu", "Threshold", "Type"],
+                    ["op_4"] = ["Operation", "KernelWidth", "KernelHeight", "Iterations"],
+                    ["op_5"] = ["MinArea", "MaxArea", "Color", "MinCircularity", "OutputDetailedFeatures"],
+                    ["op_6"] = ["Condition", "ExpectValue"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static FlowTemplate CreateCaliperWidthMeasurementTemplate()
+    {
+        const string scenarioKey = "caliper-width-measurement";
+        const string templateVersion = "1.0.0";
+
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "卡尺宽度测量",
+            Description = "适合胶条、槽宽、焊缝、间隙等稳定边缘对的在线尺寸检测；采用轻量滤波和卡尺边缘对测量，可输出均值与离散度。",
+            Industry = "精密装配",
+            Tags = ["传统视觉", "卡尺", "宽度", "尺寸测量"],
+            TemplateVersion = templateVersion,
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = CreateRuleOnlyPackage(scenarioKey, templateVersion),
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "用于两条稳定边缘之间的宽度/间隙测量。卡尺算子沿扫描方向寻找边缘对，开启亚像素模式后适合做工程尺寸判定；测量 ROI 应在现场固化。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "CaliperTool.Direction",
+                    "CaliperTool.EdgeThreshold",
+                    "CaliperTool.ExpectedCount",
+                    "ResultJudgment.ExpectValueMin",
+                    "ResultJudgment.ExpectValueMax"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "图像采集", CameraAcquisitionParameters()),
+                    Node("op_2", "Filtering", "轻量滤波", new Dictionary<string, string>
+                    {
+                        ["KernelSize"] = "3",
+                        ["SigmaX"] = "0.8",
+                        ["SigmaY"] = "0.0",
+                        ["BorderType"] = "4"
+                    }),
+                    Node("op_3", "CaliperTool", "边缘对卡尺测量", new Dictionary<string, string>
+                    {
+                        ["Direction"] = "Horizontal",
+                        ["Angle"] = "0",
+                        ["Polarity"] = "Both",
+                        ["EdgeThreshold"] = "18",
+                        ["ExpectedCount"] = "1",
+                        ["MeasureMode"] = "edge_pairs",
+                        ["PairDirection"] = "any",
+                        ["SubpixelAccuracy"] = "true",
+                        ["SubPixelMode"] = "gradient_centroid"
+                    }),
+                    Node("op_4", "ResultJudgment", "宽度范围判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "Range",
+                        ["ExpectValueMin"] = "0",
+                        ["ExpectValueMax"] = "999999",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_5", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_2", "Image"),
+                    Link("op_2", "Image", "op_3", "Image"),
+                    Link("op_3", "AverageDistance", "op_4", "Value"),
+                    Link("op_3", "Image", "op_5", "Image"),
+                    Link("op_3", "PairDistances", "op_5", "Data"),
+                    Link("op_4", "JudgmentResult", "op_5", "Result"),
+                    Link("op_4", "Details", "op_5", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["CameraId", "ExposureTime", "Gain"],
+                    ["op_2"] = ["KernelSize", "SigmaX"],
+                    ["op_3"] = ["Direction", "Angle", "Polarity", "EdgeThreshold", "ExpectedCount", "SubpixelAccuracy"],
+                    ["op_4"] = ["ExpectValueMin", "ExpectValueMax"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static FlowTemplate CreateCircularHoleMeasurementTemplate()
+    {
+        const string scenarioKey = "circular-hole-radius-measurement";
+        const string templateVersion = "1.0.0";
+
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "圆孔孔径与圆度检测",
+            Description = "适合螺丝孔、冲孔、铜孔等圆形特征的半径、圆心、圆度和数量检测；优先使用固定 ROI 和半径范围约束。",
+            Industry = "精密装配",
+            Tags = ["传统视觉", "圆测量", "孔径", "圆度"],
+            TemplateVersion = templateVersion,
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = CreateRuleOnlyPackage(scenarioKey, templateVersion),
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "用于孔径、圆心和圆度检测。先做轻量滤波降低噪声，再用圆测量输出半径、圆度和圆数量；现场应按产品规格收紧 MinRadius/MaxRadius 和判定范围。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "CircleMeasurement.Method",
+                    "CircleMeasurement.MinRadius",
+                    "CircleMeasurement.MaxRadius",
+                    "CircleMeasurement.Param1",
+                    "CircleMeasurement.Param2",
+                    "ResultJudgment.ExpectValueMin",
+                    "ResultJudgment.ExpectValueMax"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "图像采集", CameraAcquisitionParameters()),
+                    Node("op_2", "Filtering", "孔边缘降噪", new Dictionary<string, string>
+                    {
+                        ["KernelSize"] = "5",
+                        ["SigmaX"] = "1.0",
+                        ["SigmaY"] = "0.0",
+                        ["BorderType"] = "4"
+                    }),
+                    Node("op_3", "CircleMeasurement", "圆孔测量", new Dictionary<string, string>
+                    {
+                        ["Method"] = "HoughCircle",
+                        ["MinRadius"] = "10",
+                        ["MaxRadius"] = "200",
+                        ["Dp"] = "1",
+                        ["MinDist"] = "50",
+                        ["Param1"] = "100",
+                        ["Param2"] = "30"
+                    }),
+                    Node("op_4", "ResultJudgment", "孔径范围判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "Range",
+                        ["ExpectValueMin"] = "0",
+                        ["ExpectValueMax"] = "999999",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_5", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_2", "Image"),
+                    Link("op_2", "Image", "op_3", "Image"),
+                    Link("op_3", "Radius", "op_4", "Value"),
+                    Link("op_3", "Image", "op_5", "Image"),
+                    Link("op_3", "CircleDataList", "op_5", "Data"),
+                    Link("op_4", "JudgmentResult", "op_5", "Result"),
+                    Link("op_4", "Details", "op_5", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["CameraId", "ExposureTime", "Gain"],
+                    ["op_2"] = ["KernelSize", "SigmaX"],
+                    ["op_3"] = ["Method", "MinRadius", "MaxRadius", "MinDist", "Param1", "Param2"],
+                    ["op_4"] = ["ExpectValueMin", "ExpectValueMax"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static FlowTemplate CreateColorDeltaEInspectionTemplate()
+    {
+        const string scenarioKey = "color-deltae-inspection";
+        const string templateVersion = "1.0.0";
+
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Lab色差检测",
+            Description = "适合喷涂、注塑、标签和指示件的颜色偏差检测；使用光照校正和 CIEDE2000 DeltaE，避免只看 RGB 均值。",
+            Industry = "通用制造",
+            Tags = ["传统视觉", "颜色", "Lab", "DeltaE"],
+            TemplateVersion = templateVersion,
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = CreateRuleOnlyPackage(scenarioKey, templateVersion),
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "用于颜色一致性检测。先做光照校正，再在稳定 ROI 上计算 Lab DeltaE；CIEDE2000 更贴近人眼色差感知，适合喷涂和标签色偏判定。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "ColorMeasurement.RoiX",
+                    "ColorMeasurement.RoiY",
+                    "ColorMeasurement.RoiW",
+                    "ColorMeasurement.RoiH",
+                    "ColorMeasurement.RefL",
+                    "ColorMeasurement.RefA",
+                    "ColorMeasurement.RefB",
+                    "ResultJudgment.ExpectValue"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "图像采集", CameraAcquisitionParameters()),
+                    Node("op_2", "ShadingCorrection", "光照校正", new Dictionary<string, string>
+                    {
+                        ["Method"] = "GaussianModel",
+                        ["KernelSize"] = "51",
+                        ["ColorMode"] = "PerChannel"
+                    }),
+                    Node("op_3", "ColorMeasurement", "Lab色差测量", new Dictionary<string, string>
+                    {
+                        ["MeasurementMode"] = "LabDeltaE",
+                        ["DeltaEMethod"] = "CIEDE2000",
+                        ["RoiX"] = "0",
+                        ["RoiY"] = "0",
+                        ["RoiW"] = "0",
+                        ["RoiH"] = "0",
+                        ["RefL"] = "0",
+                        ["RefA"] = "0",
+                        ["RefB"] = "0"
+                    }),
+                    Node("op_4", "ResultJudgment", "色差阈值判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "LessOrEqual",
+                        ["ExpectValue"] = "3.0",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_5", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_2", "Image"),
+                    Link("op_2", "Image", "op_3", "Image"),
+                    Link("op_3", "DeltaE", "op_4", "Value"),
+                    Link("op_3", "Image", "op_5", "Image"),
+                    Link("op_3", "LabMean", "op_5", "Data"),
+                    Link("op_4", "JudgmentResult", "op_5", "Result"),
+                    Link("op_4", "Details", "op_5", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["CameraId", "ExposureTime", "Gain"],
+                    ["op_2"] = ["Method", "KernelSize", "ColorMode"],
+                    ["op_3"] = ["RoiX", "RoiY", "RoiW", "RoiH", "RefL", "RefA", "RefB"],
+                    ["op_4"] = ["ExpectValue"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static FlowTemplate CreateCodeTraceabilityTemplate()
+    {
+        const string scenarioKey = "code-traceability-inspection";
+        const string templateVersion = "1.0.0";
+
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "条码二维码追溯检测",
+            Description = "适合包装、铭牌和零部件追溯码读取；先做清晰度质量门，再识别 QR、DataMatrix、Code128 等码制并按识别数量判定。",
+            Industry = "包装追溯",
+            Tags = ["传统视觉", "条码", "二维码", "追溯"],
+            TemplateVersion = templateVersion,
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = CreateRuleOnlyPackage(scenarioKey, templateVersion),
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "用于在线追溯码读取。SharpnessEvaluation 先拦截失焦图像，CodeRecognition 负责读码，ResultJudgment 以识别数量作为 OK/NG 基础条件。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "SharpnessEvaluation.Method",
+                    "SharpnessEvaluation.Threshold",
+                    "SharpnessEvaluation.RoiX",
+                    "SharpnessEvaluation.RoiY",
+                    "SharpnessEvaluation.RoiW",
+                    "SharpnessEvaluation.RoiH",
+                    "CodeRecognition.CodeType",
+                    "CodeRecognition.MaxResults"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "图像采集", CameraAcquisitionParameters()),
+                    Node("op_2", "SharpnessEvaluation", "清晰度质量门", new Dictionary<string, string>
+                    {
+                        ["Method"] = "Tenengrad",
+                        ["ThresholdMode"] = "Manual",
+                        ["Threshold"] = "100",
+                        ["RoiX"] = "0",
+                        ["RoiY"] = "0",
+                        ["RoiW"] = "0",
+                        ["RoiH"] = "0",
+                        ["OutputImagePolicy"] = "Passthrough"
+                    }),
+                    Node("op_3", "CodeRecognition", "追溯码识别", new Dictionary<string, string>
+                    {
+                        ["CodeType"] = "All",
+                        ["MaxResults"] = "4"
+                    }),
+                    Node("op_4", "ResultJudgment", "读码数量判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "GreaterOrEqual",
+                        ["ExpectValue"] = "1",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_5", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_2", "Image"),
+                    Link("op_2", "Image", "op_3", "Image"),
+                    Link("op_3", "CodeCount", "op_4", "Value"),
+                    Link("op_3", "Image", "op_5", "Image"),
+                    Link("op_3", "Text", "op_5", "Data"),
+                    Link("op_4", "JudgmentResult", "op_5", "Result"),
+                    Link("op_4", "Details", "op_5", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["CameraId", "ExposureTime", "Gain"],
+                    ["op_2"] = ["Method", "Threshold", "RoiX", "RoiY", "RoiW", "RoiH"],
+                    ["op_3"] = ["CodeType", "MaxResults"],
+                    ["op_4"] = ["ExpectValue"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static FlowTemplate CreateSurfaceReferenceDefectTemplate()
+    {
+        const string scenarioKey = "surface-reference-defect-inspection";
+        const string templateVersion = "1.0.0";
+
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "参考图表面缺陷检测",
+            Description = "适合金属、膜面、喷涂件等低对比划伤/脏污；使用参考图差分、相位相关对齐、局部均值归一化和组件形状过滤。",
+            Industry = "表面检测",
+            Tags = ["传统视觉", "表面缺陷", "参考图差分", "划伤"],
+            TemplateVersion = templateVersion,
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = CreateRuleOnlyPackage(scenarioKey, templateVersion),
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "用于有稳定良品参考图的表面缺陷检测。ReferenceDiff + PhaseCorrelation 先做对齐，再用局部归一化和组件过滤抑制光照起伏与小噪声。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "SurfaceDefectDetection.Method",
+                    "SurfaceDefectDetection.Threshold",
+                    "SurfaceDefectDetection.MinArea",
+                    "SurfaceDefectDetection.MorphCleanSize",
+                    "SurfaceDefectDetection.ComponentFilterMode"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "待检图像", CameraAcquisitionParameters()),
+                    Node("op_2", "ImageAcquisition", "良品参考图", FileAcquisitionParameters()),
+                    Node("op_3", "SurfaceDefectDetection", "参考图差分缺陷检测", new Dictionary<string, string>
+                    {
+                        ["Method"] = "ReferenceDiff",
+                        ["Threshold"] = "35",
+                        ["MinArea"] = "20",
+                        ["MaxArea"] = "1000000",
+                        ["MorphCleanSize"] = "3",
+                        ["MorphMode"] = "OpenClose",
+                        ["AlignmentMode"] = "PhaseCorrelation",
+                        ["NormalizationMode"] = "ClaheLocalMean",
+                        ["ThresholdMode"] = "ReferenceStats",
+                        ["BackgroundKernelSize"] = "31",
+                        ["ClaheClipLimit"] = "2",
+                        ["ClaheTileGridSize"] = "8",
+                        ["ReferenceStatsSigma"] = "2.5",
+                        ["RobustReferenceStats"] = "true",
+                        ["ResponseNormalizeMode"] = "PercentileClip",
+                        ["ComponentFilterMode"] = "ShapeAndResponseStats",
+                        ["SmallNoiseAreaMax"] = "8",
+                        ["MinElongationForSmallComponent"] = "1.5",
+                        ["CompactNoiseAreaMax"] = "8",
+                        ["CompactNoiseCircularityMin"] = "0.75",
+                        ["CompactNoiseFillRatioMin"] = "0.65",
+                        ["MinLocalResponseProminence"] = "6",
+                        ["EnableCandidateProfile"] = "true",
+                        ["CandidateProfile"] = "taxonomy_v2"
+                    }),
+                    Node("op_4", "ResultJudgment", "缺陷数量判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "Equal",
+                        ["ExpectValue"] = "0",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_5", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_3", "Image"),
+                    Link("op_2", "Image", "op_3", "Reference"),
+                    Link("op_3", "DefectCount", "op_4", "Value"),
+                    Link("op_3", "Image", "op_5", "Image"),
+                    Link("op_3", "Diagnostics", "op_5", "Data"),
+                    Link("op_4", "JudgmentResult", "op_5", "Result"),
+                    Link("op_4", "Details", "op_5", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["CameraId", "ExposureTime", "Gain"],
+                    ["op_2"] = ["FilePath"],
+                    ["op_3"] = ["Threshold", "MinArea", "MorphCleanSize", "ReferenceStatsSigma", "ComponentFilterMode", "MinLocalResponseProminence"],
+                    ["op_4"] = ["ExpectValue"]
+                }
+            }, _jsonOptions),
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static FlowTemplate CreateSharpnessFocusGateTemplate()
+    {
+        const string scenarioKey = "sharpness-focus-gate";
+        const string templateVersion = "1.0.0";
+
+        return new FlowTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "清晰度对焦质量门",
+            Description = "适合所有视觉工位前置的失焦、运动模糊和脏污镜头拦截；用 Tenengrad/Laplacian 清晰度分数做质量门。",
+            Industry = "通用制造",
+            Tags = ["传统视觉", "清晰度", "对焦", "质量门"],
+            TemplateVersion = templateVersion,
+            ScenarioKey = scenarioKey,
+            ScenarioPackage = CreateRuleOnlyPackage(scenarioKey, templateVersion),
+            FlowJson = JsonSerializer.Serialize(new
+            {
+                explanation = "用于检测流程前置图像质量门。清晰度不足时直接输出 NG，可避免后续定位、测量或识别算法在失焦图上产生不稳定结论。",
+                requiredResources = Array.Empty<string>(),
+                tunableParameters = new[]
+                {
+                    "SharpnessEvaluation.Method",
+                    "SharpnessEvaluation.Threshold",
+                    "SharpnessEvaluation.RoiX",
+                    "SharpnessEvaluation.RoiY",
+                    "SharpnessEvaluation.RoiW",
+                    "SharpnessEvaluation.RoiH"
+                },
+                operators = new object[]
+                {
+                    Node("op_1", "ImageAcquisition", "图像采集", CameraAcquisitionParameters()),
+                    Node("op_2", "SharpnessEvaluation", "清晰度评估", new Dictionary<string, string>
+                    {
+                        ["Method"] = "Tenengrad",
+                        ["ThresholdMode"] = "Manual",
+                        ["Threshold"] = "100",
+                        ["RoiX"] = "0",
+                        ["RoiY"] = "0",
+                        ["RoiW"] = "0",
+                        ["RoiH"] = "0",
+                        ["OutputImagePolicy"] = "FullOverlay"
+                    }),
+                    Node("op_3", "ResultJudgment", "清晰度判定", new Dictionary<string, string>
+                    {
+                        ["FieldName"] = "Value",
+                        ["Condition"] = "Equal",
+                        ["ExpectValue"] = "True",
+                        ["MinConfidence"] = "0.0"
+                    }),
+                    Node("op_4", "ResultOutput", "结果输出", new Dictionary<string, string>
+                    {
+                        ["Format"] = "JSON",
+                        ["SaveToFile"] = "true"
+                    })
+                },
+                connections = new object[]
+                {
+                    Link("op_1", "Image", "op_2", "Image"),
+                    Link("op_2", "IsSharp", "op_3", "Value"),
+                    Link("op_2", "Image", "op_4", "Image"),
+                    Link("op_2", "Score", "op_4", "Data"),
+                    Link("op_3", "JudgmentResult", "op_4", "Result"),
+                    Link("op_3", "Details", "op_4", "Text")
+                },
+                parametersNeedingReview = new Dictionary<string, List<string>>
+                {
+                    ["op_1"] = ["CameraId", "ExposureTime", "Gain"],
+                    ["op_2"] = ["Method", "Threshold", "RoiX", "RoiY", "RoiW", "RoiH"]
                 }
             }, _jsonOptions),
             CreatedAt = DateTime.UtcNow
@@ -985,6 +1803,33 @@ public class FlowTemplateService : IFlowTemplateService
             sourcePortName,
             targetTempId,
             targetPortName
+        };
+    }
+
+    private static Dictionary<string, string> CameraAcquisitionParameters(
+        string triggerMode = "Software")
+    {
+        return new Dictionary<string, string>
+        {
+            ["SourceType"] = "Camera",
+            ["FilePath"] = "",
+            ["CameraId"] = "",
+            ["ExposureTime"] = "5000",
+            ["Gain"] = "1",
+            ["TriggerMode"] = triggerMode
+        };
+    }
+
+    private static Dictionary<string, string> FileAcquisitionParameters()
+    {
+        return new Dictionary<string, string>
+        {
+            ["SourceType"] = "File",
+            ["FilePath"] = "",
+            ["CameraId"] = "",
+            ["ExposureTime"] = "5000",
+            ["Gain"] = "1",
+            ["TriggerMode"] = "Software"
         };
     }
 }

@@ -1,0 +1,51 @@
+# Operator Knowledge Graph Report
+
+GeneratedAtUtc: `2026-05-29T13:43:46.0325373Z`
+SchemaVersion: `2026-05.operator-knowledge-graph.v1`
+Source: `OperatorMetadata + FlowTemplate + operator_quality_evidence_manifest`
+
+## Summary
+
+| Metric | Value |
+| --- | ---: |
+| Cards | 156 |
+| Edges | 1842 |
+
+## Edge Types
+
+| RelationType | Count |
+| --- | ---: |
+| ALIAS_OF | 844 |
+| COMMONLY_FOLLOWS | 52 |
+| COMMONLY_PRECEDES | 52 |
+| CONSUMES | 206 |
+| HAS_EVIDENCE | 156 |
+| PRODUCES | 404 |
+| REQUIRES_RESOURCE | 42 |
+| USED_IN_TEMPLATE | 86 |
+
+## Top Operators By Downstream Degree
+
+| OperatorType | TypicalDownstreamCount | TypicalUpstreamCount |
+| --- | ---: | ---: |
+| ImageAcquisition | 10 | 0 |
+| DeepLearning | 3 | 3 |
+| Filtering | 3 | 1 |
+| ShadingCorrection | 3 | 1 |
+| SharpnessEvaluation | 3 | 1 |
+| BlobAnalysis | 2 | 2 |
+| BoxFilter | 2 | 2 |
+| CaliperTool | 2 | 1 |
+| CircleMeasurement | 2 | 1 |
+| CodeRecognition | 2 | 1 |
+| ColorMeasurement | 2 | 1 |
+| GapMeasurement | 2 | 1 |
+| GradientShapeMatch | 2 | 1 |
+| ImageResize | 2 | 1 |
+| PlanarMatching | 2 | 1 |
+| SurfaceDefectDetection | 2 | 1 |
+| TemplateMatching | 2 | 1 |
+| DetectionSequenceJudge | 1 | 1 |
+| EdgeDetection | 1 | 1 |
+| FrameChangeTrigger | 1 | 1 |
+

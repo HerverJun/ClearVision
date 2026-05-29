@@ -1780,8 +1780,14 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "MorphologicalOperation",
+      "ShadingCorrection"
+    ],
+    "TypicalDownstream": [
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -2546,8 +2552,13 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "Filtering"
+    ],
+    "TypicalDownstream": [
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
@@ -2876,8 +2887,13 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "Filtering"
+    ],
+    "TypicalDownstream": [
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -3106,8 +3122,13 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "SharpnessEvaluation"
+    ],
+    "TypicalDownstream": [
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -3750,8 +3771,13 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "ShadingCorrection"
+    ],
+    "TypicalDownstream": [
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -6954,6 +6980,8 @@
       "ImageAcquisition"
     ],
     "TypicalDownstream": [
+      "CaliperTool",
+      "CircleMeasurement",
       "EdgeDetection"
     ],
     "AntiPatterns": [],
@@ -9036,8 +9064,13 @@
     "RequiredResources": [
       "GradientShapeMatch.TemplatePath"
     ],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "ImageAcquisition"
+    ],
+    "TypicalDownstream": [
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -9924,8 +9957,14 @@
     "TypicalDownstream": [
       "DeepLearning",
       "FrameChangeTrigger",
-      "ImageResize",
-      "Filtering"
+      "TemplateMatching",
+      "GradientShapeMatch",
+      "PlanarMatching",
+      "ShadingCorrection",
+      "Filtering",
+      "SharpnessEvaluation",
+      "SurfaceDefectDetection",
+      "ImageResize"
     ],
     "AntiPatterns": [],
     "KnownLimitations": [
@@ -13349,8 +13388,12 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "Thresholding"
+    ],
+    "TypicalDownstream": [
+      "BlobAnalysis"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -15741,8 +15784,13 @@
     "RequiredResources": [
       "PlanarMatching.TemplatePath"
     ],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "ImageAcquisition"
+    ],
+    "TypicalDownstream": [
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -18805,6 +18853,16 @@
     ],
     "RequiredResources": [],
     "TypicalUpstream": [
+      "TemplateMatching",
+      "GradientShapeMatch",
+      "PlanarMatching",
+      "BlobAnalysis",
+      "CaliperTool",
+      "CircleMeasurement",
+      "ColorMeasurement",
+      "CodeRecognition",
+      "SurfaceDefectDetection",
+      "SharpnessEvaluation",
       "BoxFilter",
       "GapMeasurement"
     ],
@@ -18955,8 +19013,18 @@
     "TypicalUpstream": [
       "DeepLearning",
       "DetectionSequenceJudge",
-      "BoxFilter",
+      "TemplateMatching",
       "ResultJudgment",
+      "GradientShapeMatch",
+      "PlanarMatching",
+      "BlobAnalysis",
+      "CaliperTool",
+      "CircleMeasurement",
+      "ColorMeasurement",
+      "CodeRecognition",
+      "SurfaceDefectDetection",
+      "SharpnessEvaluation",
+      "BoxFilter",
       "GapMeasurement"
     ],
     "TypicalDownstream": [],
@@ -19860,8 +19928,14 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "ImageAcquisition"
+    ],
+    "TypicalDownstream": [
+      "Thresholding",
+      "BlobAnalysis",
+      "ColorMeasurement"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -20248,8 +20322,14 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "ImageAcquisition"
+    ],
+    "TypicalDownstream": [
+      "CodeRecognition",
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -21587,8 +21667,13 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "ImageAcquisition"
+    ],
+    "TypicalDownstream": [
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
@@ -21756,7 +21841,12 @@
       "\u627E\u56FE",
       "Template",
       "Match",
-      "Locate"
+      "Locate",
+      "\u4F20\u7EDF\u89C6\u89C9",
+      "\u6807\u51C6\u6A21\u677F",
+      "\u53C2\u8003\u56FE",
+      "\u57FA\u51C6\u56FE",
+      "TemplateMatch"
     ],
     "IntentTags": [
       "general"
@@ -22118,8 +22208,13 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "ImageAcquisition"
+    ],
+    "TypicalDownstream": [
+      "ResultJudgment",
+      "ResultOutput"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
@@ -22361,8 +22456,12 @@
       }
     ],
     "RequiredResources": [],
-    "TypicalUpstream": [],
-    "TypicalDownstream": [],
+    "TypicalUpstream": [
+      "ShadingCorrection"
+    ],
+    "TypicalDownstream": [
+      "MorphologicalOperation"
+    ],
     "AntiPatterns": [],
     "KnownLimitations": [
       "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",

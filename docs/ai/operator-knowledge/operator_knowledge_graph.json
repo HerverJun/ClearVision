@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-05-25T16:14:05.3241859Z",
+  "GeneratedAtUtc": "2026-05-29T13:43:46.0325373Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -1784,8 +1784,14 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "MorphologicalOperation",
+        "ShadingCorrection"
+      ],
+      "TypicalDownstream": [
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -2550,8 +2556,13 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "Filtering"
+      ],
+      "TypicalDownstream": [
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
@@ -2880,8 +2891,13 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "Filtering"
+      ],
+      "TypicalDownstream": [
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -3110,8 +3126,13 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "SharpnessEvaluation"
+      ],
+      "TypicalDownstream": [
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -3754,8 +3775,13 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "ShadingCorrection"
+      ],
+      "TypicalDownstream": [
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -6958,6 +6984,8 @@
         "ImageAcquisition"
       ],
       "TypicalDownstream": [
+        "CaliperTool",
+        "CircleMeasurement",
         "EdgeDetection"
       ],
       "AntiPatterns": [],
@@ -9040,8 +9068,13 @@
       "RequiredResources": [
         "GradientShapeMatch.TemplatePath"
       ],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "ImageAcquisition"
+      ],
+      "TypicalDownstream": [
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -9928,8 +9961,14 @@
       "TypicalDownstream": [
         "DeepLearning",
         "FrameChangeTrigger",
-        "ImageResize",
-        "Filtering"
+        "TemplateMatching",
+        "GradientShapeMatch",
+        "PlanarMatching",
+        "ShadingCorrection",
+        "Filtering",
+        "SharpnessEvaluation",
+        "SurfaceDefectDetection",
+        "ImageResize"
       ],
       "AntiPatterns": [],
       "KnownLimitations": [
@@ -13353,8 +13392,12 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "Thresholding"
+      ],
+      "TypicalDownstream": [
+        "BlobAnalysis"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -15745,8 +15788,13 @@
       "RequiredResources": [
         "PlanarMatching.TemplatePath"
       ],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "ImageAcquisition"
+      ],
+      "TypicalDownstream": [
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -18809,6 +18857,16 @@
       ],
       "RequiredResources": [],
       "TypicalUpstream": [
+        "TemplateMatching",
+        "GradientShapeMatch",
+        "PlanarMatching",
+        "BlobAnalysis",
+        "CaliperTool",
+        "CircleMeasurement",
+        "ColorMeasurement",
+        "CodeRecognition",
+        "SurfaceDefectDetection",
+        "SharpnessEvaluation",
         "BoxFilter",
         "GapMeasurement"
       ],
@@ -18959,8 +19017,18 @@
       "TypicalUpstream": [
         "DeepLearning",
         "DetectionSequenceJudge",
-        "BoxFilter",
+        "TemplateMatching",
         "ResultJudgment",
+        "GradientShapeMatch",
+        "PlanarMatching",
+        "BlobAnalysis",
+        "CaliperTool",
+        "CircleMeasurement",
+        "ColorMeasurement",
+        "CodeRecognition",
+        "SurfaceDefectDetection",
+        "SharpnessEvaluation",
+        "BoxFilter",
         "GapMeasurement"
       ],
       "TypicalDownstream": [],
@@ -19864,8 +19932,14 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "ImageAcquisition"
+      ],
+      "TypicalDownstream": [
+        "Thresholding",
+        "BlobAnalysis",
+        "ColorMeasurement"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -20252,8 +20326,14 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "ImageAcquisition"
+      ],
+      "TypicalDownstream": [
+        "CodeRecognition",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -21591,8 +21671,13 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "ImageAcquisition"
+      ],
+      "TypicalDownstream": [
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
@@ -21760,7 +21845,12 @@
         "\u627E\u56FE",
         "Template",
         "Match",
-        "Locate"
+        "Locate",
+        "\u4F20\u7EDF\u89C6\u89C9",
+        "\u6807\u51C6\u6A21\u677F",
+        "\u53C2\u8003\u56FE",
+        "\u57FA\u51C6\u56FE",
+        "TemplateMatch"
       ],
       "IntentTags": [
         "general"
@@ -22122,8 +22212,13 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "ImageAcquisition"
+      ],
+      "TypicalDownstream": [
+        "ResultJudgment",
+        "ResultOutput"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1"
@@ -22365,8 +22460,12 @@
         }
       ],
       "RequiredResources": [],
-      "TypicalUpstream": [],
-      "TypicalDownstream": [],
+      "TypicalUpstream": [
+        "ShadingCorrection"
+      ],
+      "TypicalDownstream": [
+        "MorphologicalOperation"
+      ],
       "AntiPatterns": [],
       "KnownLimitations": [
         "\u529F\u80FD\u53EF\u7528\u4F46\u672A\u5B8C\u6210\u73B0\u573A\u5DE5\u4E1A\u9A8C\u8BC1",
@@ -27248,6 +27347,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "TemplateMatch",
+      "Target": "TemplateMatching",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "tenengrad",
       "Target": "SharpnessEvaluation",
       "Weight": 1,
@@ -27738,6 +27844,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u4F20\u7EDF\u89C6\u89C9",
+      "Target": "TemplateMatching",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u4F4D\u7F6E\u4FEE\u6B63",
       "Target": "PositionCorrection",
       "Weight": 1,
@@ -28018,6 +28131,13 @@
     },
     {
       "RelationType": "ALIAS_OF",
+      "Source": "\u53C2\u8003\u56FE",
+      "Target": "TemplateMatching",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
       "Source": "\u53CC\u6A21\u6001\u6295\u7968",
       "Target": "DualModalVoting",
       "Weight": 1,
@@ -28286,6 +28406,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u5782\u76F4\u5EA6",
       "Target": "GeometricTolerance",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u57FA\u51C6\u56FE",
+      "Target": "TemplateMatching",
       "Weight": 1,
       "Metadata": {}
     },
@@ -28748,6 +28875,13 @@
       "RelationType": "ALIAS_OF",
       "Source": "\u6781\u5750\u6807\u5C55\u5F00",
       "Target": "PolarUnwrap",
+      "Weight": 1,
+      "Metadata": {}
+    },
+    {
+      "RelationType": "ALIAS_OF",
+      "Source": "\u6807\u51C6\u6A21\u677F",
+      "Target": "TemplateMatching",
       "Weight": 1,
       "Metadata": {}
     },
@@ -29649,6 +29783,28 @@
     },
     {
       "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "BlobAnalysis",
+      "Target": "MorphologicalOperation",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "BlobAnalysis",
+      "Target": "ShadingCorrection",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "SourceImage"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
       "Source": "BoxFilter",
       "Target": "DeepLearning",
       "Weight": 1,
@@ -29665,6 +29821,50 @@
       "Weight": 1,
       "Metadata": {
         "template": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "CaliperTool",
+      "Target": "Filtering",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "CircleMeasurement",
+      "Target": "Filtering",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "CodeRecognition",
+      "Target": "SharpnessEvaluation",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ColorMeasurement",
+      "Target": "ShadingCorrection",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Lab\u8272\u5DEE\u68C0\u6D4B",
         "sourcePort": "Image",
         "targetPort": "Image"
       }
@@ -29730,7 +29930,7 @@
       "Target": "ImageAcquisition",
       "Weight": 1,
       "Metadata": {
-        "template": "\u4E24\u5668\u94DC\u5B54\u95F4\u8DDD\u68C0\u6D4B",
+        "template": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
         "sourcePort": "Image",
         "targetPort": "Image"
       }
@@ -29759,6 +29959,17 @@
     },
     {
       "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "GradientShapeMatch",
+      "Target": "ImageAcquisition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
       "Source": "ImageResize",
       "Target": "ImageAcquisition",
       "Weight": 1,
@@ -29766,6 +29977,39 @@
         "template": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
         "sourcePort": "Image",
         "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "MorphologicalOperation",
+      "Target": "Thresholding",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "PlanarMatching",
+      "Target": "ImageAcquisition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
+      "Target": "BlobAnalysis",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "BlobCount",
+        "targetPort": "Value"
       }
     },
     {
@@ -29782,6 +30026,50 @@
     {
       "RelationType": "COMMONLY_FOLLOWS",
       "Source": "ResultJudgment",
+      "Target": "CaliperTool",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "sourcePort": "AverageDistance",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
+      "Target": "CircleMeasurement",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "sourcePort": "Radius",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
+      "Target": "CodeRecognition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "sourcePort": "CodeCount",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
+      "Target": "ColorMeasurement",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Lab\u8272\u5DEE\u68C0\u6D4B",
+        "sourcePort": "DeltaE",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
       "Target": "GapMeasurement",
       "Weight": 1,
       "Metadata": {
@@ -29792,11 +30080,121 @@
     },
     {
       "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
+      "Target": "GradientShapeMatch",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "IsMatch",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
+      "Target": "PlanarMatching",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "VerificationPassed",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
+      "Target": "SharpnessEvaluation",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6E05\u6670\u5EA6\u5BF9\u7126\u8D28\u91CF\u95E8",
+        "sourcePort": "IsSharp",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
+      "Target": "SurfaceDefectDetection",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "sourcePort": "DefectCount",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultJudgment",
+      "Target": "TemplateMatching",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
+        "sourcePort": "IsMatch",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
+      "Target": "BlobAnalysis",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
       "Source": "ResultOutput",
       "Target": "BoxFilter",
       "Weight": 1,
       "Metadata": {
         "template": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
+      "Target": "CaliperTool",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
+      "Target": "CircleMeasurement",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
+      "Target": "CodeRecognition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
+      "Target": "ColorMeasurement",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Lab\u8272\u5DEE\u68C0\u6D4B",
         "sourcePort": "Image",
         "targetPort": "Image"
       }
@@ -29837,12 +30235,144 @@
     {
       "RelationType": "COMMONLY_FOLLOWS",
       "Source": "ResultOutput",
+      "Target": "GradientShapeMatch",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
+      "Target": "PlanarMatching",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
       "Target": "ResultJudgment",
       "Weight": 1,
       "Metadata": {
-        "template": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
+        "template": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
         "sourcePort": "JudgmentResult",
         "targetPort": "Result"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
+      "Target": "SharpnessEvaluation",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6E05\u6670\u5EA6\u5BF9\u7126\u8D28\u91CF\u95E8",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
+      "Target": "SurfaceDefectDetection",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ResultOutput",
+      "Target": "TemplateMatching",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "ShadingCorrection",
+      "Target": "ImageAcquisition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "SharpnessEvaluation",
+      "Target": "ImageAcquisition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "SurfaceDefectDetection",
+      "Target": "ImageAcquisition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "TemplateMatching",
+      "Target": "ImageAcquisition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_FOLLOWS",
+      "Source": "Thresholding",
+      "Target": "ShadingCorrection",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "BlobAnalysis",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "BlobCount",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "BlobAnalysis",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
       }
     },
     {
@@ -29863,6 +30393,94 @@
       "Weight": 1,
       "Metadata": {
         "template": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "CaliperTool",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "sourcePort": "AverageDistance",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "CaliperTool",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "CircleMeasurement",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "sourcePort": "Radius",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "CircleMeasurement",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "CodeRecognition",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "sourcePort": "CodeCount",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "CodeRecognition",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ColorMeasurement",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Lab\u8272\u5DEE\u68C0\u6D4B",
+        "sourcePort": "DeltaE",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ColorMeasurement",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Lab\u8272\u5DEE\u68C0\u6D4B",
         "sourcePort": "Image",
         "targetPort": "Image"
       }
@@ -29925,6 +30543,28 @@
     {
       "RelationType": "COMMONLY_PRECEDES",
       "Source": "Filtering",
+      "Target": "CaliperTool",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "Filtering",
+      "Target": "CircleMeasurement",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "Filtering",
       "Target": "EdgeDetection",
       "Weight": 1,
       "Metadata": {
@@ -29968,6 +30608,28 @@
     },
     {
       "RelationType": "COMMONLY_PRECEDES",
+      "Source": "GradientShapeMatch",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "IsMatch",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "GradientShapeMatch",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
       "Source": "ImageAcquisition",
       "Target": "DeepLearning",
       "Weight": 1,
@@ -29983,7 +30645,7 @@
       "Target": "Filtering",
       "Weight": 1,
       "Metadata": {
-        "template": "\u4E24\u5668\u94DC\u5B54\u95F4\u8DDD\u68C0\u6D4B",
+        "template": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
         "sourcePort": "Image",
         "targetPort": "Image"
       }
@@ -30002,10 +30664,76 @@
     {
       "RelationType": "COMMONLY_PRECEDES",
       "Source": "ImageAcquisition",
+      "Target": "GradientShapeMatch",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ImageAcquisition",
       "Target": "ImageResize",
       "Weight": 1,
       "Metadata": {
         "template": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ImageAcquisition",
+      "Target": "PlanarMatching",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ImageAcquisition",
+      "Target": "ShadingCorrection",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ImageAcquisition",
+      "Target": "SharpnessEvaluation",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ImageAcquisition",
+      "Target": "SurfaceDefectDetection",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ImageAcquisition",
+      "Target": "TemplateMatching",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
         "sourcePort": "Image",
         "targetPort": "Image"
       }
@@ -30034,13 +30762,167 @@
     },
     {
       "RelationType": "COMMONLY_PRECEDES",
+      "Source": "MorphologicalOperation",
+      "Target": "BlobAnalysis",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "PlanarMatching",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "VerificationPassed",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "PlanarMatching",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
       "Source": "ResultJudgment",
       "Target": "ResultOutput",
       "Weight": 1,
       "Metadata": {
-        "template": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
+        "template": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
         "sourcePort": "JudgmentResult",
         "targetPort": "Result"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ShadingCorrection",
+      "Target": "BlobAnalysis",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "SourceImage"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ShadingCorrection",
+      "Target": "ColorMeasurement",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Lab\u8272\u5DEE\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "ShadingCorrection",
+      "Target": "Thresholding",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "SharpnessEvaluation",
+      "Target": "CodeRecognition",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "SharpnessEvaluation",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6E05\u6670\u5EA6\u5BF9\u7126\u8D28\u91CF\u95E8",
+        "sourcePort": "IsSharp",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "SharpnessEvaluation",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u6E05\u6670\u5EA6\u5BF9\u7126\u8D28\u91CF\u95E8",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "SurfaceDefectDetection",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "sourcePort": "DefectCount",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "SurfaceDefectDetection",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "TemplateMatching",
+      "Target": "ResultJudgment",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
+        "sourcePort": "IsMatch",
+        "targetPort": "Value"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "TemplateMatching",
+      "Target": "ResultOutput",
+      "Weight": 1,
+      "Metadata": {
+        "template": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
+        "sourcePort": "Image",
+        "targetPort": "Image"
+      }
+    },
+    {
+      "RelationType": "COMMONLY_PRECEDES",
+      "Source": "Thresholding",
+      "Target": "MorphologicalOperation",
+      "Weight": 1,
+      "Metadata": {
+        "template": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "sourcePort": "Image",
+        "targetPort": "Image"
       }
     },
     {
@@ -36945,6 +37827,16 @@
     },
     {
       "RelationType": "USED_IN_TEMPLATE",
+      "Source": "BlobAnalysis",
+      "Target": "blob-defect-region-analysis",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
       "Source": "BoxFilter",
       "Target": "aircon-indoor-appearance-inspection",
       "Weight": 1,
@@ -36981,6 +37873,46 @@
       "Metadata": {
         "templateName": "\u9065\u63A7\u5668\u6F0F\u88C5\u68C0\u6D4B",
         "templateVersion": "1.2.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "CaliperTool",
+      "Target": "caliper-width-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "CircleMeasurement",
+      "Target": "circular-hole-radius-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "CodeRecognition",
+      "Target": "code-traceability-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ColorMeasurement",
+      "Target": "color-deltae-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Lab\u8272\u5DEE\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
       }
     },
     {
@@ -37076,6 +38008,26 @@
     {
       "RelationType": "USED_IN_TEMPLATE",
       "Source": "Filtering",
+      "Target": "caliper-width-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "Filtering",
+      "Target": "circular-hole-radius-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "Filtering",
       "Target": "copper-hole-spacing-measurement",
       "Weight": 1,
       "Metadata": {
@@ -37105,6 +38057,16 @@
     },
     {
       "RelationType": "USED_IN_TEMPLATE",
+      "Source": "GradientShapeMatch",
+      "Target": "gradient-shape-match-positioning",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
       "Source": "ImageAcquisition",
       "Target": "aircon-indoor-appearance-inspection",
       "Weight": 1,
@@ -37126,11 +38088,71 @@
     {
       "RelationType": "USED_IN_TEMPLATE",
       "Source": "ImageAcquisition",
+      "Target": "blob-defect-region-analysis",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
+      "Target": "caliper-width-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
       "Target": "carton-appearance-inspection",
       "Weight": 1,
       "Metadata": {
         "templateName": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
         "templateVersion": "1.2.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
+      "Target": "circular-hole-radius-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
+      "Target": "classic-template-matching-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
+      "Target": "code-traceability-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
+      "Target": "color-deltae-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Lab\u8272\u5DEE\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
       }
     },
     {
@@ -37146,11 +38168,51 @@
     {
       "RelationType": "USED_IN_TEMPLATE",
       "Source": "ImageAcquisition",
+      "Target": "gradient-shape-match-positioning",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
+      "Target": "planar-feature-label-positioning",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
       "Target": "remote-controller-missing-inspection",
       "Weight": 1,
       "Metadata": {
         "templateName": "\u9065\u63A7\u5668\u6F0F\u88C5\u68C0\u6D4B",
         "templateVersion": "1.2.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
+      "Target": "sharpness-focus-gate",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u6E05\u6670\u5EA6\u5BF9\u7126\u8D28\u91CF\u95E8",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ImageAcquisition",
+      "Target": "surface-reference-defect-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
       }
     },
     {
@@ -37215,6 +38277,26 @@
     },
     {
       "RelationType": "USED_IN_TEMPLATE",
+      "Source": "MorphologicalOperation",
+      "Target": "blob-defect-region-analysis",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "PlanarMatching",
+      "Target": "planar-feature-label-positioning",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
       "Source": "ResultJudgment",
       "Target": "aircon-indoor-appearance-inspection",
       "Weight": 1,
@@ -37236,11 +38318,71 @@
     {
       "RelationType": "USED_IN_TEMPLATE",
       "Source": "ResultJudgment",
+      "Target": "blob-defect-region-analysis",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
+      "Target": "caliper-width-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
       "Target": "carton-appearance-inspection",
       "Weight": 1,
       "Metadata": {
         "templateName": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
         "templateVersion": "1.2.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
+      "Target": "circular-hole-radius-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
+      "Target": "classic-template-matching-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
+      "Target": "code-traceability-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
+      "Target": "color-deltae-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Lab\u8272\u5DEE\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
       }
     },
     {
@@ -37256,11 +38398,51 @@
     {
       "RelationType": "USED_IN_TEMPLATE",
       "Source": "ResultJudgment",
+      "Target": "gradient-shape-match-positioning",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
+      "Target": "planar-feature-label-positioning",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
       "Target": "remote-controller-missing-inspection",
       "Weight": 1,
       "Metadata": {
         "templateName": "\u9065\u63A7\u5668\u6F0F\u88C5\u68C0\u6D4B",
         "templateVersion": "1.2.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
+      "Target": "sharpness-focus-gate",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u6E05\u6670\u5EA6\u5BF9\u7126\u8D28\u91CF\u95E8",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultJudgment",
+      "Target": "surface-reference-defect-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
       }
     },
     {
@@ -37286,11 +38468,71 @@
     {
       "RelationType": "USED_IN_TEMPLATE",
       "Source": "ResultOutput",
+      "Target": "blob-defect-region-analysis",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
+      "Target": "caliper-width-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5361\u5C3A\u5BBD\u5EA6\u6D4B\u91CF",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
       "Target": "carton-appearance-inspection",
       "Weight": 1,
       "Metadata": {
         "templateName": "\u5305\u88C5\u7BB1\u5916\u89C2\u68C0\u6D4B",
         "templateVersion": "1.2.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
+      "Target": "circular-hole-radius-measurement",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5706\u5B54\u5B54\u5F84\u4E0E\u5706\u5EA6\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
+      "Target": "classic-template-matching-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
+      "Target": "code-traceability-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
+      "Target": "color-deltae-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Lab\u8272\u5DEE\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
       }
     },
     {
@@ -37306,11 +38548,51 @@
     {
       "RelationType": "USED_IN_TEMPLATE",
       "Source": "ResultOutput",
+      "Target": "gradient-shape-match-positioning",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u68AF\u5EA6\u5F62\u72B6\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
+      "Target": "planar-feature-label-positioning",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u5E73\u9762\u7279\u5F81\u5339\u914D\u5B9A\u4F4D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
       "Target": "remote-controller-missing-inspection",
       "Weight": 1,
       "Metadata": {
         "templateName": "\u9065\u63A7\u5668\u6F0F\u88C5\u68C0\u6D4B",
         "templateVersion": "1.2.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
+      "Target": "sharpness-focus-gate",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u6E05\u6670\u5EA6\u5BF9\u7126\u8D28\u91CF\u95E8",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ResultOutput",
+      "Target": "surface-reference-defect-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
       }
     },
     {
@@ -37331,6 +38613,76 @@
       "Metadata": {
         "templateName": "\u7AEF\u5B50\u7EBF\u5E8F\u68C0\u6D4B-\u89C6\u9891\u6D41\u7248",
         "templateVersion": "1.6.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ShadingCorrection",
+      "Target": "blob-defect-region-analysis",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "ShadingCorrection",
+      "Target": "color-deltae-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Lab\u8272\u5DEE\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "SharpnessEvaluation",
+      "Target": "code-traceability-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u6761\u7801\u4E8C\u7EF4\u7801\u8FFD\u6EAF\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "SharpnessEvaluation",
+      "Target": "sharpness-focus-gate",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u6E05\u6670\u5EA6\u5BF9\u7126\u8D28\u91CF\u95E8",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "SurfaceDefectDetection",
+      "Target": "surface-reference-defect-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u53C2\u8003\u56FE\u8868\u9762\u7F3A\u9677\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "TemplateMatching",
+      "Target": "classic-template-matching-inspection",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "\u4F20\u7EDF\u6A21\u677F\u5339\u914D\u68C0\u6D4B",
+        "templateVersion": "1.0.0"
+      }
+    },
+    {
+      "RelationType": "USED_IN_TEMPLATE",
+      "Source": "Thresholding",
+      "Target": "blob-defect-region-analysis",
+      "Weight": 1,
+      "Metadata": {
+        "templateName": "Blob\u7F3A\u9677\u533A\u57DF\u5206\u6790",
+        "templateVersion": "1.0.0"
       }
     }
   ]

@@ -7,6 +7,7 @@
 
 ## 本次实现
 
+- 当前生成口径：156 张算子知识卡、1842 条图谱边、86 条 `USED_IN_TEMPLATE` 关系；模板来源为当前 `FlowTemplateService` 的 17 个内置模板，其中包含 9 个传统视觉/测量/匹配模板。
 - 新增结构模型：
   - `OperatorKnowledgeCard`
   - `OperatorKnowledgeEdge`

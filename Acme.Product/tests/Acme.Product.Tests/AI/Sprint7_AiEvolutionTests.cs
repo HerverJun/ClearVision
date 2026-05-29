@@ -24,32 +24,6 @@ public class Sprint7_AiEvolutionTests
         var currentCommPrompt = builder.BuildSystemPrompt("send inspection result to PLC through Modbus");
         ExtractPrioritizedOperatorIds(currentMeasurementPrompt).Should().NotBeEquivalentTo(ExtractPrioritizedOperatorIds(currentCommPrompt));
         currentMeasurementPrompt.Should().Contain("Section 7 - Operator Catalog");
-        return;
-
-        // Act
-        var measurementPrompt = builder.BuildSystemPrompt("测量两个孔之间的间距并输出毫米结果");
-        var commPrompt = builder.BuildSystemPrompt("把检测结果通过Modbus发送到PLC");
-        var measurementOperators = ExtractPrioritizedOperatorIds(measurementPrompt);
-        var communicationOperators = ExtractPrioritizedOperatorIds(commPrompt);
-
-        // Assert
-        measurementOperators.Should().Contain(id =>
-            id.Equals("GapMeasurement", StringComparison.OrdinalIgnoreCase) ||
-            id.Equals("Measurement", StringComparison.OrdinalIgnoreCase) ||
-            id.Equals("CoordinateTransform", StringComparison.OrdinalIgnoreCase));
-
-        communicationOperators.Should().Contain(id =>
-            id.Equals("ModbusCommunication", StringComparison.OrdinalIgnoreCase) ||
-            id.Equals("SiemensS7Communication", StringComparison.OrdinalIgnoreCase) ||
-            id.Equals("MitsubishiMcCommunication", StringComparison.OrdinalIgnoreCase) ||
-            id.Equals("OmronFinsCommunication", StringComparison.OrdinalIgnoreCase));
-
-        measurementPrompt.Should().Contain("Section 7 - Operator Catalog");
-        measurementOperators.Should().NotBeEquivalentTo(communicationOperators);
-        return;
-
-        measurementPrompt.Should().Contain("如果需要的算子不在列表中，仍可使用其他已注册算子。");
-        measurementOperators.Should().NotBeEquivalentTo(communicationOperators);
     }
 
     [Fact(DisplayName = "PromptBuilder - System Prompt 应包含参数推理指南")]
@@ -64,17 +38,6 @@ public class Sprint7_AiEvolutionTests
         currentPrompt.Should().Contain("Parameter Inference Guide");
         currentPrompt.Should().Contain("CalibrationBundleV2");
         currentPrompt.Should().Contain("CalibrationLoader");
-        return;
-
-        // Act
-        var prompt = builder.BuildSystemPrompt("测量间距0.5mm，容差0.05mm");
-
-        // Assert
-        prompt.Should().Contain("参数推理指南");
-        prompt.Should().Contain("数值提取规则");
-        prompt.Should().Contain("mm/μm");
-        prompt.Should().Contain("CalibrationBundleV2");
-        prompt.Should().Contain("CalibrationLoader");
     }
 
     [Fact(DisplayName = "AiFlowValidator - 应自动填充必填默认值并对越界参数执行 Clamp")]
@@ -257,12 +220,21 @@ public class Sprint7_AiEvolutionTests
             var templates = await service.GetTemplatesAsync();
             var currentAirConditioningTemplates = await service.GetTemplatesAsync("空调制造");
 
-            templates.Should().HaveCount(8);
+            templates.Should().HaveCount(17);
             templates.Select(t => t.ScenarioKey).Should().Contain(new[]
             {
                 "wire-sequence-terminal",
                 "wire-sequence-terminal-video-stream",
                 "classic-template-matching-inspection",
+                "gradient-shape-match-positioning",
+                "planar-feature-label-positioning",
+                "blob-defect-region-analysis",
+                "caliper-width-measurement",
+                "circular-hole-radius-measurement",
+                "color-deltae-inspection",
+                "code-traceability-inspection",
+                "surface-reference-defect-inspection",
+                "sharpness-focus-gate",
                 "carton-appearance-inspection",
                 "aircon-indoor-appearance-inspection",
                 "aircon-outdoor-appearance-inspection",
@@ -270,26 +242,6 @@ public class Sprint7_AiEvolutionTests
                 "copper-hole-spacing-measurement"
             });
             currentAirConditioningTemplates.Should().HaveCount(4);
-            File.Exists(Path.Combine(tempRoot, "templates", "flow_templates.json")).Should().BeTrue();
-            return;
-            var airConditioningTemplates = await service.GetTemplatesAsync("空调制造");
-
-            // Assert
-            templates.Should().HaveCount(6);
-            templates.Select(t => t.Name).Should().BeEquivalentTo(
-                "端子线序检测",
-                "包装箱外观检测",
-                "空调内机外观检测",
-                "空调外机外观检测",
-                "遥控器漏装检测",
-                "两器铜孔间距检测");
-            airConditioningTemplates.Should().HaveCount(5);
-            airConditioningTemplates.Select(t => t.Name).Should().BeEquivalentTo(
-                "包装箱外观检测",
-                "空调内机外观检测",
-                "空调外机外观检测",
-                "遥控器漏装检测",
-                "两器铜孔间距检测");
             File.Exists(Path.Combine(tempRoot, "templates", "flow_templates.json")).Should().BeTrue();
         }
         finally
@@ -397,11 +349,20 @@ public class Sprint7_AiEvolutionTests
 
             var templates = await service.GetTemplatesAsync();
 
-            templates.Should().HaveCount(9);
+            templates.Should().HaveCount(18);
             templates.Select(item => item.Name).Should().Contain("我的自定义模板");
             templates.Select(item => item.Name).Should().Contain("端子线序检测");
             templates.Select(item => item.Name).Should().Contain("端子线序检测-视频流版");
             templates.Select(item => item.Name).Should().Contain("传统模板匹配检测");
+            templates.Select(item => item.Name).Should().Contain("梯度形状匹配定位检测");
+            templates.Select(item => item.Name).Should().Contain("平面特征匹配定位检测");
+            templates.Select(item => item.Name).Should().Contain("Blob缺陷区域分析");
+            templates.Select(item => item.Name).Should().Contain("卡尺宽度测量");
+            templates.Select(item => item.Name).Should().Contain("圆孔孔径与圆度检测");
+            templates.Select(item => item.Name).Should().Contain("Lab色差检测");
+            templates.Select(item => item.Name).Should().Contain("条码二维码追溯检测");
+            templates.Select(item => item.Name).Should().Contain("参考图表面缺陷检测");
+            templates.Select(item => item.Name).Should().Contain("清晰度对焦质量门");
             templates.Select(item => item.Name).Should().Contain("包装箱外观检测");
             templates.Select(item => item.Name).Should().Contain("空调内机外观检测");
             templates.Select(item => item.Name).Should().Contain("空调外机外观检测");
@@ -415,16 +376,26 @@ public class Sprint7_AiEvolutionTests
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             persisted.Should().NotBeNull();
-            persisted!.Select(item => item.Name).Should().Contain("端子线序检测");
-            persisted.Select(item => item.Name).Should().Contain("端子线序检测-视频流版");
-            persisted.Select(item => item.Name).Should().Contain("我的自定义模板");
-            persisted.Select(item => item.Name).Should().Contain("传统模板匹配检测");
-            persisted.Select(item => item.Name).Should().Contain("包装箱外观检测");
-            persisted.Select(item => item.Name).Should().Contain("空调内机外观检测");
-            persisted.Select(item => item.Name).Should().Contain("空调外机外观检测");
-            persisted.Select(item => item.Name).Should().Contain("遥控器漏装检测");
-            persisted.Select(item => item.Name).Should().Contain("两器铜孔间距检测");
-            persisted.Select(item => item.Name).Should().NotContain("传统缺陷检测");
+            var persistedTemplates = persisted!;
+            persistedTemplates.Select(item => item.Name).Should().Contain("端子线序检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("端子线序检测-视频流版");
+            persistedTemplates.Select(item => item.Name).Should().Contain("我的自定义模板");
+            persistedTemplates.Select(item => item.Name).Should().Contain("传统模板匹配检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("梯度形状匹配定位检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("平面特征匹配定位检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("Blob缺陷区域分析");
+            persistedTemplates.Select(item => item.Name).Should().Contain("卡尺宽度测量");
+            persistedTemplates.Select(item => item.Name).Should().Contain("圆孔孔径与圆度检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("Lab色差检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("条码二维码追溯检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("参考图表面缺陷检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("清晰度对焦质量门");
+            persistedTemplates.Select(item => item.Name).Should().Contain("包装箱外观检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("空调内机外观检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("空调外机外观检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("遥控器漏装检测");
+            persistedTemplates.Select(item => item.Name).Should().Contain("两器铜孔间距检测");
+            persistedTemplates.Select(item => item.Name).Should().NotContain("传统缺陷检测");
         }
         finally
         {
@@ -533,21 +504,14 @@ public class Sprint7_AiEvolutionTests
                 .ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
 
             templates.Should().HaveCount(4);
-            return;
+            templates.Keys.Should().BeEquivalentTo(
+                "空调内机外观检测",
+                "空调外机外观检测",
+                "遥控器漏装检测",
+                "两器铜孔间距检测");
 
             var aiCases = new[]
             {
-                new
-                {
-                    Name = "包装箱外观检测",
-                    Tags = new[] { "包装箱", "外观", "AI", "YOLO" },
-                    DetectionMode = "Defect",
-                    DetectionPort = "Defects",
-                    TargetClasses = "CartonDamage,CartonDent,CartonStain,SealAnomaly,LabelAnomaly",
-                    Condition = "Equal",
-                    ExpectValue = "0",
-                    RequiresTargetClassesReview = true
-                },
                 new
                 {
                     Name = "空调内机外观检测",
@@ -660,9 +624,10 @@ public class Sprint7_AiEvolutionTests
             var copperHoleTemplate = templates["两器铜孔间距检测"];
             copperHoleTemplate.Industry.Should().Be("空调制造");
             copperHoleTemplate.Tags.Should().Equal("两器", "铜孔", "间距", "测量");
-            copperHoleTemplate.TemplateVersion.Should().Be("1.0.0");
-            copperHoleTemplate.ScenarioKey.Should().BeNull();
-            copperHoleTemplate.ScenarioPackage.Should().BeNull();
+            copperHoleTemplate.TemplateVersion.Should().Be("1.1.0");
+            copperHoleTemplate.ScenarioKey.Should().Be("copper-hole-spacing-measurement");
+            copperHoleTemplate.ScenarioPackage.Should().NotBeNull();
+            copperHoleTemplate.ScenarioPackage!.RequiredResources.Should().BeEmpty();
 
             using (var document = JsonDocument.Parse(copperHoleTemplate.FlowJson))
             {
