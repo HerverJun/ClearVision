@@ -1,0 +1,54 @@
+import httpClient from '../../core/messaging/httpClient.js';
+
+const settingsApi = {
+    get: (...args) => httpClient.get(...args),
+    getRoot: (...args) => httpClient.getRoot(...args),
+    post: (...args) => httpClient.post(...args),
+    postForBlob: (...args) => httpClient.postForBlob(...args),
+    getForBlob: (...args) => httpClient.getForBlob(...args),
+    put: (...args) => httpClient.put(...args),
+    delete: (...args) => httpClient.delete(...args),
+
+    loadSettings: () => httpClient.get('/settings'),
+    saveSettings: config => httpClient.put('/settings', config),
+    resetSettings: () => httpClient.post('/settings/reset'),
+    getDiskUsage: path => httpClient.get(`/settings/disk-usage?path=${encodeURIComponent(path || '')}`),
+
+    loadUsers: () => httpClient.get('/users'),
+    createUser: payload => httpClient.post('/users', payload),
+    updateUser: (id, payload) => httpClient.put(`/users/${id}`, payload),
+    deleteUser: id => httpClient.delete(`/users/${id}`),
+    resetUserPassword: (id, payload) => httpClient.post(`/users/${id}/reset-password`, payload),
+    changePassword: payload => httpClient.post('/auth/change-password', payload),
+
+    listAiModels: () => httpClient.get('/ai/models'),
+    createAiModel: payload => httpClient.post('/ai/models', payload),
+    updateAiModel: (id, payload) => httpClient.put(`/ai/models/${id}`, payload),
+    deleteAiModel: id => httpClient.delete(`/ai/models/${id}`),
+    activateAiModel: id => httpClient.post(`/ai/models/${id}/activate`, {}),
+    testAiModel: id => httpClient.post(`/ai/models/${id}/test`, {}),
+    resolveAiReasoningSupport: payload => httpClient.post('/ai/reasoning-support', payload),
+
+    loadPlcSettings: () => httpClient.get('/plc/settings'),
+    savePlcSettings: payload => httpClient.put('/plc/settings', payload),
+    testPlcConnection: payload => httpClient.post('/plc/test-connection', payload),
+
+    loadStationCommunicationSettings: () => httpClient.get('/station-communication/settings'),
+    saveStationCommunicationSettings: payload => httpClient.put('/station-communication/settings', payload),
+    revealStationToken: () => httpClient.post('/station-communication/token', { operation: 'reveal' }),
+    regenerateStationToken: () => httpClient.post('/station-communication/token', { operation: 'regenerate' }),
+
+    listCameraBindings: () => httpClient.get('/cameras/bindings'),
+    saveCameraBindings: payload => httpClient.put('/cameras/bindings', payload),
+    discoverCameras: endpoint => httpClient.get(endpoint),
+    learnEnterTriggerDevice: payload => httpClient.post('/trigger-input/learn-enter-device', payload),
+    listSerialPhotoelectricPorts: () => httpClient.get('/trigger-input/serial-photoelectric-ports'),
+    testSerialPhotoelectric: payload => httpClient.post('/trigger-input/test-serial-photoelectric', payload),
+    startContinuousPreview: payload => httpClient.post('/cameras/continuous-preview/start', payload),
+    stopContinuousPreview: payload => httpClient.post('/cameras/continuous-preview/stop', payload),
+    fetchContinuousPreviewFrame: (sessionId, cacheKey, options) =>
+        httpClient.getForBlob(`/cameras/continuous-preview/frame/${encodeURIComponent(sessionId)}?_=${cacheKey}`, options),
+    softTriggerCapture: (payload, options) => httpClient.postForBlob('/cameras/soft-trigger-capture', payload, options)
+};
+
+export default settingsApi;
