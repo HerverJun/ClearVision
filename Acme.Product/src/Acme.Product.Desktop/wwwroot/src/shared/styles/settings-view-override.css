@@ -154,6 +154,17 @@
 .settings-actions {
     display: flex;
     gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.settings-save-scope {
+    max-width: min(520px, 46vw);
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    text-align: right;
 }
 
 /* 选项卡容器滚动区 */
@@ -270,6 +281,29 @@
     font-size: 13px;
     color: var(--text-muted);
     margin: 0;
+}
+
+.settings-scope-notice {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    margin: -8px 0 20px;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #1e3a8a;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.settings-scope-notice strong {
+    flex: 0 0 auto;
+    color: #1d4ed8;
+}
+
+.settings-scope-notice span {
+    min-width: 0;
 }
 
 /* Modern Cards */
@@ -584,4 +618,112 @@ html[data-theme="dark"] .settings-btn-dark:hover {
 html[data-theme="dark"] .action-icon-btn svg,
 html[data-theme="dark"] .icon-action-btn svg {
     fill: var(--text-muted);
+}
+
+html[data-theme="dark"] .settings-scope-notice {
+    background: rgba(37, 99, 235, 0.12);
+    border-color: rgba(96, 165, 250, 0.35);
+    color: var(--text-secondary);
+}
+
+html[data-theme="dark"] .settings-scope-notice strong {
+    color: #93c5fd;
+}
+
+@media (max-width: 1280px) {
+    .settings-sidebar {
+        width: 220px;
+        min-width: 220px;
+    }
+
+    .settings-header-banner {
+        padding: 20px 24px 16px;
+    }
+
+    .settings-tab-panels {
+        padding: 24px;
+    }
+
+    .horizontal-flex {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 1024px) {
+    .settings-layout {
+        flex-direction: column;
+    }
+
+    .settings-sidebar {
+        width: 100%;
+        min-width: 0;
+        padding: 12px 0;
+        border-right: 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .settings-menu {
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 0 12px 4px;
+    }
+
+    .settings-menu-item {
+        flex: 0 0 auto;
+        min-height: 42px;
+    }
+
+    .settings-menu-item::before {
+        display: none;
+    }
+
+    .settings-header-banner {
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .settings-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .settings-save-scope {
+        max-width: 100%;
+        text-align: left;
+    }
+}
+
+@media (max-width: 800px) {
+    .settings-main-title {
+        font-size: 22px;
+    }
+
+    .settings-section-title,
+    .settings-section-title[style] {
+        display: block !important;
+    }
+
+    .settings-scope-notice {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .settings-tab-panels {
+        padding: 16px;
+    }
+
+    .settings-card-body,
+    .horizontal-flex {
+        padding: 16px;
+    }
+
+    .settings-modern-card [style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    .settings-modern-card [style*="display:flex"],
+    .settings-modern-card [style*="display: flex"] {
+        flex-wrap: wrap;
+    }
 }

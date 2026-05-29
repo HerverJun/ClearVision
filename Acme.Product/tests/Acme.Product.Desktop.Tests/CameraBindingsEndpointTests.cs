@@ -139,6 +139,31 @@ public class CameraBindingsEndpointTests
     }
 
     [Fact]
+    public async Task UpdateCameraBindings_ShouldRejectNonAdminUser()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        cameraManager.GetBindings().Returns(new List<CameraBindingConfig>());
+        var configService = Substitute.For<IConfigurationService>();
+        configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
+        configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
+
+        await using var host = await CameraBindingsTestHost.CreateAsync(
+            cameraManager,
+            configService: configService,
+            role: "Engineer");
+
+        var response = await host.Client.PutAsJsonAsync("/api/cameras/bindings", new
+        {
+            activeCameraId = "",
+            bindings = Array.Empty<CameraBindingConfig>()
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        cameraManager.DidNotReceive().UpdateBindings(Arg.Any<List<CameraBindingConfig>>(), Arg.Any<string>());
+        await configService.DidNotReceive().SaveAsync(Arg.Any<AppConfig>());
+    }
+
+    [Fact]
     public async Task UpdateCameraBindings_WhenActiveStreamBindingIsRemoved_ShouldReturnConflict()
     {
         var existingBindings = new List<CameraBindingConfig>
@@ -349,7 +374,8 @@ public class CameraBindingsEndpointTests
         public static async Task<CameraBindingsTestHost> CreateAsync(
             ICameraManager cameraManager,
             ICameraFrameStreamCoordinator? streamCoordinator = null,
-            IConfigurationService? configService = null)
+            IConfigurationService? configService = null,
+            string role = "Admin")
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -388,9 +414,9 @@ public class CameraBindingsEndpointTests
             {
                 context.Items["CurrentUser"] = new UserSession
                 {
-                    UserId = "admin",
-                    Username = "admin",
-                    Role = "Admin"
+                    UserId = role.ToLowerInvariant(),
+                    Username = role.ToLowerInvariant(),
+                    Role = role
                 };
                 await next();
             });

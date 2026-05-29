@@ -55,8 +55,89 @@ class SettingsView {
         this.lastCameraBindingSaveError = null;
         this.serialPhotoelectricPorts = [];
         this.serialPhotoelectricPortsLoaded = false;
+        this._trackedModals = new Set();
+        this._trackedTimeouts = new Set();
+        this._stationTokenHideTimer = null;
+        this._diskUsageRequestId = 0;
+        this._refreshRequestId = 0;
+    }
 
-        console.log('[SettingsView] Initialized for container:', containerId, '| isAdmin:', this.isAdmin);
+    createTrackedModal(options = {}) {
+        const modal = createModal({
+            ...options,
+            onClose: () => {
+                try {
+                    const result = options.onClose?.();
+                    if (result && typeof result.finally === 'function') {
+                        result
+                            .catch(error => console.warn('[SettingsView] Modal close cleanup failed:', error))
+                            .finally(() => this._trackedModals.delete(modal));
+                        return;
+                    }
+                } finally {
+                    this._trackedModals.delete(modal);
+                }
+            },
+            onDispose: () => {
+                try {
+                    options.onDispose?.();
+                } finally {
+                    this._trackedModals.delete(modal);
+                }
+            }
+        });
+        this._trackedModals.add(modal);
+        return modal;
+    }
+
+    setTrackedTimeout(callback, delay = 0) {
+        const timeoutId = setTimeout(() => {
+            this._trackedTimeouts.delete(timeoutId);
+            callback();
+        }, delay);
+        this._trackedTimeouts.add(timeoutId);
+        return timeoutId;
+    }
+
+    clearTrackedTimeout(timeoutId) {
+        if (!timeoutId) return;
+        clearTimeout(timeoutId);
+        this._trackedTimeouts.delete(timeoutId);
+    }
+
+    clearTransientResources() {
+        this.clearTrackedTimeout(this._aiReasoningSupportDebounce);
+        this._aiReasoningSupportDebounce = null;
+        this.clearTrackedTimeout(this._stationTokenHideTimer);
+        this._stationTokenHideTimer = null;
+
+        this._trackedTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        this._trackedTimeouts.clear();
+        this._aiReasoningSupportRequestId += 1;
+        this._diskUsageRequestId += 1;
+    }
+
+    clearSensitiveUiState({ refreshStationPanel = false } = {}) {
+        this.stationTokenVisible = false;
+        this.stationTokenValue = '';
+        this.clearAiSecretInputs();
+        if (refreshStationPanel && this.getActiveTabName() === 'station') {
+            this.refreshStationCommunicationPanel();
+        }
+    }
+
+    deactivate() {
+        this._refreshRequestId += 1;
+        this.clearTransientResources();
+        this.clearSensitiveUiState();
+        [...this._trackedModals].forEach(modal => closeModal(modal));
+    }
+
+    destroy() {
+        this.deactivate();
+        if (this.container) {
+            this.container.innerHTML = '';
+        }
     }
 
     normalizeCameraTriggerMode(value) {
@@ -291,11 +372,13 @@ class SettingsView {
      * app.js 在切换到 settings 视图时调用
      */
     async refresh() {
-        console.log('[SettingsView] === refresh() START ===');
         if (!this.container) {
             console.error('[SettingsView] Container not found:', this.containerId);
             return;
         }
+
+        this.deactivate();
+        const refreshRequestId = ++this._refreshRequestId;
         this.plcConnectionStatus = 'unknown';
         
         // 可选：添加统一骨架屏或加载提示
@@ -303,8 +386,8 @@ class SettingsView {
         
         // 获取配置信息
         try {
-            console.log('[SettingsView] Fetching main config...');
             this.config = this.normalizeAppConfig(await httpClient.get('/settings'));
+            if (refreshRequestId !== this._refreshRequestId) return;
             this.cameraBindings = this.config.cameras || [];
             this.syncActiveCameraSelection();
             this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
@@ -316,8 +399,8 @@ class SettingsView {
             this.stationTokenValue = '';
             
             if (this.isAdmin) {
-                console.log('[SettingsView] Fetching users list...');
                 this.users = await httpClient.get('/users');
+                if (refreshRequestId !== this._refreshRequestId) return;
             }
         } catch (error) {
             console.error('[SettingsView] Failed to load data:', error);
@@ -334,6 +417,7 @@ class SettingsView {
         }
         
         await this.loadAiModels();
+        if (refreshRequestId !== this._refreshRequestId) return;
         
         // 构建全屏两栏布局 DOM
         this.renderLayout();
@@ -346,8 +430,6 @@ class SettingsView {
         
         // 默认激活第一个 Tab
         this.activateTab('general');
-        
-        console.log('[SettingsView] === refresh() END ===');
     }
 
     cloneCommunicationConfig(config) {
@@ -522,6 +604,76 @@ class SettingsView {
         modelNameEl.textContent = this.getAiPerformanceModelLabel();
     }
 
+    getSaveScopeMeta(tabName = this.getActiveTabName()) {
+        const scopes = {
+            general: {
+                button: '保存常规设置',
+                title: '只保存常规页',
+                body: '保存软件标题、主题和开机启动；不会提交 PLC、Station、相机或 AI 草稿。主题保存后立即生效。'
+            },
+            communication: {
+                button: '保存 PLC 设置',
+                title: '只保存 PLC',
+                body: '通过 /plc/settings 保存当前协议连接与映射；校验失败不会写入配置。运行中的 PLC 连接需按现场流程重新连接。'
+            },
+            station: {
+                button: '保存 Station 设置',
+                title: '只保存 Station',
+                body: '通过 Station 专用配置文件保存监听模式、端口和本机 Station 同步；token 不写入普通 /settings。按页面提示决定是否重启。'
+            },
+            storage: {
+                button: '保存存储设置',
+                title: '只保存文件与存储',
+                body: '保存图像路径、清理天数和低空间阈值；保存前会检查路径可访问和可写，不影响相机、PLC、Station 或 AI。'
+            },
+            runtime: {
+                button: '保存运行保护',
+                title: '只保存运行保护',
+                body: '保存连续 NG、缺料超时和自动运行保护开关；保存后运行保护规则立即按新值工作。'
+            },
+            cameras: {
+                button: '保存当前相机',
+                title: '只保存相机管理',
+                body: '通过 /cameras/bindings 保存当前相机绑定/参数；相机流正在运行且参数有冲突时后端会拒绝保存。'
+            },
+            ai: {
+                button: '保存 AI 草稿',
+                title: '只保存 AI 模型',
+                body: '通过 /ai/models 保存当前模型表单，不会由系统页全局保存偷偷提交，也不会自动切换激活模型。API Key 保存后会从界面清空。'
+            },
+            users: {
+                button: '保存安全策略',
+                title: '只保存用户安全策略',
+                body: '保存密码长度、会话超时和登录失败锁定策略；用户新增、删除和重置密码仍走各自按钮。'
+            }
+        };
+
+        return scopes[tabName] || scopes.general;
+    }
+
+    renderScopeNotice(tabName) {
+        const meta = this.getSaveScopeMeta(tabName);
+        return `
+            <div class="settings-scope-notice">
+                <strong>${this.escapeHtml(meta.title)}</strong>
+                <span>${this.escapeHtml(meta.body)}</span>
+            </div>
+        `;
+    }
+
+    updateSaveActionState(tabName = this.getActiveTabName()) {
+        const meta = this.getSaveScopeMeta(tabName);
+        const saveBtn = this.container?.querySelector('#btn-save-settings');
+        const scopeText = this.container?.querySelector('#settings-save-scope');
+        if (saveBtn) {
+            saveBtn.textContent = meta.button;
+            saveBtn.title = meta.body;
+        }
+        if (scopeText) {
+            scopeText.textContent = meta.body;
+        }
+    }
+
     /**
      * 基于两栏结构生成主 HTML
      */
@@ -571,7 +723,8 @@ class SettingsView {
                     <div class="settings-header-banner">
                         <h1 class="settings-main-title">生产参数</h1>
                         <div class="settings-actions">
-                            <button class="cv-btn cv-btn-primary" id="btn-save-settings">保存当前设置</button>
+                            <span class="settings-save-scope" id="settings-save-scope"></span>
+                            <button class="cv-btn cv-btn-primary" id="btn-save-settings">保存当前页</button>
                         </div>
                     </div>
                     <div class="settings-tab-panels">
@@ -591,7 +744,20 @@ class SettingsView {
 
     activateTab(tabName) {
         if (!this.container) return;
+        const previousTab = this.activeTab;
+        if (previousTab && previousTab !== tabName) {
+            if (previousTab === 'cameras') {
+                [...this._trackedModals].forEach(modal => closeModal(modal));
+            }
+            if (previousTab === 'station') {
+                this.clearSensitiveUiState();
+            }
+            if (previousTab === 'ai') {
+                this.clearAiSecretInputs();
+            }
+        }
         this.activeTab = tabName;
+        this.updateSaveActionState(tabName);
         
         // 侧边栏高亮
         const menuItems = this.container.querySelectorAll('.settings-menu-item');
@@ -967,8 +1133,32 @@ class SettingsView {
         }).filter(item => item.name || item.address || item.description);
     }
 
+    validateActivePlcConnectionForm() {
+        const ipAddress = String(this.container?.querySelector('#cfg-plcIpAddress')?.value || '').trim();
+        if (!ipAddress) {
+            throw new Error('请填写 PLC IP 地址。');
+        }
+
+        this.readIntegerSetting('#cfg-plcPort', 'PLC 端口', { min: 1, max: 65535 });
+
+        if (this.getActivePlcProtocol() === 'S7') {
+            this.readIntegerSetting('#cfg-s7-rack', 'S7 Rack', { min: 0, max: 15 });
+            this.readIntegerSetting('#cfg-s7-slot', 'S7 Slot', { min: 0, max: 15 });
+        }
+    }
+
     async savePlcSettings({ silent = false, persistAllProfiles = false } = {}) {
-        const payload = this.buildPlcSettingsPayload({ persistAllProfiles });
+        let payload;
+        try {
+            this.validateActivePlcConnectionForm();
+            payload = this.buildPlcSettingsPayload({ persistAllProfiles });
+        } catch (error) {
+            if (!silent) {
+                showToast(error.message, 'warning');
+            }
+            return { success: false, settings: null };
+        }
+
         try {
             const result = await httpClient.put('/plc/settings', payload);
             const success = !!result?.success;
@@ -1008,6 +1198,13 @@ class SettingsView {
     }
 
     async testPlcConnection() {
+        try {
+            this.validateActivePlcConnectionForm();
+        } catch (error) {
+            showToast(error.message, 'warning');
+            return;
+        }
+
         this.syncActivePlcProfileDraft(this.getActivePlcProtocol());
 
         const protocol = this.getActivePlcProtocol();
@@ -1294,10 +1491,19 @@ class SettingsView {
             throw new Error('端口必须是 1-65535 之间的整数');
         }
 
+        const lanHost = this.container?.querySelector('#cfg-station-lan-host')?.value?.trim() || settings.lanHost;
+        if (settings.mode !== 'Disabled' && lanHost && (
+            /^https?:\/\//i.test(lanHost) ||
+            /\s/.test(lanHost) ||
+            /[\\/?#@]/.test(lanHost)
+        )) {
+            throw new Error('LAN 主机名/IP 只能填写主机名或 IP，不要包含 http://、路径、空格或特殊符号。');
+        }
+
         return {
             mode: settings.mode,
             port: parsedPort,
-            lanHost: this.container?.querySelector('#cfg-station-lan-host')?.value?.trim() || settings.lanHost,
+            lanHost,
             localStationSyncEnabled: settings.mode !== 'Disabled'
                 && (this.container?.querySelector('#cfg-station-local-sync')?.checked ?? settings.localStationSyncEnabled)
         };
@@ -1363,6 +1569,19 @@ class SettingsView {
         return 'Station 设置已保存，当前本机已按这些设置运行。';
     }
 
+    scheduleStationTokenAutoHide() {
+        this.clearTrackedTimeout(this._stationTokenHideTimer);
+        this._stationTokenHideTimer = this.setTrackedTimeout(() => {
+            this._stationTokenHideTimer = null;
+            this.stationTokenVisible = false;
+            this.stationTokenValue = '';
+            if (this.getActiveTabName() === 'station') {
+                this.refreshStationCommunicationPanel();
+                showToast('Station token 已自动隐藏。', 'info');
+            }
+        }, 60000);
+    }
+
     async revealStationToken() {
         if (!this.isAdmin) {
             showToast('只有管理员可以显示 Station token', 'warning');
@@ -1378,6 +1597,7 @@ class SettingsView {
                 this.stationCommunicationLoaded = true;
             }
             this.refreshStationCommunicationPanel();
+            this.scheduleStationTokenAutoHide();
             return this.stationTokenValue;
         } catch (error) {
             showToast('显示 Station token 失败: ' + error.message, 'error');
@@ -1397,6 +1617,7 @@ class SettingsView {
         }
 
         await this.copyTextToClipboard(token);
+        this.scheduleStationTokenAutoHide();
         showToast('Station token 已复制', 'success');
     }
 
@@ -1419,6 +1640,7 @@ class SettingsView {
                 this.stationCommunicationLoaded = true;
             }
             this.refreshStationCommunicationPanel();
+            this.scheduleStationTokenAutoHide();
             showToast('Station token 已重新生成，重启后生效。', 'success');
         } catch (error) {
             showToast('重新生成 Station token 失败: ' + error.message, 'error');
@@ -1530,10 +1752,10 @@ class SettingsView {
 
     scheduleAiReasoningSupportPreview() {
         if (this._aiReasoningSupportDebounce) {
-            clearTimeout(this._aiReasoningSupportDebounce);
+            this.clearTrackedTimeout(this._aiReasoningSupportDebounce);
         }
 
-        this._aiReasoningSupportDebounce = setTimeout(() => {
+        this._aiReasoningSupportDebounce = this.setTrackedTimeout(() => {
             this._aiReasoningSupportDebounce = null;
             this.refreshAiReasoningSupportPreview();
         }, 120);
@@ -1661,6 +1883,10 @@ class SettingsView {
                     return;
                 }
                 const id = btn.dataset.id;
+                const model = this.aiModels.find(item => item.id === id);
+                if (!confirm(`确定要删除 AI 模型“${model?.name || id}”吗？\n\n删除后该模型的 API Key 和路由配置会一并移除，正在使用该模型的流程需要重新选择模型。`)) {
+                    return;
+                }
                 try {
                     await httpClient.delete(`/ai/models/${id}`);
                     await this.loadAiModels();
@@ -1763,7 +1989,7 @@ class SettingsView {
         aiTab.addEventListener('input', handleAiFieldChange);
         aiTab.addEventListener('change', handleAiFieldChange);
         
-        setTimeout(() => {
+        this.setTrackedTimeout(() => {
             this.refreshAiTableAndForm();
             this.syncAiReasoningUiState();
         }, 0);
@@ -1818,6 +2044,44 @@ class SettingsView {
             || pendingApiKey.trim().length > 0;
     }
 
+    clearAiSecretInputs() {
+        const apiKeyInput = this.container?.querySelector('#cfg-ai-apikey');
+        const toggleButton = this.container?.querySelector('#btn-toggle-apikey');
+        if (apiKeyInput) {
+            apiKeyInput.value = '';
+            apiKeyInput.type = 'password';
+        }
+        if (toggleButton) {
+            toggleButton.textContent = '👁';
+        }
+    }
+
+    validateAiModelDraftPayload(payload) {
+        if (!String(payload.name || '').trim()) {
+            throw new Error('请填写模型昵称。');
+        }
+        if (!String(payload.model || '').trim()) {
+            throw new Error('请填写模型标识。');
+        }
+
+        const timeoutMs = Number(payload.timeoutMs);
+        if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 600000) {
+            throw new Error('AI 请求超时必须是 1000 - 600000 ms 之间的整数。');
+        }
+
+        const baseUrl = String(payload.baseUrl || '').trim();
+        if (baseUrl) {
+            try {
+                const parsed = new URL(baseUrl);
+                if (!['http:', 'https:'].includes(parsed.protocol)) {
+                    throw new Error('invalid protocol');
+                }
+            } catch {
+                throw new Error('API Endpoint 必须是有效的 http/https URL，或留空使用默认地址。');
+            }
+        }
+    }
+
     /** 将当前编辑表单的值保存到后端 */
     async _saveCurrentForm() {
         const modelId = this.editingAiModelId;
@@ -1839,11 +2103,12 @@ class SettingsView {
             }
         };
 
+        this.validateAiModelDraftPayload(payload);
         await httpClient.put(`/ai/models/${modelId}`, payload);
         await this.loadAiModels({ preserveEditingId: true });
         this.aiReasoningSupportPreview = null;
         this._pendingFormEdits = {};
-        this.refreshAiTableOnly();
+        this.refreshAiTableAndForm();
     }
     
     refreshAiTableOnly() {
@@ -2041,7 +2306,9 @@ class SettingsView {
                 const deleteBtn = e.target.closest('.action-icon-btn');
                 if (deleteBtn) {
                     const id = tr.dataset.id;
-                    if (confirm('确定要删除此相机配置吗？')) {
+                    const binding = this.cameraBindings.find(item => item.id === id);
+                    const label = binding?.displayName || binding?.serialNumber || id;
+                    if (confirm(`确定要删除相机绑定“${label}”吗？\n\n删除后会立即保存相机绑定列表；如果相机流正在运行，后端可能拒绝本次操作。`)) {
                         const previousBindings = [...this.cameraBindings];
                         this.cameraBindings = this.cameraBindings.filter(b => b.id !== id);
                         if (this.selectedCameraBindingId === id) {
@@ -2262,7 +2529,7 @@ class SettingsView {
             </p>
         `;
 
-        const modal = createModal({
+        const modal = this.createTrackedModal({
             title: `配置向导：发现${vendorText}相机`,
             content: contentDiv,
             width: '920px'
@@ -2912,7 +3179,7 @@ class SettingsView {
             sessionId = null;
         };
 
-        const modal = createModal({
+        const modal = this.createTrackedModal({
             title: `相机预览 - ${binding.displayName || binding.serialNumber || binding.id}`,
             content,
             width: '960px',
@@ -3094,7 +3361,7 @@ class SettingsView {
             activePreviewAbortController = null;
         };
 
-        const modal = createModal({
+        const modal = this.createTrackedModal({
             title: `相机预览 - ${binding.displayName || binding.serialNumber || binding.id}`,
             content,
             width: '960px',
@@ -3306,16 +3573,16 @@ class SettingsView {
         const triggerMode = this.normalizeCameraTriggerMode(triggerModeSelect.value || 'Software');
         const hardwareTriggerSource = this.normalizeHardwareTriggerSource(hardwareTriggerSourceSelect.value || 'Line0');
         const softwareTriggerSource = this.normalizeSoftwareTriggerSource(triggerSourceSelect.value || 'Manual');
-        const enterPhotoelectricDebounceMs = this.normalizeEnterDebounceMs(enterDebounceInput.value);
-        const enterPhotoelectricTimeoutMs = this.normalizeEnterTimeoutMs(enterTimeoutInput.value);
+        const enterPhotoelectricDebounceMs = Number.parseInt(String(enterDebounceInput.value ?? ''), 10);
+        const enterPhotoelectricTimeoutMs = Number.parseInt(String(enterTimeoutInput.value ?? ''), 10);
         const enterPhotoelectricDeviceId = String(enterDeviceInput.value || '').trim();
         const ignoreEnterTriggerWhileBusy = ignoreBusyInput.checked !== false;
         const serialPhotoelectricPortName = String(serialPortInput.value || '').trim();
-        const serialPhotoelectricBaudRate = this.normalizeSerialBaudRate(serialBaudInput.value);
-        const serialPhotoelectricDebounceMs = this.normalizeSerialDebounceMs(serialDebounceInput.value);
-        const serialPhotoelectricTimeoutMs = this.normalizeSerialTimeoutMs(serialTimeoutInput.value);
+        const serialPhotoelectricBaudRate = Number.parseInt(String(serialBaudInput.value ?? ''), 10);
+        const serialPhotoelectricDebounceMs = Number.parseInt(String(serialDebounceInput.value ?? ''), 10);
+        const serialPhotoelectricTimeoutMs = Number.parseInt(String(serialTimeoutInput.value ?? ''), 10);
         const ignoreSerialPhotoelectricTriggerWhileBusy = ignoreSerialBusyInput.checked !== false;
-        const targetFrameRateFps = this.normalizeCameraTargetFrameRate(frameRateInput.value);
+        const targetFrameRateFps = Number.parseInt(String(frameRateInput.value ?? ''), 10);
 
         if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
             showToast('曝光时间需在 10 - 1000000 µs 范围内', 'warning');
@@ -3323,6 +3590,34 @@ class SettingsView {
         }
         if (!Number.isFinite(gainDb) || gainDb < 0 || gainDb > 24) {
             showToast('增益需在 0.0 - 24.0 dB 范围内', 'warning');
+            return false;
+        }
+        if (!Number.isInteger(enterPhotoelectricDebounceMs) || enterPhotoelectricDebounceMs < 0 || enterPhotoelectricDebounceMs > 5000) {
+            showToast('回车防抖时间需在 0 - 5000 ms 范围内', 'warning');
+            return false;
+        }
+        if (!Number.isInteger(enterPhotoelectricTimeoutMs) || enterPhotoelectricTimeoutMs < 100 || enterPhotoelectricTimeoutMs > 600000) {
+            showToast('回车等待超时需在 100 - 600000 ms 范围内', 'warning');
+            return false;
+        }
+        if (!Number.isInteger(serialPhotoelectricBaudRate) || serialPhotoelectricBaudRate <= 0) {
+            showToast('串口波特率必须是大于 0 的整数', 'warning');
+            return false;
+        }
+        if (!Number.isInteger(serialPhotoelectricDebounceMs) || serialPhotoelectricDebounceMs < 0 || serialPhotoelectricDebounceMs > 5000) {
+            showToast('串口防抖时间需在 0 - 5000 ms 范围内', 'warning');
+            return false;
+        }
+        if (!Number.isInteger(serialPhotoelectricTimeoutMs) || serialPhotoelectricTimeoutMs < 100 || serialPhotoelectricTimeoutMs > 600000) {
+            showToast('串口等待超时需在 100 - 600000 ms 范围内', 'warning');
+            return false;
+        }
+        if (softwareTriggerSource === 'SerialPhotoelectric' && !/^COM\d+$/i.test(serialPhotoelectricPortName)) {
+            showToast('串口光电触发需要填写类似 COM3 的串口号', 'warning');
+            return false;
+        }
+        if (triggerMode !== 'Software' && (!Number.isInteger(targetFrameRateFps) || targetFrameRateFps < 1 || targetFrameRateFps > 120)) {
+            showToast('采集帧率需在 1 - 120 fps 范围内', 'warning');
             return false;
         }
 
@@ -3341,7 +3636,9 @@ class SettingsView {
         binding.serialPhotoelectricDebounceMs = serialPhotoelectricDebounceMs;
         binding.serialPhotoelectricTimeoutMs = serialPhotoelectricTimeoutMs;
         binding.ignoreSerialPhotoelectricTriggerWhileBusy = ignoreSerialPhotoelectricTriggerWhileBusy;
-        binding.targetFrameRateFps = targetFrameRateFps;
+        binding.targetFrameRateFps = triggerMode === 'Software'
+            ? this.normalizeCameraTargetFrameRate(binding.targetFrameRateFps)
+            : targetFrameRateFps;
 
         const saved = await this.saveCameraBindings({ silent });
         if (!saved) {
@@ -3414,6 +3711,7 @@ class SettingsView {
                 <h2>常规设置</h2>
                 <p>配置系统层面的基础选项，包括界面显示和启动行为。</p>
             </div>
+            ${this.renderScopeNotice('general')}
             
             <div class="settings-modern-card">
                 <div class="settings-card-header">
@@ -3522,6 +3820,7 @@ class SettingsView {
                 <h2>PLC 通讯配置</h2>
                 <p>聚焦已落地的厂牌协议栈，配置连接参数与地址映射。</p>
             </div>
+            ${this.renderScopeNotice('communication')}
 
             <div class="settings-modern-card">
                 <div class="settings-card-header has-badge">
@@ -3709,6 +4008,7 @@ class SettingsView {
                 <h2>Station 通讯设置</h2>
                 <p>本机 Studio 作为监控服务端；另一台电脑的 Station 主动连接这里。保存后只按下方明确提示重启。</p>
             </div>
+            ${this.renderScopeNotice('station')}
 
             <div class="settings-modern-card">
                 <div class="settings-card-header has-badge">
@@ -3832,6 +4132,7 @@ class SettingsView {
                 <h2>文件与存储管理</h2>
                 <p>配置图像数据保存路径、清理策略与磁盘容量预警。</p>
             </div>
+            ${this.renderScopeNotice('storage')}
             
             <div class="settings-modern-card" style="margin-bottom: 24px;">
                 <div class="settings-card-header">
@@ -3876,7 +4177,7 @@ class SettingsView {
                             <div class="settings-fieldset" style="flex:1;">
                                 <label>自动清理阈值 (天)</label>
                                 <div class="input-with-suffix" style="position:relative;">
-                                    <input type="number" class="cv-input" id="cfg-retentionDays" value="${storage.retentionDays || 30}" style="padding-right:36px;">
+                                    <input type="number" class="cv-input" id="cfg-retentionDays" value="${storage.retentionDays ?? 30}" style="padding-right:36px;">
                                     <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">天</span>
                                 </div>
                             </div>
@@ -3884,7 +4185,7 @@ class SettingsView {
                         <div class="settings-fieldset">
                             <label>磁盘低空间预警 (GB)</label>
                             <div class="input-with-suffix" style="position:relative; max-width: 200px;">
-                                <input type="number" class="cv-input" id="cfg-minFreeSpaceGb" value="${storage.minFreeSpaceGb || 5}" style="padding-right:36px;">
+                                <input type="number" class="cv-input" id="cfg-minFreeSpaceGb" value="${storage.minFreeSpaceGb ?? 5}" style="padding-right:36px;">
                                 <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px;">GB</span>
                             </div>
                             <span class="settings-field-hint">当磁盘剩余空间不足该值时，系统会报警并禁止生产启动。</span>
@@ -3931,6 +4232,7 @@ class SettingsView {
                     <span class="status-dot" style="background:#e74c3c;"></span> 保护机制已启用
                 </div>
             </div>
+            ${this.renderScopeNotice('runtime')}
 
             <div class="settings-modern-card">
                 <div class="settings-card-header">
@@ -3973,7 +4275,7 @@ class SettingsView {
                                 <input type="checkbox" id="cfg-applyProtectionRules" ${runtime.applyProtectionRules !== false ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--cinnabar);">
                                 保存后立即启用运行保护规则
                             </label>
-                            <span class="settings-field-hint" style="margin-left: 24px;">该配置会随“保存当前设置”一起持久化，并作为运行保护的开关。</span>
+                            <span class="settings-field-hint" style="margin-left: 24px;">该配置会随“保存运行保护”一起持久化，并作为运行保护的开关。</span>
                         </div>
                     </div>
                 </div>
@@ -4011,6 +4313,7 @@ class SettingsView {
                     </button>
                 </div>
             </div>
+            ${this.renderScopeNotice('cameras')}
 
             <div class="settings-modern-card">
                 <div class="settings-card-table-wrapper">
@@ -4231,6 +4534,7 @@ class SettingsView {
                 <h2>AI & LLM 模型管理</h2>
                 <p>集成深度学习本地模型与云端大语言模型 API 配置。</p>
             </div>
+            ${this.renderScopeNotice('ai')}
 
             <!-- Block 1: Model Tab & List -->
             <div class="settings-modern-card">
@@ -4339,6 +4643,7 @@ class SettingsView {
                     </button>
                 </div>
             </div>
+            ${this.renderScopeNotice('users')}
 
             <div class="settings-modern-card">
                 <div class="settings-card-table-wrapper">
@@ -4474,7 +4779,7 @@ class SettingsView {
             if (action === 'edit') {
                 this.showUserModal('edit', user);
             } else if (action === 'delete') {
-                if (confirm(`确定要删除用户 ${user.username} 吗？`)) {
+                if (confirm(`确定要删除用户“${user.username}”吗？\n\n该账号将无法登录，历史审计记录仍会保留用户名。`)) {
                     try {
                         await httpClient.delete(`/users/${id}`);
                         showToast('用户已删除', 'success');
@@ -4484,13 +4789,17 @@ class SettingsView {
                     }
                 }
             } else if (action === 'toggle-status') {
+                const nextAction = user.isActive ? '禁用' : '启用';
+                if (!confirm(`确定要${nextAction}用户“${user.username}”吗？${user.isActive ? '\n\n禁用后该账号将无法登录。' : ''}`)) {
+                    return;
+                }
                 try {
                     await httpClient.put(`/users/${id}`, {
                         displayName: user.displayName,
                         role: user.role,
                         isActive: !user.isActive
                     });
-                    showToast(`用户已${user.isActive?'禁用':'启用'}`, 'success');
+                    showToast(`用户已${nextAction}`, 'success');
                     this.refreshUserTable();
                 } catch(err) {
                     showToast('操作失败: ' + err.message, 'error');
@@ -4498,6 +4807,9 @@ class SettingsView {
             } else if (action === 'reset-pwd') {
                 const newPwd = prompt(`请输入为 ${user.username} 重置的新密码 (至少6位):`);
                 if (newPwd) {
+                    if (!confirm(`确定要重置用户“${user.username}”的密码吗？\n\n保存后旧密码立即失效，请通过安全渠道告知新密码。`)) {
+                        return;
+                    }
                     try {
                         await httpClient.post(`/users/${id}/reset-password`, { newPassword: newPwd });
                         showToast('密码重置成功', 'success');
@@ -4548,7 +4860,7 @@ class SettingsView {
             </div>
         `;
 
-        const modal = createModal({
+        const modal = this.createTrackedModal({
             title,
             content,
             width: '520px'
@@ -4585,14 +4897,21 @@ class SettingsView {
 
     async loadDiskUsage() {
         if (!this.container) return;
+        const requestId = ++this._diskUsageRequestId;
 
         try {
             const pathInput = this.container.querySelector('#cfg-imageSavePath');
             const sourcePath = pathInput?.value || this.config?.storage?.imageSavePath || '';
             const usage = await httpClient.get(`/settings/disk-usage?path=${encodeURIComponent(sourcePath)}`);
+            if (requestId !== this._diskUsageRequestId) {
+                return;
+            }
             this.diskUsage = usage;
             this.updateDiskUsageCard();
         } catch (error) {
+            if (requestId !== this._diskUsageRequestId) {
+                return;
+            }
             console.warn('[SettingsView] 加载磁盘容量失败:', error);
         }
     }
@@ -4739,7 +5058,12 @@ class SettingsView {
 
     async resetSettings() {
         const resetFeature = getFeatureMeta('settings.reset');
-        if (!confirm(`确定要${getFeatureButtonLabel('settings.reset', '恢复默认设置')}吗？${resetFeature.description}`)) {
+        const resetLabel = getFeatureButtonLabel('settings.reset', '恢复默认设置');
+        if (!confirm(`确定要${resetLabel}吗？\n\n将重置普通系统配置、PLC 配置、相机绑定和 AI 模型配置；Station token 不会写入普通配置，但现场连接可能需要重新检查。${resetFeature.description}`)) {
+            return;
+        }
+
+        if (!confirm('请再次确认：恢复默认设置会立即写入本机配置文件，当前未保存的设置页修改会丢失。继续执行吗？')) {
             return;
         }
 
@@ -4747,7 +5071,7 @@ class SettingsView {
             const result = await httpClient.post('/settings/reset');
             const message = result?.message
                 || result?.Message
-                || `${getFeatureButtonLabel('settings.reset', '恢复默认设置')}已执行`;
+                || `${resetLabel}已执行`;
             applyTheme(
                 normalizeTheme(result?.config?.general?.theme, this.getDefaultConfig().general.theme),
                 { persist: true }
@@ -4762,8 +5086,175 @@ class SettingsView {
     /**
      * 收集输入并调用 API
      */
+    readIntegerSetting(selector, label, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER } = {}) {
+        const raw = String(this.container?.querySelector(selector)?.value ?? '').trim();
+        if (!/^-?\d+$/.test(raw)) {
+            throw new Error(`${label}必须填写整数。`);
+        }
+
+        const value = Number.parseInt(raw, 10);
+        if (!Number.isSafeInteger(value) || value < min || value > max) {
+            throw new Error(`${label}必须在 ${min} - ${max} 范围内。`);
+        }
+
+        return value;
+    }
+
+    readFloatSetting(selector, label, { min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY } = {}) {
+        const raw = String(this.container?.querySelector(selector)?.value ?? '').trim();
+        if (!raw) {
+            throw new Error(`${label}不能为空。`);
+        }
+
+        const value = Number.parseFloat(raw);
+        if (!Number.isFinite(value) || value < min || value > max) {
+            throw new Error(`${label}必须在 ${min} - ${max} 范围内。`);
+        }
+
+        return value;
+    }
+
+    collectGeneralConfigForSave() {
+        const softwareTitle = String(this.container?.querySelector('#cfg-softwareTitle')?.value || '').trim();
+        if (!softwareTitle) {
+            throw new Error('软件标题不能为空。');
+        }
+        if (softwareTitle.length > 80) {
+            throw new Error('软件标题不能超过 80 个字符。');
+        }
+
+        const theme = normalizeTheme(this.container?.querySelector('#cfg-theme')?.value, null);
+        if (!theme) {
+            throw new Error('系统主题只能选择浅色或深色。');
+        }
+
+        return {
+            softwareTitle,
+            theme,
+            autoStart: this.container?.querySelector('#cfg-autoStart')?.checked || false
+        };
+    }
+
+    collectStorageConfigForSave() {
+        const imageSavePath = String(this.container?.querySelector('#cfg-imageSavePath')?.value || '').trim();
+        if (!imageSavePath) {
+            throw new Error('默认图像保存路径不能为空。');
+        }
+
+        const savePolicy = this.container?.querySelector('#cfg-savePolicy')?.value || 'NgOnly';
+        if (!['All', 'NgOnly', 'None'].includes(savePolicy)) {
+            throw new Error('图像保存策略无效，请重新选择。');
+        }
+
+        return {
+            imageSavePath,
+            savePolicy,
+            retentionDays: this.readIntegerSetting('#cfg-retentionDays', '自动清理阈值', { min: 0, max: 3650 }),
+            minFreeSpaceGb: this.readFloatSetting('#cfg-minFreeSpaceGb', '磁盘低空间预警', { min: 0, max: 1024 })
+        };
+    }
+
+    collectRuntimeConfigForSave() {
+        return {
+            autoRun: this.container?.querySelector('#cfg-autoRun')?.checked || false,
+            stopOnConsecutiveNg: this.readIntegerSetting('#cfg-stopOnConsecutiveNg', '连续 NG 停机报警阈值', { min: 0, max: 100000 }),
+            missingMaterialTimeoutSeconds: this.readIntegerSetting('#cfg-missingMaterialTimeoutSeconds', '缺料等待超时', { min: 0, max: 86400 }),
+            applyProtectionRules: this.container?.querySelector('#cfg-applyProtectionRules')?.checked ?? true
+        };
+    }
+
+    collectSecurityConfigForSave() {
+        return {
+            passwordMinLength: this.readIntegerSetting('#cfg-passwordMinLength', '密码最小长度', { min: 6, max: 128 }),
+            sessionTimeoutMinutes: this.readIntegerSetting('#cfg-sessionTimeoutMinutes', '会话自动超时', { min: 1, max: 1440 }),
+            loginFailureLockoutCount: this.readIntegerSetting('#cfg-loginFailureLockoutCount', '登录失败锁定次数', { min: 1, max: 100 })
+        };
+    }
+
+    buildAppConfigForSave(activeTabName) {
+        const nextConfig = this.normalizeAppConfig(this.config || this.getDefaultConfig());
+        nextConfig.communication = this.cloneCommunicationConfig(
+            this.savedCommunicationConfig || this.config?.communication || nextConfig.communication
+        );
+        nextConfig.cameras = Array.isArray(this.config?.cameras) ? [...this.config.cameras] : [];
+        nextConfig.activeCameraId = this.config?.activeCameraId || '';
+
+        if (activeTabName === 'general') {
+            nextConfig.general = this.collectGeneralConfigForSave();
+        } else if (activeTabName === 'storage') {
+            nextConfig.storage = this.collectStorageConfigForSave();
+        } else if (activeTabName === 'runtime') {
+            nextConfig.runtime = this.collectRuntimeConfigForSave();
+        } else if (activeTabName === 'users') {
+            nextConfig.security = this.collectSecurityConfigForSave();
+        }
+
+        return nextConfig;
+    }
+
+    async saveAppSettingsForTab(activeTabName) {
+        let config;
+        try {
+            config = this.buildAppConfigForSave(activeTabName);
+        } catch (error) {
+            showToast(error.message, 'warning');
+            return;
+        }
+
+        if (activeTabName === 'storage') {
+            const storagePathValid = await this.validateStoragePathBeforeSave(config.storage.imageSavePath);
+            if (!storagePathValid) {
+                return;
+            }
+        }
+
+        try {
+            await httpClient.put('/settings', config);
+            this.config = this.normalizeAppConfig(config);
+            this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
+            this.syncPlcMappingsFromActiveProfile();
+
+            if (activeTabName === 'general') {
+                applyTheme(this.config.general.theme, { persist: true });
+            }
+            if (activeTabName === 'storage') {
+                await this.loadDiskUsage();
+            }
+
+            showToast(`${this.getSaveScopeMeta(activeTabName).button}已完成。`, 'success');
+        } catch (error) {
+            console.error('[SettingsView] Failed to save app config:', error);
+            showToast('保存设置失败: ' + error.message, 'error');
+        }
+    }
+
+    async saveCameraSettingsFromTop() {
+        if (this.selectedCameraBindingId) {
+            await this.saveSelectedCameraParameters();
+            return;
+        }
+
+        const saved = await this.saveCameraBindings();
+        if (saved) {
+            showToast('相机绑定配置已保存。', 'success');
+        }
+    }
+
+    async saveAiDraftFromTop() {
+        if (!this.editingAiModelId) {
+            showToast('请先选择一个 AI 模型再保存。', 'warning');
+            return;
+        }
+
+        try {
+            await this._saveCurrentForm();
+            showToast('AI 模型草稿已保存，激活模型未切换。', 'success');
+        } catch (error) {
+            showToast('保存 AI 模型失败: ' + error.message, 'error');
+        }
+    }
+
     async save() {
-        console.log('[SettingsView] Saving config...');
         const activeTabName = this.getActiveTabName();
 
         if (activeTabName === 'station') {
@@ -4771,191 +5262,28 @@ class SettingsView {
             return;
         }
 
-        const themeSelect = this.container?.querySelector('#cfg-theme');
-        const selectedTheme = normalizeTheme(themeSelect?.value, null);
-        const currentTheme = normalizeTheme(this.config?.general?.theme, getAppliedTheme());
-        const effectiveTheme = selectedTheme || currentTheme;
-        const defaultConfig = this.getDefaultConfig();
-        const parsedHeartbeatIntervalMs = Number.parseInt(`${this.config?.communication?.heartbeatIntervalMs ?? ''}`, 10);
-        const heartbeatIntervalMs = Number.isFinite(parsedHeartbeatIntervalMs) && parsedHeartbeatIntervalMs > 0
-            ? parsedHeartbeatIntervalMs
-            : defaultConfig.communication.heartbeatIntervalMs;
-        const parsedRetentionDays = Number.parseInt(this.container?.querySelector('#cfg-retentionDays')?.value || '', 10);
-        const retentionDays = Number.isFinite(parsedRetentionDays) && parsedRetentionDays >= 0
-            ? parsedRetentionDays
-            : (this.config?.storage?.retentionDays ?? defaultConfig.storage.retentionDays);
-        const parsedMinFreeSpaceGb = Number.parseFloat(this.container?.querySelector('#cfg-minFreeSpaceGb')?.value || '');
-        const minFreeSpaceGb = Number.isFinite(parsedMinFreeSpaceGb) && parsedMinFreeSpaceGb >= 0
-            ? parsedMinFreeSpaceGb
-            : (this.config?.storage?.minFreeSpaceGb ?? defaultConfig.storage.minFreeSpaceGb);
-        const parsedMissingMaterialTimeoutSeconds = Number.parseInt(this.container?.querySelector('#cfg-missingMaterialTimeoutSeconds')?.value || '', 10);
-        const missingMaterialTimeoutSeconds = Number.isFinite(parsedMissingMaterialTimeoutSeconds) && parsedMissingMaterialTimeoutSeconds >= 0
-            ? parsedMissingMaterialTimeoutSeconds
-            : (this.config?.runtime?.missingMaterialTimeoutSeconds ?? defaultConfig.runtime.missingMaterialTimeoutSeconds);
-        const parsedPasswordMinLength = Number.parseInt(this.container?.querySelector('#cfg-passwordMinLength')?.value || '', 10);
-        const passwordMinLength = Number.isFinite(parsedPasswordMinLength) && parsedPasswordMinLength >= 6
-            ? parsedPasswordMinLength
-            : (this.config?.security?.passwordMinLength ?? defaultConfig.security.passwordMinLength);
-        const parsedSessionTimeoutMinutes = Number.parseInt(this.container?.querySelector('#cfg-sessionTimeoutMinutes')?.value || '', 10);
-        const sessionTimeoutMinutes = Number.isFinite(parsedSessionTimeoutMinutes) && parsedSessionTimeoutMinutes > 0
-            ? parsedSessionTimeoutMinutes
-            : (this.config?.security?.sessionTimeoutMinutes ?? defaultConfig.security.sessionTimeoutMinutes);
-        const parsedLoginFailureLockoutCount = Number.parseInt(this.container?.querySelector('#cfg-loginFailureLockoutCount')?.value || '', 10);
-        const loginFailureLockoutCount = Number.isFinite(parsedLoginFailureLockoutCount) && parsedLoginFailureLockoutCount > 0
-            ? parsedLoginFailureLockoutCount
-            : (this.config?.security?.loginFailureLockoutCount ?? defaultConfig.security.loginFailureLockoutCount);
-        const activeCameraId = this.resolveActiveCameraId();
-        const imageSavePath = this.container?.querySelector('#cfg-imageSavePath')?.value || '';
-
-        if (activeTabName === 'storage') {
-            const storagePathValid = await this.validateStoragePathBeforeSave(imageSavePath);
-            if (!storagePathValid) {
-                return;
-            }
+        if (activeTabName === 'communication') {
+            await this.savePlcSettings();
+            return;
         }
 
-        // 保证“保存当前设置”也会带上当前选中相机的参数修改。
-        if (this.selectedCameraBindingId) {
-            const selectedBinding = this.cameraBindings.find(b => b.id === this.selectedCameraBindingId);
-            const exposureInput = this.container?.querySelector('#cam-param-exposure');
-            const gainInput = this.container?.querySelector('#cam-param-gain');
-            const pixelFormatSelect = this.container?.querySelector('#cam-param-pixel-format');
-            const triggerModeSelect = this.container?.querySelector('#cam-param-trigger-mode');
-            const hardwareTriggerSourceSelect = this.container?.querySelector('#cam-param-hardware-trigger-source');
-            const triggerSourceSelect = this.container?.querySelector('#cam-param-software-trigger-source');
-            const enterDebounceInput = this.container?.querySelector('#cam-param-enter-debounce');
-            const enterTimeoutInput = this.container?.querySelector('#cam-param-enter-timeout');
-            const enterDeviceInput = this.container?.querySelector('#cam-param-enter-device-id');
-            const ignoreBusyInput = this.container?.querySelector('#cam-param-ignore-enter-busy');
-            const serialPortInput = this.container?.querySelector('#cam-param-serial-port-name');
-            const serialBaudInput = this.container?.querySelector('#cam-param-serial-baud-rate');
-            const serialDebounceInput = this.container?.querySelector('#cam-param-serial-debounce');
-            const serialTimeoutInput = this.container?.querySelector('#cam-param-serial-timeout');
-            const ignoreSerialBusyInput = this.container?.querySelector('#cam-param-ignore-serial-busy');
-            const frameRateInput = this.container?.querySelector('#cam-param-target-frame-rate');
-            if (selectedBinding && exposureInput && gainInput && pixelFormatSelect && triggerModeSelect && hardwareTriggerSourceSelect && triggerSourceSelect && enterDebounceInput && enterTimeoutInput && enterDeviceInput && ignoreBusyInput && serialPortInput && serialBaudInput && serialDebounceInput && serialTimeoutInput && ignoreSerialBusyInput && frameRateInput) {
-                const exposureTimeUs = Number.parseFloat(exposureInput.value);
-                const gainDb = Number.parseFloat(gainInput.value);
-                if (!Number.isFinite(exposureTimeUs) || exposureTimeUs < 10 || exposureTimeUs > 1000000) {
-                    showToast('曝光时间需在 10 - 1000000 µs 范围内', 'warning');
-                    return;
-                }
-                if (!Number.isFinite(gainDb) || gainDb < 0 || gainDb > 24) {
-                    showToast('增益需在 0.0 - 24.0 dB 范围内', 'warning');
-                    return;
-                }
-                selectedBinding.exposureTimeUs = exposureTimeUs;
-                selectedBinding.gainDb = gainDb;
-                selectedBinding.pixelFormat = this.normalizeCameraPixelFormat(pixelFormatSelect.value || 'Mono8');
-                selectedBinding.triggerMode = this.normalizeCameraTriggerMode(triggerModeSelect.value || 'Software');
-                selectedBinding.hardwareTriggerSource = this.normalizeHardwareTriggerSource(hardwareTriggerSourceSelect.value || 'Line0');
-                selectedBinding.softwareTriggerSource = this.normalizeSoftwareTriggerSource(triggerSourceSelect.value || 'Manual');
-                selectedBinding.enterPhotoelectricDebounceMs = this.normalizeEnterDebounceMs(enterDebounceInput.value);
-                selectedBinding.enterPhotoelectricTimeoutMs = this.normalizeEnterTimeoutMs(enterTimeoutInput.value);
-                selectedBinding.enterPhotoelectricDeviceId = String(enterDeviceInput.value || '').trim();
-                selectedBinding.ignoreEnterTriggerWhileBusy = ignoreBusyInput.checked !== false;
-                selectedBinding.serialPhotoelectricPortName = String(serialPortInput.value || '').trim();
-                selectedBinding.serialPhotoelectricBaudRate = this.normalizeSerialBaudRate(serialBaudInput.value);
-                selectedBinding.serialPhotoelectricDebounceMs = this.normalizeSerialDebounceMs(serialDebounceInput.value);
-                selectedBinding.serialPhotoelectricTimeoutMs = this.normalizeSerialTimeoutMs(serialTimeoutInput.value);
-                selectedBinding.ignoreSerialPhotoelectricTriggerWhileBusy = ignoreSerialBusyInput.checked !== false;
-                selectedBinding.targetFrameRateFps = this.normalizeCameraTargetFrameRate(frameRateInput.value);
-            }
-        }
-        
-        const plcSettingsDraft = this.normalizeCommunicationConfig(
-            this.buildPlcSettingsPayload({ persistAllProfiles: true })
-        );
-        const hasPendingPlcChanges = !this.areCommunicationConfigsEqual(
-            plcSettingsDraft,
-            this.savedCommunicationConfig || this.config?.communication
-        );
-        let communicationForSave = plcSettingsDraft;
-
-        if (hasPendingPlcChanges) {
-            const plcSaveResult = await this.savePlcSettings({ silent: true, persistAllProfiles: true });
-            if (!plcSaveResult?.success) {
-                showToast('PLC 配置校验未通过，请先修正当前协议配置。', 'error');
-                return;
-            }
-
-            communicationForSave = this.normalizeCommunicationConfig(plcSaveResult.settings || plcSettingsDraft);
-        } else {
-            this.config.communication = this.cloneCommunicationConfig(plcSettingsDraft);
-            this.syncPlcMappingsFromActiveProfile();
+        if (activeTabName === 'cameras') {
+            await this.saveCameraSettingsFromTop();
+            return;
         }
 
-        const config = {
-            general: {
-                softwareTitle: this.container?.querySelector('#cfg-softwareTitle')?.value || '',
-                theme: effectiveTheme,
-                autoStart: this.container?.querySelector('#cfg-autoStart')?.checked || false
-            },
-            communication: {
-                ...this.normalizeCommunicationConfig(communicationForSave),
-                heartbeatIntervalMs
-            },
-            storage: {
-                imageSavePath,
-                savePolicy: this.container?.querySelector('#cfg-savePolicy')?.value || 'NgOnly',
-                retentionDays,
-                minFreeSpaceGb
-            },
-            runtime: {
-                autoRun: this.container?.querySelector('#cfg-autoRun')?.checked || false,
-                stopOnConsecutiveNg: parseInt(this.container?.querySelector('#cfg-stopOnConsecutiveNg')?.value || '0', 10),
-                missingMaterialTimeoutSeconds,
-                applyProtectionRules: this.container?.querySelector('#cfg-applyProtectionRules')?.checked ?? true
-            },
-            security: {
-                passwordMinLength,
-                sessionTimeoutMinutes,
-                loginFailureLockoutCount
-            },
-            cameras: this.collectCameraBindings(),
-            activeCameraId
-        };
-        
-        try {
-            // 先保存相机绑定，避免运行中相机流拒绝参数变更时，全局配置已提前落盘。
-            const bindingsSaved = await this.saveCameraBindings({ silent: true });
-            if (!bindingsSaved) {
-                throw new Error(this.lastCameraBindingSaveError || '相机绑定保存失败');
-            }
-
-            config.cameras = this.collectCameraBindings();
-            await httpClient.put('/settings', config);
-            this.config = this.normalizeAppConfig(config);
-            this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
-
-            this.syncPlcMappingsFromActiveProfile();
-            this.plcSettingsLoaded = true;
-
-            // 仅在 AI 页显式保存时同步当前模型，避免全局保存触发隐式副作用。
-            const hasPendingAiChanges = this.hasPendingAiChanges();
-            if (activeTabName === 'ai' && hasPendingAiChanges) {
-                await this._saveCurrentForm();
-            }
-
-            console.log('[SettingsView] Config saved successfully');
-            if (activeTabName !== 'ai' && hasPendingAiChanges) {
-                showToast('系统设置已保存；AI 模型草稿仍保留在 AI 页，需要单独保存。', 'warning');
-            } else {
-                showToast('所有设置已生效并保存。', 'success');
-            }
-            await this.loadDiskUsage();
-            
-            applyTheme(effectiveTheme, { persist: true });
-        } catch (error) {
-            console.error('[SettingsView] Failed to save config:', error);
-            showToast('保存设置通讯错误: ' + error.message, 'error');
+        if (activeTabName === 'ai') {
+            await this.saveAiDraftFromTop();
+            return;
         }
+
+        await this.saveAppSettingsForTab(activeTabName);
     }
 }
 
 // 暴露出初始化方法给外界（比如 app.js）
 window.initializeSettingsView = function() {
-    console.log('[SettingsView] Registering globally...');
+    window.cvSettingsView?.destroy?.();
     window.cvSettingsView = new SettingsView('settings-view');
     window.cvSettingsView.refresh();
 };

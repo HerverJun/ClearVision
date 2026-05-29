@@ -112,6 +112,9 @@ export function createViewManager(options) {
         eventBus?.emit?.('view:changed', { view });
 
         const containers = getViewContainers(documentRef);
+        if (view !== 'settings') {
+            globalThis.cvSettingsView?.deactivate?.();
+        }
         hideAllViews(containers);
 
         const leftSidebar = documentRef.querySelector('.sidebar.left');

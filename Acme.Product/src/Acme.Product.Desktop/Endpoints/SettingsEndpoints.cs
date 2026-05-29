@@ -403,8 +403,14 @@ public static class SettingsEndpoints
             Acme.Product.Core.Cameras.ICameraManager cameraManager,
             [FromServices] ICameraFrameStreamCoordinator streamCoordinator,
             [FromServices] ISerialPhotoelectricTriggerInputService serialPhotoelectricTriggerInputService,
-            IConfigurationService configService) =>
+            IConfigurationService configService,
+            HttpContext context) =>
         {
+            if (!IsAdmin(context))
+            {
+                return Results.Json(new { error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             try
             {
                 // 1. 更新 CameraManager 内存状态
