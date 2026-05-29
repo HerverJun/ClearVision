@@ -180,7 +180,6 @@ export function installAiTab(SettingsView) {
                         showToast('创建模型失败: ' + err.message, 'error');
                     }
                 } else if (btn.dataset.action === 'edit') {
-                    // 切换编辑前先保存当前编辑（如果有未保存的修改）
                     this.editingAiModelId = btn.dataset.id;
                     this.aiReasoningSupportPreview = null;
                     this._aiReasoningSupportRequestId += 1;

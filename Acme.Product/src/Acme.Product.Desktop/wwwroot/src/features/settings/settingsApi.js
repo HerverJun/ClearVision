@@ -1,14 +1,6 @@
 import httpClient from '../../core/messaging/httpClient.js';
 
 const settingsApi = {
-    get: (...args) => httpClient.get(...args),
-    getRoot: (...args) => httpClient.getRoot(...args),
-    post: (...args) => httpClient.post(...args),
-    postForBlob: (...args) => httpClient.postForBlob(...args),
-    getForBlob: (...args) => httpClient.getForBlob(...args),
-    put: (...args) => httpClient.put(...args),
-    delete: (...args) => httpClient.delete(...args),
-
     loadSettings: () => httpClient.get('/settings'),
     saveSettings: config => httpClient.put('/settings', config),
     resetSettings: () => httpClient.post('/settings/reset'),
