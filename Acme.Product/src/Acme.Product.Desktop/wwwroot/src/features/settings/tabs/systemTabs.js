@@ -487,14 +487,20 @@ export function installSystemTabs(SettingsView) {
                 </div>
             `;
 
+            const eventCleanups = [];
+            const cleanupModalEvents = () => {
+                eventCleanups.splice(0).forEach(cleanup => cleanup());
+            };
+
             const modal = this.createTrackedModal({
                 title,
                 content,
-                width: '520px'
+                width: '520px',
+                onClose: cleanupModalEvents
             });
 
-            content.querySelector('#btn-cancel-usermodal').addEventListener('click', () => closeModal(modal));
-            content.querySelector('#btn-save-usermodal').addEventListener('click', async () => {
+            eventCleanups.push(this.lifecycle.trackEvent(content.querySelector('#btn-cancel-usermodal'), 'click', () => closeModal(modal)));
+            eventCleanups.push(this.lifecycle.trackEvent(content.querySelector('#btn-save-usermodal'), 'click', async () => {
                 const displayName = content.querySelector('#modal-user-displayname').value;
                 const role = parseInt(content.querySelector('#modal-user-role').value, 10);
 
@@ -517,10 +523,9 @@ export function installSystemTabs(SettingsView) {
                 } catch (err) {
                     showToast('保存失败: ' + err.message, 'error');
                 }
-            });
+            }));
         }
 
-        // saveAiConfig 已被 _saveCurrentForm() 替代，不再需要此方法
         ,
         async loadDiskUsage() {
             if (!this.container) return;

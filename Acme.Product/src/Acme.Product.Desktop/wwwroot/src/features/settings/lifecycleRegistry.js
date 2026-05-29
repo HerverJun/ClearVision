@@ -4,6 +4,7 @@ export class LifecycleRegistry {
         this.modals = new Set();
         this.abortControllers = new Set();
         this.objectUrls = new Set();
+        this.eventCleanups = new Set();
         this.cleanupCallbacks = new Set();
     }
 
@@ -57,6 +58,20 @@ export class LifecycleRegistry {
         this.objectUrls.delete(url);
     }
 
+    trackEvent(target, type, handler, options = undefined) {
+        if (!target || typeof target.addEventListener !== 'function' || typeof handler !== 'function') {
+            return () => {};
+        }
+
+        target.addEventListener(type, handler, options);
+        const cleanup = () => {
+            target.removeEventListener(type, handler, options);
+            this.eventCleanups.delete(cleanup);
+        };
+        this.eventCleanups.add(cleanup);
+        return cleanup;
+    }
+
     onCleanup(callback) {
         if (typeof callback === 'function') {
             this.cleanupCallbacks.add(callback);
@@ -73,6 +88,15 @@ export class LifecycleRegistry {
 
         this.objectUrls.forEach(url => URL.revokeObjectURL(url));
         this.objectUrls.clear();
+
+        this.eventCleanups.forEach(cleanup => {
+            try {
+                cleanup();
+            } catch (error) {
+                console.warn('[SettingsLifecycle] Event cleanup failed:', error);
+            }
+        });
+        this.eventCleanups.clear();
 
         this.cleanupCallbacks.forEach(callback => {
             try {
