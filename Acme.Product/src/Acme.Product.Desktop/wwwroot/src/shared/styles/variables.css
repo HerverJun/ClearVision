@@ -33,6 +33,33 @@
     --error-cinnabar: #f87171;
     --info-azure: #38bdf8;
 
+    /* Semantic Status Tokens - single source for inspection/result states */
+    --status-ok: var(--success-jade);
+    --status-ok-strong: #22c55e;
+    --status-ok-rgb: 74, 222, 128;
+    --status-ok-soft: rgba(74, 222, 128, 0.15);
+    --status-ok-border: rgba(74, 222, 128, 0.28);
+    --status-ok-glow: rgba(74, 222, 128, 0.22);
+    --status-ng: var(--cinnabar);
+    --status-ng-strong: var(--cinnabar-dark);
+    --status-ng-rgb: 231, 76, 60;
+    --status-ng-soft: rgba(231, 76, 60, 0.15);
+    --status-ng-border: rgba(231, 76, 60, 0.28);
+    --status-ng-glow: rgba(231, 76, 60, 0.22);
+    --status-error: var(--warning-amber);
+    --status-error-strong: #f59e0b;
+    --status-error-rgb: 251, 191, 36;
+    --status-error-soft: rgba(251, 191, 36, 0.15);
+    --status-error-border: rgba(251, 191, 36, 0.28);
+    --status-error-glow: rgba(251, 191, 36, 0.22);
+    --status-info: var(--info-azure);
+    --status-info-strong: #0ea5e9;
+    --status-info-rgb: 56, 189, 248;
+    --status-info-soft: rgba(56, 189, 248, 0.15);
+    --status-info-border: rgba(56, 189, 248, 0.28);
+    --status-idle: #94a3b8;
+    --status-idle-rgb: 148, 163, 184;
+
     /* -----------------------------------------------------------------------
        Text - Warm Platinum Scale
        ----------------------------------------------------------------------- */
@@ -92,13 +119,31 @@
        ----------------------------------------------------------------------- */
     --header-height: 48px;
     --footer-height: 24px;
-    --sidebar-width: 260px;
-    --right-sidebar-width: 260px;
+    --sidebar-width: clamp(220px, 18vw, 280px);
+    --right-sidebar-width: clamp(220px, 18vw, 280px);
+    --settings-sidebar-width: clamp(220px, 18vw, 280px);
+    --inspection-control-width: clamp(220px, 18vw, 280px);
+    --inspection-side-width: clamp(220px, 20vw, 300px);
+    --node-preview-width: clamp(240px, 24vw, 320px);
+    --template-filter-width: clamp(180px, 18vw, 240px);
     --sidebar-collapsed: 48px;
     --sidebar-resizer-hit-area: 6px;
     --content-gap: 20px;
     --card-padding: 20px;
     --float-offset: 14px;
+
+    /* Shared interaction tokens */
+    --focus-ring-color: var(--cinnabar);
+    --focus-ring: 0 0 0 3px var(--cinnabar-glow);
+    --focus-ring-soft: 0 0 0 3px rgba(212, 175, 55, 0.16);
+    --panel-border-warm: rgba(225, 190, 188, 0.5);
+    --panel-border-warm-strong: rgba(175, 38, 44, 0.32);
+    --panel-shadow-hover: 0 8px 24px rgba(175, 38, 44, 0.08);
+    --template-surface: var(--bg-surface);
+    --template-surface-muted: var(--bg-subtle);
+    --template-border: var(--border-color);
+    --template-text: var(--text-color);
+    --template-text-muted: var(--text-muted);
 
     /* -----------------------------------------------------------------------
        Typography - Refined Hierarchy
@@ -288,6 +333,15 @@ html[data-theme="dark"] {
     --border-color: var(--theme-border);
     --primary-color: var(--cinnabar);
     --hover-color: var(--theme-hover);
+    --panel-border-warm: rgba(255, 255, 255, 0.08);
+    --panel-border-warm-strong: rgba(231, 76, 60, 0.38);
+    --panel-shadow-hover: 0 8px 24px rgba(231, 76, 60, 0.12);
+    --template-surface: var(--theme-surface-1);
+    --template-surface-muted: var(--theme-surface-2);
+    --template-border: var(--theme-border);
+    --template-text: var(--theme-text-primary);
+    --template-text-muted: var(--theme-text-secondary);
+    --focus-ring: 0 0 0 3px rgba(231, 76, 60, 0.28);
 }
 
 /* ==========================================================================
@@ -358,4 +412,36 @@ html[data-theme="light"] {
     --border-color: var(--theme-border);
     --primary-color: var(--cinnabar);
     --hover-color: var(--theme-hover);
+    --status-ok: #00685b;
+    --status-ok-strong: #1a9987;
+    --status-ok-rgb: 0, 104, 91;
+    --status-ok-soft: rgba(0, 104, 91, 0.1);
+    --status-ok-border: rgba(0, 104, 91, 0.18);
+    --status-ok-glow: rgba(0, 104, 91, 0.18);
+    --status-ng: #ba1a1a;
+    --status-ng-strong: var(--cinnabar);
+    --status-ng-rgb: 186, 26, 26;
+    --status-ng-soft: rgba(186, 26, 26, 0.1);
+    --status-ng-border: rgba(186, 26, 26, 0.18);
+    --status-ng-glow: rgba(186, 26, 26, 0.18);
+    --status-error: #d97706;
+    --status-error-strong: #f59e0b;
+    --status-error-rgb: 217, 119, 6;
+    --status-error-soft: rgba(217, 119, 6, 0.1);
+    --status-error-border: rgba(217, 119, 6, 0.18);
+    --status-error-glow: rgba(217, 119, 6, 0.18);
+    --status-info: #64748b;
+    --status-info-strong: #94a3b8;
+    --status-info-rgb: 100, 116, 139;
+    --status-info-soft: rgba(100, 116, 139, 0.12);
+    --status-info-border: rgba(100, 116, 139, 0.18);
+    --panel-border-warm: rgba(225, 190, 188, 0.5);
+    --panel-border-warm-strong: rgba(175, 38, 44, 0.32);
+    --panel-shadow-hover: 0 8px 24px rgba(175, 38, 44, 0.08);
+    --template-surface: var(--theme-surface-1);
+    --template-surface-muted: #f8fafc;
+    --template-border: #e2e8f0;
+    --template-text: #0f172a;
+    --template-text-muted: #64748b;
+    --focus-ring: 0 0 0 3px rgba(231, 76, 60, 0.18);
 }

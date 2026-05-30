@@ -24,8 +24,8 @@
 }
 
 .calib-wizard-modal {
-    width: 900px;
-    height: 650px;
+    width: min(56.25rem, calc(100vw - 2rem));
+    height: min(40.625rem, calc(100vh - 2rem));
     background: var(--bg-surface, #ffffff);
     border-radius: 12px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -235,10 +235,10 @@ html[data-theme="dark"] .calib-wizard-body {
     position: absolute;
     width: 6px;
     height: 6px;
-    background: #10b981; /* Green */
+    background: var(--status-ok);
     border-radius: 50%;
     transform: translate(-50%, -50%);
-    box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 0 3px #10b981;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 0 3px var(--status-ok);
     pointer-events: none;
     z-index: 10;
 }
@@ -457,8 +457,8 @@ html[data-theme="dark"] .calib-metric {
     font-weight: 400;
 }
 
-.calib-rmse-ok { color: #10b981; } /* Green */
-.calib-rmse-warn { color: #f59e0b; } /* Orange */
+.calib-rmse-ok { color: var(--status-ok); }
+.calib-rmse-warn { color: var(--status-error); }
 
 /* Step 3: Save */
 .calib-layout-s3 {
@@ -479,12 +479,12 @@ html[data-theme="dark"] .calib-metric {
     display: flex;
     justify-content: center;
     align-items: center;
-    color: #10b981;
+    color: var(--status-ok);
     font-size: 32px;
 }
 
 html[data-theme="dark"] .calib-save-icon {
-    background: rgba(16, 185, 129, 0.1);
+    background: var(--status-ok-soft);
 }
 
 .calib-save-input-group {

@@ -23,7 +23,7 @@
 /* ---- Workspace 2-Column Layout ---- */
 .ai-workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(360px, 520px);
+    grid-template-columns: minmax(0, 1.15fr) minmax(min(100%, 22.5rem), clamp(22.5rem, 36vw, 32.5rem));
     align-items: stretch;
     flex: 1;
     overflow: hidden;
@@ -3185,8 +3185,8 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     color: #64748b;
 }
 [data-theme="light"] .wb-stage.completed {
-    background: rgba(16, 185, 129, 0.1);
-    color: #059669;
+    background: var(--status-ok-soft);
+    color: var(--status-ok);
 }
 [data-theme="light"] .wb-stage.active {
     background: rgba(59, 130, 246, 0.12);

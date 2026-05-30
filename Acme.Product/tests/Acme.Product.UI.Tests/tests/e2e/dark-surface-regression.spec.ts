@@ -78,3 +78,50 @@ test('dark theme keeps flow and inspection critical surfaces off white', async (
   await expect.poll(() => readEffectiveBackgroundMaxChannel(page, '#inspection-image-area')).toBeLessThan(90);
   await expect.poll(() => readEffectiveBackgroundMaxChannel(page, '.inspection-protection-notice')).toBeLessThan(140);
 });
+
+test('dark theme keeps template selector surfaces off white', async ({ page }) => {
+  await mockDarkSettings(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('cv_theme', 'dark');
+  });
+
+  await bootAuthenticatedApp(page);
+
+  await page.evaluate(() => {
+    const overlay = document.createElement('div');
+    overlay.className = 'template-selector-overlay';
+    overlay.innerHTML = `
+      <div class="template-selector-dialog" role="dialog" aria-modal="true">
+        <div class="template-selector-header">
+          <div>
+            <h3>从模板创建流程</h3>
+            <p>选择预设模板，快速生成流程骨架。</p>
+          </div>
+        </div>
+        <div class="template-selector-filters">
+          <input class="cv-input" placeholder="搜索模板名称或描述..." />
+          <select class="cv-input"><option>全部行业</option></select>
+        </div>
+        <div class="template-tags">
+          <button type="button" class="template-tag-btn active">全部标签</button>
+        </div>
+        <div class="template-card-grid">
+          <article class="template-card">
+            <div class="template-card-head">
+              <h4>检测模板</h4>
+              <span class="template-card-industry">通用</span>
+            </div>
+            <p class="template-card-description">用于暗色模式表面验证。</p>
+            <div class="template-card-meta"><span>3 个算子</span><span>2 个标签</span></div>
+            <div class="template-card-tags"><span class="template-card-tag">OCR</span></div>
+          </article>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  });
+
+  await expect(page.locator('.template-selector-dialog')).toBeVisible();
+  await expect.poll(() => readEffectiveBackgroundMaxChannel(page, '.template-selector-dialog')).toBeLessThan(90);
+  await expect.poll(() => readEffectiveBackgroundMaxChannel(page, '.template-card')).toBeLessThan(100);
+});

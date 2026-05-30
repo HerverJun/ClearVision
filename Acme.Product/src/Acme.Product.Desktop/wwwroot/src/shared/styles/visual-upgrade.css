@@ -478,6 +478,13 @@ a, button, input, select, textarea,
    ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+
     .panel:hover,
     .project-card:hover,
     .kpi-card:hover,
@@ -488,6 +495,28 @@ a, button, input, select, textarea,
     #btn-run:hover {
         transform: none !important;
     }
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible,
+.btn:focus-visible,
+.cv-btn:focus-visible,
+.cv-input:focus-visible,
+.cv-select:focus-visible,
+.settings-tab:focus-visible,
+.settings-menu-item:focus-visible,
+.tab-btn:focus-visible,
+.nav-btn:focus-visible,
+.action-icon-btn:focus-visible,
+.icon-action-btn:focus-visible {
+    outline: 1.5px solid var(--focus-ring-color) !important;
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring), var(--shadow-sm);
 }
 
 @media (prefers-contrast: high) {

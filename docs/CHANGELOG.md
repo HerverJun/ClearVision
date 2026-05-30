@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-05-26 00:24:19 +08:00`
+> 生成时间 / Generated At: `2026-05-31 00:44:31 +08:00`
 > 算子总数 / Total Operators: **156**
 
 ## 当前版本快照 / Current Snapshot

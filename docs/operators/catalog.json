@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-26T00:24:19.8012708+08:00",
+  "generatedAt": "2026-05-31T00:44:31.0559213+08:00",
   "totalCount": 156,
   "categories": {
     "3D": {
@@ -2013,6 +2013,18 @@
           "displayName": "Model Provenance",
           "dataType": "Any",
           "isRequired": null
+        },
+        {
+          "name": "PostprocessDiagnostics",
+          "displayName": "Postprocess Diagnostics",
+          "dataType": "Any",
+          "isRequired": null
+        },
+        {
+          "name": "OutputFormat",
+          "displayName": "Output Format",
+          "dataType": "String",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -2129,7 +2141,7 @@
           "name": "EnableInternalNms",
           "displayName": "启用内部NMS",
           "dataType": "bool",
-          "description": "关闭后输出置信度筛选后的候选框，由下游 BoxNms 负责唯一 NMS。",
+          "description": "仅用于 RawYolo 输出的后处理开关；OutputFormat=EndToEndNms 时信任 ONNX 模型内部候选框抑制/NMS，平台侧不再额外拆出 BoxNms。",
           "defaultValue": "true",
           "min": null,
           "max": null,
@@ -2146,6 +2158,30 @@
           "max": "1",
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "OutputFormat",
+          "displayName": "输出格式",
+          "dataType": "enum",
+          "description": "Auto 自动识别；RawYolo 表示原始 YOLO 输出；EndToEndNms 表示模型已输出 NMS 后的 [x1,y1,x2,y2,score,class] 检测结果。",
+          "defaultValue": "Auto",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "Auto",
+              "label": "自动识别"
+            },
+            {
+              "value": "RawYolo",
+              "label": "原始 YOLO"
+            },
+            {
+              "value": "EndToEndNms",
+              "label": "端到端 NMS"
+            }
+          ]
         },
         {
           "name": "DetectionMode",
@@ -22399,6 +22435,36 @@
           "displayName": "判定原因",
           "dataType": "String",
           "isRequired": null
+        },
+        {
+          "name": "BaselineReady",
+          "displayName": "基线已建立",
+          "dataType": "Boolean",
+          "isRequired": null
+        },
+        {
+          "name": "TotalPixels",
+          "displayName": "有效像素数",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "CooldownRemainingMs",
+          "displayName": "剩余冷却时间(ms)",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "EffectivePixelThreshold",
+          "displayName": "有效像素差阈值",
+          "dataType": "Integer",
+          "isRequired": null
+        },
+        {
+          "name": "EffectiveMinChangeRatio",
+          "displayName": "有效最小变化比例",
+          "dataType": "Float",
+          "isRequired": null
         }
       ],
       "parameters": [
@@ -22423,6 +22489,30 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "Profile",
+          "displayName": "参数配置档",
+          "dataType": "enum",
+          "description": "默认 line_fast_default；line_noise_guard 和 line_low_contrast 必须作为证据 profile 显式启用。",
+          "defaultValue": "line_fast_default",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "line_fast_default",
+              "label": "line_fast_default"
+            },
+            {
+              "value": "line_noise_guard",
+              "label": "line_noise_guard"
+            },
+            {
+              "value": "line_low_contrast",
+              "label": "line_low_contrast"
+            }
+          ]
         },
         {
           "name": "PixelThreshold",
@@ -22508,6 +22598,131 @@
           "description": "到料检测 ROI 高度；0 表示从 Y 到图像下边界。",
           "defaultValue": "0",
           "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "BlurSize",
+          "displayName": "降噪模糊核",
+          "dataType": "int",
+          "description": "0 表示关闭；开启时必须为 3 到 15 的奇数。",
+          "defaultValue": "0",
+          "min": "0",
+          "max": "15",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MorphOpenSize",
+          "displayName": "开运算核",
+          "dataType": "int",
+          "description": "0 表示关闭；开启时必须为 3 到 15 的奇数，用于去除孤立噪声。",
+          "defaultValue": "0",
+          "min": "0",
+          "max": "15",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "NormalizeMode",
+          "displayName": "亮度归一化",
+          "dataType": "enum",
+          "description": "None、MeanShift 或 PercentileClip。",
+          "defaultValue": "None",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "None",
+              "label": "None"
+            },
+            {
+              "value": "MeanShift",
+              "label": "MeanShift"
+            },
+            {
+              "value": "PercentileClip",
+              "label": "PercentileClip"
+            }
+          ]
+        },
+        {
+          "name": "ReferenceUpdateMode",
+          "displayName": "参考帧更新",
+          "dataType": "enum",
+          "description": "PreviousFrame、StableBackground 或 ExponentialMovingAverage。",
+          "defaultValue": "PreviousFrame",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "PreviousFrame",
+              "label": "PreviousFrame"
+            },
+            {
+              "value": "StableBackground",
+              "label": "StableBackground"
+            },
+            {
+              "value": "ExponentialMovingAverage",
+              "label": "ExponentialMovingAverage"
+            }
+          ]
+        },
+        {
+          "name": "ReferenceUpdateAlpha",
+          "displayName": "参考更新系数",
+          "dataType": "double",
+          "description": "仅 ExponentialMovingAverage 使用，范围 0 到 1。",
+          "defaultValue": "0.05",
+          "min": "0",
+          "max": "1",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "AdaptivePixelThreshold",
+          "displayName": "自适应像素阈值",
+          "dataType": "bool",
+          "description": "默认关闭；低对比 evidence profile 可显式启用。",
+          "defaultValue": "false",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "MinConsecutiveChangedFrames",
+          "displayName": "连续变化帧数",
+          "dataType": "int",
+          "description": "至少连续多少帧达到变化阈值才触发，用于抑制单帧闪烁。",
+          "defaultValue": "1",
+          "min": "1",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "ResetAfterNoChangeFrames",
+          "displayName": "无变化复位帧数",
+          "dataType": "int",
+          "description": "连续无变化达到该帧数后复位边沿状态；0 表示关闭。",
+          "defaultValue": "1",
+          "min": "0",
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "TriggerOnRisingEdgeOnly",
+          "displayName": "仅上升沿触发",
+          "dataType": "bool",
+          "description": "开启后持续变化只在进入变化状态的边沿触发一次。",
+          "defaultValue": "true",
+          "min": null,
           "max": null,
           "isRequired": true,
           "options": null

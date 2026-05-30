@@ -1,6 +1,6 @@
 /* ==========================================================================
    ClearVision 检测视图专用样式 (Phase 3 - Industrial Dashboard Unified)
-   与结果面板统一风格：浅绿底 + glass-card + 深红主色
+   与结果面板统一风格：主题 token + glass-card + 深红主色
    ========================================================================== */
 
 /* ==========================================================================
@@ -10,8 +10,8 @@
 .inspection-view-container {
     flex: 1;
     display: flex;
-    gap: 20px;
-    padding: 20px;
+    gap: var(--content-gap);
+    padding: var(--content-gap);
     background-color: var(--workspace-bg);
     overflow: hidden;
     position: relative;
@@ -29,7 +29,7 @@
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    border: 1px solid #e1bebc;
+    border: 1px solid var(--panel-border-warm);
     border-radius: 12px;
     box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.03);
     overflow: hidden;
@@ -42,12 +42,12 @@
 .inspection-control-panel:hover,
 .inspection-side-panel:hover,
 .inspection-image-area:hover {
-    border-color: #d4a7a4;
+    border-color: var(--panel-border-warm-strong);
     box-shadow: 4px 6px 14px rgba(0, 0, 0, 0.04);
 }
 
-.inspection-control-panel { width: 260px; flex-shrink: 0; }
-.inspection-side-panel { width: 280px; flex-shrink: 0; }
+.inspection-control-panel { width: var(--inspection-control-width); flex-shrink: 0; }
+.inspection-side-panel { width: var(--inspection-side-width); flex-shrink: 0; }
 
 /* 中间图像区域 */
 .inspection-image-area {
@@ -320,6 +320,12 @@
     outline: none;
 }
 
+.btn-inspection:focus-visible {
+    outline: 1.5px solid var(--focus-ring-color);
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring);
+}
+
 .btn-inspection .icon {
     width: 16px;
     height: 16px;
@@ -477,10 +483,10 @@
     letter-spacing: 0.05em;
 }
 
-.counter-ok .counter-value { color: #00685b; }
-.counter-ng .counter-value { color: #ba1a1a; }
-.counter-error .counter-value { color: #f97316; }
-.counter-yield .counter-value { color: #af262c; }
+.counter-ok .counter-value { color: var(--status-ok); }
+.counter-ng .counter-value { color: var(--status-ng); }
+.counter-error .counter-value { color: var(--status-error); }
+.counter-yield .counter-value { color: var(--cinnabar-dark); }
 .counter-total .counter-value { color: var(--text-color); }
 
 /* ==========================================================================
@@ -501,7 +507,7 @@
 }
 
 .timing-stats:hover {
-    border-color: #e1bebc;
+    border-color: var(--panel-border-warm);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
@@ -538,25 +544,25 @@
     height: 20px;
     border-radius: 50%;
     background: var(--bg-subtle);
-    border: 2px solid #ffffff;
+    border: 2px solid var(--bg-surface);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     position: relative;
     transition: all 0.3s ease;
 }
 
-.status-led.status-idle { background: #cbd5e1; box-shadow: 0 0 0 1px #94a3b8; }
+.status-led.status-idle { background: rgba(var(--status-idle-rgb), 0.55); box-shadow: 0 0 0 1px var(--status-idle); }
 .status-led.status-running {
-    background: #eab308;
-    box-shadow: 0 0 12px rgba(234, 179, 8, 0.4), 0 0 0 1px #eab308;
+    background: var(--status-error);
+    box-shadow: 0 0 12px var(--status-error-glow), 0 0 0 1px var(--status-error);
     animation: pulse-ring 2s infinite;
 }
 .status-led.status-ok {
-    background: #10b981;
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4), 0 0 0 1px #10b981;
+    background: var(--status-ok);
+    box-shadow: 0 0 12px var(--status-ok-glow), 0 0 0 1px var(--status-ok);
 }
 .status-led.status-ng {
-    background: #e74c3c;
-    box-shadow: 0 0 12px rgba(231, 76, 60, 0.4), 0 0 0 1px #e74c3c;
+    background: var(--status-ng);
+    box-shadow: 0 0 12px var(--status-ng-glow), 0 0 0 1px var(--status-ng);
     animation: flash-red 0.5s infinite alternate;
 }
 
@@ -593,14 +599,19 @@
 }
 
 .camera-dropdown:hover {
-    border-color: #af262c;
+    border-color: var(--cinnabar-dark);
     background-color: rgba(175, 38, 44, 0.04);
 }
 
 .camera-dropdown:focus {
     outline: none;
-    border-color: #af262c;
-    box-shadow: 0 0 0 3px rgba(175, 38, 44, 0.12);
+    border-color: var(--cinnabar-dark);
+    box-shadow: var(--focus-ring);
+}
+
+.camera-dropdown:focus-visible {
+    outline: 1.5px solid var(--focus-ring-color);
+    outline-offset: 2px;
 }
 
 .btn-refresh-cameras {
@@ -619,8 +630,14 @@
 
 .btn-refresh-cameras:hover {
     background-color: rgba(175, 38, 44, 0.06);
-    color: #af262c;
-    border-color: #af262c;
+    color: var(--cinnabar-dark);
+    border-color: var(--cinnabar-dark);
+}
+
+.btn-refresh-cameras:focus-visible {
+    outline: 1.5px solid var(--focus-ring-color);
+    outline-offset: 2px;
+    box-shadow: var(--focus-ring);
 }
 
 /* ==========================================================================
@@ -669,9 +686,9 @@
     height: 3px;
 }
 
-.recent-result-item.result-ok::before { background: #00685b; }
-.recent-result-item.result-ng::before { background: #ba1a1a; }
-.recent-result-item.result-error::before { background: #f97316; }
+.recent-result-item.result-ok::before { background: var(--status-ok); }
+.recent-result-item.result-ng::before { background: var(--status-ng); }
+.recent-result-item.result-error::before { background: var(--status-error); }
 
 .recent-result-item:hover {
     border-color: #af262c;
@@ -700,9 +717,9 @@
     align-self: center;
 }
 
-.result-ok .result-badge { background: rgba(0, 104, 91, 0.1); color: #00685b; border: 1px solid rgba(0, 104, 91, 0.15); }
-.result-ng .result-badge { background: rgba(186, 26, 26, 0.1); color: #ba1a1a; border: 1px solid rgba(186, 26, 26, 0.15); }
-.result-error .result-badge { background: rgba(249, 115, 22, 0.1); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.15); }
+.result-ok .result-badge { background: var(--status-ok-soft); color: var(--status-ok); border: 1px solid var(--status-ok-border); }
+.result-ng .result-badge { background: var(--status-ng-soft); color: var(--status-ng); border: 1px solid var(--status-ng-border); }
+.result-error .result-badge { background: var(--status-error-soft); color: var(--status-error); border: 1px solid var(--status-error-border); }
 
 .result-time {
     font-size: 10px;
@@ -804,8 +821,10 @@
    ========================================================================== */
 
 @media (max-width: 1280px) {
-    .inspection-control-panel { width: 240px; }
-    .inspection-side-panel { width: 220px; }
+    .inspection-view-container {
+        --inspection-control-width: clamp(210px, 20vw, 240px);
+        --inspection-side-width: clamp(210px, 22vw, 260px);
+    }
     .counter-value { font-size: 20px; }
 }
 
@@ -827,7 +846,7 @@
 [data-theme="light"] .inspection-side-panel,
 [data-theme="light"] .inspection-image-area {
     background: rgba(255, 255, 255, 0.9);
-    border-color: #e1bebc;
+    border-color: var(--panel-border-warm);
 }
 
 [data-theme="light"] .inspection-protection-notice {
@@ -837,28 +856,28 @@
 
 [data-theme="light"] .counter-item {
     background: #ffffff;
-    border-color: rgba(225, 190, 188, 0.5);
+    border-color: var(--panel-border-warm);
 }
 
 [data-theme="light"] .timing-stats {
     background: #ffffff;
-    border-color: rgba(225, 190, 188, 0.5);
+    border-color: var(--panel-border-warm);
 }
 
 [data-theme="light"] .recent-result-item {
     background: #ffffff;
-    border-color: rgba(225, 190, 188, 0.4);
+    border-color: var(--panel-border-warm);
 }
 
 [data-theme="light"] .camera-dropdown {
     background-color: #ffffff;
     color: var(--text-color);
-    border-color: #e1bebc;
+    border-color: var(--panel-border-warm);
 }
 
 [data-theme="light"] .btn-refresh-cameras {
     background-color: #ffffff;
-    border-color: #e1bebc;
+    border-color: var(--panel-border-warm);
 }
 
 /* ==========================================================================

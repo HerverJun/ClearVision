@@ -29,8 +29,8 @@
 # Sidebar 左侧导航栏 - 纯白微红风
 --------------------------------------------------------------*/
 .settings-sidebar {
-    width: 260px;
-    min-width: 260px;
+    width: var(--settings-sidebar-width);
+    min-width: min(100%, var(--settings-sidebar-width));
     background: #ffffff;
     border-right: 1px solid #e2e8f0;
     display: flex;
@@ -374,7 +374,7 @@
 }
 
 /* Input Overrides */
-.cv-input {
+.settings-view-container .cv-input {
     width: 100%;
     height: 40px;
     padding: 0 12px;
@@ -385,18 +385,18 @@
     color: var(--text-color);
     transition: all 0.2s;
 }
-.cv-input:focus {
+.settings-view-container .cv-input:focus {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
     outline: none;
 }
-.input-with-icon {
+.settings-view-container .input-with-icon {
     position: relative;
 }
-.input-with-icon .cv-input {
+.settings-view-container .input-with-icon .cv-input {
     padding-left: 36px;
 }
-.input-icon {
+.settings-view-container .input-icon {
     position: absolute;
     left: 10px;
     top: 50%;
@@ -590,8 +590,8 @@ html[data-theme="dark"] .settings-modern-table th {
     border-bottom-color: var(--border-color);
 }
 
-html[data-theme="dark"] .cv-input,
-html[data-theme="dark"] .input-with-icon,
+html[data-theme="dark"] .settings-view-container .cv-input,
+html[data-theme="dark"] .settings-view-container .input-with-icon,
 html[data-theme="dark"] .settings-modern-table,
 html[data-theme="dark"] .settings-btn-light {
     background: var(--bg-subtle);
@@ -599,7 +599,7 @@ html[data-theme="dark"] .settings-btn-light {
     color: var(--text-color);
 }
 
-html[data-theme="dark"] .cv-input:focus,
+html[data-theme="dark"] .settings-view-container .cv-input:focus,
 html[data-theme="dark"] .settings-btn-light:hover {
     background: var(--theme-surface-3);
     border-color: var(--theme-border-strong);
@@ -631,9 +631,13 @@ html[data-theme="dark"] .settings-scope-notice strong {
 }
 
 @media (max-width: 1280px) {
+    .settings-view-container {
+        --settings-sidebar-width: clamp(12.5rem, 18vw, 13.75rem);
+    }
+
     .settings-sidebar {
-        width: 220px;
-        min-width: 220px;
+        width: var(--settings-sidebar-width);
+        min-width: min(100%, var(--settings-sidebar-width));
     }
 
     .settings-header-banner {

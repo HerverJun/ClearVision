@@ -165,7 +165,7 @@
 
 /* 输入框 */
 .settings-input, .settings-select {
-    width: 240px;
+    width: min(100%, 15rem);
     padding: 10px 14px;
     background: var(--ink-secondary);
     border: 1px solid var(--glass-border);

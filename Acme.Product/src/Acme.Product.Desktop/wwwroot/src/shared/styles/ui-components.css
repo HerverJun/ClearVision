@@ -680,7 +680,7 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 260px;
+    width: min(100%, 16.25rem);
     height: 160px;
     border: 1.5px dashed var(--glass-border);
     border-radius: var(--radius-lg);
@@ -745,7 +745,9 @@
     background: var(--glass-panel);
     backdrop-filter: var(--glass-blur);
     border-left: 1px solid var(--glass-border);
-    width: 260px;
+    width: var(--right-sidebar-width);
+    min-width: 12rem;
+    max-width: min(32vw, 28rem);
     overflow-y: auto;
 }
 

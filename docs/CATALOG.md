@@ -1,6 +1,6 @@
 # 算子目录 / Operator Catalog
 
-> 生成时间 / Generated At: `2026-05-26 00:24:19 +08:00`
+> 生成时间 / Generated At: `2026-05-31 00:44:31 +08:00`
 > 算子总数 / Total Operators: **156**
 
 ## 分类统计 / Category Summary
@@ -71,7 +71,7 @@
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
 | `OperatorType.AnomalyDetection` | 异常检测 | 2 | 8 | 16 | 100 (A) | `1.0.0` | Simplified PatchCore | [AnomalyDetection](./operators/AnomalyDetection.md) |
-| `OperatorType.DeepLearning` | 深度学习 | 1 | 12 | 13 | 100 (A) | `1.0.0` | 该算子用于AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺… | [DeepLearning](./operators/DeepLearning.md) |
+| `OperatorType.DeepLearning` | 深度学习 | 1 | 14 | 14 | 100 (A) | `1.0.0` | 该算子用于AI 深度学习推理，支持 YOLOv5/v6/v8/v11 等模型，用于缺… | [DeepLearning](./operators/DeepLearning.md) |
 | `OperatorType.EdgePairDefect` | 边缘对缺陷 | 3 | 4 | 4 | 96 (A) | `1.0.0` | 当前元数据描述为：Checks edge-pair spacing deviatio… | [EdgePairDefect](./operators/EdgePairDefect.md) |
 | `OperatorType.SemanticSegmentation` | 语义分割 | 1 | 10 | 11 | 100 (A) | `1.0.0` | 当前元数据描述为：Runs an ONNX semantic segmentatio… | [SemanticSegmentation](./operators/SemanticSegmentation.md) |
 | `OperatorType.SurfaceDefectDetection` | 表面缺陷检测 | 2 | 8 | 24 | 100 (A) | `2.0.0` | 当前元数据描述为：Detects surface defects using gra… | [SurfaceDefectDetection](./operators/SurfaceDefectDetection.md) |
@@ -282,7 +282,7 @@
 ### 逻辑工具 (6)
 | 枚举 (Enum) | 显示名 (DisplayName) | 输入 | 输出 | 参数 | 质量 (Q) | 版本 (Version) | 算法 (Algorithm) | 文档 |
 |------|------|------:|------:|------:|------|------|------|------|
-| `OperatorType.FrameChangeTrigger` | 帧变化触发 | 1 | 5 | 10 | 100 (A) | `1.0.0` | 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空… | [FrameChangeTrigger](./operators/FrameChangeTrigger.md) |
+| `OperatorType.FrameChangeTrigger` | 帧变化触发 | 1 | 10 | 20 | 100 (A) | `1.0.0` | 该算子用于通过连续帧 ROI 变化判断端子是否到达；未到料时短路当前检测周期，避免空… | [FrameChangeTrigger](./operators/FrameChangeTrigger.md) |
 | `OperatorType.PointSetTool` | 点集工具 | 2 | 4 | 6 | 90 (A) | `1.0.0` | 当前元数据描述为：Merges/sorts/filters point lists … | [PointSetTool](./operators/PointSetTool.md) |
 | `OperatorType.ScriptOperator` | 脚本算子 | 4 | 2 | 3 | 90 (A) | `1.0.0` | 当前元数据描述为：Runs user-defined expression or s… | [ScriptOperator](./operators/ScriptOperator.md) |
 | `OperatorType.TextSave` | Text Save | 2 | 2 | 5 | 100 (A) | `1.0.0` | 当前元数据描述为：Saves text or structured data to … | [TextSave](./operators/TextSave.md) |

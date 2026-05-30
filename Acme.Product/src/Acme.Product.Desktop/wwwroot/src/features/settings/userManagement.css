@@ -76,9 +76,9 @@
 }
 
 .user-role.operator {
-    background: rgba(16, 185, 129, 0.15);
-    color: var(--success-jade);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    background: var(--status-ok-soft);
+    color: var(--status-ok);
+    border: 1px solid var(--status-ok-border);
 }
 
 /* 状态标签 */
@@ -91,9 +91,9 @@
 }
 
 .user-status.active {
-    background: rgba(16, 185, 129, 0.15);
-    color: var(--success-jade);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    background: var(--status-ok-soft);
+    color: var(--status-ok);
+    border: 1px solid var(--status-ok-border);
 }
 
 .user-status.inactive {
