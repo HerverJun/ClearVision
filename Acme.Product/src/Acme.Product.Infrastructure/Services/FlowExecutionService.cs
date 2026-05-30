@@ -1035,7 +1035,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         // 妫€鏌ユ槸鍚︽湁绠楀瓙
         if (flow.Operators.Count == 0)
         {
-            result.Errors.Add("Flow contains no operators.");
+            result.Errors.Add("流程中没有任何算子");
             return result;
         }
 

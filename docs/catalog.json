@@ -3549,19 +3549,7 @@
           "isRequired": null
         }
       ],
-      "parameters": [
-        {
-          "name": "CalibrationFile",
-          "displayName": "Calibration File",
-          "dataType": "file",
-          "description": null,
-          "defaultValue": "",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": null
-        }
-      ],
+      "parameters": [],
       "quality": {
         "totalScore": 91,
         "level": "A",
@@ -3657,17 +3645,6 @@
           "defaultValue": "0.01",
           "min": "0.0001",
           "max": "100",
-          "isRequired": true,
-          "options": null
-        },
-        {
-          "name": "CalibrationFile",
-          "displayName": "标定文件路径",
-          "dataType": "file",
-          "description": null,
-          "defaultValue": "",
-          "min": null,
-          "max": null,
           "isRequired": true,
           "options": null
         }
@@ -11214,30 +11191,6 @@
           "max": null,
           "isRequired": true,
           "options": null
-        },
-        {
-          "name": "FileFormat",
-          "displayName": "File Format",
-          "dataType": "enum",
-          "description": null,
-          "defaultValue": "JSON",
-          "min": null,
-          "max": null,
-          "isRequired": true,
-          "options": [
-            {
-              "value": "JSON",
-              "label": "JSON"
-            },
-            {
-              "value": "XML",
-              "label": "XML"
-            },
-            {
-              "value": "YAML",
-              "label": "YAML"
-            }
-          ]
         }
       ],
       "quality": {
