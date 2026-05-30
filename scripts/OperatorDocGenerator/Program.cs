@@ -16,6 +16,7 @@ var enforceVersionBump = args.Any(arg => string.Equals(arg, "--enforce-version-b
 var onlyOperators = ParseOnlyOperators(args);
 var operatorDocsRoot = Path.Combine(repoRoot, "docs", "算子资料");
 var docsRoot = Path.Combine(operatorDocsRoot, "算子名片");
+var legacyOperatorsRoot = Path.Combine(repoRoot, "docs", "operators");
 var legacyMirrorRoot = Path.Combine(repoRoot, "算子资料");
 var generatedAt = DateTimeOffset.Now;
 var qualityContext = BuildQualityContext(repoRoot, docsRoot);
@@ -59,6 +60,7 @@ GenerateCatalogJson(operators, docsRoot, generatedAt);
 GenerateCatalogMarkdown(operators, docsRoot, "./", generatedAt);
 var versionTracking = GenerateVersionTrackingArtifacts(candidates, operators, qualityContext, docsRoot, generatedAt);
 SyncRootCatalogArtifacts(operators, docsRoot, operatorDocsRoot, generatedAt);
+SyncLegacyOperatorsArtifacts(operators, docsRoot, legacyOperatorsRoot, repoRoot, generatedAt);
 SyncLegacyMirrorArtifacts(operatorDocsRoot, docsRoot, legacyMirrorRoot);
 
 Console.WriteLine($"repoRoot={repoRoot} operatorDocsRoot={operatorDocsRoot} cardsRoot={docsRoot} operators={candidates.Count} generated={generated} skipped={skipped} overwrite={overwrite}");
@@ -287,7 +289,18 @@ static void SyncLegacyMirrorArtifacts(string activeDocsRoot, string activeCardsR
 {
     Directory.CreateDirectory(legacyMirrorRoot);
 
-    foreach (var fileName in new[] { "算子目录.json", "算子目录.md", "算子变更记录.md", "算子版本记录.json", "算子手册.md", "导航.md" })
+    foreach (var fileName in new[]
+    {
+        "README.md",
+        "算子目录.json",
+        "算子目录.md",
+        "算子变更记录.md",
+        "算子版本记录.json",
+        "算子手册.md",
+        "算子文档现状对齐说明-2026-04.md",
+        "测量类算子精度升级说明-2026-04.md",
+        "导航.md"
+    })
     {
         var sourcePath = Path.Combine(activeDocsRoot, fileName);
         if (!File.Exists(sourcePath))
@@ -295,7 +308,16 @@ static void SyncLegacyMirrorArtifacts(string activeDocsRoot, string activeCardsR
             continue;
         }
 
-        File.Copy(sourcePath, Path.Combine(legacyMirrorRoot, fileName), overwrite: true);
+        var destinationPath = Path.Combine(legacyMirrorRoot, fileName);
+        if (string.Equals(Path.GetExtension(fileName), ".md", StringComparison.OrdinalIgnoreCase))
+        {
+            var content = RewriteRootMirrorLinks(File.ReadAllText(sourcePath));
+            File.WriteAllText(destinationPath, content, new UTF8Encoding(false));
+        }
+        else
+        {
+            File.Copy(sourcePath, destinationPath, overwrite: true);
+        }
     }
 
     var legacyCardsRoot = Path.Combine(legacyMirrorRoot, "算子名片");
@@ -315,6 +337,52 @@ static void SyncLegacyMirrorArtifacts(string activeDocsRoot, string activeCardsR
         }
 
         File.Copy(sourcePath, Path.Combine(legacyCardsRoot, artifact), overwrite: true);
+    }
+}
+
+static string RewriteRootMirrorLinks(string content)
+{
+    return content
+        .Replace("](../参考资料/", "](../docs/参考资料/", StringComparison.Ordinal)
+        .Replace("](../进行中/", "](../docs/进行中/", StringComparison.Ordinal)
+        .Replace("](../../quality/", "](../quality/", StringComparison.Ordinal)
+        .Replace("`../进行中/", "`../docs/进行中/", StringComparison.Ordinal)
+        .Replace("`../../quality/", "`../quality/", StringComparison.Ordinal);
+}
+
+static void SyncLegacyOperatorsArtifacts(
+    IReadOnlyList<CatalogOperator> operators,
+    string activeCardsRoot,
+    string legacyOperatorsRoot,
+    string repoRoot,
+    DateTimeOffset generatedAt)
+{
+    Directory.CreateDirectory(legacyOperatorsRoot);
+
+    foreach (var cardPath in Directory.EnumerateFiles(activeCardsRoot, "*.md", SearchOption.TopDirectoryOnly))
+    {
+        File.Copy(cardPath, Path.Combine(legacyOperatorsRoot, Path.GetFileName(cardPath)), overwrite: true);
+    }
+
+    foreach (var artifact in new[] { "catalog.json", "version-history.json" })
+    {
+        var sourcePath = Path.Combine(activeCardsRoot, artifact);
+        if (!File.Exists(sourcePath))
+        {
+            continue;
+        }
+
+        File.Copy(sourcePath, Path.Combine(legacyOperatorsRoot, artifact), overwrite: true);
+    }
+
+    var rootCatalog = BuildCatalogMarkdown(operators, generatedAt, "./operators/");
+    File.WriteAllText(Path.Combine(repoRoot, "docs", "CATALOG.md"), rootCatalog, new UTF8Encoding(false));
+    File.WriteAllText(Path.Combine(repoRoot, "docs", "OPERATOR_CATALOG.md"), rootCatalog, new UTF8Encoding(false));
+
+    var changelogPath = Path.Combine(activeCardsRoot, "CHANGELOG.md");
+    if (File.Exists(changelogPath))
+    {
+        File.Copy(changelogPath, Path.Combine(repoRoot, "docs", "CHANGELOG.md"), overwrite: true);
     }
 }
 

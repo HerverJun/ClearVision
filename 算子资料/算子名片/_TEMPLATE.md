@@ -10,15 +10,15 @@
 | 作者 (Author) | 蘅芜君 |
 
 ## 算法原理 / Algorithm Principle
-> 中文：简述核心算法思想、数学公式、信号处理原理等。  
+> 中文：简述核心算法思想、数学公式、信号处理原理等。
 > English: Brief description of core algorithm, mathematical formulas, and signal processing principles.
 
 ## 实现策略 / Implementation Strategy
-> 中文：为什么选择这种实现方式？与同类方案（如 Halcon、VisionPro）的差异。  
+> 中文：为什么选择这种实现方式？与同类方案（如 Halcon、VisionPro）的差异。
 > English: Why this approach? Comparison with alternatives (e.g., Halcon, VisionPro).
 
 ## 核心 API 调用链 / Core API Call Chain
-> 列出关键 OpenCV / 自研 API 调用序列。  
+> 列出关键 OpenCV / 自研 API 调用序列。
 > List the key OpenCV / custom API call sequence.
 
 ## 参数说明 / Parameters

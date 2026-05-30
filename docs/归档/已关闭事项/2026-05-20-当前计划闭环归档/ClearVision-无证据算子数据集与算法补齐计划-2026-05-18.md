@@ -1,7 +1,7 @@
 ---
 title: "ClearVision 无证据算子数据集与算法补齐计划"
 doc_type: "plan"
-status: "active"
+status: "closed"
 topic: "FrameChangeTrigger evidence closure"
 created: "2026-05-18"
 updated: "2026-05-18"

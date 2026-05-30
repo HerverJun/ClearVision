@@ -23,8 +23,14 @@
 
 ## 核心 API 调用链 / Core API Call Chain
 - `OperatorBase.Get*Param(...)`
+- `FrameChangeTriggerKernel.ResolveRoi(...)`
+- `FrameChangeTriggerKernel.BuildGrayRoi(...)`
+- `FrameChangeTriggerKernel.Evaluate(...)`
 - `Cv2.Absdiff`
 - `Cv2.Threshold`
+- `Cv2.GaussianBlur`
+- `Cv2.MorphologyEx`
+- `Cv2.MeanStdDev`
 - `Cv2.CountNonZero`
 - `Math.Max`
 - `Math.Clamp`
@@ -79,7 +85,13 @@
 | 名称 (Name) | 推断类型 (Inferred Type) | 说明 (Description) |
 |------|------|------|
 | `Height` | `Integer` | 由图像输出封装自动附加，表示输出图像高度。 |
+| `ConsecutiveChangedFrames` | `Integer` | 当前连续达到变化阈值的帧数。 |
+| `NoChangeFrames` | `Integer` | 当前连续未达到变化阈值的帧数。 |
 | `NoMaterialFrame` | `Any` | 源码通过输出字典索引赋值写入。 |
+| `RoiX` | `Integer` | 裁剪后的有效 ROI X。 |
+| `RoiY` | `Integer` | 裁剪后的有效 ROI Y。 |
+| `RoiW` | `Integer` | 裁剪后的有效 ROI 宽度。 |
+| `RoiH` | `Integer` | 裁剪后的有效 ROI 高度。 |
 | `StateKey` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `StateScope` | `Any` | 源码通过输出字典索引赋值写入。 |
 | `Width` | `Integer` | 由图像输出封装自动附加，表示输出图像宽度。 |

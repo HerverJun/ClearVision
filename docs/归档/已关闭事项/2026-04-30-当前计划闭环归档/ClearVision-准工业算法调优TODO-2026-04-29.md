@@ -1,7 +1,7 @@
 ---
 title: "ClearVision 准工业算法调优 TODO"
 doc_type: "todo"
-status: "closing"
+status: "closed"
 topic: "quasi-industrial-algorithm-improvement"
 created: "2026-04-29"
 updated: "2026-04-30"

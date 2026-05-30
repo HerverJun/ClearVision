@@ -1,7 +1,7 @@
 ---
 title: "ClearVision 最终整合 TODO"
 doc_type: "task-list"
-status: "active"
+status: "closed"
 topic: "consolidated-master-plan"
 created: "2026-05-03"
 updated: "2026-05-03"

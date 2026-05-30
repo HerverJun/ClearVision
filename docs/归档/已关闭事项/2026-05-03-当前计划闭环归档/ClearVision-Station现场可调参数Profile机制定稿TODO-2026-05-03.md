@@ -1,7 +1,7 @@
 ---
 title: "ClearVision Station 现场可调参数 / Profile 机制定稿 TODO"
 doc_type: "task-list"
-status: "active"
+status: "closed"
 topic: "runtime-station-site-tunable-parameters-v1"
 created: "2026-05-03"
 updated: "2026-05-03"

@@ -155,6 +155,10 @@ CI 当前覆盖构建、编码扫描、密钥扫描、单元测试、桌面端�
 
 - [项目总览](./docs/项目总览.md)
 - [文档索引](./docs/README.md)
+- [文档导航](./docs/导航.md)
+- [文档审计报告（2026-05-31）](./docs/文档审计报告-2026-05-31.md)
+- [文档治理标准](./docs/参考资料/规范/文档治理标准.md)
+- [文档治理台账（2026-05-31）](./docs/文档治理台账-2026-05-31.md)
 - [Runtime 设计](./docs/runtime/ClearVision-Runtime-Design.md)
 - [Station-Studio 同步](./docs/runtime/station-studio-sync.md)
 - [CI 与质量门禁](./docs/engineering/ci-quality-gates.md)
