@@ -4679,15 +4679,17 @@ export class AiPanel {
             ? `性能提示：${performanceBudget.warnings.slice(0, 2).join('、')}`
             : '';
         const runtimeMetrics = [
-            `意图 ${intentLabels[turnIntent] || turnIntent}`,
-            `置信度 ${confidenceLabels[routerConfidence] || routerConfidence || '--'}`,
-            `阻断 ${blockingCount}`,
-            `待补 ${effectiveNonBlockingFields.length}`
+            { label: '意图', value: intentLabels[turnIntent] || turnIntent },
+            { label: '置信度', value: confidenceLabels[routerConfidence] || routerConfidence || '--' },
+            { label: '阻断', value: blockingCount },
+            { label: '待补', value: effectiveNonBlockingFields.length }
         ];
         if (performanceBudget) {
-            runtimeMetrics.push(`耗时 ${this._formatDuration(performanceBudget.totalDurationMs)}`);
-            runtimeMetrics.push(`Token ${this._formatTokenEstimate(performanceBudget.estimatedInputTokens, performanceBudget.estimatedOutputTokens)}`);
-            runtimeMetrics.push(`预算 ${perfStatusText}`);
+            runtimeMetrics.push(
+                { label: '耗时', value: this._formatDuration(performanceBudget.totalDurationMs) },
+                { label: 'Token', value: this._formatTokenEstimate(performanceBudget.estimatedInputTokens, performanceBudget.estimatedOutputTokens) },
+                { label: '预算', value: perfStatusText }
+            );
         }
 
         const stateClass = String(interactionState || 'idle').replace(/[^a-z0-9_-]/gi, '') || 'idle';
@@ -4703,7 +4705,12 @@ export class AiPanel {
                 <span>${this._escapeHtml(summary)}</span>
             </div>
             <div class="ai-agent-runtime-metrics">
-                ${runtimeMetrics.map(metric => `<span>${this._escapeHtml(String(metric))}</span>`).join('')}
+                ${runtimeMetrics.map(metric => `
+                    <span>
+                        <small>${this._escapeHtml(String(metric.label))}</small>
+                        <b>${this._escapeHtml(String(metric.value))}</b>
+                    </span>
+                `).join('')}
             </div>
             <div class="ai-agent-runtime-next">
                 ${this._escapeHtml(nextAction)}
