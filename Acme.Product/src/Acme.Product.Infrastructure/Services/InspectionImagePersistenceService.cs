@@ -24,6 +24,8 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
 
     public async Task PersistAsync(InspectionResult result, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (result.OutputImage == null || result.OutputImage.Length == 0)
         {
             return;
@@ -31,14 +33,15 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
 
         var config = _configurationService.GetCurrent();
         var storage = config.Storage ?? new StorageConfig();
-        if (!ShouldPersistImage(storage.SavePolicy, result.Status))
+        if (!InspectionImagePersistencePolicy.ShouldPersistImage(storage.SavePolicy, result.Status))
         {
             return;
         }
 
         try
         {
-            var dateFolder = DateTime.Now.ToString("yyyyMMdd");
+            var capturedAt = DateTime.Now;
+            var dateFolder = capturedAt.ToString("yyyyMMdd");
             var statusFolder = result.Status switch
             {
                 InspectionStatus.OK => "OK",
@@ -46,9 +49,9 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
                 _ => "ERROR"
             };
             var persistedImage = EncodeForPersistence(result.OutputImage);
-            var fileName = $"{result.ProjectId:N}_{result.Id:N}_{DateTime.Now:HHmmssfff}{persistedImage.Extension}";
+            var fileName = $"{result.ProjectId:N}_{result.Id:N}_{capturedAt:HHmmssfff}{persistedImage.Extension}";
 
-            foreach (var rootPath in ResolveImageSaveRoots(storage.ImageSavePath))
+            foreach (var rootPath in InspectionImagePersistencePaths.ResolveImageSaveRoots(storage.ImageSavePath))
             {
                 var targetDir = Path.Combine(rootPath, dateFolder, statusFolder);
                 var targetPath = Path.Combine(targetDir, fileName);
@@ -65,63 +68,15 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
                 }
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _logger.LogWarning(ex, "[InspectionImagePersistence] 检测图像落盘失败");
         }
-    }
-
-    private static bool ShouldPersistImage(string? savePolicy, InspectionStatus status)
-    {
-        var policy = (savePolicy ?? "NgOnly").Trim();
-        if (policy.Equals("None", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        if (policy.Equals("All", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (policy.Equals("NgOnly", StringComparison.OrdinalIgnoreCase))
-        {
-            return status == InspectionStatus.NG;
-        }
-
-        return status == InspectionStatus.NG;
-    }
-
-    private static IEnumerable<string> ResolveImageSaveRoots(string? configuredPath)
-    {
-        var roots = new List<string>();
-        var fallbackRoot = GetFallbackImageSaveRoot();
-
-        if (!string.IsNullOrWhiteSpace(configuredPath))
-        {
-            try
-            {
-                var configuredRoot = Path.GetFullPath(configuredPath);
-                if (!string.Equals(configuredRoot, fallbackRoot, StringComparison.OrdinalIgnoreCase))
-                {
-                    roots.Add(configuredRoot);
-                }
-            }
-            catch
-            {
-            }
-        }
-
-        roots.Add(fallbackRoot);
-        return roots;
-    }
-
-    private static string GetFallbackImageSaveRoot()
-    {
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ClearVision",
-            "Images");
     }
 
     private static PersistedImage EncodeForPersistence(byte[] imageBytes)
@@ -131,7 +86,7 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
             using var decoded = Cv2.ImDecode(imageBytes, ImreadModes.Unchanged);
             if (decoded.Empty())
             {
-                return new PersistedImage(imageBytes, GuessImageExtension(imageBytes));
+                return new PersistedImage(imageBytes, InspectionImageFormatDetector.GuessExtension(imageBytes));
             }
 
             using var jpegSource = CreateJpegCompatibleMat(decoded);
@@ -151,48 +106,40 @@ public sealed class InspectionImagePersistenceService : IInspectionImagePersiste
             // Fall back to the operator output bytes if OpenCV cannot decode a custom image payload.
         }
 
-        return new PersistedImage(imageBytes, GuessImageExtension(imageBytes));
+        return new PersistedImage(imageBytes, InspectionImageFormatDetector.GuessExtension(imageBytes));
     }
 
     private static Mat CreateJpegCompatibleMat(Mat source)
     {
+        Mat? channelConverted = null;
+        var compatibleSource = source;
+
         if (source.Channels() == 4)
         {
-            var bgr = new Mat();
-            Cv2.CvtColor(source, bgr, ColorConversionCodes.BGRA2BGR);
-            return bgr;
+            channelConverted = new Mat();
+            Cv2.CvtColor(source, channelConverted, ColorConversionCodes.BGRA2BGR);
+            compatibleSource = channelConverted;
         }
 
-        if (source.Depth() != MatType.CV_8U)
+        if (compatibleSource.Depth() != MatType.CV_8U)
         {
             var converted = new Mat();
-            source.ConvertTo(converted, MatType.MakeType(MatType.CV_8U, source.Channels()));
+            compatibleSource.ConvertTo(
+                converted,
+                MatType.MakeType(MatType.CV_8U, compatibleSource.Channels()),
+                GetDepthConversionScale(compatibleSource.Depth()));
+            channelConverted?.Dispose();
             return converted;
         }
 
-        return source.Clone();
+        return channelConverted ?? source.Clone();
     }
 
-    private static string GuessImageExtension(byte[] bytes)
+    private static double GetDepthConversionScale(int depth)
     {
-        if (bytes.Length >= 8 &&
-            bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
-        {
-            return ".png";
-        }
-
-        if (bytes.Length >= 3 &&
-            bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
-        {
-            return ".jpg";
-        }
-
-        if (bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D)
-        {
-            return ".bmp";
-        }
-
-        return ".bin";
+        return depth == MatType.CV_16U
+            ? byte.MaxValue / (double)ushort.MaxValue
+            : 1.0;
     }
 
     private readonly record struct PersistedImage(byte[] Bytes, string Extension);

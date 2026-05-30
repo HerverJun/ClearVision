@@ -437,7 +437,7 @@ class SettingsView {
         // 存储路径变化后刷新磁盘容量卡片
         const imageSavePathInput = this.container.querySelector('#cfg-imageSavePath');
         if (imageSavePathInput) {
-            const refreshDiskUsage = () => this.loadDiskUsage();
+            const refreshDiskUsage = () => this.loadDiskUsage(imageSavePathInput.value);
             imageSavePathInput.addEventListener('change', refreshDiskUsage);
             imageSavePathInput.addEventListener('blur', refreshDiskUsage);
         }

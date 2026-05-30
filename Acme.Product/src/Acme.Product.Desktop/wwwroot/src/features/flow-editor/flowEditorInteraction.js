@@ -42,6 +42,9 @@ export class FlowEditorInteraction {
 
     initialize() {
         // 增强原有事件监听
+        this.installCanvasDeletionBridge();
+        this.installCanvasDuplicationBridge();
+        this.installCanvasDisabledToggleBridge();
         this.enhanceEventListeners();
         // 绑定键盘快捷键
         this.bindKeyboardShortcuts();
@@ -144,6 +147,51 @@ export class FlowEditorInteraction {
         }
 
         this.projectManager.updateFlow(this.canvas.serialize());
+    }
+
+    installCanvasDeletionBridge() {
+        if (!this.canvas || !('onSelectionDeleteRequested' in this.canvas)) {
+            return;
+        }
+
+        const previousHandler = this.canvas.onSelectionDeleteRequested;
+        const handler = () => this.deleteSelectedItems();
+        this.canvas.onSelectionDeleteRequested = handler;
+        this.cleanup.push(() => {
+            if (this.canvas.onSelectionDeleteRequested === handler) {
+                this.canvas.onSelectionDeleteRequested = previousHandler;
+            }
+        });
+    }
+
+    installCanvasDuplicationBridge() {
+        if (!this.canvas || !('onNodeDuplicateRequested' in this.canvas)) {
+            return;
+        }
+
+        const previousHandler = this.canvas.onNodeDuplicateRequested;
+        const handler = ({ nodeId } = {}) => this.duplicateNodeFromCanvasRequest(nodeId);
+        this.canvas.onNodeDuplicateRequested = handler;
+        this.cleanup.push(() => {
+            if (this.canvas.onNodeDuplicateRequested === handler) {
+                this.canvas.onNodeDuplicateRequested = previousHandler;
+            }
+        });
+    }
+
+    installCanvasDisabledToggleBridge() {
+        if (!this.canvas || !('onNodeDisabledToggleRequested' in this.canvas)) {
+            return;
+        }
+
+        const previousHandler = this.canvas.onNodeDisabledToggleRequested;
+        const handler = ({ nodeId } = {}) => this.toggleNodeDisabledFromCanvasRequest(nodeId);
+        this.canvas.onNodeDisabledToggleRequested = handler;
+        this.cleanup.push(() => {
+            if (this.canvas.onNodeDisabledToggleRequested === handler) {
+                this.canvas.onNodeDisabledToggleRequested = previousHandler;
+            }
+        });
     }
 
     /**
@@ -539,7 +587,8 @@ export class FlowEditorInteraction {
                     return;
                 }
                 e.preventDefault();
-                this.deleteSelectedNodes();
+                e.stopPropagation?.();
+                this.deleteSelectedItems();
             }
 
             // 撤销
@@ -1056,23 +1105,120 @@ export class FlowEditorInteraction {
     /**
      * 删除选中节点
      */
-    deleteSelectedNodes() {
-        if (this.multiSelectedNodes.size === 0) return;
+    duplicateNodeFromCanvasRequest(nodeId) {
+        if (!nodeId || typeof this.canvas.duplicateNode !== 'function') {
+            return false;
+        }
 
-        const count = this.multiSelectedNodes.size;
-        for (const nodeId of this.multiSelectedNodes) {
-            this.canvas.removeNode(nodeId);
+        const duplicatedNode = this.canvas.duplicateNode(nodeId);
+        if (!duplicatedNode) {
+            return false;
+        }
+
+        this.clearSelection();
+        this.multiSelectedNodes.add(duplicatedNode.id);
+        this.canvas.selectedNode = duplicatedNode.id;
+        this.notifyNodeSelectionChanged();
+        this.saveState();
+        return true;
+    }
+
+    toggleNodeDisabledFromCanvasRequest(nodeId) {
+        if (!nodeId || typeof this.canvas.toggleNodeDisabled !== 'function') {
+            return false;
+        }
+
+        const toggled = this.canvas.toggleNodeDisabled(nodeId);
+        if (!toggled) {
+            return false;
+        }
+
+        if (this.canvas.selectedNode === nodeId) {
+            this.notifyNodeSelectionChanged();
+        }
+        this.saveState();
+        return true;
+    }
+
+    deleteSelectedNodes() {
+        if (this.multiSelectedNodes.size === 0) return false;
+
+        let count = 0;
+        for (const nodeId of [...this.multiSelectedNodes]) {
+            const node = this.canvas.nodes.get(nodeId);
+            if (!node) {
+                this.multiSelectedNodes.delete(nodeId);
+                continue;
+            }
+
+            if (node._systemNode) {
+                continue;
+            }
+
+            if (this.canvas.removeNode(nodeId)) {
+                count++;
+            }
+        }
+
+        if (count === 0) {
+            return false;
         }
 
         this.multiSelectedNodes.clear();
         this.canvas.selectedNode = null;
+        this.notifyNodeSelectionChanged();
         this.saveState();
         showToast(`已删除 ${count} 个节点`, 'success');
+        return true;
     }
 
     /**
      * 保存状态（历史记录）
      */
+    deleteSelectedItems() {
+        if (this.multiSelectedNodes.size > 0) {
+            if (this.deleteSelectedNodes()) {
+                return true;
+            }
+            if (this.multiSelectedNodes.size > 0) {
+                return false;
+            }
+        }
+
+        if (this.canvas.selectedNode) {
+            const nodeId = this.canvas.selectedNode;
+            const removed = this.canvas.removeNode(nodeId);
+            if (!removed) {
+                if (!this.canvas.nodes.has(nodeId)) {
+                    this.canvas.selectedNode = null;
+                    this.notifyNodeSelectionChanged();
+                }
+                return false;
+            }
+            this.canvas.selectedNode = null;
+            this.notifyNodeSelectionChanged();
+            this.saveState();
+            showToast('已删除选中节点', 'success');
+            return true;
+        }
+
+        if (this.canvas.selectedConnection) {
+            const connectionId = this.canvas.selectedConnection.id;
+            const removed = this.canvas.removeConnection(connectionId);
+            if (!removed) {
+                if (!this.canvas.connections.some(connection => connection.id === connectionId)) {
+                    this.canvas.selectedConnection = null;
+                }
+                return false;
+            }
+            this.saveState();
+            showToast('已删除选中连接', 'success');
+            return true;
+        }
+
+        return false;
+    }
+
     saveState() {
         const state = {
             nodes: Array.from(this.canvas.nodes.entries()),
@@ -1129,9 +1275,74 @@ export class FlowEditorInteraction {
         this.canvas.nodes = new Map(state.nodes);
         this.canvas.connections = state.connections;
         this.canvas._rebuildConnectionIndex?.();
+        this.resetTransientInteractionAfterRestore();
+        this.reconcileSelectionAfterRestore();
         this.canvas.markFlowStructureChanged?.('history-restore');
         this.canvas.render();
         this.syncProjectFlow();
+    }
+
+    resetTransientInteractionAfterRestore() {
+        this.isConnecting = false;
+        this.connectionStart = null;
+        this.connectionEnd = null;
+        this.connectionAnchor = null;
+        this.connectionDidDrag = false;
+
+        this.isDraggingNodes = false;
+        this.dragStartPos = null;
+        this.dragInitialPositions?.clear?.();
+        this.hasNodeDragMoved = false;
+
+        this.isPanning = false;
+        this.panStart = null;
+        this.panStartOffset = null;
+
+        this.isSelecting = false;
+        this.selectionStart = null;
+        this.selectionBox?.remove?.();
+        this.selectionBox = null;
+
+        this.canvas.draggedNode = null;
+        this.canvas.isConnecting = false;
+        this.canvas.connectingFrom = null;
+        this.canvas.hoveredPort = null;
+        if (this.canvas.canvas?.style) {
+            this.canvas.canvas.style.cursor = 'default';
+        }
+    }
+
+    reconcileSelectionAfterRestore() {
+        if (this.canvas.selectedNode && !this.canvas.nodes.has(this.canvas.selectedNode)) {
+            this.canvas.selectedNode = null;
+        }
+
+        if (this.multiSelectedNodes) {
+            for (const nodeId of [...this.multiSelectedNodes]) {
+                if (!this.canvas.nodes.has(nodeId)) {
+                    this.multiSelectedNodes.delete(nodeId);
+                }
+            }
+        }
+
+        if (this.canvas.selectedConnection) {
+            const selectedConnectionId = this.canvas.selectedConnection.id;
+            this.canvas.selectedConnection =
+                this.canvas.connections.find(connection => connection.id === selectedConnectionId) || null;
+        }
+
+        this.notifyNodeSelectionChanged();
+    }
+
+    notifyNodeSelectionChanged() {
+        if (typeof this.canvas.onNodeSelected !== 'function') {
+            return;
+        }
+
+        const selectedNode = this.canvas.selectedNode
+            ? this.canvas.nodes.get(this.canvas.selectedNode) || null
+            : null;
+        this.canvas.onNodeSelected(selectedNode);
     }
 
     /**

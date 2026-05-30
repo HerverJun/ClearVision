@@ -17,6 +17,7 @@ public sealed class NullInspectionImagePersistenceService : IInspectionImagePers
 
     public Task PersistAsync(InspectionResult result, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;
     }
 }

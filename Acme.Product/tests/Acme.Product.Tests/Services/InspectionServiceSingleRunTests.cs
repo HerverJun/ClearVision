@@ -7,6 +7,7 @@ using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.ValueObjects;
+using Acme.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -447,6 +448,86 @@ public class InspectionServiceSingleRunTests
     }
 
     [Fact]
+    public async Task ExecuteSingleAsync_WhenLegacyImagePersistencePathIsInvalid_ShouldFallbackToLocalAppDataImages()
+    {
+        var projectId = Guid.NewGuid();
+        var outputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var configurationService = Substitute.For<IConfigurationService>();
+        var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+        var worker = Substitute.For<IInspectionWorker>();
+        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var imageCache = Substitute.For<IImageCacheRepository>();
+        var explicitFlow = CreateFlow("client-flow");
+        InspectionResult? result = null;
+
+        configurationService.GetCurrent().Returns(new AppConfig
+        {
+            Storage = new StorageConfig
+            {
+                ImageSavePath = "\0invalid-path",
+                SavePolicy = "NgOnly"
+            }
+        });
+        flowExecution
+            .ExecuteFlowAsync(Arg.Any<OperatorFlow>(), Arg.Any<Dictionary<string, object>?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new FlowExecutionResult
+            {
+                IsSuccess = true,
+                ExecutionTimeMs = 16,
+                OutputData = new Dictionary<string, object>
+                {
+                    ["JudgmentResult"] = "NG",
+                    ["Image"] = outputImage
+                }
+            }));
+        resultRepository
+            .AddAsync(Arg.Any<InspectionResult>())
+            .Returns(callInfo => Task.FromResult(callInfo.Arg<InspectionResult>()));
+        imageCache
+            .AddAsync(Arg.Any<byte[]>(), Arg.Any<string>())
+            .Returns(Task.FromResult(Guid.Empty));
+        var fallbackSnapshot = FallbackImageDirectorySnapshot.Capture();
+
+        var service = new InspectionService(
+            resultRepository,
+            projectRepository,
+            flowExecution,
+            imageAcquisition,
+            configurationService,
+            coordinator,
+            worker,
+            imageCache,
+            new AnalysisDataBuilder(),
+            flowStorage,
+            NullLogger<InspectionService>.Instance);
+
+        try
+        {
+            result = await service.ExecuteSingleAsync(projectId, new byte[] { 1, 3, 5 }, explicitFlow);
+
+            var savedPath = FindSavedImagePath(
+                InspectionImagePersistencePaths.GetFallbackImageSaveRoot(),
+                result,
+                ".png");
+            var savedBytes = await File.ReadAllBytesAsync(savedPath);
+
+            Path.GetFileName(Path.GetDirectoryName(savedPath)).Should().Be("NG");
+            savedBytes.Should().Equal(outputImage);
+        }
+        finally
+        {
+            if (result != null)
+            {
+                fallbackSnapshot.DeleteSavedFiles(result.ProjectId, result.Id);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ExecuteSingleAsync_WhenFlowExecutionThrows_ShouldReturnPersistedErrorResult()
     {
         var projectId = Guid.NewGuid();
@@ -583,6 +664,17 @@ public class InspectionServiceSingleRunTests
         executedInputs.Should().NotBeNull();
         executedInputs!.Should().NotContainKey("Image");
         _ = imageAcquisition.DidNotReceive().AcquireFromCameraAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    private static string FindSavedImagePath(string root, InspectionResult result, string extension)
+    {
+        Directory.Exists(root).Should().BeTrue();
+
+        return Directory
+            .EnumerateFiles(root, $"{result.ProjectId:N}_{result.Id:N}_*{extension}", SearchOption.AllDirectories)
+            .Should()
+            .ContainSingle()
+            .Subject;
     }
 
     private static OperatorFlow CreateFlow(string operatorName)

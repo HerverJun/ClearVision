@@ -107,11 +107,42 @@ public static class SettingsEndpoints
         // 获取磁盘容量信息（用于设置页存储卡片）
         app.MapGet("/api/settings/disk-usage", (string? path, IConfigurationService configService) =>
         {
-            var configuredPath = string.IsNullOrWhiteSpace(path)
-                ? configService.GetCurrent().Storage.ImageSavePath
-                : path;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                var errors = new List<string>();
+                DiskUsageInfo? firstUsage = null;
+                var configuredPath = configService.GetCurrent().Storage?.ImageSavePath;
+                foreach (var rootPath in InspectionImagePersistencePaths.ResolveImageSaveRoots(configuredPath))
+                {
+                    if (TryBuildDiskUsage(rootPath, out var resolvedUsage, out var resolvedError))
+                    {
+                        if (resolvedUsage.CanWrite)
+                        {
+                            return Results.Ok(resolvedUsage);
+                        }
 
-            if (!TryBuildDiskUsage(configuredPath, out var usage, out var error))
+                        firstUsage ??= resolvedUsage;
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(resolvedError))
+                    {
+                        errors.Add(resolvedError);
+                    }
+                }
+
+                if (firstUsage != null)
+                {
+                    return Results.Ok(firstUsage);
+                }
+
+                return Results.BadRequest(new
+                {
+                    Error = errors.FirstOrDefault() ?? "Unable to resolve disk usage path."
+                });
+            }
+
+            if (!TryBuildDiskUsage(path, out var usage, out var error))
             {
                 return Results.BadRequest(new { Error = error });
             }
@@ -1023,7 +1054,7 @@ public static class SettingsEndpoints
             : value.Value.ToUniversalTime();
     }
 
-    private static bool TryBuildDiskUsage(string? targetPath, out object usage, out string error)
+    private static bool TryBuildDiskUsage(string? targetPath, out DiskUsageInfo usage, out string error)
     {
         usage = default!;
         error = string.Empty;
@@ -1032,7 +1063,7 @@ public static class SettingsEndpoints
         {
             var fullPath = string.IsNullOrWhiteSpace(targetPath)
                 ? AppContext.BaseDirectory
-                : Path.GetFullPath(targetPath);
+                : Path.GetFullPath(targetPath.Trim());
 
             var rootPath = Path.GetPathRoot(fullPath);
             if (string.IsNullOrWhiteSpace(rootPath))
@@ -1057,25 +1088,130 @@ public static class SettingsEndpoints
             var freeBytes = drive.AvailableFreeSpace;
             var usedBytes = totalBytes - freeBytes;
             var usedPercent = totalBytes > 0 ? usedBytes * 100.0 / totalBytes : 0;
+            var isAccessible = Directory.Exists(fullPath);
+            var canWrite = isAccessible
+                ? CanWriteToDirectory(fullPath)
+                : CanCreateDirectoryAt(fullPath);
 
-            usage = new
-            {
-                driveName = drive.Name,
-                sourcePath = fullPath,
-                totalBytes,
-                usedBytes,
-                freeBytes,
-                totalGb = Math.Round(totalBytes / 1024d / 1024d / 1024d, 2),
-                usedGb = Math.Round(usedBytes / 1024d / 1024d / 1024d, 2),
-                freeGb = Math.Round(freeBytes / 1024d / 1024d / 1024d, 2),
-                usedPercent = Math.Round(usedPercent, 2)
-            };
+            usage = new DiskUsageInfo(
+                DriveName: drive.Name,
+                SourcePath: fullPath,
+                IsAccessible: isAccessible,
+                CanWrite: canWrite,
+                TotalBytes: totalBytes,
+                UsedBytes: usedBytes,
+                FreeBytes: freeBytes,
+                TotalGb: Math.Round(totalBytes / 1024d / 1024d / 1024d, 2),
+                UsedGb: Math.Round(usedBytes / 1024d / 1024d / 1024d, 2),
+                FreeGb: Math.Round(freeBytes / 1024d / 1024d / 1024d, 2),
+                UsedPercent: Math.Round(usedPercent, 2));
             return true;
         }
         catch (Exception ex)
         {
             error = ex.Message;
             return false;
+        }
+    }
+
+    private sealed record DiskUsageInfo(
+        string DriveName,
+        string SourcePath,
+        bool IsAccessible,
+        bool CanWrite,
+        long TotalBytes,
+        long UsedBytes,
+        long FreeBytes,
+        double TotalGb,
+        double UsedGb,
+        double FreeGb,
+        double UsedPercent);
+
+    private static bool CanWriteToDirectory(string directoryPath)
+    {
+        string? probePath = null;
+        try
+        {
+            probePath = Path.Combine(directoryPath, $".cv-write-probe-{Guid.NewGuid():N}.tmp");
+            using var stream = new FileStream(
+                probePath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 1,
+                FileOptions.DeleteOnClose);
+            stream.WriteByte(0);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(probePath))
+            {
+                try
+                {
+                    if (File.Exists(probePath))
+                    {
+                        File.Delete(probePath);
+                    }
+                }
+                catch
+                {
+                    // Best-effort cleanup; the file is also opened with DeleteOnClose.
+                }
+            }
+        }
+    }
+
+    private static bool CanCreateDirectoryAt(string directoryPath)
+    {
+        var nearestExistingDirectory = directoryPath;
+        while (!string.IsNullOrWhiteSpace(nearestExistingDirectory) &&
+               !Directory.Exists(nearestExistingDirectory))
+        {
+            if (File.Exists(nearestExistingDirectory))
+            {
+                return false;
+            }
+
+            nearestExistingDirectory = Path.GetDirectoryName(nearestExistingDirectory);
+        }
+
+        if (string.IsNullOrWhiteSpace(nearestExistingDirectory))
+        {
+            return false;
+        }
+
+        string? probePath = null;
+        try
+        {
+            probePath = Path.Combine(nearestExistingDirectory, $".cv-dir-probe-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(probePath);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(probePath))
+            {
+                try
+                {
+                    if (Directory.Exists(probePath))
+                    {
+                        Directory.Delete(probePath, recursive: true);
+                    }
+                }
+                catch
+                {
+                    // Best-effort cleanup for the temporary directory probe.
+                }
+            }
         }
     }
 

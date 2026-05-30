@@ -667,15 +667,15 @@ public class InspectionService : IInspectionService
 
         var config = _configurationService.GetCurrent();
         var storage = config.Storage ?? new StorageConfig();
-        if (!ShouldPersistImage(storage.SavePolicy, result.Status))
+        if (!InspectionImagePersistencePolicy.ShouldPersistImage(storage.SavePolicy, result.Status))
         {
             return;
         }
 
         try
         {
-            var rootPath = ResolveImageSaveRoot(storage.ImageSavePath);
-            var dateFolder = DateTime.Now.ToString("yyyyMMdd");
+            var capturedAt = DateTime.Now;
+            var dateFolder = capturedAt.ToString("yyyyMMdd");
             var statusFolder = result.Status switch
             {
                 InspectionStatus.OK => "OK",
@@ -683,18 +683,33 @@ public class InspectionService : IInspectionService
                 _ => "ERROR"
             };
 
-            var targetDir = Path.Combine(rootPath, dateFolder, statusFolder);
-            Directory.CreateDirectory(targetDir);
+            var extension = InspectionImageFormatDetector.GuessExtension(result.OutputImage);
+            var fileName = $"{result.ProjectId:N}_{result.Id:N}_{capturedAt:HHmmssfff}{extension}";
 
-            var extension = GuessImageExtension(result.OutputImage);
-            var fileName = $"{result.ProjectId:N}_{result.Id:N}_{DateTime.Now:HHmmssfff}{extension}";
-            var targetPath = Path.Combine(targetDir, fileName);
-
-            await File.WriteAllBytesAsync(targetPath, result.OutputImage, cancellationToken);
-            _logger.LogDebug("[InspectionService] 检测图像已落盘: {Path}", targetPath);
+            foreach (var rootPath in InspectionImagePersistencePaths.ResolveImageSaveRoots(storage.ImageSavePath))
+            {
+                var targetDir = Path.Combine(rootPath, dateFolder, statusFolder);
+                var targetPath = Path.Combine(targetDir, fileName);
+                try
+                {
+                    Directory.CreateDirectory(targetDir);
+                    await File.WriteAllBytesAsync(targetPath, result.OutputImage, cancellationToken);
+                    _logger.LogDebug("[InspectionService] 检测图像已落盘: {Path}", targetPath);
+                    return;
+                }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogWarning(ex, "[InspectionService] 检测图像落盘失败，尝试下一个保存目录: {Path}", targetPath);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _logger.LogWarning(ex, "[InspectionService] 检测图像落盘失败");
         }
     }
@@ -708,7 +723,7 @@ public class InspectionService : IInspectionService
 
         try
         {
-            var format = GuessImageFormat(result.OutputImage);
+            var format = InspectionImageFormatDetector.GuessFormat(result.OutputImage);
             var imageId = await _imageCacheRepository.AddAsync(result.OutputImage, format);
             if (imageId != Guid.Empty)
             {
@@ -719,64 +734,6 @@ public class InspectionService : IInspectionService
         {
             _logger.LogWarning(ex, "[InspectionService] 结果图像缓存失败");
         }
-    }
-
-    private static bool ShouldPersistImage(string? savePolicy, InspectionStatus status)
-    {
-        var policy = (savePolicy ?? "NgOnly").Trim();
-        if (policy.Equals("None", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        if (policy.Equals("All", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (policy.Equals("NgOnly", StringComparison.OrdinalIgnoreCase))
-        {
-            return status == InspectionStatus.NG;
-        }
-
-        return status == InspectionStatus.NG;
-    }
-
-    private static string ResolveImageSaveRoot(string? configuredPath)
-    {
-        if (!string.IsNullOrWhiteSpace(configuredPath))
-        {
-            return Path.GetFullPath(configuredPath);
-        }
-
-        return Path.Combine(AppContext.BaseDirectory, "VisionData", "Images");
-    }
-
-    private static string GuessImageExtension(byte[] bytes)
-    {
-        if (bytes.Length >= 8 &&
-            bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
-        {
-            return ".png";
-        }
-
-        if (bytes.Length >= 3 &&
-            bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
-        {
-            return ".jpg";
-        }
-
-        if (bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D)
-        {
-            return ".bmp";
-        }
-
-        return ".bin";
-    }
-
-    private static string GuessImageFormat(byte[] bytes)
-    {
-        return GuessImageExtension(bytes).TrimStart('.');
     }
 
     private sealed class NoOpImageCacheRepository : IImageCacheRepository

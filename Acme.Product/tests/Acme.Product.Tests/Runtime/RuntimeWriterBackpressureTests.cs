@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Reflection;
+using System.Threading.Channels;
 using Acme.Product.Runtime;
 using Acme.Product.Runtime.Abstractions;
 using FluentAssertions;
@@ -73,6 +75,159 @@ public sealed class RuntimeWriterBackpressureTests
         }
         finally
         {
+            await DisposeIfNeededAsync(writer);
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ResultRecordWriter_ShouldSnapshotQueuedResultBeforeReturning()
+    {
+        var root = CreateTempDirectory();
+        var consumer = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var writer = CreateInternalWriter(
+            "Acme.Product.Runtime.RuntimeResultRecordWriter",
+            root,
+            2,
+            NullLogger.Instance,
+            TimeSpan.FromSeconds(5),
+            consumer.Task);
+        var result = BuildResult(1);
+        result.PrimaryOutputs["Score"] = 1;
+        result.PrimaryOutputs["Nested"] = new Dictionary<string, object?>
+        {
+            ["Value"] = "before"
+        };
+        result.OutputImageBytes = [1, 2, 3];
+
+        try
+        {
+            (await EnqueueAsync(writer, result)).Should().BeTrue();
+
+            result.RunId = "mutated-run";
+            result.PrimaryOutputs["Score"] = 99;
+            ((Dictionary<string, object?>)result.PrimaryOutputs["Nested"]!)["Value"] = "after";
+            result.OutputImageBytes[0] = 9;
+
+            var queued = ReadQueuedResult(writer);
+            queued.RunId.Should().Be("run-001");
+            queued.PrimaryOutputs["Score"].Should().Be(1);
+            ((Dictionary<string, object?>)queued.PrimaryOutputs["Nested"]!)["Value"].Should().Be("before");
+            queued.OutputImageBytes.Should().BeNull();
+            queued.SourceImageBytes.Should().BeNull();
+        }
+        finally
+        {
+            consumer.TrySetResult(null);
+            await DisposeIfNeededAsync(writer);
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ImageWriter_ShouldSnapshotQueuedImageBeforeReturning()
+    {
+        var root = CreateTempDirectory();
+        var consumer = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var profile = new RuntimeProfile
+        {
+            ImageQueueCapacity = 2
+        };
+        var writer = CreateInternalWriter(
+            "Acme.Product.Runtime.RuntimeImageWriter",
+            root,
+            profile,
+            NullLogger.Instance,
+            TimeSpan.FromSeconds(5),
+            consumer.Task);
+        var result = BuildResult(1);
+        result.SavedImagePath = Path.Combine(root, "images", "before.png");
+        result.OutputImageBytes = [0x89, 0x50, 0x4E, 0x47, 0x01];
+
+        try
+        {
+            (await EnqueueAsync(writer, result)).Should().BeTrue();
+
+            result.SavedImagePath = Path.Combine(root, "images", "after.png");
+            result.OutputImageBytes[4] = 0xFF;
+
+            var queued = ReadQueuedResult(writer);
+            queued.SavedImagePath.Should().EndWith(Path.Combine("images", "before.png"));
+            queued.OutputImageBytes.Should().Equal([0x89, 0x50, 0x4E, 0x47, 0x01]);
+        }
+        finally
+        {
+            consumer.TrySetResult(null);
+            await DisposeIfNeededAsync(writer);
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ImageWriter_ShouldUseSourceImage_WhenOutputImageIsEmpty()
+    {
+        var root = CreateTempDirectory();
+        var profile = new RuntimeProfile
+        {
+            ImageQueueCapacity = 2
+        };
+        var writer = CreateInternalWriter(
+            "Acme.Product.Runtime.RuntimeImageWriter",
+            root,
+            profile,
+            NullLogger.Instance);
+        var sourceImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x42 };
+        var result = BuildResult(1);
+        result.OutputImageBytes = [];
+        result.SourceImageBytes = sourceImage;
+        result.SavedImagePath = PlanImagePath(writer, result);
+
+        try
+        {
+            result.SavedImagePath.Should().EndWith(".png");
+            (await EnqueueAsync(writer, result)).Should().BeTrue();
+            await ((IAsyncDisposable)writer).DisposeAsync();
+
+            var savedPath = Directory.EnumerateFiles(root, "*.png", SearchOption.AllDirectories).Single();
+            File.ReadAllBytes(savedPath).Should().Equal(sourceImage);
+        }
+        finally
+        {
+            await DisposeIfNeededAsync(writer);
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ImageWriter_ShouldSkipQueue_WhenNoImageBytesAreAvailable()
+    {
+        var root = CreateTempDirectory();
+        var consumer = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var profile = new RuntimeProfile
+        {
+            ImageQueueCapacity = 2
+        };
+        var writer = CreateInternalWriter(
+            "Acme.Product.Runtime.RuntimeImageWriter",
+            root,
+            profile,
+            NullLogger.Instance,
+            TimeSpan.FromSeconds(5),
+            consumer.Task);
+        var result = BuildResult(1);
+        result.SavedImagePath = Path.Combine(root, "images", "missing.bin");
+        result.OutputImageBytes = [];
+        result.SourceImageBytes = null;
+
+        try
+        {
+            (await EnqueueAsync(writer, result)).Should().BeFalse();
+            TryReadQueuedResult(writer, out _).Should().BeFalse();
+            ReadIntProperty(writer, "DroppedCount").Should().Be(0);
+        }
+        finally
+        {
+            consumer.TrySetResult(null);
             await DisposeIfNeededAsync(writer);
             DeleteTempDirectory(root);
         }
@@ -154,9 +309,30 @@ public sealed class RuntimeWriterBackpressureTests
         return await valueTask;
     }
 
+    private static string PlanImagePath(object writer, RuntimeNormalizedResult result)
+    {
+        return (string)writer.GetType().GetMethod("PlanPath")!.Invoke(writer, [result])!;
+    }
+
     private static int ReadIntProperty(object instance, string propertyName)
     {
         return (int)instance.GetType().GetProperty(propertyName)!.GetValue(instance)!;
+    }
+
+    private static RuntimeNormalizedResult ReadQueuedResult(object writer)
+    {
+        TryReadQueuedResult(writer, out var result).Should().BeTrue();
+        return result!;
+    }
+
+    private static bool TryReadQueuedResult(object writer, out RuntimeNormalizedResult? result)
+    {
+        var channel = (Channel<RuntimeNormalizedResult>)writer
+            .GetType()
+            .GetField("_channel", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(writer)!;
+
+        return channel.Reader.TryRead(out result);
     }
 
     private static async Task DisposeIfNeededAsync(object writer)

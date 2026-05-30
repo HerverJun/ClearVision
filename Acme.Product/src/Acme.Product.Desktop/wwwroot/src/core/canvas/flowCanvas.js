@@ -93,6 +93,9 @@ class FlowCanvas {
         // 浜嬩欢鍥炶皟
         this.onNodeSelected = null;
         this.onConnectionCreated = null;
+        this.onSelectionDeleteRequested = null;
+        this.onNodeDuplicateRequested = null;
+        this.onNodeDisabledToggleRequested = null;
 
         // 鏉╃偟鍤庨悩鑸碘偓浣侯吀閻?
         this.isConnecting = false;
@@ -366,11 +369,11 @@ class FlowCanvas {
     removeNode(nodeId) {
         const node = this.nodes.get(nodeId);
         if (!node) {
-            return;
+            return false;
         }
         if (node._systemNode) {
             console.warn('[FlowCanvas] System node cannot be removed:', node.title || node.type);
-            return;
+            return false;
         }
 
         // 娓呯悊涓庢湰鑺傜偣鐩稿叧鐨勮繛鎺ワ紙鍚屾椂鍚屾绱㈠紩锛?
@@ -393,6 +396,7 @@ class FlowCanvas {
         }
         this.invalidate();
         this.markFlowStructureChanged('removeNode');
+        return true;
     }
 
     /**
@@ -1286,7 +1290,7 @@ class FlowCanvas {
     removeConnection(connectionId) {
         const connection = this._connectionById.get(connectionId);
         if (!connection) {
-            return;
+            return false;
         }
         this.connections = this.connections.filter(conn => conn.id !== connectionId);
         this._unindexConnection(connection);
@@ -1295,6 +1299,7 @@ class FlowCanvas {
         }
         this.invalidate();
         this.markFlowStructureChanged('removeConnection');
+        return true;
     }
 
     /**
@@ -2246,14 +2251,9 @@ class FlowCanvas {
         }
 
         if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (this.selectedNode) {
-                if (confirm('确定删除选中的节点吗？')) {
-                    this.removeNode(this.selectedNode);
-                }
-            } else if (this.selectedConnection) {
-                if (confirm('确定删除选中的连接吗？')) {
-                    this.removeConnection(this.selectedConnection.id);
-                }
+            if (this.selectedNode || this.selectedConnection) {
+                this.requestSelectionDelete('keyboard');
+                return;
             }
         }
 
@@ -2304,10 +2304,10 @@ class FlowCanvas {
         if (connection) {
             this.selectedNode = null;
             this.selectedConnection = connection;
-
-            if (confirm('确定删除选中的连接吗？')) {
-                this.removeConnection(connection.id);
+            if (typeof this.onSelectionDeleteRequested === 'function' && !confirm('确定删除选中的连接吗？')) {
+                return;
             }
+            this.requestSelectionDelete('context-menu-connection');
             return;
         }
 
@@ -2356,9 +2356,9 @@ class FlowCanvas {
 
         const menuItems = [
             { icon: '>', label: '运行到此节点/调试预览', action: () => this.runNode(nodeId) },
-            { icon: '+', label: '复制节点', action: () => this.duplicateNode(nodeId) },
-            { icon: 'x', label: '删除节点', action: () => this.removeNode(nodeId), danger: true },
-            { icon: '!', label: node.disabled ? '启用节点' : '禁用节点', action: () => this.toggleNodeDisabled(nodeId) },
+            { icon: '+', label: '复制节点', action: () => this.requestNodeDuplicate(nodeId, 'context-menu-node') },
+            { icon: 'x', label: '删除节点', action: () => this.requestSelectionDelete('context-menu-node'), danger: true },
+            { icon: '!', label: node.disabled ? '启用节点' : '禁用节点', action: () => this.requestNodeDisabledToggle(nodeId, 'context-menu-node') },
             { icon: '?', label: '查看帮助', action: () => this.showNodeHelp(node) }
         ];
 
@@ -2415,6 +2415,57 @@ class FlowCanvas {
     /**
      * 濞撳懐鈹栭悽璇茬
      */
+    requestSelectionDelete(reason = 'unknown') {
+        if (typeof this.onSelectionDeleteRequested === 'function') {
+            return this.onSelectionDeleteRequested({
+                reason,
+                selectedNode: this.selectedNode,
+                selectedConnection: this.selectedConnection
+            }) === true;
+        }
+
+        return this.deleteSelectionWithConfirmation();
+    }
+
+    requestNodeDuplicate(nodeId, reason = 'unknown') {
+        if (typeof this.onNodeDuplicateRequested === 'function') {
+            return this.onNodeDuplicateRequested({
+                reason,
+                nodeId
+            }) === true;
+        }
+
+        return Boolean(this.duplicateNode(nodeId));
+    }
+
+    requestNodeDisabledToggle(nodeId, reason = 'unknown') {
+        if (typeof this.onNodeDisabledToggleRequested === 'function') {
+            return this.onNodeDisabledToggleRequested({
+                reason,
+                nodeId
+            }) === true;
+        }
+
+        return this.toggleNodeDisabled(nodeId);
+    }
+
+    deleteSelectionWithConfirmation() {
+        if (this.selectedNode) {
+            if (confirm('确定删除选中的节点吗？')) {
+                return this.removeNode(this.selectedNode);
+            }
+            return false;
+        }
+
+        if (this.selectedConnection) {
+            if (confirm('确定删除选中的连接吗？')) {
+                return this.removeConnection(this.selectedConnection.id);
+            }
+        }
+
+        return false;
+    }
+
     clear(silent = false) {
         this.nodes.clear();
         this.connections = [];
@@ -2463,7 +2514,7 @@ class FlowCanvas {
      */
     duplicateNode(nodeId) {
         const node = this.nodes.get(nodeId);
-        if (!node) return;
+        if (!node) return null;
 
         const newNode = {
             ...node,
@@ -2481,13 +2532,14 @@ class FlowCanvas {
         this.selectedNode = newNode.id;
         this.invalidate();
         this.markFlowStructureChanged('duplicateNode');
+        return newNode;
     }
 
     /**
      * 閸掔娀娅庨懞鍌滃仯閿涘牆褰搁柨顔垮綅閸楁洖寮?API 閸忕厧顔愰崗銉ュ經閿涘鈧倸顫欓幍妯肩舶 removeNode 娴犮儰绻氶悾?_systemNode 娣囨繃濮㈡稉搴ｅ偍瀵洖鎮撳銉ｂ偓?
      */
     deleteNode(nodeId) {
-        this.removeNode(nodeId);
+        return this.removeNode(nodeId);
     }
 
     /**
@@ -2499,7 +2551,10 @@ class FlowCanvas {
             node.disabled = !node.disabled;
             this.invalidate();
             this.markFlowStructureChanged('toggleNodeDisabled');
+            return true;
         }
+
+        return false;
     }
 
     /**

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 using Acme.Product.Application.DTOs;
+using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Entities.Base;
 using Acme.Product.Core.Enums;
@@ -1067,6 +1068,59 @@ public sealed class RuntimeResultNormalizer
     }
 }
 
+internal static class RuntimeResultSnapshot
+{
+    public static RuntimeNormalizedResult Create(RuntimeNormalizedResult source, bool includeImageBytes)
+    {
+        return new RuntimeNormalizedResult
+        {
+            RunId = source.RunId,
+            PackageId = source.PackageId,
+            PackageName = source.PackageName,
+            FlowHash = source.FlowHash,
+            ImageId = source.ImageId,
+            SourceImagePath = source.SourceImagePath,
+            Outcome = source.Outcome,
+            InspectionStatus = source.InspectionStatus,
+            ExecutionTimeMs = source.ExecutionTimeMs,
+            DiagnosticCode = source.DiagnosticCode,
+            DiagnosticMessage = source.DiagnosticMessage,
+            HasJudgmentSignal = source.HasJudgmentSignal,
+            SavedImagePath = source.SavedImagePath,
+            StartedAtUtc = source.StartedAtUtc,
+            CompletedAtUtc = source.CompletedAtUtc,
+            PrimaryOutputs = ClonePrimaryOutputs(source.PrimaryOutputs),
+            OutputImageBytes = includeImageBytes ? source.OutputImageBytes?.ToArray() : null,
+            SourceImageBytes = includeImageBytes ? source.SourceImageBytes?.ToArray() : null
+        };
+    }
+
+    private static Dictionary<string, object?> ClonePrimaryOutputs(Dictionary<string, object?> source)
+    {
+        return source.ToDictionary(
+            pair => pair.Key,
+            pair => CloneOutputValue(pair.Value),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static object? CloneOutputValue(object? value)
+    {
+        return value switch
+        {
+            null => null,
+            byte[] bytes => bytes.ToArray(),
+            JsonElement element => element.Clone(),
+            string or bool or int or long or double or float or decimal or DateTime or DateTimeOffset or Guid => value,
+            IDictionary<string, object?> dictionary => dictionary.ToDictionary(
+                pair => pair.Key,
+                pair => CloneOutputValue(pair.Value),
+                StringComparer.OrdinalIgnoreCase),
+            IEnumerable<object?> sequence => sequence.Select(CloneOutputValue).ToList(),
+            _ => value
+        };
+    }
+}
+
 internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
 {
     private readonly Channel<RuntimeNormalizedResult> _channel;
@@ -1123,7 +1177,8 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
             return false;
         }
 
-        if (_channel.Writer.TryWrite(result))
+        var snapshot = RuntimeResultSnapshot.Create(result, includeImageBytes: false);
+        if (_channel.Writer.TryWrite(snapshot))
         {
             return true;
         }
@@ -1138,7 +1193,7 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
 
         try
         {
-            await _channel.Writer.WriteAsync(result, cancellationToken).ConfigureAwait(false);
+            await _channel.Writer.WriteAsync(snapshot, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (ChannelClosedException)
@@ -1295,7 +1350,7 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
             RuntimeRunOutcome.Ng => "NG",
             _ => "ERROR"
         };
-        var extension = GuessImageExtension(result.OutputImageBytes ?? result.SourceImageBytes);
+        var extension = InspectionImageFormatDetector.GuessExtension(SelectImageBytes(result));
         return Path.Combine(
             DataRoot,
             "images",
@@ -1306,6 +1361,11 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
 
     public async ValueTask<bool> EnqueueAsync(RuntimeNormalizedResult result, CancellationToken cancellationToken)
     {
+        if (SelectImageBytes(result) == null || string.IsNullOrWhiteSpace(result.SavedImagePath))
+        {
+            return false;
+        }
+
         if (Interlocked.CompareExchange(ref _disposeStarted, 0, 0) != 0)
         {
             Interlocked.Increment(ref _droppedCount);
@@ -1313,7 +1373,8 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
             return false;
         }
 
-        if (_channel.Writer.TryWrite(result))
+        var snapshot = RuntimeResultSnapshot.Create(result, includeImageBytes: true);
+        if (_channel.Writer.TryWrite(snapshot))
         {
             return true;
         }
@@ -1328,7 +1389,7 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
 
         try
         {
-            await _channel.Writer.WriteAsync(result, cancellationToken).ConfigureAwait(false);
+            await _channel.Writer.WriteAsync(snapshot, cancellationToken).ConfigureAwait(false);
             return true;
         }
         catch (ChannelClosedException)
@@ -1387,7 +1448,7 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
                 {
                     try
                     {
-                        var bytes = result.OutputImageBytes ?? result.SourceImageBytes;
+                        var bytes = SelectImageBytes(result);
                         if (bytes == null || bytes.Length == 0 || string.IsNullOrWhiteSpace(result.SavedImagePath))
                         {
                             continue;
@@ -1422,29 +1483,19 @@ internal sealed class RuntimeImageWriter : IAsyncDisposable
         }
     }
 
-    private static string GuessImageExtension(byte[]? bytes)
+    private static byte[]? SelectImageBytes(RuntimeNormalizedResult result)
     {
-        if (bytes == null || bytes.Length < 2)
+        if (result.OutputImageBytes is { Length: > 0 } outputImageBytes)
         {
-            return ".bin";
+            return outputImageBytes;
         }
 
-        if (bytes.Length >= 8 &&
-            bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
+        if (result.SourceImageBytes is { Length: > 0 } sourceImageBytes)
         {
-            return ".png";
+            return sourceImageBytes;
         }
 
-        if (bytes[0] == 0xFF && bytes[1] == 0xD8)
-        {
-            return ".jpg";
-        }
-
-        if (bytes[0] == 0x42 && bytes[1] == 0x4D)
-        {
-            return ".bmp";
-        }
-
-        return ".bin";
+        return null;
     }
+
 }

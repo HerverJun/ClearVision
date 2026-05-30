@@ -1,7 +1,6 @@
 using System.Threading.Channels;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -44,7 +43,7 @@ public sealed class QueuedInspectionImagePersistenceService : BackgroundService,
         }
 
         var storage = _configurationService.GetCurrent().Storage ?? new StorageConfig();
-        if (!ShouldPersistImage(storage.SavePolicy, result.Status))
+        if (!InspectionImagePersistencePolicy.ShouldPersistImage(storage.SavePolicy, result.Status))
         {
             return Task.CompletedTask;
         }
@@ -109,22 +108,6 @@ public sealed class QueuedInspectionImagePersistenceService : BackgroundService,
             "[InspectionImagePersistenceQueue] 停机前未能在 {TimeoutSeconds:F0} 秒内排空图像保存队列，将按主机关闭流程取消剩余保存。",
             ShutdownDrainTimeout.TotalSeconds);
         await base.StopAsync(cancellationToken);
-    }
-
-    private static bool ShouldPersistImage(string? savePolicy, InspectionStatus status)
-    {
-        var policy = (savePolicy ?? "NgOnly").Trim();
-        if (policy.Equals("None", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        if (policy.Equals("All", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return status == InspectionStatus.NG;
     }
 
     private static InspectionResult SnapshotResult(InspectionResult source)

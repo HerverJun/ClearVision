@@ -1378,7 +1378,9 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
 
         try
         {
-            var imageId = await _imageCacheRepository.AddAsync(result.OutputImage, GuessImageFormat(result.OutputImage));
+            var imageId = await _imageCacheRepository.AddAsync(
+                result.OutputImage,
+                InspectionImageFormatDetector.GuessFormat(result.OutputImage));
             if (imageId != Guid.Empty)
             {
                 result.SetImageId(imageId);
@@ -1388,28 +1390,6 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         {
             _logger.LogWarning(ex, "[InspectionWorker] 结果图像缓存失败");
         }
-    }
-
-    private static string GuessImageFormat(byte[] bytes)
-    {
-        if (bytes.Length >= 8 &&
-            bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
-        {
-            return "png";
-        }
-
-        if (bytes.Length >= 3 &&
-            bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
-        {
-            return "jpg";
-        }
-
-        if (bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D)
-        {
-            return "bmp";
-        }
-
-        return "bin";
     }
 
     #endregion

@@ -178,6 +178,10 @@ export function installSystemTabs(SettingsView) {
                                 <span class="text-muted">可用空间</span>
                                 <span class="font-bold" id="disk-free-gb" style="color:#059669;">-- GB</span>
                             </div>
+                            <div style="margin-top:14px; font-size:12px; line-height:1.5;">
+                                <span class="text-muted">容量检查目录</span>
+                                <div id="disk-source-path" title="" style="margin-top:4px; color:var(--text-secondary); font-family:var(--font-mono); overflow-wrap:anywhere;">--</div>
+                            </div>
 
                             <button class="cv-btn settings-btn-light" id="btn-clean-expired-files" style="width:100%; margin-top:32px;" ${isFeatureEnabled('storage.immediateCleanup') ? '' : 'disabled'} title="${immediateCleanupFeature.title}">${getFeatureButtonLabel('storage.immediateCleanup', '立即清理过期文件')}</button>
                             <span class="settings-field-hint" style="display:block; margin-top:12px;">${immediateCleanupFeature.description}</span>
@@ -527,17 +531,26 @@ export function installSystemTabs(SettingsView) {
         }
 
         ,
-        async loadDiskUsage() {
+        async loadDiskUsage(path) {
             if (!this.container) return;
             const requestId = ++this._diskUsageRequestId;
 
             try {
-                const pathInput = this.container.querySelector('#cfg-imageSavePath');
-                const sourcePath = pathInput?.value || this.config?.storage?.imageSavePath || '';
-                const usage = await settingsApi.getDiskUsage(sourcePath);
+                const usage = path === undefined
+                    ? await settingsApi.getDiskUsage()
+                    : await settingsApi.getDiskUsage(path);
                 if (requestId !== this._diskUsageRequestId) {
                     return;
                 }
+                if (usage?.canWrite === false) {
+                    this.diskUsage = null;
+                    this.updateDiskUsageUnavailable(
+                        usage.sourcePath || path,
+                        '保存路径不可创建或不可写',
+                        '保存路径不可写');
+                    return;
+                }
+
                 this.diskUsage = usage;
                 this.updateDiskUsageCard();
             } catch (error) {
@@ -545,6 +558,8 @@ export function installSystemTabs(SettingsView) {
                     return;
                 }
                 console.warn('[SettingsView] 加载磁盘容量失败:', error);
+                this.diskUsage = null;
+                this.updateDiskUsageUnavailable(path, error);
             }
         }
         ,
@@ -557,8 +572,13 @@ export function installSystemTabs(SettingsView) {
 
             try {
                 const usage = await settingsApi.getDiskUsage(normalizedPath);
-                if (usage?.isAccessible === false || usage?.canWrite === false) {
-                    showToast('保存路径不可访问或不可写，请联系管理员确认目录权限。', 'error');
+                if (usage?.canWrite === false) {
+                    this.diskUsage = null;
+                    this.updateDiskUsageUnavailable(
+                        usage.sourcePath || normalizedPath,
+                        '保存路径不可创建或不可写',
+                        '保存路径不可写');
+                    showToast('保存路径不可创建或不可写，请联系管理员确认目录权限。', 'error');
                     return false;
                 }
 
@@ -567,7 +587,9 @@ export function installSystemTabs(SettingsView) {
                 return true;
             } catch (error) {
                 console.warn('[SettingsView] 保存路径校验失败:', error);
-                showToast(`保存路径校验失败，请确认目录存在且当前账号可写: ${error.message}`, 'error');
+                this.diskUsage = null;
+                this.updateDiskUsageUnavailable(normalizedPath, error);
+                showToast(`保存路径校验失败，请确认目录所在磁盘可用且当前账号有权限: ${error.message}`, 'error');
                 return false;
             }
         }
@@ -581,12 +603,44 @@ export function installSystemTabs(SettingsView) {
             const usedBar = this.container.querySelector('#disk-used-bar');
             const usedGb = this.container.querySelector('#disk-used-gb');
             const freeGb = this.container.querySelector('#disk-free-gb');
+            const sourcePath = this.container.querySelector('#disk-source-path');
 
             if (driveLabel) driveLabel.textContent = `${usage.driveName} 磁盘空间`;
             if (usedPercent) usedPercent.textContent = `${usage.usedPercent}% 已用`;
             if (usedBar) usedBar.style.width = `${Math.min(100, Math.max(0, usage.usedPercent))}%`;
             if (usedGb) usedGb.textContent = `${usage.usedGb} GB`;
             if (freeGb) freeGb.textContent = `${usage.freeGb} GB`;
+            if (sourcePath) {
+                sourcePath.textContent = usage.sourcePath || '--';
+                sourcePath.title = usage.sourcePath || '';
+            }
+        }
+        ,
+        updateDiskUsageUnavailable(path, error, title = '容量检查失败') {
+            if (!this.container) return;
+
+            const driveLabel = this.container.querySelector('#disk-drive-label');
+            const usedPercent = this.container.querySelector('#disk-used-percent');
+            const usedBar = this.container.querySelector('#disk-used-bar');
+            const usedGb = this.container.querySelector('#disk-used-gb');
+            const freeGb = this.container.querySelector('#disk-free-gb');
+            const sourcePath = this.container.querySelector('#disk-source-path');
+            const displayPath = path === undefined
+                ? this.config?.storage?.imageSavePath || '--'
+                : String(path || '').trim() || '--';
+            const message = typeof error === 'string'
+                ? error
+                : error?.message || title;
+
+            if (driveLabel) driveLabel.textContent = title;
+            if (usedPercent) usedPercent.textContent = '--% 已用';
+            if (usedBar) usedBar.style.width = '0%';
+            if (usedGb) usedGb.textContent = '-- GB';
+            if (freeGb) freeGb.textContent = '-- GB';
+            if (sourcePath) {
+                sourcePath.textContent = displayPath;
+                sourcePath.title = message;
+            }
         }
         ,
         async changePassword() {

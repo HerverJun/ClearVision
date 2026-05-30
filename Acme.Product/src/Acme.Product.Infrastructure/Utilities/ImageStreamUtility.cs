@@ -42,32 +42,9 @@ public static class ImageStreamUtility
             using var resizedMat = ResizeMat(mat, maxWidth, maxHeight);
 
             // 编码参数
-            var extension = format.ToLower() switch
-            {
-                "png" => ".png",
-                "bmp" => ".bmp",
-                _ => ".jpg"
-            };
+            var extension = NormalizeExtension(format);
 
-            var encodeParams = new int[0];
-            if (extension == ".jpg")
-            {
-                // JPEG质量参数
-                encodeParams = new[]
-                {
-                    (int)ImwriteFlags.JpegQuality,
-                    quality
-                };
-            }
-            else if (extension == ".png")
-            {
-                // PNG压缩级别
-                encodeParams = new[]
-                {
-                    (int)ImwriteFlags.PngCompression,
-                    6
-                };
-            }
+            var encodeParams = BuildEncodeParams(extension, quality);
 
             // 编码为字节数组
             var compressedData = encodeParams.Length > 0
@@ -96,45 +73,23 @@ public static class ImageStreamUtility
         int? maxWidth = null,
         int? maxHeight = null)
     {
-        try
+        if (mat.Empty())
         {
-            if (mat.Empty())
-            {
-                throw new ArgumentException("Mat不能为空");
-            }
-
-            // 缩放图像（如果需要）
-            using var resizedMat = ResizeMat(mat, maxWidth, maxHeight);
-
-            var extension = format.ToLower() switch
-            {
-                "png" => ".png",
-                "bmp" => ".bmp",
-                _ => ".jpg"
-            };
-
-            var encodeParams = new int[0];
-            if (extension == ".jpg")
-            {
-                encodeParams = new[]
-                {
-                    (int)ImwriteFlags.JpegQuality,
-                    quality
-                };
-            }
-
-            var compressedData = encodeParams.Length > 0
-                ? resizedMat.ToBytes(extension, encodeParams)
-                : resizedMat.ToBytes(extension);
-
-            return Convert.ToBase64String(compressedData);
+            throw new ArgumentException("Mat不能为空");
         }
-        catch (Exception)
-        {
-            // 注意：此类为静态工具类，无法直接注入ILogger
-            // 异常向上抛出，由调用方使用ILogger记录
-            throw;
-        }
+
+        // 缩放图像（如果需要）
+        using var resizedMat = ResizeMat(mat, maxWidth, maxHeight);
+
+        var extension = NormalizeExtension(format);
+
+        var encodeParams = BuildEncodeParams(extension, quality);
+
+        var compressedData = encodeParams.Length > 0
+            ? resizedMat.ToBytes(extension, encodeParams)
+            : resizedMat.ToBytes(extension);
+
+        return Convert.ToBase64String(compressedData);
     }
 
     /// <summary>
@@ -142,6 +97,9 @@ public static class ImageStreamUtility
     /// </summary>
     private static Mat ResizeMat(Mat mat, int? maxWidth, int? maxHeight)
     {
+        maxWidth = NormalizeMaxDimension(maxWidth);
+        maxHeight = NormalizeMaxDimension(maxHeight);
+
         if (!maxWidth.HasValue && !maxHeight.HasValue)
         {
             return mat.Clone();
@@ -174,16 +132,55 @@ public static class ImageStreamUtility
         if (maxWidth.HasValue && originalWidth > maxWidth.Value)
         {
             newWidth = maxWidth.Value;
-            newHeight = (int)((double)originalHeight * maxWidth.Value / originalWidth);
+            newHeight = ScaleDimension(originalHeight, maxWidth.Value, originalWidth);
         }
 
         if (maxHeight.HasValue && newHeight > maxHeight.Value)
         {
-            newHeight = maxHeight.Value;
-            newWidth = (int)((double)newWidth * maxHeight.Value / newHeight);
+            var targetHeight = maxHeight.Value;
+            newWidth = ScaleDimension(newWidth, targetHeight, newHeight);
+            newHeight = targetHeight;
         }
 
-        return (newWidth, newHeight);
+        return (Math.Max(1, newWidth), Math.Max(1, newHeight));
+    }
+
+    private static int ScaleDimension(int dimension, int targetDimension, int sourceDimension)
+    {
+        return (int)Math.Round(
+            (double)dimension * targetDimension / sourceDimension,
+            MidpointRounding.AwayFromZero);
+    }
+
+    private static int? NormalizeMaxDimension(int? value)
+    {
+        return value.GetValueOrDefault() > 0 ? value : null;
+    }
+
+    private static string NormalizeExtension(string? format)
+    {
+        return TryNormalizeKnownExtension(format) ?? ".jpg";
+    }
+
+    private static string? TryNormalizeKnownExtension(string? format)
+    {
+        return format?.Trim().TrimStart('.').ToLowerInvariant() switch
+        {
+            "jpg" or "jpeg" or "image/jpg" or "image/jpeg" => ".jpg",
+            "png" or "image/png" => ".png",
+            "bmp" or "image/bmp" => ".bmp",
+            _ => null
+        };
+    }
+
+    private static int[] BuildEncodeParams(string extension, int quality)
+    {
+        return extension switch
+        {
+            ".jpg" => [(int)ImwriteFlags.JpegQuality, Math.Clamp(quality, 0, 100)],
+            ".png" => [(int)ImwriteFlags.PngCompression, 6],
+            _ => []
+        };
     }
 
     /// <summary>
@@ -191,11 +188,13 @@ public static class ImageStreamUtility
     /// </summary>
     public static long EstimateCompressedSize(long originalSize, string format, int quality)
     {
-        return format.ToLower() switch
+        var sourceSize = Math.Max(0, originalSize);
+
+        return TryNormalizeKnownExtension(format) switch
         {
-            "jpg" or "jpeg" => (long)(originalSize * (quality / 100.0) * 0.1),
-            "png" => (long)(originalSize * 0.5),
-            _ => originalSize
+            ".jpg" => (long)(sourceSize * (Math.Clamp(quality, 0, 100) / 100.0) * 0.1),
+            ".png" => (long)(sourceSize * 0.5),
+            _ => sourceSize
         };
     }
 

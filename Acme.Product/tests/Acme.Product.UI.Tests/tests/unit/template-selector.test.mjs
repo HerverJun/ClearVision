@@ -212,3 +212,409 @@ test('FlowEditorInteraction undo/redo restore syncs project flow and rebuilds co
   assert.equal(updates.length, 1);
   assert.deepEqual(updates[0].operators, [{ id: 'node-1' }]);
 });
+
+test('FlowEditorInteraction restore prunes stale selection state', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  const selectedPayloads = [];
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.projectManager = null;
+  interaction.multiSelectedNodes = new Set(['node-1', 'removed-node']);
+  interaction.canvas = {
+    nodes: new Map([['removed-node', { id: 'removed-node' }]]),
+    connections: [{ id: 'removed-conn' }],
+    selectedNode: 'removed-node',
+    selectedConnection: { id: 'removed-conn' },
+    _rebuildConnectionIndex() {},
+    markFlowStructureChanged() {},
+    render() {},
+    serialize() {
+      return {
+        operators: [...this.nodes.keys()].map(id => ({ id })),
+        connections: this.connections
+      };
+    },
+    onNodeSelected(node) {
+      selectedPayloads.push(node);
+    }
+  };
+  interaction.history = [
+    JSON.stringify({
+      nodes: [['node-1', { id: 'node-1', type: 'ImageAcquisition' }]],
+      connections: [{ id: 'conn-1', source: 'node-1', target: 'node-2' }]
+    })
+  ];
+  interaction.historyIndex = 0;
+
+  interaction.restoreState();
+
+  assert.equal(interaction.canvas.selectedNode, null);
+  assert.equal(interaction.canvas.selectedConnection, null);
+  assert.deepEqual([...interaction.multiSelectedNodes], ['node-1']);
+  assert.deepEqual(selectedPayloads, [null]);
+});
+
+test('FlowEditorInteraction restore clears transient drag and connection state', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  let selectionBoxRemoved = false;
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.projectManager = null;
+  interaction.multiSelectedNodes = new Set();
+  interaction.isConnecting = true;
+  interaction.connectionStart = { nodeId: 'old-source' };
+  interaction.connectionEnd = { x: 10, y: 20 };
+  interaction.connectionAnchor = { x: 5, y: 5 };
+  interaction.connectionDidDrag = true;
+  interaction.isDraggingNodes = true;
+  interaction.dragStartPos = { x: 1, y: 2 };
+  interaction.dragInitialPositions = new Map([['old-node', { x: 10, y: 10 }]]);
+  interaction.hasNodeDragMoved = true;
+  interaction.isPanning = true;
+  interaction.panStart = { x: 1, y: 1 };
+  interaction.panStartOffset = { x: 2, y: 2 };
+  interaction.isSelecting = true;
+  interaction.selectionStart = { x: 0, y: 0 };
+  interaction.selectionBox = {
+    remove() {
+      selectionBoxRemoved = true;
+    }
+  };
+  interaction.canvas = {
+    nodes: new Map(),
+    connections: [],
+    selectedNode: null,
+    selectedConnection: null,
+    draggedNode: 'old-node',
+    isConnecting: true,
+    connectingFrom: { nodeId: 'old-source' },
+    hoveredPort: { nodeId: 'old-target' },
+    canvas: { style: { cursor: 'grabbing' } },
+    _rebuildConnectionIndex() {},
+    markFlowStructureChanged() {},
+    render() {},
+    serialize() {
+      return {
+        operators: [...this.nodes.keys()].map(id => ({ id })),
+        connections: this.connections
+      };
+    }
+  };
+  interaction.history = [
+    JSON.stringify({
+      nodes: [['node-1', { id: 'node-1', type: 'ImageAcquisition' }]],
+      connections: []
+    })
+  ];
+  interaction.historyIndex = 0;
+
+  interaction.restoreState();
+
+  assert.equal(interaction.isConnecting, false);
+  assert.equal(interaction.connectionStart, null);
+  assert.equal(interaction.connectionEnd, null);
+  assert.equal(interaction.connectionAnchor, null);
+  assert.equal(interaction.connectionDidDrag, false);
+  assert.equal(interaction.isDraggingNodes, false);
+  assert.equal(interaction.dragStartPos, null);
+  assert.equal(interaction.dragInitialPositions.size, 0);
+  assert.equal(interaction.hasNodeDragMoved, false);
+  assert.equal(interaction.isPanning, false);
+  assert.equal(interaction.panStart, null);
+  assert.equal(interaction.panStartOffset, null);
+  assert.equal(interaction.isSelecting, false);
+  assert.equal(interaction.selectionStart, null);
+  assert.equal(interaction.selectionBox, null);
+  assert.equal(selectionBoxRemoved, true);
+  assert.equal(interaction.canvas.draggedNode, null);
+  assert.equal(interaction.canvas.isConnecting, false);
+  assert.equal(interaction.canvas.connectingFrom, null);
+  assert.equal(interaction.canvas.hoveredPort, null);
+  assert.equal(interaction.canvas.canvas.style.cursor, 'default');
+});
+
+test('FlowEditorInteraction deleteSelectedItems records selected connection deletion', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  installMinimalDom();
+  const updates = [];
+  const connection = { id: 'conn-1', source: 'node-1', target: 'node-2' };
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.history = [];
+  interaction.historyIndex = -1;
+  interaction.maxHistorySize = 50;
+  interaction.multiSelectedNodes = new Set();
+  interaction.projectManager = {
+    updateFlow(flow) {
+      updates.push(flow);
+    }
+  };
+  interaction.canvas = {
+    nodes: new Map([['node-1', { id: 'node-1' }], ['node-2', { id: 'node-2' }]]),
+    connections: [connection],
+    selectedNode: null,
+    selectedConnection: connection,
+    removeConnection(connectionId) {
+      const before = this.connections.length;
+      this.connections = this.connections.filter(item => item.id !== connectionId);
+      if (this.selectedConnection?.id === connectionId) {
+        this.selectedConnection = null;
+      }
+      return this.connections.length < before;
+    },
+    serialize() {
+      return {
+        operators: [...this.nodes.keys()].map(id => ({ id })),
+        connections: this.connections
+      };
+    }
+  };
+
+  const handled = interaction.deleteSelectedItems();
+
+  assert.equal(handled, true);
+  assert.equal(interaction.canvas.connections.length, 0);
+  assert.equal(interaction.canvas.selectedConnection, null);
+  assert.equal(interaction.history.length, 1);
+  assert.equal(interaction.historyIndex, 0);
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0].connections, []);
+});
+
+test('FlowEditorInteraction bridges canvas delete requests into history', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  installMinimalDom();
+  const updates = [];
+  const previousHandler = () => false;
+  const node = { id: 'node-1' };
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.history = [];
+  interaction.historyIndex = -1;
+  interaction.maxHistorySize = 50;
+  interaction.multiSelectedNodes = new Set();
+  interaction.cleanup = [];
+  interaction.projectManager = {
+    updateFlow(flow) {
+      updates.push(flow);
+    }
+  };
+  interaction.canvas = {
+    nodes: new Map([[node.id, node]]),
+    connections: [],
+    selectedNode: node.id,
+    selectedConnection: null,
+    onSelectionDeleteRequested: previousHandler,
+    removeNode(nodeId) {
+      if (!this.nodes.has(nodeId)) {
+        return false;
+      }
+      this.nodes.delete(nodeId);
+      this.selectedNode = null;
+      return true;
+    },
+    serialize() {
+      return {
+        operators: [...this.nodes.keys()].map(id => ({ id })),
+        connections: this.connections
+      };
+    }
+  };
+
+  interaction.installCanvasDeletionBridge();
+
+  assert.notEqual(interaction.canvas.onSelectionDeleteRequested, previousHandler);
+  assert.equal(interaction.canvas.onSelectionDeleteRequested({ reason: 'context-menu-node' }), true);
+  assert.equal(interaction.canvas.nodes.has(node.id), false);
+  assert.equal(interaction.history.length, 1);
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0].operators, []);
+
+  interaction.cleanup.splice(0).forEach(dispose => dispose());
+  assert.equal(interaction.canvas.onSelectionDeleteRequested, previousHandler);
+});
+
+test('FlowEditorInteraction bridges canvas duplicate requests into history', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  installMinimalDom();
+  const updates = [];
+  const selectedPayloads = [];
+  const previousHandler = () => false;
+  const sourceNode = { id: 'node-1', type: 'ImageAcquisition', x: 10, y: 20 };
+  const duplicatedNode = { ...sourceNode, id: 'node-2', x: 40, y: 50 };
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.history = [];
+  interaction.historyIndex = -1;
+  interaction.maxHistorySize = 50;
+  interaction.multiSelectedNodes = new Set();
+  interaction.cleanup = [];
+  interaction.projectManager = {
+    updateFlow(flow) {
+      updates.push(flow);
+    }
+  };
+  interaction.canvas = {
+    nodes: new Map([[sourceNode.id, sourceNode]]),
+    connections: [],
+    selectedNode: sourceNode.id,
+    selectedConnection: null,
+    onNodeDuplicateRequested: previousHandler,
+    duplicateNode(nodeId) {
+      if (!this.nodes.has(nodeId)) {
+        return null;
+      }
+      this.nodes.set(duplicatedNode.id, duplicatedNode);
+      this.selectedNode = duplicatedNode.id;
+      return duplicatedNode;
+    },
+    invalidate() {},
+    serialize() {
+      return {
+        operators: [...this.nodes.keys()].map(id => ({ id })),
+        connections: this.connections
+      };
+    },
+    onNodeSelected(node) {
+      selectedPayloads.push(node);
+    }
+  };
+
+  interaction.installCanvasDuplicationBridge();
+
+  assert.notEqual(interaction.canvas.onNodeDuplicateRequested, previousHandler);
+  assert.equal(interaction.canvas.onNodeDuplicateRequested({ reason: 'context-menu-node', nodeId: sourceNode.id }), true);
+  assert.equal(interaction.canvas.nodes.has(duplicatedNode.id), true);
+  assert.deepEqual([...interaction.multiSelectedNodes], [duplicatedNode.id]);
+  assert.equal(interaction.canvas.selectedNode, duplicatedNode.id);
+  assert.equal(interaction.history.length, 1);
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0].operators, [{ id: sourceNode.id }, { id: duplicatedNode.id }]);
+  assert.deepEqual(selectedPayloads, [duplicatedNode]);
+
+  interaction.cleanup.splice(0).forEach(dispose => dispose());
+  assert.equal(interaction.canvas.onNodeDuplicateRequested, previousHandler);
+});
+
+test('FlowEditorInteraction bridges canvas disabled toggle requests into history', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  installMinimalDom();
+  const updates = [];
+  const selectedPayloads = [];
+  const previousHandler = () => false;
+  const node = { id: 'node-1', type: 'ImageAcquisition', disabled: false };
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.history = [];
+  interaction.historyIndex = -1;
+  interaction.maxHistorySize = 50;
+  interaction.multiSelectedNodes = new Set();
+  interaction.cleanup = [];
+  interaction.projectManager = {
+    updateFlow(flow) {
+      updates.push(flow);
+    }
+  };
+  interaction.canvas = {
+    nodes: new Map([[node.id, node]]),
+    connections: [],
+    selectedNode: node.id,
+    selectedConnection: null,
+    onNodeDisabledToggleRequested: previousHandler,
+    toggleNodeDisabled(nodeId) {
+      const target = this.nodes.get(nodeId);
+      if (!target) {
+        return false;
+      }
+      target.disabled = !target.disabled;
+      return true;
+    },
+    serialize() {
+      return {
+        operators: [...this.nodes.values()].map(value => ({
+          id: value.id,
+          isEnabled: value.disabled !== true
+        })),
+        connections: this.connections
+      };
+    },
+    onNodeSelected(selectedNode) {
+      selectedPayloads.push(selectedNode);
+    }
+  };
+
+  interaction.installCanvasDisabledToggleBridge();
+
+  assert.notEqual(interaction.canvas.onNodeDisabledToggleRequested, previousHandler);
+  assert.equal(interaction.canvas.onNodeDisabledToggleRequested({ reason: 'context-menu-node', nodeId: node.id }), true);
+  assert.equal(node.disabled, true);
+  assert.equal(interaction.history.length, 1);
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0].operators, [{ id: node.id, isEnabled: false }]);
+  assert.deepEqual(selectedPayloads, [node]);
+
+  interaction.cleanup.splice(0).forEach(dispose => dispose());
+  assert.equal(interaction.canvas.onNodeDisabledToggleRequested, previousHandler);
+});
+
+test('FlowEditorInteraction deleteSelectedItems ignores refused node deletion', async () => {
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  installMinimalDom();
+  const selectedPayloads = [];
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.history = [];
+  interaction.historyIndex = -1;
+  interaction.maxHistorySize = 50;
+  interaction.multiSelectedNodes = new Set();
+  interaction.projectManager = {
+    updateFlow() {
+      throw new Error('Project flow should not update when nothing is deleted');
+    }
+  };
+  interaction.canvas = {
+    nodes: new Map([['system-node', { id: 'system-node', _systemNode: true }]]),
+    connections: [],
+    selectedNode: 'system-node',
+    selectedConnection: null,
+    removeNode(nodeId) {
+      const node = this.nodes.get(nodeId);
+      if (!node || node._systemNode) {
+        return false;
+      }
+      this.nodes.delete(nodeId);
+      return true;
+    },
+    serialize() {
+      return {
+        operators: [...this.nodes.keys()].map(id => ({ id })),
+        connections: this.connections
+      };
+    },
+    onNodeSelected(node) {
+      selectedPayloads.push(node);
+    }
+  };
+
+  const handled = interaction.deleteSelectedItems();
+
+  assert.equal(handled, false);
+  assert.equal(interaction.canvas.nodes.has('system-node'), true);
+  assert.equal(interaction.canvas.selectedNode, 'system-node');
+  assert.equal(interaction.history.length, 0);
+  assert.deepEqual(selectedPayloads, []);
+});

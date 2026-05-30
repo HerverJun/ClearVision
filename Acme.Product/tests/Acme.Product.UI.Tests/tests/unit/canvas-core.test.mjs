@@ -256,9 +256,10 @@ test('FlowCanvas portKey helper produces stable identifiers', async () => {
   assert.equal(foundInput.id, conn.id);
 
   // Remove connection should clean indices
-  fc.removeConnection(conn.id);
+  assert.equal(fc.removeConnection(conn.id), true);
   assert.equal(fc.getConnectionsAtPort(n1.id, 0, true).length, 0);
   assert.equal(fc.getConnectionAtPort(n2.id, 0, false), null);
+  assert.equal(fc.removeConnection(conn.id), false);
 
   fc.destroy();
 });
@@ -290,12 +291,105 @@ test('FlowCanvas removeNode preserves _systemNode and clears selectedConnection'
   n1._systemNode = true;
 
   // deleteNode should delegate to removeNode and protect system nodes
-  fc.deleteNode(n1.id);
+  assert.equal(fc.deleteNode(n1.id), false);
   assert.ok(fc.nodes.has(n1.id), 'system node should not be removed');
 
   // removeNode on non-system node should also clear selectedConnection if affected
-  fc.removeNode(n2.id);
+  assert.equal(fc.removeNode(n2.id), true);
   assert.equal(fc.selectedConnection, null, 'selectedConnection should be cleared when its target is removed');
+  assert.equal(fc.removeNode(n2.id), false);
+
+  fc.destroy();
+});
+
+test('FlowCanvas requestSelectionDelete delegates selection deletion when provided', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  const node = fc.addNode('ImageAcquisition', 0, 0, {
+    inputs: [],
+    outputs: [{ id: 'o1', name: 'out', type: 'Image' }]
+  });
+  const payloads = [];
+
+  fc.selectedNode = node.id;
+  fc.onSelectionDeleteRequested = payload => {
+    payloads.push(payload);
+    return true;
+  };
+
+  assert.equal(fc.requestSelectionDelete('context-menu-node'), true);
+  assert.equal(payloads.length, 1);
+  assert.equal(payloads[0].reason, 'context-menu-node');
+  assert.equal(payloads[0].selectedNode, node.id);
+  assert.equal(fc.nodes.has(node.id), true, 'delegate owns the actual deletion');
+
+  fc.destroy();
+});
+
+test('FlowCanvas requestNodeDuplicate delegates node duplication when provided', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  const node = fc.addNode('ImageAcquisition', 0, 0, {
+    inputs: [],
+    outputs: [{ id: 'o1', name: 'out', type: 'Image' }]
+  });
+  const payloads = [];
+
+  fc.onNodeDuplicateRequested = payload => {
+    payloads.push(payload);
+    return true;
+  };
+
+  assert.equal(fc.requestNodeDuplicate(node.id, 'context-menu-node'), true);
+  assert.equal(payloads.length, 1);
+  assert.equal(payloads[0].reason, 'context-menu-node');
+  assert.equal(payloads[0].nodeId, node.id);
+  assert.equal(fc.nodes.size, 1, 'delegate owns the actual duplication');
+
+  fc.destroy();
+});
+
+test('FlowCanvas requestNodeDisabledToggle delegates disabled toggle when provided', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  const node = fc.addNode('ImageAcquisition', 0, 0, {
+    inputs: [],
+    outputs: [{ id: 'o1', name: 'out', type: 'Image' }]
+  });
+  const payloads = [];
+
+  fc.onNodeDisabledToggleRequested = payload => {
+    payloads.push(payload);
+    return true;
+  };
+  const disabledBefore = node.disabled;
+
+  assert.equal(fc.requestNodeDisabledToggle(node.id, 'context-menu-node'), true);
+  assert.equal(payloads.length, 1);
+  assert.equal(payloads[0].reason, 'context-menu-node');
+  assert.equal(payloads[0].nodeId, node.id);
+  assert.equal(node.disabled, disabledBefore, 'delegate owns the actual disabled-state change');
 
   fc.destroy();
 });

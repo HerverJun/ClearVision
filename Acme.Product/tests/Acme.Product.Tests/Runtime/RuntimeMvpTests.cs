@@ -167,6 +167,45 @@ public class RuntimeMvpTests
     }
 
     [Fact]
+    public async Task RuntimeHost_WhenImageSaveIsEnabledButNoImageExists_ShouldNotPublishSavedImagePath()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var project = CreateProjectDto("no-image-save-path");
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            var flowExecutionService = CreateFlowExecutionService(new NoImageNgExecutor());
+            var runtimeHost = new RuntimeHost(
+                flowExecutionService,
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+            RuntimeNormalizedResult? published = null;
+            runtimeHost.ResultAvailable += result => published = result;
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            var result = await runtimeHost.RunPackageConfiguredSingleAsync();
+            await runtimeHost.DisposeAsync();
+
+            result.Outcome.Should().Be(RuntimeRunOutcome.Ng);
+            result.SavedImagePath.Should().BeNull();
+            published.Should().NotBeNull();
+            published!.SavedImagePath.Should().BeNull();
+            FindRuntimeResultRecord(result).GetProperty("savedImagePath").ValueKind.Should().Be(JsonValueKind.Null);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task RuntimeHost_StopAsync_ShouldCancelFolderReplayAndBeIdempotent()
     {
         var root = CreateTempDirectory();
@@ -332,6 +371,29 @@ public class RuntimeMvpTests
         }
 
         throw new TimeoutException($"RuntimeHost did not reach state {state} within {timeout}.");
+    }
+
+    private static JsonElement FindRuntimeResultRecord(RuntimeNormalizedResult result)
+    {
+        var dataRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ClearVisionStation");
+        var runDate = result.CompletedAtUtc.LocalDateTime.ToString("yyyyMMdd");
+        var resultFile = Path.Combine(dataRoot, "runs", runDate, "runtime-results.jsonl");
+
+        File.Exists(resultFile).Should().BeTrue();
+
+        foreach (var line in File.ReadLines(resultFile).Reverse())
+        {
+            using var document = JsonDocument.Parse(line);
+            if (document.RootElement.TryGetProperty("runId", out var runId) &&
+                string.Equals(runId.GetString(), result.RunId, StringComparison.Ordinal))
+            {
+                return document.RootElement.Clone();
+            }
+        }
+
+        throw new InvalidOperationException($"Runtime result record not found for run {result.RunId}.");
     }
 
     private static InspectionService CreateInspectionService(IFlowExecutionService flowExecutionService)
@@ -561,6 +623,28 @@ public class RuntimeMvpTests
             return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
             {
                 ["Image"] = _imageBytes
+            }));
+        }
+
+        public ValidationResult ValidateParameters(Operator @operator)
+        {
+            return ValidationResult.Valid();
+        }
+    }
+
+    private sealed class NoImageNgExecutor : IOperatorExecutor
+    {
+        public OperatorType OperatorType => OperatorType.ResultOutput;
+
+        public Task<OperatorExecutionOutput> ExecuteAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["JudgmentResult"] = "NG",
+                ["Score"] = 0.01
             }));
         }
 
