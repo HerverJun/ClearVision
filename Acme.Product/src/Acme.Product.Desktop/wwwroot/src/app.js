@@ -626,6 +626,7 @@ function initializeOperatorLibraryPanel() {
         debugLogger.debug('[App] 选中算子:', operatorData.type);
         const operatorCopy = {
             ...operatorData,
+            isLibrarySelection: true,
             title: operatorData.title || operatorData.displayName || operatorData.type,
             parameters: operatorData.parameters ? operatorData.parameters.map(p => ({ ...p })) : []
         };

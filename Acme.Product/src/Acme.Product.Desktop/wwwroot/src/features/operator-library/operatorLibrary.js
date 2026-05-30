@@ -84,15 +84,6 @@ export class OperatorLibraryPanel {
                 
                 <!-- 算子树形列表 -->
                 <div class="library-tree" id="library-tree"></div>
-                
-                <!-- 算子详情预览 -->
-                <div class="operator-preview" id="operator-preview">
-                    <div class="preview-placeholder">
-                        <span class="preview-svg-icon"></span>
-                        <p>选择一个算子查看详情</p>
-                    </div>
-                </div>
-                
                 <!-- 快捷操作 -->
                 <div class="library-actions">
                     <button id="btn-expand-all" class="cv-btn cv-btn-secondary" title="展开全部">📂</button>
@@ -101,12 +92,6 @@ export class OperatorLibraryPanel {
                 </div>
             </div>
         `;
-
-        const placeholderIcon = this.container.querySelector('.preview-svg-icon');
-        placeholderIcon?.replaceChildren(createPathIconElement(
-            'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L5.03 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
-            'preview-svg-icon',
-            '#9ca3af').firstElementChild);
         
         this.bindSearchEvents();
         this.bindActionEvents();
@@ -124,7 +109,6 @@ export class OperatorLibraryPanel {
             draggable: false,
             onSelect: (node) => {
                 if (node.type === 'operator') {
-                    this.showOperatorPreview(node.data);
                     if (this.onOperatorSelected) {
                         this.onOperatorSelected(node.data);
                     }
@@ -666,6 +650,9 @@ export class OperatorLibraryPanel {
      */
     showOperatorPreview(operator) {
         const preview = this.container.querySelector('#operator-preview');
+        if (!preview) {
+            return;
+        }
         const resolvedOperator = this.metadataByType.get(operator.type) || operator;
         const inputPorts = Array.isArray(resolvedOperator.inputPorts) ? resolvedOperator.inputPorts : [];
         const outputPorts = Array.isArray(resolvedOperator.outputPorts) ? resolvedOperator.outputPorts : [];

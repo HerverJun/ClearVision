@@ -143,12 +143,22 @@ class PropertyPanel {
      * 设置算子
      */
     setOperator(operator) {
-        if (!operator || this.currentOperator?.id !== operator.id) {
+        const previousKey = this.getOperatorIdentity(this.currentOperator);
+        const nextKey = this.getOperatorIdentity(operator);
+        if (!operator || previousKey !== nextKey) {
             this.pendingRecommendation = null;
             this.recommendedFieldNames.clear();
         }
         this.currentOperator = operator;
         this.render();
+    }
+
+    getOperatorIdentity(operator) {
+        if (!operator) {
+            return '';
+        }
+
+        return String(operator.id || operator.type || operator.Type || operator.displayName || operator.DisplayName || '');
     }
 
     /**
@@ -173,6 +183,11 @@ class PropertyPanel {
     render() {
         if (!this.currentOperator) {
             this.clear();
+            return;
+        }
+
+        if (this.currentOperator.isLibrarySelection) {
+            this.renderLibraryOperatorSummary();
             return;
         }
 
@@ -266,6 +281,169 @@ class PropertyPanel {
         if (this.pendingRecommendation) {
             this._restoreRecommendationHighlights();
         }
+    }
+
+    renderLibraryOperatorSummary() {
+        if (this.previewPanel) {
+            this.previewPanel.destroy();
+            this.previewPanel = null;
+        }
+        if (this.roiEditorPanel) {
+            this.roiEditorPanel.destroy();
+            this.roiEditorPanel = null;
+        }
+
+        const operator = this.currentOperator || {};
+        const title = this.getOperatorText(operator, ['title', 'displayName', 'DisplayName', 'name', 'Name', 'type', 'Type'], '未命名算子');
+        const type = this.getOperatorText(operator, ['type', 'Type'], '');
+        const category = this.getOperatorText(operator, ['category', 'Category'], '其他');
+        const description = this.getOperatorText(operator, ['description', 'Description'], '暂无说明');
+        const usage = this.getOperatorText(operator, ['usage', 'Usage', 'purpose', 'Purpose'], '');
+        const scenario = this.getOperatorText(operator, ['scenario', 'Scenario', 'typicalScenario', 'TypicalScenario'], '');
+        const iconPath = operator.iconPath || operator.IconPath || null;
+        const icon = operator.icon || operator.Icon || '';
+        const inputPorts = Array.isArray(operator.inputPorts)
+            ? operator.inputPorts
+            : (Array.isArray(operator.InputPorts) ? operator.InputPorts : []);
+        const outputPorts = Array.isArray(operator.outputPorts)
+            ? operator.outputPorts
+            : (Array.isArray(operator.OutputPorts) ? operator.OutputPorts : []);
+        const inputType = this.getOperatorText(operator, ['inputType', 'InputType'], 'Any');
+        const outputType = this.getOperatorText(operator, ['outputType', 'OutputType'], 'Any');
+        const parameters = Array.isArray(operator.parameters)
+            ? operator.parameters
+            : (Array.isArray(operator.Parameters) ? operator.Parameters : []);
+
+        const iconHtml = iconPath
+            ? `<div class="property-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="${this.escapeAttribute(iconPath)}"/></svg></div>`
+            : (icon ? `<div class="property-icon text-icon">${this.escapeHtml(icon)}</div>` : '');
+
+        this.container.innerHTML = `
+            <div class="property-header property-header-library">
+                ${iconHtml}
+                <div class="header-text">
+                    <h4>${this.escapeHtml(title)}</h4>
+                    <span class="property-type">${this.escapeHtml(type)}</span>
+                </div>
+            </div>
+            <div class="property-content property-library-summary">
+                <div class="property-summary-meta">
+                    <span>${this.escapeHtml(category)}</span>
+                    <span>${this.escapeHtml(parameters.length)} 个参数</span>
+                </div>
+
+                <section class="property-summary-section">
+                    <h5>说明</h5>
+                    <p>${this.escapeHtml(description)}</p>
+                </section>
+
+                ${usage && usage !== description ? `
+                    <section class="property-summary-section">
+                        <h5>用途</h5>
+                        <p>${this.escapeHtml(usage)}</p>
+                    </section>
+                ` : ''}
+
+                ${scenario ? `
+                    <section class="property-summary-section">
+                        <h5>典型场景</h5>
+                        <p>${this.escapeHtml(scenario)}</p>
+                    </section>
+                ` : ''}
+
+                <section class="property-summary-section">
+                    <h5>输入 / 输出</h5>
+                    <div class="property-port-list">
+                        ${this.renderLibraryPorts(inputPorts, inputType, '输入')}
+                        ${this.renderLibraryPorts(outputPorts, outputType, '输出')}
+                    </div>
+                </section>
+
+                <section class="property-summary-section">
+                    <h5>关键参数</h5>
+                    ${this.renderLibraryParameterList(parameters)}
+                </section>
+            </div>
+        `;
+    }
+
+    getOperatorText(operator, keys, fallback = '') {
+        for (const key of keys) {
+            const value = operator?.[key];
+            if (value !== null && value !== undefined && String(value).trim() !== '') {
+                return String(value);
+            }
+        }
+
+        return fallback;
+    }
+
+    renderLibraryPorts(ports, fallbackType, label) {
+        if (!Array.isArray(ports) || ports.length === 0) {
+            return `
+                <div class="property-port-row">
+                    <span class="property-port-direction">${this.escapeHtml(label)}</span>
+                    <span class="property-port-name">${this.escapeHtml(fallbackType || 'Any')}</span>
+                </div>
+            `;
+        }
+
+        return ports.slice(0, 3).map(port => {
+            const name = port.displayName || port.DisplayName || port.name || port.Name || '未命名';
+            const dataType = port.dataType || port.DataType || port.type || port.Type || 'Any';
+            const required = label === '输入' && Boolean(port.isRequired ?? port.IsRequired);
+
+            return `
+                <div class="property-port-row">
+                    <span class="property-port-direction">${this.escapeHtml(label)}</span>
+                    <span class="property-port-name">${this.escapeHtml(name)}${required ? ' *' : ''}</span>
+                    <span class="property-port-type">${this.escapeHtml(dataType)}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderLibraryParameterList(parameters) {
+        if (!Array.isArray(parameters) || parameters.length === 0) {
+            return '<p class="property-summary-empty">无可配置参数</p>';
+        }
+
+        const keyParameters = [...parameters]
+            .sort((left, right) => Number(isParameterRequired(right)) - Number(isParameterRequired(left)))
+            .slice(0, 6);
+
+        return `
+            <ul class="property-param-list">
+                ${keyParameters.map(param => {
+                    const name = getParameterLabel(param);
+                    const type = getParameterDataType(param, 'Any') || 'Any';
+                    const value = getParameterEffectiveValue(param);
+                    const description = param.description || param.Description || '';
+                    const valueText = isEmptyValue(value) ? '' : `默认: ${value}`;
+                    const detail = valueText || description || type;
+
+                    return `
+                        <li class="property-param-row">
+                            <span class="property-param-name">${this.escapeHtml(name)}${isParameterRequired(param) ? ' *' : ''}</span>
+                            <span class="property-param-detail">${this.escapeHtml(detail)}</span>
+                        </li>
+                    `;
+                }).join('')}
+            </ul>
+        `;
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    escapeAttribute(value) {
+        return this.escapeHtml(value);
     }
     
     /**
