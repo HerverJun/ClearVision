@@ -44,12 +44,31 @@ public abstract class PlcBaseClient : IPlcClient
         {
             if (_disposed)
                 return false;
-            if (_tcpClient?.Connected != true)
+
+            var client = _tcpClient;
+            if (client?.Connected != true)
                 return false;
-            // 检查最后通信时间，超过60秒认为可能断开
-            if (DateTime.Now - _lastCommunicationTime > TimeSpan.FromSeconds(60))
+
+            try
+            {
+                var socket = client.Client;
+                if (socket == null)
+                    return false;
+
+                // 使用 Poll 来检测物理 Socket 是否真的断开连接
+                // 如果 Poll 返回 true 且 Available == 0，说明物理连接已被对方优雅关闭或异常终止
+                // 注意：用 Available 而非 Receive(Peek)，因为 Available 完全非阻塞，
+                //       而 Receive 在极端半开连接场景下可能挂起，不适合在属性 getter / 心跳路径调用
+                if (socket.Poll(0, SelectMode.SelectRead) && socket.Available == 0)
+                {
+                    return false;
+                }
+                return true;
+            }
+            catch
+            {
                 return false;
-            return true;
+            }
         }
     }
 
@@ -584,19 +603,94 @@ public abstract class PlcBaseClient : IPlcClient
     protected abstract Task<OperateResult> WriteCoreAsync(string address, byte[] value, CancellationToken ct);
     protected virtual Task<bool> PingCoreAsync(CancellationToken ct) => Task.FromResult(IsConnected);
 
+    protected virtual void ForcePhysicalClose()
+    {
+        try
+        {
+            _networkStream?.Close();
+            _tcpClient?.Close();
+        }
+        catch
+        {
+        }
+    }
+
     // ─── IDisposable ───────────────────────────────────────
     public void Dispose()
     {
         if (_disposed)
             return;
 
+        _disposed = true;
+        var hasResources = HasActiveConnectionResources();
+
         try
         {
-            DisconnectAsync().GetAwaiter().GetResult();
+            if (hasResources)
+            {
+                try
+                {
+                    var disconnectTask = DisconnectCoreAsync();
+                    if (disconnectTask.IsCompleted)
+                    {
+                        // 已同步完成（例如在单元测试环境下的虚实现），同步获取结果以防时序断言竞态，0 阻断
+                        disconnectTask.GetAwaiter().GetResult();
+                    }
+                    else
+                    {
+                        // 真实异步，丢给后台，不阻塞 Dispose 同步线程，物理彻底消灭 sync-over-async
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await disconnectTask;
+                            }
+                            catch
+                            {
+                            }
+                        });
+                    }
+                }
+                catch
+                {
+                    // 忽略协议层断开异常
+                }
+            }
+
+            try
+            {
+                // 物理断开，防止任何未决 of 异步网络读写一直挂起
+                _networkStream?.Close();
+                _networkStream?.Dispose();
+                _networkStream = null;
+
+                _tcpClient?.Close();
+                _tcpClient?.Dispose();
+                _tcpClient = null;
+            }
+            catch
+            {
+                // 忽略物理连接释放过程中的异常
+            }
+
+            if (hasResources)
+            {
+                try
+                {
+                    Disconnected?.Invoke(this, new DisconnectionEventArgs
+                    {
+                        Timestamp = DateTime.Now,
+                        Reason = DisconnectionReason.UserInitiated,
+                        Message = "Client disposed"
+                    });
+                }
+                catch
+                {
+                }
+            }
         }
         finally
         {
-            _disposed = true;
             _communicationLock.Dispose();
             _connectLock.Dispose();
             GC.SuppressFinalize(this);

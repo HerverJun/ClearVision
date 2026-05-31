@@ -253,17 +253,64 @@ public abstract class HaoPlcClientBase : IPlcClient
             return;
         }
 
+        _disposed = true;
         try
         {
-            DisconnectAsync().GetAwaiter().GetResult();
+            var disconnectTask = DisconnectCoreAsync();
+            if (disconnectTask.IsCompleted)
+            {
+                // 已同步完成（例如在单元测试环境下的虚实现），同步获取结果以防时序断言竞态，0 阻断
+                disconnectTask.GetAwaiter().GetResult();
+            }
+            else
+            {
+                // 真实异步，丢给后台，不阻塞 Dispose 同步线程，物理彻底消灭 sync-over-async
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await disconnectTask;
+                    }
+                    catch
+                    {
+                    }
+                });
+            }
+        }
+        catch
+        {
+            // 忽略物理连接释放过程中的异常
         }
         finally
         {
-            _disposed = true;
+            _isConnected = false;
             _communicationLock.Dispose();
             _connectLock.Dispose();
             GC.SuppressFinalize(this);
         }
+    }
+
+    protected virtual void ForcePhysicalClose()
+    {
+    }
+
+    protected async Task<T> WithCancellationAsync<T>(Task<T> task, CancellationToken ct)
+    {
+        if (!ct.CanBeCanceled)
+        {
+            return await task;
+        }
+
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (ct.Register(s => ((TaskCompletionSource<bool>)s!).TrySetResult(true), tcs))
+        {
+            if (task != await Task.WhenAny(task, tcs.Task))
+            {
+                ForcePhysicalClose(); // 物理强行掐断 Socket 连接，促使底层 HSL 操作快速报错失败
+                throw new OperationCanceledException(ct);
+            }
+        }
+        return await task;
     }
 
     protected abstract void ApplyConnectionSettings();

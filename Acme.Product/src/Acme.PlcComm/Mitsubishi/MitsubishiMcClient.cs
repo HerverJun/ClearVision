@@ -1,4 +1,4 @@
-using Acme.PlcComm.Common;
+﻿using Acme.PlcComm.Common;
 using Acme.PlcComm.Core;
 using HslCommunication.Profinet.Melsec;
 using Microsoft.Extensions.Logging;
@@ -30,7 +30,9 @@ public class MitsubishiMcClient : HaoPlcClientBase
     protected override async Task<OperateResult> ConnectCoreAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        return ToAcmeResult(await _client.ConnectServerAsync());
+        var hslTask = _client.ConnectServerAsync();
+        var result = await WithCancellationAsync(hslTask, ct);
+        return ToAcmeResult(result);
     }
 
     protected override async Task DisconnectCoreAsync()
@@ -50,12 +52,14 @@ public class MitsubishiMcClient : HaoPlcClientBase
         if (parsed.Content.DataType == PlcDataType.Bit)
         {
             var result = length <= 1
-                ? await ReadSingleBoolAsync(address)
-                : await ReadBoolArrayAsync(address, length);
+                ? await ReadSingleBoolAsync(address, ct)
+                : await ReadBoolArrayAsync(address, length, ct);
             return result;
         }
 
-        return ToAcmeResult(await _client.ReadAsync(address, length));
+        var hslTask = _client.ReadAsync(address, length);
+        var readResult = await WithCancellationAsync(hslTask, ct);
+        return ToAcmeResult(readResult);
     }
 
     protected override async Task<OperateResult> WriteCoreAsync(string address, byte[] value, CancellationToken ct)
@@ -71,35 +75,57 @@ public class MitsubishiMcClient : HaoPlcClientBase
         {
             if (value.Length <= 1)
             {
-                return ToAcmeResult(await _client.WriteAsync(address, value.Length > 0 && value[0] != 0));
+                var writeTask = _client.WriteAsync(address, value.Length > 0 && value[0] != 0);
+                var writeResult = await WithCancellationAsync(writeTask, ct);
+                return ToAcmeResult(writeResult);
             }
 
-            return ToAcmeResult(await _client.WriteAsync(address, value.Select(item => item != 0).ToArray()));
+            var batchWriteTask = _client.WriteAsync(address, value.Select(item => item != 0).ToArray());
+            var batchWriteResult = await WithCancellationAsync(batchWriteTask, ct);
+            return ToAcmeResult(batchWriteResult);
         }
 
-        return ToAcmeResult(await _client.WriteAsync(address, value));
+        var genericWriteTask = _client.WriteAsync(address, value);
+        var genericWriteResult = await WithCancellationAsync(genericWriteTask, ct);
+        return ToAcmeResult(genericWriteResult);
     }
 
     protected override async Task<bool> PingCoreAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var result = await _client.ReadAsync("D0", 1);
+        var pingTask = _client.ReadAsync("D0", 1);
+        var result = await WithCancellationAsync(pingTask, ct);
         return result.IsSuccess;
     }
 
-    private async Task<OperateResult<byte[]>> ReadSingleBoolAsync(string address)
+    private async Task<OperateResult<byte[]>> ReadSingleBoolAsync(string address, CancellationToken ct)
     {
-        var result = await _client.ReadBoolAsync(address);
+        ct.ThrowIfCancellationRequested();
+        var readTask = _client.ReadBoolAsync(address);
+        var result = await WithCancellationAsync(readTask, ct);
         return result.IsSuccess
             ? OperateResult<byte[]>.Success(new[] { result.Content ? (byte)1 : (byte)0 })
             : OperateResult<byte[]>.Failure(result.ErrorCode, result.Message);
     }
 
-    private async Task<OperateResult<byte[]>> ReadBoolArrayAsync(string address, ushort length)
+    private async Task<OperateResult<byte[]>> ReadBoolArrayAsync(string address, ushort length, CancellationToken ct)
     {
-        var result = await _client.ReadBoolAsync(address, length);
+        ct.ThrowIfCancellationRequested();
+        var readTask = _client.ReadBoolAsync(address, length);
+        var result = await WithCancellationAsync(readTask, ct);
         return result.IsSuccess
             ? OperateResult<byte[]>.Success((result.Content ?? Array.Empty<bool>()).Select(item => item ? (byte)1 : (byte)0).ToArray())
             : OperateResult<byte[]>.Failure(result.ErrorCode, result.Message);
+    }
+
+    protected override void ForcePhysicalClose()
+    {
+        try
+        {
+            _client.ConnectClose();
+        }
+        catch
+        {
+        }
     }
 }
