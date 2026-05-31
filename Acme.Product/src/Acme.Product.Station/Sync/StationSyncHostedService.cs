@@ -2,6 +2,11 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
 using System.Threading.Channels;
+using Acme.Product.Application.DTOs;
+using Acme.Product.Core.Cameras;
+using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
+using Acme.Product.Infrastructure.Operators;
 using Acme.Product.Runtime;
 using Acme.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Hosting;
@@ -14,22 +19,32 @@ public sealed class StationSyncHostedService : BackgroundService
 {
     private const string ResultBackpressureDiagnosticCode = "StationResultBackpressure";
     private const string ResultSpoolPersistFailedDiagnosticCode = "StationResultSpoolPersistFailed";
+    private static readonly HashSet<OperatorType> PlcOperatorTypes =
+    [
+        OperatorType.ModbusCommunication,
+        OperatorType.SiemensS7Communication,
+        OperatorType.MitsubishiMcCommunication,
+        OperatorType.OmronFinsCommunication
+    ];
 
     private readonly RuntimeHost _runtimeHost;
     private readonly StationIdentityResolver _identityResolver;
     private readonly StationSpoolStore _spoolStore;
     private readonly StationCommandResultSpoolStore _commandResultSpoolStore;
+    private readonly StationCommandExecutionJournalStore _commandExecutionJournalStore;
     private readonly StationHubClient _hubClient;
     private readonly StationPackageDeploymentService _packageDeploymentService;
     private readonly StationLogRelayService _logRelayService;
     private readonly StationLocalSettingsStore _settingsStore;
     private readonly StationSiteProfileStore _siteProfileStore;
     private readonly StationSyncSettingsStore _syncSettingsStore;
+    private readonly ICameraManager _cameraManager;
     private readonly StationSyncOptions _options;
     private readonly ILogger<StationSyncHostedService> _logger;
     private readonly Channel<StationResultSummaryDto> _resultIngressChannel;
     private readonly SemaphoreSlim _syncSignal = new(0);
     private readonly object _snapshotGate = new();
+    private readonly object _cpuSampleGate = new();
 
     private readonly Action<RuntimeNormalizedResult> _resultHandler;
     private readonly Action<RuntimeHostSnapshot> _snapshotHandler;
@@ -47,6 +62,9 @@ public sealed class StationSyncHostedService : BackgroundService
     private long _resultBackpressureWaits;
     private long _droppedResultSummaries;
     private long _overwrittenSnapshots;
+    private DateTimeOffset? _lastCpuSampleAtUtc;
+    private TimeSpan _lastTotalProcessorTime;
+    private double? _lastCpuUsagePercent;
     private string? _lastSyncBlockReason;
 
     public StationSyncHostedService(
@@ -54,12 +72,14 @@ public sealed class StationSyncHostedService : BackgroundService
         StationIdentityResolver identityResolver,
         StationSpoolStore spoolStore,
         StationCommandResultSpoolStore commandResultSpoolStore,
+        StationCommandExecutionJournalStore commandExecutionJournalStore,
         StationHubClient hubClient,
         StationPackageDeploymentService packageDeploymentService,
         StationLogRelayService logRelayService,
         StationLocalSettingsStore settingsStore,
         StationSiteProfileStore siteProfileStore,
         StationSyncSettingsStore syncSettingsStore,
+        ICameraManager cameraManager,
         IOptions<StationSyncOptions> options,
         ILogger<StationSyncHostedService> logger)
     {
@@ -67,12 +87,14 @@ public sealed class StationSyncHostedService : BackgroundService
         _identityResolver = identityResolver;
         _spoolStore = spoolStore;
         _commandResultSpoolStore = commandResultSpoolStore;
+        _commandExecutionJournalStore = commandExecutionJournalStore;
         _hubClient = hubClient;
         _packageDeploymentService = packageDeploymentService;
         _logRelayService = logRelayService;
         _settingsStore = settingsStore;
         _siteProfileStore = siteProfileStore;
         _syncSettingsStore = syncSettingsStore;
+        _cameraManager = cameraManager;
         _options = options.Value;
         _logger = logger;
         _resultIngressChannel = Channel.CreateBounded<StationResultSummaryDto>(
@@ -80,6 +102,8 @@ public sealed class StationSyncHostedService : BackgroundService
             {
                 SingleReader = true,
                 SingleWriter = false,
+                // The result callback runs on the inspection path. Never wait here; TryWrite failures are
+                // reported as dropped Studio-facing telemetry so local inspection stays autonomous.
                 FullMode = BoundedChannelFullMode.Wait
             });
         _resultHandler = HandleResultAvailable;
@@ -239,15 +263,17 @@ public sealed class StationSyncHostedService : BackgroundService
                 if (!_resultIngressChannel.Writer.TryWrite(summary))
                 {
                     var waits = Interlocked.Increment(ref _resultBackpressureWaits);
+                    var dropped = Interlocked.Increment(ref _droppedResultSummaries);
                     if (waits == 1 || waits % 100 == 0)
                     {
                         _logger.LogWarning(
-                            "Station result sync is applying backpressure instead of dropping result summaries. BackpressureWaits={BackpressureWaits}, OutboundQueueCapacity={OutboundQueueCapacity}",
+                            "Station result sync queue is full. Dropped Studio-facing result summary to protect local inspection latency. BackpressureWaits={BackpressureWaits}, DroppedResultSummaries={DroppedResultSummaries}, OutboundQueueCapacity={OutboundQueueCapacity}",
                             waits,
+                            dropped,
                             Math.Max(1, _options.OutboundQueueCapacity));
                     }
 
-                    _resultIngressChannel.Writer.WriteAsync(summary).AsTask().GetAwaiter().GetResult();
+                    return;
                 }
 
                 accepted = true;
@@ -641,6 +667,11 @@ public sealed class StationSyncHostedService : BackgroundService
             return false;
         }
 
+        if (await TryReplayCompletedCommandAsync(command, stoppingToken))
+        {
+            return true;
+        }
+
         await ReportCommandAsync(command, StationCommandStatus.Accepted, 0, "Accepted", stoppingToken);
         await ReportCommandAsync(command, StationCommandStatus.Running, 10, "Running", stoppingToken);
 
@@ -683,6 +714,37 @@ public sealed class StationSyncHostedService : BackgroundService
             _logRelayService.TryEnqueue("ERROR", "StationCommand", $"Command {command.CommandId} failed: {ex.Message}", ex);
             await ReportCommandAsync(command, StationCommandStatus.Failed, 100, ex.Message, stoppingToken, "CommandFailed", ex.ToString());
         }
+
+        return true;
+    }
+
+    private async Task<bool> TryReplayCompletedCommandAsync(StationCommandDto command, CancellationToken cancellationToken)
+    {
+        if (!_commandExecutionJournalStore.TryGetTerminalResult(command, out var cachedResult))
+        {
+            return false;
+        }
+
+        _logger.LogInformation(
+            "Station command {CommandId} was already completed locally. Replaying cached terminal result {Status}.",
+            command.CommandId,
+            cachedResult.Status);
+
+        if (cachedResult.Status is StationCommandStatus.Succeeded or StationCommandStatus.Failed)
+        {
+            await ReportCommandAsync(command, StationCommandStatus.Accepted, 0, "Accepted cached command redelivery.", cancellationToken);
+            await ReportCommandAsync(command, StationCommandStatus.Running, 100, "Replaying cached command result.", cancellationToken);
+        }
+
+        await ReportCommandAsync(
+            command,
+            cachedResult.Status,
+            Math.Clamp(cachedResult.ProgressPercent <= 0 ? 100 : cachedResult.ProgressPercent, 0, 100),
+            BuildCachedCommandReplayMessage(cachedResult),
+            cancellationToken,
+            cachedResult.ErrorCode,
+            cachedResult.ErrorDetail,
+            recordTerminal: false);
 
         return true;
     }
@@ -830,7 +892,8 @@ public sealed class StationSyncHostedService : BackgroundService
         string message,
         CancellationToken cancellationToken,
         string? errorCode = null,
-        string? errorDetail = null)
+        string? errorDetail = null,
+        bool recordTerminal = true)
     {
         var now = DateTimeOffset.UtcNow;
         var payload = new StationCommandResultDto
@@ -848,12 +911,33 @@ public sealed class StationSyncHostedService : BackgroundService
             CreatedAtUtc = now
         };
 
+        if (recordTerminal && IsTerminalCommandStatus(status))
+        {
+            _commandExecutionJournalStore.RecordTerminalResult(command, payload);
+        }
+
         if (!await _hubClient.ReportCommandResultAsync(payload, cancellationToken))
         {
             _isRegistered = false;
             _commandResultSpoolStore.Enqueue(payload);
             SignalSync();
         }
+    }
+
+    private static string BuildCachedCommandReplayMessage(StationCommandResultDto cachedResult)
+    {
+        return string.IsNullOrWhiteSpace(cachedResult.Message)
+            ? "Command already completed locally; replaying cached terminal result."
+            : $"Command already completed locally; replaying cached terminal result. Original: {cachedResult.Message}";
+    }
+
+    private static bool IsTerminalCommandStatus(StationCommandStatus status)
+    {
+        return status is StationCommandStatus.Succeeded
+            or StationCommandStatus.Failed
+            or StationCommandStatus.TimedOut
+            or StationCommandStatus.Cancelled
+            or StationCommandStatus.Rejected;
     }
 
     private async Task WaitForNextSignalAsync(CancellationToken stoppingToken)
@@ -1007,21 +1091,180 @@ public sealed class StationSyncHostedService : BackgroundService
             MessageId = $"health_{identity.StationId}_{Guid.NewGuid():N}",
             RuntimeState = StationSyncStateMapper.ToStationRuntimeState(snapshot.State),
             ProcessUptimeSeconds = (long)Math.Max(0, (now - identity.StartedAtUtc).TotalSeconds),
-            CpuUsagePercent = null,
+            CpuUsagePercent = SampleCpuUsagePercent(process, now),
             WorkingSetMb = process.WorkingSet64 / 1024 / 1024,
             PrivateMemoryMb = process.PrivateMemorySize64 / 1024 / 1024,
             DiskFreeMb = driveInfo?.AvailableFreeSpace / 1024 / 1024 ?? 0,
             DiskTotalMb = driveInfo?.TotalSize / 1024 / 1024 ?? 0,
             SpoolPendingCount = spoolPendingCount,
             SpoolBytes = spoolBytes,
-            CameraStatusSummary = "Unknown",
-            PlcStatusSummary = BuildPlcStatusSummary(snapshot),
+            CameraStatusSummary = BuildCameraStatusSummary(_runtimeHost.LoadedPackage),
+            PlcStatusSummary = BuildPlcStatusSummary(_runtimeHost.LoadedPackage, snapshot),
             CurrentPackageId = snapshot.PackageId,
             CurrentPackageHealth = snapshot.PackageId == null ? "NoPackage" : "Loaded",
             LastErrorCode = resultSyncDiagnostic.Code,
             LastErrorMessage = resultSyncDiagnostic.Message,
             CreatedAtUtc = now
         };
+    }
+
+    private double? SampleCpuUsagePercent(Process process, DateTimeOffset now)
+    {
+        var totalProcessorTime = process.TotalProcessorTime;
+
+        lock (_cpuSampleGate)
+        {
+            if (_lastCpuSampleAtUtc is not { } lastSampleAt)
+            {
+                _lastCpuSampleAtUtc = now;
+                _lastTotalProcessorTime = totalProcessorTime;
+                return _lastCpuUsagePercent;
+            }
+
+            var elapsedMilliseconds = (now - lastSampleAt).TotalMilliseconds;
+            var processorMilliseconds = Math.Max(0d, (totalProcessorTime - _lastTotalProcessorTime).TotalMilliseconds);
+            _lastCpuSampleAtUtc = now;
+            _lastTotalProcessorTime = totalProcessorTime;
+
+            if (elapsedMilliseconds <= 0)
+            {
+                return _lastCpuUsagePercent;
+            }
+
+            var processorCount = Math.Max(1, Environment.ProcessorCount);
+            var cpuUsage = processorMilliseconds / elapsedMilliseconds / processorCount * 100d;
+            _lastCpuUsagePercent = Math.Round(Math.Clamp(cpuUsage, 0d, 100d), 2);
+            return _lastCpuUsagePercent;
+        }
+    }
+
+    private string BuildCameraStatusSummary(RuntimePackage? package)
+    {
+        if (package?.Flow == null)
+        {
+            return "NotConfigured: no runtime package is loaded.";
+        }
+
+        var acquisitionOperators = package.Flow.Operators
+            .Where(op => op.IsEnabled && OperatorTypeAliasResolver.Resolve(op.Type) == OperatorType.ImageAcquisition)
+            .ToList();
+        if (acquisitionOperators.Count == 0)
+        {
+            return "NotConfigured: current flow does not contain an enabled ImageAcquisition operator.";
+        }
+
+        var probes = acquisitionOperators.Select(BuildCameraStatusProbe).ToList();
+        var cameraProbes = probes.Where(probe => probe.IsCameraMode).ToList();
+        if (cameraProbes.Count == 0)
+        {
+            return acquisitionOperators.Count == 1
+                ? "FileMode: current flow uses image file input."
+                : $"FileMode: current flow uses {acquisitionOperators.Count} image file inputs.";
+        }
+
+        var disconnected = cameraProbes.Where(probe => !probe.IsConnected).ToList();
+        if (disconnected.Count > 0)
+        {
+            return disconnected.Count == 1
+                ? disconnected[0].Summary
+                : $"Disconnected: {disconnected.Count} of {cameraProbes.Count} camera bindings unavailable. " +
+                  string.Join("; ", disconnected.Take(2).Select(probe => probe.Detail));
+        }
+
+        return cameraProbes.Count == 1
+            ? cameraProbes[0].Summary
+            : $"Connected: {cameraProbes.Count} camera bindings are connected.";
+    }
+
+    private CameraStatusProbe BuildCameraStatusProbe(OperatorDto acquisitionOperator)
+    {
+        var bindingId = GetParameterString(acquisitionOperator, "CameraId", string.Empty);
+        var sourceType = NormalizeOptionValue(GetParameterString(acquisitionOperator, "SourceType", string.Empty), string.Empty);
+        var isCameraMode = sourceType.Equals("Camera", StringComparison.OrdinalIgnoreCase)
+            || (string.IsNullOrWhiteSpace(sourceType) && !string.IsNullOrWhiteSpace(bindingId));
+        if (!isCameraMode)
+        {
+            return new CameraStatusProbe(false, true, "FileMode: current flow uses image file input.", acquisitionOperator.Name);
+        }
+
+        if (string.IsNullOrWhiteSpace(bindingId))
+        {
+            return new CameraStatusProbe(
+                true,
+                false,
+                "Disconnected: camera mode is selected but CameraId is not configured.",
+                $"{acquisitionOperator.Name}: CameraId is empty");
+        }
+
+        var binding = _cameraManager.FindBinding(bindingId);
+        if (binding == null)
+        {
+            return new CameraStatusProbe(
+                true,
+                false,
+                $"Disconnected: camera binding '{bindingId}' is not configured.",
+                $"{acquisitionOperator.Name}: binding '{bindingId}' is not configured");
+        }
+
+        var displayName = DescribeCameraBinding(binding);
+        if (!binding.IsEnabled)
+        {
+            return new CameraStatusProbe(
+                true,
+                false,
+                $"Disconnected: camera binding {displayName} is disabled.",
+                $"{acquisitionOperator.Name}: {displayName} disabled");
+        }
+
+        var camera = !string.IsNullOrWhiteSpace(binding.SerialNumber)
+            ? _cameraManager.GetCamera(binding.SerialNumber)
+            : null;
+        camera ??= _cameraManager.GetCamera(binding.Id);
+
+        if (camera?.IsConnected == true)
+        {
+            return new CameraStatusProbe(
+                true,
+                true,
+                $"Connected: {displayName}.",
+                $"{acquisitionOperator.Name}: {displayName}");
+        }
+
+        return new CameraStatusProbe(
+            true,
+            false,
+            $"Disconnected: {displayName}.",
+            $"{acquisitionOperator.Name}: {displayName}");
+    }
+
+    private static string DescribeCameraBinding(CameraBindingConfig binding)
+    {
+        var displayName = string.IsNullOrWhiteSpace(binding.DisplayName)
+            ? binding.Id
+            : binding.DisplayName.Trim();
+        var id = string.IsNullOrWhiteSpace(binding.Id) ? "unbound" : binding.Id.Trim();
+        var serial = binding.SerialNumber?.Trim();
+
+        return string.IsNullOrWhiteSpace(serial)
+            ? $"{displayName} [{id}]"
+            : $"{displayName} [{id}/{serial}]";
+    }
+
+    private static string GetParameterString(OperatorDto op, string parameterName, string fallback)
+    {
+        var parameter = op.Parameters.FirstOrDefault(item => string.Equals(item.Name, parameterName, StringComparison.OrdinalIgnoreCase));
+        var value = parameter?.Value ?? parameter?.DefaultValue;
+        var text = value?.ToString()?.Trim();
+        return string.IsNullOrWhiteSpace(text) ? fallback : text;
+    }
+
+    private static string NormalizeOptionValue(string? value, string fallback)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        var separatorIndex = normalized.IndexOf('|', StringComparison.Ordinal);
+        return separatorIndex >= 0
+            ? normalized[..separatorIndex].Trim()
+            : normalized;
     }
 
     private (string? Code, string? Message) BuildResultSyncDiagnostic(
@@ -1049,6 +1292,8 @@ public sealed class StationSyncHostedService : BackgroundService
 
         return (null, null);
     }
+
+    private sealed record CameraStatusProbe(bool IsCameraMode, bool IsConnected, string Summary, string Detail);
 
     private bool IsResultBackpressured(long queued, int spoolPending)
     {
@@ -1080,21 +1325,200 @@ public sealed class StationSyncHostedService : BackgroundService
             $"spoolPending={spoolPending}; spoolBytes={spoolBytes}; diskFreeMb={diskFreeMb}; {trimmingText}failedResultSpoolWrites={dropped}";
     }
 
-    private static string BuildPlcStatusSummary(RuntimeHostSnapshot snapshot)
+    private static string BuildPlcStatusSummary(RuntimePackage? package, RuntimeHostSnapshot snapshot)
     {
-        if (snapshot.PackageId == null)
+        return BuildPlcStatusSummaryCore(
+            package,
+            snapshot,
+            PlcCommunicationOperatorBase.GetConnectionStateSnapshot(),
+            ModbusCommunicationOperator.GetConnectionStateSnapshot());
+    }
+
+    private static string BuildPlcStatusSummaryCore(
+        RuntimePackage? package,
+        RuntimeHostSnapshot snapshot,
+        IReadOnlyDictionary<string, bool> industrialConnectionStates,
+        IReadOnlyDictionary<string, bool> modbusConnectionStates)
+    {
+        if (package?.Flow == null || snapshot.PackageId == null)
         {
             return "NotConfigured: no runtime package is loaded.";
         }
 
-        return snapshot.State switch
+        if (snapshot.State == RuntimeHostState.Faulted)
         {
-            RuntimeHostState.Faulted => "Error: runtime host is faulted; PLC operator state may be unavailable.",
-            RuntimeHostState.Loaded => "Ready: runtime package is loaded; PLC status is reported by PLC operators when configured.",
-            RuntimeHostState.Running or RuntimeHostState.Idle => "Ready: PLC status is reported by PLC operators when configured.",
-            _ => $"Disconnected: runtime host state is {snapshot.State}."
+            return "Error: runtime host is faulted; PLC operator state may be unavailable.";
+        }
+
+        if (snapshot.State is not (RuntimeHostState.Loaded or RuntimeHostState.Running or RuntimeHostState.Idle))
+        {
+            return $"Disconnected: runtime host state is {snapshot.State}.";
+        }
+
+        var plcOperators = package.Flow.Operators
+            .Where(op => op.IsEnabled && PlcOperatorTypes.Contains(OperatorTypeAliasResolver.Resolve(op.Type)))
+            .ToList();
+        if (plcOperators.Count == 0)
+        {
+            return "NotConfigured: current flow does not contain an enabled PLC communication operator.";
+        }
+
+        var probes = plcOperators
+            .Select(op => BuildPlcStatusProbe(op, industrialConnectionStates, modbusConnectionStates))
+            .ToList();
+        var connectedCount = probes.Count(probe => probe.HasRuntimeState && probe.IsConnected);
+        var disconnected = probes.Where(probe => probe.HasRuntimeState && !probe.IsConnected).ToList();
+        var pending = probes.Where(probe => !probe.HasRuntimeState).ToList();
+
+        if (disconnected.Count > 0)
+        {
+            return $"Disconnected: PLC online {connectedCount} / disconnected {disconnected.Count} / pending {pending.Count}. " +
+                string.Join("; ", disconnected.Take(2).Select(probe => probe.Detail));
+        }
+
+        if (connectedCount == 0)
+        {
+            return $"Pending: {plcOperators.Count} PLC operator(s) configured; no runtime connection has been opened.";
+        }
+
+        if (pending.Count > 0)
+        {
+            return $"Ready: PLC online {connectedCount} / pending {pending.Count}. " +
+                string.Join("; ", pending.Take(2).Select(probe => probe.Detail));
+        }
+
+        return $"Connected: PLC online {connectedCount} / total {probes.Count}.";
+    }
+
+    private static PlcStatusProbe BuildPlcStatusProbe(
+        OperatorDto plcOperator,
+        IReadOnlyDictionary<string, bool> industrialConnectionStates,
+        IReadOnlyDictionary<string, bool> modbusConnectionStates)
+    {
+        var type = OperatorTypeAliasResolver.Resolve(plcOperator.Type);
+        var operatorName = string.IsNullOrWhiteSpace(plcOperator.Name)
+            ? type.ToString()
+            : plcOperator.Name.Trim();
+        var connectionKey = BuildPlcConnectionKey(plcOperator, type);
+        if (string.IsNullOrWhiteSpace(connectionKey))
+        {
+            return new PlcStatusProbe(
+                false,
+                false,
+                $"{operatorName}: PLC connection parameters are incomplete.");
+        }
+
+        var states = type == OperatorType.ModbusCommunication
+            ? modbusConnectionStates
+            : industrialConnectionStates;
+        if (!states.TryGetValue(connectionKey, out var isConnected))
+        {
+            return new PlcStatusProbe(
+                false,
+                false,
+                $"{operatorName}: {GetPlcProtocolLabel(type)} {connectionKey} not opened");
+        }
+
+        return new PlcStatusProbe(
+            true,
+            isConnected,
+            $"{operatorName}: {GetPlcProtocolLabel(type)} {connectionKey}");
+    }
+
+    private static string? BuildPlcConnectionKey(OperatorDto plcOperator, OperatorType type)
+    {
+        var ipAddress = GetParameterString(plcOperator, "IpAddress", string.Empty);
+        var port = GetParameterInt(plcOperator, "Port", GetDefaultPlcPort(type));
+        if (string.IsNullOrWhiteSpace(ipAddress) || port <= 0)
+        {
+            return null;
+        }
+
+        return type switch
+        {
+            OperatorType.SiemensS7Communication => BuildS7ConnectionKey(plcOperator, ipAddress, port),
+            OperatorType.MitsubishiMcCommunication => $"MC:{ipAddress}:{port}",
+            OperatorType.OmronFinsCommunication => $"FINS:{ipAddress}:{port}",
+            OperatorType.ModbusCommunication => $"{ipAddress}:{port}",
+            _ => null
         };
     }
+
+    private static string BuildS7ConnectionKey(OperatorDto plcOperator, string ipAddress, int port)
+    {
+        var cpuType = NormalizeS7CpuType(GetParameterString(plcOperator, "CpuType", "S71200"));
+        var rack = GetParameterInt(plcOperator, "Rack", 0);
+        var slot = GetParameterInt(plcOperator, "Slot", 1);
+        return $"S7:{ipAddress}:{port}:{cpuType}:{rack}:{slot}";
+    }
+
+    private static string NormalizeS7CpuType(string? value)
+    {
+        var normalized = NormalizeOptionValue(value, "S71200").ToUpperInvariant();
+        return normalized switch
+        {
+            "S7200" => "S7200",
+            "S7200SMART" => "S7200Smart",
+            "S7300" => "S7300",
+            "S7400" => "S7400",
+            "S71500" => "S71500",
+            _ => "S71200"
+        };
+    }
+
+    private static int GetDefaultPlcPort(OperatorType type)
+    {
+        return type switch
+        {
+            OperatorType.SiemensS7Communication => 102,
+            OperatorType.MitsubishiMcCommunication => 5002,
+            OperatorType.OmronFinsCommunication => 9600,
+            OperatorType.ModbusCommunication => 502,
+            _ => 0
+        };
+    }
+
+    private static string GetPlcProtocolLabel(OperatorType type)
+    {
+        return type switch
+        {
+            OperatorType.SiemensS7Communication => "S7",
+            OperatorType.MitsubishiMcCommunication => "MC",
+            OperatorType.OmronFinsCommunication => "FINS",
+            OperatorType.ModbusCommunication => "Modbus",
+            _ => type.ToString()
+        };
+    }
+
+    private static int GetParameterInt(OperatorDto op, string parameterName, int fallback)
+    {
+        var parameter = op.Parameters.FirstOrDefault(item => string.Equals(item.Name, parameterName, StringComparison.OrdinalIgnoreCase));
+        var value = parameter?.Value ?? parameter?.DefaultValue;
+        if (value == null)
+        {
+            return fallback;
+        }
+
+        if (value is JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Number && element.TryGetInt32(out var jsonNumber))
+            {
+                return jsonNumber;
+            }
+
+            if (element.ValueKind == JsonValueKind.String &&
+                int.TryParse(element.GetString(), out var jsonTextNumber))
+            {
+                return jsonTextNumber;
+            }
+        }
+
+        return int.TryParse(value.ToString(), out var parsed)
+            ? parsed
+            : fallback;
+    }
+
+    private sealed record PlcStatusProbe(bool HasRuntimeState, bool IsConnected, string Detail);
 
     private static RuntimeSiteProfile DeserializeSiteProfilePayload(string? payloadJson)
     {

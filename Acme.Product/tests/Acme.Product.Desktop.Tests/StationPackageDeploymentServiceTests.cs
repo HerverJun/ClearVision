@@ -120,6 +120,56 @@ public sealed class StationPackageDeploymentServiceTests
     }
 
     [Fact]
+    public void RollBack_ShouldRemoveFailedActive_WhenNoLastKnownGoodExists()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionPackageRollbackTests", Guid.NewGuid().ToString("N"));
+        var activeRoot = Path.Combine(root, "active");
+        var lastKnownGoodRoot = Path.Combine(root, "last-known-good");
+        Directory.CreateDirectory(activeRoot);
+        File.WriteAllText(Path.Combine(activeRoot, "package.json"), "failed-active");
+
+        try
+        {
+            InvokeRollBack(activeRoot, lastKnownGoodRoot);
+
+            Directory.Exists(activeRoot).Should().BeFalse("a failed first deployment must not leave an invalid active package on disk.");
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void RollBack_ShouldRestoreLastKnownGood_WhenAvailable()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionPackageRollbackTests", Guid.NewGuid().ToString("N"));
+        var activeRoot = Path.Combine(root, "active");
+        var lastKnownGoodRoot = Path.Combine(root, "last-known-good");
+        Directory.CreateDirectory(activeRoot);
+        Directory.CreateDirectory(lastKnownGoodRoot);
+        File.WriteAllText(Path.Combine(activeRoot, "package.json"), "failed-active");
+        File.WriteAllText(Path.Combine(lastKnownGoodRoot, "package.json"), "last-known-good");
+
+        try
+        {
+            InvokeRollBack(activeRoot, lastKnownGoodRoot);
+
+            File.ReadAllText(Path.Combine(activeRoot, "package.json")).Should().Be("last-known-good");
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task LoadPackageWithLocalProfileAsync_ShouldApplyPersistedSiteProfile()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionPackageProfileLoadTests", Guid.NewGuid().ToString("N"));
@@ -222,5 +272,14 @@ public sealed class StationPackageDeploymentServiceTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    private static void InvokeRollBack(string activeRoot, string lastKnownGoodRoot)
+    {
+        var method = typeof(StationPackageDeploymentService).GetMethod(
+            "RollBack",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        method.Should().NotBeNull();
+        method!.Invoke(null, [activeRoot, lastKnownGoodRoot]);
     }
 }

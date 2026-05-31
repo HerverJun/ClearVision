@@ -30,6 +30,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSpoolStore.cs" Link="Station\Sync\StationSpoolStore.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationCommandResultSpoolStore.cs" Link="Station\Sync\StationCommandResultSpoolStore.cs" />
+    <Compile Include="..\..\src\Acme.Product.Station\Sync\StationCommandExecutionJournalStore.cs" Link="Station\Sync\StationCommandExecutionJournalStore.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSyncOptions.cs" Link="Station\Sync\StationSyncOptions.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSyncConnectionSettings.cs" Link="Station\Sync\StationSyncConnectionSettings.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSyncSettingsStore.cs" Link="Station\Sync\StationSyncSettingsStore.cs" />
@@ -40,6 +41,7 @@
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationLogRelayService.cs" Link="Station\Sync\StationLogRelayService.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationPackageDeploymentService.cs" Link="Station\Sync\StationPackageDeploymentService.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationResultMapper.cs" Link="Station\Sync\StationResultMapper.cs" />
+    <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSyncHostedService.cs" Link="Station\Sync\StationSyncHostedService.cs" />
   </ItemGroup>
 
   <ItemGroup>

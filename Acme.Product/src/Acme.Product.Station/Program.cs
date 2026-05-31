@@ -39,6 +39,7 @@ internal static class Program
                 services.AddSingleton<Sync.StationIdentityResolver>();
                 services.AddSingleton<Sync.StationSpoolStore>();
                 services.AddSingleton<Sync.StationCommandResultSpoolStore>();
+                services.AddSingleton<Sync.StationCommandExecutionJournalStore>();
                 services.AddSingleton<Sync.StationHubClient>();
                 services.AddSingleton<Sync.StationPackageDeploymentService>();
                 services.AddSingleton<Sync.StationLogRelayService>();

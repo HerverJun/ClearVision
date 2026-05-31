@@ -216,6 +216,17 @@ public class ModbusCommunicationOperator : OperatorBase
         }
     }
 
+    public static IReadOnlyDictionary<string, bool> GetConnectionStateSnapshot()
+    {
+        var snapshot = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, client) in ConnectionPool)
+        {
+            snapshot[key] = IsConnectionAlive(client);
+        }
+
+        return snapshot;
+    }
+
     private static void ApplyClientTimeouts(TcpClient client, int timeoutMs)
     {
         client.ReceiveTimeout = timeoutMs;

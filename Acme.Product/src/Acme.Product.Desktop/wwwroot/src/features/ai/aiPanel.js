@@ -110,6 +110,13 @@ export class AiPanel {
         // 附件报告缓存
         this._lastAttachmentReport = null;
         this._lastModelSupportsVision = null;
+        this._chatContainer = null;
+        this._scrollBottomButton = null;
+        this._scrollBottomBadge = null;
+        this._scrollStateRaf = 0;
+        this._inputResizeObserver = null;
+        this.userHasScrolledUp = false;
+        this.unreadStreamCount = 0;
 
         // 绑定方法
         this._handleGenerate = this._handleGenerate.bind(this);
@@ -137,6 +144,9 @@ export class AiPanel {
         this._setupMessageListeners();
         this._setupCanvasStructureSync();
         this._loadHistory();
+        this._setupScrollListener();
+        this._setupComposerLayoutSync();
+        this._setupExamplesFolding();
     }
     
     activate() {
@@ -150,6 +160,9 @@ export class AiPanel {
         this._saveSessionId(null);
         this.currentResult = null;
         this.lastUserPrompt = '';
+        this.unreadStreamCount = 0;
+        this.userHasScrolledUp = false;
+        this._updateScrollBottomBtn();
         this.nextHintDraft = '';
         this.nextTemplateSelection = null;
         this.activeGenerateRequestId = null;
@@ -273,8 +286,23 @@ export class AiPanel {
                         </span>
                         <span class="pane-title">CO-PILOT 对话</span>
                         <span class="status-badge online" id="ai-conn-status"><span class="status-dot connected"></span>在线</span>
-                        <button class="icon-btn" id="ai-btn-new-session" title="新建对话">新对话</button>
-                        <button class="icon-btn ai-btn-history" id="ai-btn-history" title="历史会话" aria-expanded="false">历史</button>
+                        <div class="ai-pane-actions" role="group" aria-label="AI 对话操作">
+                            <button class="icon-btn ai-action-btn" id="ai-btn-new-session" type="button" title="新建对话" aria-label="新建对话">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M12 5v14"></path>
+                                    <path d="M5 12h14"></path>
+                                </svg>
+                                <span>新对话</span>
+                            </button>
+                            <button class="icon-btn ai-action-btn ai-btn-history" id="ai-btn-history" type="button" title="历史会话" aria-label="历史会话" aria-expanded="false">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+                                    <path d="M3 4v5h5"></path>
+                                    <path d="M12 7v5l3 2"></path>
+                                </svg>
+                                <span>历史</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="ai-history-panel" id="ai-history-panel">
@@ -298,34 +326,35 @@ export class AiPanel {
                     <div class="ai-input-section">
                         <div class="ai-requirement-mode-bar">
                             <div class="ai-requirement-mode-label">需求模式</div>
-                            <div class="ai-requirement-mode-toggle" id="ai-requirement-mode-toggle">
+                            <div class="ai-requirement-mode-toggle" id="ai-requirement-mode-toggle" role="group" aria-label="需求模式">
                                 <button class="ai-mode-chip" type="button" data-requirement-mode="strict">严格澄清</button>
                                 <button class="ai-mode-chip" type="button" data-requirement-mode="draft">草稿优先</button>
                             </div>
                             <div class="ai-requirement-mode-tip" id="ai-requirement-mode-tip"></div>
                         </div>
                         <div class="ai-input-box">
-                            <button class="icon-btn" id="ai-btn-attach" title="附件">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 005 0V5c0-1.38-1.12-2.5-2.5-2.5S8 3.62 8 5v11.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
+                            <button class="icon-btn" id="ai-btn-attach" type="button" title="添加附件" aria-label="添加附件">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 005 0V5c0-1.38-1.12-2.5-2.5-2.5S8 3.62 8 5v11.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
                             </button>
-                            <textarea class="ai-textarea" id="ai-input" placeholder="输入指令..."></textarea>
+                            <textarea class="ai-textarea" id="ai-input" placeholder="描述检测目标、缺陷或流程修改..."></textarea>
                             <button class="ai-btn-cancel" id="ai-btn-cancel" type="button" title="取消生成">取消</button>
-                            <button class="ai-btn-send" id="ai-btn-gen">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                            <button class="ai-btn-send" id="ai-btn-gen" type="button" title="发送" aria-label="发送">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="white" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                             </button>
                         </div>
                         <div class="ai-attachments" id="ai-attachments"></div>
                         <div class="ai-manual-retry-banner" id="ai-manual-retry-banner"></div>
                         <div class="ai-followup-hint-banner" id="ai-followup-hint-banner"></div>
                         <div class="ai-quick-examples">
-                            <div class="examples-header" id="examples-toggle">
-                                快捷示例 
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:middle;"><path d="M7 10l5 5 5-5z"/></svg>
-                            </div>
-                            <div class="ai-example-tags">
-                                <span class="ai-tag" data-text="读取产品上的DataMatrix二维码。">条码读取</span>
-                                <span class="ai-tag" data-text="检测金属零件表面的划痕缺陷。先进行高斯滤波去噪，然后使用Canny边缘检测，最后通过Blob分析计算划痕面积。">缺陷检测</span>
-                                <span class="ai-tag" data-text="测量两个圆形孔位的圆心距离。">孔距测量</span>
+                            <button class="examples-header" id="examples-toggle" type="button" aria-expanded="true" aria-controls="ai-example-tags">
+                                <span>快捷示例</span>
+                                <svg class="examples-chevron" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+                            </button>
+                            <div class="ai-example-tags" id="ai-example-tags">
+                                <button class="ai-tag" type="button" data-text="读取产品上的DataMatrix二维码。">条码读取</button>
+                                <button class="ai-tag" type="button" data-text="检测金属零件表面的划痕缺陷。先进行高斯滤波去噪，然后使用Canny边缘检测，最后通过Blob分析计算划痕面积。">缺陷检测</button>
+                                <button class="ai-tag" type="button" data-text="测量两个圆形孔位的圆心距离。">孔距测量</button>
+                                <button class="ai-tag" type="button" data-text="识别线束端子颜色顺序，并输出线序是否正确。">线序检测</button>
                             </div>
                         </div>
                     </div>
@@ -3297,11 +3326,17 @@ export class AiPanel {
                 </div>
                 <details class="ai-assistant-section ai-assistant-reasoning-section" ${openReasoning ? 'open' : ''} hidden>
                     <summary>生成诊断</summary>
-                    <div class="ai-assistant-section-body ai-assistant-reasoning-body"></div>
+                    <div class="ai-stream-body-wrap">
+                        <div class="ai-assistant-section-body ai-assistant-reasoning-body"></div>
+                        <span class="ai-cursor reasoning-cursor" hidden></span>
+                    </div>
                 </details>
                 <details class="ai-assistant-section ai-assistant-reply-section" ${openReply ? 'open' : ''} hidden>
                     <summary>回复</summary>
-                    <div class="ai-assistant-section-body ai-assistant-reply-body"></div>
+                    <div class="ai-stream-body-wrap">
+                        <div class="ai-assistant-section-body ai-assistant-reply-body"></div>
+                        <span class="ai-cursor reply-cursor" hidden></span>
+                    </div>
                 </details>
                 <details class="ai-assistant-section ai-assistant-clarification-section" hidden>
                     <summary>需求澄清</summary>
@@ -3323,6 +3358,8 @@ export class AiPanel {
             reasoningBody: msg.querySelector('.ai-assistant-reasoning-body'),
             replySection: msg.querySelector('.ai-assistant-reply-section'),
             replyBody: msg.querySelector('.ai-assistant-reply-body'),
+            reasoningCursor: msg.querySelector('.reasoning-cursor'),
+            replyCursor: msg.querySelector('.reply-cursor'),
             clarificationSection: msg.querySelector('.ai-assistant-clarification-section'),
             clarificationBody: msg.querySelector('.ai-assistant-clarification-body'),
             failureSection: msg.querySelector('.ai-assistant-failure-section'),
@@ -3344,6 +3381,17 @@ export class AiPanel {
         turn.statusEl.textContent = statusText;
         turn.statusEl.className = `ai-assistant-status is-${tone}`;
         turn.card.dataset.turnTone = tone;
+
+        if (tone !== 'streaming') {
+            [turn.reasoningCursor, turn.replyCursor].forEach(cursor => {
+                if (!cursor) return;
+                cursor.classList.add('fading');
+                window.setTimeout(() => cursor.setAttribute('hidden', 'true'), 180);
+            });
+            this.unreadStreamCount = 0;
+            this.userHasScrolledUp = false;
+            this._updateScrollBottomBtn();
+        }
     }
 
     _appendAssistantStreamText(field, text) {
@@ -3355,12 +3403,25 @@ export class AiPanel {
         if (!body || !section) return;
 
         section.hidden = false;
+
+        const cursor = field === 'reasoning' ? turn.reasoningCursor : turn.replyCursor;
+        if (cursor) {
+            cursor.removeAttribute('hidden');
+            cursor.classList.remove('fading');
+        }
+
         const shouldFollowBottom = this._isNearBottom(body);
         body.textContent += text;
         if (shouldFollowBottom) {
             body.scrollTop = body.scrollHeight;
         }
-        this._scrollToBottom();
+
+        if (this.userHasScrolledUp) {
+            this.unreadStreamCount += text.length;
+            this._updateScrollBottomBtn();
+        } else {
+            this._scrollToBottom();
+        }
     }
 
     _setAssistantSectionText(turn, field, text, { keepExisting = false } = {}) {
@@ -6013,5 +6074,168 @@ export class AiPanel {
             }
             return `<span class="ai-requirement-brief-tag is-missing">${this._escapeHtml(String(fact))}</span>`;
         }).join('')}</div>`;
+    }
+
+    _setupScrollListener() {
+        const container = this.container?.querySelector('#ai-chat-container');
+        if (!container) return;
+        this._chatContainer = container;
+
+        container.addEventListener('scroll', () => {
+            if (this._scrollStateRaf) return;
+            this._scrollStateRaf = window.requestAnimationFrame(() => {
+                this._scrollStateRaf = 0;
+                this._syncScrollFollowState();
+            });
+        }, { passive: true });
+
+        this._createScrollBottomBtn();
+    }
+
+    _setupComposerLayoutSync() {
+        const pane = this.container?.querySelector('.ai-pane-left');
+        const input = this.container?.querySelector('.ai-input-section');
+        if (!pane || !input) return;
+
+        this._syncComposerOffset();
+
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', () => this._syncComposerOffset(), { passive: true });
+            return;
+        }
+
+        if (this._inputResizeObserver) {
+            this._inputResizeObserver.disconnect();
+        }
+        this._inputResizeObserver = new ResizeObserver(() => this._syncComposerOffset());
+        this._inputResizeObserver.observe(input);
+    }
+
+    _syncComposerOffset() {
+        const pane = this.container?.querySelector('.ai-pane-left');
+        const input = this.container?.querySelector('.ai-input-section');
+        if (!pane || !input) return;
+
+        const height = Math.ceil(input.getBoundingClientRect().height || 0);
+        if (height > 0) {
+            pane.style.setProperty('--ai-composer-offset', `${height}px`);
+        }
+    }
+
+    _syncScrollFollowState() {
+        const container = this._chatContainer || this.container?.querySelector('#ai-chat-container');
+        if (!container) return;
+
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 120;
+        this.userHasScrolledUp = !isNearBottom;
+        if (isNearBottom) {
+            this.unreadStreamCount = 0;
+        }
+        this._updateScrollBottomBtn();
+    }
+
+    _createScrollBottomBtn() {
+        const container = this._chatContainer || this.container?.querySelector('#ai-chat-container');
+        if (!container) return;
+
+        let btn = this.container.querySelector('#ai-scroll-bottom-btn');
+        if (btn) {
+            this._scrollBottomButton = btn;
+            this._scrollBottomBadge = btn.querySelector('.ai-scroll-bottom-badge');
+            return;
+        }
+
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'ai-scroll-bottom-btn';
+        btn.className = 'ai-scroll-bottom-btn';
+        btn.title = '回到底部';
+        btn.setAttribute('aria-label', '回到底部');
+        btn.setAttribute('aria-hidden', 'true');
+        btn.tabIndex = -1;
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <polyline points="19 12 12 19 5 12"></polyline>
+            </svg>
+            <span class="ai-scroll-bottom-badge" id="ai-scroll-bottom-badge" hidden>0</span>
+        `;
+
+        const parent = container.parentElement;
+        if (parent) {
+            parent.appendChild(btn);
+            btn.addEventListener('click', () => {
+                const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+                container.scroll({
+                    top: container.scrollHeight,
+                    behavior: prefersReducedMotion ? 'auto' : 'smooth'
+                });
+                this.userHasScrolledUp = false;
+                this.unreadStreamCount = 0;
+                this._updateScrollBottomBtn();
+            });
+            this._scrollBottomButton = btn;
+            this._scrollBottomBadge = btn.querySelector('.ai-scroll-bottom-badge');
+        }
+    }
+
+    _updateScrollBottomBtn() {
+        const btn = this._scrollBottomButton || this.container?.querySelector('#ai-scroll-bottom-btn');
+        const badge = this._scrollBottomBadge || this.container?.querySelector('#ai-scroll-bottom-badge');
+        if (!btn) return;
+
+        const shouldShow = this.userHasScrolledUp && this.unreadStreamCount > 0 && this.isGenerating;
+        btn.classList.toggle('show', shouldShow);
+        btn.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+        btn.tabIndex = shouldShow ? 0 : -1;
+
+        if (badge) {
+            badge.hidden = !shouldShow;
+            badge.textContent = this.unreadStreamCount > 99 ? '99+' : String(this.unreadStreamCount);
+        }
+    }
+
+    _setupExamplesFolding() {
+        const toggle = this.container?.querySelector('#examples-toggle');
+        const tagsContainer = this.container?.querySelector('.ai-example-tags');
+        const parentSection = this.container?.querySelector('.ai-quick-examples');
+        if (!toggle || !tagsContainer || !parentSection) return;
+
+        let isCollapsed = false;
+        try {
+            const savedPreference = localStorage.getItem('cv_ai_examples_collapsed');
+            if (savedPreference === 'true' || savedPreference === 'false') {
+                isCollapsed = savedPreference === 'true';
+            } else {
+                isCollapsed = window.matchMedia?.('(max-width: 720px)').matches || false;
+            }
+        } catch {
+            isCollapsed = window.matchMedia?.('(max-width: 720px)').matches || false;
+        }
+
+        if (isCollapsed) {
+            tagsContainer.classList.add('is-collapsed');
+            parentSection.classList.add('is-collapsed');
+        }
+        toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+
+        const toggleExamples = () => {
+            const currentlyCollapsed = tagsContainer.classList.contains('is-collapsed');
+            const nextCollapsed = !currentlyCollapsed;
+            tagsContainer.classList.toggle('is-collapsed', nextCollapsed);
+            parentSection.classList.toggle('is-collapsed', nextCollapsed);
+            toggle.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
+
+            try {
+                localStorage.setItem('cv_ai_examples_collapsed', nextCollapsed ? 'true' : 'false');
+            } catch {
+                // ignore localStorage failures
+            }
+
+            window.requestAnimationFrame(() => this._syncComposerOffset());
+            window.setTimeout(() => this._syncComposerOffset(), 260);
+        };
+
+        toggle.addEventListener('click', toggleExamples);
     }
 }

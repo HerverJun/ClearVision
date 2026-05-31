@@ -1,6 +1,6 @@
 # 算子版本变更记录 / Operator Version Changelog
 
-> 生成时间 / Generated At: `2026-05-31 00:44:31 +08:00`
+> 生成时间 / Generated At: `2026-06-01 01:11:17 +08:00`
 > 算子总数 / Total Operators: **156**
 
 ## 当前版本快照 / Current Snapshot
@@ -1179,6 +1179,7 @@
 ### OperatorType.ModbusCommunication / Modbus Communication
 | 版本 (Version) | 记录时间 (Recorded At) | 源码摘要 (Source Hash) |
 |------|------|------|
+| `1.0.0` | `2026-06-01T01:11:17.9618416+08:00` | `8703BB6001B1` |
 | `1.0.0` | `2026-05-16T11:53:47.4328965+08:00` | `D0DE04C84A90` |
 | `1.0.0` | `2026-04-29T17:13:24.7548110+08:00` | `A44E72F03DB4` |
 | `1.0.0` | `2026-04-29T10:56:41.0664908+08:00` | `F61D0A205F88` |

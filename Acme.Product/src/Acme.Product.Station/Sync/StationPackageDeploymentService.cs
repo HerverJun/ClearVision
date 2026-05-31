@@ -17,6 +17,7 @@ public sealed class StationPackageDeploymentService
     private readonly StationSiteProfileStore _siteProfileStore;
     private readonly ILogger<StationPackageDeploymentService> _logger;
     private readonly HttpClient _httpClient = new();
+    private readonly SemaphoreSlim _deploymentGate = new(1, 1);
 
     public StationPackageDeploymentService(
         IOptions<StationSyncOptions> options,
@@ -49,66 +50,77 @@ public sealed class StationPackageDeploymentService
             throw new InvalidOperationException("DeployPackage payload is missing downloadUrl.");
         }
 
-        var packageFileSegment = SanitizePackageFileSegment(payload.PackageId);
-        var packageRoot = Path.GetFullPath(_options.ResolvedPackageDirectory);
-        var stagingRoot = Path.Combine(packageRoot, "staging");
-        var activeRoot = Path.Combine(packageRoot, "active");
-        var lastKnownGoodRoot = Path.Combine(packageRoot, "last-known-good");
-        var archiveRoot = Path.Combine(packageRoot, "archive");
-        Directory.CreateDirectory(packageRoot);
-        Directory.CreateDirectory(archiveRoot);
-
-        var downloadPath = Path.Combine(packageRoot, $"{packageFileSegment}.cvpkg.download");
-        await DownloadAsync(payload, downloadPath, cancellationToken);
-        await VerifyHashAsync(downloadPath, payload.Sha256, cancellationToken);
-
-        ResetDirectory(stagingRoot);
-        ZipFile.ExtractToDirectory(downloadPath, stagingRoot);
-        var runtimeRoot = ResolveRuntimeRoot(stagingRoot);
-        ValidateExtractedPackage(stagingRoot, runtimeRoot, payload);
-
-        if (Directory.Exists(activeRoot))
-        {
-            ResetDirectory(lastKnownGoodRoot);
-            CopyDirectory(activeRoot, lastKnownGoodRoot);
-        }
-
+        await _deploymentGate.WaitAsync(cancellationToken);
         try
         {
-            var archiveTarget = Path.Combine(archiveRoot, $"{packageFileSegment}-{DateTime.UtcNow:yyyyMMddHHmmss}");
-            if (Directory.Exists(archiveTarget))
+            var packageFileSegment = SanitizePackageFileSegment(payload.PackageId);
+            var packageRoot = Path.GetFullPath(_options.ResolvedPackageDirectory);
+            var stagingRoot = Path.Combine(packageRoot, "staging");
+            var activeRoot = Path.Combine(packageRoot, "active");
+            var lastKnownGoodRoot = Path.Combine(packageRoot, "last-known-good");
+            var archiveRoot = Path.Combine(packageRoot, "archive");
+            Directory.CreateDirectory(packageRoot);
+            Directory.CreateDirectory(archiveRoot);
+
+            var downloadPath = Path.Combine(packageRoot, $"{packageFileSegment}.cvpkg.download");
+            try
             {
-                Directory.Delete(archiveTarget, recursive: true);
-            }
+                await DownloadAsync(payload, downloadPath, cancellationToken);
+                await VerifyHashAsync(downloadPath, payload.Sha256, cancellationToken);
 
-            if (Directory.Exists(activeRoot))
+                ResetDirectory(stagingRoot);
+                ZipFile.ExtractToDirectory(downloadPath, stagingRoot);
+                var runtimeRoot = ResolveRuntimeRoot(stagingRoot);
+                ValidateExtractedPackage(stagingRoot, runtimeRoot, payload);
+
+                if (Directory.Exists(activeRoot))
+                {
+                    ResetDirectory(lastKnownGoodRoot);
+                    CopyDirectory(activeRoot, lastKnownGoodRoot);
+                }
+
+                try
+                {
+                    var archiveTarget = Path.Combine(archiveRoot, $"{packageFileSegment}-{DateTime.UtcNow:yyyyMMddHHmmss}");
+                    if (Directory.Exists(archiveTarget))
+                    {
+                        Directory.Delete(archiveTarget, recursive: true);
+                    }
+
+                    if (Directory.Exists(activeRoot))
+                    {
+                        Directory.Move(activeRoot, archiveTarget);
+                    }
+
+                    Directory.Move(runtimeRoot, activeRoot);
+
+                    if (!File.Exists(Path.Combine(activeRoot, "package.json")))
+                    {
+                        throw new InvalidOperationException("Package is missing runtime package.json.");
+                    }
+
+                    await LoadPackageWithLocalProfileAsync(activeRoot, cancellationToken);
+                    _settingsStore.UpdateLastGoodPackage(activeRoot);
+                    return $"Package {payload.PackageId} deployed.";
+                }
+                catch
+                {
+                    RollBack(activeRoot, lastKnownGoodRoot);
+                    throw;
+                }
+            }
+            finally
             {
-                Directory.Move(activeRoot, archiveTarget);
+                TryDelete(downloadPath);
+                if (Directory.Exists(stagingRoot))
+                {
+                    Directory.Delete(stagingRoot, recursive: true);
+                }
             }
-
-            Directory.Move(runtimeRoot, activeRoot);
-
-            if (!File.Exists(Path.Combine(activeRoot, "package.json")))
-            {
-                throw new InvalidOperationException("Package is missing runtime package.json.");
-            }
-
-            await LoadPackageWithLocalProfileAsync(activeRoot, cancellationToken);
-            _settingsStore.UpdateLastGoodPackage(activeRoot);
-            return $"Package {payload.PackageId} deployed.";
-        }
-        catch
-        {
-            RollBack(activeRoot, lastKnownGoodRoot);
-            throw;
         }
         finally
         {
-            TryDelete(downloadPath);
-            if (Directory.Exists(stagingRoot))
-            {
-                Directory.Delete(stagingRoot, recursive: true);
-            }
+            _deploymentGate.Release();
         }
     }
 
@@ -285,14 +297,14 @@ public sealed class StationPackageDeploymentService
 
     private static void RollBack(string activeRoot, string lastKnownGoodRoot)
     {
-        if (!Directory.Exists(lastKnownGoodRoot))
-        {
-            return;
-        }
-
         if (Directory.Exists(activeRoot))
         {
             Directory.Delete(activeRoot, recursive: true);
+        }
+
+        if (!Directory.Exists(lastKnownGoodRoot))
+        {
+            return;
         }
 
         CopyDirectory(lastKnownGoodRoot, activeRoot);
