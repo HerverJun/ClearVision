@@ -30,6 +30,8 @@ public sealed class StationSpoolStore
 
     private readonly List<StationResultSummaryDto> _pendingResults = [];
     private StationSpoolState _state = new();
+    private long _cachedSpoolBytes = -1;
+    private DateTime _lastSpoolBytesTime = DateTime.MinValue;
 
     public StationSpoolStore(
         IOptions<StationSyncOptions> options,
@@ -98,9 +100,15 @@ public sealed class StationSpoolStore
         {
             lock (_syncRoot)
             {
-                return Directory.Exists(_directoryPath)
-                    ? Directory.EnumerateFiles(_directoryPath, "*", SearchOption.AllDirectories).Sum(path => new FileInfo(path).Length)
-                    : 0;
+                var now = DateTime.Now;
+                if (_cachedSpoolBytes < 0 || now - _lastSpoolBytesTime > TimeSpan.FromSeconds(5))
+                {
+                    _cachedSpoolBytes = Directory.Exists(_directoryPath)
+                        ? Directory.EnumerateFiles(_directoryPath, "*", SearchOption.AllDirectories).Sum(path => new FileInfo(path).Length)
+                        : 0;
+                    _lastSpoolBytesTime = now;
+                }
+                return _cachedSpoolBytes;
             }
         }
     }

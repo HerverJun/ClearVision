@@ -40,9 +40,22 @@ public sealed class StationHubClient : IAsyncDisposable
             return false;
         }
 
-        await _connectionGate.WaitAsync(cancellationToken);
         try
         {
+            await _connectionGate.WaitAsync(cancellationToken);
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
             var desiredSignature = BuildConnectionSignature();
             if (desiredSignature == null)
             {
@@ -82,7 +95,13 @@ public sealed class StationHubClient : IAsyncDisposable
         }
         finally
         {
-            _connectionGate.Release();
+            try
+            {
+                _connectionGate.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
     }
 
@@ -166,20 +185,26 @@ public sealed class StationHubClient : IAsyncDisposable
             return;
         }
 
-        await _connectionGate.WaitAsync();
+        _disposed = true; // 1. 先置为已销毁，防止任何新的 EnsureConnectedAsync / DisconnectAsync 进入
+
         try
         {
-            if (_disposed)
-            {
-                return;
-            }
+            // 2. 等待并独占锁。一旦 Wait 成功，代表此前所有并发线程已全部安全退出。
+            await _connectionGate.WaitAsync();
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
 
+        try
+        {
+            // 3. 安全销毁物理连接
             await DisposeConnectionCoreAsync();
-            _disposed = true;
         }
         finally
         {
-            _connectionGate.Release();
+            // 4. 安全 Dispose 信号量。由于此时没有任何其他线程在等待或并发占有该锁，这里绝对安全！
             _connectionGate.Dispose();
         }
     }
@@ -191,14 +216,32 @@ public sealed class StationHubClient : IAsyncDisposable
             return;
         }
 
-        await _connectionGate.WaitAsync(cancellationToken);
         try
         {
+            await _connectionGate.WaitAsync(cancellationToken);
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_disposed)
+            {
+                return;
+            }
             await DisposeConnectionCoreAsync();
         }
         finally
         {
-            _connectionGate.Release();
+            try
+            {
+                _connectionGate.Release();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
     }
 

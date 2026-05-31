@@ -834,7 +834,15 @@ public sealed class StationSyncHostedService : BackgroundService
             "ClearVisionStation",
             "diagnostics");
         Directory.CreateDirectory(diagnosticsRoot);
-        var bundlePath = Path.Combine(diagnosticsRoot, $"collectlogs-{command.CommandId}.zip");
+
+        // 使用 Path.GetFileName 过滤外部 CommandId，规避路径穿越写入安全漏洞
+        var safeCommandId = Path.GetFileName(command.CommandId);
+        if (string.IsNullOrWhiteSpace(safeCommandId))
+        {
+            safeCommandId = Guid.NewGuid().ToString("N");
+        }
+
+        var bundlePath = Path.Combine(diagnosticsRoot, $"collectlogs-{safeCommandId}.zip");
         if (File.Exists(bundlePath))
         {
             File.Delete(bundlePath);
@@ -860,9 +868,28 @@ public sealed class StationSyncHostedService : BackgroundService
                     break;
                 }
 
-                archive.CreateEntryFromFile(file, Path.GetRelativePath(logRoot, file), CompressionLevel.Fastest);
-                includedFiles++;
-                includedBytes += info.Length;
+                try
+                {
+                    archive.CreateEntryFromFile(file, Path.GetRelativePath(logRoot, file), CompressionLevel.Fastest);
+                    includedFiles++;
+                    includedBytes += info.Length;
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to pack active log file: {FilePath}. Skipping to avoid task disruption.", file);
+                    try
+                    {
+                        var entryName = Path.GetRelativePath(logRoot, file) + ".locked.txt";
+                        var entry = archive.CreateEntry(entryName);
+                        using var writer = new StreamWriter(entry.Open());
+                        writer.WriteLine($"[Warning] The file could not be collected because it was locked by another process.");
+                        writer.WriteLine($"Exception Message: {ex.Message}");
+                    }
+                    catch
+                    {
+                        // 忽略占位文件写入过程中的异常
+                    }
+                }
             }
         }
 

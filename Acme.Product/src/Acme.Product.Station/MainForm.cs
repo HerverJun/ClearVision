@@ -1528,7 +1528,13 @@ public sealed class MainForm : Form
 
         if (InvokeRequired)
         {
-            BeginInvoke(action);
+            BeginInvoke(() =>
+            {
+                if (!IsDisposed)
+                {
+                    action();
+                }
+            });
             return;
         }
 
