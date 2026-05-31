@@ -195,7 +195,7 @@ public class AIWorkflowService
     /// <summary>
     /// 快速验证 Legacy 流程（无需 LLM，用于兼容测试）
     /// </summary>
-    public AIWorkflowResult ValidateFlow(OperatorFlow flow, bool enableDryRun = true)
+    public async Task<AIWorkflowResult> ValidateFlowAsync(OperatorFlow flow, bool enableDryRun = true)
     {
         var stopwatch = Stopwatch.StartNew();
         var telemetry = new WorkflowTelemetry();
@@ -213,7 +213,7 @@ public class AIWorkflowService
             );
         }
 
-        // Dry-Run（同步执行）
+        // Dry-Run（异步执行）
         DryRunResult? dryRunResult = null;
         if (enableDryRun)
         {
@@ -222,7 +222,7 @@ public class AIWorkflowService
             var stubRegistry = stubBuilder.BuildForFlow(operatorTypes);
             var testInputs = new Dictionary<string, object> { ["Image"] = "TestImage" };
 
-            dryRunResult = _dryRunService.RunAsync(flow, testInputs, stubRegistry).GetAwaiter().GetResult();
+            dryRunResult = await _dryRunService.RunAsync(flow, testInputs, stubRegistry);
             telemetry.DryRunTimeMs = stopwatch.ElapsedMilliseconds - telemetry.LintTimeMs;
 
             if (!dryRunResult.IsSuccess)
@@ -237,6 +237,15 @@ public class AIWorkflowService
 
         telemetry.TotalTimeMs = stopwatch.ElapsedMilliseconds;
         return AIWorkflowResult.Success(flow, telemetry, new List<LintIssue>(), lintResult.Issues.Where(i => i.Severity == LintSeverity.Warning).ToList(), dryRunResult);
+    }
+
+    /// <summary>
+    /// 快速验证 Legacy 流程（无需 LLM，用于兼容测试）
+    /// 为了避免在具有 SynchronizationContext 的 GUI 线程中同步阻断异步引发死锁，内部使用 Task.Run 包装并抛送至线程池执行。
+    /// </summary>
+    public AIWorkflowResult ValidateFlow(OperatorFlow flow, bool enableDryRun = true)
+    {
+        return Task.Run(() => ValidateFlowAsync(flow, enableDryRun)).GetAwaiter().GetResult();
     }
 }
 

@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using System.Text.Json;
 using Acme.Product.Application.Analysis;
 using Acme.Product.Application.Services;
@@ -116,6 +117,62 @@ public sealed class ContinuousInspectionWorker
         {
             var restartRequested = false;
             var lease = await streamCoordinator.AcquireStreamLeaseAsync(cameraId, cancellationToken);
+
+            // 1. 创建基于 Bounded 背压的帧收集 Channel (包含 Frame 和 TrackId 元组)
+            var frameChannel = Channel.CreateBounded<(Acme.Product.Core.Streaming.FrameEnvelope Frame, string TrackId)>(new BoundedChannelOptions(config.SchedulerQueueLength > 0 ? config.SchedulerQueueLength : 100)
+            {
+                SingleWriter = true,
+                SingleReader = true,
+                FullMode = BoundedChannelFullMode.DropOldest // 满时丢弃最老，实现优雅背压
+            });
+
+            // 2. 启动单一的工控后台处理流水线 Task，专门负责本连接周期内的异步帧收集与推理排程
+            var pipelineTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await foreach (var item in frameChannel.Reader.ReadAllAsync(cancellationToken))
+                    {
+                        try
+                        {
+                            var frames = await CollectDecisionFramesAsync(
+                                streamCoordinator,
+                                lease,
+                                cameraId,
+                                item.Frame,
+                                config,
+                                cancellationToken);
+
+                            foreach (var candidate in frames)
+                            {
+                                var scheduled = scheduler.TrySchedule(new ScheduledInferenceItem(
+                                    candidate,
+                                    item.TrackId,
+                                    (envelope, ct) => flowExecution.ExecuteFlowAsync(
+                                        flow,
+                                        new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope },
+                                        cancellationToken: ct)));
+                                if (scheduled)
+                                {
+                                    metrics.RecordInferenceScheduled();
+                                }
+                                else
+                                {
+                                    metrics.RecordInferenceDropped();
+                                }
+                            }
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            _logger.LogError(ex, "[ContinuousInspection] Pipeline frame collection and scheduling failed. CameraId={CameraId}, TrackId={TrackId}", cameraId, item.TrackId);
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }, cancellationToken);
+
             try
             {
                 long? lastSequence = null;
@@ -154,31 +211,8 @@ public sealed class ContinuousInspectionWorker
                         metrics.RecordTrackCreated();
                     }
 
-                    var frames = await CollectDecisionFramesAsync(
-                        streamCoordinator,
-                        lease,
-                        cameraId,
-                        frame,
-                        config,
-                        cancellationToken);
-                    foreach (var candidate in frames)
-                    {
-                        var scheduled = scheduler.TrySchedule(new ScheduledInferenceItem(
-                            candidate,
-                            track.TrackId,
-                            (envelope, ct) => flowExecution.ExecuteFlowAsync(
-                                flow,
-                                new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope },
-                                cancellationToken: ct)));
-                        if (scheduled)
-                        {
-                            metrics.RecordInferenceScheduled();
-                        }
-                        else
-                        {
-                            metrics.RecordInferenceDropped();
-                        }
-                    }
+                    // 极速、同步、非阻塞地将当前帧与 TrackId 写入 Channel 流水线，0% 线程池开销
+                    frameChannel.Writer.TryWrite((frame, track.TrackId));
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -196,6 +230,16 @@ public sealed class ContinuousInspectionWorker
             }
             finally
             {
+                // 关闭 Channel 写入端并安全等待流水线结束，彻底终结任何并发生命周期竞争
+                frameChannel.Writer.Complete();
+                try
+                {
+                    await pipelineTask;
+                }
+                catch
+                {
+                }
+
                 await streamCoordinator.ReleaseStreamLeaseAsync(lease);
                 var snapshot = metrics.Snapshot();
                 var logMessage = restartRequested
