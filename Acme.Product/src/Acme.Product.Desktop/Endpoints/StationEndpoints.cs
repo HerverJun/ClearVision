@@ -82,10 +82,16 @@ public static class StationEndpoints
                 return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
             }
 
+            var issuedBy = GetAuthenticatedUserName(context);
+            if (string.IsNullOrEmpty(issuedBy))
+            {
+                return Results.Json(new { error = "InvalidUserSession" }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
             var updated = registry.UpdateIdentity(
                 stationId,
                 request,
-                GetAuthenticatedUserName(context),
+                issuedBy,
                 context.Connection.RemoteIpAddress?.ToString());
             return Results.Ok(updated);
         });
@@ -106,6 +112,12 @@ public static class StationEndpoints
                 return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
             }
 
+            var issuedBy = GetAuthenticatedUserName(context);
+            if (string.IsNullOrEmpty(issuedBy))
+            {
+                return Results.Json(new { error = "InvalidUserSession" }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
             if (string.IsNullOrWhiteSpace(stationId))
             {
                 return Results.BadRequest(new { error = "StationIdRequired" });
@@ -120,7 +132,7 @@ public static class StationEndpoints
                 stationId,
                 request.CommandType,
                 payloadJson,
-                GetAuthenticatedUserName(context),
+                issuedBy,
                 TimeSpan.FromSeconds(Math.Clamp(request.ExpiresInSeconds ?? 300, 30, 86_400)));
             return Results.Ok(command);
         });
@@ -135,6 +147,12 @@ public static class StationEndpoints
             if (!IsStationAdmin(context))
             {
                 return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var issuedBy = GetAuthenticatedUserName(context);
+            if (string.IsNullOrEmpty(issuedBy))
+            {
+                return Results.Json(new { error = "InvalidUserSession" }, statusCode: StatusCodes.Status401Unauthorized);
             }
 
             if (string.IsNullOrWhiteSpace(stationId))
@@ -165,7 +183,7 @@ public static class StationEndpoints
                 stationId,
                 Acme.Product.Runtime.Abstractions.StationCommandType.DeployPackage,
                 payload,
-                GetAuthenticatedUserName(context),
+                issuedBy,
                 TimeSpan.FromMinutes(30));
             return Results.Ok(command);
         });
@@ -180,6 +198,12 @@ public static class StationEndpoints
             if (!IsStationAdmin(context))
             {
                 return Results.Json(new { error = "StationAdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var issuedBy = GetAuthenticatedUserName(context);
+            if (string.IsNullOrEmpty(issuedBy))
+            {
+                return Results.Json(new { error = "InvalidUserSession" }, statusCode: StatusCodes.Status401Unauthorized);
             }
 
             return Results.Ok(await packageStore.CreateTestPackageAsync(cancellationToken));
@@ -397,7 +421,13 @@ public static class StationEndpoints
         }
 
         var principalName = context.User?.Identity?.Name;
-        return string.IsNullOrWhiteSpace(principalName) ? "Studio" : principalName.Trim();
+        if (!string.IsNullOrWhiteSpace(principalName))
+        {
+            return principalName.Trim();
+        }
+
+        // 拒绝回退到 "Studio"，防止特权端点进行隐秘操作或审计绕过
+        return string.Empty;
     }
 }
 

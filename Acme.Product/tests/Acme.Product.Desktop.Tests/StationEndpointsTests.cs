@@ -172,6 +172,26 @@ public sealed class StationEndpointsTests
     }
 
     [Fact]
+    public async Task CreateCommand_ShouldRejectAdminSessionWithoutUsername()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(username: "   ");
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/commands",
+            new StationCommandCreateRequest
+            {
+                CommandType = StationCommandType.Ping,
+                PayloadJson = "{}"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        await using var scope = host.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        (await db.StationCommandRecords.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task UpdateIdentity_ShouldRejectNonAdminUser()
     {
         await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync(role: "Operator");
@@ -390,7 +410,7 @@ public sealed class StationEndpointsTests
             return new StationEndpointTestHost(app, app.Services.GetRequiredService<StationRegistryService>());
         }
 
-        public static async Task<StationEndpointTestHost> CreateWithCentralStoreAsync(string? role = "Admin")
+        public static async Task<StationEndpointTestHost> CreateWithCentralStoreAsync(string? role = "Admin", string? username = null)
         {
             var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationEndpointTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
@@ -436,7 +456,7 @@ public sealed class StationEndpointsTests
                     context.Items["CurrentUser"] = new UserSession
                     {
                         UserId = role.ToLowerInvariant(),
-                        Username = role.ToLowerInvariant(),
+                        Username = username ?? role.ToLowerInvariant(),
                         Role = role
                     };
                 }

@@ -985,6 +985,7 @@ public sealed class StationSyncHostedService : BackgroundService
         var driveRoot = Path.GetPathRoot(Path.GetFullPath(dataDirectory));
         var driveInfo = string.IsNullOrWhiteSpace(driveRoot) ? null : new DriveInfo(driveRoot);
 
+        var gap = spoolStore.GetPendingUnavailableRange();
         var queuedResultSummaries = Volatile.Read(ref _queuedResultSummaries);
         var resultBackpressureWaits = Volatile.Read(ref _resultBackpressureWaits);
         var droppedResultSummaries = Volatile.Read(ref _droppedResultSummaries);
@@ -996,7 +997,8 @@ public sealed class StationSyncHostedService : BackgroundService
             droppedResultSummaries,
             spoolPendingCount,
             spoolBytes,
-            driveInfo?.AvailableFreeSpace / 1024 / 1024 ?? 0);
+            driveInfo?.AvailableFreeSpace / 1024 / 1024 ?? 0,
+            (gap.FromSequenceId, gap.ThroughSequenceId));
 
         return new StationHealthSnapshotDto
         {
@@ -1028,20 +1030,21 @@ public sealed class StationSyncHostedService : BackgroundService
         long dropped,
         int spoolPending,
         long spoolBytes,
-        long diskFreeMb)
+        long diskFreeMb,
+        (long From, long Through) spoolTrimmingRange)
     {
-        if (dropped > 0)
+        if (dropped > 0 || spoolTrimmingRange.From > 0)
         {
             return (
                 ResultSpoolPersistFailedDiagnosticCode,
-                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb));
+                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb, spoolTrimmingRange));
         }
 
         if (IsResultBackpressured(queued, spoolPending))
         {
             return (
                 ResultBackpressureDiagnosticCode,
-                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb));
+                BuildResultSyncDiagnosticMessage(queued, backpressureWaits, dropped, spoolPending, spoolBytes, diskFreeMb, spoolTrimmingRange));
         }
 
         return (null, null);
@@ -1066,11 +1069,15 @@ public sealed class StationSyncHostedService : BackgroundService
         long dropped,
         int spoolPending,
         long spoolBytes,
-        long diskFreeMb)
+        long diskFreeMb,
+        (long From, long Through) spoolTrimmingRange)
     {
+        var trimmingText = spoolTrimmingRange.From > 0
+            ? $"spoolTrimmingRange={spoolTrimmingRange.From}-{spoolTrimmingRange.Through}; "
+            : "";
         return "Station 结果同步出现背压。请检查：Studio 连接、工站到 Studio 的网络、防火墙规则、spool 磁盘空间/权限、StationSync 队列容量。 " +
             $"queued={queued}; outboundQueueCapacity={Math.Max(1, _options.OutboundQueueCapacity)}; backpressureWaits={backpressureWaits}; " +
-            $"spoolPending={spoolPending}; spoolBytes={spoolBytes}; diskFreeMb={diskFreeMb}; failedResultSpoolWrites={dropped}";
+            $"spoolPending={spoolPending}; spoolBytes={spoolBytes}; diskFreeMb={diskFreeMb}; {trimmingText}failedResultSpoolWrites={dropped}";
     }
 
     private static string BuildPlcStatusSummary(RuntimeHostSnapshot snapshot)
