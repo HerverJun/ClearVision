@@ -131,6 +131,58 @@ public abstract class PlcCommunicationOperatorBase : OperatorBase
         return _lastKnownState.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     }
 
+    public static void InvalidateGlobalConfigurationCache()
+    {
+        lock (_configLock)
+        {
+            _cachedCommunicationConfig = new CommunicationConfig();
+            _cachedCommunicationConfigAtUtc = DateTime.MinValue;
+        }
+    }
+
+    public static async Task ClearConnectionPoolAsync()
+    {
+        KeyValuePair<string, IPlcClient>[] snapshot;
+        await _poolLock.WaitAsync();
+        try
+        {
+            snapshot = _connectionPool.ToArray();
+            _connectionPool.Clear();
+            _lastKnownState.Clear();
+        }
+        finally
+        {
+            _poolLock.Release();
+        }
+
+        foreach (var (_, client) in snapshot)
+        {
+            try
+            {
+                await client.DisconnectAsync();
+            }
+            catch
+            {
+                // Ignore disconnect failures while resetting local station settings.
+            }
+
+            try
+            {
+                client.Dispose();
+            }
+            catch
+            {
+                // Ignore dispose failures while resetting local station settings.
+            }
+        }
+    }
+
+    public static async Task ResetRuntimeConfigurationAsync()
+    {
+        InvalidateGlobalConfigurationCache();
+        await ClearConnectionPoolAsync();
+    }
+
     /// <summary>
     /// 心跳巡检主循环
     /// </summary>

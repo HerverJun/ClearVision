@@ -15,6 +15,7 @@ public sealed class MainForm : Form
     private readonly StationSyncSettingsStore _syncSettingsStore;
     private readonly StationHubClient _stationHubClient;
     private readonly StationStudioConnectionTester _studioConnectionTester;
+    private readonly StationHardwareSettingsService _hardwareSettingsService;
     private readonly ICameraManager _cameraManager;
     private readonly System.Windows.Forms.Timer _statusRefreshTimer = new();
     private readonly Label _selectedPathLabel = new();
@@ -49,6 +50,7 @@ public sealed class MainForm : Form
     private readonly Button _runFolderButton = new();
     private readonly Button _stopButton = new();
     private readonly Button _studioConnectionButton = new();
+    private readonly Button _hardwareSettingsButton = new();
     private readonly PictureBox _previewBox = new();
     private readonly ListView _recentResultsView = new();
     private readonly TextBox _logTextBox = new();
@@ -76,6 +78,7 @@ public sealed class MainForm : Form
         StationSyncSettingsStore syncSettingsStore,
         StationHubClient stationHubClient,
         StationStudioConnectionTester studioConnectionTester,
+        StationHardwareSettingsService hardwareSettingsService,
         ICameraManager cameraManager)
     {
         _runtimeHost = runtimeHost;
@@ -84,6 +87,7 @@ public sealed class MainForm : Form
         _syncSettingsStore = syncSettingsStore;
         _stationHubClient = stationHubClient;
         _studioConnectionTester = studioConnectionTester;
+        _hardwareSettingsService = hardwareSettingsService;
         _cameraManager = cameraManager;
 
         Text = "ClearVision 工作站";
@@ -476,6 +480,7 @@ public sealed class MainForm : Form
         ConfigureButton(_runSingleButton, "单张测试", async (_, _) => await RunSingleAsync());
         ConfigureButton(_runFolderButton, "启动系统", async (_, _) => await RunFolderAsync());
         ConfigureButton(_stopButton, "停止", async (_, _) => await StopAsync());
+        ConfigureButton(_hardwareSettingsButton, "现场设置", (_, _) => ShowHardwareSettingsDialog());
         ConfigureButton(_studioConnectionButton, "Studio 连接", (_, _) => ShowStudioConnectionDialog());
 
         _selectedPathLabel.AutoSize = false;
@@ -494,6 +499,7 @@ public sealed class MainForm : Form
             _runSingleButton,
             _runFolderButton,
             _stopButton,
+            _hardwareSettingsButton,
             _studioConnectionButton
         ]);
 
@@ -1134,6 +1140,7 @@ public sealed class MainForm : Form
         _runSingleButton.Enabled = hasPackage && !running;
         _runFolderButton.Enabled = hasPackage && !running;
         _stopButton.Enabled = running;
+        _hardwareSettingsButton.Enabled = !running;
         _runtimeParameterPanel.SetEditingEnabled(hasPackage && !running);
     }
 
@@ -1266,7 +1273,16 @@ public sealed class MainForm : Form
             return;
         }
 
-        var connectionStates = PlcCommunicationOperatorBase.GetConnectionStateSnapshot();
+        var connectionStates = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in PlcCommunicationOperatorBase.GetConnectionStateSnapshot())
+        {
+            connectionStates[pair.Key] = pair.Value;
+        }
+
+        foreach (var pair in ModbusCommunicationOperator.GetConnectionStateSnapshot())
+        {
+            connectionStates[pair.Key] = pair.Value;
+        }
         if (connectionStates.Count == 0)
         {
             _plcStatusValueLabel.Text = "待连接";
@@ -1506,6 +1522,13 @@ public sealed class MainForm : Form
             _stationHubClient,
             _studioConnectionTester);
         dialog.ShowDialog(this);
+    }
+
+    private void ShowHardwareSettingsDialog()
+    {
+        using var dialog = new HardwareSettingsDialog(_hardwareSettingsService);
+        dialog.ShowDialog(this);
+        RefreshHeaderCards();
     }
 
     private void ConfigureButton(Button button, string text, EventHandler onClick)

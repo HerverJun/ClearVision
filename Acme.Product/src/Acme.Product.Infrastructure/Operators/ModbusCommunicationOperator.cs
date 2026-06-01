@@ -227,6 +227,38 @@ public class ModbusCommunicationOperator : OperatorBase
         return snapshot;
     }
 
+    public static void ClearConnectionPool()
+    {
+        foreach (var (_, master) in MasterPool)
+        {
+            try
+            {
+                master.Dispose();
+            }
+            catch
+            {
+                // Ignore dispose failures while resetting local station settings.
+            }
+        }
+
+        foreach (var (_, client) in ConnectionPool)
+        {
+            try
+            {
+                client.Close();
+                client.Dispose();
+            }
+            catch
+            {
+                // Ignore dispose failures while resetting local station settings.
+            }
+        }
+
+        MasterPool.Clear();
+        ConnectionPool.Clear();
+        ConnectionLastUsed.Clear();
+    }
+
     private static void ApplyClientTimeouts(TcpClient client, int timeoutMs)
     {
         client.ReceiveTimeout = timeoutMs;

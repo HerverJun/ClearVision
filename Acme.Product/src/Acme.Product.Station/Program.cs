@@ -1,9 +1,11 @@
 using Acme.Product.Infrastructure.DependencyInjection;
+using Acme.Product.Infrastructure.Services;
 using Acme.Product.Runtime;
 using Acme.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using IConfigurationService = Acme.Product.Core.Interfaces.IConfigurationService;
 
 namespace Acme.Product.Station;
 
@@ -31,6 +33,8 @@ internal static class Program
                 services.AddSingleton<RuntimePackageLoader>();
                 services.AddSingleton<RuntimeResultNormalizer>();
                 services.AddSingleton<RuntimeHost>();
+                services.AddSingleton<IConfigurationService, JsonConfigurationService>();
+                services.AddSingleton<StationHardwareSettingsService>();
                 services.AddSingleton<StationLocalSettingsStore>();
                 services.AddSingleton<StationSiteProfileStore>();
                 services.Configure<Sync.StationSyncOptions>(context.Configuration.GetSection(Sync.StationSyncOptions.SectionName));
@@ -50,6 +54,10 @@ internal static class Program
 
         var settingsStore = host.Services.GetRequiredService<StationLocalSettingsStore>();
         settingsStore.MarkStartup();
+        host.Services.GetRequiredService<StationHardwareSettingsService>()
+            .ApplyCurrentAsync()
+            .GetAwaiter()
+            .GetResult();
 
         try
         {
