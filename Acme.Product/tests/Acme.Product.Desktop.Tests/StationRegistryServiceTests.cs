@@ -147,6 +147,64 @@ public sealed class StationRegistryServiceTests
     }
 
     [Fact]
+    public async Task CentralStore_ShouldFilterResultPagesAndStatisticsByDateRange_WithSqlite()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationCentralStoreDateRangeTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        var provider = new ServiceCollection()
+            .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+            .BuildServiceProvider();
+
+        try
+        {
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<VisionDbContext>().Database.EnsureCreatedAsync();
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var oldResult = BuildResult(1, stationId: "station-date", diagnosticCode: "OLD_DEFECT");
+            oldResult.StartedAtUtc = now.AddHours(-6).AddMilliseconds(-32);
+            oldResult.CompletedAtUtc = now.AddHours(-6);
+
+            var matchingResult = BuildResult(2, stationId: "station-date", diagnosticCode: "WIRE_SWAP");
+            matchingResult.StartedAtUtc = now.AddMinutes(-20).AddMilliseconds(-32);
+            matchingResult.CompletedAtUtc = now.AddMinutes(-20);
+
+            var store = CreateCentralStore(provider);
+            store.UpsertResultSummary(oldResult);
+            store.UpsertResultSummary(matchingResult);
+
+            var fromUtc = now.AddHours(-1);
+            var toUtc = now.AddMinutes(1);
+            var page = store.GetResultsPage("station-date", fromUtc, toUtc, "Ng", "WIRE_SWAP", 0, 10);
+            var statisticsJson = System.Text.Json.JsonSerializer.Serialize(
+                store.GetStatistics(fromUtc, toUtc, "station-date", "Ng", "WIRE_SWAP"));
+            using var statistics = System.Text.Json.JsonDocument.Parse(statisticsJson);
+
+            page.TotalCount.Should().Be(1);
+            page.Items.Should().ContainSingle(item =>
+                item.SequenceId == 2 &&
+                item.DiagnosticCode == "WIRE_SWAP");
+            statistics.RootElement.GetProperty("totalCount").GetInt32().Should().Be(1);
+            statistics.RootElement.GetProperty("ngCount").GetInt32().Should().Be(1);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    [Fact]
     public void ReportResultGap_ShouldAdvanceMemoryCursorAcrossUnavailableRange()
     {
         var registry = CreateRegistry();

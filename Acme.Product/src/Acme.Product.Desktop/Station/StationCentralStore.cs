@@ -332,18 +332,10 @@ public sealed class StationCentralStore
             query = query.Where(item => item.StationId == stationId);
         }
 
-        if (fromUtc.HasValue)
-        {
-            query = query.Where(item => item.CompletedAtUtc >= fromUtc.Value);
-        }
-
-        if (toUtc.HasValue)
-        {
-            query = query.Where(item => item.CompletedAtUtc <= toUtc.Value);
-        }
-
         var filtered = query
             .AsEnumerable()
+            .Where(item => !fromUtc.HasValue || item.CompletedAtUtc >= fromUtc.Value)
+            .Where(item => !toUtc.HasValue || item.CompletedAtUtc <= toUtc.Value)
             .Where(item => MatchesStatus(item.Outcome, item.InspectionStatus, status))
             .Where(item => MatchesText(item.DiagnosticCode, diagnosticCode))
             .OrderByDescending(item => item.CompletedAtUtc)
@@ -631,18 +623,10 @@ public sealed class StationCentralStore
             query = query.Where(item => item.StationId == stationId);
         }
 
-        if (fromUtc.HasValue)
-        {
-            query = query.Where(item => item.CompletedAtUtc >= fromUtc.Value);
-        }
-
-        if (toUtc.HasValue)
-        {
-            query = query.Where(item => item.CompletedAtUtc < toUtc.Value);
-        }
-
         var results = query
             .AsEnumerable()
+            .Where(item => !fromUtc.HasValue || item.CompletedAtUtc >= fromUtc.Value)
+            .Where(item => !toUtc.HasValue || item.CompletedAtUtc < toUtc.Value)
             .Where(item => MatchesStatus(item.Outcome, item.InspectionStatus, status))
             .Where(item => MatchesText(item.DiagnosticCode, diagnosticCode))
             .ToList();
