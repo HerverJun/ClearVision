@@ -606,6 +606,101 @@ public sealed class StationRegistryService
         }
     }
 
+    public object GetStatistics(
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        string? stationId,
+        string? status,
+        string? diagnosticCode)
+    {
+        if (_centralStore != null)
+        {
+            return _centralStore.GetStatistics(fromUtc, toUtc, stationId, status, diagnosticCode);
+        }
+
+        lock (_syncRoot)
+        {
+            var results = _entries.Values
+                .Where(entry => string.IsNullOrWhiteSpace(stationId) ||
+                                string.Equals(entry.StationId, stationId, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(entry => entry.RecentResults.Select(CloneResult))
+                .Where(result => !fromUtc.HasValue || result.CompletedAtUtc >= fromUtc.Value)
+                .Where(result => !toUtc.HasValue || result.CompletedAtUtc < toUtc.Value)
+                .Where(result => MatchesStatus(result, status))
+                .Where(result => MatchesText(result.DiagnosticCode, diagnosticCode))
+                .ToList();
+
+            var total = results.Count;
+            var ok = results.Count(item => item.Outcome == RuntimeRunOutcome.Ok);
+            var ng = results.Count(item => item.Outcome == RuntimeRunOutcome.Ng);
+            var error = results.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled);
+            var averageExecutionTimeMs = total == 0 ? 0 : results.Average(item => item.ExecutionTimeMs);
+            var byDiagnosticCode = results
+                .GroupBy(item => string.IsNullOrWhiteSpace(item.DiagnosticCode) ? "Unknown" : item.DiagnosticCode, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new { diagnosticCode = group.Key, defectType = group.Key, count = group.Count() })
+                .OrderByDescending(item => item.count)
+                .Take(20)
+                .ToList();
+            var hourlyTrend = results
+                .GroupBy(item => new DateTimeOffset(item.CompletedAtUtc.Year, item.CompletedAtUtc.Month, item.CompletedAtUtc.Day, item.CompletedAtUtc.Hour, 0, 0, TimeSpan.Zero))
+                .Select(group => new
+                {
+                    hourUtc = group.Key,
+                    timestamp = group.Key,
+                    total = group.Count(),
+                    totalCount = group.Count(),
+                    ok = group.Count(item => item.Outcome == RuntimeRunOutcome.Ok),
+                    okCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ok),
+                    ng = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng),
+                    ngCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng),
+                    error = group.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled),
+                    errorCount = group.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled),
+                    defectCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng)
+                })
+                .OrderBy(item => item.hourUtc)
+                .ToList();
+
+            return new
+            {
+                fromUtc,
+                toUtc,
+                total,
+                totalCount = total,
+                ok,
+                okCount = ok,
+                ng,
+                ngCount = ng,
+                error,
+                errorCount = error,
+                yieldRate = total == 0 ? 0 : Math.Round((double)ok / total, 4),
+                okRate = total == 0 ? 0 : Math.Round((double)ok / total, 4),
+                averageExecutionTimeMs,
+                averageProcessingTimeMs = averageExecutionTimeMs,
+                byStation = results
+                    .GroupBy(item => item.StationId, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => new
+                    {
+                        stationId = group.Key,
+                        total = group.Count(),
+                        totalCount = group.Count(),
+                        ok = group.Count(item => item.Outcome == RuntimeRunOutcome.Ok),
+                        okCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ok),
+                        ng = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng),
+                        ngCount = group.Count(item => item.Outcome == RuntimeRunOutcome.Ng),
+                        error = group.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled),
+                        errorCount = group.Count(item => item.Outcome is RuntimeRunOutcome.Error or RuntimeRunOutcome.Canceled),
+                        averageExecutionTimeMs = group.Average(item => item.ExecutionTimeMs)
+                    })
+                    .OrderByDescending(item => item.total)
+                    .ToList(),
+                byDiagnosticCode,
+                defectDistribution = new { items = byDiagnosticCode },
+                hourlyTrend,
+                trend = new { dataPoints = hourlyTrend }
+            };
+        }
+    }
+
     public IReadOnlyList<StationHealthSnapshotDto> GetRecentHealth(string stationId, int take)
     {
         lock (_syncRoot)

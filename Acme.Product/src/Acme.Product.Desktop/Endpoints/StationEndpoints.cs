@@ -233,10 +233,13 @@ public static class StationEndpoints
             string? range,
             DateTimeOffset? from,
             DateTimeOffset? to,
-            [FromServices] StationCentralStore store) =>
+            string? stationId,
+            string? status,
+            string? diagnosticCode,
+            [FromServices] StationRegistryService registry) =>
         {
             var (fromUtc, toUtc) = ResolveStatisticsWindow(range, from, to);
-            return Results.Ok(store.GetStatistics(fromUtc, toUtc));
+            return Results.Ok(registry.GetStatistics(fromUtc, toUtc, stationId, status, diagnosticCode));
         });
 
         app.MapGet("/api/stations/events", HandleSseEventsAsync);
@@ -351,7 +354,7 @@ public static class StationEndpoints
         }
     }
 
-    private static (DateTimeOffset FromUtc, DateTimeOffset ToUtc) ResolveStatisticsWindow(
+    private static (DateTimeOffset? FromUtc, DateTimeOffset? ToUtc) ResolveStatisticsWindow(
         string? range,
         DateTimeOffset? from,
         DateTimeOffset? to)
@@ -359,6 +362,11 @@ public static class StationEndpoints
         if (from.HasValue && to.HasValue && from < to)
         {
             return (from.Value.ToUniversalTime(), to.Value.ToUniversalTime());
+        }
+
+        if (string.Equals(range, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return (null, null);
         }
 
         var now = DateTimeOffset.UtcNow;

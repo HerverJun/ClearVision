@@ -610,13 +610,41 @@ public sealed class StationCentralStore
             .ToList();
     }
 
-    public object GetStatistics(DateTimeOffset fromUtc, DateTimeOffset toUtc)
+    public object GetStatistics(DateTimeOffset? fromUtc, DateTimeOffset? toUtc)
+    {
+        return GetStatistics(fromUtc, toUtc, null, null, null);
+    }
+
+    public object GetStatistics(
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        string? stationId,
+        string? status,
+        string? diagnosticCode)
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        var results = db.StationResultSummaries
-            .AsNoTracking()
-            .Where(item => item.CompletedAtUtc >= fromUtc && item.CompletedAtUtc < toUtc)
+        var query = db.StationResultSummaries.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(stationId))
+        {
+            query = query.Where(item => item.StationId == stationId);
+        }
+
+        if (fromUtc.HasValue)
+        {
+            query = query.Where(item => item.CompletedAtUtc >= fromUtc.Value);
+        }
+
+        if (toUtc.HasValue)
+        {
+            query = query.Where(item => item.CompletedAtUtc < toUtc.Value);
+        }
+
+        var results = query
+            .AsEnumerable()
+            .Where(item => MatchesStatus(item.Outcome, item.InspectionStatus, status))
+            .Where(item => MatchesText(item.DiagnosticCode, diagnosticCode))
             .ToList();
 
         static bool IsOutcome(StationResultSummaryEntity item, string value)
@@ -628,47 +656,68 @@ public sealed class StationCentralStore
         var ok = results.Count(item => IsOutcome(item, "Ok"));
         var ng = results.Count(item => IsOutcome(item, "Ng"));
         var error = results.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled"));
+        var byDiagnosticCode = results
+            .GroupBy(item => string.IsNullOrWhiteSpace(item.DiagnosticCode) ? "Unknown" : item.DiagnosticCode, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new { diagnosticCode = group.Key, defectType = group.Key, count = group.Count() })
+            .OrderByDescending(item => item.count)
+            .Take(20)
+            .ToList();
+        var hourlyTrend = results
+            .GroupBy(item => new DateTimeOffset(item.CompletedAtUtc.Year, item.CompletedAtUtc.Month, item.CompletedAtUtc.Day, item.CompletedAtUtc.Hour, 0, 0, TimeSpan.Zero))
+            .Select(group => new
+            {
+                hourUtc = group.Key,
+                timestamp = group.Key,
+                total = group.Count(),
+                totalCount = group.Count(),
+                ok = group.Count(item => IsOutcome(item, "Ok")),
+                okCount = group.Count(item => IsOutcome(item, "Ok")),
+                ng = group.Count(item => IsOutcome(item, "Ng")),
+                ngCount = group.Count(item => IsOutcome(item, "Ng")),
+                error = group.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled")),
+                errorCount = group.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled")),
+                defectCount = group.Count(item => IsOutcome(item, "Ng"))
+            })
+            .OrderBy(item => item.hourUtc)
+            .ToList();
+
         return new
         {
             fromUtc,
             toUtc,
             total,
+            totalCount = total,
             ok,
+            okCount = ok,
             ng,
+            ngCount = ng,
             error,
+            errorCount = error,
             yieldRate = total == 0 ? 0 : Math.Round((double)ok / total, 4),
+            okRate = total == 0 ? 0 : Math.Round((double)ok / total, 4),
             averageExecutionTimeMs = total == 0 ? 0 : results.Average(item => item.ExecutionTimeMs),
+            averageProcessingTimeMs = total == 0 ? 0 : results.Average(item => item.ExecutionTimeMs),
             byStation = results
                 .GroupBy(item => item.StationId, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new
                 {
                     stationId = group.Key,
                     total = group.Count(),
+                    totalCount = group.Count(),
                     ok = group.Count(item => IsOutcome(item, "Ok")),
+                    okCount = group.Count(item => IsOutcome(item, "Ok")),
                     ng = group.Count(item => IsOutcome(item, "Ng")),
+                    ngCount = group.Count(item => IsOutcome(item, "Ng")),
                     error = group.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled")),
+                    errorCount = group.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled")),
                     averageExecutionTimeMs = group.Average(item => item.ExecutionTimeMs)
                 })
                 .OrderByDescending(item => item.total)
                 .ToList(),
-            byDiagnosticCode = results
-                .GroupBy(item => string.IsNullOrWhiteSpace(item.DiagnosticCode) ? "Unknown" : item.DiagnosticCode, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new { diagnosticCode = group.Key, count = group.Count() })
-                .OrderByDescending(item => item.count)
-                .Take(20)
-                .ToList(),
-            hourlyTrend = results
-                .GroupBy(item => new DateTimeOffset(item.CompletedAtUtc.Year, item.CompletedAtUtc.Month, item.CompletedAtUtc.Day, item.CompletedAtUtc.Hour, 0, 0, TimeSpan.Zero))
-                .Select(group => new
-                {
-                    hourUtc = group.Key,
-                    total = group.Count(),
-                    ok = group.Count(item => IsOutcome(item, "Ok")),
-                    ng = group.Count(item => IsOutcome(item, "Ng")),
-                    error = group.Count(item => IsOutcome(item, "Error") || IsOutcome(item, "Canceled"))
-                })
-                .OrderBy(item => item.hourUtc)
-                .ToList()
+            byDiagnosticCode,
+            defectDistribution = new { items = byDiagnosticCode },
+            hourlyTrend,
+            trend = new { dataPoints = hourlyTrend }
         };
     }
 

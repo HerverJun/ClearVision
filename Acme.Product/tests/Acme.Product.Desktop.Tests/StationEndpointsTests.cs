@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Acme.Product.Core.Enums;
 using Acme.Product.Desktop.Endpoints;
 using Acme.Product.Desktop.Middleware;
@@ -132,6 +133,29 @@ public sealed class StationEndpointsTests
             item.StationId == "station-a" &&
             item.Outcome == RuntimeRunOutcome.Ng &&
             item.DiagnosticCode == "WIRE_SWAP");
+    }
+
+    [Fact]
+    public async Task StatisticsEndpoint_ShouldUseStationResultFiltersAndDashboardFieldNames()
+    {
+        await using var host = await StationEndpointTestHost.CreateAsync();
+        host.Registry.UpsertRegistration("conn-a", BuildRegistration("station-a"));
+        host.Registry.UpsertRegistration("conn-b", BuildRegistration("station-b"));
+
+        host.Registry.UpsertResultSummary("conn-a", BuildResult("station-a", 1, RuntimeRunOutcome.Ok, "OK", -3));
+        host.Registry.UpsertResultSummary("conn-b", BuildResult("station-b", 1, RuntimeRunOutcome.Error, "CAMERA_TIMEOUT", -2));
+        host.Registry.UpsertResultSummary("conn-a", BuildResult("station-a", 2, RuntimeRunOutcome.Ng, "WIRE_SWAP", -1));
+
+        var json = await host.Client.GetStringAsync(
+            "/api/stations/statistics?range=all&stationId=station-a&status=Ng&diagnosticCode=WIRE_SWAP");
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+
+        root.GetProperty("totalCount").GetInt32().Should().Be(1);
+        root.GetProperty("ngCount").GetInt32().Should().Be(1);
+        root.GetProperty("okCount").GetInt32().Should().Be(0);
+        root.GetProperty("byDiagnosticCode")[0].GetProperty("diagnosticCode").GetString().Should().Be("WIRE_SWAP");
+        root.GetProperty("defectDistribution").GetProperty("items")[0].GetProperty("defectType").GetString().Should().Be("WIRE_SWAP");
     }
 
     [Fact]

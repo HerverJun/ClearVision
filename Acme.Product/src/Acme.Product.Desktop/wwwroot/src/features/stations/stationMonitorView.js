@@ -17,6 +17,7 @@ class StationMonitorView {
         this.selectedStationId = null;
         this.selectedStationDetail = null;
         this.monitorResults = [];
+        this.monitorStatistics = null;
         this.monitorTotalCount = 0;
         this.monitorPageIndex = 0;
         this.monitorPageSize = 12;
@@ -371,26 +372,27 @@ class StationMonitorView {
         }
 
         try {
-            const params = {
+            const resultParams = {
                 pageIndex: this.monitorPageIndex,
-                pageSize: this.monitorPageSize
+                pageSize: this.monitorPageSize,
+                ...this.buildResultQueryParams()
             };
 
-            if (this.selectedStationId) {
-                params.stationId = this.selectedStationId;
-            }
+            const statisticsParams = {
+                range: 'all',
+                ...this.buildResultQueryParams()
+            };
 
-            if (this.resultFilters.status !== 'all') {
-                params.status = this.resultFilters.status;
-            }
-
-            if (this.resultFilters.diagnosticCode !== 'all') {
-                params.diagnosticCode = this.resultFilters.diagnosticCode;
-            }
-
-            const response = await httpClient.get('/stations/results', params);
+            const [response, statistics] = await Promise.all([
+                httpClient.get('/stations/results', resultParams),
+                httpClient.get('/stations/statistics', statisticsParams).catch((error) => {
+                    console.warn('[StationMonitorView] Failed to load station statistics:', error);
+                    return null;
+                })
+            ]);
             const page = this.normalizeResultsPage(response);
             this.monitorResults = page.items;
+            this.monitorStatistics = this.normalizeResultStatistics(statistics);
             this.monitorTotalCount = page.totalCount;
             this.monitorPageIndex = page.pageIndex;
             this.monitorPageSize = page.pageSize;
@@ -405,6 +407,24 @@ class StationMonitorView {
                 this.render();
             }
         }
+    }
+
+    buildResultQueryParams() {
+        const params = {};
+
+        if (this.selectedStationId) {
+            params.stationId = this.selectedStationId;
+        }
+
+        if (this.resultFilters.status !== 'all') {
+            params.status = this.resultFilters.status;
+        }
+
+        if (this.resultFilters.diagnosticCode !== 'all') {
+            params.diagnosticCode = this.resultFilters.diagnosticCode;
+        }
+
+        return params;
     }
 
     connectSse() {
@@ -597,14 +617,24 @@ class StationMonitorView {
             return;
         }
 
+        const alreadyLoaded = this.hasResultRecord(this.globalResults, record) ||
+            this.hasResultRecord(this.monitorResults, record);
+
         this.globalResults.unshift(record);
         this.globalResults = this.dedupeResultRecords(this.globalResults).slice(0, 80);
 
-        if (this.monitorPageIndex === 0 &&
-            this.resultMatchesCurrentScope(record) &&
-            this.resultMatchesFilters(record)) {
-            this.monitorResults = this.dedupeResultRecords([record, ...this.monitorResults]).slice(0, this.monitorPageSize);
+        const matchesCurrentQuery = this.resultMatchesCurrentScope(record) &&
+            this.resultMatchesFilters(record);
+        if (matchesCurrentQuery && !alreadyLoaded) {
             this.monitorTotalCount += 1;
+            this.applyRealtimeResultToStatistics(record);
+        }
+
+        if (this.monitorPageIndex === 0 && matchesCurrentQuery) {
+            this.monitorResults = this.dedupeResultRecords([record, ...this.monitorResults]).slice(0, this.monitorPageSize);
+            if (!alreadyLoaded) {
+                this.monitorTotalCount = Math.max(this.monitorTotalCount, this.monitorResults.length);
+            }
         }
 
         if (this.selectedStationId === record.stationId) {
@@ -1349,7 +1379,7 @@ class StationMonitorView {
         }
 
         const scopeLabel = this.getCurrentScopeLabel();
-        const stats = this.calculateResultStats(this.monitorResults);
+        const stats = this.monitorStatistics || this.calculateResultStats(this.monitorResults);
         const totalPages = Math.max(1, Math.ceil(this.monitorTotalCount / this.monitorPageSize));
         this.resultsTitle.textContent = `${scopeLabel}结果明细`;
         this.resultsSubtitle.textContent = this.selectedStationId
@@ -1361,19 +1391,19 @@ class StationMonitorView {
 
         this.resultOverview.innerHTML = `
             <article class="sm-result-kpi">
-                <span>当前页</span>
-                <strong>${this.monitorResults.length}</strong>
-                <small>总计 ${this.monitorTotalCount}</small>
+                <span>命中总量</span>
+                <strong>${stats.total}</strong>
+                <small>当前页 ${this.monitorResults.length}</small>
             </article>
             <article class="sm-result-kpi">
                 <span>OK / NG / ERR</span>
                 <strong>${stats.ok} / ${stats.ng} / ${stats.error}</strong>
-                <small>来自真实结果</small>
+                <small>来自工站采集</small>
             </article>
             <article class="sm-result-kpi">
                 <span>良率</span>
                 <strong>${stats.total === 0 ? '--' : `${Math.round((stats.ok / stats.total) * 1000) / 10}%`}</strong>
-                <small>按当前加载结果计算</small>
+                <small>${this.monitorStatistics ? '按筛选范围计算' : '按当前加载结果计算'}</small>
             </article>
             <article class="sm-result-kpi">
                 <span>平均耗时</span>
@@ -1384,8 +1414,8 @@ class StationMonitorView {
 
         this.resultCharts.innerHTML = `
             ${this.renderYieldChart(stats)}
-            ${this.renderDiagnosticChart(this.monitorResults)}
-            ${this.renderTrendChart(this.monitorResults)}
+            ${this.renderDiagnosticChart(this.monitorResults, this.monitorStatistics)}
+            ${this.renderTrendChart(this.monitorResults, this.monitorStatistics)}
         `;
 
         this.resultToolbar.innerHTML = `
@@ -1461,8 +1491,10 @@ class StationMonitorView {
         `;
     }
 
-    renderDiagnosticChart(records) {
-        const groups = this.groupBy(records, (record) => record.diagnosticCode || 'Unknown')
+    renderDiagnosticChart(records, statistics = null) {
+        const groups = (Array.isArray(statistics?.byDiagnosticCode) && statistics.byDiagnosticCode.length > 0
+            ? statistics.byDiagnosticCode
+            : this.groupBy(records, (record) => record.diagnosticCode || 'Unknown'))
             .slice(0, 6);
         const max = Math.max(1, ...groups.map((item) => item.count));
         return `
@@ -1486,8 +1518,13 @@ class StationMonitorView {
         `;
     }
 
-    renderTrendChart(records) {
-        const groups = this.groupBy(records, (record) => this.formatHourBucket(record.completedAtUtc))
+    renderTrendChart(records, statistics = null) {
+        const groups = (Array.isArray(statistics?.hourlyTrend) && statistics.hourlyTrend.length > 0
+            ? statistics.hourlyTrend.map((item) => ({
+                key: this.formatHourBucket(item.time),
+                count: item.count
+            }))
+            : this.groupBy(records, (record) => this.formatHourBucket(record.completedAtUtc)))
             .sort((left, right) => String(left.key).localeCompare(String(right.key)))
             .slice(-8);
         const max = Math.max(1, ...groups.map((item) => item.count));
@@ -1797,6 +1834,48 @@ class StationMonitorView {
         };
     }
 
+    normalizeResultStatistics(statistics) {
+        if (!statistics || typeof statistics !== 'object') {
+            return null;
+        }
+
+        const diagnosticItems = statistics.byDiagnosticCode
+            ?? statistics.ByDiagnosticCode
+            ?? statistics.defectDistribution?.items
+            ?? statistics.DefectDistribution?.Items
+            ?? [];
+        const trendItems = statistics.hourlyTrend
+            ?? statistics.HourlyTrend
+            ?? statistics.trend?.dataPoints
+            ?? statistics.Trend?.DataPoints
+            ?? [];
+
+        return {
+            total: Number(statistics.totalCount ?? statistics.TotalCount ?? statistics.total ?? statistics.Total ?? 0),
+            ok: Number(statistics.okCount ?? statistics.OKCount ?? statistics.ok ?? statistics.Ok ?? 0),
+            ng: Number(statistics.ngCount ?? statistics.NGCount ?? statistics.ng ?? statistics.Ng ?? 0),
+            error: Number(statistics.errorCount ?? statistics.ErrorCount ?? statistics.error ?? statistics.Error ?? 0),
+            averageExecutionTimeMs: Number(
+                statistics.averageExecutionTimeMs
+                ?? statistics.AverageExecutionTimeMs
+                ?? statistics.averageProcessingTimeMs
+                ?? statistics.AverageProcessingTimeMs
+                ?? 0),
+            byDiagnosticCode: (Array.isArray(diagnosticItems) ? diagnosticItems : [])
+                .map((item) => ({
+                    key: item.diagnosticCode ?? item.DiagnosticCode ?? item.defectType ?? item.DefectType ?? 'Unknown',
+                    count: Number(item.count ?? item.Count ?? 0)
+                }))
+                .filter((item) => item.count > 0),
+            hourlyTrend: (Array.isArray(trendItems) ? trendItems : [])
+                .map((item) => ({
+                    time: item.hourUtc ?? item.HourUtc ?? item.timestamp ?? item.Timestamp ?? null,
+                    count: Number(item.totalCount ?? item.TotalCount ?? item.total ?? item.Total ?? 0)
+                }))
+                .filter((item) => item.time && item.count > 0)
+        };
+    }
+
     normalizeMonitorResult(result, station = null) {
         const normalized = this.normalizeResult(result);
         if (!normalized.stationId) {
@@ -1966,6 +2045,7 @@ class StationMonitorView {
         const values = [
             ...this.monitorResults.map((record) => record.diagnosticCode),
             ...this.globalResults.map((record) => record.diagnosticCode),
+            ...(this.monitorStatistics?.byDiagnosticCode || []).map((item) => item.key),
             ...this.getSortedStations().map((station) => station.lastDiagnosticCode)
         ].filter(Boolean);
         return [...new Set(values)].sort((left, right) => String(left).localeCompare(String(right)));
@@ -1986,10 +2066,51 @@ class StationMonitorView {
             .sort((left, right) => right.count - left.count || String(left.key).localeCompare(String(right.key)));
     }
 
+    applyRealtimeResultToStatistics(record) {
+        if (!this.monitorStatistics) {
+            return;
+        }
+
+        this.monitorStatistics.total += 1;
+        if (record.status === 'OK') {
+            this.monitorStatistics.ok += 1;
+        } else if (record.status === 'NG') {
+            this.monitorStatistics.ng += 1;
+        } else if (record.status === 'Error' || record.status === 'Canceled') {
+            this.monitorStatistics.error += 1;
+        }
+
+        const executionTime = Number(record.executionTimeMs || 0);
+        if (executionTime > 0) {
+            const totalTime = Number(this.monitorStatistics.averageExecutionTimeMs || 0) * Math.max(0, this.monitorStatistics.total - 1);
+            this.monitorStatistics.averageExecutionTimeMs = (totalTime + executionTime) / Math.max(1, this.monitorStatistics.total);
+        }
+
+        const diagnosticCode = record.diagnosticCode || 'Unknown';
+        const existingDiagnostic = this.monitorStatistics.byDiagnosticCode
+            .find((item) => String(item.key).toLowerCase() === String(diagnosticCode).toLowerCase());
+        if (existingDiagnostic) {
+            existingDiagnostic.count += 1;
+        } else {
+            this.monitorStatistics.byDiagnosticCode.push({ key: diagnosticCode, count: 1 });
+        }
+        this.monitorStatistics.byDiagnosticCode.sort((left, right) =>
+            right.count - left.count || String(left.key).localeCompare(String(right.key)));
+
+        const bucketKey = this.formatHourBucket(record.completedAtUtc);
+        const existingBucket = this.monitorStatistics.hourlyTrend
+            .find((item) => this.formatHourBucket(item.time) === bucketKey);
+        if (existingBucket) {
+            existingBucket.count += 1;
+        } else if (record.completedAtUtc) {
+            this.monitorStatistics.hourlyTrend.push({ time: record.completedAtUtc, count: 1 });
+        }
+    }
+
     dedupeResults(results) {
         const seen = new Set();
         return results.filter((result) => {
-            const key = `${result.stationId || ''}:${result.sequenceId || ''}:${result.messageId || ''}`;
+            const key = this.getResultRecordKey(result);
             if (seen.has(key)) {
                 return false;
             }
@@ -2001,13 +2122,22 @@ class StationMonitorView {
     dedupeResultRecords(records) {
         const seen = new Set();
         return records.filter((record) => {
-            const key = `${record.stationId || ''}:${record.sequenceId || ''}:${record.messageId || ''}`;
+            const key = this.getResultRecordKey(record);
             if (seen.has(key)) {
                 return false;
             }
             seen.add(key);
             return true;
         });
+    }
+
+    hasResultRecord(records, record) {
+        const key = this.getResultRecordKey(record);
+        return (Array.isArray(records) ? records : []).some((item) => this.getResultRecordKey(item) === key);
+    }
+
+    getResultRecordKey(record) {
+        return `${record?.stationId || ''}:${record?.sequenceId || ''}:${record?.messageId || ''}`;
     }
 
     exportMonitorResults(format) {

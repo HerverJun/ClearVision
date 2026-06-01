@@ -17,6 +17,8 @@ import {
 
 const LIVE_RESULT_HISTORY_REFRESH_DELAY_MS = 2000;
 const LIVE_RESULT_ANALYTICS_REFRESH_DELAY_MS = 5000;
+const RESULT_DATA_SOURCE_INSPECTION = 'inspection';
+const RESULT_DATA_SOURCE_STATION = 'station';
 
 class ResultPanel {
     constructor(containerId) {
@@ -27,6 +29,7 @@ class ResultPanel {
         this.serverReport = null;
         this.serverAnalysis = null;
         this.serverAnalysisSource = 'local';
+        this.dataSource = RESULT_DATA_SOURCE_INSPECTION;
         this._resultsStreamController = null;
         this._resultsStreamConnectionId = 0;
         this._resultsStreamReconnectAttempt = 0;
@@ -78,6 +81,15 @@ class ResultPanel {
      * 绑定事件
      */
     bindEvents() {
+        this.ensureDataSourceFilter();
+
+        const dataSourceFilter = document.getElementById('filter-data-source');
+        if (dataSourceFilter) {
+            dataSourceFilter.addEventListener('change', (e) => {
+                this.setDataSource(e.target.value);
+            });
+        }
+
         // 时间范围选择
         document.querySelectorAll('.time-range-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -136,6 +148,64 @@ class ResultPanel {
             });
         }
     }
+
+    ensureDataSourceFilter() {
+        const filterBar = document.getElementById('results-filters-bar');
+        if (!filterBar || document.getElementById('filter-data-source')) {
+            return;
+        }
+
+        const group = document.createElement('div');
+        group.className = 'filter-group';
+        group.innerHTML = `
+            <label>数据源:</label>
+            <select class="filter-select" id="filter-data-source">
+                <option value="${RESULT_DATA_SOURCE_INSPECTION}">工程追溯</option>
+                <option value="${RESULT_DATA_SOURCE_STATION}">Station采集</option>
+            </select>
+        `;
+        filterBar.insertBefore(group, filterBar.firstElementChild);
+    }
+
+    setDataSource(source) {
+        const normalizedSource = source === RESULT_DATA_SOURCE_STATION
+            ? RESULT_DATA_SOURCE_STATION
+            : RESULT_DATA_SOURCE_INSPECTION;
+        if (this.dataSource === normalizedSource) {
+            return;
+        }
+
+        this.dataSource = normalizedSource;
+        const dataSourceFilter = document.getElementById('filter-data-source');
+        if (dataSourceFilter) {
+            dataSourceFilter.value = this.dataSource;
+        }
+
+        this.serverReport = null;
+        this.serverAnalysis = null;
+        this.serverAnalysisSource = 'local';
+        this.currentPage = 1;
+        this.results = [];
+        this.filteredResults = [];
+        this.trendData = [];
+        this.defectTypes = {};
+        this.statistics = { total: 0, ok: 0, ng: 0, error: 0, avgTime: 0 };
+        this.totalResultCount = 0;
+        this.serverPageIndex = 0;
+        this.serverPaged = true;
+
+        if (this.dataSource === RESULT_DATA_SOURCE_STATION) {
+            this.disconnectResultsStream();
+        }
+
+        if (this.historyLoader) {
+            this.requestHistoryPage(0).catch(error => {
+                debugLogger.warn('[ResultPanel] Failed to switch result data source:', error);
+            });
+        }
+
+        this.render();
+    }
     
     /**
      * 设置时间范围
@@ -150,13 +220,13 @@ class ResultPanel {
         this.applyFilters();
         this.render();
 
-        if (this.projectId && this.historyLoader) {
+        if (this.historyLoader && this.canRequestServerData()) {
             this.requestHistoryPage(0).catch(error => {
                 debugLogger.warn('[ResultPanel] 刷新服务端历史失败:', error);
             });
         }
 
-        if (this.projectId) {
+        if (this.canRequestServerData()) {
             this.loadServerAnalytics().catch(error => {
                 debugLogger.warn('[ResultPanel] 刷新服务端分析失败:', error);
             });
@@ -210,7 +280,7 @@ class ResultPanel {
             this.totalResultCount = 0;
             this.serverPageIndex = 0;
             this.serverPaged = false;
-            if (this.projectId) {
+            if (this.projectId && this.dataSource !== RESULT_DATA_SOURCE_STATION) {
                 this.connectResultsHub();
             }
         }
@@ -218,6 +288,10 @@ class ResultPanel {
 
     setHistoryLoader(loader) {
         this.historyLoader = typeof loader === 'function' ? loader : null;
+    }
+
+    canRequestServerData() {
+        return this.dataSource === RESULT_DATA_SOURCE_STATION || !!this.projectId;
     }
 
     hasLocalPageFilters() {
@@ -254,13 +328,14 @@ class ResultPanel {
     }
 
     requestHistoryPage(pageIndex = 0) {
-        if (!this.historyLoader || !this.projectId) {
+        if (!this.historyLoader || !this.canRequestServerData()) {
             return Promise.resolve(false);
         }
 
         return this.historyLoader({
             pageIndex,
             pageSize: this.pageSize,
+            dataSource: this.dataSource,
             ...this.getAnalyticsQueryParams()
         });
     }
@@ -288,7 +363,7 @@ class ResultPanel {
     }
 
     queueServerAnalyticsRefresh(delayMs = 800) {
-        if (!this.projectId) {
+        if (!this.canRequestServerData()) {
             return;
         }
 
@@ -305,7 +380,7 @@ class ResultPanel {
     }
 
     queueServerHistoryRefresh(delayMs = 400) {
-        if (!this.projectId || !this.historyLoader) {
+        if (!this.historyLoader || !this.canRequestServerData()) {
             return;
         }
 
@@ -327,18 +402,25 @@ class ResultPanel {
         }
 
         return {
-            total: statistics.totalCount ?? statistics.TotalCount ?? 0,
-            ok: statistics.okCount ?? statistics.OKCount ?? 0,
-            ng: statistics.ngCount ?? statistics.NGCount ?? 0,
-            error: statistics.errorCount ?? statistics.ErrorCount ?? 0,
-            avgTime: Math.round(statistics.averageProcessingTimeMs ?? statistics.AverageProcessingTimeMs ?? 0)
+            total: statistics.totalCount ?? statistics.TotalCount ?? statistics.total ?? statistics.Total ?? 0,
+            ok: statistics.okCount ?? statistics.OKCount ?? statistics.ok ?? statistics.Ok ?? 0,
+            ng: statistics.ngCount ?? statistics.NGCount ?? statistics.ng ?? statistics.Ng ?? 0,
+            error: statistics.errorCount ?? statistics.ErrorCount ?? statistics.error ?? statistics.Error ?? 0,
+            avgTime: Math.round(
+                statistics.averageProcessingTimeMs
+                ?? statistics.AverageProcessingTimeMs
+                ?? statistics.averageExecutionTimeMs
+                ?? statistics.AverageExecutionTimeMs
+                ?? 0)
         };
     }
 
     normalizeDefectDistribution(defectDistribution) {
-        const items = defectDistribution?.items || defectDistribution?.Items || [];
+        const items = Array.isArray(defectDistribution)
+            ? defectDistribution
+            : (defectDistribution?.items || defectDistribution?.Items || []);
         return items.reduce((accumulator, item) => {
-            const defectType = item.defectType || item.DefectType || t('common.unknown', '未知');
+            const defectType = item.defectType || item.DefectType || item.diagnosticCode || item.DiagnosticCode || t('common.unknown', '未知');
             const count = item.count ?? item.Count ?? 0;
             accumulator[defectType] = count;
             return accumulator;
@@ -346,13 +428,16 @@ class ResultPanel {
     }
 
     normalizeTrendPoints(trend) {
-        const points = trend?.dataPoints || trend?.DataPoints || [];
+        const points = Array.isArray(trend)
+            ? trend
+            : (trend?.dataPoints || trend?.DataPoints || []);
         return points.map(point => ({
-            time: new Date(point.timestamp || point.Timestamp || Date.now()),
+            time: new Date(point.timestamp || point.Timestamp || point.hourUtc || point.HourUtc || Date.now()),
             status: (point.ngCount ?? point.NGCount ?? 0) > 0
                 ? 'NG'
                 : ((point.errorCount ?? point.ErrorCount ?? 0) > 0 ? 'Error' : 'OK'),
-            defectCount: point.defectCount ?? point.DefectCount ?? 0
+            defectCount: point.defectCount ?? point.DefectCount ?? 0,
+            count: point.totalCount ?? point.TotalCount ?? point.total ?? point.Total ?? 1
         }));
     }
 
@@ -361,24 +446,32 @@ class ResultPanel {
             report?.summary || report?.Summary || statistics
         );
         const normalizedDefects = this.normalizeDefectDistribution(
-            report?.defectDistribution || report?.DefectDistribution || defectDistribution
+            report?.defectDistribution
+            || report?.DefectDistribution
+            || defectDistribution
+            || statistics?.defectDistribution
+            || statistics?.DefectDistribution
+            || statistics?.byDiagnosticCode
+            || statistics?.ByDiagnosticCode
         );
         const normalizedTrend = this.normalizeTrendPoints(
-            report?.hourlyTrend || report?.HourlyTrend || trend
+            report?.hourlyTrend
+            || report?.HourlyTrend
+            || trend
+            || statistics?.hourlyTrend
+            || statistics?.HourlyTrend
+            || statistics?.trend
+            || statistics?.Trend
         );
 
         if (normalizedStatistics) {
             this.statistics = normalizedStatistics;
         }
 
-        if (Object.keys(normalizedDefects).length > 0) {
-            this.defectTypes = normalizedDefects;
-            this.updateDefectTypeFilter();
-        }
+        this.defectTypes = normalizedDefects;
+        this.updateDefectTypeFilter();
 
-        if (normalizedTrend.length > 0) {
-            this.trendData = normalizedTrend;
-        }
+        this.trendData = normalizedTrend;
 
         this.serverReport = report || this.serverReport;
         this.serverAnalysis = {
@@ -390,6 +483,10 @@ class ResultPanel {
     }
 
     async loadServerAnalytics(projectId = this.projectId) {
+        if (this.dataSource === RESULT_DATA_SOURCE_STATION) {
+            return this.loadStationAnalytics();
+        }
+
         if (!projectId) {
             return;
         }
@@ -489,6 +586,41 @@ class ResultPanel {
 
         this.render();
     }
+
+    async loadStationAnalytics() {
+        const queryParams = this.getAnalyticsQueryParams();
+        const stationParams = {
+            range: queryParams.startTime && queryParams.endTime ? undefined : 'all',
+            ...(queryParams.startTime ? { from: queryParams.startTime } : {}),
+            ...(queryParams.endTime ? { to: queryParams.endTime } : {}),
+            ...(queryParams.status ? { status: queryParams.status } : {}),
+            ...(queryParams.defectType ? { diagnosticCode: queryParams.defectType } : {})
+        };
+
+        Object.keys(stationParams).forEach((key) => {
+            if (stationParams[key] === undefined || stationParams[key] === null || stationParams[key] === '') {
+                delete stationParams[key];
+            }
+        });
+
+        const statistics = await httpClient.get('/stations/statistics', stationParams)
+            .catch(error => {
+                debugLogger.warn('[ResultPanel] Failed to load Station analytics:', error);
+                return null;
+            });
+
+        if (!statistics) {
+            this.serverReport = null;
+            this.serverAnalysis = null;
+            this.serverAnalysisSource = 'server-unavailable';
+            this.render();
+            return;
+        }
+
+        this.applyServerAnalysis({ statistics });
+        this.serverAnalysisSource = 'station';
+        this.render();
+    }
     
     /**
      * 更新统计
@@ -550,7 +682,7 @@ class ResultPanel {
             });
         }
 
-        if (this.projectId) {
+        if (this.canRequestServerData()) {
             this.queueServerAnalyticsRefresh();
         }
 
@@ -695,7 +827,7 @@ class ResultPanel {
     setFilter(type, value) {
         this.filters[type] = value;
         this.currentPage = 1;
-        if (this.serverPaged && this.projectId) {
+        if (this.serverPaged && this.canRequestServerData()) {
             this.requestHistoryPage(0).catch(error => {
                 debugLogger.warn('[ResultPanel] 刷新服务端历史失败:', error);
             });
@@ -849,6 +981,10 @@ class ResultPanel {
     }
 
     getDashboardDataSourceLabel() {
+        if (this.serverAnalysisSource === 'station' || this.dataSource === RESULT_DATA_SOURCE_STATION) {
+            return 'Station采集';
+        }
+
         if (this.serverAnalysisSource === 'server') {
             return '真实数据';
         }
@@ -980,7 +1116,8 @@ class ResultPanel {
         const bucketMap = new Map();
         this.trendData.forEach(p => {
             const hour = new Date(p.time).getHours();
-            bucketMap.set(hour, (bucketMap.get(hour) || 0) + 1);
+            const count = Math.max(1, Number(p.count ?? 1) || 1);
+            bucketMap.set(hour, (bucketMap.get(hour) || 0) + count);
         });
 
         const buckets = Array.from(bucketMap.entries()).sort((a, b) => a[0] - b[0]);
@@ -1240,7 +1377,9 @@ class ResultPanel {
     buildClientExportMetadata(format = 'json') {
         const { startTime, endTime } = this.getTimeRangeBounds();
         return {
-            dataSource: this.serverPaged ? 'server-page-loaded-in-browser' : 'browser-current-results',
+            dataSource: this.dataSource === RESULT_DATA_SOURCE_STATION
+                ? 'station-ingest'
+                : (this.serverPaged ? 'server-page-loaded-in-browser' : 'browser-current-results'),
             exportScope: this.isClientFilteringServerPage() ? '当前已加载页' : '当前视图筛选结果',
             format,
             exportedAt: new Date().toISOString(),

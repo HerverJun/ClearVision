@@ -566,6 +566,76 @@ function normalizeInspectionStatus(status) {
     return status || 'Unknown';
 }
 
+function normalizeStationResultStatus(outcome, inspectionStatus = null) {
+    const normalizedOutcome = String(outcome ?? '').trim().toUpperCase();
+    if (normalizedOutcome === 'OK' || normalizedOutcome === '0') {
+        return 'OK';
+    }
+
+    if (normalizedOutcome === 'NG' || normalizedOutcome === '1') {
+        return 'NG';
+    }
+
+    if (normalizedOutcome === 'ERROR' || normalizedOutcome === '2') {
+        return 'Error';
+    }
+
+    if (normalizedOutcome === 'CANCELED' || normalizedOutcome === 'CANCELLED' || normalizedOutcome === '3') {
+        return 'Error';
+    }
+
+    return normalizeInspectionStatus(inspectionStatus || outcome || 'Unknown');
+}
+
+function normalizeStationTraceResultRecord(result) {
+    if (!result || typeof result !== 'object') {
+        return null;
+    }
+
+    const stationId = result.stationId ?? result.StationId ?? '';
+    const sequenceId = result.sequenceId ?? result.SequenceId ?? 0;
+    const diagnosticCode = result.diagnosticCode ?? result.DiagnosticCode ?? '';
+    const diagnosticMessage = result.diagnosticMessage ?? result.DiagnosticMessage ?? '';
+    const status = normalizeStationResultStatus(
+        result.outcome ?? result.Outcome,
+        result.inspectionStatus ?? result.InspectionStatus);
+    const primaryOutputsPreview = result.primaryOutputsPreview ?? result.PrimaryOutputsPreview ?? {};
+    const outputData = {
+        ...(primaryOutputsPreview && typeof primaryOutputsPreview === 'object' ? primaryOutputsPreview : {}),
+        stationId,
+        sequenceId,
+        runId: result.runId ?? result.RunId ?? '',
+        packageId: result.packageId ?? result.PackageId ?? '',
+        packageName: result.packageName ?? result.PackageName ?? '',
+        imageId: result.imageId ?? result.ImageId ?? '',
+        diagnosticCode,
+        diagnosticMessage
+    };
+    const defects = status === 'OK'
+        ? []
+        : [{
+            type: diagnosticCode || status,
+            description: diagnosticMessage || diagnosticCode || status
+        }];
+
+    return {
+        id: `${stationId || 'station'}:${sequenceId}:${result.messageId ?? result.MessageId ?? ''}`,
+        projectId: null,
+        stationId,
+        status,
+        defects,
+        defectCount: defects.length,
+        processingTime: result.executionTimeMs ?? result.ExecutionTimeMs ?? 0,
+        processingTimeMs: result.executionTimeMs ?? result.ExecutionTimeMs ?? 0,
+        timestamp: result.completedAtUtc ?? result.CompletedAtUtc ?? result.createdAtUtc ?? result.CreatedAtUtc ?? new Date().toISOString(),
+        confidenceScore: null,
+        imageId: null,
+        outputData,
+        analysisData: null,
+        errorMessage: status === 'Error' ? diagnosticMessage : ''
+    };
+}
+
 function normalizeInspectionResultRecord(result, fallbackProjectId = null) {
     if (!result || typeof result !== 'object') {
         return null;
@@ -878,12 +948,12 @@ async function loadInspectionHistory({
     startTime = resultPanel?.getAnalyticsQueryParams?.().startTime,
     endTime = resultPanel?.getAnalyticsQueryParams?.().endTime,
     status = resultPanel?.getAnalyticsQueryParams?.().status,
-    defectType = resultPanel?.getAnalyticsQueryParams?.().defectType
+    defectType = resultPanel?.getAnalyticsQueryParams?.().defectType,
+    dataSource = resultPanel?.dataSource ?? 'inspection'
 } = {}) {
     const project = getCurrentProject();
-    if (!project) {
-        debugLogger.debug('[App] 没有打开的工程，跳过加载历史数据');
-        return false;
+    if (dataSource === 'station' || !project) {
+        return loadStationResultHistory({ pageIndex, pageSize, startTime, endTime, status, defectType });
     }
 
     try {
@@ -936,6 +1006,69 @@ async function loadInspectionHistory({
         return true;
     } catch (error) {
         console.error('[App] 加载检测历史数据失败:', error);
+        return false;
+    }
+}
+
+async function loadStationResultHistory({
+    pageIndex = 0,
+    pageSize = resultPanel?.pageSize ?? 12,
+    startTime = resultPanel?.getAnalyticsQueryParams?.().startTime,
+    endTime = resultPanel?.getAnalyticsQueryParams?.().endTime,
+    status = resultPanel?.getAnalyticsQueryParams?.().status,
+    defectType = resultPanel?.getAnalyticsQueryParams?.().defectType
+} = {}) {
+    if (!resultPanel) {
+        return false;
+    }
+
+    try {
+        debugLogger.debug('[App] 正在加载 Station 采集追溯数据...');
+        const response = await httpClient.get('/stations/results', {
+            pageIndex,
+            pageSize,
+            ...(startTime ? { from: startTime } : {}),
+            ...(endTime ? { to: endTime } : {}),
+            ...(status ? { status } : {}),
+            ...(defectType ? { diagnosticCode: defectType } : {})
+        });
+
+        const results = Array.isArray(response)
+            ? response
+            : (response?.items || response?.Items || []);
+        const totalCount = Array.isArray(response)
+            ? results.length
+            : (response?.totalCount ?? response?.TotalCount ?? results.length);
+        const resolvedPageIndex = Array.isArray(response)
+            ? pageIndex
+            : (response?.pageIndex ?? response?.PageIndex ?? pageIndex);
+        const resolvedPageSize = Array.isArray(response)
+            ? pageSize
+            : (response?.pageSize ?? response?.PageSize ?? pageSize);
+
+        resultPanel.dataSource = 'station';
+        const dataSourceFilter = document.getElementById('filter-data-source');
+        if (dataSourceFilter) {
+            dataSourceFilter.value = 'station';
+        }
+
+        resultPanel.disconnectResultsStream?.();
+        resultPanel.loadResults(
+            results.map(normalizeStationTraceResultRecord).filter(Boolean),
+            {
+                totalCount,
+                pageIndex: resolvedPageIndex,
+                pageSize: resolvedPageSize,
+                serverPaged: true
+            });
+
+        if (typeof resultPanel.loadServerAnalytics === 'function') {
+            await resultPanel.loadServerAnalytics();
+        }
+
+        return true;
+    } catch (error) {
+        console.error('[App] 加载 Station 采集追溯数据失败:', error);
         return false;
     }
 }
