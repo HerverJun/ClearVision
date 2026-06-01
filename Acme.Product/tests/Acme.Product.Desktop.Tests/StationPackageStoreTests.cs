@@ -54,6 +54,7 @@ public sealed class StationPackageStoreTests
                 var manifest = await store.CreateTestPackageAsync(CancellationToken.None);
                 var packagePath = store.GetPackagePath(manifest.PackageId);
 
+                manifest.PackageKind.Should().Be(StationPackageKind.Test);
                 packagePath.Should().NotBeNullOrWhiteSpace();
                 File.Exists(packagePath).Should().BeTrue();
 
@@ -72,7 +73,10 @@ public sealed class StationPackageStoreTests
                 loaded.Flow.Operators.Should().ContainSingle();
                 loaded.ValidationReport.IsValid.Should().BeTrue();
 
-                store.GetPackages().Should().ContainSingle(item => item.PackageId == manifest.PackageId);
+                store.GetPackages().Should().ContainSingle(item =>
+                    item.PackageId == manifest.PackageId &&
+                    item.PackageKind == StationPackageKind.Test);
+                store.GetProductionPackages().Should().BeEmpty();
             }
         }
         finally
@@ -115,6 +119,7 @@ public sealed class StationPackageStoreTests
                 var packagePath = store.GetPackagePath(manifest.PackageId);
 
                 manifest.PackageId.Should().Be("cvpkg-import-1");
+                manifest.PackageKind.Should().Be(StationPackageKind.Production);
                 manifest.CreatedBy.Should().Be("unit-test");
                 packagePath.Should().NotBeNullOrWhiteSpace();
                 File.Exists(packagePath).Should().BeTrue();
@@ -128,7 +133,10 @@ public sealed class StationPackageStoreTests
                 loaded.Manifest.PackageId.Should().Be("cvpkg-import-1");
                 loaded.ValidationReport.IsValid.Should().BeTrue();
 
-                store.GetPackages().Should().Contain(item => item.PackageId == manifest.PackageId);
+                store.GetPackages().Should().Contain(item =>
+                    item.PackageId == manifest.PackageId &&
+                    item.PackageKind == StationPackageKind.Production);
+                store.GetProductionPackages().Should().ContainSingle(item => item.PackageId == manifest.PackageId);
             }
         }
         finally

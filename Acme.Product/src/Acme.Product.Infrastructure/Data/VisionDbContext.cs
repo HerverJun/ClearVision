@@ -325,6 +325,7 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.PackageId).IsRequired().HasMaxLength(128);
             entity.Property(e => e.PackageName).HasMaxLength(200);
             entity.Property(e => e.PackageVersion).HasMaxLength(80);
+            entity.Property(e => e.PackageKind).HasMaxLength(40).HasDefaultValue("Production");
             entity.Property(e => e.Sha256).HasMaxLength(128);
             entity.HasIndex(e => e.PackageId).IsUnique();
             entity.HasIndex(e => e.CreatedAtUtc);

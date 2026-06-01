@@ -810,15 +810,56 @@ class StationMonitorView {
     }
 
     async deployLatestPackage() {
-        const packageId = this.packages[0]?.packageId ?? this.packages[0]?.PackageId;
+        const targetPackage = this.getLatestProductionPackage();
+        const packageId = targetPackage?.packageId ?? targetPackage?.PackageId;
         if (!packageId) {
-            return null;
+            throw new Error('当前没有正式运行包。请先从工程导出正式运行包，或使用“下发测试包”。');
         }
 
         return httpClient.post(`/stations/${encodeURIComponent(this.selectedStationId)}/deploy-package`, {
             packageId,
             issuedBy: this.getCommandIssuer()
         });
+    }
+
+    getPackageKind(pkg) {
+        const value = pkg?.packageKind ?? pkg?.PackageKind ?? pkg?.kind ?? pkg?.Kind;
+        if (typeof value === 'string') {
+            return value.toLowerCase();
+        }
+
+        if (typeof value === 'number') {
+            return value === 1 ? 'test' : 'production';
+        }
+
+        return 'production';
+    }
+
+    isProductionPackage(pkg) {
+        return this.getPackageKind(pkg) === 'production';
+    }
+
+    getProductionPackages() {
+        return Array.isArray(this.packages)
+            ? this.packages.filter((pkg) => this.isProductionPackage(pkg))
+            : [];
+    }
+
+    getLatestProductionPackage() {
+        return this.getProductionPackages()[0] || null;
+    }
+
+    formatPackageLabel(pkg) {
+        if (!pkg) {
+            return '--';
+        }
+
+        const packageName = pkg.packageName ?? pkg.PackageName ?? pkg.packageId ?? pkg.PackageId ?? '--';
+        const packageId = pkg.packageId ?? pkg.PackageId;
+        const kind = this.isProductionPackage(pkg) ? '正式包' : '测试包';
+        return packageId && packageId !== packageName
+            ? `${packageName}（${kind} / ${packageId}）`
+            : `${packageName}（${kind}）`;
     }
 
     stationActionRequiresConfirmation(action) {
@@ -835,9 +876,9 @@ class StationMonitorView {
                 };
             case 'deploy':
                 return {
-                    title: '部署运行包',
-                    impact: '会向工站下发新的运行包，工站轮询执行后可能替换当前检测配置。',
-                    confirmHint: '请确认当前产线允许变更配置。'
+                    title: '部署正式运行包',
+                    impact: '会向工站下发最新正式运行包，工站轮询执行后可能替换当前检测配置。',
+                    confirmHint: '测试包不会从这里下发；请确认当前产线允许变更正式配置。'
                 };
             case 'testDeploy':
                 return {
@@ -859,14 +900,19 @@ class StationMonitorView {
         const meta = this.getStationActionMeta(action);
         const stationName = station.stationName || station.lineName || station.machineName || '未命名工作站';
         const state = this.formatState(station.state, this.computeIsOnline(station));
-        const packageId = station.packageId || this.packages[0]?.packageId || this.packages[0]?.PackageId || '--';
+        const targetPackage = action === 'deploy' ? this.getLatestProductionPackage() : null;
+        const packageLabel = action === 'deploy'
+            ? this.formatPackageLabel(targetPackage)
+            : action === 'testDeploy'
+                ? '将生成新的测试包'
+                : (station.packageId || '--');
         const lines = [
             `即将执行：${meta.title}`,
             '',
             `工站：${stationName}`,
             `标识：${this.selectedStationId}`,
             `当前状态：${state}`,
-            `当前/目标包：${packageId}`,
+            `目标包：${packageLabel}`,
             '',
             `影响范围：${meta.impact}`,
             meta.confirmHint,
@@ -1097,8 +1143,9 @@ class StationMonitorView {
         const productionActionDisabled = this.commandBusy || !isOnline
             ? 'disabled title="工站离线或状态未知，不能下发会影响生产的命令"'
             : '';
-        const deployDisabled = this.commandBusy || !isOnline || this.packages.length === 0
-            ? 'disabled title="工站离线、状态未知或暂无运行包，不能部署"'
+        const productionPackages = this.getProductionPackages();
+        const deployDisabled = this.commandBusy || !isOnline || productionPackages.length === 0
+            ? 'disabled title="工站离线、状态未知或暂无正式运行包，不能部署正式包"'
             : '';
         const testDeployDisabled = this.commandBusy || !isOnline
             ? 'disabled title="工站离线或状态未知，不能下发测试包"'
@@ -1118,7 +1165,7 @@ class StationMonitorView {
                 <button type="button" data-station-action="ping" ${actionsDisabled}>Ping</button>
                 <button type="button" data-station-action="reload" ${actionsDisabled}>重载</button>
                 <button type="button" data-station-action="stop" data-risk="production-impact" ${productionActionDisabled}>停止运行</button>
-                <button type="button" data-station-action="deploy" data-risk="configuration-change" ${deployDisabled}>部署运行包</button>
+                <button type="button" data-station-action="deploy" data-risk="configuration-change" ${deployDisabled}>部署正式包</button>
                 <button type="button" class="sm-action-wide" data-station-action="testDeploy" data-risk="configuration-change" ${testDeployDisabled}>下发测试包</button>
             </div>
             ${this.commandStatusMessage

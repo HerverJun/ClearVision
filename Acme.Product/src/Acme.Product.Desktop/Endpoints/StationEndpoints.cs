@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using Acme.Product.Core.Enums;
 using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;
+using Acme.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -169,6 +170,15 @@ public static class StationEndpoints
             if (package == null)
             {
                 return Results.NotFound(new { error = "PackageNotFound" });
+            }
+
+            if (package.PackageKind != StationPackageKind.Production)
+            {
+                return Results.BadRequest(new
+                {
+                    error = "ProductionPackageRequired",
+                    message = "测试包不能通过正式部署入口下发，请使用“下发测试包”。"
+                });
             }
 
             var payload = System.Text.Json.JsonSerializer.Serialize(new

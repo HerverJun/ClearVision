@@ -60,17 +60,15 @@ public sealed class StationPackageStore
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
         return db.StationPackageRecords
             .OrderByDescending(item => item.Id)
-            .Select(item => new StationPackageManifestDto
-            {
-                PackageId = item.PackageId,
-                PackageName = item.PackageName,
-                PackageVersion = item.PackageVersion,
-                FlowHash = item.FlowHash,
-                CreatedBy = item.CreatedBy,
-                SizeBytes = item.SizeBytes,
-                Sha256 = item.Sha256,
-                CreatedAtUtc = item.CreatedAtUtc
-            })
+            .AsEnumerable()
+            .Select(item => ToManifest(item))
+            .ToList();
+    }
+
+    public IReadOnlyList<StationPackageManifestDto> GetProductionPackages()
+    {
+        return GetPackages()
+            .Where(item => item.PackageKind == StationPackageKind.Production)
             .ToList();
     }
 
@@ -79,19 +77,7 @@ public sealed class StationPackageStore
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
         var entity = db.StationPackageRecords.FirstOrDefault(item => item.PackageId == packageId);
-        return entity == null
-            ? null
-            : new StationPackageManifestDto
-            {
-                PackageId = entity.PackageId,
-                PackageName = entity.PackageName,
-                PackageVersion = entity.PackageVersion,
-                FlowHash = entity.FlowHash,
-                CreatedBy = entity.CreatedBy,
-                SizeBytes = entity.SizeBytes,
-                Sha256 = entity.Sha256,
-                CreatedAtUtc = entity.CreatedAtUtc
-            };
+        return entity == null ? null : ToManifest(entity);
     }
 
     public string? GetPackagePath(string packageId)
@@ -214,6 +200,7 @@ public sealed class StationPackageStore
             PackageId = packageId,
             PackageName = packageName,
             PackageVersion = packageVersion,
+            PackageKind = StationPackageKind.Test,
             FlowHash = flowHash,
             CreatedBy = "Studio",
             MinStationVersion = "0.1.0",
@@ -281,6 +268,7 @@ public sealed class StationPackageStore
             PackageVersion = string.IsNullOrWhiteSpace(runtimeManifest.RuntimeApiVersion)
                 ? "1.0"
                 : runtimeManifest.RuntimeApiVersion.Trim(),
+            PackageKind = StationPackageKind.Production,
             FlowHash = runtimeManifest.FlowHash,
             CreatedBy = string.IsNullOrWhiteSpace(createdBy)
                 ? (string.IsNullOrWhiteSpace(runtimeManifest.CreatedBy) ? "Studio" : runtimeManifest.CreatedBy.Trim())
@@ -378,6 +366,7 @@ public sealed class StationPackageStore
 
         existing.PackageName = manifest.PackageName;
         existing.PackageVersion = manifest.PackageVersion;
+        existing.PackageKind = manifest.PackageKind.ToString();
         existing.FlowHash = manifest.FlowHash;
         existing.FileName = Path.GetFileName(path);
         existing.FilePath = path;
@@ -388,6 +377,29 @@ public sealed class StationPackageStore
         db.SaveChanges();
 
         _logger.LogInformation("Stored Station package {PackageId} at {PackagePath}", manifest.PackageId, path);
+    }
+
+    private static StationPackageManifestDto ToManifest(StationPackageRecordEntity entity)
+    {
+        return new StationPackageManifestDto
+        {
+            PackageId = entity.PackageId,
+            PackageName = entity.PackageName,
+            PackageVersion = entity.PackageVersion,
+            PackageKind = ParsePackageKind(entity.PackageKind),
+            FlowHash = entity.FlowHash,
+            CreatedBy = entity.CreatedBy,
+            SizeBytes = entity.SizeBytes,
+            Sha256 = entity.Sha256,
+            CreatedAtUtc = entity.CreatedAtUtc
+        };
+    }
+
+    private static StationPackageKind ParsePackageKind(string? value)
+    {
+        return Enum.TryParse<StationPackageKind>(value, ignoreCase: true, out var parsed)
+            ? parsed
+            : StationPackageKind.Production;
     }
 
     private bool TryNormalizeAllowedPackagePath(string storedPath, out string normalizedPath)

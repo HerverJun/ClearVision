@@ -127,6 +127,15 @@ public enum StationPackageState
 }
 
 /// <summary>
+/// Studio-side package purpose for Station deployment.
+/// </summary>
+public enum StationPackageKind
+{
+    Production = 0,
+    Test = 1
+}
+
+/// <summary>
 /// Registers a Station with the central Studio ingress hub.
 /// </summary>
 public sealed class StationRegistrationDto
@@ -836,6 +845,9 @@ public sealed class StationPackageManifestDto
 
     /// <summary>Runtime package version.</summary>
     public string PackageVersion { get; set; } = string.Empty;
+
+    /// <summary>Package purpose.</summary>
+    public StationPackageKind PackageKind { get; set; } = StationPackageKind.Production;
 
     /// <summary>Flow hash for the package.</summary>
     public string FlowHash { get; set; } = string.Empty;

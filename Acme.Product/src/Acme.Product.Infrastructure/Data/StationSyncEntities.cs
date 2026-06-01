@@ -297,6 +297,8 @@ public sealed class StationPackageRecordEntity
 
     public string PackageVersion { get; set; } = string.Empty;
 
+    public string PackageKind { get; set; } = "Production";
+
     public string FlowHash { get; set; } = string.Empty;
 
     public string FileName { get; set; } = string.Empty;

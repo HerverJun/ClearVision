@@ -252,6 +252,50 @@ public sealed class StationEndpointsTests
     }
 
     [Fact]
+    public async Task DeployPackage_ShouldRejectTestPackageFromProductionEndpoint()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(host.Services, "test-package", StationPackageKind.Test);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "test-package",
+                IssuedBy = "unit-test"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        await using var scope = host.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        (await db.StationCommandRecords.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DeployPackage_ShouldCreateDeployCommandForProductionPackage()
+    {
+        await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
+        await SeedPackageAsync(host.Services, "production-package", StationPackageKind.Production);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            "/api/stations/station-a/deploy-package",
+            new StationDeployPackageRequest
+            {
+                PackageId = "production-package",
+                IssuedBy = "unit-test"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using var scope = host.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        var command = await db.StationCommandRecords.SingleAsync();
+        command.CommandType.Should().Be(StationCommandType.DeployPackage.ToString());
+        command.PayloadJson.Should().Contain("production-package");
+    }
+
+    [Fact]
     public async Task DownloadPackage_ShouldRejectStoredPathOutsidePackageDirectory()
     {
         await using var host = await StationEndpointTestHost.CreateWithCentralStoreAsync();
@@ -322,6 +366,30 @@ public sealed class StationEndpointsTests
             ClientVersion = "test",
             StartedAtUtc = DateTimeOffset.UtcNow
         };
+    }
+
+    private static async Task SeedPackageAsync(
+        IServiceProvider services,
+        string packageId,
+        StationPackageKind packageKind)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+        db.StationPackageRecords.Add(new StationPackageRecordEntity
+        {
+            PackageId = packageId,
+            PackageName = packageKind == StationPackageKind.Test ? "Test Package" : "Production Package",
+            PackageVersion = "1.0.0",
+            PackageKind = packageKind.ToString(),
+            FlowHash = "sha256:test",
+            FileName = $"{packageId}.cvpkg",
+            FilePath = Path.Combine(Path.GetTempPath(), $"{packageId}.cvpkg"),
+            SizeBytes = 1024,
+            Sha256 = "test",
+            CreatedBy = "unit-test",
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
     }
 
     private static StationResultSummaryDto BuildResult(

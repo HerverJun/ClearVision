@@ -342,6 +342,17 @@ internal static class VisionDatabaseInitializer
                 cancellationToken);
         }
 
+        if (!await ColumnExistsAsync(
+                dbContext.Database.GetDbConnection(),
+                "StationPackageRecords",
+                "PackageKind",
+                cancellationToken))
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "StationPackageRecords" ADD COLUMN "PackageKind" TEXT NOT NULL DEFAULT 'Production';""",
+                cancellationToken);
+        }
+
         foreach (var statement in LegacyStationSyncSchemaStatements)
         {
             await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);
@@ -359,6 +370,7 @@ internal static class VisionDatabaseInitializer
         "table:StationLogSummaries",
         "table:StationNodes",
         "table:StationPackageRecords",
+        "column:StationPackageRecords.PackageKind",
         "table:StationResultSummaries",
         "table:StationSyncCursors",
         "index:IX_StationAlarmEvents_AlarmId",
@@ -413,6 +425,7 @@ internal static class VisionDatabaseInitializer
             "PackageId" TEXT NOT NULL,
             "PackageName" TEXT NOT NULL,
             "PackageVersion" TEXT NOT NULL,
+            "PackageKind" TEXT NOT NULL DEFAULT 'Production',
             "FlowHash" TEXT NOT NULL,
             "ImageId" TEXT NOT NULL,
             "Outcome" TEXT NOT NULL,
