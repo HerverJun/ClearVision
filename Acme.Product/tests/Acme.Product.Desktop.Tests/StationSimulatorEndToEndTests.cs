@@ -25,12 +25,12 @@ public sealed class StationSimulatorEndToEndTests
 
         await connection.StartAsync();
         var cursor = await connection.InvokeAsync<StationReplayCursorDto>(
-            "RegisterStationAsync",
+            StationHubMethods.RegisterStationAsync,
             BuildRegistration("sim-1"));
         cursor.StationId.Should().Be("sim-1");
 
         var heartbeatCursor = await connection.InvokeAsync<StationReplayCursorDto>(
-            "PushHeartbeatAsync",
+            StationHubMethods.PushHeartbeatAsync,
             new StationHeartbeatDto
             {
                 StationId = "sim-1",
@@ -45,7 +45,7 @@ public sealed class StationSimulatorEndToEndTests
         heartbeatCursor.StationId.Should().Be("sim-1");
 
         var healthAck = await connection.InvokeAsync<StationAckDto>(
-            "PushHealth",
+            StationHubMethods.PushHealth,
             new StationHealthSnapshotDto
             {
                 StationId = "sim-1",
@@ -62,17 +62,21 @@ public sealed class StationSimulatorEndToEndTests
 
         await connection.StopAsync();
         await connection.StartAsync();
-        await connection.InvokeAsync<StationReplayCursorDto>("RegisterStationAsync", BuildRegistration("sim-1"));
+        await connection.InvokeAsync<StationReplayCursorDto>(
+            StationHubMethods.RegisterStationAsync,
+            BuildRegistration("sim-1"));
 
         for (var sequence = 1; sequence <= 20; sequence++)
         {
-            var ack = await connection.InvokeAsync<StationAckDto>("PushResult", BuildResult(sequence));
+            var ack = await connection.InvokeAsync<StationAckDto>(StationHubMethods.PushResult, BuildResult(sequence));
             ack.LastPersistedSequenceId.Should().Be(sequence);
         }
 
         for (var i = 0; i < 10; i++)
         {
-            var duplicateAck = await connection.InvokeAsync<StationAckDto>("PushResult", BuildResult(20, $"DUP-{i}"));
+            var duplicateAck = await connection.InvokeAsync<StationAckDto>(
+                StationHubMethods.PushResult,
+                BuildResult(20, $"DUP-{i}"));
             duplicateAck.LastPersistedSequenceId.Should().Be(20);
         }
 
@@ -163,7 +167,7 @@ public sealed class StationSimulatorEndToEndTests
             var testServer = _app.GetTestServer();
             return new HubConnectionBuilder()
                 .WithUrl(
-                    "http://localhost/hubs/station-ingest",
+                    "http://localhost" + StationSyncContractDefaults.HubPath,
                     options =>
                     {
                         options.Transports = HttpTransportType.LongPolling;
@@ -200,7 +204,7 @@ public sealed class StationSimulatorEndToEndTests
                     NullLogger<StationRegistryService>.Instance));
 
             var app = builder.Build();
-            app.MapHub<StationHub>("/hubs/station-ingest");
+            app.MapHub<StationHub>(StationSyncContractDefaults.HubPath);
             app.MapStationEndpoints();
             await app.StartAsync();
 

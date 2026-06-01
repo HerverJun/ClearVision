@@ -23,6 +23,19 @@ public sealed class StationHub : Hub
         return base.OnDisconnectedAsync(exception);
     }
 
+    public Task<StationProbeAckDto> Probe()
+    {
+        EnsureAuthorized();
+        var now = DateTimeOffset.UtcNow;
+        return Task.FromResult(new StationProbeAckDto
+        {
+            Accepted = true,
+            Message = "Station ingress probe accepted.",
+            ServerTimeUtc = now,
+            CreatedAtUtc = now
+        });
+    }
+
     public Task<StationReplayCursorDto> RegisterStationAsync(StationRegistrationDto registration)
     {
         EnsureAuthorizedForRegistration(registration);

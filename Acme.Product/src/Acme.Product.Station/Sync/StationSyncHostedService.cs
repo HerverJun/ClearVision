@@ -54,6 +54,7 @@ public sealed class StationSyncHostedService : BackgroundService
     private RuntimeHostSnapshot? _debouncedSnapshotSource;
     private StationSnapshotDto? _pendingSnapshot;
     private bool _isRegistered;
+    private long _registeredConnectionEpoch = -1;
     private DateTimeOffset _lastHeartbeatAtUtc = DateTimeOffset.MinValue;
     private DateTimeOffset _lastHealthAtUtc = DateTimeOffset.MinValue;
     private DateTimeOffset? _lastResultAtUtc;
@@ -133,15 +134,20 @@ public sealed class StationSyncHostedService : BackgroundService
                 var didWork = false;
                 if (!CanRunSync())
                 {
-                    _isRegistered = false;
+                    MarkUnregistered();
                     await _hubClient.DisconnectAsync(stoppingToken);
                 }
                 else if (!await _hubClient.EnsureConnectedAsync(stoppingToken))
                 {
-                    _isRegistered = false;
+                    MarkUnregistered();
                 }
                 else
                 {
+                    if (_isRegistered && _registeredConnectionEpoch != _hubClient.ConnectionEpoch)
+                    {
+                        MarkUnregistered();
+                    }
+
                     didWork |= await TryRegisterAsync(stoppingToken);
                     didWork |= await TryPushSnapshotAsync(stoppingToken);
                     didWork |= await TryReportResultGapAsync(stoppingToken);
@@ -220,7 +226,7 @@ public sealed class StationSyncHostedService : BackgroundService
 
     private void HandleConnectionSettingsChanged(object? sender, StationSyncConnectionSettings settings)
     {
-        _isRegistered = false;
+        MarkUnregistered();
         if (settings.Enabled)
         {
             HandleSnapshotChanged(_runtimeHost.GetSnapshot());
@@ -469,6 +475,7 @@ public sealed class StationSyncHostedService : BackgroundService
         }
 
         _isRegistered = true;
+        _registeredConnectionEpoch = _hubClient.ConnectionEpoch;
         ApplyAck(response);
         return true;
     }
@@ -495,7 +502,7 @@ public sealed class StationSyncHostedService : BackgroundService
             stoppingToken);
         if (response == null)
         {
-            _isRegistered = false;
+            MarkUnregistered();
             return false;
         }
 
@@ -521,7 +528,7 @@ public sealed class StationSyncHostedService : BackgroundService
         {
             if (!await _hubClient.ReportCommandResultAsync(result, stoppingToken))
             {
-                _isRegistered = false;
+                MarkUnregistered();
                 return sentAny;
             }
 
@@ -546,7 +553,7 @@ public sealed class StationSyncHostedService : BackgroundService
             var response = await _hubClient.PushResultSummaryAsync(summary, stoppingToken);
             if (response == null)
             {
-                _isRegistered = false;
+                MarkUnregistered();
                 break;
             }
 
@@ -573,7 +580,7 @@ public sealed class StationSyncHostedService : BackgroundService
         var response = await _hubClient.PushSnapshotAsync(snapshot, stoppingToken);
         if (response == null)
         {
-            _isRegistered = false;
+            MarkUnregistered();
             return false;
         }
 
@@ -607,7 +614,7 @@ public sealed class StationSyncHostedService : BackgroundService
             stoppingToken);
         if (response == null)
         {
-            _isRegistered = false;
+            MarkUnregistered();
             return false;
         }
 
@@ -630,7 +637,7 @@ public sealed class StationSyncHostedService : BackgroundService
             stoppingToken);
         if (response == null)
         {
-            _isRegistered = false;
+            MarkUnregistered();
             return false;
         }
 
@@ -648,7 +655,7 @@ public sealed class StationSyncHostedService : BackgroundService
             var response = await _hubClient.PushLogAsync(log, stoppingToken);
             if (response == null)
             {
-                _isRegistered = false;
+                MarkUnregistered();
                 return sentAny;
             }
 
@@ -945,10 +952,16 @@ public sealed class StationSyncHostedService : BackgroundService
 
         if (!await _hubClient.ReportCommandResultAsync(payload, cancellationToken))
         {
-            _isRegistered = false;
+            MarkUnregistered();
             _commandResultSpoolStore.Enqueue(payload);
             SignalSync();
         }
+    }
+
+    private void MarkUnregistered()
+    {
+        _isRegistered = false;
+        _registeredConnectionEpoch = -1;
     }
 
     private static string BuildCachedCommandReplayMessage(StationCommandResultDto cachedResult)

@@ -5,6 +5,7 @@
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Enums;
 using Acme.Product.Desktop.Station;
+using Acme.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -124,7 +125,7 @@ public class AuthMiddleware
         }
 
         // API 文档和其他公开端点
-        if (path.StartsWith("/hubs/station-ingest", StringComparison.OrdinalIgnoreCase))
+        if (path.StartsWith(StationSyncContractDefaults.HubPath, StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }

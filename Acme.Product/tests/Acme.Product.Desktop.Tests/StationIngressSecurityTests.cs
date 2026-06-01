@@ -3,8 +3,12 @@ using Acme.Product.Desktop.Hubs;
 using Acme.Product.Desktop.Middleware;
 using Acme.Product.Desktop.Station;
 using Acme.Product.Runtime.Abstractions;
+using Acme.Product.Station.Sync;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR;
@@ -34,7 +38,7 @@ public sealed class StationIngressSecurityTests
         using var uiResponse = await host.Client.GetAsync("/");
         using var stationsResponse = await host.Client.GetAsync("/api/stations");
         using var healthResponse = await host.Client.GetAsync("/health");
-        using var hubPathResponse = await host.Client.GetAsync("/hubs/station-ingest/negotiate");
+        using var hubPathResponse = await host.Client.GetAsync(StationSyncContractDefaults.HubPath + "/negotiate");
 
         uiResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         stationsResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -68,12 +72,63 @@ public sealed class StationIngressSecurityTests
 
         await connection.StartAsync();
         var act = () => connection.InvokeAsync<StationReplayCursorDto>(
-            "RegisterStationAsync",
+            StationHubMethods.RegisterStationAsync,
             BuildRegistration("station-no-token"));
 
         var exception = await Assert.ThrowsAsync<HubException>(act);
         exception.Message.Should().Contain("token is invalid");
         host.Registry.GetStation("station-no-token").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task StationHubProbe_ShouldRejectWithoutStationToken()
+    {
+        var options = CreateEnabledIngressOptions();
+        await using var host = await StationHubTestHost.CreateAsync(options);
+        await using var connection = host.CreateConnection(accessToken: null);
+
+        await connection.StartAsync();
+        var act = () => connection.InvokeAsync<StationProbeAckDto>(StationHubMethods.Probe);
+
+        var exception = await Assert.ThrowsAsync<HubException>(act);
+        exception.Message.Should().Contain("token is invalid");
+        host.Registry.GetStations().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task StationHubProbe_ShouldAcceptBearerTokenWithoutRegisteringStation()
+    {
+        var options = CreateEnabledIngressOptions();
+        await using var host = await StationHubTestHost.CreateAsync(options);
+        await using var connection = host.CreateConnection("station-secret");
+
+        await connection.StartAsync();
+        var ack = await connection.InvokeAsync<StationProbeAckDto>(StationHubMethods.Probe);
+
+        ack.Accepted.Should().BeTrue();
+        ack.Message.Should().Contain("accepted");
+        host.Registry.GetStations().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task StationConnectionTester_ShouldProbeHubWithoutRegisteringStation()
+    {
+        var options = CreateEnabledIngressOptions();
+        await using var host = await StationConnectionTestHost.CreateAsync(options);
+        var tester = new StationStudioConnectionTester();
+
+        var result = await tester.TestAsync(
+            new StationSyncConnectionSettings
+            {
+                Enabled = true,
+                StudioBaseUrl = host.BaseUrl,
+                SharedToken = "station-secret"
+            });
+
+        result.Success.Should().BeTrue(result.Message);
+        result.HealthReachable.Should().BeTrue();
+        result.HubReachable.Should().BeTrue();
+        host.Registry.GetStations().Should().BeEmpty();
     }
 
     [Fact]
@@ -85,7 +140,7 @@ public sealed class StationIngressSecurityTests
 
         await connection.StartAsync();
         var cursor = await connection.InvokeAsync<StationReplayCursorDto>(
-            "RegisterStationAsync",
+            StationHubMethods.RegisterStationAsync,
             BuildRegistration("station-token"));
 
         cursor.StationId.Should().Be("station-token");
@@ -109,7 +164,7 @@ public sealed class StationIngressSecurityTests
 
         await connection.StartAsync();
         var act = () => connection.InvokeAsync<StationReplayCursorDto>(
-            "RegisterStationAsync",
+            StationHubMethods.RegisterStationAsync,
             BuildRegistration("station-disabled"));
 
         var exception = await Assert.ThrowsAsync<HubException>(act);
@@ -182,7 +237,7 @@ public sealed class StationIngressSecurityTests
             app.MapGet("/", () => Results.Ok("studio-ui"));
             app.MapGet("/api/stations", () => Results.Ok("stations"));
             app.MapGet("/health", () => Results.Ok("healthy"));
-            app.MapGet("/hubs/station-ingest/negotiate", () => Results.Ok("hub-path"));
+            app.MapGet(StationSyncContractDefaults.HubPath + "/negotiate", () => Results.Ok("hub-path"));
 
             await app.StartAsync();
             return new IngressIsolationTestHost(app);
@@ -213,7 +268,7 @@ public sealed class StationIngressSecurityTests
             var testServer = _app.GetTestServer();
             return new HubConnectionBuilder()
                 .WithUrl(
-                    "http://localhost/hubs/station-ingest",
+                    "http://localhost" + StationSyncContractDefaults.HubPath,
                     options =>
                     {
                         options.Transports = HttpTransportType.LongPolling;
@@ -246,10 +301,68 @@ public sealed class StationIngressSecurityTests
                     NullLogger<StationRegistryService>.Instance));
 
             var app = builder.Build();
-            app.MapHub<StationHub>("/hubs/station-ingest");
+            app.MapHub<StationHub>(StationSyncContractDefaults.HubPath);
             await app.StartAsync();
 
             return new StationHubTestHost(app, app.Services.GetRequiredService<StationRegistryService>());
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _app.StopAsync();
+            await _app.DisposeAsync();
+        }
+    }
+
+    private sealed class StationConnectionTestHost : IAsyncDisposable
+    {
+        private readonly WebApplication _app;
+
+        private StationConnectionTestHost(WebApplication app, StationRegistryService registry, string baseUrl)
+        {
+            _app = app;
+            Registry = registry;
+            BaseUrl = baseUrl;
+        }
+
+        public StationRegistryService Registry { get; }
+
+        public string BaseUrl { get; }
+
+        public static async Task<StationConnectionTestHost> CreateAsync(StationIngressOptions options)
+        {
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                EnvironmentName = Environments.Development
+            });
+            builder.WebHost.UseUrls("http://127.0.0.1:0");
+
+            builder.Services.AddSignalR();
+            builder.Services.AddSingleton(Options.Create(options));
+            builder.Services.AddSingleton<StationIngressAuthService>(sp =>
+                new StationIngressAuthService(
+                    sp.GetRequiredService<IOptions<StationIngressOptions>>(),
+                    NullLogger<StationIngressAuthService>.Instance));
+            builder.Services.AddSingleton<StationRegistryService>(sp =>
+                new StationRegistryService(
+                    sp.GetRequiredService<IOptions<StationIngressOptions>>(),
+                    NullLogger<StationRegistryService>.Instance));
+
+            var app = builder.Build();
+            app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
+            app.MapHub<StationHub>(StationSyncContractDefaults.HubPath);
+            await app.StartAsync();
+
+            var addresses = app.Services.GetRequiredService<IServer>()
+                .Features
+                .Get<IServerAddressesFeature>();
+            var baseUrl = addresses?.Addresses.Single()
+                ?? throw new InvalidOperationException("Unable to resolve Station connection test URL.");
+
+            return new StationConnectionTestHost(
+                app,
+                app.Services.GetRequiredService<StationRegistryService>(),
+                baseUrl);
         }
 
         public async ValueTask DisposeAsync()

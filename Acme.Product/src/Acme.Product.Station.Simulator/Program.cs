@@ -63,7 +63,7 @@ internal static class Program
                 if (now - lastHeartbeatAtUtc >= TimeSpan.FromSeconds(options.HeartbeatSeconds))
                 {
                     await connection.InvokeAsync<StationAckDto>(
-                        "Heartbeat",
+                        StationHubMethods.Heartbeat,
                         BuildHeartbeat(stationId, index, Interlocked.Increment(ref controlSequenceId), okCount, ngCount, errorCount),
                         cancellationToken);
                     lastHeartbeatAtUtc = now;
@@ -72,7 +72,7 @@ internal static class Program
                 if (now - lastHealthAtUtc >= TimeSpan.FromSeconds(options.HealthSeconds))
                 {
                     await connection.InvokeAsync<StationAckDto>(
-                        "PushHealth",
+                        StationHubMethods.PushHealth,
                         BuildHealth(stationId, Interlocked.Increment(ref controlSequenceId), startedAtUtc, random),
                         cancellationToken);
                     lastHealthAtUtc = now;
@@ -87,7 +87,7 @@ internal static class Program
                 if (random.NextDouble() < options.LogProbability)
                 {
                     await connection.InvokeAsync<StationAckDto>(
-                        "PushLog",
+                        StationHubMethods.PushLog,
                         BuildLog(stationId, Interlocked.Increment(ref controlSequenceId), random),
                         cancellationToken);
                 }
@@ -112,7 +112,7 @@ internal static class Program
                         break;
                 }
 
-                await connection.InvokeAsync<StationAckDto>("PushResult", result, cancellationToken);
+                await connection.InvokeAsync<StationAckDto>(StationHubMethods.PushResult, result, cancellationToken);
 
                 if (random.NextDouble() < options.DisconnectProbability)
                 {
@@ -168,7 +168,7 @@ internal static class Program
         CancellationToken cancellationToken)
     {
         return connection.InvokeAsync<StationRegisterAckDto>(
-            "RegisterStation",
+            StationHubMethods.RegisterStation,
             new StationRegistrationDto
             {
                 StationId = stationId,
@@ -313,7 +313,10 @@ internal static class Program
 
     private static async Task PollCommandAsync(HubConnection connection, string stationId, CancellationToken cancellationToken)
     {
-        var command = await connection.InvokeAsync<StationCommandDto?>("PollCommand", stationId, cancellationToken);
+        var command = await connection.InvokeAsync<StationCommandDto?>(
+            StationHubMethods.PollCommand,
+            stationId,
+            cancellationToken);
         if (command == null)
         {
             return;
@@ -335,7 +338,7 @@ internal static class Program
     {
         var now = DateTimeOffset.UtcNow;
         return connection.InvokeAsync(
-            "ReportCommandResult",
+            StationHubMethods.ReportCommandResult,
             new StationCommandResultDto
             {
                 CommandId = command.CommandId,
@@ -353,7 +356,7 @@ internal static class Program
 
     private sealed class SimulatorOptions
     {
-        public Uri StudioHubUrl { get; private init; } = new("http://127.0.0.1:5000/hubs/station-ingest");
+        public Uri StudioHubUrl { get; private init; } = new("http://127.0.0.1:5000" + StationSyncContractDefaults.HubPath);
 
         public string SharedToken { get; private init; } = string.Empty;
 
@@ -398,7 +401,7 @@ internal static class Program
 
             return new SimulatorOptions
             {
-                StudioHubUrl = NormalizeHubUrl(Get(values, "studio", "http://127.0.0.1:5000/hubs/station-ingest")),
+                StudioHubUrl = NormalizeHubUrl(Get(values, "studio", "http://127.0.0.1:5000" + StationSyncContractDefaults.HubPath)),
                 SharedToken = Get(values, "token", string.Empty),
                 StationPrefix = Get(values, "prefix", "sim-station"),
                 StationCount = GetInt(values, "stations", 4),
@@ -416,7 +419,7 @@ internal static class Program
         private static Uri NormalizeHubUrl(string value)
         {
             var uri = new Uri(value, UriKind.Absolute);
-            if (uri.AbsolutePath.Contains("/hubs/station-ingest", StringComparison.OrdinalIgnoreCase))
+            if (uri.AbsolutePath.Contains(StationSyncContractDefaults.HubPath, StringComparison.OrdinalIgnoreCase))
             {
                 return uri;
             }

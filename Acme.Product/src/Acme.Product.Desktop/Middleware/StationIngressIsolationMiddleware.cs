@@ -1,5 +1,6 @@
 using System.Net;
 using Acme.Product.Desktop.Station;
+using Acme.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
@@ -9,7 +10,7 @@ public sealed class StationIngressIsolationMiddleware
 {
     private static readonly string[] AllowedRemotePathPrefixes =
     [
-        "/hubs/station-ingest",
+        StationSyncContractDefaults.HubPath,
         "/api/station-packages/"
     ];
 

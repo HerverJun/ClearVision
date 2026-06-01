@@ -13,6 +13,7 @@ public sealed class StationHubClient : IAsyncDisposable
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private HubConnection? _connection;
     private ConnectionSignature? _connectionSignature;
+    private long _connectionEpoch;
     private bool _disposed;
 
     public StationHubClient(
@@ -32,6 +33,8 @@ public sealed class StationHubClient : IAsyncDisposable
     public DateTimeOffset? LastConnectedAtUtc { get; private set; }
 
     public string ConnectionState => _connection?.State.ToString() ?? "Disconnected";
+
+    public long ConnectionEpoch => Interlocked.Read(ref _connectionEpoch);
 
     public async Task<bool> EnsureConnectedAsync(CancellationToken cancellationToken)
     {
@@ -82,6 +85,7 @@ public sealed class StationHubClient : IAsyncDisposable
             }
 
             await _connection.StartAsync(cancellationToken);
+            BumpConnectionEpoch();
             LastConnectedAtUtc = DateTimeOffset.UtcNow;
             LastErrorMessage = string.Empty;
             _logger.LogInformation("Connected to Studio Station hub at {HubUrl}", desiredSignature.HubUrl);
@@ -109,54 +113,54 @@ public sealed class StationHubClient : IAsyncDisposable
         StationRegistrationDto payload,
         CancellationToken cancellationToken)
     {
-        return InvokeAsync<StationReplayCursorDto>("RegisterStationAsync", payload, cancellationToken);
+        return InvokeAsync<StationReplayCursorDto>(StationHubMethods.RegisterStationAsync, payload, cancellationToken);
     }
 
     public Task<StationReplayCursorDto?> PushHeartbeatAsync(
         StationHeartbeatDto payload,
         CancellationToken cancellationToken)
     {
-        return InvokeAsync<StationReplayCursorDto>("PushHeartbeatAsync", payload, cancellationToken);
+        return InvokeAsync<StationReplayCursorDto>(StationHubMethods.PushHeartbeatAsync, payload, cancellationToken);
     }
 
     public Task<StationReplayCursorDto?> PushSnapshotAsync(
         StationSnapshotDto payload,
         CancellationToken cancellationToken)
     {
-        return InvokeAsync<StationReplayCursorDto>("PushSnapshotAsync", payload, cancellationToken);
+        return InvokeAsync<StationReplayCursorDto>(StationHubMethods.PushSnapshotAsync, payload, cancellationToken);
     }
 
     public Task<StationReplayCursorDto?> PushResultSummaryAsync(
         StationResultSummaryDto payload,
         CancellationToken cancellationToken)
     {
-        return InvokeAsync<StationReplayCursorDto>("PushResultSummaryAsync", payload, cancellationToken);
+        return InvokeAsync<StationReplayCursorDto>(StationHubMethods.PushResultSummaryAsync, payload, cancellationToken);
     }
 
     public Task<StationAckDto?> ReportResultGapAsync(
         StationResultGapDto payload,
         CancellationToken cancellationToken)
     {
-        return InvokeAsync<StationAckDto>("ReportResultGap", payload, cancellationToken);
+        return InvokeAsync<StationAckDto>(StationHubMethods.ReportResultGap, payload, cancellationToken);
     }
 
     public Task<StationAckDto?> PushHealthAsync(
         StationHealthSnapshotDto payload,
         CancellationToken cancellationToken)
     {
-        return InvokeAsync<StationAckDto>("PushHealth", payload, cancellationToken);
+        return InvokeAsync<StationAckDto>(StationHubMethods.PushHealth, payload, cancellationToken);
     }
 
     public Task<StationAckDto?> PushLogAsync(
         StationLogSummaryDto payload,
         CancellationToken cancellationToken)
     {
-        return InvokeAsync<StationAckDto>("PushLog", payload, cancellationToken);
+        return InvokeAsync<StationAckDto>(StationHubMethods.PushLog, payload, cancellationToken);
     }
 
     public Task<StationCommandDto?> PollCommandAsync(string stationId, CancellationToken cancellationToken)
     {
-        return InvokeAsync<StationCommandDto?>("PollCommand", stationId, cancellationToken);
+        return InvokeAsync<StationCommandDto?>(StationHubMethods.PollCommand, stationId, cancellationToken);
     }
 
     public async Task<bool> ReportCommandResultAsync(StationCommandResultDto payload, CancellationToken cancellationToken)
@@ -168,12 +172,12 @@ public sealed class StationHubClient : IAsyncDisposable
 
         try
         {
-            await _connection!.InvokeAsync("ReportCommandResult", payload, cancellationToken);
+            await _connection!.InvokeAsync(StationHubMethods.ReportCommandResult, payload, cancellationToken);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Studio Station hub invocation failed: ReportCommandResult");
+            await HandleInvocationFailureAsync(StationHubMethods.ReportCommandResult, ex);
             return false;
         }
     }
@@ -285,6 +289,7 @@ public sealed class StationHubClient : IAsyncDisposable
                 _logger.LogWarning(error, "Studio Station hub connection closed.");
             }
 
+            BumpConnectionEpoch();
             return Task.CompletedTask;
         };
 
@@ -301,6 +306,7 @@ public sealed class StationHubClient : IAsyncDisposable
 
         connection.Reconnected += connectionId =>
         {
+            BumpConnectionEpoch();
             LastConnectedAtUtc = DateTimeOffset.UtcNow;
             LastErrorMessage = string.Empty;
             _logger.LogInformation("Reconnected to Studio Station hub. ConnectionId={ConnectionId}", connectionId);
@@ -323,10 +329,38 @@ public sealed class StationHubClient : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            LastErrorMessage = ex.Message;
-            _logger.LogWarning(ex, "Studio Station hub invocation failed: {MethodName}", methodName);
+            await HandleInvocationFailureAsync(methodName, ex);
             return default;
         }
+    }
+
+    private async Task HandleInvocationFailureAsync(
+        string methodName,
+        Exception ex)
+    {
+        LastErrorMessage = ex.Message;
+        _logger.LogWarning(ex, "Studio Station hub invocation failed: {MethodName}", methodName);
+
+        if (IsRegistrationOrAuthorizationFailure(ex))
+        {
+            await DisconnectAsync(CancellationToken.None);
+        }
+    }
+
+    private static bool IsRegistrationOrAuthorizationFailure(Exception ex)
+    {
+        return ex.Message.Contains("not registered", StringComparison.OrdinalIgnoreCase) ||
+               ex.Message.Contains("not authorized", StringComparison.OrdinalIgnoreCase) ||
+               ex.Message.Contains("already registered", StringComparison.OrdinalIgnoreCase) ||
+               ex.Message.Contains("token", StringComparison.OrdinalIgnoreCase) ||
+               ex.Message.Contains("ingress", StringComparison.OrdinalIgnoreCase) ||
+               ex.Message.Contains("disabled", StringComparison.OrdinalIgnoreCase) ||
+               ex.Message.Contains("not configured", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void BumpConnectionEpoch()
+    {
+        Interlocked.Increment(ref _connectionEpoch);
     }
 
     private ConnectionSignature? BuildConnectionSignature()

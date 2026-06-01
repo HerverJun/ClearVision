@@ -34,6 +34,7 @@
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSyncOptions.cs" Link="Station\Sync\StationSyncOptions.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSyncConnectionSettings.cs" Link="Station\Sync\StationSyncConnectionSettings.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationSyncSettingsStore.cs" Link="Station\Sync\StationSyncSettingsStore.cs" />
+    <Compile Include="..\..\src\Acme.Product.Station\Sync\StationStudioConnectionTester.cs" Link="Station\Sync\StationStudioConnectionTester.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\Sync\StationHubClient.cs" Link="Station\Sync\StationHubClient.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\StationLocalSettingsStore.cs" Link="Station\StationLocalSettingsStore.cs" />
     <Compile Include="..\..\src\Acme.Product.Station\StationSiteProfileStore.cs" Link="Station\StationSiteProfileStore.cs" />

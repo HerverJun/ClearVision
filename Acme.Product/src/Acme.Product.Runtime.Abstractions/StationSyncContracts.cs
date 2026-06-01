@@ -24,6 +24,27 @@ public static class StationSyncContractDefaults
 }
 
 /// <summary>
+/// SignalR hub method names used by Station clients and Studio.
+/// </summary>
+public static class StationHubMethods
+{
+    public const string Probe = nameof(Probe);
+    public const string RegisterStationAsync = nameof(RegisterStationAsync);
+    public const string RegisterStation = nameof(RegisterStation);
+    public const string PushHeartbeatAsync = nameof(PushHeartbeatAsync);
+    public const string Heartbeat = nameof(Heartbeat);
+    public const string PushSnapshotAsync = nameof(PushSnapshotAsync);
+    public const string PushHealth = nameof(PushHealth);
+    public const string PushResultSummaryAsync = nameof(PushResultSummaryAsync);
+    public const string ReportResultGap = nameof(ReportResultGap);
+    public const string PushResult = nameof(PushResult);
+    public const string PushLog = nameof(PushLog);
+    public const string GetReplayCursor = nameof(GetReplayCursor);
+    public const string PollCommand = nameof(PollCommand);
+    public const string ReportCommandResult = nameof(ReportCommandResult);
+}
+
+/// <summary>
 /// Studio-side online state for a Station.
 /// </summary>
 public enum StationOnlineState
@@ -200,6 +221,27 @@ public sealed class StationRegisterAckDto
 
     /// <summary>Highest persisted result sequence known to Studio.</summary>
     public long LastPersistedSequenceId { get; set; }
+
+    /// <summary>Optional operator-facing message.</summary>
+    public string? Message { get; set; }
+
+    /// <summary>Studio server timestamp.</summary>
+    public DateTimeOffset ServerTimeUtc { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>When this payload was created.</summary>
+    public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>
+/// Acknowledges a lightweight Station ingress connectivity probe.
+/// </summary>
+public sealed class StationProbeAckDto
+{
+    /// <summary>Payload schema version.</summary>
+    public int SchemaVersion { get; set; } = StationSyncContractDefaults.SchemaVersion;
+
+    /// <summary>Whether Studio accepted the probe.</summary>
+    public bool Accepted { get; set; }
 
     /// <summary>Optional operator-facing message.</summary>
     public string? Message { get; set; }

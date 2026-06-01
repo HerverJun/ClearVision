@@ -234,7 +234,7 @@ static class Program
             app.UseMiddleware<AuthMiddleware>();
 
             app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Port = _webPort }));
-            app.MapHub<StationHub>("/hubs/station-ingest");
+            app.MapHub<StationHub>(StationSyncContractDefaults.HubPath);
             app.MapAuthEndpoints();
             app.MapUserEndpoints();
             app.MapVisionApiEndpoints();

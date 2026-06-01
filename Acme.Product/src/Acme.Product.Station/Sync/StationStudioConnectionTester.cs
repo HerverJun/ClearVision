@@ -96,14 +96,10 @@ public sealed class StationStudioConnectionTester
                 .Build();
 
             await connection.StartAsync(cancellationToken);
-            try
-            {
-                await connection.InvokeAsync<StationReplayCursorDto>(
-                    "GetReplayCursor",
-                    "__connection_test__",
-                    cancellationToken);
-            }
-            catch (HubException ex) when (IsExpectedUnauthenticatedProbeResult(ex))
+            var probe = await connection.InvokeAsync<StationProbeAckDto>(
+                StationHubMethods.Probe,
+                cancellationToken);
+            if (probe.Accepted)
             {
                 return StationStudioConnectionTestResult.Succeeded(
                     "Studio 可达，SignalR 入口和 token 验证通过。",
@@ -111,10 +107,9 @@ public sealed class StationStudioConnectionTester
                     hubReachable: true);
             }
 
-            return StationStudioConnectionTestResult.Succeeded(
-                "Studio 可达，SignalR 入口连接成功。",
-                healthReachable: true,
-                hubReachable: true);
+            return StationStudioConnectionTestResult.Fail(
+                probe.Message ?? "Studio SignalR 入口拒绝了连接测试。",
+                healthReachable: true);
         }
         catch (HubException ex) when (IsTokenOrIngressFailure(ex))
         {
@@ -141,11 +136,6 @@ public sealed class StationStudioConnectionTester
                 await connection.DisposeAsync();
             }
         }
-    }
-
-    private static bool IsExpectedUnauthenticatedProbeResult(HubException ex)
-    {
-        return ex.Message.Contains("not registered", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsTokenOrIngressFailure(HubException ex)
