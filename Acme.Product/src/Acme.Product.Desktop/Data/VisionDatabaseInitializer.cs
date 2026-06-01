@@ -76,6 +76,7 @@ internal static class VisionDatabaseInitializer
 
         if (dbContext.Database.IsSqlite())
         {
+            await RepairStationPackageKindColumnAsync(dbContext, cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;", cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync("PRAGMA synchronous=NORMAL;", cancellationToken);
         }
@@ -359,6 +360,43 @@ internal static class VisionDatabaseInitializer
         }
     }
 
+    private static async Task RepairStationPackageKindColumnAsync(
+        VisionDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+        if (shouldCloseConnection)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            if (!await TableExistsAsync(connection, "StationPackageRecords", cancellationToken))
+            {
+                return;
+            }
+
+            if (await ColumnExistsAsync(connection, "StationPackageRecords", "PackageKind", cancellationToken))
+            {
+                return;
+            }
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "StationPackageRecords" ADD COLUMN "PackageKind" TEXT NOT NULL DEFAULT 'Production';""",
+                cancellationToken);
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
     private static readonly HashSet<string> RepairableLegacySqliteSchemaItems = new(StringComparer.OrdinalIgnoreCase)
     {
         "column:InspectionResults.AnalysisDataJson",
@@ -425,7 +463,6 @@ internal static class VisionDatabaseInitializer
             "PackageId" TEXT NOT NULL,
             "PackageName" TEXT NOT NULL,
             "PackageVersion" TEXT NOT NULL,
-            "PackageKind" TEXT NOT NULL DEFAULT 'Production',
             "FlowHash" TEXT NOT NULL,
             "ImageId" TEXT NOT NULL,
             "Outcome" TEXT NOT NULL,
@@ -561,6 +598,7 @@ internal static class VisionDatabaseInitializer
             "PackageId" TEXT NOT NULL,
             "PackageName" TEXT NOT NULL,
             "PackageVersion" TEXT NOT NULL,
+            "PackageKind" TEXT NOT NULL DEFAULT 'Production',
             "FlowHash" TEXT NOT NULL,
             "FileName" TEXT NOT NULL,
             "FilePath" TEXT NOT NULL,

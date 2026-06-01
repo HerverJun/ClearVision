@@ -149,6 +149,41 @@ public sealed class StationPackageStoreTests
         }
     }
 
+    [Fact]
+    public async Task GetPackages_ShouldRepairLegacyPackageKindColumn()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationPackageLegacyKindTests", Guid.NewGuid().ToString("N"));
+        var dbPath = Path.Combine(root, "vision.db");
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            await CreateLegacyPackageRecordDatabaseAsync(dbPath);
+            await using (var provider = new ServiceCollection()
+                .AddLogging()
+                .AddDbContext<VisionDbContext>(options => options.UseSqlite($"Data Source={dbPath}"))
+                .AddSingleton<StationPackageStore>()
+                .BuildServiceProvider())
+            {
+                var store = provider.GetRequiredService<StationPackageStore>();
+
+                var packages = store.GetPackages();
+
+                packages.Should().ContainSingle(item =>
+                    item.PackageId == "legacy-package" &&
+                    item.PackageKind == StationPackageKind.Production);
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(root))
+            {
+                DeleteDirectoryWithRetry(root);
+            }
+        }
+    }
+
     private static async Task CreateRuntimePackageRootAsync(string runtimeRoot, string packageId)
     {
         Directory.CreateDirectory(runtimeRoot);
@@ -208,6 +243,34 @@ public sealed class StationPackageStoreTests
         await File.WriteAllTextAsync(
             Path.Combine(runtimeRoot, "quality", "validation-report.json"),
             JsonSerializer.Serialize(validationReport, JsonOptions));
+    }
+
+    private static async Task CreateLegacyPackageRecordDatabaseAsync(string dbPath)
+    {
+        await using var connection = new SqliteConnection($"Data Source={dbPath}");
+        await connection.OpenAsync();
+
+        await using var createCommand = connection.CreateCommand();
+        createCommand.CommandText = """
+            CREATE TABLE "StationPackageRecords" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_StationPackageRecords" PRIMARY KEY AUTOINCREMENT,
+                "PackageId" TEXT NOT NULL,
+                "PackageName" TEXT NOT NULL,
+                "PackageVersion" TEXT NOT NULL,
+                "FlowHash" TEXT NOT NULL,
+                "FileName" TEXT NOT NULL,
+                "FilePath" TEXT NOT NULL,
+                "SizeBytes" INTEGER NOT NULL,
+                "Sha256" TEXT NOT NULL,
+                "CreatedBy" TEXT NOT NULL,
+                "CreatedAtUtc" TEXT NOT NULL
+            );
+            INSERT INTO "StationPackageRecords"
+                ("PackageId", "PackageName", "PackageVersion", "FlowHash", "FileName", "FilePath", "SizeBytes", "Sha256", "CreatedBy", "CreatedAtUtc")
+            VALUES
+                ('legacy-package', 'Legacy Package', '1.0.0', 'sha256:legacy', 'legacy.cvpkg', 'legacy.cvpkg', 10, 'legacy', 'Studio', '2026-01-01T00:00:00Z');
+            """;
+        await createCommand.ExecuteNonQueryAsync();
     }
 
     private static void DeleteDirectoryWithRetry(string path)
