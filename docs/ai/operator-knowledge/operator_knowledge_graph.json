@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "2026-05.operator-knowledge-graph.v1",
-  "GeneratedAtUtc": "2026-05-29T13:43:46.0325373Z",
+  "GeneratedAtUtc": "2026-06-01T23:57:30.106981Z",
   "Source": "OperatorMetadata \u002B FlowTemplate \u002B operator_quality_evidence_manifest",
   "Cards": [
     {
@@ -2950,7 +2950,7 @@
           "Name": "ClipLimit",
           "DisplayName": "\u88C1\u526A\u9650\u5236",
           "DataType": "double",
-          "Description": "Limits local contrast amplification to avoid excessive noise boosting.",
+          "Description": "\u9650\u5236\u5C40\u90E8\u5BF9\u6BD4\u5EA6\u653E\u5927\u5E45\u5EA6\uFF0C\u907F\u514D\u566A\u58F0\u88AB\u8FC7\u5EA6\u589E\u5F3A\u3002",
           "DefaultValue": "2",
           "MinValue": "0",
           "MaxValue": "40",
@@ -2999,7 +2999,7 @@
           "Name": "Channel",
           "DisplayName": "\u76EE\u6807\u901A\u9053",
           "DataType": "enum",
-          "Description": "Auto follows ColorSpace. L/V/Y/All explicitly choose the processing branch.",
+          "Description": "Auto \u6839\u636E\u8272\u5F69\u7A7A\u95F4\u81EA\u52A8\u9009\u62E9\u5904\u7406\u901A\u9053\uFF1BL/V/Y/All \u7528\u4E8E\u660E\u786E\u6307\u5B9A\u5904\u7406\u5206\u652F\u3002",
           "DefaultValue": "Auto",
           "MinValue": null,
           "MaxValue": null,
@@ -13012,7 +13012,7 @@
           "Name": "PollingMode",
           "DisplayName": "Polling Mode",
           "DataType": "enum",
-          "Description": "Whether to poll while reading.",
+          "Description": "\u8BFB\u53D6\u65F6\u662F\u5426\u542F\u7528\u8F6E\u8BE2\u7B49\u5F85\u3002",
           "DefaultValue": "None",
           "MinValue": null,
           "MaxValue": null,
@@ -13026,7 +13026,7 @@
           "Name": "PollingCondition",
           "DisplayName": "Polling Condition",
           "DataType": "enum",
-          "Description": "Condition for polling.",
+          "Description": "\u8F6E\u8BE2\u7B49\u5F85\u65F6\u7528\u4E8E\u5224\u65AD\u76EE\u6807\u503C\u662F\u5426\u6EE1\u8DB3\u7684\u6761\u4EF6\u3002",
           "DefaultValue": "Equal",
           "MinValue": null,
           "MaxValue": null,
@@ -13044,7 +13044,7 @@
           "Name": "PollingValue",
           "DisplayName": "Polling Value",
           "DataType": "string",
-          "Description": "Target value for polling.",
+          "Description": "\u8F6E\u8BE2\u7B49\u5F85\u65F6\u8981\u5339\u914D\u7684\u76EE\u6807\u503C\u3002",
           "DefaultValue": "1",
           "MinValue": null,
           "MaxValue": null,
@@ -13055,7 +13055,7 @@
           "Name": "PollingTimeout",
           "DisplayName": "Polling Timeout (ms)",
           "DataType": "int",
-          "Description": "Maximum wait duration in milliseconds.",
+          "Description": "\u8F6E\u8BE2\u7B49\u5F85\u7684\u6700\u5927\u6301\u7EED\u65F6\u95F4\uFF08\u6BEB\u79D2\uFF09\u3002",
           "DefaultValue": "30000",
           "MinValue": "100",
           "MaxValue": "300000",
@@ -13066,7 +13066,7 @@
           "Name": "PollingInterval",
           "DisplayName": "Polling Interval (ms)",
           "DataType": "int",
-          "Description": "Interval between polling reads in milliseconds.",
+          "Description": "\u8F6E\u8BE2\u8BFB\u53D6\u4E4B\u95F4\u7684\u65F6\u95F4\u95F4\u9694\uFF08\u6BEB\u79D2\uFF09\u3002",
           "DefaultValue": "50",
           "MinValue": "10",
           "MaxValue": "5000",
@@ -19011,6 +19011,17 @@
           "MaxValue": null,
           "IsRequired": true,
           "AllowedValues": []
+        },
+        {
+          "Name": "MaxFormattedCollectionItems",
+          "DisplayName": "Max formatted collection items",
+          "DataType": "int",
+          "Description": "",
+          "DefaultValue": "256",
+          "MinValue": "1",
+          "MaxValue": "10000",
+          "IsRequired": true,
+          "AllowedValues": []
         }
       ],
       "RequiredResources": [],
@@ -19493,6 +19504,20 @@
           "Description": ""
         },
         {
+          "Name": "ClassMaskCount",
+          "DisplayName": "Class Mask Count",
+          "DataType": "Integer",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
+          "Name": "OmittedClassMaskCount",
+          "DisplayName": "Omitted Class Mask Count",
+          "DataType": "Integer",
+          "IsRequired": false,
+          "Description": ""
+        },
+        {
           "Name": "PresentClasses",
           "DisplayName": "Present Classes",
           "DataType": "Any",
@@ -19599,6 +19624,17 @@
           "DefaultValue": "",
           "MinValue": null,
           "MaxValue": null,
+          "IsRequired": true,
+          "AllowedValues": []
+        },
+        {
+          "Name": "MaxClassMasks",
+          "DisplayName": "Max Class Masks",
+          "DataType": "int",
+          "Description": "Limits generated per-class mask images; 0 disables per-class masks.",
+          "DefaultValue": "32",
+          "MinValue": "0",
+          "MaxValue": "4096",
           "IsRequired": true,
           "AllowedValues": []
         },

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Enums;
+using Acme.Product.Desktop.Data;
 using Acme.Product.Desktop.Station;
 using Acme.Product.Infrastructure.Data;
 using Acme.Product.Runtime;
@@ -150,7 +151,7 @@ public sealed class StationPackageStoreTests
     }
 
     [Fact]
-    public async Task GetPackages_ShouldRepairLegacyPackageKindColumn()
+    public async Task GetPackages_ShouldReadLegacyPackageKindColumn_AfterDatabaseMaintenance()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionStationPackageLegacyKindTests", Guid.NewGuid().ToString("N"));
         var dbPath = Path.Combine(root, "vision.db");
@@ -165,6 +166,12 @@ public sealed class StationPackageStoreTests
                 .AddSingleton<StationPackageStore>()
                 .BuildServiceProvider())
             {
+                await using (var scope = provider.CreateAsyncScope())
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
+                    await VisionDatabaseMaintenance.ApplyPostMigrationMaintenanceAsync(db, CancellationToken.None);
+                }
+
                 var store = provider.GetRequiredService<StationPackageStore>();
 
                 var packages = store.GetPackages();

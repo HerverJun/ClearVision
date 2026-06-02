@@ -1,7 +1,10 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import httpClient from '../../core/messaging/httpClient.js';
 import serviceRegistry from '../../core/app/serviceRegistry.js';
-import inspectionController from '../inspection/inspectionController.js';
+import inspectionController, {
+    getResultImageUrl,
+    loadImageUrlAsBase64
+} from '../inspection/inspectionController.js';
 import PreviewPanel from './previewPanel.js';
 import RoiEditorPanel from './roiEditorPanel.js';
 import { resolvePreviewInputImageBase64 } from './previewCoordinator.js';
@@ -67,10 +70,12 @@ class PropertyPanel {
         this.roiEditorPanel = null;
         this.previewCoordinator = options.previewCoordinator ?? null;
         this.onOpenPreviewImage = options.onOpenPreviewImage ?? (() => {});
+        this.loadImageUrlAsBase64 = options.loadImageUrlAsBase64 ?? loadImageUrlAsBase64;
         this.pendingRecommendation = null;
         this.recommendedFieldNames = new Set();
         this.cameraBindingsCache = [];
         this.cameraBindingsLoadingPromise = null;
+        this.inputImageBase64Load = null;
         this.recommendationSupportedOperators = new Set([
             'Thresholding',
             'Filtering',
@@ -173,6 +178,7 @@ class PropertyPanel {
             this.roiEditorPanel.destroy();
             this.roiEditorPanel = null;
         }
+        this.inputImageBase64Load = null;
         this.currentOperator = null;
         this.container.innerHTML = '<p class="empty-text">选择一个算子查看属性</p>';
     }
@@ -1576,8 +1582,46 @@ class PropertyPanel {
     }
 
     async resolveInputImageBase64() {
+        const latestImage = serviceRegistry.get('lastInspectionImageBase64')
+            || inspectionController.getLastResultImageBase64?.();
+        if (latestImage) {
+            this.inputImageBase64Load = null;
+            return latestImage;
+        }
+
         const inspectionResult = serviceRegistry.get('lastInspectionResult') || inspectionController.getLastResult?.();
-        return resolvePreviewInputImageBase64(inspectionResult);
+        const inlineImage = resolvePreviewInputImageBase64(inspectionResult);
+        if (inlineImage) {
+            this.inputImageBase64Load = null;
+            return inlineImage;
+        }
+
+        const latestImageUrl = serviceRegistry.get('lastInspectionImageUrl')
+            || inspectionController.getLastResultImageUrl?.()
+            || getResultImageUrl(inspectionResult);
+        return this.loadInputImageUrlAsBase64(latestImageUrl);
+    }
+
+    loadInputImageUrlAsBase64(imageUrl) {
+        if (!imageUrl) {
+            this.inputImageBase64Load = null;
+            return null;
+        }
+
+        const sourceKey = String(imageUrl);
+        if (this.inputImageBase64Load?.sourceKey === sourceKey) {
+            return this.inputImageBase64Load.promise;
+        }
+
+        const promise = Promise.resolve()
+            .then(() => this.loadImageUrlAsBase64(imageUrl))
+            .finally(() => {
+                if (this.inputImageBase64Load?.promise === promise) {
+                    this.inputImageBase64Load = null;
+                }
+            });
+        this.inputImageBase64Load = { sourceKey, promise };
+        return promise;
     }
 
     async handleWireSequenceAnalyze({ operator, previewState } = {}) {

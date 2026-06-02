@@ -12,6 +12,7 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
     private readonly ConcurrentDictionary<Guid, CacheEntry> _pendingAdds = new();
     private readonly Channel<Guid> _addQueue;
     private readonly object _lock = new();
+    private readonly object _admissionLock = new();
     private readonly long _maxSizeInBytes;
     private long _currentSizeInBytes;
     private long _pendingSizeInBytes;
@@ -58,12 +59,26 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
             SizeInBytes = imageData.Length
         };
 
-        _pendingAdds[id] = entry;
-        Interlocked.Add(ref _pendingSizeInBytes, entry.SizeInBytes);
-
-        if (!_addQueue.Writer.TryWrite(id))
+        lock (_admissionLock)
         {
-            _ = EnqueueWhenAvailableAsync(id);
+            if (GetRetainedSizeInBytes() + entry.SizeInBytes > _maxSizeInBytes)
+            {
+                DrainQueuedPendingAdds();
+            }
+
+            if (GetRetainedSizeInBytes() + entry.SizeInBytes > _maxSizeInBytes)
+            {
+                CommitEntry(id, entry);
+                return Task.FromResult(id);
+            }
+
+            _pendingAdds[id] = entry;
+            Interlocked.Add(ref _pendingSizeInBytes, entry.SizeInBytes);
+
+            if (!_addQueue.Writer.TryWrite(id))
+            {
+                CommitPendingAdd(id);
+            }
         }
 
         return Task.FromResult(id);
@@ -197,18 +212,6 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         }
     }
 
-    private async Task EnqueueWhenAvailableAsync(Guid id)
-    {
-        try
-        {
-            await _addQueue.Writer.WriteAsync(id);
-        }
-        catch (InvalidOperationException)
-        {
-            CommitPendingAdd(id);
-        }
-    }
-
     private void CommitPendingAdd(Guid id)
     {
         if (!_pendingAdds.TryRemove(id, out var entry))
@@ -217,7 +220,11 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
         }
 
         Interlocked.Add(ref _pendingSizeInBytes, -entry.SizeInBytes);
+        CommitEntry(id, entry);
+    }
 
+    private void CommitEntry(Guid id, CacheEntry entry)
+    {
         lock (_lock)
         {
             while (_currentSizeInBytes + entry.SizeInBytes > _maxSizeInBytes && _accessOrder.Count > 0)
@@ -228,6 +235,22 @@ public class LruImageCacheRepository : BackgroundService, IImageCacheRepository
             _cache[id] = entry;
             _accessOrder.AddFirst(id);
             _currentSizeInBytes += entry.SizeInBytes;
+        }
+    }
+
+    private void DrainQueuedPendingAdds()
+    {
+        while (_addQueue.Reader.TryRead(out var id))
+        {
+            CommitPendingAdd(id);
+        }
+    }
+
+    private long GetRetainedSizeInBytes()
+    {
+        lock (_lock)
+        {
+            return _currentSizeInBytes + Interlocked.Read(ref _pendingSizeInBytes);
         }
     }
 

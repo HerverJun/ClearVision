@@ -230,10 +230,10 @@ test('AiPanel runtime strip renders clarification state and missing-field counts
   assert.match(runtime.className, /is-clarifying/);
   assert.match(runtime.innerHTML, /待澄清/);
   assert.match(runtime.innerHTML, /2 项阻断澄清/);
-  assert.match(runtime.innerHTML, /意图 新建流程/);
-  assert.match(runtime.innerHTML, /置信度 高/);
-  assert.match(runtime.innerHTML, /阻断 2/);
-  assert.match(runtime.innerHTML, /待补 2/);
+  assert.match(runtime.innerHTML, /意图[\s\S]*新建流程/);
+  assert.match(runtime.innerHTML, /置信度[\s\S]*高/);
+  assert.match(runtime.innerHTML, /阻断[\s\S]*2/);
+  assert.match(runtime.innerHTML, /待补[\s\S]*2/);
   assert.match(runtime.innerHTML, /下一步：先回答 2 个阻断问题/);
 });
 

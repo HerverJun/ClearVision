@@ -5,6 +5,11 @@ const settingsApi = {
     saveSettings: config => httpClient.put('/settings', config),
     resetSettings: () => httpClient.post('/settings/reset'),
     getDiskUsage: path => httpClient.get(`/settings/disk-usage?path=${encodeURIComponent(path || '')}`),
+    getDatabaseStatus: () => httpClient.get('/settings/database/status'),
+    repairDatabase: () => httpClient.post('/settings/database/repair', {}),
+    backupDatabase: () => httpClient.post('/settings/database/backup', {}),
+    restoreDatabase: backupPath => httpClient.post('/settings/database/restore', { backupPath }),
+    cleanupDatabaseHistory: retentionDays => httpClient.post('/settings/database/cleanup', { retentionDays }),
 
     loadUsers: () => httpClient.get('/users'),
     createUser: payload => httpClient.post('/users', payload),

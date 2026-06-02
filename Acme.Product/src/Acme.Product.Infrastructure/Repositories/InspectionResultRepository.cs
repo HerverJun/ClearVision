@@ -34,12 +34,14 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
 
     public async Task<IEnumerable<InspectionResult>> GetByProjectIdAsync(Guid projectId, int pageIndex = 0, int pageSize = 20)
     {
-        return await _dbSet
-            .Where(r => r.ProjectId == projectId && !r.IsDeleted)
+        var items = await SelectHistoryItems(_dbSet
+                .Where(r => r.ProjectId == projectId && !r.IsDeleted))
             .OrderByDescending(r => r.InspectionTime)
             .Skip(pageIndex * pageSize)
             .Take(pageSize)
             .ToListAsync();
+
+        return items.Select(ToInspectionResultWithoutOutputImage).ToList();
     }
 
     public async Task<InspectionHistoryPage> GetHistoryPageAsync(
@@ -57,7 +59,7 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         var query = BuildFilteredQuery(projectId, startTime, endTime, status, defectType);
 
         var totalCount = await query.CountAsync();
-        var items = await query
+        var items = await SelectHistoryItems(query)
             .OrderByDescending(r => r.InspectionTime)
             .Skip(pageIndex * pageSize)
             .Take(pageSize)
@@ -79,9 +81,11 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         string? status = null,
         string? defectType = null)
     {
-        return await BuildFilteredQuery(projectId, startTime, endTime, status, defectType)
+        var items = await SelectHistoryItems(BuildFilteredQuery(projectId, startTime, endTime, status, defectType))
             .OrderByDescending(r => r.InspectionTime)
             .ToListAsync();
+
+        return items.Select(ToInspectionResultWithoutOutputImage).ToList();
     }
 
     public async Task<InspectionStatistics> GetStatisticsAsync(
@@ -167,5 +171,72 @@ public class InspectionResultRepository : RepositoryBase<InspectionResult>, IIns
         }
 
         return query;
+    }
+
+    private static IQueryable<InspectionHistoryItem> SelectHistoryItems(IQueryable<InspectionResult> query)
+    {
+        return query
+            .AsNoTracking()
+            .Select(r => new InspectionHistoryItem
+            {
+                Id = r.Id,
+                ProjectId = r.ProjectId,
+                Status = r.Status,
+                Defects = r.Defects.Select(d => new InspectionHistoryDefectItem
+                {
+                    Id = d.Id,
+                    Type = d.Type,
+                    X = d.X,
+                    Y = d.Y,
+                    Width = d.Width,
+                    Height = d.Height,
+                    ConfidenceScore = d.ConfidenceScore,
+                    Description = d.Description,
+                    AnnotationData = d.AnnotationData
+                }).ToList(),
+                ProcessingTimeMs = r.ProcessingTimeMs,
+                ImageId = r.ImageId,
+                ConfidenceScore = r.ConfidenceScore,
+                ErrorMessage = r.ErrorMessage,
+                InspectionTime = r.InspectionTime,
+                OutputDataJson = r.OutputDataJson,
+                AnalysisDataJson = r.AnalysisDataJson,
+                CreatedAt = r.CreatedAt,
+                ModifiedAt = r.ModifiedAt
+            });
+    }
+
+    private static InspectionResult ToInspectionResultWithoutOutputImage(InspectionHistoryItem item)
+    {
+        var result = new InspectionResult(item.ProjectId, item.ImageId);
+        result.SetResult(item.Status, item.ProcessingTimeMs, item.ConfidenceScore, item.ErrorMessage);
+
+        if (!string.IsNullOrWhiteSpace(item.OutputDataJson))
+        {
+            result.SetOutputDataJson(item.OutputDataJson);
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.AnalysisDataJson))
+        {
+            result.SetAnalysisDataJson(item.AnalysisDataJson);
+        }
+
+        foreach (var defect in item.Defects)
+        {
+            result.AddDefect(new Defect(
+                item.Id,
+                defect.Type,
+                defect.X,
+                defect.Y,
+                defect.Width,
+                defect.Height,
+                defect.ConfidenceScore,
+                defect.Description,
+                defect.AnnotationData));
+        }
+
+        var createdAt = item.CreatedAt == default ? item.InspectionTime : item.CreatedAt;
+        result.RestorePersistenceMetadata(item.Id, item.InspectionTime, createdAt, item.ModifiedAt);
+        return result;
     }
 }

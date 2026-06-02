@@ -6,8 +6,6 @@ using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Enums;
 using Acme.Product.Infrastructure.Data;
 using Acme.Product.Runtime.Abstractions;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -60,7 +58,6 @@ public sealed class StationPackageStore
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        EnsurePackageKindColumn(db);
         return db.StationPackageRecords
             .OrderByDescending(item => item.Id)
             .AsEnumerable()
@@ -79,7 +76,6 @@ public sealed class StationPackageStore
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        EnsurePackageKindColumn(db);
         var entity = db.StationPackageRecords.FirstOrDefault(item => item.PackageId == packageId);
         return entity == null ? null : ToManifest(entity);
     }
@@ -88,7 +84,6 @@ public sealed class StationPackageStore
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        EnsurePackageKindColumn(db);
         return db.StationPackageRecords
             .Where(item => item.PackageId == packageId)
             .Select(item => item.FilePath)
@@ -359,7 +354,6 @@ public sealed class StationPackageStore
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VisionDbContext>();
-        EnsurePackageKindColumn(db);
         var existing = db.StationPackageRecords.FirstOrDefault(item => item.PackageId == manifest.PackageId);
         if (existing == null)
         {
@@ -383,25 +377,6 @@ public sealed class StationPackageStore
         db.SaveChanges();
 
         _logger.LogInformation("Stored Station package {PackageId} at {PackagePath}", manifest.PackageId, path);
-    }
-
-    private static void EnsurePackageKindColumn(VisionDbContext db)
-    {
-        if (!db.Database.IsSqlite())
-        {
-            return;
-        }
-
-        try
-        {
-            db.Database.ExecuteSqlRaw(
-                """ALTER TABLE "StationPackageRecords" ADD COLUMN "PackageKind" TEXT NOT NULL DEFAULT 'Production';""");
-        }
-        catch (SqliteException ex) when (
-            ex.SqliteErrorCode == 1 &&
-            ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
-        {
-        }
     }
 
     private static StationPackageManifestDto ToManifest(StationPackageRecordEntity entity)

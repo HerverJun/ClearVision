@@ -97,6 +97,43 @@ public sealed class IndustrialTemplateLibraryTests
         }
     }
 
+    [Fact(DisplayName = "FlowTemplateService - built-in templates should disable ResultOutput file persistence by default")]
+    public async Task FlowTemplateService_BuiltInTemplates_ShouldDisableResultOutputFilePersistenceByDefault()
+    {
+        var tempRoot = CreateTempRoot();
+        try
+        {
+            var service = new FlowTemplateService(tempRoot);
+            var templates = await service.GetTemplatesAsync();
+
+            templates.Should().NotBeEmpty();
+            foreach (var template in templates)
+            {
+                using var document = JsonDocument.Parse(template.FlowJson);
+                var resultOutputs = document.RootElement.GetProperty("operators")
+                    .EnumerateArray()
+                    .Where(item =>
+                        item.TryGetProperty("operatorType", out var operatorType) &&
+                        string.Equals(operatorType.GetString(), "ResultOutput", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                resultOutputs.Should().NotBeEmpty($"{template.Name} should expose a ResultOutput operator");
+                foreach (var resultOutput in resultOutputs)
+                {
+                    var hasSaveToFile = resultOutput.GetProperty("parameters")
+                        .TryGetProperty("SaveToFile", out var saveToFile);
+
+                    hasSaveToFile.Should().BeTrue($"{template.Name} ResultOutput should declare SaveToFile explicitly");
+                    saveToFile.GetString().Should().Be("false", $"{template.Name} should not write per-result files unless explicitly enabled");
+                }
+            }
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
     private static AiGeneratedFlowJson DeserializeFlow(FlowTemplate template)
     {
         var flow = JsonSerializer.Deserialize<AiGeneratedFlowJson>(template.FlowJson, JsonOptions);

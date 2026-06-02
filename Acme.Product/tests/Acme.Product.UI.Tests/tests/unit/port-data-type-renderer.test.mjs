@@ -48,6 +48,32 @@ test('renders detection boxes from top-level detection coordinates', () => {
   assert.match(html, /x 11, y 12, w 13, h 14/);
 });
 
+test('renders truncated detection payload wrappers from bounded backend output', () => {
+  const value = {
+    Detections: {
+      items: [
+        { label: 'Wire_Red', confidence: 0.93 },
+        { label: 'Wire_Black', confidence: 0.81 }
+      ],
+      __truncated: true,
+      __shownCount: 2,
+      __limit: 2,
+      __totalCount: 300
+    },
+    Count: 300
+  };
+
+  const html = renderPortDataTypeValue({
+    key: 'Detections',
+    value,
+    dataType: 'DetectionList'
+  });
+
+  assert.match(html, /Wire_Red/);
+  assert.match(html, /Wire_Black/);
+  assert.equal(summarizeResultField({ key: 'Detections', value, dataType: 'DetectionList' }), '2 detections');
+});
+
 test('builds typed result cards from mixed output data', () => {
   const cards = buildResultCardsFromOutputData({
     Text: 'ABC-123',
@@ -96,6 +122,41 @@ test('renders full result card html and compact summaries', () => {
   assert.match(html, /mm/);
 
   assert.equal(summarizeResultField(card.fields[0]), '9.877 mm');
+});
+
+test('truncates long rendered strings and summaries', () => {
+  const longText = 'A'.repeat(320);
+  const html = renderPortDataTypeValue({
+    key: 'Text',
+    value: longText
+  });
+
+  assert.match(html, /\.\.\.<\/span>/);
+  assert.equal(html.includes(longText), false);
+
+  const summary = summarizeResultField({ key: 'Text', value: longText });
+  assert.equal(summary.length, 123);
+  assert.match(summary, /\.\.\.$/);
+});
+
+test('truncates long structured values and detection labels', () => {
+  const longBody = 'B'.repeat(320);
+  const structuredHtml = renderPortDataTypeValue({
+    key: 'Response',
+    value: { body: longBody }
+  });
+
+  assert.match(structuredHtml, /\.\.\./);
+  assert.equal(structuredHtml.includes(longBody), false);
+
+  const longLabel = 'C'.repeat(120);
+  const detectionHtml = renderPortDataTypeValue({
+    key: 'Detections',
+    value: [{ label: longLabel, confidence: 0.9 }]
+  });
+
+  assert.match(detectionHtml, /\.\.\./);
+  assert.equal(detectionHtml.includes(longLabel), false);
 });
 
 test('renders informational detection cards without OK judgment badge', () => {

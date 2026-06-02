@@ -143,9 +143,13 @@ export function createViewManager(options) {
                     inspectionImageViewer?.imageCanvas?.resize?.();
 
                     const lastInspectionResult = serviceRegistry?.get?.('lastInspectionResult');
-                    const lastInspectionImage = getInlineResultImageBase64(lastInspectionResult);
+                    const lastInspectionImageBase64 = serviceRegistry?.get?.('lastInspectionImageBase64')
+                        || getInlineResultImageBase64(lastInspectionResult);
+                    const lastInspectionImage = lastInspectionImageBase64
+                        ? `data:image/png;base64,${lastInspectionImageBase64}`
+                        : serviceRegistry?.get?.('lastInspectionImageUrl');
                     if (lastInspectionImage && inspectionImageViewer) {
-                        inspectionImageViewer.loadImage(`data:image/png;base64,${lastInspectionImage}`, { silent: true });
+                        inspectionImageViewer.loadImage(lastInspectionImage, { silent: true });
                     }
 
                     panel?.refresh?.();

@@ -19,6 +19,32 @@ const LIVE_RESULT_HISTORY_REFRESH_DELAY_MS = 2000;
 const LIVE_RESULT_ANALYTICS_REFRESH_DELAY_MS = 5000;
 const RESULT_DATA_SOURCE_INSPECTION = 'inspection';
 const RESULT_DATA_SOURCE_STATION = 'station';
+const LOCAL_RESULT_HISTORY_LIMIT = 500;
+const LOCAL_RESULT_INLINE_IMAGE_RETAIN_LIMIT = 12;
+const LOCAL_RESULT_PAYLOAD_ARRAY_LIMIT = 24;
+const LOCAL_RESULT_PAYLOAD_OBJECT_FIELD_LIMIT = 48;
+const LOCAL_RESULT_PAYLOAD_STRING_LIMIT = 512;
+const LOCAL_RESULT_PAYLOAD_MAX_DEPTH = 3;
+const LOCAL_RESULT_PAYLOAD_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
+const DEFAULT_RESULTS_SSE_MAX_FRAME_CHARS = 2 * 1024 * 1024;
+const DEFAULT_RESULTS_SSE_MAX_BUFFER_CHARS = 4 * 1024 * 1024;
+const RESULT_DETAIL_MAX_ANALYSIS_CARDS = 24;
+const RESULT_DETAIL_MAX_STRUCTURED_CARDS = 12;
+const RESULT_DETAIL_MAX_FIELDS_PER_CARD = 16;
+const RESULT_DETAIL_MAX_RAW_OUTPUT_ROWS = 64;
+const RESULT_DETAIL_MAX_DEFECT_ROWS = 50;
+const RESULT_DETAIL_MAX_FIELD_VALUE_CHARS = 240;
+const RESULT_DETAIL_REMOVE_DELAY_MS = 200;
+const INLINE_RESULT_IMAGE_KEYS = [
+    'imageData',
+    'ImageData',
+    'outputImage',
+    'OutputImage',
+    'outputImageBase64',
+    'OutputImageBase64',
+    'resultImageBase64',
+    'ResultImageBase64'
+];
 
 class ResultPanel {
     constructor(containerId) {
@@ -37,6 +63,19 @@ class ResultPanel {
         this._resultsLastEventId = null;
         this._analyticsRefreshTimer = null;
         this._historyRefreshTimer = null;
+        this._renderFrameHandle = null;
+        this._renderFrameCancel = null;
+        this._eventDisposers = [];
+        this._isDisposed = false;
+        this._activeDetailModals = new Set();
+        this.resultDetailMaxAnalysisCards = RESULT_DETAIL_MAX_ANALYSIS_CARDS;
+        this.resultDetailMaxStructuredCards = RESULT_DETAIL_MAX_STRUCTURED_CARDS;
+        this.resultDetailMaxFieldsPerCard = RESULT_DETAIL_MAX_FIELDS_PER_CARD;
+        this.resultDetailMaxRawOutputRows = RESULT_DETAIL_MAX_RAW_OUTPUT_ROWS;
+        this.resultDetailMaxDefectRows = RESULT_DETAIL_MAX_DEFECT_ROWS;
+        this.resultDetailMaxFieldValueChars = RESULT_DETAIL_MAX_FIELD_VALUE_CHARS;
+        this.resultsSseMaxFrameChars = DEFAULT_RESULTS_SSE_MAX_FRAME_CHARS;
+        this.resultsSseMaxBufferChars = DEFAULT_RESULTS_SSE_MAX_BUFFER_CHARS;
         this.statistics = {
             total: 0,
             ok: 0,
@@ -85,14 +124,14 @@ class ResultPanel {
 
         const dataSourceFilter = document.getElementById('filter-data-source');
         if (dataSourceFilter) {
-            dataSourceFilter.addEventListener('change', (e) => {
+            this.addManagedEventListener(dataSourceFilter, 'change', (e) => {
                 this.setDataSource(e.target.value);
             });
         }
 
         // 时间范围选择
         document.querySelectorAll('.time-range-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            this.addManagedEventListener(btn, 'click', (e) => {
                 document.querySelectorAll('.time-range-btn').forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
                 this.setTimeRange(e.target.dataset.range);
@@ -102,7 +141,7 @@ class ResultPanel {
         // 状态筛选
         const statusFilter = document.getElementById('filter-status');
         if (statusFilter) {
-            statusFilter.addEventListener('change', (e) => {
+            this.addManagedEventListener(statusFilter, 'change', (e) => {
                 this.setFilter('status', e.target.value);
             });
         }
@@ -110,7 +149,7 @@ class ResultPanel {
         // 缺陷类型筛选
         const defectTypeFilter = document.getElementById('filter-defect-type');
         if (defectTypeFilter) {
-            defectTypeFilter.addEventListener('change', (e) => {
+            this.addManagedEventListener(defectTypeFilter, 'change', (e) => {
                 this.setFilter('defectType', e.target.value);
             });
         }
@@ -119,13 +158,13 @@ class ResultPanel {
         const exportDropdown = document.getElementById('export-dropdown');
         const exportBtn = document.getElementById('btn-export-results');
         if (exportBtn && exportDropdown) {
-            exportBtn.addEventListener('click', () => {
+            this.addManagedEventListener(exportBtn, 'click', () => {
                 exportDropdown.classList.toggle('open');
             });
             
             // 导出选项
             exportDropdown.querySelectorAll('.export-menu-item').forEach(item => {
-                item.addEventListener('click', () => {
+                this.addManagedEventListener(item, 'click', () => {
                     const format = item.dataset.format;
                     this.exportResults(format);
                     exportDropdown.classList.remove('open');
@@ -133,7 +172,7 @@ class ResultPanel {
             });
             
             // 点击外部关闭
-            document.addEventListener('click', (e) => {
+            this.addManagedEventListener(document, 'click', (e) => {
                 if (!exportDropdown.contains(e.target)) {
                     exportDropdown.classList.remove('open');
                 }
@@ -143,10 +182,23 @@ class ResultPanel {
         // 【后端对接占位符 1】：生成深度报告按钮
         const advancedReportBtn = document.getElementById('btn-advanced-report');
         if (advancedReportBtn) {
-            advancedReportBtn.addEventListener('click', () => {
+            this.addManagedEventListener(advancedReportBtn, 'click', () => {
                 this.generatePdfReport(this.getAnalyticsQueryParams());
             });
         }
+    }
+
+    addManagedEventListener(target, type, handler, options) {
+        if (!target || typeof target.addEventListener !== 'function') {
+            return;
+        }
+
+        target.addEventListener(type, handler, options);
+        this._eventDisposers.push(() => {
+            if (typeof target.removeEventListener === 'function') {
+                target.removeEventListener(type, handler, options);
+            }
+        });
     }
 
     ensureDataSourceFilter() {
@@ -328,7 +380,7 @@ class ResultPanel {
     }
 
     requestHistoryPage(pageIndex = 0) {
-        if (!this.historyLoader || !this.canRequestServerData()) {
+        if (this._isDisposed || !this.historyLoader || !this.canRequestServerData()) {
             return Promise.resolve(false);
         }
 
@@ -363,16 +415,17 @@ class ResultPanel {
     }
 
     queueServerAnalyticsRefresh(delayMs = 800) {
-        if (!this.canRequestServerData()) {
+        if (this._isDisposed || !this.canRequestServerData()) {
             return;
         }
 
-        if (this._analyticsRefreshTimer) {
-            clearTimeout(this._analyticsRefreshTimer);
-        }
+        this.clearQueuedAnalyticsRefresh();
 
         this._analyticsRefreshTimer = window.setTimeout(() => {
             this._analyticsRefreshTimer = null;
+            if (this._isDisposed) {
+                return;
+            }
             this.loadServerAnalytics().catch(error => {
                 debugLogger.warn('[ResultPanel] Server analytics refresh failed:', error);
             });
@@ -380,20 +433,69 @@ class ResultPanel {
     }
 
     queueServerHistoryRefresh(delayMs = 400) {
-        if (!this.historyLoader || !this.canRequestServerData()) {
+        if (this._isDisposed || !this.historyLoader || !this.canRequestServerData()) {
             return;
         }
 
-        if (this._historyRefreshTimer) {
-            clearTimeout(this._historyRefreshTimer);
-        }
+        this.clearQueuedHistoryRefresh();
 
         this._historyRefreshTimer = window.setTimeout(() => {
             this._historyRefreshTimer = null;
+            if (this._isDisposed) {
+                return;
+            }
             this.requestHistoryPage(0).catch(error => {
                 debugLogger.warn('[ResultPanel] Server history refresh failed:', error);
             });
         }, delayMs);
+    }
+
+    clearQueuedAnalyticsRefresh() {
+        if (this._analyticsRefreshTimer) {
+            clearTimeout(this._analyticsRefreshTimer);
+            this._analyticsRefreshTimer = null;
+        }
+    }
+
+    clearQueuedHistoryRefresh() {
+        if (this._historyRefreshTimer) {
+            clearTimeout(this._historyRefreshTimer);
+            this._historyRefreshTimer = null;
+        }
+    }
+
+    clearQueuedRefreshes() {
+        this.clearQueuedAnalyticsRefresh();
+        this.clearQueuedHistoryRefresh();
+    }
+
+    scheduleRender() {
+        if (this._isDisposed || this._renderFrameHandle != null) {
+            return;
+        }
+
+        const scheduleFrame = window.requestAnimationFrame
+            ? callback => window.requestAnimationFrame(callback)
+            : callback => window.setTimeout(callback, 0);
+        this._renderFrameCancel = window.cancelAnimationFrame || window.clearTimeout;
+        this._renderFrameHandle = scheduleFrame(() => {
+            this._renderFrameHandle = null;
+            this._renderFrameCancel = null;
+            if (!this._isDisposed) {
+                this.render();
+            }
+        });
+    }
+
+    clearQueuedRender() {
+        if (this._renderFrameHandle == null) {
+            return;
+        }
+
+        const cancel = this._renderFrameCancel || window.cancelAnimationFrame || window.clearTimeout;
+        cancel.call(window, this._renderFrameHandle);
+        this._renderFrameHandle = null;
+        this._renderFrameCancel = null;
     }
 
     normalizeStatistics(statistics) {
@@ -635,6 +737,10 @@ class ResultPanel {
      * 添加结果
      */
     addResult(result, options = {}) {
+        if (this._isDisposed) {
+            return;
+        }
+
         if (this.serverPaged) {
             if (this.projectId) {
                 const isRealtime = options?.isRealtime === true;
@@ -644,57 +750,31 @@ class ResultPanel {
             return;
         }
 
-        this.results.unshift(result);
+        this.results.unshift(this.prepareResultForLocalHistory(result, 0));
+        this.pruneLocalResultHistory();
         this.applyFilters();
-        
-        // 更新统计
-        this.statistics.total++;
-        if (result.status === 'OK') {
-            this.statistics.ok++;
-        } else if (result.status === 'NG') {
-            this.statistics.ng++;
-        } else if (result.status === 'Error') {
-            this.statistics.error++;
-        }
-        
-        // 更新平均耗时
-        if (result.processingTime) {
-            const validResults = this.results.filter(r => r.processingTime);
-            const totalTime = validResults.reduce((sum, r) => sum + r.processingTime, 0);
-            this.statistics.avgTime = validResults.length > 0 ? Math.round(totalTime / validResults.length) : 0;
-        }
-        
-        // 更新趋势图数据
-        this.trendData.push({
-            time: new Date(result.timestamp || Date.now()),
-            status: result.status,
-            defectCount: result.defects?.length || 0
-        });
-        if (this.trendData.length > 100) {
-            this.trendData.shift();
-        }
-        
-        // 更新缺陷类型统计
-        if (result.defects) {
-            result.defects.forEach(defect => {
-                const type = defect.type || defect.description || t('common.unknown', '未知');
-                this.defectTypes[type] = (this.defectTypes[type] || 0) + 1;
-            });
-        }
+        this.calculateStatistics();
+        this.updateTrendData();
 
         if (this.canRequestServerData()) {
             this.queueServerAnalyticsRefresh();
         }
 
-        this.render();
+        this.scheduleRender();
     }
     
     /**
      * 加载历史结果
      */
     loadResults(results, { totalCount = null, pageIndex = 0, pageSize = this.pageSize, serverPaged = false } = {}) {
-        this.results = Array.isArray(results) ? results : [];
-        this.serverPaged = !!serverPaged;
+        const isServerPaged = !!serverPaged;
+        this.results = Array.isArray(results)
+            ? results.map((result, index) => this.prepareResultForLocalHistory(result, isServerPaged ? 0 : index))
+            : [];
+        this.serverPaged = isServerPaged;
+        if (!this.serverPaged) {
+            this.pruneLocalResultHistory();
+        }
         this.serverPageIndex = Math.max(0, pageIndex);
         this.pageSize = Number.isFinite(pageSize) && pageSize > 0 ? pageSize : this.pageSize;
         this.totalResultCount = Number.isFinite(totalCount) ? totalCount : this.results.length;
@@ -710,6 +790,184 @@ class ResultPanel {
 
         this.render();
     }
+
+    prepareResultForLocalHistory(result, index = 0) {
+        if (!result || typeof result !== 'object') {
+            return result;
+        }
+
+        const normalized = { ...result };
+        this.compactInlineResultImage(normalized);
+        this.compactStoredResultPayload(normalized);
+        if (index >= LOCAL_RESULT_INLINE_IMAGE_RETAIN_LIMIT) {
+            this.stripInlineResultImage(normalized);
+        }
+
+        return normalized;
+    }
+
+    compactStoredResultPayload(result) {
+        if (!result || typeof result !== 'object') {
+            return result;
+        }
+
+        ['outputData', 'OutputData', 'analysisData', 'AnalysisData'].forEach(key => {
+            if (Object.prototype.hasOwnProperty.call(result, key)) {
+                result[key] = this.compactStoredResultValue(result[key]);
+            }
+        });
+
+        ['defects', 'Defects'].forEach(key => {
+            if (Array.isArray(result[key]) && result[key].length > LOCAL_RESULT_PAYLOAD_ARRAY_LIMIT) {
+                result[key] = [
+                    ...result[key]
+                        .slice(0, LOCAL_RESULT_PAYLOAD_ARRAY_LIMIT)
+                        .map(item => this.compactStoredResultValue(item)),
+                    `+${result[key].length - LOCAL_RESULT_PAYLOAD_ARRAY_LIMIT} more`
+                ];
+            }
+        });
+
+        return result;
+    }
+
+    compactStoredResultValue(value, depth = 0, seen = new WeakSet(), sourceKey = '') {
+        if (typeof value === 'string') {
+            return this.compactStoredResultString(sourceKey, value);
+        }
+
+        if (value === null || value === undefined || typeof value !== 'object') {
+            return value;
+        }
+
+        if (seen.has(value)) {
+            return '[circular]';
+        }
+
+        if (depth >= LOCAL_RESULT_PAYLOAD_MAX_DEPTH) {
+            return Array.isArray(value)
+                ? `${value.length} items`
+                : `${Object.keys(value).length} fields`;
+        }
+
+        seen.add(value);
+
+        if (Array.isArray(value)) {
+            const visibleItems = value
+                .slice(0, LOCAL_RESULT_PAYLOAD_ARRAY_LIMIT)
+                .map(item => this.compactStoredResultValue(item, depth + 1, seen, sourceKey));
+            if (value.length > visibleItems.length) {
+                visibleItems.push(`+${value.length - visibleItems.length} more`);
+            }
+            return visibleItems;
+        }
+
+        const compact = {};
+        const entries = Object.entries(value);
+        let visibleCount = 0;
+        let omittedImageCount = 0;
+        for (const [key, entryValue] of entries) {
+            if (this.isStoredResultImageLikeValue(key, entryValue)) {
+                omittedImageCount += 1;
+                continue;
+            }
+
+            if (visibleCount >= LOCAL_RESULT_PAYLOAD_OBJECT_FIELD_LIMIT) {
+                break;
+            }
+
+            compact[key] = this.compactStoredResultValue(entryValue, depth + 1, seen, key);
+            visibleCount += 1;
+        }
+
+        const hiddenCount = Math.max(0, entries.length - visibleCount - omittedImageCount);
+        if (hiddenCount > 0) {
+            compact.__hiddenFieldCount = hiddenCount;
+        }
+        if (omittedImageCount > 0) {
+            compact.__omittedImageFieldCount = omittedImageCount;
+        }
+
+        return compact;
+    }
+
+    compactStoredResultString(key, value) {
+        if (this.isStoredResultImageLikeValue(key, value)) {
+            return '[image omitted]';
+        }
+
+        const text = String(value ?? '');
+        return text.length > LOCAL_RESULT_PAYLOAD_STRING_LIMIT
+            ? `${text.slice(0, LOCAL_RESULT_PAYLOAD_STRING_LIMIT)}...`
+            : text;
+    }
+
+    isStoredResultImageLikeValue(key, value) {
+        if (typeof value !== 'string') {
+            return false;
+        }
+
+        const text = value.trim();
+        if (text.startsWith('data:image/')) {
+            return true;
+        }
+
+        return LOCAL_RESULT_PAYLOAD_IMAGE_KEY_PATTERN.test(String(key || '')) && text.length > 120;
+    }
+
+    compactInlineResultImage(result) {
+        if (!result || typeof result !== 'object') {
+            return result;
+        }
+
+        const inlineImage = this.getInlineResultImageBase64(result);
+        INLINE_RESULT_IMAGE_KEYS.forEach(key => {
+            if (key !== 'imageData' && Object.prototype.hasOwnProperty.call(result, key)) {
+                result[key] = null;
+            }
+        });
+
+        if (inlineImage) {
+            result.imageData = inlineImage;
+        }
+
+        return result;
+    }
+
+    stripInlineResultImage(result) {
+        if (!result || typeof result !== 'object') {
+            return result;
+        }
+
+        let stripped = false;
+        INLINE_RESULT_IMAGE_KEYS.forEach(key => {
+            if (result[key]) {
+                result[key] = null;
+                stripped = true;
+            }
+        });
+
+        if (stripped) {
+            result.inlineImageDiscarded = true;
+        }
+
+        return result;
+    }
+
+    pruneLocalResultHistory() {
+        if (this.serverPaged || !Array.isArray(this.results)) {
+            return;
+        }
+
+        if (this.results.length > LOCAL_RESULT_HISTORY_LIMIT) {
+            this.results.length = LOCAL_RESULT_HISTORY_LIMIT;
+        }
+
+        for (let index = LOCAL_RESULT_INLINE_IMAGE_RETAIN_LIMIT; index < this.results.length; index += 1) {
+            this.stripInlineResultImage(this.results[index]);
+        }
+    }
+
     /**
      * 计算统计
      */
@@ -891,11 +1149,14 @@ class ResultPanel {
             return null;
         }
 
-        return result.imageData
-            || result.outputImage
-            || result.outputImageBase64
-            || result.resultImageBase64
-            || null;
+        for (const key of INLINE_RESULT_IMAGE_KEYS) {
+            const value = result[key];
+            if (typeof value === 'string' && value.length > 0) {
+                return value;
+            }
+        }
+
+        return null;
     }
 
     getResultImageSrc(result) {
@@ -1489,7 +1750,45 @@ class ResultPanel {
         return lines.join('\n');
     }
 
+    getDetailLimit(value, fallback) {
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue) && numericValue >= 0
+            ? Math.floor(numericValue)
+            : fallback;
+    }
+
+    getResultDetailLimits() {
+        return {
+            analysisCards: this.getDetailLimit(this.resultDetailMaxAnalysisCards, RESULT_DETAIL_MAX_ANALYSIS_CARDS),
+            structuredCards: this.getDetailLimit(this.resultDetailMaxStructuredCards, RESULT_DETAIL_MAX_STRUCTURED_CARDS),
+            fieldsPerCard: this.getDetailLimit(this.resultDetailMaxFieldsPerCard, RESULT_DETAIL_MAX_FIELDS_PER_CARD),
+            rawOutputRows: this.getDetailLimit(this.resultDetailMaxRawOutputRows, RESULT_DETAIL_MAX_RAW_OUTPUT_ROWS),
+            defects: this.getDetailLimit(this.resultDetailMaxDefectRows, RESULT_DETAIL_MAX_DEFECT_ROWS),
+            fieldValueChars: this.getDetailLimit(this.resultDetailMaxFieldValueChars, RESULT_DETAIL_MAX_FIELD_VALUE_CHARS)
+        };
+    }
+
+    closeActiveDetailModals({ immediate = true } = {}) {
+        if (!this._activeDetailModals || typeof this._activeDetailModals.forEach !== 'function') {
+            return;
+        }
+
+        Array.from(this._activeDetailModals).forEach(handle => {
+            try {
+                handle.close({ immediate });
+            } catch (error) {
+                debugLogger.warn('[ResultPanel] Failed to close result detail modal:', error);
+            }
+        });
+    }
+
     showResultDetail(result) {
+        if (this._isDisposed) {
+            return;
+        }
+
+        this.closeActiveDetailModals({ immediate: true });
+
         debugLogger.debug('[ResultPanel] 查看结果详情:', result);
         
         const modal = document.createElement('div');
@@ -1521,32 +1820,73 @@ class ResultPanel {
                         ${this.renderStructuredOutputSection(result.outputData, result.status)}
                         ${this.renderDiagnosticsSection(result.outputData, result.status)}
                         ${this.renderOutputDataTable(result.outputData)}
-                        ${result.defects?.length > 0 ? `
-                            <div class="detail-section">
-                                <div class="detail-section-title">缺陷列表 (${result.defects.length})</div>
-                                ${result.defects.map(d => `
-                                    <div class="detail-item">
-                                        <span class="detail-label">${this.escapeHtml(d.type || d.description || t('common.unknown', '未知'))}</span>
-                                        <span class="detail-value">${d.confidenceScore ? (d.confidenceScore * 100).toFixed(1) + '%' : '--'}</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        ` : ''}
+                        ${this.renderDefectsSection(result.defects)}
                     </div>
                 </div>
             </div>
         `;
         
         document.body.appendChild(modal);
-        // 入场动画
-        requestAnimationFrame(() => modal.classList.add('visible'));
-        
-        const closeModal = () => {
-            modal.classList.remove('visible');
-            setTimeout(() => modal.remove(), 200);
+        const scheduleFrame = typeof window.requestAnimationFrame === 'function'
+            ? callback => window.requestAnimationFrame(callback)
+            : (typeof globalThis.requestAnimationFrame === 'function'
+                ? callback => globalThis.requestAnimationFrame(callback)
+                : callback => window.setTimeout(callback, 0));
+        scheduleFrame(() => modal.classList.add('visible'));
+
+        const closeButton = modal.querySelector('.result-detail-close');
+        const overlay = modal.querySelector('.result-detail-overlay');
+        let removeTimer = null;
+        let closed = false;
+        let listenersAttached = true;
+
+        const cleanupListeners = () => {
+            if (!listenersAttached) {
+                return;
+            }
+
+            closeButton?.removeEventListener?.('click', closeModal);
+            overlay?.removeEventListener?.('click', closeModal);
+            listenersAttached = false;
         };
-        modal.querySelector('.result-detail-close').addEventListener('click', closeModal);
-        modal.querySelector('.result-detail-overlay').addEventListener('click', closeModal);
+
+        const removeModal = () => {
+            if (removeTimer !== null) {
+                window.clearTimeout(removeTimer);
+                removeTimer = null;
+            }
+
+            cleanupListeners();
+            modal.remove?.();
+            this._activeDetailModals?.delete(detailModalHandle);
+        };
+
+        const closeModal = ({ immediate = false } = {}) => {
+            if (closed) {
+                if (immediate) {
+                    removeModal();
+                }
+                return;
+            }
+
+            closed = true;
+            modal.classList.remove('visible');
+            cleanupListeners();
+            if (immediate) {
+                removeModal();
+                return;
+            }
+
+            removeTimer = window.setTimeout(removeModal, RESULT_DETAIL_REMOVE_DELAY_MS);
+        };
+
+        const detailModalHandle = { close: closeModal };
+        if (!this._activeDetailModals) {
+            this._activeDetailModals = new Set();
+        }
+        this._activeDetailModals.add(detailModalHandle);
+        closeButton?.addEventListener?.('click', closeModal);
+        overlay?.addEventListener?.('click', closeModal);
     }
     
     renderAnalysisDataPreview(analysisData) {
@@ -1575,12 +1915,20 @@ class ResultPanel {
             return '';
         }
 
+        const { structuredCards, fieldsPerCard } = this.getResultDetailLimits();
+        const visibleCards = cards.slice(0, structuredCards);
+        const hiddenCardCount = Math.max(0, cards.length - visibleCards.length);
+        const hiddenHint = hiddenCardCount > 0
+            ? `<div class="detail-item type-null"><span class="detail-label">More</span><span class="detail-value">Hidden ${hiddenCardCount} more structured cards</span></div>`
+            : '';
+
         return `
             <div class="detail-section">
                 <div class="detail-section-title">结构化输出</div>
                 <div class="analysis-cards-container ac-diagnostics-inline ac-diagnostics-detail">
-                    ${cards.map(card => renderResultCardHtml(card, { fallbackStatus })).join('')}
+                    ${visibleCards.map(card => renderResultCardHtml(card, { fallbackStatus, maxFields: fieldsPerCard })).join('')}
                 </div>
+                ${hiddenHint}
             </div>
         `;
     }
@@ -1590,8 +1938,14 @@ class ResultPanel {
         
         const rows = [];
         let hiddenCount = 0;
+        const { rawOutputRows } = this.getResultDetailLimits();
         for (const [key, value] of Object.entries(outputData)) {
             if (this.shouldHideOutputDetailEntry(key, value, outputData)) {
+                hiddenCount += 1;
+                continue;
+            }
+
+            if (rows.length >= rawOutputRows) {
                 hiddenCount += 1;
                 continue;
             }
@@ -1622,34 +1976,47 @@ class ResultPanel {
         if (rows.length === 0 && hiddenCount === 0) return '';
 
         const hiddenNotice = hiddenCount > 0
-            ? `<div class="detail-item type-null"><span class="detail-label">说明</span><span class="detail-value">已隐藏 ${hiddenCount} 个导出/技术字段</span></div>`
+            ? `<div class="detail-item type-null"><span class="detail-label">More</span><span class="detail-value">Hidden ${hiddenCount} output fields</span></div>`
             : '';
 
         return `<div class="detail-section"><div class="detail-section-title">原始输出数据（调试）</div>${rows.join('')}${hiddenNotice}</div>`;
     }
 
     renderAnalysisDataSection(analysisData) {
-        const cards = Array.isArray(analysisData?.cards) ? analysisData.cards : [];
-        if (cards.length === 0) {
+        const sourceCards = Array.isArray(analysisData?.cards) ? analysisData.cards : [];
+        if (sourceCards.length === 0) {
             return '';
         }
 
+        const { analysisCards, fieldsPerCard } = this.getResultDetailLimits();
+        const cards = sourceCards.slice(0, analysisCards);
         const sections = cards.map(card => {
-            const fields = Array.isArray(card?.fields) ? card.fields : [];
+            const sourceFields = Array.isArray(card?.fields) ? card.fields : [];
+            const fields = sourceFields.slice(0, fieldsPerCard);
             const rows = fields.map(field => `<div class="detail-item">
                 <span class="detail-label">${this.escapeHtml(field.label || field.key || '--')}</span>
                 <span class="detail-value">${this.escapeHtml(this.formatAnalysisFieldValue(field.value))}${field.unit ? ` ${this.escapeHtml(field.unit)}` : ''}</span>
             </div>`).join('');
+            const hiddenFieldCount = Math.max(0, sourceFields.length - fields.length);
+            const hiddenFieldsHint = hiddenFieldCount > 0
+                ? `<div class="detail-item type-null"><span class="detail-label">More</span><span class="detail-value">Hidden ${hiddenFieldCount} more fields</span></div>`
+                : '';
 
             return `
                 <div class="detail-section">
                     <div class="detail-section-title">${this.escapeHtml(card.title || card.category || '分析卡片')}</div>
                     ${rows || '<div class="detail-item"><span class="detail-label">内容</span><span class="detail-value">--</span></div>'}
+                    ${hiddenFieldsHint}
                 </div>
             `;
         }).join('');
 
-        return sections;
+        const hiddenCardCount = Math.max(0, sourceCards.length - cards.length);
+        const hiddenCardsHint = hiddenCardCount > 0
+            ? `<div class="detail-section"><div class="detail-item type-null"><span class="detail-label">More</span><span class="detail-value">Hidden ${hiddenCardCount} more analysis cards</span></div></div>`
+            : '';
+
+        return `${sections}${hiddenCardsHint}`;
     }
 
     renderDiagnosticsSection(outputData, fallbackStatus) {
@@ -1658,7 +2025,8 @@ class ResultPanel {
         }
 
         const diagnosticsHtml = renderDiagnosticsCardsHtml(outputData, fallbackStatus || 'OK', {
-            containerClass: 'analysis-cards-container ac-diagnostics-inline ac-diagnostics-detail'
+            containerClass: 'analysis-cards-container ac-diagnostics-inline ac-diagnostics-detail',
+            maxFields: this.getResultDetailLimits().fieldsPerCard
         });
 
         if (!diagnosticsHtml) {
@@ -1669,6 +2037,33 @@ class ResultPanel {
             <div class="detail-section">
                 <div class="detail-section-title">诊断面板</div>
                 ${diagnosticsHtml}
+            </div>
+        `;
+    }
+
+    renderDefectsSection(defects) {
+        if (!Array.isArray(defects) || defects.length === 0) {
+            return '';
+        }
+
+        const { defects: maxDefects } = this.getResultDetailLimits();
+        const visibleDefects = defects.slice(0, maxDefects);
+        const rows = visibleDefects.map(defect => `
+            <div class="detail-item">
+                <span class="detail-label">${this.escapeHtml(defect.type || defect.description || t('common.unknown', '未知'))}</span>
+                <span class="detail-value">${defect.confidenceScore ? (defect.confidenceScore * 100).toFixed(1) + '%' : '--'}</span>
+            </div>
+        `).join('');
+        const hiddenCount = Math.max(0, defects.length - visibleDefects.length);
+        const hiddenNotice = hiddenCount > 0
+            ? `<div class="detail-item type-null"><span class="detail-label">More</span><span class="detail-value">Hidden ${hiddenCount} more defects</span></div>`
+            : '';
+
+        return `
+            <div class="detail-section">
+                <div class="detail-section-title">缺陷列表 (${defects.length})</div>
+                ${rows || '<div class="detail-item"><span class="detail-label">Defects</span><span class="detail-value">--</span></div>'}
+                ${hiddenNotice}
             </div>
         `;
     }
@@ -1690,9 +2085,20 @@ class ResultPanel {
         return `${label}: ${value}`;
     }
 
+    truncateDetailText(value, maxChars = this.getResultDetailLimits().fieldValueChars) {
+        const text = String(value ?? '');
+        if (!Number.isFinite(maxChars) || maxChars <= 0 || text.length <= maxChars) {
+            return text;
+        }
+
+        return `${text.slice(0, maxChars)}...`;
+    }
+
     formatAnalysisFieldValue(value) {
+        let text = '';
         if (typeof value === 'number') {
-            return Number.isInteger(value) ? String(value) : value.toFixed(3);
+            text = Number.isInteger(value) ? String(value) : value.toFixed(3);
+            return this.truncateDetailText(text);
         }
 
         if (typeof value === 'boolean') {
@@ -1704,10 +2110,15 @@ class ResultPanel {
         }
 
         if (typeof value === 'object') {
-            return JSON.stringify(value);
+            try {
+                text = JSON.stringify(value);
+            } catch {
+                text = '[unserializable object]';
+            }
+            return this.truncateDetailText(text);
         }
 
-        return String(value);
+        return this.truncateDetailText(value);
     }
 
     isMeaningfulRecognitionText(value, outputData, sourceKey = '') {
@@ -1835,7 +2246,7 @@ class ResultPanel {
     // ==========================================================================
 
     async connectResultsHub() {
-        if (!this.projectId || this._resultsStreamController) {
+        if (this._isDisposed || !this.projectId || this._resultsStreamController) {
             return;
         }
 
@@ -1892,20 +2303,51 @@ class ResultPanel {
         const decoder = new TextDecoder();
         let buffer = '';
 
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) {
-                break;
-            }
+        try {
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) {
+                    break;
+                }
 
-            buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
-            let separatorIndex = buffer.indexOf('\n\n');
-            while (separatorIndex >= 0) {
-                const frame = buffer.slice(0, separatorIndex);
-                buffer = buffer.slice(separatorIndex + 2);
-                this.dispatchResultsSseFrame(frame);
-                separatorIndex = buffer.indexOf('\n\n');
+                buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+                let separatorIndex = buffer.indexOf('\n\n');
+                while (separatorIndex >= 0) {
+                    const frame = buffer.slice(0, separatorIndex);
+                    buffer = buffer.slice(separatorIndex + 2);
+                    this.dispatchBoundedResultsSseFrame(frame);
+                    separatorIndex = buffer.indexOf('\n\n');
+                }
+
+                this.assertResultsSseBufferWithinLimit(buffer);
             }
+        } finally {
+            try {
+                reader.releaseLock?.();
+            } catch (error) {
+                debugLogger.warn('[ResultPanel] Failed to release results SSE reader:', error);
+            }
+        }
+    }
+
+    dispatchBoundedResultsSseFrame(frame) {
+        const maxFrameChars = Number(this.resultsSseMaxFrameChars);
+        if (Number.isFinite(maxFrameChars) && maxFrameChars > 0 && frame.length > maxFrameChars) {
+            debugLogger.warn('[ResultPanel] Dropping oversized results SSE frame.', {
+                length: frame.length,
+                maxFrameChars
+            });
+            return false;
+        }
+
+        this.dispatchResultsSseFrame(frame);
+        return true;
+    }
+
+    assertResultsSseBufferWithinLimit(buffer) {
+        const maxBufferChars = Number(this.resultsSseMaxBufferChars);
+        if (Number.isFinite(maxBufferChars) && maxBufferChars > 0 && buffer.length > maxBufferChars) {
+            throw new Error(`Results SSE buffer exceeded ${maxBufferChars} characters without a frame boundary`);
         }
     }
 
@@ -1996,6 +2438,31 @@ class ResultPanel {
             this._resultsStreamReconnectAttempt = 0;
         }
     }
+
+    dispose() {
+        if (this._isDisposed) {
+            return;
+        }
+
+        this._isDisposed = true;
+        this.disconnectResultsStream();
+        this.clearQueuedRefreshes();
+        this.clearQueuedRender();
+
+        const eventDisposers = this._eventDisposers.splice(0);
+        eventDisposers.forEach(dispose => {
+            try {
+                dispose();
+            } catch (error) {
+                debugLogger.warn('[ResultPanel] Failed to dispose event listener:', error);
+            }
+        });
+
+        this.closeActiveDetailModals({ immediate: true });
+        this.historyLoader = null;
+        this.onResultClick = null;
+    }
+
     /**
      * 【后端对接占位符 2】：高级统计 API
      * 后端需要提供: GET /api/v1/analytics/advanced?timeRange=xxx

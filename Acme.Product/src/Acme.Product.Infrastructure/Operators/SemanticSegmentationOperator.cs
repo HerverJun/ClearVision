@@ -27,6 +27,8 @@ namespace Acme.Product.Infrastructure.Operators;
 [OutputPort("ColoredMap", "Colored Map", PortDataType.Image)]
 [OutputPort("ClassMasks", "Class Masks", PortDataType.Any)]
 [OutputPort("ClassCount", "Class Count", PortDataType.Integer)]
+[OutputPort("ClassMaskCount", "Class Mask Count", PortDataType.Integer)]
+[OutputPort("OmittedClassMaskCount", "Omitted Class Mask Count", PortDataType.Integer)]
 [OutputPort("PresentClasses", "Present Classes", PortDataType.Any)]
 [OutputPort("ResolvedModelPath", "Resolved Model Path", PortDataType.String)]
 [OutputPort("ResolvedModelId", "Resolved Model Id", PortDataType.String)]
@@ -39,6 +41,7 @@ namespace Acme.Product.Infrastructure.Operators;
 [OperatorParam("InputSize", "Input Size", "string", DefaultValue = "512,512", Description = "Width,Height")]
 [OperatorParam("NumClasses", "Num Classes", "int", DefaultValue = 21, Min = 2, Max = 4096)]
 [OperatorParam("ClassNames", "Class Names", "string", DefaultValue = "", Description = "JSON array or comma-separated names")]
+[OperatorParam("MaxClassMasks", "Max Class Masks", "int", DefaultValue = 32, Min = 0, Max = 4096, Description = "Limits generated per-class mask images; 0 disables per-class masks.")]
 [OperatorParam("ExecutionProvider", "Execution Provider", "enum", DefaultValue = "cpu", Options = new[] { "cpu|CPU", "cuda|CUDA" })]
 [OperatorParam("ScaleToUnitRange", "Scale To Unit Range", "bool", DefaultValue = true)]
 [OperatorParam("ChannelOrder", "Channel Order", "enum", DefaultValue = "RGB", Options = new[] { "RGB|RGB", "BGR|BGR" })]
@@ -194,6 +197,7 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         var useUnitRange = GetBoolParam(@operator, "ScaleToUnitRange", true);
         var channelOrder = ParseChannelOrder(GetStringParam(@operator, "ChannelOrder", "RGB"));
         var classNames = ResolveClassNames(@operator, modelCatalogEntry, numClasses);
+        var maxClassMasks = GetIntParam(@operator, "MaxClassMasks", 32, min: 0, max: 4096);
 
         SessionLease sessionLease;
         try
@@ -213,7 +217,7 @@ public sealed class SemanticSegmentationOperator : OperatorBase
             {
                 var session = sessionLease.Session;
                 executionResult = await RunCpuBoundWork(
-                    () => ExecuteSegmentation(session, src, inputWidth, inputHeight, numClasses, classNames, channelOrder, mean, std, useUnitRange),
+                    () => ExecuteSegmentation(session, src, inputWidth, inputHeight, numClasses, classNames, maxClassMasks, channelOrder, mean, std, useUnitRange),
                     cancellationToken);
             }
         }
@@ -237,6 +241,9 @@ public sealed class SemanticSegmentationOperator : OperatorBase
                 pair => (object)new ImageWrapper(pair.Value),
                 StringComparer.OrdinalIgnoreCase),
             ["ClassCount"] = executionResult.PresentClasses.Length,
+            ["ClassMaskCount"] = executionResult.ClassMasks.Count,
+            ["OmittedClassMaskCount"] = executionResult.OmittedClassMaskCount,
+            ["MaxClassMasks"] = executionResult.MaxClassMasks,
             ["PresentClasses"] = executionResult.PresentClasses,
             ["ResolvedModelPath"] = modelTarget.ResolvedPath,
             ["ResolvedModelId"] = modelTarget.ModelId,
@@ -297,6 +304,7 @@ public sealed class SemanticSegmentationOperator : OperatorBase
 
         _ = ParseChannelOrder(GetStringParam(@operator, "ChannelOrder", "RGB"));
         _ = ResolveClassNames(@operator, modelCatalogEntry, ResolveNumClasses(@operator, modelCatalogEntry));
+        _ = GetIntParam(@operator, "MaxClassMasks", 32, min: 0, max: 4096);
 
         return ValidationResult.Valid();
     }
@@ -432,6 +440,7 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         int inputHeight,
         int numClasses,
         string[] classNames,
+        int maxClassMasks,
         SegmentationChannelOrder channelOrder,
         float[] mean,
         float[] std,
@@ -517,13 +526,15 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         Cv2.Resize(smallClassMap, finalClassMap, sourceImage.Size(), 0, 0, InterpolationFlags.Nearest);
 
         var coloredMap = BuildColoredMap(finalClassMap, numClasses);
-        var classMasks = BuildClassMasks(finalClassMap, presentClasses, classNames);
+        var (classMasks, omittedClassMaskCount) = BuildClassMasks(finalClassMap, presentClasses, classNames, maxClassMasks);
 
         return new SegmentationExecutionResult(
             finalClassMap,
             coloredMap,
             classMasks,
-            presentClasses.Select(c => classNames[c]).ToArray());
+            presentClasses.Select(c => classNames[c]).ToArray(),
+            maxClassMasks,
+            omittedClassMaskCount);
     }
 
     private static DenseTensor<float> PreprocessImage(
@@ -611,17 +622,25 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         return colored;
     }
 
-    private static Dictionary<string, Mat> BuildClassMasks(Mat classMap, IEnumerable<int> presentClasses, string[] classNames)
+    private static (Dictionary<string, Mat> Masks, int OmittedCount) BuildClassMasks(
+        Mat classMap,
+        IEnumerable<int> presentClasses,
+        string[] classNames,
+        int maxClassMasks)
     {
+        var orderedClasses = presentClasses.OrderBy(x => x).ToArray();
+        var maskLimit = Math.Max(0, maxClassMasks);
+        var emittedCount = Math.Min(maskLimit, orderedClasses.Length);
         var masks = new Dictionary<string, Mat>(StringComparer.OrdinalIgnoreCase);
-        foreach (var classId in presentClasses.OrderBy(x => x))
+        for (var i = 0; i < emittedCount; i++)
         {
+            var classId = orderedClasses[i];
             var mask = new Mat();
             Cv2.Compare(classMap, classId, mask, CmpType.EQ);
             masks[classNames[classId]] = mask;
         }
 
-        return masks;
+        return (masks, orderedClasses.Length - emittedCount);
     }
 
     private static string NormalizeExecutionProvider(string executionProvider)
@@ -746,5 +765,7 @@ public sealed class SemanticSegmentationOperator : OperatorBase
         Mat SegmentationMap,
         Mat ColoredMap,
         Dictionary<string, Mat> ClassMasks,
-        string[] PresentClasses);
+        string[] PresentClasses,
+        int MaxClassMasks,
+        int OmittedClassMaskCount);
 }

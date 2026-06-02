@@ -770,6 +770,11 @@ public class Sprint7_AiEvolutionTests
             deepLearningParams.GetProperty("LabelsPath").GetString().Should().BeEmpty();
 
             judgeParams.GetProperty("MinConfidence").GetString().Should().Be("0.0");
+
+            var resultOutputParams = root.GetProperty("operators").EnumerateArray()
+                .Single(item => item.GetProperty("tempId").GetString() == "op_4")
+                .GetProperty("parameters");
+            resultOutputParams.GetProperty("SaveToFile").GetString().Should().Be("false");
         }
         finally
         {
@@ -824,6 +829,11 @@ public class Sprint7_AiEvolutionTests
                 .Should().Contain("FrameChangeTrigger.MinChangeRatio");
             root.GetProperty("tunableParameters").EnumerateArray().Select(item => item.GetString())
                 .Should().Contain("DeepLearning.Confidence");
+
+            var resultOutputParams = root.GetProperty("operators").EnumerateArray()
+                .Single(item => item.GetProperty("tempId").GetString() == "op_5")
+                .GetProperty("parameters");
+            resultOutputParams.GetProperty("SaveToFile").GetString().Should().Be("false");
         }
         finally
         {

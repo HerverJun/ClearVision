@@ -121,6 +121,7 @@ public class LocalDeformableMatchingOperatorTests
         result.OutputData!["IsMatch"].Should().Be(true);
         result.OutputData["VerificationPassed"].Should().Be(true);
         result.OutputData["Method"].Should().Be("MLS_Deformable");
+        result.OutputData["OcclusionMask"].Should().BeOfType<ImageWrapper>();
         Convert.ToDouble(result.OutputData["DeformationMagnitude"]).Should().BeGreaterThan(0.5);
     }
 

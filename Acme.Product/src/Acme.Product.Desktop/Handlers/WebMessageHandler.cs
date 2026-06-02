@@ -35,6 +35,8 @@ namespace Acme.Product.Desktop.Handlers;
 /// </summary>
 public class WebMessageHandler : IWebMessageClient, IDisposable
 {
+    private const int MaxPendingWebMessages = 512;
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOperatorFactory _operatorFactory;
     private readonly IInspectionEventBus _eventBus;
@@ -47,6 +49,10 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     private WebView2? _webViewControl;
     private CoreWebView2? _webView;
     private int _disposeState;
+    private readonly ConcurrentQueue<string> _pendingWebMessages = new();
+    private int _pendingWebMessageCount;
+    private int _webMessageDrainScheduled;
+    private long _droppedWebMessageCount;
     private readonly ConcurrentDictionary<string, ActiveGenerateFlowRequest> _activeGenerateFlowRequests = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _activeGenerateFlowRequestIdsBySessionId = new(StringComparer.OrdinalIgnoreCase);
     private string? _latestGenerateFlowRequestId;
@@ -784,7 +790,10 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 description = d.Description ?? string.Empty
             }).ToList(),
             processingTimeMs = result.ProcessingTimeMs,
-            outputImage = result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null,
+            imageId = result.ImageId,
+            outputImage = result.ImageId.HasValue
+                ? null
+                : (result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null),
             outputData,
             analysisData
         };
@@ -830,6 +839,12 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
         if (webViewControl.InvokeRequired)
         {
+            if (TryEnqueuePendingWebMessage(json))
+            {
+                SchedulePendingWebMessageDrain(webViewControl);
+                return;
+            }
+
             _ = webViewControl.BeginInvoke(new Action(() =>
             {
                 if (webViewControl.IsDisposed)
@@ -850,6 +865,101 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         webView.PostWebMessageAsJson(json);
     }
 
+    private bool TryEnqueuePendingWebMessage(string json)
+    {
+        while (Volatile.Read(ref _pendingWebMessageCount) >= MaxPendingWebMessages)
+        {
+            if (!_pendingWebMessages.TryDequeue(out _))
+            {
+                break;
+            }
+
+            Interlocked.Decrement(ref _pendingWebMessageCount);
+            Interlocked.Increment(ref _droppedWebMessageCount);
+        }
+
+        _pendingWebMessages.Enqueue(json);
+        Interlocked.Increment(ref _pendingWebMessageCount);
+        return true;
+    }
+
+    private void SchedulePendingWebMessageDrain(WebView2 webViewControl)
+    {
+        if (Interlocked.CompareExchange(ref _webMessageDrainScheduled, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _ = webViewControl.BeginInvoke(new Action(DrainPendingWebMessages));
+        }
+        catch (Exception ex)
+        {
+            Interlocked.Exchange(ref _webMessageDrainScheduled, 0);
+            ClearPendingWebMessages();
+            _logger.LogDebug(ex, "[WebMessageHandler] Failed to schedule WebMessage drain.");
+        }
+    }
+
+    private void DrainPendingWebMessages()
+    {
+        try
+        {
+            var webViewControl = _webViewControl;
+            var webView = _webView;
+            if (webViewControl == null || webView == null || webViewControl.IsDisposed)
+            {
+                ClearPendingWebMessages();
+                return;
+            }
+
+            while (_pendingWebMessages.TryDequeue(out var json))
+            {
+                Interlocked.Decrement(ref _pendingWebMessageCount);
+                if (webViewControl.IsDisposed)
+                {
+                    ClearPendingWebMessages();
+                    return;
+                }
+
+                try
+                {
+                    webView.PostWebMessageAsJson(json);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "[WebMessageHandler] Failed to post queued WebMessage.");
+                }
+            }
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _webMessageDrainScheduled, 0);
+            if (Volatile.Read(ref _pendingWebMessageCount) > 0)
+            {
+                var webViewControl = _webViewControl;
+                if (webViewControl != null && !webViewControl.IsDisposed)
+                {
+                    SchedulePendingWebMessageDrain(webViewControl);
+                }
+                else
+                {
+                    ClearPendingWebMessages();
+                }
+            }
+        }
+    }
+
+    private void ClearPendingWebMessages()
+    {
+        while (_pendingWebMessages.TryDequeue(out _))
+        {
+        }
+
+        Interlocked.Exchange(ref _pendingWebMessageCount, 0);
+    }
+
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposeState, 1) != 0)
@@ -857,6 +967,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             return;
         }
         _logger.LogInformation("[WebMessageHandler] 正在释放资源");
+
+        ClearPendingWebMessages();
 
         foreach (var activeRequest in _activeGenerateFlowRequests.Values)
         {

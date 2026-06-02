@@ -4,6 +4,8 @@ import {
     isPreviewImageLikePayload
 } from './previewOutputFormatter.mjs';
 
+const MAX_ANALYSIS_IMAGE_BASE64_CHARS = 24 * 1024 * 1024;
+
 function escapeHtml(value) {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -11,6 +13,18 @@ function escapeHtml(value) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+
+function toPreviewDataUrl(imageBase64, maxChars = MAX_ANALYSIS_IMAGE_BASE64_CHARS) {
+    if (typeof imageBase64 !== 'string' || imageBase64.length === 0) {
+        return null;
+    }
+
+    if (Number.isFinite(maxChars) && maxChars > 0 && imageBase64.length > maxChars) {
+        return null;
+    }
+
+    return `data:image/png;base64,${imageBase64}`;
 }
 
 export class PreviewPanel {
@@ -23,6 +37,9 @@ export class PreviewPanel {
         this.onAutoTune = options.onAutoTune ?? null;
         this.validateBeforePreview = options.validateBeforePreview ?? (() => true);
         this.debounceMs = options.debounceMs ?? 500;
+        this.maxAnalysisImageBase64Chars = Number.isFinite(options.maxAnalysisImageBase64Chars)
+            ? options.maxAnalysisImageBase64Chars
+            : MAX_ANALYSIS_IMAGE_BASE64_CHARS;
 
         this.autoPreviewEnabled = true;
         this.collapsed = false;
@@ -42,6 +59,7 @@ export class PreviewPanel {
     destroy() {
         this.unsubscribePreview?.();
         this.unsubscribePreview = null;
+        this.analysisResult = null;
         this._setImage('before', null);
         this._setImage('after', null);
     }
@@ -347,18 +365,18 @@ export class PreviewPanel {
         }
 
         const previewImageBase64 = result.previewImageBase64 || result.PreviewImageBase64 || null;
-        const inputImageBase64 = result.inputImageBase64 || result.InputImageBase64 || null;
         const outputs = result.outputs || result.Outputs || null;
 
         return {
             targetNodeId: result.targetNodeId || result.TargetNodeId || null,
             success: Boolean(result.success ?? result.Success),
             errorMessage: result.errorMessage || result.ErrorMessage || null,
-            inputImageSrc: inputImageBase64 ? `data:image/png;base64,${inputImageBase64}` : null,
-            previewImageSrc: previewImageBase64 ? `data:image/png;base64,${previewImageBase64}` : null,
+            inputImageSrc: null,
+            previewImageSrc: toPreviewDataUrl(previewImageBase64, this.maxAnalysisImageBase64Chars),
             outputs
         };
     }
 }
 
 export default PreviewPanel;
+export { toPreviewDataUrl };

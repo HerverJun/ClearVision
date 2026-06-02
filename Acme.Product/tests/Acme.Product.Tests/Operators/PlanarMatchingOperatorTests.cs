@@ -210,6 +210,9 @@ public class PlanarMatchingOperatorTests
         Convert.ToInt32(result.OutputData["InlierCount"]).Should().BeGreaterThanOrEqualTo(4);
         Convert.ToDouble(result.OutputData["InlierRatio"]).Should().BeGreaterThan(0.2);
         Convert.ToDouble(result.OutputData["CandidateScore"]).Should().BeGreaterThan(0.0);
+        var homography = result.OutputData["Homography"].Should().BeOfType<double[][]>().Subject;
+        homography.Should().HaveCount(3);
+        homography.Should().OnlyContain(row => row.Length == 3);
         result.OutputData.Should().ContainKey("MatchResult");
     }
 

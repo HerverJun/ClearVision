@@ -31,8 +31,11 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
     private readonly int _batchSize;
     private readonly int _queueCapacity;
     private readonly int _maxSaveRetries;
+    private readonly long _maxQueuedImageBytes;
     private readonly string _spoolFilePath;
     private readonly string _deadLetterFilePath;
+    private readonly object _queuedImageBytesLock = new();
+    private long _queuedImageBytes;
     private long _spooledResultCount;
     private long _deadLetterResultCount;
 
@@ -74,6 +77,14 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
             fallback: 3,
             min: 1,
             max: 20);
+        _maxQueuedImageBytes = ResolveConfiguredInt(
+            configuration,
+            "Performance:Persistence:MaxQueuedImageBytes",
+            "Performance__Persistence__MaxQueuedImageBytes",
+            "CV_PERSISTENCE_MAX_QUEUED_IMAGE_BYTES",
+            fallback: 64 * 1024 * 1024,
+            min: 1,
+            max: int.MaxValue);
 
         var spoolDirectory = ResolveConfiguredPath(
             configuration?["Performance:Persistence:SpoolDirectory"],
@@ -97,9 +108,21 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
 
     public bool TryWrite(InspectionResult result)
     {
+        if (!TryReserveQueuedImageBytes(result))
+        {
+            _logger.LogWarning(
+                "Inspection result persistence image budget is full; caller should use WriteAsync to apply backpressure. ResultId={ResultId}, OutputImageBytes={OutputImageBytes}, QueuedImageBytes={QueuedImageBytes}, MaxQueuedImageBytes={MaxQueuedImageBytes}",
+                result.Id,
+                GetOutputImageBytes(result),
+                Volatile.Read(ref _queuedImageBytes),
+                _maxQueuedImageBytes);
+            return false;
+        }
+
         var written = _channel.Writer.TryWrite(result);
         if (!written)
         {
+            ReleaseQueuedImageBytes(result);
             _logger.LogWarning(
                 "Inspection result persistence queue is full; caller should use WriteAsync to avoid dropping the result. ResultId={ResultId}",
                 result.Id);
@@ -110,12 +133,22 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
 
     public async ValueTask WriteAsync(InspectionResult result, CancellationToken cancellationToken = default)
     {
+        await WaitForQueuedImageBudgetAsync(result, cancellationToken);
+
         if (_channel.Writer.TryWrite(result))
         {
             return;
         }
 
-        await _channel.Writer.WriteAsync(result, cancellationToken);
+        try
+        {
+            await _channel.Writer.WriteAsync(result, cancellationToken);
+        }
+        catch
+        {
+            ReleaseQueuedImageBytes(result);
+            throw;
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -138,7 +171,7 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
 
                     if (batch.Count > 0 && await SaveBatchWithRetryOrSpoolAsync(batch, stoppingToken))
                     {
-                        batch.Clear();
+                        ClearBatchAndReleaseQueuedImageBytes(batch);
                     }
                 }
             }
@@ -147,7 +180,7 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
                 if (batch.Count > 0)
                 {
                     await SaveBatchWithRetryOrSpoolAsync(batch, CancellationToken.None);
-                    batch.Clear();
+                    ClearBatchAndReleaseQueuedImageBytes(batch);
                 }
 
                 break;
@@ -160,7 +193,7 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
 
         while (_channel.Reader.TryRead(out var lastResult))
         {
-            batch.Clear();
+            ClearBatchAndReleaseQueuedImageBytes(batch);
             batch.Add(lastResult);
             while (batch.Count < _batchSize && _channel.Reader.TryRead(out var result))
             {
@@ -168,7 +201,7 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
             }
 
             await SaveBatchWithRetryOrSpoolAsync(batch, CancellationToken.None);
-            batch.Clear();
+            ClearBatchAndReleaseQueuedImageBytes(batch);
         }
     }
 
@@ -228,52 +261,60 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
         }
 
         var replayed = new List<InspectionResult>(_batchSize);
-        var remaining = new List<string>();
+        var tempPath = _spoolFilePath + ".tmp";
+        var remainingCount = 0;
 
-        foreach (var line in File.ReadLines(_spoolFilePath, Encoding.UTF8))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(line))
-            {
-                continue;
-            }
+            await using var remainingStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.Read);
+            await using var remainingWriter = new StreamWriter(remainingStream, new UTF8Encoding(false));
 
-            try
+            foreach (var line in File.ReadLines(_spoolFilePath, Encoding.UTF8))
             {
-                var record = JsonSerializer.Deserialize<InspectionResultSpoolRecord>(line, SpoolJsonOptions);
-                if (record == null)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(line))
                 {
                     continue;
                 }
 
-                replayed.Add(record.ToEntity());
-                if (replayed.Count >= _batchSize)
+                try
                 {
-                    if (!await TrySaveBatchAsync(replayed, cancellationToken))
+                    var record = JsonSerializer.Deserialize<InspectionResultSpoolRecord>(line, SpoolJsonOptions);
+                    if (record == null)
                     {
-                        remaining.AddRange(replayed.Select(ToSpoolLine));
+                        continue;
                     }
 
-                    replayed.Clear();
+                    replayed.Add(record.ToEntity());
+                    if (replayed.Count >= _batchSize)
+                    {
+                        if (!await TrySaveBatchAsync(replayed, cancellationToken))
+                        {
+                            remainingCount += await WriteSpoolLinesAsync(remainingWriter, replayed, cancellationToken);
+                        }
+
+                        replayed.Clear();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await File.AppendAllTextAsync(_deadLetterFilePath, line + Environment.NewLine, Encoding.UTF8, cancellationToken);
+                    Interlocked.Increment(ref _deadLetterResultCount);
+                    _logger.LogWarning(ex, "Moved invalid inspection result spool line to dead letter file.");
                 }
             }
-            catch (Exception ex)
+
+            if (replayed.Count > 0 && !await TrySaveBatchAsync(replayed, cancellationToken))
             {
-                await File.AppendAllTextAsync(_deadLetterFilePath, line + Environment.NewLine, Encoding.UTF8, cancellationToken);
-                Interlocked.Increment(ref _deadLetterResultCount);
-                _logger.LogWarning(ex, "Moved invalid inspection result spool line to dead letter file.");
+                remainingCount += await WriteSpoolLinesAsync(remainingWriter, replayed, cancellationToken);
             }
+
+            await remainingWriter.FlushAsync(cancellationToken);
         }
 
-        if (replayed.Count > 0 && !await TrySaveBatchAsync(replayed, cancellationToken))
-        {
-            remaining.AddRange(replayed.Select(ToSpoolLine));
-        }
-
-        await RewriteSpoolAsync(remaining, cancellationToken);
+        File.Move(tempPath, _spoolFilePath, overwrite: true);
         _logger.LogInformation(
             "Inspection result spool replay completed. Remaining={Remaining}, DeadLetter={DeadLetter}",
-            remaining.Count,
+            remainingCount,
             Volatile.Read(ref _deadLetterResultCount));
     }
 
@@ -288,16 +329,84 @@ public sealed class InspectionResultBackgroundService : BackgroundService, IInsp
         }
     }
 
-    private async Task RewriteSpoolAsync(IReadOnlyList<string> lines, CancellationToken cancellationToken)
+    private static async Task<int> WriteSpoolLinesAsync(
+        TextWriter writer,
+        IEnumerable<InspectionResult> results,
+        CancellationToken cancellationToken)
     {
-        var tempPath = _spoolFilePath + ".tmp";
-        await File.WriteAllLinesAsync(tempPath, lines, new UTF8Encoding(false), cancellationToken);
-        File.Move(tempPath, _spoolFilePath, overwrite: true);
+        var count = 0;
+        foreach (var result in results)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await writer.WriteLineAsync(ToSpoolLine(result));
+            count++;
+        }
+
+        return count;
     }
 
     private static string ToSpoolLine(InspectionResult result)
     {
         return JsonSerializer.Serialize(InspectionResultSpoolRecord.FromEntity(result), SpoolJsonOptions);
+    }
+
+    private async ValueTask WaitForQueuedImageBudgetAsync(InspectionResult result, CancellationToken cancellationToken)
+    {
+        while (!TryReserveQueuedImageBytes(result))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.Delay(25, cancellationToken);
+        }
+    }
+
+    private bool TryReserveQueuedImageBytes(InspectionResult result)
+    {
+        var imageBytes = GetOutputImageBytes(result);
+        if (imageBytes <= 0)
+        {
+            return true;
+        }
+
+        lock (_queuedImageBytesLock)
+        {
+            if (_queuedImageBytes + imageBytes <= _maxQueuedImageBytes ||
+                (imageBytes > _maxQueuedImageBytes && _queuedImageBytes == 0))
+            {
+                _queuedImageBytes += imageBytes;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    private void ReleaseQueuedImageBytes(InspectionResult result)
+    {
+        var imageBytes = GetOutputImageBytes(result);
+        if (imageBytes <= 0)
+        {
+            return;
+        }
+
+        lock (_queuedImageBytesLock)
+        {
+            _queuedImageBytes = Math.Max(0, _queuedImageBytes - imageBytes);
+        }
+    }
+
+    private void ClearBatchAndReleaseQueuedImageBytes(List<InspectionResult> batch)
+    {
+        foreach (var result in batch)
+        {
+            ReleaseQueuedImageBytes(result);
+        }
+
+        batch.Clear();
+    }
+
+    private static int GetOutputImageBytes(InspectionResult result)
+    {
+        return result.OutputImage?.Length ?? 0;
     }
 
     private static int ResolveConfiguredInt(

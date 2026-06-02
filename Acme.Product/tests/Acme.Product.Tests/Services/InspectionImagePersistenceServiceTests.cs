@@ -5,6 +5,7 @@ using Acme.Product.Core.Interfaces;
 using Acme.Product.Infrastructure.Services;
 using Acme.Product.Tests.TestSupport;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using OpenCvSharp;
@@ -253,6 +254,62 @@ public sealed class InspectionImagePersistenceServiceTests
 
             savedBytes[0].Should().Be(0xFF);
             savedBytes[1].Should().Be(0xD8);
+        }
+        finally
+        {
+            if (started)
+            {
+                await service.StopAsync(CancellationToken.None);
+            }
+
+            service.Dispose();
+            DeleteTempDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task QueuedPersistence_WhenImageByteBudgetIsFull_ShouldSkipAdditionalSnapshots()
+    {
+        var root = CreateTempDirectory();
+        var outputImage = CreatePngImageBytes();
+        var configService = CreateConfigService(root);
+        var inner = CreatePersistenceService(configService);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Performance:Persistence:MaxQueuedImageBytes"] = (outputImage.Length + 1).ToString()
+            })
+            .Build();
+        var service = new QueuedInspectionImagePersistenceService(
+            configService,
+            inner,
+            NullLogger<QueuedInspectionImagePersistenceService>.Instance,
+            configuration);
+        var first = new InspectionResult(Guid.NewGuid());
+        first.SetResult(InspectionStatus.NG, 7);
+        first.SetOutputImage(outputImage);
+        var second = new InspectionResult(Guid.NewGuid());
+        second.SetResult(InspectionStatus.NG, 8);
+        second.SetOutputImage(outputImage.ToArray());
+        var started = false;
+
+        try
+        {
+            await service.PersistAsync(first);
+            await service.PersistAsync(second);
+
+            await service.StartAsync(CancellationToken.None);
+            started = true;
+            await service.StopAsync(CancellationToken.None);
+            started = false;
+
+            Directory.EnumerateFiles(root, "*.jpg", SearchOption.AllDirectories)
+                .Should()
+                .ContainSingle();
+            FindSavedImagePath(root, first, ".jpg").Should().NotBeNullOrWhiteSpace();
+            Directory.EnumerateFiles(root, $"{second.ProjectId:N}_{second.Id:N}_*.jpg", SearchOption.AllDirectories)
+                .Should()
+                .BeEmpty();
         }
         finally
         {

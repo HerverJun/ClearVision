@@ -31,6 +31,37 @@ public class InspectionRealtimeEventMapperTests
         GetProperty(firstCard, "sourceOperatorType").GetString().Should().Be("OcrRecognition");
     }
 
+    [Fact]
+    public void Map_ResultProduced_WithImageId_Should_OmitInlineOutputImage()
+    {
+        var inspectionResultEvent = CreateInspectionResultEventWithAnalysisData();
+        SetProperty(inspectionResultEvent, nameof(InspectionResultEvent.OutputImageBase64), "large-inline-image");
+
+        var messages = InspectionRealtimeEventMapper.Map(inspectionResultEvent);
+
+        var resultMessage = messages.Single(message => message.EventType == "resultProduced");
+        var payloadJson = JsonDocument.Parse(JsonSerializer.Serialize(resultMessage.Payload));
+
+        GetProperty(payloadJson.RootElement, "imageId").GetGuid().Should().NotBeEmpty();
+        GetProperty(payloadJson.RootElement, "outputImageBase64").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public void Map_ResultProduced_WithoutImageId_Should_KeepInlineOutputImageFallback()
+    {
+        var inspectionResultEvent = CreateInspectionResultEventWithAnalysisData();
+        SetProperty(inspectionResultEvent, nameof(InspectionResultEvent.ImageId), (Guid?)null);
+        SetProperty(inspectionResultEvent, nameof(InspectionResultEvent.OutputImageBase64), "inline-fallback");
+
+        var messages = InspectionRealtimeEventMapper.Map(inspectionResultEvent);
+
+        var resultMessage = messages.Single(message => message.EventType == "resultProduced");
+        var payloadJson = JsonDocument.Parse(JsonSerializer.Serialize(resultMessage.Payload));
+
+        GetProperty(payloadJson.RootElement, "imageId").ValueKind.Should().Be(JsonValueKind.Null);
+        GetProperty(payloadJson.RootElement, "outputImageBase64").GetString().Should().Be("inline-fallback");
+    }
+
     private static InspectionResultEvent CreateInspectionResultEventWithAnalysisData()
     {
         var evt = (InspectionResultEvent)FormatterServices.GetUninitializedObject(typeof(InspectionResultEvent));

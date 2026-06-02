@@ -18,16 +18,28 @@ export class TemplateSelector {
         this.activeTag = '';
         this.activeTemplateId = null;
         this.isLoading = false;
+        this._dataLoadPromise = null;
+        this._eventDisposers = [];
+        this._isDisposed = false;
+        this._applyingTemplateIds = new Set();
 
         this.overlay = null;
         this.dialog = null;
     }
 
     async open() {
+        if (this._isDisposed) {
+            return;
+        }
+
         this._ensureUi();
         this.overlay.classList.remove('hidden');
 
         await this._ensureDataLoaded();
+        if (this._isDisposed) {
+            return;
+        }
+
         this._renderFilters();
         this._renderTemplateCards();
         this._updateActionButtons();
@@ -40,23 +52,32 @@ export class TemplateSelector {
     }
 
     async _ensureDataLoaded() {
-        if (this.isLoading) {
-            return;
+        if (this._dataLoadPromise) {
+            return this._dataLoadPromise;
         }
 
         this.isLoading = true;
-        try {
+        this._dataLoadPromise = (async () => {
             await Promise.all([
                 this._loadOperatorMetadata(),
                 this._loadTemplates()
             ]);
+        })();
+
+        try {
+            return await this._dataLoadPromise;
         } finally {
             this.isLoading = false;
+            this._dataLoadPromise = null;
         }
     }
 
     async _loadTemplates() {
         const templates = await httpClient.get('/templates');
+        if (this._isDisposed) {
+            return;
+        }
+
         this.templates = Array.isArray(templates) ? templates : [];
         if (this.activeTemplateId && !this.templates.some(item => String(item.id) === String(this.activeTemplateId))) {
             this.activeTemplateId = null;
@@ -69,6 +90,9 @@ export class TemplateSelector {
         const operators = cachedOperators.length > 0
             ? cachedOperators
             : await httpClient.get('/operators/library');
+        if (this._isDisposed) {
+            return;
+        }
 
         this.operatorMetadata.clear();
         for (const operator of operators || []) {
@@ -82,7 +106,7 @@ export class TemplateSelector {
     }
 
     _ensureUi() {
-        if (this.overlay) {
+        if (this.overlay || this._isDisposed) {
             return;
         }
 
@@ -121,35 +145,115 @@ export class TemplateSelector {
         this.dialog = this.overlay.querySelector('.template-selector-dialog');
 
         const closeBtn = this.overlay.querySelector('#btn-template-close');
-        closeBtn.addEventListener('click', () => this.close());
+        this._addEventListener(closeBtn, 'click', () => this.close());
         const saveBtn = this.overlay.querySelector('#btn-template-save');
-        saveBtn.addEventListener('click', () => this._saveAsTemplate());
+        this._addEventListener(saveBtn, 'click', () => this._saveAsTemplate());
         const updateBtn = this.overlay.querySelector('#btn-template-update');
-        updateBtn.addEventListener('click', () => this._updateActiveTemplate());
+        this._addEventListener(updateBtn, 'click', () => this._updateActiveTemplate());
 
-        this.overlay.addEventListener('click', (event) => {
+        this._addEventListener(this.overlay, 'click', (event) => {
             if (event.target === this.overlay) {
                 this.close();
             }
         });
 
         const searchInput = this.overlay.querySelector('#template-search-input');
-        searchInput.addEventListener('input', () => this._renderTemplateCards());
+        this._addEventListener(searchInput, 'input', () => this._renderTemplateCards());
 
         const industrySelect = this.overlay.querySelector('#template-industry-select');
-        industrySelect.addEventListener('change', () => this._renderTemplateCards());
+        this._addEventListener(industrySelect, 'change', () => this._renderTemplateCards());
 
-        this.overlay.addEventListener('keydown', (event) => {
+        this._addEventListener(this.overlay, 'keydown', (event) => {
             if (event.key === 'Escape') {
                 this.close();
             }
         });
 
+        const tagsContainer = this.overlay.querySelector('#template-tags');
+        this._addEventListener(tagsContainer, 'click', (event) => {
+            const button = this._findClosest(event.target, '.template-tag-btn');
+            if (!button) {
+                return;
+            }
+
+            this.activeTag = button.dataset?.tag || '';
+            this._renderFilters();
+            this._renderTemplateCards();
+        });
+
+        const body = this.overlay.querySelector('#template-selector-body');
+        this._addEventListener(body, 'click', (event) => this._handleTemplateUseClick(event));
+
         this._updateActionButtons();
     }
 
+    _addEventListener(target, type, handler, options) {
+        if (!target || typeof target.addEventListener !== 'function') {
+            return;
+        }
+
+        target.addEventListener(type, handler, options);
+        this._eventDisposers.push(() => {
+            target.removeEventListener?.(type, handler, options);
+        });
+    }
+
+    _findClosest(target, selector) {
+        if (!target || !selector) {
+            return null;
+        }
+
+        if (typeof target.closest === 'function') {
+            return target.closest(selector);
+        }
+
+        const className = selector.startsWith('.') ? selector.slice(1) : null;
+        let current = target;
+        while (current) {
+            if (className && current.classList?.contains?.(className)) {
+                return current;
+            }
+
+            current = current.parentElement || current.parentNode || null;
+        }
+
+        return null;
+    }
+
+    destroy() {
+        this._isDisposed = true;
+
+        const disposers = this._eventDisposers.splice(0);
+        disposers.forEach((dispose) => {
+            try {
+                dispose();
+            } catch (error) {
+                console.warn('[TemplateSelector] Event cleanup failed:', error);
+            }
+        });
+
+        this._applyingTemplateIds.clear();
+        this._dataLoadPromise = null;
+        this.isLoading = false;
+        this.templates = [];
+        this.operatorMetadata.clear();
+        this.onApplied = null;
+        this.flowCanvas = null;
+
+        if (this.overlay) {
+            if (typeof this.overlay.remove === 'function') {
+                this.overlay.remove();
+            } else if (this.overlay.parentNode?.removeChild) {
+                this.overlay.parentNode.removeChild(this.overlay);
+            }
+        }
+
+        this.overlay = null;
+        this.dialog = null;
+    }
+
     _renderFilters() {
-        if (!this.overlay) {
+        if (this._isDisposed || !this.overlay) {
             return;
         }
 
@@ -180,17 +284,10 @@ export class TemplateSelector {
         ];
 
         tagsContainer.innerHTML = tagButtons.join('');
-        tagsContainer.querySelectorAll('.template-tag-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                this.activeTag = button.dataset.tag || '';
-                this._renderFilters();
-                this._renderTemplateCards();
-            });
-        });
     }
 
     _renderTemplateCards() {
-        if (!this.overlay) {
+        if (this._isDisposed || !this.overlay) {
             return;
         }
 
@@ -252,6 +349,8 @@ export class TemplateSelector {
         `;
 
         body.querySelectorAll('.btn-template-use').forEach(button => {
+            button.disabled = this._applyingTemplateIds.has(String(button.dataset.id || ''));
+            return;
             button.addEventListener('click', async () => {
                 const templateId = button.dataset.id;
                 if (!templateId) {
@@ -271,10 +370,39 @@ export class TemplateSelector {
         });
     }
 
+    async _handleTemplateUseClick(event) {
+        const button = this._findClosest(event.target, '.btn-template-use');
+        const templateId = button?.dataset?.id;
+        if (!button || !templateId || this._applyingTemplateIds.has(String(templateId))) {
+            return;
+        }
+
+        this._applyingTemplateIds.add(String(templateId));
+        button.disabled = true;
+        try {
+            await this._applyTemplate(templateId);
+        } catch (error) {
+            console.error('[TemplateSelector] 搴旂敤妯℃澘澶辫触:', error);
+            showToast(`搴旂敤妯℃澘澶辫触: ${error.message}`, 'error');
+        } finally {
+            this._applyingTemplateIds.delete(String(templateId));
+            if (!this._isDisposed) {
+                button.disabled = false;
+            }
+        }
+    }
+
     async _applyTemplate(templateId) {
+        if (this._isDisposed) {
+            return;
+        }
+
         let template = this.templates.find(item => String(item.id) === String(templateId));
         if (!template || !template.flowJson) {
             template = await httpClient.get(`/templates/${templateId}`);
+        }
+        if (this._isDisposed) {
+            return;
         }
 
         if (!template?.flowJson) {
@@ -408,7 +536,7 @@ export class TemplateSelector {
     }
 
     _updateActionButtons() {
-        if (!this.overlay) {
+        if (this._isDisposed || !this.overlay) {
             return;
         }
 
@@ -430,6 +558,10 @@ export class TemplateSelector {
                 this.activeTemplateId = created.id;
             }
             await this._loadTemplates();
+            if (this._isDisposed) {
+                return;
+            }
+
             this._renderFilters();
             this._renderTemplateCards();
             this._updateActionButtons();
@@ -455,6 +587,10 @@ export class TemplateSelector {
             const payload = this._buildTemplatePayload(activeTemplate);
             await httpClient.put(`/templates/${activeTemplate.id}`, payload);
             await this._loadTemplates();
+            if (this._isDisposed) {
+                return;
+            }
+
             this._renderFilters();
             this._renderTemplateCards();
             this._updateActionButtons();

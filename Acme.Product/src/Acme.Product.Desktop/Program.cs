@@ -161,6 +161,7 @@ static class Program
             builder.Services.AddSingleton<StationRegistryService>();
             builder.Services.AddSingleton<StationCentralStore>();
             builder.Services.AddSingleton<StationPackageStore>();
+            builder.Services.AddSingleton<VisionDatabaseMaintenanceService>();
             builder.Services.AddSignalR();
             builder.Services.ConfigureHttpJsonOptions(options =>
             {

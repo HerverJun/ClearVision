@@ -13,6 +13,103 @@
 import ImageCanvas from '../../core/canvas/imageCanvas.js';
 import { showToast } from '../../shared/components/uiComponents.js';
 
+const MAX_IMAGE_VIEWER_DEFECTS = 300;
+const DEFECT_TEXT_LIMIT = 120;
+const DEFECT_ID_TEXT_LIMIT = 96;
+
+function normalizeImageFormat(format) {
+    const normalized = String(format || 'png').trim().toLowerCase();
+    return /^[a-z0-9.+-]+$/.test(normalized) ? normalized : 'png';
+}
+
+function parseDataImageSource(source) {
+    if (typeof source !== 'string') {
+        return null;
+    }
+
+    const trimmed = source.trim();
+    const match = /^data:image\/([^;,]+)((?:;[^,]*)?),(.*)$/i.exec(trimmed);
+    if (!match || !match[2].toLowerCase().includes(';base64')) {
+        return null;
+    }
+
+    return {
+        format: normalizeImageFormat(match[1]),
+        base64: match[3].replace(/\s+/g, '')
+    };
+}
+
+function decodeBase64ToBytes(base64String) {
+    const sanitized = String(base64String || '').replace(/\s+/g, '');
+    if (!sanitized) {
+        return new Uint8Array();
+    }
+
+    if (typeof atob === 'function') {
+        const binary = atob(sanitized);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+    }
+
+    if (typeof Buffer !== 'undefined') {
+        return new Uint8Array(Buffer.from(sanitized, 'base64'));
+    }
+
+    throw new Error('Base64 decoding is not supported in this environment');
+}
+
+function hashString(value) {
+    let hash = 2166136261;
+    for (let index = 0; index < value.length; index += 1) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+
+    return (hash >>> 0).toString(16);
+}
+
+function getBase64SourceKey(base64String, format = 'png') {
+    const sanitized = String(base64String || '').replace(/\s+/g, '');
+    return `base64:${normalizeImageFormat(format)}:${sanitized.length}:${hashString(sanitized)}`;
+}
+
+function isLikelyImageUrl(source) {
+    if (typeof source !== 'string') {
+        return false;
+    }
+
+    const trimmed = source.trim();
+    if (/^https?:\/\//i.test(trimmed) || /^blob:/i.test(trimmed) || /^file:/i.test(trimmed)) {
+        return true;
+    }
+
+    if (/^\/api\/images(?:\/|\?|$)/i.test(trimmed)) {
+        return true;
+    }
+
+    return /^(?:\/|\.\/|\.\.\/).+\.(?:png|jpe?g|gif|webp|bmp|svg)(?:[?#].*)?$/i.test(trimmed);
+}
+
+function getImageSourceKey(source) {
+    if (typeof source !== 'string') {
+        return null;
+    }
+
+    const dataImage = parseDataImageSource(source);
+    if (dataImage) {
+        return getBase64SourceKey(dataImage.base64, dataImage.format);
+    }
+
+    if (source.startsWith('data:') || isLikelyImageUrl(source)) {
+        return `url:${source}`;
+    }
+
+    return getBase64SourceKey(source, 'png');
+}
+
 export class ImageViewerComponent {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
@@ -21,7 +118,13 @@ export class ImageViewerComponent {
         this.imageCanvas = null;
         this.currentImage = null;
         this.currentImageSource = null;
+        this.currentImageSourceKey = null;
         this.defects = [];
+        this.omittedDefectCount = 0;
+        this._eventDisposers = [];
+        this._originalImageCanvasLoadImage = null;
+        this._originalImageCanvasRender = null;
+        this._isDestroyed = false;
         
         // 生成唯一 ID，避免多个实例冲突
         this.canvasId = `viewer-canvas-${containerId}`;
@@ -100,21 +203,30 @@ export class ImageViewerComponent {
      */
     bindToolbarEvents() {
         // 缩放控制
-        this.container.querySelector('#btn-zoom-in').addEventListener('click', () => {
+        this.addDomEventListener(this.container.querySelector('#btn-zoom-in'), 'click', () => {
             this.zoomIn();
         });
         
-        this.container.querySelector('#btn-zoom-out').addEventListener('click', () => {
+        this.addDomEventListener(this.container.querySelector('#btn-zoom-out'), 'click', () => {
             this.zoomOut();
         });
         
-        this.container.querySelector('#btn-fit-window').addEventListener('click', () => {
+        this.addDomEventListener(this.container.querySelector('#btn-fit-window'), 'click', () => {
             this.fitToWindow();
         });
         
-        this.container.querySelector('#btn-actual-size').addEventListener('click', () => {
+        this.addDomEventListener(this.container.querySelector('#btn-actual-size'), 'click', () => {
             this.actualSize();
         });
+    }
+
+    addDomEventListener(target, type, handler, options) {
+        if (!target || typeof target.addEventListener !== 'function') {
+            return;
+        }
+
+        target.addEventListener(type, handler, options);
+        this._eventDisposers.push(() => target.removeEventListener(type, handler, options));
     }
 
     /**
@@ -123,6 +235,7 @@ export class ImageViewerComponent {
     bindCanvasEvents() {
         // 监听图像加载
         const originalLoadImage = this.imageCanvas.loadImage.bind(this.imageCanvas);
+        this._originalImageCanvasLoadImage = originalLoadImage;
         this.imageCanvas.loadImage = (source) => {
             return originalLoadImage(source).then((img) => {
                 this.currentImage = img;
@@ -137,13 +250,14 @@ export class ImageViewerComponent {
 
         // 监听缩放变化
         const originalRender = this.imageCanvas.render.bind(this.imageCanvas);
+        this._originalImageCanvasRender = originalRender;
         this.imageCanvas.render = () => {
             originalRender();
             this.updateZoomInfo();
         };
 
         // 监听标注点击
-        this.imageCanvas.canvas.addEventListener('click', (e) => {
+        this.addDomEventListener(this.imageCanvas.canvas, 'click', (e) => {
             const overlay = this.getOverlayAt(e.offsetX, e.offsetY);
             if (overlay && this.onAnnotationClicked) {
                 this.onAnnotationClicked(overlay);
@@ -170,6 +284,7 @@ export class ImageViewerComponent {
         
         return this.imageCanvas.loadImage(file).then(() => {
             this.currentImageSource = null;
+            this.currentImageSourceKey = null;
             if (!silent) {
                 showToast('图像加载成功', 'success');
             }
@@ -192,6 +307,7 @@ export class ImageViewerComponent {
         
         return this.imageCanvas.loadImage(url).then(() => {
             this.currentImageSource = url;
+            this.currentImageSourceKey = getImageSourceKey(url);
             if (!silent) {
                 showToast('图像加载成功', 'success');
             }
@@ -207,8 +323,19 @@ export class ImageViewerComponent {
      * 从Base64加载图像
      */
     loadFromBase64(base64String, format = 'png', options = {}) {
-        const url = `data:image/${format};base64,${base64String}`;
-        return this.loadFromUrl(url, options);
+        try {
+            const bytes = decodeBase64ToBytes(base64String);
+            return this.loadFromByteArray(bytes, normalizeImageFormat(format)).then((image) => {
+                this.currentImageSource = null;
+                this.currentImageSourceKey = options.sourceKey || getBase64SourceKey(base64String, format);
+                return image;
+            });
+        } catch (error) {
+            if (options.silent !== true) {
+                showToast('Image load failed: ' + error.message, 'error');
+            }
+            return Promise.reject(error);
+        }
     }
 
     /**
@@ -228,25 +355,36 @@ export class ImageViewerComponent {
             return Promise.reject(new Error('Image source is empty'));
         }
 
-        if (typeof source === 'string' && this.currentImage && this.currentImageSource === source) {
+        const sourceKey = getImageSourceKey(source);
+        if (this.currentImage && sourceKey && this.currentImageSourceKey === sourceKey) {
             this.imageCanvas?.resize?.();
             this.imageCanvas?.render?.();
             return Promise.resolve(this.currentImage);
         }
 
-        // 如果是 data URL，直接当作 URL 加载
+        // Decode base64 data URLs to Blob URLs so old inspection frames can be revoked.
         if (typeof source === 'string' && source.startsWith('data:')) {
+            const dataImage = parseDataImageSource(source);
+            if (dataImage) {
+                return this.loadFromBase64(dataImage.base64, dataImage.format, { ...options, sourceKey });
+            }
+
             return this.loadFromUrl(source, options);
         }
         
-        // 如果是 raw base64，使用 loadFromBase64
+        // Route real image URLs before treating any string as raw base64.
+        if (isLikelyImageUrl(source)) {
+            return this.loadFromUrl(source, options);
+        }
+
         if (typeof source === 'string') {
-            return this.loadFromBase64(source, 'png', options);
+            return this.loadFromBase64(source, 'png', { ...options, sourceKey });
         }
 
         if (source instanceof Blob || source instanceof ArrayBuffer || source instanceof Uint8Array) {
             return this.imageCanvas.loadImage(source).then(() => {
                 this.currentImageSource = null;
+                this.currentImageSourceKey = null;
             }).catch((err) => {
                 if (options.silent !== true) {
                     showToast('图像加载失败: ' + err.message, 'error');
@@ -262,10 +400,14 @@ export class ImageViewerComponent {
      * 显示缺陷标注
      */
     showDefects(defects) {
-        this.clearAnnotations();
-        this.defects = defects;
+        const sourceDefects = Array.isArray(defects) ? defects : [];
+        this.resetAnnotations();
+        this.defects = sourceDefects
+            .slice(0, MAX_IMAGE_VIEWER_DEFECTS)
+            .map((defect, index) => this.createDisplayDefect(defect, index));
+        this.omittedDefectCount = Math.max(0, sourceDefects.length - this.defects.length);
         
-        defects.forEach((defect, index) => {
+        this.defects.forEach((defect, index) => {
             const id = this.getDefectProp(defect, 'id') || index;
             const type = this.getDefectProp(defect, 'type');
             const description = this.getDefectProp(defect, 'description');
@@ -301,6 +443,36 @@ export class ImageViewerComponent {
     /**
      * 获取缺陷类型对应的颜色
      */
+    resetAnnotations() {
+        this.imageCanvas.clearOverlays();
+        this.defects = [];
+        this.omittedDefectCount = 0;
+    }
+
+    createDisplayDefect(defect, index) {
+        return {
+            id: this.compactDefectText(this.getDefectProp(defect, 'id') ?? index, DEFECT_ID_TEXT_LIMIT),
+            type: this.compactDefectText(this.getDefectProp(defect, 'type')),
+            description: this.compactDefectText(this.getDefectProp(defect, 'description')),
+            x: this.getDefectProp(defect, 'x'),
+            y: this.getDefectProp(defect, 'y'),
+            width: this.getDefectProp(defect, 'width'),
+            height: this.getDefectProp(defect, 'height'),
+            confidenceScore: this.getDefectProp(defect, 'confidenceScore')
+        };
+    }
+
+    compactDefectText(value, limit = DEFECT_TEXT_LIMIT) {
+        if (value === null || value === undefined || typeof value !== 'string') {
+            return value;
+        }
+
+        const maxLength = Number.isFinite(limit) && limit > 0 ? limit : DEFECT_TEXT_LIMIT;
+        return value.length > maxLength
+            ? `${value.slice(0, maxLength)}...`
+            : value;
+    }
+
     getDefectColor(type) {
         const colors = {
             // 中文映射
@@ -367,7 +539,7 @@ export class ImageViewerComponent {
             return;
         }
         
-        list.innerHTML = this.defects.map((defect, index) => {
+        const rows = this.defects.map((defect, index) => {
             const id = this.getDefectProp(defect, 'id') || index;
             const type = this.getDefectProp(defect, 'type');
             const description = this.getDefectProp(defect, 'description');
@@ -388,6 +560,11 @@ export class ImageViewerComponent {
                 </div>
             </div>
         `}).join('');
+
+        const hiddenRow = this.omittedDefectCount > 0
+            ? `<div class="defect-empty">Hidden ${this.omittedDefectCount} more defects</div>`
+            : '';
+        list.innerHTML = `${rows}${hiddenRow}`;
         
         // 绑定点击事件
         list.querySelectorAll('.defect-item').forEach(item => {
@@ -476,8 +653,7 @@ export class ImageViewerComponent {
      * 标注控制
      */
     clearAnnotations() {
-        this.imageCanvas.clearOverlays();
-        this.defects = [];
+        this.resetAnnotations();
         this.renderDefectList();
         showToast('已清除所有标注', 'info');
     }
@@ -540,6 +716,65 @@ export class ImageViewerComponent {
      */
     getDefects() {
         return this.defects;
+    }
+
+    isAttachedTo(container = this.container) {
+        return !!(
+            container
+            && this._isDestroyed !== true
+            && this.container === container
+            && this.canvas
+            && (typeof container.contains !== 'function' || container.contains(this.canvas))
+        );
+    }
+
+    destroy() {
+        if (this._isDestroyed) {
+            return;
+        }
+
+        this._isDestroyed = true;
+        const disposers = Array.isArray(this._eventDisposers)
+            ? this._eventDisposers.splice(0)
+            : [];
+        disposers.forEach(dispose => {
+            try {
+                dispose();
+            } catch (error) {
+                console.warn('[ImageViewer] Failed to remove event listener during destroy:', error);
+            }
+        });
+
+        if (this.imageCanvas) {
+            if (this._originalImageCanvasLoadImage) {
+                this.imageCanvas.loadImage = this._originalImageCanvasLoadImage;
+            }
+            if (this._originalImageCanvasRender) {
+                this.imageCanvas.render = this._originalImageCanvasRender;
+            }
+            this.imageCanvas.destroy?.();
+        }
+
+        this.currentImage = null;
+        this.currentImageSource = null;
+        this.currentImageSourceKey = null;
+        this.defects = [];
+        this.omittedDefectCount = 0;
+        this.onRegionSelected = null;
+        this.onAnnotationClicked = null;
+        this.onImageLoaded = null;
+        this._originalImageCanvasLoadImage = null;
+        this._originalImageCanvasRender = null;
+        this.imageCanvas = null;
+        this.canvas = null;
+
+        if (this.container) {
+            this.container.innerHTML = '';
+        }
+    }
+
+    dispose() {
+        this.destroy();
     }
 
     escapeHtml(value) {

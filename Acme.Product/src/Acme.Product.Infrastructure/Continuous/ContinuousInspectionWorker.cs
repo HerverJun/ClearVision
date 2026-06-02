@@ -7,6 +7,7 @@ using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
+using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
 using Acme.Product.Infrastructure.Diagnostics;
 using Acme.Product.Infrastructure.Replay;
@@ -39,7 +40,8 @@ public sealed class ContinuousInspectionWorker
         IInspectionImagePersistenceService imagePersistenceService,
         IInspectionEventBus eventBus,
         CancellationToken cancellationToken,
-        Func<ContinuousInspectionMode>? resolveCurrentMode = null)
+        Func<ContinuousInspectionMode>? resolveCurrentMode = null,
+        IImageCacheRepository? imageCacheRepository = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
         ArgumentNullException.ThrowIfNull(config);
@@ -99,6 +101,7 @@ public sealed class ContinuousInspectionWorker
             if (mode == ContinuousInspectionMode.Primary)
             {
                 await imagePersistenceService.PersistAsync(result, cancellationToken);
+                await CacheResultImageAsync(imageCacheRepository, result);
                 await resultChannelWriter.WriteAsync(result, cancellationToken);
                 await PublishResultEventAsync(eventBus, projectId, sessionId, result, cancellationToken);
             }
@@ -418,10 +421,36 @@ public sealed class ContinuousInspectionWorker
             DefectCount = result.Defects.Count,
             ProcessingTimeMs = result.ProcessingTimeMs,
             ErrorMessage = result.ErrorMessage,
-            OutputImageBase64 = result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null,
+            OutputImageBase64 = BuildInlineOutputImageBase64(result),
             OutputData = AnalysisPayloadSerialization.DeserializeJsonDictionary(result.OutputDataJson),
             AnalysisData = AnalysisPayloadSerialization.DeserializeJsonDictionary(result.AnalysisDataJson)
         }, cancellationToken);
+    }
+
+    private static async Task CacheResultImageAsync(IImageCacheRepository? imageCacheRepository, InspectionResult result)
+    {
+        if (imageCacheRepository == null || result.OutputImage == null || result.OutputImage.Length == 0)
+        {
+            return;
+        }
+
+        var imageId = await imageCacheRepository.AddAsync(result.OutputImage, "png");
+        if (imageId != Guid.Empty)
+        {
+            result.SetImageId(imageId);
+        }
+    }
+
+    private static string? BuildInlineOutputImageBase64(InspectionResult result)
+    {
+        if (result.ImageId.HasValue)
+        {
+            return null;
+        }
+
+        return result.OutputImage != null
+            ? Convert.ToBase64String(result.OutputImage)
+            : null;
     }
 
     private static double ResolveConfidence(Dictionary<string, object> outputData)

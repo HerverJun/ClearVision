@@ -53,7 +53,7 @@
       "name": "Output",
       "params": {
         "Format": "JSON",
-        "SaveToFile": "true"
+        "SaveToFile": "false"
       }
     }
   ],

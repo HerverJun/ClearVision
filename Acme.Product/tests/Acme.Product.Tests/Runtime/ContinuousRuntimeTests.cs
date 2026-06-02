@@ -5,6 +5,7 @@ using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Events;
+using Acme.Product.Core.Interfaces;
 using Acme.Product.Core.Services;
 using Acme.Product.Core.Streaming;
 using Acme.Product.Infrastructure.Continuous;
@@ -108,6 +109,57 @@ public class ContinuousRuntimeTests
         decision.NgVotes.Should().Be(2);
         decision.BestSequence.Should().Be(3);
         judge.AddFrame(CreateJudgment("track-1", 4, "OK")).Should().BeNull();
+    }
+
+    [Fact]
+    public void TrackConsensusJudge_ShouldBoundPendingTracksAndFrameHistory()
+    {
+        var judge = new TrackConsensusJudge(
+            minConsensusFrames: 2,
+            consensusThreshold: 1,
+            maxPendingTracks: 3,
+            maxFramesPerTrack: 4,
+            maxFinalizedTracks: 2);
+
+        for (var index = 0; index < 10; index++)
+        {
+            judge.AddFrame(CreateJudgment($"track-{index}", index, "OK")).Should().BeNull();
+        }
+
+        var pendingSnapshot = judge.Snapshot();
+        pendingSnapshot.PendingTrackCount.Should().Be(3);
+        pendingSnapshot.PendingFrameCount.Should().Be(3);
+        pendingSnapshot.MaxPendingTracks.Should().Be(3);
+
+        for (var index = 0; index < 20; index++)
+        {
+            var judgment = index % 2 == 0 ? "OK" : "NG";
+            judge.AddFrame(CreateJudgment("long-running-track", 100 + index, judgment)).Should().BeNull();
+        }
+
+        var frameSnapshot = judge.Snapshot();
+        frameSnapshot.PendingTrackCount.Should().Be(3);
+        frameSnapshot.PendingFrameCount.Should().BeLessThanOrEqualTo(frameSnapshot.PendingTrackCount * frameSnapshot.MaxFramesPerTrack);
+        frameSnapshot.MaxFramesPerTrack.Should().Be(4);
+    }
+
+    [Fact]
+    public void TrackConsensusJudge_ShouldBoundFinalizedTrackDedupe()
+    {
+        var judge = new TrackConsensusJudge(
+            minConsensusFrames: 1,
+            consensusThreshold: 1,
+            maxPendingTracks: 8,
+            maxFramesPerTrack: 4,
+            maxFinalizedTracks: 2);
+
+        judge.AddFrame(CreateJudgment("track-1", 1, "OK")).Should().NotBeNull();
+        judge.AddFrame(CreateJudgment("track-2", 2, "OK")).Should().NotBeNull();
+        judge.AddFrame(CreateJudgment("track-3", 3, "OK")).Should().NotBeNull();
+
+        var snapshot = judge.Snapshot();
+        snapshot.FinalizedTrackCount.Should().Be(2);
+        snapshot.MaxFinalizedTracks.Should().Be(2);
     }
 
     [Fact]
@@ -215,6 +267,7 @@ public class ContinuousRuntimeTests
     public async Task ContinuousInspectionWorker_Primary_WithNgOutputImage_ShouldPersistResultImage()
     {
         var outputImage = new byte[] { 0x89, 0x50, 0x4E, 0x47, 9, 8, 7, 6 };
+        var imageId = Guid.NewGuid();
         var frames = new[]
         {
             CreateFrame(1, new Scalar(0, 0, 0), 32),
@@ -224,6 +277,11 @@ public class ContinuousRuntimeTests
         var flow = new FakeFlowExecutionService("NG", outputImage);
         var writer = new CapturingResultWriter();
         var imagePersistence = Substitute.For<IInspectionImagePersistenceService>();
+        var imageCache = Substitute.For<IImageCacheRepository>();
+        imageCache.AddAsync(
+                Arg.Is<byte[]>(bytes => bytes.SequenceEqual(outputImage)),
+                Arg.Any<string>())
+            .Returns(Task.FromResult(imageId));
         var eventBus = new CapturingEventBus();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         writer.Written += () => cts.Cancel();
@@ -250,12 +308,14 @@ public class ContinuousRuntimeTests
             writer,
             imagePersistence,
             eventBus,
-            cts.Token);
+            cts.Token,
+            imageCacheRepository: imageCache);
 
         writer.Results.Should().ContainSingle();
         writer.Results[0].Status.Should().Be(InspectionStatus.NG);
         eventBus.Results.Should().ContainSingle();
-        eventBus.Results[0].OutputImageBase64.Should().Be(Convert.ToBase64String(outputImage));
+        eventBus.Results[0].ImageId.Should().Be(imageId);
+        eventBus.Results[0].OutputImageBase64.Should().BeNull();
         eventBus.Results[0].OutputData.Should().NotContainKey("Image");
         eventBus.Results[0].OutputData.Should().ContainKey("JudgmentResult");
         eventBus.Results[0].OutputData.Should().ContainKey("ContinuousInspection");

@@ -1215,7 +1215,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
 
         if (bestMatch.OcclusionMask != null && !bestMatch.OcclusionMask.Empty())
         {
-            resultData["OcclusionMask"] = bestMatch.OcclusionMask.Clone();
+            resultData["OcclusionMask"] = new ImageWrapper(bestMatch.OcclusionMask.Clone());
         }
 
         return OperatorExecutionOutput.Success(CreateImageOutput(resultImage, resultData));

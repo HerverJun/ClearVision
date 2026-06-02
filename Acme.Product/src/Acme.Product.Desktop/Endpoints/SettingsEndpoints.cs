@@ -13,6 +13,7 @@ using Acme.Product.Core.Continuous;
 using Acme.Product.Core.Entities;
 using Acme.Product.Core.Enums;
 using Acme.Product.Core.Interfaces;
+using Acme.Product.Desktop.Data;
 using Acme.Product.Desktop.Triggers;
 using Acme.Product.Infrastructure.AI;
 using Acme.Product.Infrastructure.Cameras;
@@ -148,6 +149,76 @@ public static class SettingsEndpoints
             }
 
             return Results.Ok(usage);
+        });
+
+        app.MapGet("/api/settings/database/status", async (
+            [FromServices] VisionDatabaseMaintenanceService databaseMaintenance,
+            CancellationToken cancellationToken) =>
+        {
+            return Results.Ok(await databaseMaintenance.GetStatusAsync(cancellationToken));
+        });
+
+        app.MapPost("/api/settings/database/repair", async (
+            [FromServices] VisionDatabaseMaintenanceService databaseMaintenance,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            return Results.Ok(await databaseMaintenance.RepairAsync(cancellationToken));
+        });
+
+        app.MapPost("/api/settings/database/backup", async (
+            [FromServices] VisionDatabaseMaintenanceService databaseMaintenance,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            return Results.Ok(await databaseMaintenance.CreateBackupAsync("manual", cancellationToken));
+        });
+
+        app.MapPost("/api/settings/database/restore", async (
+            [FromBody] VisionDatabaseRestoreRequest request,
+            [FromServices] VisionDatabaseMaintenanceService databaseMaintenance,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            if (string.IsNullOrWhiteSpace(request.BackupPath))
+            {
+                return Results.BadRequest(new { Error = "BackupPath is required." });
+            }
+
+            return Results.Ok(await databaseMaintenance.RestoreBackupAsync(request.BackupPath, cancellationToken));
+        });
+
+        app.MapPost("/api/settings/database/cleanup", async (
+            [FromBody] VisionDatabaseCleanupRequest request,
+            [FromServices] VisionDatabaseMaintenanceService databaseMaintenance,
+            [FromServices] IConfigurationService configService,
+            HttpContext context,
+            CancellationToken cancellationToken) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            var retentionDays = request.RetentionDays
+                ?? configService.GetCurrent().Storage?.RetentionDays
+                ?? 30;
+            return Results.Ok(await databaseMaintenance.CleanupHistoryAsync(retentionDays, cancellationToken));
         });
 
         // ==================== AI 多模型管理 API ====================

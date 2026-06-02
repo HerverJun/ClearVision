@@ -47,25 +47,39 @@ function debugWebMessageLog(...args) {
     }
 }
 
+const DEFAULT_MAX_PENDING_REQUESTS = 256;
+const REQUEST_TIMEOUT_MS = 30000;
+
 class WebMessageBridge {
     constructor() {
         // messageType -> Set<handler>
         this.messageHandlers = new Map();
         this.pendingRequests = new Map();
+        this.pendingRequestTimeouts = new Map();
         this.requestId = 0;
         this.mockMode = false;
+        this.maxPendingRequests = DEFAULT_MAX_PENDING_REQUESTS;
+        this._boundHandleMessage = this.handleMessage.bind(this);
+        this._boundHandleSharedBuffer = this.handleSharedBuffer.bind(this);
+        this._isInitialized = false;
 
         this.initialize();
     }
 
     initialize() {
+        if (this._isInitialized) {
+            return;
+        }
+
         if (window.chrome && window.chrome.webview) {
-            window.chrome.webview.addEventListener('message', this.handleMessage.bind(this));
-            window.chrome.webview.addEventListener('sharedbufferreceived', this.handleSharedBuffer.bind(this));
+            window.chrome.webview.addEventListener('message', this._boundHandleMessage);
+            window.chrome.webview.addEventListener('sharedbufferreceived', this._boundHandleSharedBuffer);
+            this._isInitialized = true;
             debugWebMessageLog('[WebMessageBridge] Initialized in WebView2');
         } else {
             console.warn('[WebMessageBridge] Not in WebView2, using mock mode');
             this.enableMockMode();
+            this._isInitialized = true;
         }
     }
 
@@ -87,7 +101,7 @@ class WebMessageBridge {
                 return;
             }
 
-            handlers.forEach((handler) => {
+            [...handlers].forEach((handler) => {
                 try {
                     handler(payload);
                 } catch (error) {
@@ -118,13 +132,10 @@ class WebMessageBridge {
         debugWebMessageLog('[WebMessageBridge] Received message:', messageType, message);
 
         if (message.requestId && this.pendingRequests.has(message.requestId)) {
-            const { resolve, reject } = this.pendingRequests.get(message.requestId);
-            this.pendingRequests.delete(message.requestId);
-
             if (message.error) {
-                reject(new Error(message.error));
+                this.rejectPendingRequest(message.requestId, new Error(message.error));
             } else {
-                resolve(message.data ?? message.payload ?? message);
+                this.resolvePendingRequest(message.requestId, message.data ?? message.payload ?? message);
             }
             return;
         }
@@ -141,7 +152,7 @@ class WebMessageBridge {
 
         const payload = message.payload ?? message.data ?? message;
 
-        handlers.forEach((handler) => {
+        [...handlers].forEach((handler) => {
             try {
                 const result = handler(payload);
                 if (!hasResult) {
@@ -176,14 +187,14 @@ class WebMessageBridge {
             message.requestId = ++this.requestId;
 
             return new Promise((resolve, reject) => {
-                this.pendingRequests.set(message.requestId, { resolve, reject });
+                this.prunePendingRequestsForNewRequest();
 
-                setTimeout(() => {
-                    if (this.pendingRequests.has(message.requestId)) {
-                        this.pendingRequests.delete(message.requestId);
-                        reject(new Error('Request timeout'));
-                    }
-                }, 30000);
+                const timeoutId = setTimeout(() => {
+                    this.rejectPendingRequest(message.requestId, new Error('Request timeout'));
+                }, REQUEST_TIMEOUT_MS);
+
+                this.pendingRequests.set(message.requestId, { resolve, reject });
+                this.pendingRequestTimeouts.set(message.requestId, timeoutId);
 
                 this.postMessage(message);
             });
@@ -255,6 +266,75 @@ class WebMessageBridge {
         if (handlers.size === 0) {
             this.messageHandlers.delete(type);
         }
+    }
+
+    prunePendingRequestsForNewRequest() {
+        const maxPendingRequests = Number(this.maxPendingRequests);
+        if (!Number.isFinite(maxPendingRequests) || maxPendingRequests <= 0) {
+            return;
+        }
+
+        while (this.pendingRequests.size >= maxPendingRequests) {
+            const oldestRequestId = this.pendingRequests.keys().next().value;
+            if (oldestRequestId === undefined) {
+                break;
+            }
+
+            this.rejectPendingRequest(
+                oldestRequestId,
+                new Error(`Pending WebMessage request limit exceeded (${maxPendingRequests})`)
+            );
+        }
+    }
+
+    resolvePendingRequest(requestId, data) {
+        const pendingRequest = this.pendingRequests.get(requestId);
+        if (!pendingRequest) {
+            return false;
+        }
+
+        this.clearPendingRequest(requestId);
+        pendingRequest.resolve(data);
+        return true;
+    }
+
+    rejectPendingRequest(requestId, error) {
+        const pendingRequest = this.pendingRequests.get(requestId);
+        if (!pendingRequest) {
+            return false;
+        }
+
+        this.clearPendingRequest(requestId);
+        pendingRequest.reject(error);
+        return true;
+    }
+
+    clearPendingRequest(requestId) {
+        const timeoutId = this.pendingRequestTimeouts.get(requestId);
+        if (timeoutId !== undefined) {
+            clearTimeout(timeoutId);
+            this.pendingRequestTimeouts.delete(requestId);
+        }
+
+        this.pendingRequests.delete(requestId);
+    }
+
+    clearPendingRequests(error = new Error('WebMessage bridge disposed')) {
+        const pendingRequestIds = [...this.pendingRequests.keys()];
+        pendingRequestIds.forEach((requestId) => {
+            this.rejectPendingRequest(requestId, error);
+        });
+    }
+
+    dispose() {
+        if (this._isInitialized && window.chrome && window.chrome.webview) {
+            window.chrome.webview.removeEventListener?.('message', this._boundHandleMessage);
+            window.chrome.webview.removeEventListener?.('sharedbufferreceived', this._boundHandleSharedBuffer);
+        }
+
+        this.clearPendingRequests();
+        this.messageHandlers.clear();
+        this._isInitialized = false;
     }
 }
 

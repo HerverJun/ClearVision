@@ -11,6 +11,12 @@ import {
     renderResultCardHtml
 } from '../results/portDataTypeRenderer.mjs';
 
+const DEFAULT_ANALYSIS_CARD_FIELD_LIMIT = 16;
+const DEFAULT_DIAGNOSTIC_LIST_ITEM_LIMIT = 24;
+const DEFAULT_ANALYSIS_CARD_LIMIT = 24;
+const DEFAULT_ANALYSIS_TEXT_VALUE_LIMIT = 240;
+const DEFAULT_DIAGNOSTIC_MESSAGE_LIMIT = 360;
+
 const ICONS = {
     distance: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`,
     angle: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"></path><path d="M3 20L19.4 3"></path><path d="M10 20a7 7 0 0 1 5-5.6"></path></svg>`,
@@ -50,6 +56,24 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function truncateDisplayText(value, maxChars = DEFAULT_ANALYSIS_TEXT_VALUE_LIMIT) {
+    const text = String(value ?? '');
+    const limit = Number(maxChars);
+    if (!Number.isFinite(limit) || limit <= 0 || text.length <= limit) {
+        return text;
+    }
+
+    return `${text.slice(0, Math.floor(limit))}...`;
+}
+
+function stringifyForDisplay(value) {
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return '[unserializable object]';
+    }
 }
 
 function readFirstDefined(...values) {
@@ -279,8 +303,11 @@ function formatDiagnosticValue(field) {
             return '<span class="ac-diagnostic-empty">无</span>';
         }
 
-        const text = value.map(item => String(item)).join('->');
-        return `<span class="ac-diagnostic-sequence-text" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+        const visibleItems = value.slice(0, DEFAULT_DIAGNOSTIC_LIST_ITEM_LIMIT);
+        const hiddenCount = Math.max(0, value.length - visibleItems.length);
+        const text = visibleItems.map(item => String(item)).join('->');
+        const displayText = hiddenCount > 0 ? `${text}->+${hiddenCount} more` : text;
+        return `<span class="ac-diagnostic-sequence-text" title="${escapeHtml(displayText)}">${escapeHtml(displayText)}</span>`;
     }
 
     if (normalizedVariant === 'labels' && Array.isArray(value)) {
@@ -288,8 +315,13 @@ function formatDiagnosticValue(field) {
             return '<span class="ac-diagnostic-empty">无</span>';
         }
 
-        const items = value.map(item => `<span class="ac-diagnostic-chip">${escapeHtml(String(item))}</span>`).join('');
-        return `<div class="ac-diagnostic-chip-list">${items}</div>`;
+        const visibleItems = value.slice(0, DEFAULT_DIAGNOSTIC_LIST_ITEM_LIMIT);
+        const hiddenCount = Math.max(0, value.length - visibleItems.length);
+        const items = visibleItems.map(item => `<span class="ac-diagnostic-chip">${escapeHtml(String(item))}</span>`).join('');
+        const hiddenHint = hiddenCount > 0
+            ? `<span class="ac-diagnostic-chip ac-diagnostic-chip-muted">+${hiddenCount}</span>`
+            : '';
+        return `<div class="ac-diagnostic-chip-list">${items}${hiddenHint}</div>`;
     }
 
     if (normalizedVariant === 'status') {
@@ -302,7 +334,7 @@ function formatDiagnosticValue(field) {
             || lowerText.includes('no match');
         const isOk = !isNegativeStatus
             && (text.includes('匹配') || /\bmatch(?:ed)?\b/.test(lowerText));
-        return `<span class="ac-diagnostic-status ${isOk ? 'ok' : 'ng'}">${escapeHtml(String(value))}</span>`;
+        return `<span class="ac-diagnostic-status ${isOk ? 'ok' : 'ng'}">${escapeHtml(truncateDisplayText(value))}</span>`;
     }
 
     if (typeof value === 'number') {
@@ -313,7 +345,7 @@ function formatDiagnosticValue(field) {
         return '<span class="ac-diagnostic-empty">--</span>';
     }
 
-    return `<span class="ac-diagnostic-text">${escapeHtml(String(value))}</span>`;
+    return `<span class="ac-diagnostic-text">${escapeHtml(truncateDisplayText(value))}</span>`;
 }
 
 function renderDiagnosticCardHtml(card, fallbackStatus, options = {}) {
@@ -325,8 +357,12 @@ function renderDiagnosticCardHtml(card, fallbackStatus, options = {}) {
     const sourceFields = Array.isArray(card?.fields)
         ? card.fields
         : (Array.isArray(card?.Fields) ? card.Fields : []);
+    const requestedMaxFields = Number(options.maxFields);
+    const maxFields = Number.isFinite(requestedMaxFields)
+        ? Math.max(0, Math.floor(requestedMaxFields))
+        : (compact ? 4 : sourceFields.length);
     const fields = Array.isArray(sourceFields)
-        ? (compact ? sourceFields.slice(0, 4) : sourceFields)
+        ? sourceFields.slice(0, maxFields)
         : [];
     const rows = fields.map(field => {
         const variant = getDiagnosticVariant(field).replace(/[^a-z0-9_-]/g, '');
@@ -340,9 +376,9 @@ function renderDiagnosticCardHtml(card, fallbackStatus, options = {}) {
     }).join('');
     const messageText = readFirstDefined(card?.message, card?.Message, card?.meta?.Message, card?.Meta?.Message);
     const message = messageText
-        ? `<div class="ac-diagnostic-message ${statusClass}">${escapeHtml(messageText)}</div>`
+        ? `<div class="ac-diagnostic-message ${statusClass}">${escapeHtml(truncateDisplayText(messageText, DEFAULT_DIAGNOSTIC_MESSAGE_LIMIT))}</div>`
         : '';
-    const hint = compact && sourceFields.length > fields.length
+    const hint = sourceFields.length > fields.length
         ? `<div class="ac-diagnostic-hint">还有 ${sourceFields.length - fields.length} 项诊断字段，请在结果详情查看完整信息。</div>`
         : '';
 
@@ -475,6 +511,10 @@ class AnalysisCardsPanel {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
         this.usesFlowContext = false;
+        this.maxFieldsPerCard = DEFAULT_ANALYSIS_CARD_FIELD_LIMIT;
+        this.maxCardsPerUpdate = DEFAULT_ANALYSIS_CARD_LIMIT;
+        this._toggleEventsBound = false;
+        this._handleToggleClick = this._handleToggleClick.bind(this);
 
         if (!this.container) {
             console.warn('[AnalysisCardsPanel] 找不到容器:', containerId);
@@ -539,23 +579,37 @@ class AnalysisCardsPanel {
     }
 
     _renderAnalysisData(analysisData, fallbackStatus) {
-        const cards = Array.isArray(analysisData?.cards) ? [...analysisData.cards] : [];
-        if (cards.length === 0) {
+        const sourceCards = Array.isArray(analysisData?.cards) ? [...analysisData.cards] : [];
+        if (sourceCards.length === 0) {
             this.container.innerHTML = '<p class="empty-text">无分析数据</p>';
             return;
         }
 
-        cards.sort((left, right) => {
+        sourceCards.sort((left, right) => {
             const leftPriority = Number(left?.priority ?? 0);
             const rightPriority = Number(right?.priority ?? 0);
             return rightPriority - leftPriority;
         });
 
-        this.container.innerHTML = cards
+        const maxCards = this._getRenderLimit(this.maxCardsPerUpdate, DEFAULT_ANALYSIS_CARD_LIMIT);
+        const cards = sourceCards.slice(0, maxCards);
+        const hiddenCardCount = Math.max(0, sourceCards.length - cards.length);
+        const hiddenHint = hiddenCardCount > 0
+            ? `<div class="ac-diagnostic-hint ac-card-limit-hint">+${hiddenCardCount} more analysis cards</div>`
+            : '';
+
+        this.container.innerHTML = `${cards
             .map(card => this._renderAnalysisCard(card, fallbackStatus))
-            .join('');
+            .join('')}${hiddenHint}`;
 
         this._bindToggleEvents();
+    }
+
+    _getRenderLimit(value, fallback) {
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue) && numericValue >= 0
+            ? Math.floor(numericValue)
+            : fallback;
     }
 
     _renderAnalysisCard(card, fallbackStatus) {
@@ -565,16 +619,18 @@ class AnalysisCardsPanel {
             case 'recognition':
                 return this._renderStructuredRecognitionCard(card, fallbackStatus);
             case 'diagnostic':
-                return renderDiagnosticCardHtml(card, fallbackStatus);
+                return renderDiagnosticCardHtml(card, fallbackStatus, { maxFields: this.maxFieldsPerCard });
             default:
-                return renderResultCardHtml(card, { fallbackStatus });
+                return renderResultCardHtml(card, { fallbackStatus, maxFields: this.maxFieldsPerCard });
         }
     }
 
     _renderStructuredMeasurementCard(card, fallbackStatus) {
-        const fields = Array.isArray(card?.fields) ? card.fields : [];
+        const sourceFields = Array.isArray(card?.fields) ? card.fields : [];
+        const fields = sourceFields.slice(0, this.maxFieldsPerCard);
+        const hiddenFieldCount = Math.max(0, sourceFields.length - fields.length);
         const cardStatus = card?.status || fallbackStatus || 'OK';
-        const rows = fields.map(field => {
+        let rows = fields.map(field => {
             const numericValue = typeof field?.value === 'number'
                 ? field.value
                 : Number.parseFloat(field?.value);
@@ -614,6 +670,12 @@ class AnalysisCardsPanel {
                 </div>
             `;
         }).join('');
+        const hiddenHint = hiddenFieldCount > 0
+            ? `<div class="ac-diagnostic-hint">+${hiddenFieldCount} more fields</div>`
+            : '';
+        if (hiddenHint) {
+            rows = `${rows}${hiddenHint}`;
+        }
 
         return this._wrapCard(
             'measurement',
@@ -637,7 +699,7 @@ class AnalysisCardsPanel {
         const confidencePct = Number.isFinite(confidence)
             ? (confidence > 1 ? confidence : confidence * 100)
             : null;
-        const displayText = textField?.value ?? '--';
+        const displayText = truncateDisplayText(textField?.value ?? '--');
         const isNG = ['NG', 'ERROR'].includes(String(cardStatus || 'OK').toUpperCase());
         const statusBadge = isNG
             ? `<span class="ac-badge ac-badge-ng" title="NG">${ICONS.cross}</span>`
@@ -665,7 +727,7 @@ class AnalysisCardsPanel {
                         ${statusBadge}
                     </div>
                     <div class="ac-ocr-text-box ${isNG ? 'ng' : 'ok'}">
-                        <span class="ac-ocr-text">${this._escapeHtml(String(displayText))}</span>
+                        <span class="ac-ocr-text">${this._escapeHtml(displayText)}</span>
                         ${!isNG ? `<span class="ac-ocr-check">${ICONS.check}</span>` : `<span class="ac-ocr-cross">${ICONS.cross}</span>`}
                     </div>
                     ${confidenceHtml}
@@ -676,12 +738,15 @@ class AnalysisCardsPanel {
     }
 
     _renderStructuredGenericCard(card, fallbackStatus) {
-        const fields = Array.isArray(card?.fields) ? card.fields : [];
-        const rows = fields.map(field => {
+        const sourceFields = Array.isArray(card?.fields) ? card.fields : [];
+        const fields = sourceFields.slice(0, this.maxFieldsPerCard);
+        const hiddenFieldCount = Math.max(0, sourceFields.length - fields.length);
+        let rows = fields.map(field => {
             const rawValue = field?.value;
-            const displayValue = typeof rawValue === 'object' && rawValue !== null
-                ? this._escapeHtml(JSON.stringify(rawValue))
-                : this._escapeHtml(String(rawValue ?? '--'));
+            const rawDisplayValue = typeof rawValue === 'object' && rawValue !== null
+                ? stringifyForDisplay(rawValue)
+                : String(rawValue ?? '--');
+            const displayValue = this._escapeHtml(truncateDisplayText(rawDisplayValue));
 
             return `
                 <div class="ac-generic-row">
@@ -690,6 +755,12 @@ class AnalysisCardsPanel {
                 </div>
             `;
         }).join('');
+        const hiddenHint = hiddenFieldCount > 0
+            ? `<div class="ac-diagnostic-hint">+${hiddenFieldCount} more fields</div>`
+            : '';
+        if (hiddenHint) {
+            rows = `${rows}${hiddenHint}`;
+        }
 
         return this._wrapCard(
             'generic',
@@ -746,20 +817,34 @@ class AnalysisCardsPanel {
     }
 
     _bindToggleEvents() {
-        this.container.querySelectorAll('.ac-card-toggle').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const card = btn.closest('.ac-card');
-                if (!card) {
-                    return;
-                }
+        if (!this.container || this._toggleEventsBound) {
+            return;
+        }
 
-                card.classList.toggle('collapsed');
-                const icon = btn.querySelector('svg');
-                if (icon) {
-                    icon.style.transform = card.classList.contains('collapsed') ? 'rotate(180deg)' : '';
-                }
-            });
-        });
+        this.container.addEventListener('click', this._handleToggleClick);
+        this._toggleEventsBound = true;
+    }
+
+    _handleToggleClick(event) {
+        const btn = event?.target?.closest?.('.ac-card-toggle');
+        if (!btn) {
+            return;
+        }
+
+        if (typeof this.container?.contains === 'function' && !this.container.contains(btn)) {
+            return;
+        }
+
+        const card = btn.closest('.ac-card');
+        if (!card) {
+            return;
+        }
+
+        card.classList.toggle('collapsed');
+        const icon = btn.querySelector('svg');
+        if (icon) {
+            icon.style.transform = card.classList.contains('collapsed') ? 'rotate(180deg)' : '';
+        }
     }
 
     _toDisplayName(key) {
@@ -799,6 +884,11 @@ class AnalysisCardsPanel {
     }
 
     dispose() {
+        if (this.container && this._toggleEventsBound) {
+            this.container.removeEventListener('click', this._handleToggleClick);
+            this._toggleEventsBound = false;
+        }
+
         this.container = null;
     }
 }

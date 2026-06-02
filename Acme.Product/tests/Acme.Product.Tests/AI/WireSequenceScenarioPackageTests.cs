@@ -89,6 +89,11 @@ public class WireSequenceScenarioPackageTests
             .GetProperty("params");
         judgeParams.GetProperty("MinConfidence").GetString().Should().Be("0.0");
 
+        var resultOutputParams = template.RootElement.GetProperty("operators").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetString() == "op_4")
+            .GetProperty("params");
+        resultOutputParams.GetProperty("SaveToFile").GetString().Should().Be("false");
+
         var manifestSequence = manifest.RootElement.GetProperty("Constraints").GetProperty("ExpectedSequence")
             .EnumerateArray().Select(item => item.GetString()).ToArray();
         var ruleSequence = rule.RootElement.GetProperty("expectedSequence")
@@ -155,6 +160,11 @@ public class WireSequenceScenarioPackageTests
         template.RootElement.GetProperty("parametersNeedingReview").GetProperty("op_3")
             .EnumerateArray().Select(item => item.GetString())
             .Should().Contain("LabelsPath");
+
+        var resultOutputParams = template.RootElement.GetProperty("operators").EnumerateArray()
+            .Single(item => item.GetProperty("type").GetString() == "ResultOutput")
+            .GetProperty("params");
+        resultOutputParams.GetProperty("SaveToFile").GetString().Should().Be("false");
 
         var readiness = template.RootElement.GetProperty("productionReadiness");
         readiness.GetProperty("status").GetString().Should().Be("blockedUntilConfigured");

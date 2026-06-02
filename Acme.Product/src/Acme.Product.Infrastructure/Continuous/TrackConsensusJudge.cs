@@ -19,18 +19,44 @@ public sealed record TrackDecision(
     double ConsensusScore,
     bool IsFinal);
 
+public sealed record TrackConsensusSnapshot(
+    int PendingTrackCount,
+    int PendingFrameCount,
+    int FinalizedTrackCount,
+    int MaxPendingTracks,
+    int MaxFramesPerTrack,
+    int MaxFinalizedTracks);
+
 public sealed class TrackConsensusJudge
 {
+    private const int DefaultMaxPendingTracks = 2048;
+    private const int DefaultMaxFramesPerTrack = 128;
+    private const int DefaultMaxFinalizedTracks = 4096;
+
     private readonly int _minConsensusFrames;
     private readonly double _consensusThreshold;
+    private readonly int _maxPendingTracks;
+    private readonly int _maxFramesPerTrack;
+    private readonly int _maxFinalizedTracks;
     private readonly object _gate = new();
     private readonly Dictionary<string, List<TrackFrameJudgment>> _frames = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, long> _pendingTrackTouches = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _finalizedTracks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Queue<string> _finalizedTrackOrder = new();
+    private long _touchCounter;
 
-    public TrackConsensusJudge(int minConsensusFrames = 3, double consensusThreshold = 0.6)
+    public TrackConsensusJudge(
+        int minConsensusFrames = 3,
+        double consensusThreshold = 0.6,
+        int maxPendingTracks = DefaultMaxPendingTracks,
+        int maxFramesPerTrack = DefaultMaxFramesPerTrack,
+        int maxFinalizedTracks = DefaultMaxFinalizedTracks)
     {
         _minConsensusFrames = Math.Max(1, minConsensusFrames);
         _consensusThreshold = Math.Clamp(consensusThreshold, 0.0, 1.0);
+        _maxPendingTracks = Math.Max(1, maxPendingTracks);
+        _maxFramesPerTrack = Math.Max(_minConsensusFrames, maxFramesPerTrack);
+        _maxFinalizedTracks = Math.Max(0, maxFinalizedTracks);
     }
 
     public TrackDecision? AddFrame(TrackFrameJudgment judgment)
@@ -52,9 +78,12 @@ public sealed class TrackConsensusJudge
             {
                 list = new List<TrackFrameJudgment>();
                 _frames[judgment.TrackId] = list;
+                PrunePendingTracksIfNeeded();
             }
 
             list.Add(judgment);
+            TouchPendingTrack(judgment.TrackId);
+            PruneTrackFrames(list);
             if (list.Count < _minConsensusFrames)
             {
                 return null;
@@ -89,9 +118,78 @@ public sealed class TrackConsensusJudge
                 score,
                 IsFinal: true);
 
-            _finalizedTracks.Add(judgment.TrackId);
+            AddFinalizedTrack(judgment.TrackId);
             _frames.Remove(judgment.TrackId);
+            _pendingTrackTouches.Remove(judgment.TrackId);
             return decision;
+        }
+    }
+
+    public TrackConsensusSnapshot Snapshot()
+    {
+        lock (_gate)
+        {
+            return new TrackConsensusSnapshot(
+                _frames.Count,
+                _frames.Values.Sum(list => list.Count),
+                _finalizedTracks.Count,
+                _maxPendingTracks,
+                _maxFramesPerTrack,
+                _maxFinalizedTracks);
+        }
+    }
+
+    private void TouchPendingTrack(string trackId)
+    {
+        _pendingTrackTouches[trackId] = ++_touchCounter;
+    }
+
+    private void PruneTrackFrames(List<TrackFrameJudgment> frames)
+    {
+        if (frames.Count <= _maxFramesPerTrack)
+        {
+            return;
+        }
+
+        frames.RemoveRange(0, frames.Count - _maxFramesPerTrack);
+    }
+
+    private void PrunePendingTracksIfNeeded()
+    {
+        while (_frames.Count > _maxPendingTracks)
+        {
+            var oldestTrackId = _pendingTrackTouches.Count == 0
+                ? _frames.Keys.FirstOrDefault()
+                : _pendingTrackTouches
+                    .OrderBy(pair => pair.Value)
+                    .Select(pair => pair.Key)
+                    .FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(oldestTrackId))
+            {
+                return;
+            }
+
+            _frames.Remove(oldestTrackId);
+            _pendingTrackTouches.Remove(oldestTrackId);
+        }
+    }
+
+    private void AddFinalizedTrack(string trackId)
+    {
+        if (_maxFinalizedTracks == 0)
+        {
+            return;
+        }
+
+        if (_finalizedTracks.Add(trackId))
+        {
+            _finalizedTrackOrder.Enqueue(trackId);
+        }
+
+        while (_finalizedTracks.Count > _maxFinalizedTracks && _finalizedTrackOrder.TryDequeue(out var oldestTrackId))
+        {
+            _finalizedTracks.Remove(oldestTrackId);
         }
     }
 }

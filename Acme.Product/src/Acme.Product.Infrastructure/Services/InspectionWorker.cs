@@ -158,6 +158,18 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         await EnsureGracefulShutdownAsync(cancellationToken);
     }
 
+    private static string? BuildInlineOutputImageBase64(InspectionResult result)
+    {
+        if (result.ImageId.HasValue)
+        {
+            return null;
+        }
+
+        return result.OutputImage != null
+            ? Convert.ToBase64String(result.OutputImage)
+            : null;
+    }
+
     #endregion
 
     #region IInspectionWorker Implementation
@@ -449,7 +461,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     _imagePersistenceService,
                     _eventBus,
                     ct,
-                    () => ResolveContinuousInspectionMode(flow, cameraId));
+                    () => ResolveContinuousInspectionMode(flow, cameraId),
+                    _imageCacheRepository);
                 return;
             }
         }
@@ -540,7 +553,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         DefectCount = result.Defects.Count,
                         ProcessingTimeMs = result.ProcessingTimeMs,
                         ErrorMessage = result.ErrorMessage,
-                        OutputImageBase64 = result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null,
+                        OutputImageBase64 = BuildInlineOutputImageBase64(result),
                         OutputData = outputPayload,
                         AnalysisData = analysisPayload
                     }, ct);

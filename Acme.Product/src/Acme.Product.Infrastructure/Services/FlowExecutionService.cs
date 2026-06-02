@@ -30,6 +30,9 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private static readonly TimeSpan DebugSessionTtl = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan ExecutionStatusTtl = TimeSpan.FromSeconds(30);
     private const string OperatorCanceledErrorMessage = "Operator execution was canceled.";
+    private const int DefaultDebugCacheMaxEntries = 256;
+    private const long DefaultDebugCacheMaxBytes = 128L * 1024 * 1024;
+    private const long DefaultDebugCacheMaxEntryBytes = 32L * 1024 * 1024;
     private static readonly ConditionalWeakTable<OperatorFlow, FlowExecutionPlanCache> FlowExecutionPlanCaches = new();
     private static readonly ConditionalWeakTable<Operator, ParameterFingerprintOrderCache> FingerprintParameterOrderCaches = new();
     private static readonly HashSet<OperatorType> AutoParallelBlockedOperatorTypes =
@@ -76,8 +79,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     // 璋冭瘯妯″紡锛氱紦瀛樹腑闂寸粨鏋?- Key: (DebugSessionId, OperatorId)
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), Dictionary<string, object>> _debugCache = new();
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), string> _debugCacheFingerprints = new();
+    private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), long> _debugCacheEntrySizes = new();
     private readonly ConcurrentDictionary<Guid, DebugOptions> _debugOptions = new();
     private readonly ConcurrentDictionary<Guid, DateTime> _debugSessionLastAccess = new();
+    private readonly object _debugCacheEvictionGate = new();
+    private readonly int _debugCacheMaxEntries;
+    private readonly long _debugCacheMaxBytes;
+    private readonly long _debugCacheMaxEntryBytes;
+    private long _debugCacheBytes;
     private readonly Timer _debugCacheCleanupTimer;
     private bool _disposed;
 
@@ -442,11 +451,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     public FlowExecutionService(
         IEnumerable<IOperatorExecutor> executors,
         ILogger<FlowExecutionService> logger,
-        IVariableContext variableContext)
+        IVariableContext variableContext,
+        long? debugCacheMaxBytes = null,
+        int? debugCacheMaxEntries = null,
+        long? debugCacheMaxEntryBytes = null)
     {
         _executors = executors.ToDictionary(e => e.OperatorType);
         _logger = logger;
         _variableContext = variableContext;
+        _debugCacheMaxBytes = Math.Max(0, debugCacheMaxBytes ?? DefaultDebugCacheMaxBytes);
+        _debugCacheMaxEntries = Math.Max(0, debugCacheMaxEntries ?? DefaultDebugCacheMaxEntries);
+        _debugCacheMaxEntryBytes = Math.Min(
+            Math.Max(0, debugCacheMaxEntryBytes ?? DefaultDebugCacheMaxEntryBytes),
+            _debugCacheMaxBytes);
         _debugCacheCleanupTimer = new Timer(CleanupStaleDebugSessions, null, DebugCleanupInterval, DebugCleanupInterval);
     }
 
@@ -1913,8 +1930,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 // 璋冭瘯妯″紡锛氱紦瀛樹腑闂寸粨鏋?
                 if (options.EnableIntermediateCache && normalizedOutputData.Count > 0)
                 {
-                    _debugCache[cacheKey] = normalizedOutputData;
-                    _debugCacheFingerprints[cacheKey] = cacheFingerprint!;
+                    SetDebugCacheEntry(cacheKey, normalizedOutputData, cacheFingerprint!);
                     result.IntermediateResults[op.Id] = CloneNormalizedDictionary(normalizedOutputData);
                     TouchDebugSession(options.DebugSessionId);
                 }
@@ -2025,11 +2041,13 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     public Task ClearDebugCacheAsync(Guid debugSessionId)
     {
         // 娓呴櫎璇ヤ細璇濈殑鎵€鏈夌紦瀛?
-        var keysToRemove = _debugCache.Keys.Where(k => k.DebugSessionId == debugSessionId).ToList();
-        foreach (var key in keysToRemove)
+        lock (_debugCacheEvictionGate)
         {
-            _debugCache.TryRemove(key, out _);
-            _debugCacheFingerprints.TryRemove(key, out _);
+            var keysToRemove = _debugCache.Keys.Where(k => k.DebugSessionId == debugSessionId).ToList();
+            foreach (var key in keysToRemove)
+            {
+                RemoveDebugCacheEntryUnderLock(key);
+            }
         }
 
         _debugOptions.TryRemove(debugSessionId, out _);
@@ -2037,6 +2055,156 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         _logger.LogInformation("[Debug] Cleared debug cache: {DebugSessionId}", debugSessionId);
         return Task.CompletedTask;
+    }
+
+    private void SetDebugCacheEntry(
+        (Guid DebugSessionId, Guid OperatorId) cacheKey,
+        Dictionary<string, object> normalizedOutputData,
+        string fingerprint)
+    {
+        if (_debugCacheMaxEntries <= 0 || _debugCacheMaxBytes <= 0 || _debugCacheMaxEntryBytes <= 0)
+        {
+            lock (_debugCacheEvictionGate)
+            {
+                RemoveDebugCacheEntryUnderLock(cacheKey);
+            }
+
+            return;
+        }
+
+        var entryBytes = EstimateDebugCacheSize(normalizedOutputData);
+        if (entryBytes > _debugCacheMaxEntryBytes)
+        {
+            lock (_debugCacheEvictionGate)
+            {
+                RemoveDebugCacheEntryUnderLock(cacheKey);
+            }
+
+            _logger.LogDebug(
+                "[Debug] Skipped intermediate cache entry {DebugSessionId}/{OperatorId}: {EntryBytes} bytes exceeds per-entry limit {MaxEntryBytes} bytes.",
+                cacheKey.DebugSessionId,
+                cacheKey.OperatorId,
+                entryBytes,
+                _debugCacheMaxEntryBytes);
+            return;
+        }
+
+        lock (_debugCacheEvictionGate)
+        {
+            if (_debugCacheEntrySizes.TryGetValue(cacheKey, out var previousBytes))
+            {
+                _debugCacheBytes -= previousBytes;
+            }
+
+            _debugCache[cacheKey] = normalizedOutputData;
+            _debugCacheFingerprints[cacheKey] = fingerprint;
+            _debugCacheEntrySizes[cacheKey] = entryBytes;
+            _debugCacheBytes += entryBytes;
+
+            TrimDebugCacheUnderLock(cacheKey);
+        }
+    }
+
+    private void TrimDebugCacheUnderLock((Guid DebugSessionId, Guid OperatorId) protectedKey)
+    {
+        if (_debugCacheEntrySizes.Count <= _debugCacheMaxEntries && _debugCacheBytes <= _debugCacheMaxBytes)
+        {
+            return;
+        }
+
+        var candidates = _debugCacheEntrySizes.Keys
+            .Where(key => !key.Equals(protectedKey))
+            .OrderBy(key => _debugSessionLastAccess.TryGetValue(key.DebugSessionId, out var lastAccess)
+                ? lastAccess
+                : DateTime.MinValue)
+            .ThenBy(key => key.DebugSessionId)
+            .ThenBy(key => key.OperatorId)
+            .ToList();
+
+        foreach (var key in candidates)
+        {
+            if (_debugCacheEntrySizes.Count <= _debugCacheMaxEntries && _debugCacheBytes <= _debugCacheMaxBytes)
+            {
+                break;
+            }
+
+            RemoveDebugCacheEntryUnderLock(key);
+        }
+    }
+
+    private void RemoveDebugCacheEntryUnderLock((Guid DebugSessionId, Guid OperatorId) cacheKey)
+    {
+        _debugCache.TryRemove(cacheKey, out _);
+        _debugCacheFingerprints.TryRemove(cacheKey, out _);
+        if (_debugCacheEntrySizes.TryRemove(cacheKey, out var entryBytes))
+        {
+            _debugCacheBytes = Math.Max(0, _debugCacheBytes - entryBytes);
+        }
+    }
+
+    private static long EstimateDebugCacheSize(object? value, int depth = 0)
+    {
+        const int maxDepth = 8;
+        if (value == null)
+        {
+            return 0;
+        }
+
+        if (depth > maxDepth)
+        {
+            return 64;
+        }
+
+        return value switch
+        {
+            byte[] bytes => bytes.LongLength,
+            string text => (long)text.Length * sizeof(char),
+            Dictionary<string, object> dictionary => EstimateStringObjectDictionarySize(dictionary, depth),
+            IDictionary<string, object> dictionary => EstimateStringObjectDictionarySize(dictionary, depth),
+            IDictionary dictionary => EstimateUntypedDictionarySize(dictionary, depth),
+            IEnumerable enumerable when value is not string => EstimateEnumerableSize(enumerable, depth),
+            _ => 64
+        };
+    }
+
+    private static long EstimateStringObjectDictionarySize(IDictionary<string, object> dictionary, int depth)
+    {
+        var total = 0L;
+        foreach (var (key, child) in dictionary)
+        {
+            total = AddClamped(total, (long)key.Length * sizeof(char));
+            total = AddClamped(total, EstimateDebugCacheSize(child, depth + 1));
+        }
+
+        return total;
+    }
+
+    private static long EstimateUntypedDictionarySize(IDictionary dictionary, int depth)
+    {
+        var total = 0L;
+        foreach (DictionaryEntry entry in dictionary)
+        {
+            total = AddClamped(total, EstimateDebugCacheSize(entry.Key, depth + 1));
+            total = AddClamped(total, EstimateDebugCacheSize(entry.Value, depth + 1));
+        }
+
+        return total;
+    }
+
+    private static long EstimateEnumerableSize(IEnumerable enumerable, int depth)
+    {
+        var total = 0L;
+        foreach (var child in enumerable)
+        {
+            total = AddClamped(total, EstimateDebugCacheSize(child, depth + 1));
+        }
+
+        return total;
+    }
+
+    private static long AddClamped(long current, long addition)
+    {
+        return addition > long.MaxValue - current ? long.MaxValue : current + addition;
     }
 
     private static Dictionary<string, object> CloneNormalizedDictionary(Dictionary<string, object> source)

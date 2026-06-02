@@ -13,6 +13,13 @@ import { showToast } from '../../shared/components/uiComponents.js';
 
 const DEFAULT_MISSING_MATERIAL_TIMEOUT_SECONDS = 120;
 const RECENT_RESULTS_PREVIEW_LIMIT = 3;
+const PENDING_ANALYSIS_CARD_LIMIT = 24;
+const PENDING_ANALYSIS_FIELD_LIMIT = 16;
+const PENDING_ANALYSIS_ARRAY_LIMIT = 24;
+const PENDING_ANALYSIS_OBJECT_FIELD_LIMIT = 32;
+const PENDING_ANALYSIS_STRING_LIMIT = 512;
+const PENDING_ANALYSIS_MAX_DEPTH = 3;
+const PENDING_ANALYSIS_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
 
 function debugInspectionPanelLog(...args) {
     if (globalThis.CV_DEBUG_INSPECTION === true) {
@@ -71,6 +78,9 @@ class InspectionPanel {
         this._pendingAnalysisUpdate = null;
         this._recentResultsDirty = false;
         this._countersDirty = false;
+        this._eventDisposers = [];
+        this._isDisposed = false;
+        this._runRequestSeq = 0;
         this.projectId = getCurrentProject()?.id || null;
 
         // 初始化 UI 和分析卡片面板
@@ -171,6 +181,20 @@ class InspectionPanel {
         return true;
     }
 
+    beginRunRequest() {
+        const current = Number(this._runRequestSeq || 0);
+        this._runRequestSeq = Number.isFinite(current) ? current + 1 : 1;
+        return this._runRequestSeq;
+    }
+
+    invalidateRunRequests() {
+        this.beginRunRequest();
+    }
+
+    isRunRequestActive(runRequestSeq) {
+        return !this._isDisposed && this._runRequestSeq === runRequestSeq;
+    }
+
     setProjectContext(projectId) {
         const normalizedProjectId = projectId || null;
         if (this.projectId === normalizedProjectId) {
@@ -198,6 +222,10 @@ class InspectionPanel {
     }
 
     armProtectionWatchdog(reason = '等待检测结果') {
+        if (this._isDisposed) {
+            return;
+        }
+
         this.clearProtectionWatchdog();
 
         if (!this.isProtectionEnabled()) {
@@ -234,6 +262,10 @@ class InspectionPanel {
     async handleProtectionTimeout(reason) {
         this._materialTimeoutHandle = null;
 
+        if (this._isDisposed) {
+            return;
+        }
+
         if (!this.isProtectionEnabled()) {
             return;
         }
@@ -257,6 +289,9 @@ class InspectionPanel {
 
         if (shouldStopContinuous) {
             await this.handleStop();
+            if (this._isDisposed) {
+                return;
+            }
             this.updateStatus('error', `${message}，请检查上料、触发链路或相机状态`);
             return;
         }
@@ -265,6 +300,11 @@ class InspectionPanel {
     }
 
     async handleRunSingle() {
+        if (this._isDisposed) {
+            return;
+        }
+
+        const runRequestSeq = this.beginRunRequest();
         const wasContinuous = this.isContinuous === true;
 
         try {
@@ -281,9 +321,17 @@ class InspectionPanel {
 
             await inspectionController.executeSingle();
         } catch (error) {
+            if (!this.isRunRequestActive(runRequestSeq)) {
+                return;
+            }
+
             console.error('[InspectionPanel] 单次运行失败:', error);
             this.updateStatus('error', '运行失败');
         } finally {
+            if (!this.isRunRequestActive(runRequestSeq)) {
+                return;
+            }
+
             if (!wasContinuous && this.isContinuous !== true) {
                 this.clearProtectionWatchdog();
                 this.setButtonsState(false);
@@ -292,6 +340,12 @@ class InspectionPanel {
     }
 
     async handleRunContinuous() {
+        if (this._isDisposed) {
+            return;
+        }
+
+        const runRequestSeq = this.beginRunRequest();
+
         try {
             this.syncAnalysisFlowContext();
             this.isContinuous = true;
@@ -315,6 +369,10 @@ class InspectionPanel {
                 await inspectionController.startRealtime();
             }
         } catch (error) {
+            if (!this.isRunRequestActive(runRequestSeq)) {
+                return;
+            }
+
             this.clearProtectionWatchdog();
             console.error('[InspectionPanel] 连续运行失败:', error);
             this.updateStatus('error', '启动失败');
@@ -324,12 +382,26 @@ class InspectionPanel {
     }
 
     async handleStop() {
+        if (this._isDisposed) {
+            return;
+        }
+
+        const runRequestSeq = this.beginRunRequest();
+
         try {
             this.clearProtectionWatchdog();
             if (this.isContinuous) {
                 await inspectionController.stopRealtime();
+                if (!this.isRunRequestActive(runRequestSeq)) {
+                    return;
+                }
+
                 this.isContinuous = false;
             }
+            if (!this.isRunRequestActive(runRequestSeq)) {
+                return;
+            }
+
             this.consecutiveNgCount = 0;
             this.updateStatus('idle', '已停止');
             this.setButtonsState(false);
@@ -341,6 +413,10 @@ class InspectionPanel {
     }
 
     handleInspectionResult(result) {
+        if (this._isDisposed) {
+            return;
+        }
+
         this.clearProtectionWatchdog();
         const shouldRender = this.isPanelVisible();
 
@@ -370,7 +446,9 @@ class InspectionPanel {
         const analysisPayload = this.getAnalysisPayload(result);
         if (this.analysisCardsPanel) {
             this._pendingAnalysisUpdate = {
-                analysisPayload,
+                analysisPayload: shouldRender
+                    ? analysisPayload
+                    : this.preparePendingAnalysisPayload(analysisPayload),
                 status: result.status,
                 processingTimeMs: result.processingTimeMs
             };
@@ -446,6 +524,152 @@ class InspectionPanel {
         }
     }
 
+    preparePendingAnalysisPayload(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return this.compactPendingAnalysisValue(payload);
+        }
+
+        const sourceCards = Array.isArray(payload.cards)
+            ? payload.cards
+            : (Array.isArray(payload.Cards) ? payload.Cards : null);
+        if (sourceCards) {
+            return {
+                version: payload.version ?? payload.Version ?? 1,
+                cards: sourceCards
+                    .slice(0, PENDING_ANALYSIS_CARD_LIMIT)
+                    .map(card => this.compactPendingAnalysisCard(card)),
+                summary: this.compactPendingAnalysisValue(payload.summary ?? payload.Summary ?? null),
+                hiddenCardCount: Math.max(0, sourceCards.length - PENDING_ANALYSIS_CARD_LIMIT)
+            };
+        }
+
+        return this.compactPendingAnalysisValue(payload);
+    }
+
+    compactPendingAnalysisCard(card) {
+        if (!card || typeof card !== 'object') {
+            return card;
+        }
+
+        const sourceFields = Array.isArray(card.fields)
+            ? card.fields
+            : (Array.isArray(card.Fields) ? card.Fields : []);
+        return {
+            id: card.id ?? card.Id ?? null,
+            category: card.category ?? card.Category ?? 'structured',
+            type: card.type ?? card.Type ?? null,
+            title: this.compactPendingAnalysisValue(card.title ?? card.Title ?? card.category ?? card.Category ?? 'Analysis'),
+            status: card.status ?? card.Status ?? null,
+            priority: card.priority ?? card.Priority ?? 0,
+            icon: card.icon ?? card.Icon ?? null,
+            message: this.compactPendingAnalysisValue(card.message ?? card.Message ?? null),
+            fields: sourceFields
+                .slice(0, PENDING_ANALYSIS_FIELD_LIMIT)
+                .map(field => this.compactPendingAnalysisField(field)),
+            hiddenFieldCount: Math.max(0, sourceFields.length - PENDING_ANALYSIS_FIELD_LIMIT),
+            meta: this.compactPendingAnalysisValue(card.meta ?? card.Meta ?? null)
+        };
+    }
+
+    compactPendingAnalysisField(field) {
+        if (!field || typeof field !== 'object') {
+            return field;
+        }
+
+        const key = field.key ?? field.Key ?? null;
+        const rawValue = field.value ?? field.Value;
+        return {
+            key,
+            label: this.compactPendingAnalysisValue(field.label ?? field.Label ?? key ?? ''),
+            value: this.isPendingAnalysisImageLikeValue(key, rawValue)
+                ? '[image omitted]'
+                : this.compactPendingAnalysisValue(rawValue),
+            dataType: field.dataType ?? field.DataType ?? null,
+            unit: this.compactPendingAnalysisValue(field.unit ?? field.Unit ?? ''),
+            displayHint: field.displayHint ?? field.DisplayHint ?? field.variant ?? field.Variant ?? null,
+            variant: field.variant ?? field.Variant ?? null,
+            status: field.status ?? field.Status ?? null
+        };
+    }
+
+    compactPendingAnalysisValue(value, depth = 0, seen = new WeakSet()) {
+        if (typeof value === 'string') {
+            return this.truncatePendingAnalysisString(value);
+        }
+
+        if (value === null || value === undefined || typeof value !== 'object') {
+            return value;
+        }
+
+        if (seen.has(value)) {
+            return '[circular]';
+        }
+
+        if (depth >= PENDING_ANALYSIS_MAX_DEPTH) {
+            return Array.isArray(value)
+                ? `${value.length} items`
+                : `${Object.keys(value).length} fields`;
+        }
+
+        seen.add(value);
+
+        if (Array.isArray(value)) {
+            const visibleItems = value
+                .slice(0, PENDING_ANALYSIS_ARRAY_LIMIT)
+                .map(item => this.compactPendingAnalysisValue(item, depth + 1, seen));
+            if (value.length > visibleItems.length) {
+                visibleItems.push(`+${value.length - visibleItems.length} more`);
+            }
+            return visibleItems;
+        }
+
+        const compact = {};
+        const entries = Object.entries(value);
+        let visibleCount = 0;
+        for (const [key, entryValue] of entries) {
+            if (this.isPendingAnalysisImageLikeValue(key, entryValue)) {
+                continue;
+            }
+
+            if (visibleCount >= PENDING_ANALYSIS_OBJECT_FIELD_LIMIT) {
+                break;
+            }
+
+            compact[key] = this.compactPendingAnalysisValue(entryValue, depth + 1, seen);
+            visibleCount += 1;
+        }
+
+        const hiddenCount = Math.max(0, entries.length - visibleCount);
+        if (hiddenCount > 0) {
+            compact.__hiddenFieldCount = hiddenCount;
+        }
+        return compact;
+    }
+
+    truncatePendingAnalysisString(value) {
+        if (this.isPendingAnalysisImageLikeValue('', value)) {
+            return '[image omitted]';
+        }
+
+        const text = String(value ?? '');
+        return text.length > PENDING_ANALYSIS_STRING_LIMIT
+            ? `${text.slice(0, PENDING_ANALYSIS_STRING_LIMIT)}...`
+            : text;
+    }
+
+    isPendingAnalysisImageLikeValue(key, value) {
+        if (typeof value !== 'string') {
+            return false;
+        }
+
+        const text = value.trim();
+        if (text.startsWith('data:image/')) {
+            return true;
+        }
+
+        return PENDING_ANALYSIS_IMAGE_KEY_PATTERN.test(String(key || '')) && text.length > 120;
+    }
+
     renderPendingAnalysisUpdate() {
         if (!this.analysisCardsPanel || !this._pendingAnalysisUpdate) {
             return;
@@ -460,6 +684,10 @@ class InspectionPanel {
     }
 
     async loadRuntimeConfig(options = {}) {
+        if (this._isDisposed) {
+            return this.runtimeConfig;
+        }
+
         const force = options.force === true;
         const now = Date.now();
         if (!force && this._runtimeConfigLoadedAt > 0 && now - this._runtimeConfigLoadedAt < 10000) {
@@ -473,6 +701,10 @@ class InspectionPanel {
         this._runtimeConfigLoadPromise = (async () => {
             try {
                 const settings = await httpClient.get('/settings');
+                if (this._isDisposed) {
+                    return this.runtimeConfig;
+                }
+
                 const runtime = settings?.runtime || {};
                 const rawMissingMaterialTimeout = runtime.missingMaterialTimeoutSeconds;
                 const parsedMissingMaterialTimeout = Number(rawMissingMaterialTimeout);
@@ -487,6 +719,10 @@ class InspectionPanel {
                 };
                 this._runtimeConfigLoadedAt = Date.now();
             } catch (error) {
+                if (this._isDisposed) {
+                    return this.runtimeConfig;
+                }
+
                 console.warn('[InspectionPanel] 加载运行时配置失败:', error);
                 this.runtimeConfig = {
                     autoRun: false,
@@ -497,6 +733,10 @@ class InspectionPanel {
                 this._runtimeConfigLoadedAt = Date.now();
             } finally {
                 this._runtimeConfigLoadPromise = null;
+            }
+
+            if (this._isDisposed) {
+                return this.runtimeConfig;
             }
 
             this.updateProtectionNotice();
@@ -511,6 +751,11 @@ class InspectionPanel {
      * 初始化面板UI
      */
     initialize() {
+        if (this._isDisposed) {
+            return;
+        }
+
+        this.clearEventListeners();
         this.container.innerHTML = `
             <div class="inspection-panel">
                 <!-- 运行控制条 -->
@@ -618,7 +863,7 @@ class InspectionPanel {
         const runSingleBtn = this.container.querySelector('#btn-run-single');
         debugInspectionPanelLog('[InspectionPanel] btn-run-single 查找结果:', runSingleBtn);
         if (runSingleBtn) {
-            runSingleBtn.addEventListener('click', (e) => {
+            this.addDomListener(runSingleBtn, 'click', (e) => {
                 debugInspectionPanelLog('[InspectionPanel] btn-run-single 点击触发');
                 this.handleRunSingle();
             });
@@ -628,7 +873,7 @@ class InspectionPanel {
         const runContinuousBtn = this.container.querySelector('#btn-run-continuous');
         debugInspectionPanelLog('[InspectionPanel] btn-run-continuous 查找结果:', runContinuousBtn);
         if (runContinuousBtn) {
-            runContinuousBtn.addEventListener('click', () => {
+            this.addDomListener(runContinuousBtn, 'click', () => {
                 debugInspectionPanelLog('[InspectionPanel] btn-run-continuous 点击');
                 this.handleRunContinuous();
             });
@@ -638,7 +883,7 @@ class InspectionPanel {
         const stopBtn = this.container.querySelector('#btn-stop');
         debugInspectionPanelLog('[InspectionPanel] btn-stop 查找结果:', stopBtn);
         if (stopBtn) {
-            stopBtn.addEventListener('click', () => {
+            this.addDomListener(stopBtn, 'click', () => {
                 debugInspectionPanelLog('[InspectionPanel] btn-stop 点击');
                 this.handleStop();
             });
@@ -647,7 +892,7 @@ class InspectionPanel {
         // 【第二优先级】运行模式选择
         const runModeSelect = this.container.querySelector('#run-mode');
         if (runModeSelect) {
-            runModeSelect.addEventListener('change', (e) => {
+            this.addDomListener(runModeSelect, 'change', (e) => {
                 this.selectedRunMode = e.target.value;
                 debugInspectionPanelLog('[InspectionPanel] 运行模式切换为:', this.selectedRunMode);
                 
@@ -660,6 +905,35 @@ class InspectionPanel {
                 }
             });
         }
+    }
+
+    addDomListener(target, type, handler, options) {
+        if (!target || typeof target.addEventListener !== 'function') {
+            return;
+        }
+
+        target.addEventListener(type, handler, options);
+        if (!Array.isArray(this._eventDisposers)) {
+            this._eventDisposers = [];
+        }
+
+        this._eventDisposers.push(() => {
+            target.removeEventListener?.(type, handler, options);
+        });
+    }
+
+    clearEventListeners() {
+        const disposers = Array.isArray(this._eventDisposers)
+            ? this._eventDisposers.splice(0)
+            : [];
+
+        disposers.forEach((dispose) => {
+            try {
+                dispose();
+            } catch (error) {
+                console.warn('[InspectionPanel] DOM listener cleanup failed:', error);
+            }
+        });
     }
     
     /**
@@ -733,7 +1007,7 @@ class InspectionPanel {
         }
 
         const recentResults = getRecentResults();
-        setRecentResults([result, ...recentResults].slice(0, RECENT_RESULTS_PREVIEW_LIMIT));
+        setRecentResults([this.createRecentResultSummary(result), ...recentResults].slice(0, RECENT_RESULTS_PREVIEW_LIMIT));
         if (options.render === false) {
             this._recentResultsDirty = true;
             return;
@@ -741,6 +1015,21 @@ class InspectionPanel {
 
         this.renderRecentResults();
         this._recentResultsDirty = false;
+    }
+
+    createRecentResultSummary(result) {
+        return {
+            id: result?.id ?? result?.Id ?? result?.resultId ?? result?.ResultId ?? null,
+            status: result?.status ?? result?.Status ?? 'NG',
+            timestamp: result?.timestamp ?? result?.inspectionTime ?? result?.Timestamp ?? result?.InspectionTime ?? null,
+            textPreview: this.extractTextPreview(
+                result?.outputData
+                    ?? result?.OutputData
+                    ?? result?.analysisData
+                    ?? result?.AnalysisData
+                    ?? result?.errorMessage
+                    ?? result?.ErrorMessage)
+        };
     }
 
     renderRecentResults() {
@@ -770,7 +1059,7 @@ class InspectionPanel {
             const timeText = timestamp
                 ? new Date(timestamp).toLocaleTimeString([], { hour12: false })
                 : new Date().toLocaleTimeString([], { hour12: false });
-            const textPreview = this.extractTextPreview(
+            const textPreview = result?.textPreview ?? this.extractTextPreview(
                 result?.outputData ?? result?.OutputData ?? result?.analysisData ?? result?.AnalysisData ?? result?.errorMessage
             );
 
@@ -785,6 +1074,7 @@ class InspectionPanel {
     }
 
     reset() {
+        this.invalidateRunRequests();
         this.clearProtectionWatchdog();
         this.isContinuous = false;
         this.consecutiveNgCount = 0;
@@ -870,6 +1160,10 @@ class InspectionPanel {
     }
 
     refresh() {
+        if (this._isDisposed) {
+            return;
+        }
+
         this.container = document.getElementById(this.panelId);
         if (!this.container) {
             console.warn('[InspectionPanel] refresh skipped: container not found');
@@ -909,6 +1203,10 @@ class InspectionPanel {
     }
 
     tryAutoRunIfNeeded() {
+        if (this._isDisposed) {
+            return;
+        }
+
         if (!this.runtimeConfig?.autoRun || this._autoRunTriggered || this.isContinuous) {
             return;
         }
@@ -953,6 +1251,12 @@ class InspectionPanel {
      * 销毁组件，清理资源
      */
     dispose() {
+        if (this._isDisposed) {
+            return;
+        }
+
+        this._isDisposed = true;
+        this.invalidateRunRequests();
         debugInspectionPanelLog('[InspectionPanel] 正在销毁...');
         
         // 取消订阅
@@ -965,7 +1269,12 @@ class InspectionPanel {
             this.unsubscribeError();
             this.unsubscribeError = null;
         }
+        this.clearEventListeners();
         this.clearProtectionWatchdog();
+        this._runtimeConfigLoadPromise = null;
+        this._pendingAnalysisUpdate = null;
+        this.analysisCardsPanel?.dispose?.();
+        this.analysisCardsPanel = null;
         
         // 清理DOM事件（通过innerHTML置空自动处理大部分，但为了保险可以手动移除）
         // 这里主要依赖 innerHTML 清空或 DOM 移除

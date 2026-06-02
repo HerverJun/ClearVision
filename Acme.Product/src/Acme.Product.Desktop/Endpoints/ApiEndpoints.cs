@@ -4,6 +4,7 @@
 
 using System.Linq;
 using System.Text.Json;
+using Acme.Product.Application.Analysis;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Application.Services;
 using Acme.Product.Core.Entities;
@@ -261,12 +262,12 @@ public static class ApiEndpoints
                     }
 
                     var result = await service.ExecuteSingleAsync(request.ProjectId, imageData, request.FlowData?.ToEntity());
-                    return Results.Ok(result);
+                    return Results.Ok(ToInspectionExecutionResponse(result));
                 }
                 else if (!string.IsNullOrEmpty(request.CameraId))
                 {
                     var result = await service.ExecuteSingleAsync(request.ProjectId, request.CameraId, request.FlowData?.ToEntity());
-                    return Results.Ok(result);
+                    return Results.Ok(ToInspectionExecutionResponse(result));
                 }
                 else
                 {
@@ -276,7 +277,7 @@ public static class ApiEndpoints
                     // 前端流程数据已通过日志中间件记录
 
                     var result = await service.ExecuteSingleAsync(request.ProjectId, (byte[])null!, flow);
-                    return Results.Ok(result);
+                    return Results.Ok(ToInspectionExecutionResponse(result));
                 }
             }
             catch (Exception ex)
@@ -297,7 +298,7 @@ public static class ApiEndpoints
         int pageSize = 20) =>
         {
             var results = await service.GetInspectionHistoryAsync(projectId, startTime, endTime, status, defectType, pageIndex, pageSize);
-            return Results.Ok(results);
+            return Results.Ok(ToInspectionHistoryListResponse(results));
         });
 
         // 获取统计信息
@@ -573,6 +574,126 @@ public static class ApiEndpoints
             return null;
 
         return JsonSerializer.Serialize(request.FlowData);
+    }
+
+    internal static object ToInspectionHistoryListResponse(InspectionHistoryPage page)
+    {
+        return new
+        {
+            items = page.Items.Select(ToInspectionHistoryListItem).ToList(),
+            totalCount = page.TotalCount,
+            pageIndex = page.PageIndex,
+            pageSize = page.PageSize
+        };
+    }
+
+    private static object ToInspectionHistoryListItem(InspectionHistoryItem result)
+    {
+        return new
+        {
+            id = result.Id,
+            projectId = result.ProjectId,
+            status = result.Status.ToString(),
+            defects = result.Defects.Select(ToInspectionDefectListItem).ToList(),
+            defectCount = result.Defects.Count,
+            processingTime = result.ProcessingTimeMs,
+            processingTimeMs = result.ProcessingTimeMs,
+            timestamp = result.InspectionTime,
+            inspectionTime = result.InspectionTime,
+            confidenceScore = result.ConfidenceScore,
+            imageId = result.ImageId,
+            outputData = TryDeserializeOutputData(result.OutputDataJson),
+            analysisData = TryDeserializeAnalysisData(result.AnalysisDataJson),
+            errorMessage = result.ErrorMessage
+        };
+    }
+
+    private static object ToInspectionDefectListItem(InspectionHistoryDefectItem defect)
+    {
+        return new
+        {
+            id = defect.Id,
+            type = defect.Type.ToString(),
+            x = defect.X,
+            y = defect.Y,
+            width = defect.Width,
+            height = defect.Height,
+            confidenceScore = defect.ConfidenceScore,
+            description = defect.Description,
+            annotationData = defect.AnnotationData
+        };
+    }
+
+    internal static object ToInspectionExecutionResponse(InspectionResult result)
+    {
+        return new
+        {
+            id = result.Id,
+            projectId = result.ProjectId,
+            status = result.Status.ToString(),
+            defects = result.Defects.Select(ToInspectionDefectListItem).ToList(),
+            defectCount = result.Defects.Count,
+            processingTime = result.ProcessingTimeMs,
+            processingTimeMs = result.ProcessingTimeMs,
+            timestamp = result.InspectionTime,
+            inspectionTime = result.InspectionTime,
+            confidenceScore = result.ConfidenceScore,
+            imageId = result.ImageId,
+            outputImage = result.ImageId.HasValue
+                ? null
+                : (result.OutputImage != null ? Convert.ToBase64String(result.OutputImage) : null),
+            outputData = TryDeserializeOutputData(result.OutputDataJson),
+            analysisData = TryDeserializeAnalysisData(result.AnalysisDataJson),
+            errorMessage = result.ErrorMessage
+        };
+    }
+
+    private static object ToInspectionDefectListItem(Defect defect)
+    {
+        return new
+        {
+            id = defect.Id,
+            type = defect.Type.ToString(),
+            x = defect.X,
+            y = defect.Y,
+            width = defect.Width,
+            height = defect.Height,
+            confidenceScore = defect.ConfidenceScore,
+            description = defect.Description,
+            annotationData = defect.AnnotationData
+        };
+    }
+
+    private static Dictionary<string, object>? TryDeserializeOutputData(string? json)
+    {
+        try
+        {
+            return AnalysisPayloadSerialization.DeserializeJsonDictionary(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static AnalysisDataDto? TryDeserializeAnalysisData(string? json)
+    {
+        try
+        {
+            return AnalysisPayloadSerialization.DeserializeAnalysisData(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static void MapImageEndpoints(IEndpointRouteBuilder app)

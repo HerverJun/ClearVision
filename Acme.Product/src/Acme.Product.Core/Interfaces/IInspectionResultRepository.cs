@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using Acme.Product.Core.Entities;
+using Acme.Product.Core.Enums;
 
 namespace Acme.Product.Core.Interfaces;
 
@@ -79,8 +80,38 @@ public class InspectionStatistics
 
 public class InspectionHistoryPage
 {
-    public IReadOnlyList<InspectionResult> Items { get; set; } = Array.Empty<InspectionResult>();
+    public IReadOnlyList<InspectionHistoryItem> Items { get; set; } = Array.Empty<InspectionHistoryItem>();
     public int TotalCount { get; set; }
     public int PageIndex { get; set; }
     public int PageSize { get; set; }
+}
+
+public class InspectionHistoryItem
+{
+    public Guid Id { get; set; }
+    public Guid ProjectId { get; set; }
+    public InspectionStatus Status { get; set; }
+    public IReadOnlyList<InspectionHistoryDefectItem> Defects { get; set; } = Array.Empty<InspectionHistoryDefectItem>();
+    public long ProcessingTimeMs { get; set; }
+    public Guid? ImageId { get; set; }
+    public double? ConfidenceScore { get; set; }
+    public string? ErrorMessage { get; set; }
+    public DateTime InspectionTime { get; set; }
+    public string? OutputDataJson { get; set; }
+    public string? AnalysisDataJson { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ModifiedAt { get; set; }
+}
+
+public class InspectionHistoryDefectItem
+{
+    public Guid Id { get; set; }
+    public DefectType Type { get; set; }
+    public double X { get; set; }
+    public double Y { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+    public double ConfidenceScore { get; set; }
+    public string? Description { get; set; }
+    public string? AnnotationData { get; set; }
 }

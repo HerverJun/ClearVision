@@ -42,6 +42,7 @@ class SettingsView {
         this._aiReasoningSupportRequestId = 0;
         this._aiReasoningSupportDebounce = null;
         this.diskUsage = null;
+        this.databaseStatus = null;
         this.plcMappings = [];
         this.plcConnectionStatus = 'unknown';
         this.plcValidationErrors = [];
@@ -213,42 +214,47 @@ class SettingsView {
         const scopes = {
             general: {
                 button: '保存常规设置',
-                title: '只保存常规页',
-                body: '保存软件标题、主题和开机启动；不会提交 PLC、Station、相机或 AI 草稿。主题保存后立即生效。'
+                title: '保存常规设置',
+                body: '保存软件标题、主题和开机启动。主题立即生效。'
             },
             communication: {
                 button: '保存 PLC 设置',
-                title: '只保存 PLC',
-                body: '通过 /plc/settings 保存当前协议连接与映射；校验失败不会写入配置。运行中的 PLC 连接需按现场流程重新连接。'
+                title: '保存 PLC 设置',
+                body: '保存 PLC 协议连接和映射配置。'
             },
             station: {
                 button: '保存 Station 设置',
-                title: '只保存 Station',
-                body: '通过 Station 专用配置文件保存监听模式、端口和本机 Station 同步；token 不写入普通 /settings。按页面提示决定是否重启。'
+                title: '保存 Station 设置',
+                body: '保存监听模式、端口和本机 Station 同步配置。'
             },
             storage: {
                 button: '保存存储设置',
-                title: '只保存文件与存储',
-                body: '保存图像路径、清理天数和低空间阈值；保存前会检查路径可访问和可写，不影响相机、PLC、Station 或 AI。'
+                title: '保存文件与存储',
+                body: '保存图像路径、清理天数和低空间阈值。'
+            },
+            database: {
+                button: '刷新数据库状态',
+                title: '刷新数据库状态',
+                body: '查看 SQLite schema、迁移、备份、恢复、历史清理和健康检查状态。'
             },
             runtime: {
                 button: '保存运行保护',
-                title: '只保存运行保护',
-                body: '保存连续 NG、缺料超时和自动运行保护开关；保存后运行保护规则立即按新值工作。'
+                title: '保存运行保护',
+                body: '保存连续 NG、缺料超时和自动运行保护规则。'
             },
             cameras: {
                 button: '保存当前相机',
-                title: '只保存相机管理',
-                body: '通过 /cameras/bindings 保存当前相机绑定/参数；相机流正在运行且参数有冲突时后端会拒绝保存。'
+                title: '保存相机管理',
+                body: '保存当前相机绑定和参数。'
             },
             ai: {
-                button: '保存 AI 草稿',
-                title: '只保存 AI 模型',
-                body: '通过 /ai/models 保存当前模型表单，不会由系统页全局保存偷偷提交，也不会自动切换激活模型。API Key 保存后会从界面清空。'
+                button: '保存 AI 模型',
+                title: '保存 AI 模型',
+                body: '保存当前 AI 模型配置。API Key 保存后清空输入框。'
             },
             users: {
                 button: '保存安全策略',
-                title: '只保存用户安全策略',
+                title: '保存安全策略',
                 body: '保存密码长度、会话超时和登录失败锁定策略；用户新增、删除和重置密码仍走各自按钮。'
             }
         };
@@ -309,6 +315,10 @@ class SettingsView {
                             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M2 20h20v-4H2v4zm2-3h2v2H4v-2zM2 4v4h20V4H2zm4 3H4V5h2v2zm-4 7h20v-4H2v4zm2-3h2v2H4v-2z"/></svg>
                             文件存储
                         </div>
+                        <div class="settings-menu-item" data-tab="database">
+                            <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M12 3C7.58 3 4 4.34 4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6c0-1.66-3.58-3-8-3zm0 2c3.31 0 6 .67 6 1s-2.69 1-6 1-6-.67-6-1 2.69-1 6-1zm0 14c-3.31 0-6-.67-6-1v-2.08C7.46 16.58 9.6 17 12 17s4.54-.42 6-1.08V18c0 .33-2.69 1-6 1zm0-4c-3.31 0-6-.67-6-1v-2.08C7.46 12.58 9.6 13 12 13s4.54-.42 6-1.08V14c0 .33-2.69 1-6 1zm0-4c-3.31 0-6-.67-6-1V7.92C7.46 8.58 9.6 9 12 9s4.54-.42 6-1.08V10c0 .33-2.69 1-6 1z"/></svg>
+                            数据库维护
+                        </div>
                         <div class="settings-menu-item" data-tab="runtime">
                             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
                             生产运行保护
@@ -337,6 +347,7 @@ class SettingsView {
                         <div class="settings-panel" data-section="communication">${this.renderCommunicationTab()}</div>
                         <div class="settings-panel" data-section="station">${this.renderStationCommunicationTab()}</div>
                         <div class="settings-panel" data-section="storage">${this.renderStorageTab()}</div>
+                        <div class="settings-panel" data-section="database">${this.renderDatabaseTab()}</div>
                         <div class="settings-panel" data-section="runtime">${this.renderRuntimeTab()}</div>
                         <div class="settings-panel" data-section="cameras">${this.renderCameraTab()}</div>
                         <div class="settings-panel" data-section="ai">${this.renderAiTab()}</div>
@@ -398,6 +409,8 @@ class SettingsView {
             this.loadPlcSettings();
         } else if (tabName === 'station') {
             this.loadStationCommunicationSettings();
+        } else if (tabName === 'database') {
+            this.refreshDatabaseStatus();
         }
     }
 
@@ -446,6 +459,7 @@ class SettingsView {
         this.container.querySelector('#btn-reset-settings')?.addEventListener('click', () => this.resetSettings());
         this.container.querySelector('#btn-apply-protection-rules')?.addEventListener('click', () => this.save());
         this.container.querySelector('#btn-save-security-policy')?.addEventListener('click', () => this.save());
+        this.bindDatabaseMaintenanceEvents();
 
         applyFeatureToButton(this.container.querySelector('#btn-change-image-save-path'), 'storage.pathPicker', { fallbackLabel: '更改目录' });
         applyFeatureToButton(this.container.querySelector('#btn-clean-expired-files'), 'storage.immediateCleanup', { fallbackLabel: '立即清理过期文件' });
@@ -481,6 +495,11 @@ class SettingsView {
 
         if (activeTabName === 'ai') {
             await this.saveAiDraftFromTop();
+            return;
+        }
+
+        if (activeTabName === 'database') {
+            await this.refreshDatabaseStatus();
             return;
         }
 

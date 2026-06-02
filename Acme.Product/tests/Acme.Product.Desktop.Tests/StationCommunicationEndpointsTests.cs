@@ -81,14 +81,16 @@ namespace Acme.Product.Desktop.Tests;
         revealResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         using var revealDocument = JsonDocument.Parse(await revealResponse.Content.ReadAsStringAsync());
         var revealedToken = revealDocument.RootElement.GetProperty("token").GetString();
-        revealedToken.Should().NotBeNullOrWhiteSpace();
+        revealedToken.Should().MatchRegex(@"^\d{6}$");
 
         using var regenerateResponse = await adminHost.Client.PostAsync(
             "/api/station-communication/token",
             JsonContent(new { operation = "regenerate" }));
         regenerateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         using var regenerateDocument = JsonDocument.Parse(await regenerateResponse.Content.ReadAsStringAsync());
-        regenerateDocument.RootElement.GetProperty("token").GetString().Should().NotBe(revealedToken);
+        var regeneratedToken = regenerateDocument.RootElement.GetProperty("token").GetString();
+        regeneratedToken.Should().MatchRegex(@"^\d{6}$");
+        regeneratedToken.Should().NotBe(revealedToken);
 
         await using var operatorHost = await StationCommunicationTestHost.CreateAsync(role: "Operator");
         using var forbiddenResponse = await operatorHost.Client.PostAsync(

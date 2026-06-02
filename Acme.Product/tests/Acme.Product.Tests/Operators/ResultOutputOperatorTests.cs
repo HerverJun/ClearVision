@@ -176,6 +176,32 @@ public class ResultOutputOperatorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithLargeDetectionList_ShouldCapFormattedOutputOnly()
+    {
+        var op = new Operator("test", OperatorType.ResultOutput, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Format", "JSON", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("MaxFormattedCollectionItems", 3, "int"));
+
+        var detectionList = new DetectionList(Enumerable.Range(0, 10)
+            .Select(index => new DetectionResult($"Wire_{index}", 0.9f, index, index + 1, 10, 12)));
+
+        var result = await _operator.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Result"] = detectionList
+        });
+
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["Result"].Should().BeSameAs(detectionList);
+
+        using var document = JsonDocument.Parse(result.OutputData["Output"].Should().BeOfType<string>().Subject);
+        var formattedResult = document.RootElement.GetProperty("Result");
+        formattedResult.GetProperty("Truncated").GetBoolean().Should().BeTrue();
+        formattedResult.GetProperty("TotalCount").GetInt32().Should().Be(10);
+        formattedResult.GetProperty("OmittedCount").GetInt32().Should().Be(7);
+        formattedResult.GetProperty("Items").GetArrayLength().Should().Be(3);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithNullValues_ShouldPreserveNullInJsonOutput()
     {
         var op = new Operator("test", OperatorType.ResultOutput, 0, 0);

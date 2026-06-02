@@ -199,6 +199,105 @@ public class FlowExecutionServiceTests
     }
 
     [Fact]
+    public async Task ExecuteFlowDebugAsync_WhenDebugCacheByteBudgetExceeded_ShouldEvictOldEntries()
+    {
+        var executor = Substitute.For<IOperatorExecutor>();
+        executor.OperatorType.Returns(OperatorType.Thresholding);
+        executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        executor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var op = callInfo.Arg<Operator>();
+                var fill = string.Equals(op.Name, "First", StringComparison.Ordinal) ? (byte)1 : (byte)2;
+                return Task.FromResult(OperatorExecutionOutput.Success(
+                    new Dictionary<string, object> { ["Image"] = Enumerable.Repeat(fill, 60).ToArray() },
+                    executionTimeMs: 1));
+            });
+
+        using var sut = new FlowExecutionService(
+            new[] { executor },
+            _logger,
+            _variableContext,
+            debugCacheMaxBytes: 90,
+            debugCacheMaxEntries: 10,
+            debugCacheMaxEntryBytes: 80);
+
+        var flow = new OperatorFlow("DebugCacheBudgetFlow");
+        var first = CreateOperatorWithPorts("First", OperatorType.Thresholding);
+        var second = CreateOperatorWithPorts("Second", OperatorType.Thresholding);
+        flow.AddOperator(first);
+        flow.AddOperator(second);
+
+        var debugSessionId = Guid.NewGuid();
+        var result = await sut.ExecuteFlowDebugAsync(
+            flow,
+            new DebugOptions
+            {
+                DebugSessionId = debugSessionId,
+                EnableIntermediateCache = true
+            });
+
+        result.IsSuccess.Should().BeTrue();
+        result.IntermediateResults.Should().ContainKeys(first.Id, second.Id);
+        sut.GetDebugIntermediateResult(debugSessionId, first.Id).Should().BeNull();
+        ((byte[])sut.GetDebugIntermediateResult(debugSessionId, second.Id)!["Image"]).Should().Equal(Enumerable.Repeat((byte)2, 60));
+    }
+
+    [Fact]
+    public async Task ExecuteFlowDebugAsync_WhenDebugCacheEntryExceedsLimit_ShouldSkipRetainedCacheAndRemoveStaleEntry()
+    {
+        var executor = Substitute.For<IOperatorExecutor>();
+        executor.OperatorType.Returns(OperatorType.Thresholding);
+        executor.ValidateParameters(Arg.Any<Operator>()).Returns(new ValidationResult { IsValid = true });
+        executor.ExecuteAsync(
+                Arg.Any<Operator>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                var op = callInfo.Arg<Operator>();
+                var size = Convert.ToInt32(op.Parameters.Single(parameter => parameter.Name == "Size").GetValue());
+                return Task.FromResult(OperatorExecutionOutput.Success(
+                    new Dictionary<string, object> { ["Image"] = new byte[size] },
+                    executionTimeMs: 1));
+            });
+
+        using var sut = new FlowExecutionService(
+            new[] { executor },
+            _logger,
+            _variableContext,
+            debugCacheMaxBytes: 128,
+            debugCacheMaxEntries: 10,
+            debugCacheMaxEntryBytes: 80);
+
+        var flow = new OperatorFlow("DebugCacheEntryBudgetFlow");
+        var op = CreateOperatorWithPorts("Single", OperatorType.Thresholding);
+        op.AddParameter(new Parameter(Guid.NewGuid(), "Size", "Size", string.Empty, "int", 40, 0, 200, true));
+        flow.AddOperator(op);
+
+        var debugSessionId = Guid.NewGuid();
+        var debugOptions = new DebugOptions
+        {
+            DebugSessionId = debugSessionId,
+            EnableIntermediateCache = true
+        };
+
+        var firstResult = await sut.ExecuteFlowDebugAsync(flow, debugOptions);
+        firstResult.IsSuccess.Should().BeTrue();
+        sut.GetDebugIntermediateResult(debugSessionId, op.Id).Should().NotBeNull();
+
+        op.Parameters.Single(parameter => parameter.Name == "Size").SetValue(100);
+        var secondResult = await sut.ExecuteFlowDebugAsync(flow, debugOptions);
+
+        secondResult.IsSuccess.Should().BeTrue();
+        secondResult.IntermediateResults[op.Id].Should().ContainKey("Image");
+        sut.GetDebugIntermediateResult(debugSessionId, op.Id).Should().BeNull();
+    }
+
+    [Fact]
     public async Task ExecuteFlowAsync_WhenParallelLayerFails_CancelsSiblingOperators()
     {
         var slowStartedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

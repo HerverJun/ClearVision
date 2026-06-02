@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -21,6 +22,8 @@ public enum StationCommunicationMode
 
 public sealed class StationCommunicationSettingsStore
 {
+    private const int GeneratedTokenUpperBound = 1_000_000;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -110,7 +113,7 @@ public sealed class StationCommunicationSettingsStore
     public StationCommunicationTokenResult RegenerateToken(StationIngressOptions runningIngress)
     {
         var snapshot = ReadSnapshot(runningIngress);
-        var generatedToken = GenerateToken();
+        var generatedToken = GenerateToken(ResolveToken(snapshot));
         var mode = InferMode(snapshot.Ingress, snapshot.Metadata);
         var request = new StationCommunicationSettingsUpdateRequest
         {
@@ -452,13 +455,30 @@ public sealed class StationCommunicationSettingsStore
         };
     }
 
-    private static string GenerateToken()
+    private static string GenerateToken(string? excludedToken = null)
     {
-        var bytes = RandomNumberGenerator.GetBytes(32);
-        return Convert.ToBase64String(bytes)
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
+        excludedToken = excludedToken?.Trim();
+        for (var attempt = 0; attempt < 5; attempt += 1)
+        {
+            var token = FormatToken(RandomNumberGenerator.GetInt32(GeneratedTokenUpperBound));
+            if (!string.Equals(token, excludedToken, StringComparison.Ordinal))
+            {
+                return token;
+            }
+        }
+
+        if (int.TryParse(excludedToken, NumberStyles.None, CultureInfo.InvariantCulture, out var excludedValue) &&
+            excludedValue is >= 0 and < GeneratedTokenUpperBound)
+        {
+            return FormatToken((excludedValue + 1) % GeneratedTokenUpperBound);
+        }
+
+        return FormatToken(RandomNumberGenerator.GetInt32(GeneratedTokenUpperBound));
+    }
+
+    private static string FormatToken(int value)
+    {
+        return value.ToString("D6", CultureInfo.InvariantCulture);
     }
 
     private static bool TryNormalizeLanHost(

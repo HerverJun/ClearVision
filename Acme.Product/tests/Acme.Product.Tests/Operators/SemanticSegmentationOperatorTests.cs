@@ -106,19 +106,107 @@ public sealed class SemanticSegmentationOperatorTests
         }
     }
 
-    private static Operator CreateOperator(string inputSize = "2,2")
+    [Fact]
+    public async Task ExecuteAsync_WithMaxClassMasks_ShouldLimitPerClassMaskOutputs()
+    {
+        var sut = new SemanticSegmentationOperator(Substitute.For<ILogger<SemanticSegmentationOperator>>());
+        var op = CreateOperator(maxClassMasks: 2);
+
+        using var image = new ImageWrapper(Cv2.ImRead(ResolveTestDataPath(@"model_test_suite\identity_2x2\input.png"), ImreadModes.Color));
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().NotBeNull();
+
+        try
+        {
+            var classMasks = result.OutputData!["ClassMasks"].Should().BeOfType<Dictionary<string, object>>().Subject;
+            classMasks.Should().HaveCount(2);
+            classMasks.Keys.Should().BeEquivalentTo(["red", "green"]);
+            result.OutputData["ClassCount"].Should().Be(3);
+            result.OutputData["ClassMaskCount"].Should().Be(2);
+            result.OutputData["OmittedClassMaskCount"].Should().Be(1);
+            result.OutputData["MaxClassMasks"].Should().Be(2);
+            result.OutputData["PresentClasses"].Should().BeOfType<string[]>().Subject.Should().BeEquivalentTo(["red", "green", "blue"]);
+        }
+        finally
+        {
+            DisposeSegmentationOutputs(result.OutputData);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithZeroMaxClassMasks_ShouldDisablePerClassMaskOutputs()
+    {
+        var sut = new SemanticSegmentationOperator(Substitute.For<ILogger<SemanticSegmentationOperator>>());
+        var op = CreateOperator(maxClassMasks: 0);
+
+        using var image = new ImageWrapper(Cv2.ImRead(ResolveTestDataPath(@"model_test_suite\identity_2x2\input.png"), ImreadModes.Color));
+        var result = await sut.ExecuteAsync(op, TestHelpers.CreateImageInputs(image));
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().NotBeNull();
+
+        try
+        {
+            var classMasks = result.OutputData!["ClassMasks"].Should().BeOfType<Dictionary<string, object>>().Subject;
+            classMasks.Should().BeEmpty();
+            result.OutputData["ClassCount"].Should().Be(3);
+            result.OutputData["ClassMaskCount"].Should().Be(0);
+            result.OutputData["OmittedClassMaskCount"].Should().Be(3);
+            result.OutputData["MaxClassMasks"].Should().Be(0);
+            result.OutputData["PresentClasses"].Should().BeOfType<string[]>().Subject.Should().BeEquivalentTo(["red", "green", "blue"]);
+        }
+        finally
+        {
+            DisposeSegmentationOutputs(result.OutputData);
+        }
+    }
+
+    private static Operator CreateOperator(string inputSize = "2,2", int? maxClassMasks = null)
     {
         var op = new Operator("segmentation", OperatorType.SemanticSegmentation, 0, 0);
         op.AddParameter(TestHelpers.CreateParameter("ModelPath", ResolveTestDataPath(@"model_test_suite\identity_2x2\identity_2x2.onnx"), "file"));
         op.AddParameter(TestHelpers.CreateParameter("InputSize", inputSize, "string"));
         op.AddParameter(TestHelpers.CreateParameter("NumClasses", 3, "int"));
         op.AddParameter(TestHelpers.CreateParameter("ClassNames", "[\"red\",\"green\",\"blue\"]", "string"));
+        if (maxClassMasks.HasValue)
+        {
+            op.AddParameter(TestHelpers.CreateParameter("MaxClassMasks", maxClassMasks.Value, "int"));
+        }
+
         op.AddParameter(TestHelpers.CreateParameter("ExecutionProvider", "cpu", "string"));
         op.AddParameter(TestHelpers.CreateParameter("ScaleToUnitRange", true, "bool"));
         op.AddParameter(TestHelpers.CreateParameter("ChannelOrder", "RGB", "string"));
         op.AddParameter(TestHelpers.CreateParameter("Mean", "0,0,0", "string"));
         op.AddParameter(TestHelpers.CreateParameter("Std", "1,1,1", "string"));
         return op;
+    }
+
+    private static void DisposeSegmentationOutputs(IDictionary<string, object>? outputData)
+    {
+        if (outputData == null)
+        {
+            return;
+        }
+
+        if (outputData.TryGetValue("SegmentationMap", out var segmentationMap) && segmentationMap is ImageWrapper segmentationImage)
+        {
+            segmentationImage.Dispose();
+        }
+
+        if (outputData.TryGetValue("ColoredMap", out var coloredMap) && coloredMap is ImageWrapper coloredImage)
+        {
+            coloredImage.Dispose();
+        }
+
+        if (outputData.TryGetValue("ClassMasks", out var classMasks) && classMasks is Dictionary<string, object> masks)
+        {
+            foreach (var mask in masks.Values.OfType<ImageWrapper>())
+            {
+                mask.Dispose();
+            }
+        }
     }
 
     private static string ResolveTestDataPath(string relativePath)

@@ -77,16 +77,92 @@ public sealed class InspectionResultBackgroundServiceTests
         }
     }
 
-    private static InspectionResultBackgroundService CreateService(IServiceProvider provider, string spoolRoot)
+    [Fact]
+    public async Task StartAsync_WhenSpoolReplayStillFails_ShouldKeepSpooledResults()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+        var root = CreateTempPath();
+        try
+        {
+            var failingRepository = new CapturingInspectionResultRepository { FailAdds = true };
+            await using (var provider = CreateProvider(failingRepository))
             {
-                ["Performance:Persistence:SpoolDirectory"] = spoolRoot,
-                ["Performance:Persistence:BatchSize"] = "1",
-                ["Performance:Persistence:MaxSaveRetries"] = "1",
-                ["Performance:Persistence:QueueCapacity"] = "4"
-            })
+                var failingService = CreateService(provider, root);
+                await failingService.StartAsync(CancellationToken.None);
+                await failingService.WriteAsync(CreateResult(), CancellationToken.None);
+                await failingService.WriteAsync(CreateResult(), CancellationToken.None);
+                await failingService.WriteAsync(CreateResult(), CancellationToken.None);
+                await WaitUntilAsync(() => TryGetSpoolLineCount(root, out var lineCount) && lineCount == 3);
+                await failingService.StopAsync(CancellationToken.None);
+            }
+
+            var replayRepository = new CapturingInspectionResultRepository { FailAdds = true };
+            await using (var provider = CreateProvider(replayRepository))
+            {
+                var replayService = CreateService(provider, root);
+                await replayService.StartAsync(CancellationToken.None);
+                await WaitUntilAsync(() => replayRepository.AddRangeCallCount >= 3);
+                await WaitUntilAsync(() => TryGetSpoolLineCount(root, out var lineCount) && lineCount == 3);
+                await replayService.StopAsync(CancellationToken.None);
+            }
+
+            File.Exists(Path.Combine(root, "inspection-results.jsonl.tmp")).Should().BeFalse();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public void TryWrite_WhenQueuedImageBudgetIsFull_ShouldRejectAdditionalImageResults()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var repository = new CapturingInspectionResultRepository();
+            using var provider = CreateProvider(repository);
+            var service = CreateService(
+                provider,
+                root,
+                new Dictionary<string, string?>
+                {
+                    ["Performance:Persistence:QueueCapacity"] = "10",
+                    ["Performance:Persistence:MaxQueuedImageBytes"] = "256"
+                });
+
+            service.TryWrite(CreateResult(outputImageBytes: 128)).Should().BeTrue();
+            service.TryWrite(CreateResult(outputImageBytes: 128)).Should().BeTrue();
+            service.TryWrite(CreateResult(outputImageBytes: 128)).Should().BeFalse();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    private static InspectionResultBackgroundService CreateService(
+        IServiceProvider provider,
+        string spoolRoot,
+        Dictionary<string, string?>? overrides = null)
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["Performance:Persistence:SpoolDirectory"] = spoolRoot,
+            ["Performance:Persistence:BatchSize"] = "1",
+            ["Performance:Persistence:MaxSaveRetries"] = "1",
+            ["Performance:Persistence:QueueCapacity"] = "4"
+        };
+
+        if (overrides != null)
+        {
+            foreach (var (key, value) in overrides)
+            {
+                settings[key] = value;
+            }
+        }
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(settings)
             .Build();
 
         return new InspectionResultBackgroundService(
@@ -102,7 +178,7 @@ public sealed class InspectionResultBackgroundServiceTests
         return services.BuildServiceProvider();
     }
 
-    private static InspectionResult CreateResult(bool includeDefect = false)
+    private static InspectionResult CreateResult(bool includeDefect = false, int outputImageBytes = 0)
     {
         var result = new InspectionResult(Guid.NewGuid(), null);
         result.SetResult(InspectionStatus.OK, 12, 0.95, null);
@@ -111,6 +187,11 @@ public sealed class InspectionResultBackgroundServiceTests
             new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
             new DateTime(2026, 1, 2, 3, 4, 0, DateTimeKind.Utc),
             result.ModifiedAt);
+
+        if (outputImageBytes > 0)
+        {
+            result.SetOutputImage(Enumerable.Repeat((byte)7, outputImageBytes).ToArray());
+        }
 
         if (includeDefect)
         {
@@ -199,10 +280,14 @@ public sealed class InspectionResultBackgroundServiceTests
     {
         public bool FailAdds { get; set; }
 
+        public int AddRangeCallCount { get; private set; }
+
         public List<InspectionResult> Added { get; } = [];
 
         public Task AddRangeAsync(IEnumerable<InspectionResult> results)
         {
+            AddRangeCallCount++;
+
             if (FailAdds)
             {
                 throw new IOException("Simulated repository failure.");

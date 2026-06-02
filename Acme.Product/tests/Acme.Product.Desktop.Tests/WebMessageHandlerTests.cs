@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;
 using Acme.Product.Application.DTOs;
@@ -180,6 +181,68 @@ public class WebMessageHandlerTests
         root.GetProperty("analysisData").GetProperty("Summary").GetString().Should().Be("OK");
         root.TryGetProperty("outputDataJson", out _).Should().BeFalse();
         root.TryGetProperty("analysisDataJson", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreateInspectionCompletedMessage_WithImageId_ShouldOmitInlineOutputImage()
+    {
+        var projectId = Guid.NewGuid();
+        var imageId = Guid.NewGuid();
+        var result = new InspectionResult(projectId, imageId);
+        result.SetResult(InspectionStatus.OK, processingTimeMs: 42);
+        result.SetOutputImage(new byte[] { 1, 2, 3 });
+
+        var message = WebMessageHandler.CreateInspectionCompletedMessage(
+            result,
+            projectId,
+            outputData: null,
+            analysisData: null);
+
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(message));
+        var root = doc.RootElement;
+
+        root.GetProperty("imageId").GetGuid().Should().Be(imageId);
+        root.GetProperty("outputImage").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public void PendingWebMessageQueue_ShouldDropOldestMessagesWhenCapacityIsExceeded()
+    {
+        var operatorFactory = new OperatorFactory();
+        using var serviceProvider = BuildServiceProvider(_ => { });
+        var handler = CreateHandler(serviceProvider, operatorFactory);
+
+        var enqueueMethod = typeof(WebMessageHandler).GetMethod(
+            "TryEnqueuePendingWebMessage",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        enqueueMethod.Should().NotBeNull();
+
+        for (var index = 0; index < 520; index++)
+        {
+            var enqueued = (bool)enqueueMethod!.Invoke(handler, [$"message-{index}"])!;
+            enqueued.Should().BeTrue();
+        }
+
+        var countField = typeof(WebMessageHandler).GetField(
+            "_pendingWebMessageCount",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var droppedField = typeof(WebMessageHandler).GetField(
+            "_droppedWebMessageCount",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var queueField = typeof(WebMessageHandler).GetField(
+            "_pendingWebMessages",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        countField.Should().NotBeNull();
+        droppedField.Should().NotBeNull();
+        queueField.Should().NotBeNull();
+
+        countField!.GetValue(handler).Should().Be(512);
+        droppedField!.GetValue(handler).Should().Be(8L);
+        var queue = queueField!.GetValue(handler).Should().BeOfType<ConcurrentQueue<string>>().Subject;
+        queue.Should().HaveCount(512);
+        queue.First().Should().Be("message-8");
+        queue.Last().Should().Be("message-519");
     }
 
     [Fact]

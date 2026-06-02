@@ -790,6 +790,12 @@ namespace Acme.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PackageKind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Production");
+
                     b.Property<string>("PackageName")
                         .IsRequired()
                         .HasMaxLength(200)

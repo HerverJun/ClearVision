@@ -10,6 +10,7 @@ import eventBus from './core/app/eventBus.js';
 import serviceRegistry from './core/app/serviceRegistry.js';
 import { installLegacyGlobalAccessors } from './core/app/legacyGlobals.js';
 import { createViewManager } from './core/app/viewManager.js';
+import { buildResultDefects as buildBoundedResultDefects, getResultDefectCount } from './core/app/resultDefects.js';
 import { bindToolbarCommands } from './core/app/commandHandlers.js';
 import { createFlowCanvasAdapter } from './core/canvas/flowCanvasAdapter.js';
 import { createAiGenerationController } from './features/ai/aiGenerationController.js';
@@ -68,7 +69,11 @@ import FlowCanvas from './core/canvas/flowCanvas.js';
 import { FlowEditorInteraction } from './features/flow-editor/flowEditorInteraction.js';
 import { ImageViewerComponent } from './features/image-viewer/imageViewer.js';
 import { OperatorLibraryPanel } from './features/operator-library/operatorLibrary.js';
-import inspectionController from './features/inspection/inspectionController.js';
+import inspectionController, {
+    createLightweightInspectionResult,
+    getResultImageUrl,
+    loadImageUrlAsBase64
+} from './features/inspection/inspectionController.js';
 import { showToast, createModal, closeModal, createInput, createLabeledInput, createButton } from './shared/components/uiComponents.js';
 import {
     applyTheme,
@@ -511,6 +516,44 @@ function getInlineResultImageBase64(result) {
         || null;
 }
 
+function getLatestInspectionImageBase64() {
+    return serviceRegistry.get('lastInspectionImageBase64')
+        || inspectionController.getLastResultImageBase64?.()
+        || getInlineResultImageBase64(serviceRegistry.get('lastInspectionResult'))
+        || getInlineResultImageBase64(inspectionController.getLastResult?.());
+}
+
+function getLatestInspectionImageSource() {
+    const latestBase64 = getLatestInspectionImageBase64();
+    if (latestBase64) {
+        return `data:image/png;base64,${latestBase64}`;
+    }
+
+    return getLatestInspectionImageUrl();
+}
+
+function getLatestInspectionImageUrl() {
+    return serviceRegistry.get('lastInspectionImageUrl')
+        || inspectionController.getLastResultImageUrl?.()
+        || getResultImageUrl(serviceRegistry.get('lastInspectionResult'))
+        || getResultImageUrl(inspectionController.getLastResult?.());
+}
+
+async function getLatestInspectionInputImageBase64() {
+    const latestImage = getLatestInspectionImageBase64();
+    if (latestImage) {
+        return latestImage;
+    }
+
+    const inspectionResult = serviceRegistry.get('lastInspectionResult') || inspectionController.getLastResult?.();
+    const inlineImage = resolvePreviewInputImageBase64(inspectionResult);
+    if (inlineImage) {
+        return inlineImage;
+    }
+
+    return loadImageUrlAsBase64(getLatestInspectionImageUrl());
+}
+
 function loadViewerImageSilently(viewer, imageData) {
     if (!viewer || !imageData) {
         return;
@@ -529,6 +572,8 @@ function loadViewerImageSilently(viewer, imageData) {
 }
 
 function buildResultDefects(result) {
+    return buildBoundedResultDefects(result);
+
     const actualDefects = result?.defects || result?.Defects;
     if (Array.isArray(actualDefects) && actualDefects.length > 0) {
         return actualDefects;
@@ -544,8 +589,12 @@ function buildResultDefects(result) {
     }
 
     return Array.from({ length: defectCount }, (_, index) => ({
+        type: `Target ${index + 1}`,
+        description: 'Result did not include defect details.'
+        /*
         type: `目标 ${index + 1}`,
         description: '实时结果未携带缺陷详情'
+        */
     }));
 }
 
@@ -645,9 +694,11 @@ function normalizeInspectionResultRecord(result, fallbackProjectId = null) {
     normalized.id = normalized.id ?? normalized.Id;
     normalized.projectId = normalized.projectId ?? normalized.ProjectId ?? fallbackProjectId ?? null;
     normalized.status = normalizeInspectionStatus(normalized.status ?? normalized.Status);
-    normalized.defects = buildResultDefects(normalized);
+    const actualDefectCount = getResultDefectCount(normalized);
+    normalized.defects = buildBoundedResultDefects(normalized);
     normalized.defectCount = normalized.defectCount
         ?? normalized.DefectCount
+        ?? actualDefectCount
         ?? normalized.defects.length;
     normalized.processingTime = normalized.processingTime
         ?? normalized.processingTimeMs
@@ -664,9 +715,13 @@ function normalizeInspectionResultRecord(result, fallbackProjectId = null) {
     normalized.confidenceScore = normalized.confidenceScore ?? normalized.ConfidenceScore;
     normalized.imageId = normalized.imageId || normalized.ImageId;
     normalized.imageData = getInlineResultImageBase64(normalized);
-    normalized.outputImage = normalized.outputImage || normalized.OutputImage || null;
-    normalized.outputImageBase64 = normalized.outputImageBase64 || normalized.OutputImageBase64 || null;
-    normalized.resultImageBase64 = normalized.resultImageBase64 || normalized.ResultImageBase64 || null;
+    normalized.ImageData = null;
+    normalized.outputImage = null;
+    normalized.OutputImage = null;
+    normalized.outputImageBase64 = null;
+    normalized.OutputImageBase64 = null;
+    normalized.resultImageBase64 = null;
+    normalized.ResultImageBase64 = null;
     normalized.outputData = normalizeOutputData(normalized);
     normalized.analysisData = normalizeAnalysisData(normalized);
     normalized.errorMessage = normalized.errorMessage ?? normalized.ErrorMessage ?? '';
@@ -713,6 +768,24 @@ function initializeImageViewer() {
         return;
     }
 
+    const existingImageViewer = serviceRegistry.get('imageViewer');
+    if (existingImageViewer) {
+        if (typeof existingImageViewer.isAttachedTo === 'function' && existingImageViewer.isAttachedTo(container)) {
+            imageViewer = existingImageViewer;
+            requestAnimationFrame(() => {
+                existingImageViewer.imageCanvas?.resize?.();
+            });
+            return;
+        }
+
+        if (typeof existingImageViewer.destroy === 'function') {
+            existingImageViewer.destroy();
+        } else {
+            existingImageViewer.dispose?.();
+        }
+        serviceRegistry.unregister('imageViewer', existingImageViewer);
+    }
+
     imageViewer = new ImageViewerComponent('image-viewer');
     serviceRegistry.register('imageViewer', imageViewer);
 
@@ -736,20 +809,28 @@ function initializeInspectionImageViewer() {
 
     const existingInspectionImageViewer = serviceRegistry.get('inspectionImageViewer');
     if (existingInspectionImageViewer) {
-        requestAnimationFrame(() => {
-            existingInspectionImageViewer.imageCanvas?.resize();
-        });
-        return;
+        if (typeof existingInspectionImageViewer.isAttachedTo === 'function' && existingInspectionImageViewer.isAttachedTo(container)) {
+            requestAnimationFrame(() => {
+                existingInspectionImageViewer.imageCanvas?.resize();
+            });
+            return;
+        }
+
+        if (typeof existingInspectionImageViewer.destroy === 'function') {
+            existingInspectionImageViewer.destroy();
+        } else {
+            existingInspectionImageViewer.dispose?.();
+        }
+        serviceRegistry.unregister('inspectionImageViewer', existingInspectionImageViewer);
     }
 
     try {
         const inspectionImageViewer = new ImageViewerComponent('inspection-image-area');
         serviceRegistry.register('inspectionImageViewer', inspectionImageViewer);
 
-        const lastResult = inspectionController.getLastResult?.();
-        const lastImage = getInlineResultImageBase64(lastResult);
-        if (lastImage) {
-            loadViewerImageSilently(inspectionImageViewer, `data:image/png;base64,${lastImage}`);
+        const lastImageSource = getLatestInspectionImageSource();
+        if (lastImageSource) {
+            loadViewerImageSilently(inspectionImageViewer, lastImageSource);
         }
 
         debugLogger.debug('[App] 检测图像查看器初始化完成');
@@ -787,10 +868,7 @@ function initializeNodePreviewExperience() {
             getFlowRevision: () => flowCanvas.getFlowRevision?.() || 0,
             getNodeById: nodeId => flowCanvas.nodes.get(nodeId) || null,
             getOperatorMetadata: type => findOperatorDefinition(type),
-            getInputImageBase64: () => {
-                const inspectionResult = serviceRegistry.get('lastInspectionResult') || inspectionController.getLastResult?.();
-                return resolvePreviewInputImageBase64(inspectionResult);
-            },
+            getInputImageBase64: () => getLatestInspectionInputImageBase64(),
             previewExecutor: (nodeId, options) => inspectionController.previewNode(nodeId, options),
             subscribeStructureState: listener => flowCanvas.subscribeStructureState(listener),
             debounceMs: 500
@@ -825,17 +903,32 @@ function initializeInspectionController() {
             return;
         }
 
-        eventBus.emit('inspection:result', normalizedResult);
-        serviceRegistry.register('lastInspectionResult', normalizedResult);
-        window._lastInspectionResult = normalizedResult;
+        const inlineResultImage = getInlineResultImageBase64(normalizedResult);
+        const resultImageUrl = inlineResultImage ? null : getResultImageUrl(normalizedResult);
+        const lightweightResult = createLightweightInspectionResult(normalizedResult);
+        eventBus.emit('inspection:result', lightweightResult);
+        serviceRegistry.register('lastInspectionResult', lightweightResult);
+        if (inlineResultImage) {
+            serviceRegistry.register('lastInspectionImageBase64', inlineResultImage);
+            serviceRegistry.unregister('lastInspectionImageUrl');
+        } else if (resultImageUrl) {
+            serviceRegistry.unregister('lastInspectionImageBase64');
+            serviceRegistry.register('lastInspectionImageUrl', resultImageUrl);
+        } else {
+            serviceRegistry.unregister('lastInspectionImageBase64');
+            serviceRegistry.unregister('lastInspectionImageUrl');
+        }
+        window._lastInspectionResult = lightweightResult;
 
         const isRealtimeResult = inspectionController.getState?.().isRealtime === true;
 
         if (getCurrentView() === 'inspection') {
-            const outputImage = getInlineResultImageBase64(normalizedResult);
+            const outputImage = inlineResultImage
+                ? `data:image/png;base64,${inlineResultImage}`
+                : resultImageUrl;
             const inspectionImageViewerService = serviceRegistry.get('inspectionImageViewer');
             if (outputImage && inspectionImageViewerService) {
-                loadViewerImageSilently(inspectionImageViewerService, `data:image/png;base64,${outputImage}`);
+                loadViewerImageSilently(inspectionImageViewerService, outputImage);
             }
 
             updateInspectionResultsPanel(normalizedResult);
@@ -843,7 +936,7 @@ function initializeInspectionController() {
 
         if (resultPanel && isResultPanelVisible()) {
             resultPanel.setProjectContext(currentProjectId);
-            const normalizedDefects = buildResultDefects(normalizedResult);
+            const normalizedDefects = buildBoundedResultDefects(normalizedResult);
             resultPanel.addResult({
                 id: normalizedResult.id,
                 projectId: normalizedResult.projectId,
@@ -855,7 +948,7 @@ function initializeInspectionController() {
                 timestamp: normalizedResult.timestamp || new Date().toISOString(),
                 confidenceScore: normalizedResult.confidenceScore,
                 imageId: normalizedResult.imageId,
-                imageData: getInlineResultImageBase64(normalizedResult),
+                imageData: inlineResultImage,
                 outputImage: normalizedResult.outputImage || null,
                 outputImageBase64: normalizedResult.outputImageBase64 || null,
                 resultImageBase64: normalizedResult.resultImageBase64 || null,
@@ -1329,6 +1422,13 @@ async function ensureResultPanel() {
     }
 
     const { ResultPanel } = await loadResultPanelModule();
+
+    const existingResultPanel = serviceRegistry.get('resultPanel');
+    if (existingResultPanel && typeof existingResultPanel.dispose === 'function') {
+        debugLogger.warn('[App] Found stale ResultPanel instance; disposing before recreation.');
+        existingResultPanel.dispose();
+    }
+
     resultPanel = new ResultPanel('results-list-container');
     serviceRegistry.register('resultPanel', resultPanel);
     resultPanel.setProjectContext(getCurrentProject()?.id || null);

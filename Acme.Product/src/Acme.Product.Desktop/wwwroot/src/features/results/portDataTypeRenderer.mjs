@@ -46,6 +46,10 @@ const COMMUNICATION_KEYS = new Set([
     'error',
     'errormessage'
 ]);
+const RESULT_TEXT_VALUE_MAX_CHARS = 240;
+const RESULT_STRUCTURED_VALUE_MAX_CHARS = 180;
+const RESULT_SUMMARY_VALUE_MAX_CHARS = 120;
+const RESULT_LABEL_MAX_CHARS = 80;
 
 function escapeHtml(value) {
     return String(value ?? '')
@@ -54,6 +58,24 @@ function escapeHtml(value) {
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#39;');
+}
+
+function truncateText(value, maxChars = RESULT_TEXT_VALUE_MAX_CHARS) {
+    const text = String(value ?? '');
+    const limit = Number(maxChars);
+    if (!Number.isFinite(limit) || limit <= 0 || text.length <= limit) {
+        return text;
+    }
+
+    return `${text.slice(0, Math.floor(limit))}...`;
+}
+
+function stringifyForDisplay(value) {
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return '[unserializable object]';
+    }
 }
 
 function toLookupKey(value) {
@@ -187,7 +209,17 @@ function extractDetectionItems(value) {
         return [];
     }
 
-    return getCaseInsensitive(value, 'detections', 'objects', 'defects', 'items', 'results', 'boxes') || [];
+    const candidate = getCaseInsensitive(value, 'detections', 'objects', 'defects', 'items', 'results', 'boxes');
+    if (Array.isArray(candidate)) {
+        return candidate;
+    }
+
+    if (isPlainObject(candidate)) {
+        const nestedItems = getCaseInsensitive(candidate, 'items', 'detections', 'objects', 'defects', 'results', 'boxes');
+        return Array.isArray(nestedItems) ? nestedItems : [];
+    }
+
+    return [];
 }
 
 function detectionLabel(item, index) {
@@ -228,7 +260,7 @@ function renderDetectionList(value) {
 
         return `
             <div class="cv-result-detection-row">
-                <span class="cv-result-detection-label">${escapeHtml(detectionLabel(item, index))}</span>
+                <span class="cv-result-detection-label">${escapeHtml(truncateText(detectionLabel(item, index), RESULT_LABEL_MAX_CHARS))}</span>
                 ${score ? `<span class="cv-result-detection-score">${escapeHtml(score)}</span>` : ''}
                 ${boxText}
             </div>
@@ -244,16 +276,17 @@ function renderDetectionList(value) {
 
 function renderStructuredObject(value) {
     if (!isPlainObject(value)) {
-        return `<span class="cv-result-value">${escapeHtml(String(value ?? '--'))}</span>`;
+        return `<span class="cv-result-value">${escapeHtml(truncateText(String(value ?? '--'), RESULT_STRUCTURED_VALUE_MAX_CHARS))}</span>`;
     }
 
     const rows = Object.entries(value)
         .filter(([entryKey, entryValue]) => !isImageLikeString(entryKey, entryValue))
         .slice(0, 8)
         .map(([entryKey, entryValue]) => {
-            const displayValue = isPlainObject(entryValue) || Array.isArray(entryValue)
-                ? JSON.stringify(entryValue)
+            const rawDisplayValue = isPlainObject(entryValue) || Array.isArray(entryValue)
+                ? stringifyForDisplay(entryValue)
                 : String(entryValue ?? '--');
+            const displayValue = truncateText(rawDisplayValue, RESULT_STRUCTURED_VALUE_MAX_CHARS);
 
             return `
                 <div class="cv-result-kv-row">
@@ -391,7 +424,7 @@ function renderPortDataTypeValue(field) {
         case 'DetectionList':
             return renderDetectionList(value);
         case 'String':
-            return `<span class="cv-result-text">${escapeHtml(value)}</span>`;
+            return `<span class="cv-result-text">${escapeHtml(truncateText(value))}</span>`;
         default:
             return Array.isArray(value)
                 ? `<span class="cv-result-list-summary">${value.length} items</span>`
@@ -494,12 +527,21 @@ function renderResultCardHtml(card, options = {}) {
     const statusTitle = statusClass === 'info'
         ? '算子执行数据，仅供分析；不代表最终 OK/NG 判定'
         : '结果状态';
-    const rows = normalizedCard.fields.map(field => `
+    const requestedMaxFields = Number(options.maxFields);
+    const maxFields = Number.isFinite(requestedMaxFields)
+        ? Math.max(0, Math.floor(requestedMaxFields))
+        : normalizedCard.fields.length;
+    const visibleFields = normalizedCard.fields.slice(0, maxFields);
+    const hiddenFieldCount = Math.max(0, normalizedCard.fields.length - visibleFields.length);
+    const rows = visibleFields.map(field => `
         <div class="cv-result-field cv-result-field-${escapeHtml(inferResultCategory(field))}">
             <span class="cv-result-label">${escapeHtml(field.label || field.key)}</span>
             <span class="cv-result-rendered-value">${renderPortDataTypeValue(field)}</span>
         </div>
     `).join('');
+    const hiddenHint = hiddenFieldCount > 0
+        ? `<div class="cv-result-hint">+${hiddenFieldCount} more fields</div>`
+        : '';
 
     return `
         <div class="ac-card cv-result-card ac-status-${statusClass}" data-card-type="${escapeHtml(normalizedCard.category)}">
@@ -509,6 +551,7 @@ function renderResultCardHtml(card, options = {}) {
             </div>
             <div class="ac-card-body cv-result-card-body">
                 ${rows || '<span class="cv-result-empty">No fields</span>'}
+                ${hiddenHint}
             </div>
         </div>
     `;
@@ -533,7 +576,7 @@ function summarizeResultField(field) {
     }
 
     if (typeof field?.value === 'string') {
-        return field.value;
+        return truncateText(field.value, RESULT_SUMMARY_VALUE_MAX_CHARS);
     }
 
     if (Array.isArray(field?.value)) {
@@ -544,7 +587,7 @@ function summarizeResultField(field) {
         return `${Object.keys(field.value).length} fields`;
     }
 
-    return String(field?.value ?? '--');
+    return truncateText(String(field?.value ?? '--'), RESULT_SUMMARY_VALUE_MAX_CHARS);
 }
 
 export {

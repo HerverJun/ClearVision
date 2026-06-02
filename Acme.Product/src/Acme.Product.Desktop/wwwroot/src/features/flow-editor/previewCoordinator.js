@@ -8,6 +8,12 @@ const DEFAULT_PREVIEW_TIMEOUT_MS = 15000;
 const HIGH_COST_PREVIEW_TIMEOUT_MS = 30000;
 const MAX_PREVIEW_INPUT_BASE64_CHARS = 24 * 1024 * 1024;
 const MAX_CACHE_IMAGE_BASE64_CHARS = 6 * 1024 * 1024;
+const DEFAULT_MAX_CACHE_OUTPUT_IMAGE_BASE64_CHARS = 24 * 1024 * 1024;
+const PREVIEW_OUTPUT_ARRAY_LIMIT = 24;
+const PREVIEW_OUTPUT_OBJECT_FIELD_LIMIT = 48;
+const PREVIEW_OUTPUT_STRING_LIMIT = 512;
+const PREVIEW_OUTPUT_MAX_DEPTH = 3;
+const PREVIEW_OUTPUT_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
 const HIGH_COST_OPERATOR_TYPE_HINTS = [
     'DeepLearning',
     'OnnxInference',
@@ -115,6 +121,93 @@ function normalizeBase64Image(imageValue) {
 
 function isPreviewPayloadTooLarge(imageBase64) {
     return typeof imageBase64 === 'string' && imageBase64.length > MAX_PREVIEW_INPUT_BASE64_CHARS;
+}
+
+function getCacheOutputImageBase64Chars(value) {
+    return typeof value?.outputImageBase64 === 'string'
+        ? value.outputImageBase64.length
+        : 0;
+}
+
+function isPreviewOutputImageLikeValue(key, value) {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    const text = value.trim();
+    return isPreviewImageLikePayload(text) ||
+        (PREVIEW_OUTPUT_IMAGE_KEY_PATTERN.test(String(key || '')) && text.length > 120);
+}
+
+function compactPreviewOutputString(key, value) {
+    if (isPreviewOutputImageLikeValue(key, value)) {
+        return '[image omitted]';
+    }
+
+    const text = String(value ?? '');
+    return text.length > PREVIEW_OUTPUT_STRING_LIMIT
+        ? `${text.slice(0, PREVIEW_OUTPUT_STRING_LIMIT)}...`
+        : text;
+}
+
+function compactPreviewOutputValue(value, depth = 0, seen = new WeakSet(), sourceKey = '') {
+    if (typeof value === 'string') {
+        return compactPreviewOutputString(sourceKey, value);
+    }
+
+    if (value === null || value === undefined || typeof value !== 'object') {
+        return value;
+    }
+
+    if (seen.has(value)) {
+        return '[circular]';
+    }
+
+    if (depth >= PREVIEW_OUTPUT_MAX_DEPTH) {
+        return Array.isArray(value)
+            ? `${value.length} items`
+            : `${Object.keys(value).length} fields`;
+    }
+
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+        const compactItems = value
+            .slice(0, PREVIEW_OUTPUT_ARRAY_LIMIT)
+            .map(item => compactPreviewOutputValue(item, depth + 1, seen, sourceKey));
+        if (value.length > compactItems.length) {
+            compactItems.push(`+${value.length - compactItems.length} more`);
+        }
+        return compactItems;
+    }
+
+    const compact = {};
+    const entries = Object.entries(value);
+    let visibleCount = 0;
+    let omittedImageCount = 0;
+    for (const [key, entryValue] of entries) {
+        if (isPreviewOutputImageLikeValue(key, entryValue)) {
+            omittedImageCount += 1;
+            continue;
+        }
+
+        if (visibleCount >= PREVIEW_OUTPUT_OBJECT_FIELD_LIMIT) {
+            break;
+        }
+
+        compact[key] = compactPreviewOutputValue(entryValue, depth + 1, seen, key);
+        visibleCount += 1;
+    }
+
+    const hiddenCount = Math.max(0, entries.length - visibleCount - omittedImageCount);
+    if (hiddenCount > 0) {
+        compact.__hiddenFieldCount = hiddenCount;
+    }
+    if (omittedImageCount > 0) {
+        compact.__omittedImageFieldCount = omittedImageCount;
+    }
+
+    return compact;
 }
 
 export function extractPreviewImageBase64(result) {
@@ -506,6 +599,11 @@ export class NodePreviewCoordinator {
         this.maxCacheEntries = Number.isFinite(maxCacheEntries)
             ? Math.max(0, Math.floor(maxCacheEntries))
             : 30;
+        const maxCacheOutputImageBase64Chars = Number(
+            options.maxCacheOutputImageBase64Chars ?? DEFAULT_MAX_CACHE_OUTPUT_IMAGE_BASE64_CHARS);
+        this.maxCacheOutputImageBase64Chars = Number.isFinite(maxCacheOutputImageBase64Chars)
+            ? Math.max(0, Math.floor(maxCacheOutputImageBase64Chars))
+            : DEFAULT_MAX_CACHE_OUTPUT_IMAGE_BASE64_CHARS;
 
         this.listeners = new Set();
         this.cache = new Map();
@@ -748,7 +846,8 @@ export class NodePreviewCoordinator {
                 this.cache.set(request.requestKey, cached);
                 this.updateState({
                     ...cached,
-                    request
+                    request,
+                    inputImageBase64: inputImageBase64 || null
                 });
                 return;
             }
@@ -793,9 +892,7 @@ export class NodePreviewCoordinator {
                 }
 
                 const parsed = parsePreviewResponse(response);
-                const outputData = parsed.outputData && typeof parsed.outputData === 'object'
-                    ? { ...parsed.outputData }
-                    : parsed.outputData;
+                const outputData = compactPreviewOutputValue(parsed.outputData);
                 if (parsed.outputImageBase64 && isPreviewPayloadTooLarge(parsed.outputImageBase64)) {
                     parsed.outputImageBase64 = null;
                     if (outputData && typeof outputData === 'object') {
@@ -906,8 +1003,35 @@ export class NodePreviewCoordinator {
             this.cache.delete(requestKey);
         }
 
-        this.cache.set(requestKey, value);
+        this.cache.set(requestKey, {
+            ...value,
+            inputImageBase64: null
+        });
+        this.pruneCache();
+    }
+
+    getCachedOutputImageBase64Chars() {
+        let total = 0;
+        this.cache.forEach(value => {
+            total += getCacheOutputImageBase64Chars(value);
+        });
+
+        return total;
+    }
+
+    pruneCache() {
         while (this.cache.size > this.maxCacheEntries) {
+            const oldestKey = this.cache.keys().next().value;
+            if (oldestKey === undefined) {
+                break;
+            }
+            this.cache.delete(oldestKey);
+        }
+
+        while (
+            this.cache.size > 0
+            && this.getCachedOutputImageBase64Chars() > this.maxCacheOutputImageBase64Chars
+        ) {
             const oldestKey = this.cache.keys().next().value;
             if (oldestKey === undefined) {
                 break;

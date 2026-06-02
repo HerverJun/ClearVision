@@ -191,6 +191,108 @@ export function installSystemTabs(SettingsView) {
             `;
         }
         ,
+        renderDatabaseTab() {
+            const status = this.databaseStatus || {};
+            const rowCounts = status.rowCounts || {};
+            const state = status.state || 'Unknown';
+            const stateClass = state === 'Healthy'
+                ? 'status-connected'
+                : (state === 'PendingMigration' ? 'status-warning' : 'status-disconnected');
+            const issueCount = Array.isArray(status.issues) ? status.issues.length : 0;
+            const backupRoot = status.backupRootDirectory || '--';
+            const databasePath = status.databasePath || '--';
+            const packageRoot = status.packageRootDirectory || '--';
+            const retentionDays = this.config?.storage?.retentionDays ?? 30;
+            return `
+                <div class="settings-section-title">
+                    <h2>数据库维护</h2>
+                    <p>SQLite schema、迁移、备份恢复、历史清理和健康诊断集中在这里。</p>
+                </div>
+                ${this.renderScopeNotice('database')}
+
+                <div class="settings-modern-card" style="margin-bottom:24px;">
+                    <div class="settings-card-header">
+                        <div class="settings-header-left">
+                            <svg viewBox="0 0 24 24" class="settings-header-icon"><path d="M12 3C7.58 3 4 4.34 4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6c0-1.66-3.58-3-8-3zm0 2c3.31 0 6 .67 6 1s-2.69 1-6 1-6-.67-6-1 2.69-1 6-1zm0 14c-3.31 0-6-.67-6-1v-2.08C7.46 16.58 9.6 17 12 17s4.54-.42 6-1.08V18c0 .33-2.69 1-6 1z"/></svg>
+                            <span>数据库状态</span>
+                        </div>
+                        <span class="settings-status-badge ${stateClass}"><span class="status-dot"></span> ${this.escapeHtml(state)}</span>
+                    </div>
+                    <div class="settings-card-body">
+                        <div style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-bottom:20px;">
+                            ${this.renderDatabaseMetric('Schema', `${status.schemaVersion ?? 0} / ${status.currentSchemaVersion ?? 0}`)}
+                            ${this.renderDatabaseMetric('待迁移', `${status.pendingMigrations?.length ?? 0}`)}
+                            ${this.renderDatabaseMetric('健康检查', status.integrityCheck || 'not-run')}
+                            ${this.renderDatabaseMetric('问题', `${issueCount}`)}
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; font-size:12px; line-height:1.5;">
+                            <div><span class="text-muted">数据库</span><div style="font-family:var(--font-mono); overflow-wrap:anywhere;">${this.escapeHtml(databasePath)}</div></div>
+                            <div><span class="text-muted">备份目录</span><div style="font-family:var(--font-mono); overflow-wrap:anywhere;">${this.escapeHtml(backupRoot)}</div></div>
+                            <div><span class="text-muted">包目录</span><div style="font-family:var(--font-mono); overflow-wrap:anywhere;">${this.escapeHtml(packageRoot)}</div></div>
+                            <div><span class="text-muted">数据库大小</span><div>${this.formatDatabaseBytes(status.databaseSizeBytes || 0)} / WAL ${this.formatDatabaseBytes(status.walSizeBytes || 0)}</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,0.9fr); gap:24px;">
+                    <div class="settings-modern-card">
+                        <div class="settings-card-header">
+                            <div class="settings-header-left">
+                                <svg viewBox="0 0 24 24" class="settings-header-icon"><path d="M19 21H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h11l5 5v11c0 1.1-.9 2-2 2zM12 19c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zM6 5v5h9V5H6z"/></svg>
+                                <span>备份与恢复</span>
+                            </div>
+                        </div>
+                        <div class="settings-card-body">
+                            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;">
+                                <button class="cv-btn cv-btn-primary" id="btn-database-backup">创建备份</button>
+                                <button class="cv-btn settings-btn-light" id="btn-database-refresh">刷新状态</button>
+                                <button class="cv-btn settings-btn-light" id="btn-database-repair">执行维护</button>
+                            </div>
+                            <div class="settings-fieldset">
+                                <label>恢复备份路径</label>
+                                <input type="text" class="cv-input" id="cfg-database-restore-path" placeholder="${this.escapeHtml(backupRoot)}">
+                            </div>
+                            <button class="cv-btn settings-btn-danger" id="btn-database-restore" style="margin-top:12px;">恢复备份</button>
+                            <div id="database-last-action" class="settings-field-hint" style="display:block; margin-top:12px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-modern-card">
+                        <div class="settings-card-header">
+                            <div class="settings-header-left">
+                                <svg viewBox="0 0 24 24" class="settings-header-icon"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4h-3.5z"/></svg>
+                                <span>历史保留清理</span>
+                            </div>
+                        </div>
+                        <div class="settings-card-body">
+                            <div class="settings-fieldset">
+                                <label>保留天数</label>
+                                <input type="number" class="cv-input" id="cfg-database-retention-days" value="${retentionDays}">
+                            </div>
+                            <button class="cv-btn settings-btn-danger" id="btn-database-cleanup" style="width:100%; margin-top:16px;">清理历史数据</button>
+                            <div style="margin-top:16px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; font-size:12px;">
+                                ${this.renderDatabaseMetric('检测历史', rowCounts.InspectionResults ?? 0)}
+                                ${this.renderDatabaseMetric('监控结果', rowCounts.StationResultSummaries ?? 0)}
+                                ${this.renderDatabaseMetric('健康采样', rowCounts.StationHealthSnapshots ?? 0)}
+                                ${this.renderDatabaseMetric('命令记录', rowCounts.StationCommandRecords ?? 0)}
+                                ${this.renderDatabaseMetric('审计记录', rowCounts.StationAuditRecords ?? 0)}
+                                ${this.renderDatabaseMetric('包记录', rowCounts.StationPackageRecords ?? 0)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        ,
+        renderDatabaseMetric(label, value) {
+            return `
+                <div style="border:1px solid #e2e8f0; border-radius:8px; padding:10px 12px; background:#fff;">
+                    <div class="text-muted" style="font-size:12px; margin-bottom:4px;">${this.escapeHtml(label)}</div>
+                    <div style="font-weight:700; color:#0f172a; overflow-wrap:anywhere;">${this.escapeHtml(value)}</div>
+                </div>
+            `;
+        }
+        ,
         renderRuntimeTab() {
             const runtime = this.config?.runtime || this.getDefaultConfig().runtime;
             return `
@@ -643,6 +745,129 @@ export function installSystemTabs(SettingsView) {
             }
         }
         ,
+        bindDatabaseMaintenanceEvents() {
+            const tab = this.container?.querySelector('[data-section="database"]');
+            if (!tab || tab.dataset.bound === 'true') return;
+            tab.dataset.bound = 'true';
+
+            tab.addEventListener('click', async event => {
+                const button = event.target.closest('button');
+                if (!button) return;
+
+                if (button.id === 'btn-database-refresh') {
+                    await this.refreshDatabaseStatus();
+                } else if (button.id === 'btn-database-repair') {
+                    await this.runDatabaseRepair();
+                } else if (button.id === 'btn-database-backup') {
+                    await this.createDatabaseBackup();
+                } else if (button.id === 'btn-database-cleanup') {
+                    await this.cleanupDatabaseHistory();
+                } else if (button.id === 'btn-database-restore') {
+                    await this.restoreDatabaseBackup();
+                }
+            });
+        }
+        ,
+        async refreshDatabaseStatus() {
+            try {
+                this.databaseStatus = await settingsApi.getDatabaseStatus();
+                this.renderDatabasePanel();
+            } catch (error) {
+                showToast('数据库状态加载失败: ' + error.message, 'error');
+            }
+        }
+        ,
+        renderDatabasePanel() {
+            const panel = this.container?.querySelector('[data-section="database"]');
+            if (!panel) return;
+            panel.innerHTML = this.renderDatabaseTab();
+            panel.dataset.bound = 'false';
+            this.bindDatabaseMaintenanceEvents();
+        }
+        ,
+        async createDatabaseBackup() {
+            try {
+                const result = await settingsApi.backupDatabase();
+                showToast('数据库备份已创建', 'success');
+                await this.refreshDatabaseStatus();
+                this.setDatabaseLastAction(`备份已创建：${result?.backupPath || result?.BackupPath || ''}`);
+            } catch (error) {
+                showToast('数据库备份失败: ' + error.message, 'error');
+            }
+        }
+        ,
+        async runDatabaseRepair() {
+            try {
+                this.databaseStatus = await settingsApi.repairDatabase();
+                this.renderDatabasePanel();
+                showToast('数据库维护已执行', 'success');
+            } catch (error) {
+                showToast('数据库维护失败: ' + error.message, 'error');
+            }
+        }
+        ,
+        async cleanupDatabaseHistory() {
+            let retentionDays;
+            try {
+                retentionDays = this.readIntegerSetting('#cfg-database-retention-days', '数据库历史保留天数', { min: 1, max: 3650 });
+            } catch (error) {
+                showToast(error.message, 'warning');
+                return;
+            }
+
+            if (!confirm(`确认清理 ${retentionDays} 天以前的检测历史和 Station 监控采样吗？\n\n包记录、命令记录和审计记录会保留。`)) {
+                return;
+            }
+
+            try {
+                const result = await settingsApi.cleanupDatabaseHistory(retentionDays);
+                const totalDeleted = Object.values(result?.deletedRows || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+                showToast(`历史清理完成：${totalDeleted} 行`, 'success');
+                await this.refreshDatabaseStatus();
+                this.setDatabaseLastAction(`历史清理完成：${totalDeleted} 行`);
+            } catch (error) {
+                showToast('历史清理失败: ' + error.message, 'error');
+            }
+        }
+        ,
+        async restoreDatabaseBackup() {
+            const input = this.container?.querySelector('#cfg-database-restore-path');
+            const backupPath = String(input?.value || '').trim();
+            if (!backupPath) {
+                showToast('请先填写备份路径', 'warning');
+                return;
+            }
+
+            if (!confirm('确认恢复数据库备份吗？\n\n系统会先创建一份恢复前安全备份，然后替换当前 SQLite 数据库并合并包文件。')) {
+                return;
+            }
+
+            try {
+                const result = await settingsApi.restoreDatabase(backupPath);
+                this.databaseStatus = result?.status || result?.Status || null;
+                this.renderDatabasePanel();
+                this.setDatabaseLastAction(`恢复完成，安全备份：${result?.safetyBackupPath || result?.SafetyBackupPath || ''}`);
+                showToast('数据库备份已恢复', 'success');
+            } catch (error) {
+                showToast('数据库恢复失败: ' + error.message, 'error');
+            }
+        }
+        ,
+        setDatabaseLastAction(message) {
+            const element = this.container?.querySelector('#database-last-action');
+            if (element) {
+                element.textContent = message || '';
+            }
+        }
+        ,
+        formatDatabaseBytes(bytes) {
+            const value = Number(bytes || 0);
+            if (value < 1024) return `${value} B`;
+            if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+            if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+            return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
+        }
+        ,
         async changePassword() {
             const currentPassword = this.container?.querySelector('#cfg-current-password')?.value || '';
             const newPassword = this.container?.querySelector('#cfg-new-password')?.value || '';
@@ -684,7 +909,7 @@ export function installSystemTabs(SettingsView) {
         async resetSettings() {
             const resetFeature = getFeatureMeta('settings.reset');
             const resetLabel = getFeatureButtonLabel('settings.reset', '恢复默认设置');
-            if (!confirm(`确定要${resetLabel}吗？\n\n将重置普通系统配置、PLC 配置、相机绑定和 AI 模型配置；Station token 不会写入普通配置，但现场连接可能需要重新检查。${resetFeature.description}`)) {
+            if (!confirm(`确定要${resetLabel}吗？\n\n将重置普通系统配置、PLC 配置、相机绑定和 AI 模型配置；Station token 保存在 Station 专用配置中，现场连接可能需要重新检查。${resetFeature.description}`)) {
                 return;
             }
 

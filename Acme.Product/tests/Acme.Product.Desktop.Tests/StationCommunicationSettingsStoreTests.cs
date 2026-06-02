@@ -48,7 +48,8 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
         ingress.GetProperty("Enabled").GetBoolean().Should().BeTrue();
         ingress.GetProperty("ListenMode").GetString().Should().Be("Loopback");
         ingress.GetProperty("Port").GetInt32().Should().Be(5010);
-        ingress.GetProperty("SharedToken").GetString().Should().NotBeNullOrWhiteSpace();
+        var sharedToken = ingress.GetProperty("SharedToken").GetString();
+        sharedToken.Should().MatchRegex(@"^\d{6}$");
         ingress.GetProperty("AllowInsecureDevelopment").GetBoolean().Should().BeFalse();
 
         using var stationDocument = JsonDocument.Parse(File.ReadAllText(store.StationSyncSettingsPath));
@@ -56,7 +57,7 @@ public sealed class StationCommunicationSettingsStoreTests : IDisposable
         stationSync.GetProperty("Enabled").GetBoolean().Should().BeTrue();
         stationSync.GetProperty("StudioBaseUrl").GetString().Should().Be("http://127.0.0.1:5010");
         stationSync.GetProperty("StudioHubUrl").GetString().Should().BeEmpty();
-        stationSync.GetProperty("SharedToken").GetString().Should().Be(ingress.GetProperty("SharedToken").GetString());
+        stationSync.GetProperty("SharedToken").GetString().Should().Be(sharedToken);
         stationSync.TryGetProperty("HeartbeatIntervalSeconds", out _).Should().BeFalse();
         stationSync.TryGetProperty("SpoolDirectory", out _).Should().BeFalse();
     }

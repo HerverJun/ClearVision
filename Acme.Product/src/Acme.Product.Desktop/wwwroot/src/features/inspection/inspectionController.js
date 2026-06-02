@@ -21,6 +21,226 @@ const [getInspectionState, setInspectionState, subscribeInspectionState] = creat
 
 const [getLastResult, setLastResult, subscribeLastResult] = createSignal(null);
 
+const INLINE_RESULT_IMAGE_KEYS = [
+    'imageData',
+    'ImageData',
+    'outputImage',
+    'OutputImage',
+    'outputImageBase64',
+    'OutputImageBase64',
+    'resultImageBase64',
+    'ResultImageBase64'
+];
+
+const MAX_PREVIEW_INPUT_IMAGE_BYTES = 18 * 1024 * 1024;
+const DEFAULT_SSE_MAX_FRAME_CHARS = 2 * 1024 * 1024;
+const DEFAULT_SSE_MAX_BUFFER_CHARS = 4 * 1024 * 1024;
+const LIGHTWEIGHT_RESULT_ARRAY_LIMIT = 24;
+const LIGHTWEIGHT_RESULT_OBJECT_FIELD_LIMIT = 48;
+const LIGHTWEIGHT_RESULT_STRING_LIMIT = 512;
+const LIGHTWEIGHT_RESULT_MAX_DEPTH = 3;
+const LIGHTWEIGHT_RESULT_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
+
+function getInlineResultImageBase64(result) {
+    if (!result || typeof result !== 'object') {
+        return null;
+    }
+
+    for (const key of INLINE_RESULT_IMAGE_KEYS) {
+        const value = result[key];
+        if (typeof value === 'string' && value.length > 0) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+function isLightweightImageLikeValue(key, value) {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    const text = value.trim();
+    if (text.startsWith('data:image/')) {
+        return true;
+    }
+
+    return LIGHTWEIGHT_RESULT_IMAGE_KEY_PATTERN.test(String(key || '')) && text.length > 120;
+}
+
+function compactLightweightResultString(key, value) {
+    if (isLightweightImageLikeValue(key, value)) {
+        return '[image omitted]';
+    }
+
+    const text = String(value ?? '');
+    return text.length > LIGHTWEIGHT_RESULT_STRING_LIMIT
+        ? `${text.slice(0, LIGHTWEIGHT_RESULT_STRING_LIMIT)}...`
+        : text;
+}
+
+function compactLightweightResultValue(value, depth = 0, seen = new WeakSet(), sourceKey = '') {
+    if (typeof value === 'string') {
+        return compactLightweightResultString(sourceKey, value);
+    }
+
+    if (value === null || value === undefined || typeof value !== 'object') {
+        return value;
+    }
+
+    if (seen.has(value)) {
+        return '[circular]';
+    }
+
+    if (depth >= LIGHTWEIGHT_RESULT_MAX_DEPTH) {
+        return Array.isArray(value)
+            ? `${value.length} items`
+            : `${Object.keys(value).length} fields`;
+    }
+
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+        const visibleItems = value
+            .slice(0, LIGHTWEIGHT_RESULT_ARRAY_LIMIT)
+            .map(item => compactLightweightResultValue(item, depth + 1, seen, sourceKey));
+        if (value.length > visibleItems.length) {
+            visibleItems.push(`+${value.length - visibleItems.length} more`);
+        }
+        return visibleItems;
+    }
+
+    const compact = {};
+    const entries = Object.entries(value);
+    let visibleCount = 0;
+    let omittedImageCount = 0;
+    for (const [key, entryValue] of entries) {
+        if (isLightweightImageLikeValue(key, entryValue)) {
+            omittedImageCount += 1;
+            continue;
+        }
+
+        if (visibleCount >= LIGHTWEIGHT_RESULT_OBJECT_FIELD_LIMIT) {
+            break;
+        }
+
+        compact[key] = compactLightweightResultValue(entryValue, depth + 1, seen, key);
+        visibleCount += 1;
+    }
+
+    const hiddenCount = Math.max(0, entries.length - visibleCount - omittedImageCount);
+    if (hiddenCount > 0) {
+        compact.__hiddenFieldCount = hiddenCount;
+    }
+    if (omittedImageCount > 0) {
+        compact.__omittedImageFieldCount = omittedImageCount;
+    }
+    return compact;
+}
+
+function createLightweightInspectionResult(result) {
+    if (!result || typeof result !== 'object') {
+        return result ?? null;
+    }
+
+    const lightweight = { ...result };
+    for (const key of INLINE_RESULT_IMAGE_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(lightweight, key)) {
+            lightweight[key] = null;
+        }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(lightweight, 'outputData')) {
+        lightweight.outputData = compactLightweightResultValue(lightweight.outputData);
+    }
+    if (Object.prototype.hasOwnProperty.call(lightweight, 'OutputData')) {
+        lightweight.OutputData = compactLightweightResultValue(lightweight.OutputData);
+    }
+    if (Object.prototype.hasOwnProperty.call(lightweight, 'analysisData')) {
+        lightweight.analysisData = compactLightweightResultValue(lightweight.analysisData);
+    }
+    if (Object.prototype.hasOwnProperty.call(lightweight, 'AnalysisData')) {
+        lightweight.AnalysisData = compactLightweightResultValue(lightweight.AnalysisData);
+    }
+    if (Array.isArray(lightweight.defects) && lightweight.defects.length > LIGHTWEIGHT_RESULT_ARRAY_LIMIT) {
+        lightweight.defects = [
+            ...lightweight.defects.slice(0, LIGHTWEIGHT_RESULT_ARRAY_LIMIT).map(defect => compactLightweightResultValue(defect)),
+            `+${lightweight.defects.length - LIGHTWEIGHT_RESULT_ARRAY_LIMIT} more`
+        ];
+    }
+    if (Array.isArray(lightweight.Defects) && lightweight.Defects.length > LIGHTWEIGHT_RESULT_ARRAY_LIMIT) {
+        lightweight.Defects = [
+            ...lightweight.Defects.slice(0, LIGHTWEIGHT_RESULT_ARRAY_LIMIT).map(defect => compactLightweightResultValue(defect)),
+            `+${lightweight.Defects.length - LIGHTWEIGHT_RESULT_ARRAY_LIMIT} more`
+        ];
+    }
+
+    return lightweight;
+}
+
+function getResultImageUrl(result) {
+    const imageId = result?.imageId ?? result?.ImageId;
+    if (!imageId) {
+        return null;
+    }
+
+    return httpClient.buildRequestUrl(`/images/${encodeURIComponent(imageId)}`);
+}
+
+function encodeBytesToBase64(bytes) {
+    if (typeof Buffer !== 'undefined') {
+        return Buffer.from(bytes).toString('base64');
+    }
+
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let index = 0; index < bytes.length; index += chunkSize) {
+        const chunk = bytes.subarray(index, index + chunkSize);
+        binary += String.fromCharCode(...chunk);
+    }
+
+    return btoa(binary);
+}
+
+async function loadImageUrlAsBase64(imageUrl, options = {}) {
+    if (!imageUrl) {
+        return null;
+    }
+
+    const configuredMaxBytes = Number(options.maxBytes ?? MAX_PREVIEW_INPUT_IMAGE_BYTES);
+    const maxBytes = Number.isFinite(configuredMaxBytes) && configuredMaxBytes > 0
+        ? configuredMaxBytes
+        : MAX_PREVIEW_INPUT_IMAGE_BYTES;
+    const requestUrl = httpClient.buildRequestUrl(imageUrl);
+
+    try {
+        const response = await fetch(requestUrl, {
+            method: 'GET',
+            headers: httpClient.defaultHeaders,
+            signal: options.signal
+        });
+        if (!response.ok) {
+            return null;
+        }
+
+        const contentLength = Number(response.headers?.get?.('content-length') ?? 0);
+        if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+            return null;
+        }
+
+        const blob = await response.blob();
+        if (Number.isFinite(maxBytes) && blob.size > maxBytes) {
+            return null;
+        }
+
+        return encodeBytesToBase64(new Uint8Array(await blob.arrayBuffer()));
+    } catch (error) {
+        console.warn('[InspectionController] Failed to load cached inspection image:', error);
+        return null;
+    }
+}
+
 function debugInspectionLog(...args) {
     if (globalThis.CV_DEBUG_INSPECTION === true) {
         console.debug(...args);
@@ -34,6 +254,10 @@ class InspectionController {
         this.abortController = null;
         this.flowProvider = null;
         this.imageSinks = [];
+        this.webMessageUnsubscribers = [];
+        this.webMessageInitialized = false;
+        this._onCompletedCallbacks = new Set();
+        this._onErrorCallbacks = new Set();
         
         // 【架构修复 v2】SSE 相关
         this.eventSource = null;
@@ -48,8 +272,13 @@ class InspectionController {
         this.sseReconnectAttempt = 0;
         this.sseReconnectBaseDelayMs = 1000;
         this.sseReconnectMaxDelayMs = 10000;
+        this.sseMaxFrameChars = DEFAULT_SSE_MAX_FRAME_CHARS;
+        this.sseMaxBufferChars = DEFAULT_SSE_MAX_BUFFER_CHARS;
         this.recentCompletedResultKeys = new Map();
         this.resultDedupeWindowMs = 5000;
+        this.resultDedupeMaxEntries = 1000;
+        this.lastResultImageBase64 = null;
+        this.lastResultImageUrl = null;
         
         // 初始化监听
         this.initializeWebMessage();
@@ -113,45 +342,68 @@ class InspectionController {
      * 初始化 WebMessage 监听（降级方案）
      */
     initializeWebMessage() {
+        if (this.webMessageInitialized) {
+            return;
+        }
+
+        const register = (type, handler) => {
+            this.webMessageUnsubscribers.push(webMessageBridge.on(type, handler));
+        };
+
         // 监听算子执行事件
-        webMessageBridge.on('operatorExecuted', (data) => {
+        register('operatorExecuted', (data) => {
             debugInspectionLog('[InspectionController] 算子执行完成:', data);
             this.updateProgress(data);
         });
 
         // 【架构修复 v2】监听状态变更事件
-        webMessageBridge.on('stateChanged', (data) => {
+        register('stateChanged', (data) => {
             debugInspectionLog('[InspectionController] 状态变更:', data);
             this.handleStateChanged(data);
         });
 
         // 【架构修复 v2】监听检测结果事件
-        webMessageBridge.on('resultProduced', (data) => {
+        register('resultProduced', (data) => {
             debugInspectionLog('[InspectionController] 检测结果:', data);
             this.handleResultEvent(data);
         });
 
         // 【架构修复 v2】监听进度事件
-        webMessageBridge.on('progressChanged', (data) => {
+        register('progressChanged', (data) => {
             debugInspectionLog('[InspectionController] 进度更新:', data);
             this.updateProgress(data);
         });
 
         // 监听检测完成事件（兼容旧版）
-        webMessageBridge.on('faulted', (data) => {
+        register('faulted', (data) => {
             console.error('[InspectionController] faulted:', data);
             this.handleInspectionError(new Error(data.errorMessage || 'Realtime inspection faulted'));
         });
 
-        webMessageBridge.on('inspectionCompleted', (data) => {
+        register('inspectionCompleted', (data) => {
             debugInspectionLog('[InspectionController] 检测完成:', data);
             this.handleInspectionCompleted(data);
         });
 
         // 监听进度通知
-        webMessageBridge.on('progressNotification', (data) => {
+        register('progressNotification', (data) => {
             this.updateProgress(data);
         });
+
+        this.webMessageInitialized = true;
+    }
+
+    disposeWebMessage() {
+        const unsubscribers = this.webMessageUnsubscribers.splice(0);
+        unsubscribers.forEach((unsubscribe) => {
+            try {
+                unsubscribe();
+            } catch (error) {
+                console.warn('[InspectionController] WebMessage unsubscribe failed:', error);
+            }
+        });
+
+        this.webMessageInitialized = false;
     }
 
     /**
@@ -248,24 +500,55 @@ class InspectionController {
         const decoder = new TextDecoder();
         let buffer = '';
 
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) {
-                break;
+        try {
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) {
+                    break;
+                }
+
+                buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+
+                let separatorIndex = buffer.indexOf('\n\n');
+                while (separatorIndex >= 0) {
+                    const frame = buffer.slice(0, separatorIndex);
+                    buffer = buffer.slice(separatorIndex + 2);
+                    this.dispatchBoundedSseFrame(frame);
+                    separatorIndex = buffer.indexOf('\n\n');
+                }
+
+                this.assertSseBufferWithinLimit(buffer);
+            }
+        } finally {
+            try {
+                reader.releaseLock?.();
+            } catch (error) {
+                debugInspectionLog('[InspectionController] SSE reader release failed:', error);
             }
 
-            buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+            this.useSse = false;
+        }
+    }
 
-            let separatorIndex = buffer.indexOf('\n\n');
-            while (separatorIndex >= 0) {
-                const frame = buffer.slice(0, separatorIndex);
-                buffer = buffer.slice(separatorIndex + 2);
-                this.dispatchSseFrame(frame);
-                separatorIndex = buffer.indexOf('\n\n');
-            }
+    dispatchBoundedSseFrame(frame) {
+        const maxFrameChars = Number(this.sseMaxFrameChars);
+        if (Number.isFinite(maxFrameChars) && maxFrameChars > 0 && frame.length > maxFrameChars) {
+            console.warn('[InspectionController] Dropping oversized SSE frame.', {
+                length: frame.length,
+                maxFrameChars
+            });
+            return false;
         }
 
-        this.useSse = false;
+        this.dispatchSseFrame(frame);
+        return true;
+    }
+
+    assertSseBufferWithinLimit(buffer) {
+        const maxBufferChars = Number(this.sseMaxBufferChars);
+        if (Number.isFinite(maxBufferChars) && maxBufferChars > 0 && buffer.length > maxBufferChars) {
+            throw new Error(`SSE buffer exceeded ${maxBufferChars} characters without a frame boundary`);
+        }
     }
 
     isActiveSseConnection(connectionId) {
@@ -437,16 +720,21 @@ class InspectionController {
             outputImageBase64: data.outputImageBase64 ?? data.OutputImageBase64
         });
 
-        setLastResult(result);
-
-        // 如果有输出图像，显示它
-        if (result.outputImageBase64) {
-            this.publishBase64Image(result.outputImageBase64);
-        }
-
         if (!this.markResultAsHandled(result)) {
             debugInspectionLog('[InspectionController] 忽略重复检测结果:', this.getResultDedupeKey(result));
             return;
+        }
+
+        const outputImage = getInlineResultImageBase64(result);
+        this.lastResultImageBase64 = outputImage || null;
+        this.lastResultImageUrl = outputImage ? null : getResultImageUrl(result);
+        setLastResult(createLightweightInspectionResult(result));
+
+        // 如果有输出图像，显示它
+        if (outputImage) {
+            this.publishBase64Image(outputImage);
+        } else if (this.lastResultImageUrl) {
+            this.publishImageData(this.lastResultImageUrl);
         }
 
         this.notifyInspectionCompleted(result);
@@ -472,8 +760,8 @@ class InspectionController {
             const flowData = this.getCurrentFlowData();
 
             if (imageData) {
-                const base64Data = imageData instanceof Uint8Array 
-                    ? btoa(String.fromCharCode(...imageData))
+                const base64Data = imageData instanceof Uint8Array
+                    ? encodeBytesToBase64(imageData)
                     : imageData;
 
                 result = await httpClient.post('/inspection/execute', {
@@ -722,8 +1010,7 @@ class InspectionController {
      */
     handleInspectionCompleted(result) {
         const normalizedResult = this.normalizeResultPayload(result);
-
-        setLastResult(normalizedResult);
+        const isDuplicate = !this.markResultAsHandled(normalizedResult);
 
         setInspectionState({
             ...getInspectionState(),
@@ -732,16 +1019,20 @@ class InspectionController {
             status: normalizedResult.status === 'Error' ? 'error' : 'completed'
         });
 
-        const outputImage = normalizedResult.outputImage
-            || normalizedResult.resultImageBase64
-            || normalizedResult.outputImageBase64;
-        if (outputImage) {
-            this.publishBase64Image(outputImage);
-        }
-
-        if (!this.markResultAsHandled(normalizedResult)) {
+        if (isDuplicate) {
             debugInspectionLog('[InspectionController] 忽略重复检测完成:', this.getResultDedupeKey(normalizedResult));
             return;
+        }
+
+        const outputImage = getInlineResultImageBase64(normalizedResult);
+        this.lastResultImageBase64 = outputImage || null;
+        this.lastResultImageUrl = outputImage ? null : getResultImageUrl(normalizedResult);
+        setLastResult(createLightweightInspectionResult(normalizedResult));
+
+        if (outputImage) {
+            this.publishBase64Image(outputImage);
+        } else if (this.lastResultImageUrl) {
+            this.publishImageData(this.lastResultImageUrl);
         }
 
         this.notifyInspectionCompleted(normalizedResult);
@@ -758,15 +1049,13 @@ class InspectionController {
             status: 'error'
         });
 
-        if (this._onErrorCallbacks) {
-            this._onErrorCallbacks.forEach(cb => {
-                try {
-                    cb(error);
-                } catch (callbackError) {
-                    console.error('[InspectionController] 错误回调执行失败:', callbackError);
-                }
-            });
-        }
+        [...this._onErrorCallbacks].forEach(cb => {
+            try {
+                cb(error);
+            } catch (callbackError) {
+                console.error('[InspectionController] 错误回调执行失败:', callbackError);
+            }
+        });
     }
 
     /**
@@ -838,15 +1127,13 @@ class InspectionController {
      * 设置检测完成回调
      */
     onInspectionCompleted(callback) {
-        if (!this._onCompletedCallbacks) {
-            this._onCompletedCallbacks = [];
+        if (typeof callback !== 'function') {
+            return () => {};
         }
-        this._onCompletedCallbacks.push(callback);
+        this._onCompletedCallbacks.add(callback);
         
         return () => {
-            if (this._onCompletedCallbacks) {
-                this._onCompletedCallbacks = this._onCompletedCallbacks.filter(cb => cb !== callback);
-            }
+            this._onCompletedCallbacks.delete(callback);
         };
     }
 
@@ -854,15 +1141,13 @@ class InspectionController {
      * 设置检测错误回调
      */
     onInspectionError(callback) {
-        if (!this._onErrorCallbacks) {
-            this._onErrorCallbacks = [];
+        if (typeof callback !== 'function') {
+            return () => {};
         }
-        this._onErrorCallbacks.push(callback);
+        this._onErrorCallbacks.add(callback);
         
         return () => {
-            if (this._onErrorCallbacks) {
-                this._onErrorCallbacks = this._onErrorCallbacks.filter(cb => cb !== callback);
-            }
+            this._onErrorCallbacks.delete(callback);
         };
     }
 
@@ -878,6 +1163,14 @@ class InspectionController {
      */
     getLastResult() {
         return getLastResult();
+    }
+
+    getLastResultImageBase64() {
+        return this.lastResultImageBase64;
+    }
+
+    getLastResultImageUrl() {
+        return this.lastResultImageUrl;
     }
 
     /**
@@ -1029,21 +1322,48 @@ class InspectionController {
         }
 
         this.recentCompletedResultKeys.set(key, now);
+        this.pruneResultDedupeEntries();
         return true;
     }
 
-    notifyInspectionCompleted(result) {
-        if (!this._onCompletedCallbacks) {
+    pruneResultDedupeEntries() {
+        const maxEntries = Number(this.resultDedupeMaxEntries);
+        if (!Number.isFinite(maxEntries) || maxEntries <= 0) {
             return;
         }
 
-        this._onCompletedCallbacks.forEach(cb => {
+        while (this.recentCompletedResultKeys.size > maxEntries) {
+            const oldestKey = this.recentCompletedResultKeys.keys().next().value;
+            if (oldestKey === undefined) {
+                break;
+            }
+
+            this.recentCompletedResultKeys.delete(oldestKey);
+        }
+    }
+
+    notifyInspectionCompleted(result) {
+        [...this._onCompletedCallbacks].forEach(cb => {
             try {
                 cb(result);
             } catch (callbackError) {
                 console.error('[InspectionController] 完成回调执行失败:', callbackError);
             }
         });
+    }
+
+    dispose() {
+        this.abortController?.abort?.();
+        this.abortController = null;
+        this.unsubscribeFromSseEvents();
+        this.disposeWebMessage();
+        this.setImageSinks([]);
+        this.setFlowProvider(null);
+        this._onCompletedCallbacks.clear();
+        this._onErrorCallbacks.clear();
+        this.recentCompletedResultKeys.clear();
+        this.lastResultImageBase64 = null;
+        this.lastResultImageUrl = null;
     }
 }
 
@@ -1054,5 +1374,9 @@ export default inspectionController;
 export { 
     inspectionController,
     getInspectionState,
-    getLastResult
+    getLastResult,
+    getInlineResultImageBase64,
+    createLightweightInspectionResult,
+    getResultImageUrl,
+    loadImageUrlAsBase64
 };

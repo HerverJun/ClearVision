@@ -36,8 +36,11 @@ namespace Acme.Product.Infrastructure.Operators;
 [OutputPort("FilePath", "文件路径", PortDataType.String)]
 [OperatorParam("Format", "输出格式", "enum", DefaultValue = "JSON", Options = new[] { "JSON|JSON", "CSV|CSV", "Text|Text" })]
 [OperatorParam("SaveToFile", "保存到文件", "bool", DefaultValue = false)]
+[OperatorParam("MaxFormattedCollectionItems", "Max formatted collection items", "int", DefaultValue = 256, Min = 1, Max = 10000)]
 public class ResultOutputOperator : OperatorBase
 {
+    private const int DefaultMaxFormattedCollectionItems = 256;
+
     public override OperatorType OperatorType => OperatorType.ResultOutput;
 
     public ResultOutputOperator(ILogger<ResultOutputOperator> logger) : base(logger) { }
@@ -49,6 +52,12 @@ public class ResultOutputOperator : OperatorBase
     {
         var format = GetStringParam(@operator, "Format", "JSON");
         var saveToFile = GetBoolParam(@operator, "SaveToFile", false);
+        var maxFormattedCollectionItems = GetIntParam(
+            @operator,
+            "MaxFormattedCollectionItems",
+            DefaultMaxFormattedCollectionItems,
+            1,
+            10000);
 
         var output = new Dictionary<string, object>();
 
@@ -75,7 +84,7 @@ public class ResultOutputOperator : OperatorBase
             }
         }
 
-        var formattedText = BuildFormattedOutput(output, format);
+        var formattedText = BuildFormattedOutput(output, format, maxFormattedCollectionItems);
         if (!string.IsNullOrWhiteSpace(formattedText))
         {
             output["Output"] = formattedText;
@@ -141,7 +150,7 @@ public class ResultOutputOperator : OperatorBase
             : ValidationResult.Invalid("Format must be JSON, CSV or Text.");
     }
 
-    private static string BuildFormattedOutput(Dictionary<string, object> output, string format)
+    private static string BuildFormattedOutput(Dictionary<string, object> output, string format, int maxFormattedCollectionItems)
     {
         if (output.TryGetValue("Text", out var text) && text is string textValue && !string.IsNullOrWhiteSpace(textValue))
         {
@@ -161,7 +170,7 @@ public class ResultOutputOperator : OperatorBase
                 continue;
             }
 
-            exportPayload[key] = NormalizeForExport(value);
+            exportPayload[key] = NormalizeForExport(value, maxFormattedCollectionItems);
         }
 
         if (exportPayload.Count == 0)
@@ -182,13 +191,13 @@ public class ResultOutputOperator : OperatorBase
         return JsonSerializer.Serialize(exportPayload, new JsonSerializerOptions { WriteIndented = true });
     }
 
-    private static object? NormalizeForExport(object? value)
+    private static object? NormalizeForExport(object? value, int maxFormattedCollectionItems)
     {
         return value switch
         {
             null => null,
             ImageWrapper wrapper => new { wrapper.Width, wrapper.Height, wrapper.Channels },
-            DetectionList detectionList => detectionList.Detections.Select(NormalizeForExport).ToList(),
+            DetectionList detectionList => NormalizeCollectionForExport(detectionList.Detections, maxFormattedCollectionItems),
             DetectionResult detection => new
             {
                 detection.Label,
@@ -202,9 +211,37 @@ public class ResultOutputOperator : OperatorBase
                 detection.Area
             },
             Position position => new { position.X, position.Y },
-            IEnumerable<KeyValuePair<string, object>> dict => dict.ToDictionary(kvp => kvp.Key, kvp => NormalizeForExport(kvp.Value)),
-            IEnumerable<object> list => list.Select(NormalizeForExport).ToList(),
+            IEnumerable<KeyValuePair<string, object>> dict => dict.ToDictionary(kvp => kvp.Key, kvp => NormalizeForExport(kvp.Value, maxFormattedCollectionItems)),
+            IEnumerable<object> list => NormalizeCollectionForExport(list, maxFormattedCollectionItems),
             _ => value
+        };
+    }
+
+    private static object NormalizeCollectionForExport(IEnumerable<object> values, int maxFormattedCollectionItems)
+    {
+        var items = new List<object?>(Math.Min(maxFormattedCollectionItems, 64));
+        var totalCount = 0;
+
+        foreach (var value in values)
+        {
+            totalCount++;
+            if (items.Count < maxFormattedCollectionItems)
+            {
+                items.Add(NormalizeForExport(value, maxFormattedCollectionItems));
+            }
+        }
+
+        if (totalCount <= maxFormattedCollectionItems)
+        {
+            return items;
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["Items"] = items,
+            ["TotalCount"] = totalCount,
+            ["OmittedCount"] = totalCount - items.Count,
+            ["Truncated"] = true
         };
     }
 

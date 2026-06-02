@@ -722,7 +722,7 @@ public class PlanarMatchingOperator : OperatorBase
             { "ProcessingTimeMs", processingTime },
             { "Center", match.Center },
             { "Corners", corners.Select(c => new Position(c.X, c.Y)).ToList() },
-            { "Homography", match.Homography.Empty() ? new Mat() : match.Homography.Clone() },
+            { "Homography", SerializeHomography(match.Homography) },
             { "DetectorParameterDiagnostics", new Dictionary<string, object>(detectorDiagnostics) },
             { "MatchResult", new Dictionary<string, object>
                 {
@@ -849,10 +849,40 @@ public class PlanarMatchingOperator : OperatorBase
         {
             resultData["Center"] = match.Center;
             resultData["Corners"] = match.Corners.Select(c => new Position(c.X, c.Y)).ToList();
-            resultData["Homography"] = match.Homography.Empty() ? new Mat() : match.Homography.Clone();
+            resultData["Homography"] = SerializeHomography(match.Homography);
         }
 
         return OperatorExecutionOutput.Success(CreateImageOutput(resultImage, resultData));
+    }
+
+    private static double[][] SerializeHomography(Mat homography)
+    {
+        if (homography.Empty())
+        {
+            return Array.Empty<double[]>();
+        }
+
+        using var converted = new Mat();
+        var source = homography.Type() == MatType.CV_64FC1
+            ? homography
+            : converted;
+
+        if (!ReferenceEquals(source, homography))
+        {
+            homography.ConvertTo(converted, MatType.CV_64FC1);
+        }
+
+        var matrix = new double[source.Rows][];
+        for (var row = 0; row < source.Rows; row++)
+        {
+            matrix[row] = new double[source.Cols];
+            for (var col = 0; col < source.Cols; col++)
+            {
+                matrix[row][col] = source.Get<double>(row, col);
+            }
+        }
+
+        return matrix;
     }
 
     private static string BuildTemplateCacheKey(string templatePath, string detectorType, int maxFeatures, double scaleFactor, int nLevels)

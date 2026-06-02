@@ -3,11 +3,88 @@ using Acme.Product.Infrastructure.Data;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Acme.Product.Desktop.Tests;
 
 public sealed class VisionDatabaseInitializerTests
 {
+    [Fact]
+    public async Task InitializeAsync_ShouldCreateNewSqliteDatabase_WithCurrentSchemaVersion()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        try
+        {
+            var options = new DbContextOptionsBuilder<VisionDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                await VisionDatabaseInitializer.InitializeAsync(dbContext);
+            }
+
+            await using var connection = new SqliteConnection($"Data Source={dbPath}");
+            await connection.OpenAsync();
+
+            (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
+            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
+            (await ColumnExistsAsync(connection, "StationPackageRecords", "PackageKind")).Should().BeTrue();
+            (await UserVersionAsync(connection)).Should().Be(VisionDatabaseMaintenance.CurrentSqliteSchemaVersion);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldUpgradeInitialMigrationDatabase_AndPreserveStationData()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        try
+        {
+            await CreateInitialMigrationDatabaseWithStationDataAsync(dbPath);
+
+            var options = new DbContextOptionsBuilder<VisionDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                await VisionDatabaseInitializer.InitializeAsync(dbContext);
+            }
+
+            await using var connection = new SqliteConnection($"Data Source={dbPath}");
+            await connection.OpenAsync();
+
+            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
+            (await ColumnExistsAsync(connection, "StationPackageRecords", "PackageKind")).Should().BeTrue();
+            (await ScalarStringAsync(connection, """SELECT "PackageKind" FROM "StationPackageRecords" WHERE "PackageId" = 'pkg-upgrade';"""))
+                .Should()
+                .Be("Production");
+            (await ScalarLongAsync(connection, """SELECT COUNT(1) FROM "StationPackageRecords";""")).Should().Be(1);
+            (await ScalarLongAsync(connection, """SELECT COUNT(1) FROM "StationResultSummaries";""")).Should().Be(1);
+            (await ScalarLongAsync(connection, """SELECT COUNT(1) FROM "StationHealthSnapshots";""")).Should().Be(1);
+            (await ScalarLongAsync(connection, """SELECT COUNT(1) FROM "StationCommandRecords";""")).Should().Be(1);
+            (await ScalarLongAsync(connection, """SELECT COUNT(1) FROM "StationAuditRecords";""")).Should().Be(1);
+            (await UserVersionAsync(connection)).Should().Be(VisionDatabaseMaintenance.CurrentSqliteSchemaVersion);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
     [Fact]
     public async Task InitializeAsync_ShouldAdoptCompleteLegacySqliteSchema_WhenDatabaseAlreadyExists()
     {
@@ -32,12 +109,48 @@ public sealed class VisionDatabaseInitializerTests
             await connection.OpenAsync();
 
             (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
-            (await MigrationHistoryCountAsync(connection)).Should().Be(1);
+            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
             (await ColumnExistsAsync(connection, "InspectionResults", "AnalysisDataJson")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationResultSummaries")).Should().BeTrue();
             (await IndexExistsAsync(connection, "IX_StationNodes_StationId")).Should().BeTrue();
             (await IndexExistsAsync(connection, "IX_StationResultSummaries_StationId_SequenceId")).Should().BeTrue();
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShouldRepairLegacyCoreSchemaMissingStationSyncTables()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.DatabaseInitializer.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var dbPath = Path.Combine(root, "vision.db");
+
+        try
+        {
+            await CreateCoreDatabaseWithoutStationSyncSchemaAsync(dbPath);
+
+            var options = new DbContextOptionsBuilder<VisionDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+
+            await using (var dbContext = new VisionDbContext(options))
+            {
+                await VisionDatabaseInitializer.InitializeAsync(dbContext);
+            }
+
+            await using var connection = new SqliteConnection($"Data Source={dbPath}");
+            await connection.OpenAsync();
+
+            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
+            (await TableExistsAsync(connection, "StationAlarmEvents")).Should().BeTrue();
+            (await IndexExistsAsync(connection, "IX_StationAlarmEvents_StationId_IsActive")).Should().BeTrue();
+            (await ColumnExistsAsync(connection, "StationPackageRecords", "PackageKind")).Should().BeTrue();
+            (await UserVersionAsync(connection)).Should().Be(VisionDatabaseMaintenance.CurrentSqliteSchemaVersion);
         }
         finally
         {
@@ -119,7 +232,7 @@ public sealed class VisionDatabaseInitializerTests
             await connection.OpenAsync();
 
             (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
-            (await MigrationHistoryCountAsync(connection)).Should().Be(1);
+            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
             (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationPackageRecords")).Should().BeTrue();
         }
@@ -202,7 +315,7 @@ public sealed class VisionDatabaseInitializerTests
             await connection.OpenAsync();
 
             (await TableExistsAsync(connection, "__EFMigrationsHistory")).Should().BeTrue();
-            (await MigrationHistoryCountAsync(connection)).Should().Be(1);
+            (await MigrationHistoryCountAsync(connection)).Should().Be(2);
             (await TableExistsAsync(connection, "Projects")).Should().BeTrue();
             (await TableExistsAsync(connection, "StationNodes")).Should().BeTrue();
         }
@@ -221,6 +334,74 @@ public sealed class VisionDatabaseInitializerTests
 
         await using var dbContext = new VisionDbContext(options);
         await dbContext.Database.EnsureCreatedAsync();
+    }
+
+    private static async Task CreateCoreDatabaseWithoutStationSyncSchemaAsync(string dbPath)
+    {
+        await CreateCompleteDatabaseWithoutMigrationHistoryAsync(dbPath);
+
+        await using var connection = new SqliteConnection($"Data Source={dbPath}");
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            DROP TABLE "StationAlarmEvents";
+            DROP TABLE "StationAuditRecords";
+            DROP TABLE "StationCommandRecords";
+            DROP TABLE "StationConnectionEvents";
+            DROP TABLE "StationHealthSnapshots";
+            DROP TABLE "StationLogSummaries";
+            DROP TABLE "StationNodes";
+            DROP TABLE "StationPackageRecords";
+            DROP TABLE "StationResultSummaries";
+            DROP TABLE "StationSyncCursors";
+            """;
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task CreateInitialMigrationDatabaseWithStationDataAsync(string dbPath)
+    {
+        var options = new DbContextOptionsBuilder<VisionDbContext>()
+            .UseSqlite($"Data Source={dbPath}")
+            .Options;
+
+        await using (var dbContext = new VisionDbContext(options))
+        {
+            var migrator = dbContext.GetService<IMigrator>();
+            await migrator.MigrateAsync("20260509024011_InitialVisionSchema");
+        }
+
+        await using var connection = new SqliteConnection($"Data Source={dbPath}");
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO "StationPackageRecords"
+                ("PackageId", "PackageName", "PackageVersion", "FlowHash", "FileName", "FilePath", "SizeBytes", "Sha256", "CreatedBy", "CreatedAtUtc")
+            VALUES
+                ('pkg-upgrade', 'Upgrade Package', '1.0.0', 'sha256:pkg', 'pkg.cvpkg', 'pkg.cvpkg', 128, 'sha256', 'Studio', '2026-01-01T00:00:00+00:00');
+
+            INSERT INTO "StationResultSummaries"
+                ("StationId", "SequenceId", "MessageId", "RunId", "PackageId", "PackageName", "PackageVersion", "FlowHash", "ImageId", "Outcome", "InspectionStatus", "ExecutionTimeMs", "DiagnosticCode", "DiagnosticMessage", "PrimaryOutputsPreviewJson", "StartedAtUtc", "CompletedAtUtc", "CreatedAtUtc", "ReceivedAtUtc")
+            VALUES
+                ('station-upgrade', 1, 'result-1', 'run-1', 'pkg-upgrade', 'Upgrade Package', '1.0.0', 'sha256:pkg', 'image-1', 'Ok', 'Passed', 42, 'OK', NULL, '{}', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:01+00:00', '2026-01-01T00:00:01+00:00', '2026-01-01T00:00:02+00:00');
+
+            INSERT INTO "StationHealthSnapshots"
+                ("StationId", "SequenceId", "MessageId", "RuntimeState", "ProcessUptimeSeconds", "CpuUsagePercent", "WorkingSetMb", "PrivateMemoryMb", "DiskFreeMb", "DiskTotalMb", "SpoolPendingCount", "SpoolBytes", "CameraStatusSummary", "PlcStatusSummary", "CurrentPackageId", "CurrentPackageHealth", "LastErrorCode", "LastErrorMessage", "CreatedAtUtc", "ReceivedAtUtc")
+            VALUES
+                ('station-upgrade', 2, 'health-1', 'Running', 10, 1.5, 100, 120, 2048, 4096, 0, 0, 'Connected', 'Connected', 'pkg-upgrade', 'Loaded', NULL, NULL, '2026-01-01T00:00:03+00:00', '2026-01-01T00:00:04+00:00');
+
+            INSERT INTO "StationCommandRecords"
+                ("CommandId", "StationId", "CommandType", "PayloadJson", "Status", "ProgressPercent", "CreatedAtUtc", "ExpiresAtUtc", "DeliveredAtUtc", "AcceptedAtUtc", "StartedAtUtc", "CompletedAtUtc", "IssuedBy", "CorrelationId", "ResultMessage", "ErrorCode", "ErrorDetail")
+            VALUES
+                ('cmd-upgrade', 'station-upgrade', 'Ping', '{}', 'Created', 0, '2026-01-01T00:00:05+00:00', '2026-01-01T00:05:05+00:00', NULL, NULL, NULL, NULL, 'Studio', 'corr-upgrade', NULL, NULL, NULL);
+
+            INSERT INTO "StationAuditRecords"
+                ("AuditId", "UserId", "UserName", "Action", "TargetStationId", "CommandId", "PayloadSummary", "CreatedAtUtc", "Result", "ClientIp")
+            VALUES
+                ('audit-upgrade', 'user-1', 'admin', 'CreateCommand', 'station-upgrade', 'cmd-upgrade', '{}', '2026-01-01T00:00:06+00:00', 'Created', '127.0.0.1');
+            """;
+        await command.ExecuteNonQueryAsync();
     }
 
     private static async Task CreateIncompleteLegacyDatabaseAsync(string dbPath)
@@ -304,6 +485,29 @@ public sealed class VisionDatabaseInitializerTests
         command.CommandText = """SELECT COUNT(1) FROM "__EFMigrationsHistory";""";
         var result = await command.ExecuteScalarAsync();
         return Convert.ToInt32(result);
+    }
+
+    private static async Task<int> UserVersionAsync(SqliteConnection connection)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+        var result = await command.ExecuteScalarAsync();
+        return Convert.ToInt32(result);
+    }
+
+    private static async Task<long> ScalarLongAsync(SqliteConnection connection, string sql)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        var result = await command.ExecuteScalarAsync();
+        return Convert.ToInt64(result);
+    }
+
+    private static async Task<string?> ScalarStringAsync(SqliteConnection connection, string sql)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        return (await command.ExecuteScalarAsync())?.ToString();
     }
 
     private static async Task<bool> ColumnExistsAsync(SqliteConnection connection, string tableName, string columnName)

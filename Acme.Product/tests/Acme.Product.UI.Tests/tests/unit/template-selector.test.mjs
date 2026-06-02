@@ -129,6 +129,101 @@ test('TemplateSelector invokes onApplied with serialized canvas flow', async () 
   assert.equal(applied[0].serializedFlow.operators.length, 1);
 });
 
+test('TemplateSelector shares in-flight template data loading', async (t) => {
+  installMinimalDom();
+  const { TemplateSelector } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/templateSelector.js'
+  );
+  const { default: httpClient } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/core/messaging/httpClient.js'
+  );
+  const originalGet = httpClient.get;
+  const calls = [];
+  let resolveTemplates;
+  let resolveOperators;
+
+  t.after(() => {
+    httpClient.get = originalGet;
+  });
+
+  httpClient.get = (url) => {
+    calls.push(url);
+    if (url === '/templates') {
+      return new Promise(resolve => {
+        resolveTemplates = resolve;
+      });
+    }
+
+    if (url === '/operators/library') {
+      return new Promise(resolve => {
+        resolveOperators = resolve;
+      });
+    }
+
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const selector = new TemplateSelector({}, {});
+  const firstLoad = selector._ensureDataLoaded();
+  const secondLoad = selector._ensureDataLoaded();
+
+  assert.deepEqual(calls.sort(), ['/operators/library', '/templates']);
+
+  resolveTemplates([{ id: 'template-1', flowJson: { operators: [{ tempId: 'op-1' }] } }]);
+  resolveOperators([{ type: 'ImageAcquisition', parameters: [] }]);
+  await Promise.all([firstLoad, secondLoad]);
+
+  assert.equal(selector.templates.length, 1);
+  assert.equal(selector.operatorMetadata.size, 1);
+  assert.equal(selector.isLoading, false);
+});
+
+test('TemplateSelector destroy releases overlay, listeners, and cached template data', async () => {
+  installMinimalDom();
+  const { TemplateSelector } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/templateSelector.js'
+  );
+  const listeners = new Map();
+  let overlayRemoved = false;
+  const target = {
+    addEventListener(type, handler) {
+      if (!listeners.has(type)) {
+        listeners.set(type, new Set());
+      }
+
+      listeners.get(type).add(handler);
+    },
+    removeEventListener(type, handler) {
+      listeners.get(type)?.delete(handler);
+    }
+  };
+  const selector = new TemplateSelector({ id: 'canvas' }, {});
+
+  selector.templates = [{ id: 'template-large', flowJson: { operators: new Array(100).fill({}) } }];
+  selector.operatorMetadata.set('largeoperator', { type: 'LargeOperator' });
+  selector._applyingTemplateIds.add('template-large');
+  selector.overlay = {
+    remove() {
+      overlayRemoved = true;
+    }
+  };
+  selector.dialog = {};
+  selector._addEventListener(target, 'click', () => {});
+
+  assert.equal(listeners.get('click')?.size, 1);
+
+  selector.destroy();
+
+  assert.equal(listeners.get('click')?.size, 0);
+  assert.equal(overlayRemoved, true);
+  assert.equal(selector.templates.length, 0);
+  assert.equal(selector.operatorMetadata.size, 0);
+  assert.equal(selector._applyingTemplateIds.size, 0);
+  assert.equal(selector.overlay, null);
+  assert.equal(selector.dialog, null);
+  assert.equal(selector.flowCanvas, null);
+});
+
 test('FlowEditorInteraction syncs applied template flow into project manager', async () => {
   const { FlowEditorInteraction } = await import(
     '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'

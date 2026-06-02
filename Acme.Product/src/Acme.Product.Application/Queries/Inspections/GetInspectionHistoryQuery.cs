@@ -2,9 +2,10 @@
 // GetInspectionHistory查询
 // 作者：蘅芜君
 
+using System.Text.Json;
+using Acme.Product.Application.Analysis;
 using Acme.Product.Application.DTOs;
 using Acme.Product.Core.Interfaces;
-using AutoMapper;
 using MediatR;
 
 namespace Acme.Product.Application.Queries.Inspections;
@@ -14,32 +15,89 @@ public record GetInspectionHistoryQuery(Guid ProjectId, DateTime? StartDate, Dat
 public class GetInspectionHistoryQueryHandler : IRequestHandler<GetInspectionHistoryQuery, List<InspectionResultDto>>
 {
     private readonly IInspectionResultRepository _repository;
-    private readonly IMapper _mapper;
 
-    public GetInspectionHistoryQueryHandler(IInspectionResultRepository repository, IMapper mapper)
+    public GetInspectionHistoryQueryHandler(IInspectionResultRepository repository)
     {
         _repository = repository;
-        _mapper = mapper;
     }
 
     public async Task<List<InspectionResultDto>> Handle(GetInspectionHistoryQuery request, CancellationToken cancellationToken)
     {
-        // Use GetByProjectIdAsync or GetByTimeRangeAsync based on params
-        // For simplicity, using GetByProjectIdAsync with limit as pageSize
+        var pageSize = request.Limit > 0 ? request.Limit : 200;
+        var page = await _repository.GetHistoryPageAsync(
+            request.ProjectId,
+            request.StartDate,
+            request.EndDate,
+            pageIndex: 0,
+            pageSize: pageSize);
 
-        IEnumerable<Core.Entities.InspectionResult> results;
-        if (request.StartDate.HasValue && request.EndDate.HasValue)
-        {
-            results = await _repository.GetByTimeRangeAsync(request.ProjectId, request.StartDate.Value, request.EndDate.Value);
-            // Limit manually if needed
-            if (request.Limit > 0)
-                results = results.Take(request.Limit);
-        }
-        else
-        {
-            results = await _repository.GetByProjectIdAsync(request.ProjectId, 0, request.Limit);
-        }
+        return page.Items.Select(ToDto).ToList();
+    }
 
-        return _mapper.Map<List<InspectionResultDto>>(results);
+    private static InspectionResultDto ToDto(InspectionHistoryItem item)
+    {
+        return new InspectionResultDto
+        {
+            Id = item.Id,
+            ProjectId = item.ProjectId,
+            Status = item.Status,
+            Defects = item.Defects.Select(ToDto).ToList(),
+            ProcessingTimeMs = item.ProcessingTimeMs,
+            ImageId = item.ImageId,
+            ConfidenceScore = item.ConfidenceScore,
+            ErrorMessage = item.ErrorMessage,
+            InspectionTime = item.InspectionTime,
+            OutputImage = null,
+            OutputData = TryDeserializeOutputData(item.OutputDataJson),
+            AnalysisData = TryDeserializeAnalysisData(item.AnalysisDataJson)
+        };
+    }
+
+    private static DefectDto ToDto(InspectionHistoryDefectItem defect)
+    {
+        return new DefectDto
+        {
+            Id = defect.Id,
+            Type = defect.Type,
+            X = defect.X,
+            Y = defect.Y,
+            Width = defect.Width,
+            Height = defect.Height,
+            ConfidenceScore = defect.ConfidenceScore,
+            Description = defect.Description,
+            AnnotationData = defect.AnnotationData
+        };
+    }
+
+    private static Dictionary<string, object>? TryDeserializeOutputData(string? json)
+    {
+        try
+        {
+            return AnalysisPayloadSerialization.DeserializeJsonDictionary(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static AnalysisDataDto? TryDeserializeAnalysisData(string? json)
+    {
+        try
+        {
+            return AnalysisPayloadSerialization.DeserializeAnalysisData(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 }
