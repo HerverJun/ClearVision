@@ -74,7 +74,7 @@ $studioProject = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Desktop\Acme
     -p:PublishReadyToRun=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:EnableCompressionInSingleFile=true `
-    -p:RestorePackagesWithLockFile=false `
+    -p:RestorePackagesWithLockFile=true `
     -p:DebugType=none `
     -p:DebugSymbols=false `
     -o $studioStaging
@@ -101,7 +101,7 @@ $stationProject = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Station\Acm
     -p:PublishReadyToRun=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:EnableCompressionInSingleFile=true `
-    -p:RestorePackagesWithLockFile=false `
+    -p:RestorePackagesWithLockFile=true `
     -p:DebugType=none `
     -p:DebugSymbols=false `
     -o $stationStaging

@@ -1,6 +1,14 @@
 {
   "version": 2,
   "dependencies": {
-    "net8.0": {}
+    "net8.0": {
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[8.0.16, )",
+        "resolved": "8.0.16",
+        "contentHash": "0H1QaKpVibe++Zx6EYJQGhrpfz2bBPGiQ7Rpsmx8I3+oKv+ZRRIfVfmcj50KuZlhhRE6V02y5bUjP+V2oPM2ng=="
+      }
+    },
+    "net8.0/win-x64": {}
   }
 }

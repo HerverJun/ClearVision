@@ -17,6 +17,12 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2"
         }
       },
+      "Microsoft.NET.ILLink.Tasks": {
+        "type": "Direct",
+        "requested": "[8.0.16, )",
+        "resolved": "8.0.16",
+        "contentHash": "0H1QaKpVibe++Zx6EYJQGhrpfz2bBPGiQ7Rpsmx8I3+oKv+ZRRIfVfmcj50KuZlhhRE6V02y5bUjP+V2oPM2ng=="
+      },
       "MediatR.Contracts": {
         "type": "Transitive",
         "resolved": "2.0.1",
@@ -188,6 +194,14 @@
         "requested": "[7.0.0, )",
         "resolved": "7.0.0",
         "contentHash": "Wa75efpUNY/S16fQyjq0z96AL1JlqR6J76PjbRuSlI/1/YWEUN1HvUR9fZX69Qe4MDHDRK4Yn7NvbYmZXLMzaA=="
+      }
+    },
+    "net8.0/win-x64": {
+      "OpenCvSharp4.runtime.win": {
+        "type": "CentralTransitive",
+        "requested": "[4.9.0.20240103, )",
+        "resolved": "4.9.0.20240103",
+        "contentHash": "PkV3ge6rE//gj0OlG4TRXzmcLVDoKsJx0lYN1ogx9gZhqUPHlzrnWqKk2hAFK+nU8T0chRhrwHL0U2hSMyoCWw=="
       }
     }
   }
