@@ -1246,6 +1246,20 @@ class PropertyPanel {
         return true;
     }
 
+    syncDraftChanges(options = {}) {
+        if (!this.currentOperator) {
+            return true;
+        }
+
+        this._notifyValueChanged({
+            schedulePreview: options.schedulePreview === true,
+            forcePreview: false,
+            syncRoiEditor: options.syncRoiEditor !== false
+        });
+
+        return true;
+    }
+
     /**
      * 初始化预览面板
      */

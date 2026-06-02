@@ -83,16 +83,21 @@
     <Reference Include="MVSDK_Net">
       <HintPath>..\..\lib\HuaraySDK\x64\MVSDK_Net.dll</HintPath>
       <Private>true</Private>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Reference>
   </ItemGroup>
 
-  <!-- Huaray SDK native runtime dependencies copied to output. -->
+  <!-- Huaray SDK native runtime dependencies: use Content + CopyToPublishDirectory
+       so dotnet publish copies them alongside the single-file exe.
+       ExcludeFromSingleFile keeps them as loose files instead of embedding. -->
   <ItemGroup Condition="'$(EnableHuaraySdk)' == 'true'">
-    <None Include="..\..\lib\HuaraySDK\x64\**\*.*"
-          Exclude="..\..\lib\HuaraySDK\x64\MVSDK_Net.dll;..\..\lib\HuaraySDK\x64\MVSDK_Net.XML">
+    <Content Include="..\..\lib\HuaraySDK\x64\**\*.*"
+             Exclude="..\..\lib\HuaraySDK\x64\MVSDK_Net.dll;..\..\lib\HuaraySDK\x64\MVSDK_Net.XML">
       <Link>%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
   </ItemGroup>
 
 </Project>

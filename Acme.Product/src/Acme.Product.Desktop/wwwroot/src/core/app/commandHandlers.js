@@ -31,6 +31,22 @@ function validateFlowBeforeAction(propertyPanel, flowCanvas, action) {
     return true;
 }
 
+function syncDraftBeforeSave(propertyPanel) {
+    if (!propertyPanel?.currentOperator) {
+        return true;
+    }
+
+    if (typeof propertyPanel.syncDraftChanges === 'function') {
+        return propertyPanel.syncDraftChanges({ showToast: false }) !== false;
+    }
+
+    if (typeof propertyPanel.applyChanges === 'function') {
+        return propertyPanel.applyChanges({ showToast: false }) !== false;
+    }
+
+    return true;
+}
+
 /**
  * @typedef {Object} ToolbarCommandOptions
  * @property {Document} documentRef
@@ -83,7 +99,7 @@ export function bindToolbarCommands(options) {
         try {
             const propertyPanel = getPropertyPanel?.() || serviceRegistry?.get?.('propertyPanel');
             const flowCanvas = getFlowCanvas();
-            if (!validateFlowBeforeAction(propertyPanel, flowCanvas, '保存')) {
+            if (!syncDraftBeforeSave(propertyPanel)) {
                 return;
             }
 

@@ -186,8 +186,8 @@ export class ProjectView {
                     break;
                 case 'modifiedAt':
                 default:
-                    valueA = new Date(a.modifiedAt).getTime();
-                    valueB = new Date(b.modifiedAt).getTime();
+                    valueA = this.getProjectDateTime(a.modifiedAt, a.createdAt);
+                    valueB = this.getProjectDateTime(b.modifiedAt, b.createdAt);
                     break;
             }
             
@@ -197,6 +197,24 @@ export class ProjectView {
                 return valueA < valueB ? 1 : -1;
             }
         });
+    }
+
+    getProjectDateTime(...values) {
+        for (const value of values) {
+            const timestamp = new Date(value).getTime();
+            if (Number.isFinite(timestamp) && timestamp > 0) {
+                return timestamp;
+            }
+        }
+
+        return 0;
+    }
+
+    formatProjectDate(...values) {
+        const timestamp = this.getProjectDateTime(...values);
+        return timestamp > 0
+            ? new Date(timestamp).toLocaleDateString('zh-CN')
+            : '-';
     }
     
     renderProjects(container) {
@@ -228,8 +246,7 @@ export class ProjectView {
      * 创建工程卡片（列表视图）
      */
     createProjectCardList(project) {
-        const createdDate = new Date(project.createdAt).toLocaleDateString('zh-CN');
-        const modifiedDate = new Date(project.modifiedAt).toLocaleDateString('zh-CN');
+        const modifiedDate = this.formatProjectDate(project.modifiedAt, project.createdAt);
         const status = project.status || 'ready';
         const statusConfig = this.getStatusConfig(status);
         
@@ -429,9 +446,14 @@ export class ProjectView {
             onClick: () => closeModal(modalOverlay)
         });
         
+        let createInFlight = false;
         const btnCreate = createButton({
             text: '创建',
             onClick: async () => {
+                if (createInFlight) {
+                    return;
+                }
+
                 const nameInput = document.getElementById('new-project-name');
                 const descInput = document.getElementById('new-project-desc');
                 const modeInput = content.querySelector('input[name="new-project-mode"]:checked');
@@ -451,6 +473,8 @@ export class ProjectView {
                 }
                 
                 try {
+                    createInFlight = true;
+                    btnCreate.disabled = true;
                     const project = mode === 'demo'
                         ? await projectManager.createDemoProject('full')
                         : (mode === 'simple-demo'
@@ -460,6 +484,8 @@ export class ProjectView {
                     showToast(`工程 "${displayName}" 已创建`, 'success');
                     closeModal(modalOverlay);
                 } catch (error) {
+                    createInFlight = false;
+                    btnCreate.disabled = false;
                     console.error('[ProjectView] 创建工程失败:', error);
                     showToast('创建失败: ' + error.message, 'error');
                 }

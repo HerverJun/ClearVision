@@ -15,6 +15,58 @@ class ProjectManager {
     constructor() {
         this.currentProject = null;
         this.unsavedChanges = false;
+        this.openProjectRequestId = 0;
+    }
+
+    invalidateOpenProjectRequests() {
+        this.openProjectRequestId += 1;
+        return this.openProjectRequestId;
+    }
+
+    rememberProjectInCaches(project) {
+        if (!project?.id) {
+            return;
+        }
+
+        const upsert = (projects) => {
+            if (!Array.isArray(projects)) {
+                return [project];
+            }
+
+            return [
+                project,
+                ...projects.filter(item => item?.id !== project.id)
+            ];
+        };
+
+        setProjectList(upsert(getProjectList()));
+        setRecentProjects(upsert(getRecentProjects()));
+    }
+
+    forgetProjectFromCaches(projectId) {
+        if (!projectId) {
+            return;
+        }
+
+        const remove = (projects) => Array.isArray(projects)
+            ? projects.filter(item => item?.id !== projectId)
+            : [];
+
+        setProjectList(remove(getProjectList()));
+        setRecentProjects(remove(getRecentProjects()));
+    }
+
+    async prepareForProjectSwitch() {
+        if (!this.currentProject || !this.unsavedChanges) {
+            return true;
+        }
+
+        const shouldSave = window.confirm('当前工程有未保存的更改，是否先保存？');
+        if (shouldSave) {
+            await this.saveProject();
+        }
+
+        return true;
     }
 
     /**
@@ -63,6 +115,8 @@ class ProjectManager {
      */
     async createProject(name, description = '') {
         try {
+            this.invalidateOpenProjectRequests();
+            await this.prepareForProjectSwitch();
             const project = await httpClient.post('/projects', {
                 name,
                 description
@@ -71,6 +125,8 @@ class ProjectManager {
             this.currentProject = project;
             setCurrentProject(project);
             this.unsavedChanges = false;
+            this.updateStatusBar(project);
+            this.rememberProjectInCaches(project);
             
             console.log('[ProjectManager] 工程创建成功:', project.id);
             return project;
@@ -84,12 +140,15 @@ class ProjectManager {
         const endpoint = mode === 'simple' ? '/demo/create-simple' : '/demo/create';
 
         try {
+            this.invalidateOpenProjectRequests();
+            await this.prepareForProjectSwitch();
             const project = await httpClient.post(endpoint);
 
             this.currentProject = project;
             setCurrentProject(project);
             this.unsavedChanges = false;
             this.updateStatusBar(project);
+            this.rememberProjectInCaches(project);
 
             console.log('[ProjectManager] 示例工程创建成功:', project.id, '| mode:', mode);
             return project;
@@ -113,7 +172,21 @@ class ProjectManager {
      */
     async openProject(projectId) {
         try {
+            if (this.currentProject?.id === projectId) {
+                if (this.unsavedChanges) {
+                    await this.prepareForProjectSwitch();
+                }
+
+                return this.currentProject;
+            }
+
+            const requestId = this.invalidateOpenProjectRequests();
+            await this.prepareForProjectSwitch();
             const project = await httpClient.get(`/projects/${projectId}`);
+            if (requestId !== this.openProjectRequestId) {
+                console.warn('[ProjectManager] 忽略过期的工程打开结果:', projectId);
+                return null;
+            }
             
             this.currentProject = project;
             setCurrentProject(project);
@@ -138,24 +211,37 @@ class ProjectManager {
             throw new Error('没有打开的工程');
         }
 
+        const targetProjectId = this.currentProject.id;
         const data = projectData || this.currentProject;
         
         try {
             // 更新工程基本信息
-            await httpClient.put(`/projects/${this.currentProject.id}`, {
+            await httpClient.put(`/projects/${targetProjectId}`, {
                 name: data.name,
                 description: data.description
             });
 
             // 保存流程
             if (data.flow) {
-                await httpClient.put(`/projects/${this.currentProject.id}/flow`, data.flow);
+                await httpClient.put(`/projects/${targetProjectId}/flow`, data.flow);
             }
 
+            if (!this.currentProject || this.currentProject.id !== targetProjectId) {
+                return true;
+            }
+
+            this.currentProject.name = data.name ?? this.currentProject.name;
+            this.currentProject.description = data.description ?? this.currentProject.description;
+            if (data.flow) {
+                this.currentProject.flow = data.flow;
+            }
+            this.currentProject.modifiedAt = new Date().toISOString();
             this.unsavedChanges = false;
+            this.rememberProjectInCaches(this.currentProject);
+            this.updateStatusBar(this.currentProject);
             this.updateTitle();
             
-            console.log('[ProjectManager] 工程保存成功:', this.currentProject.id);
+            console.log('[ProjectManager] 工程保存成功:', targetProjectId);
             return true;
         } catch (error) {
             console.error('[ProjectManager] 保存工程失败:', error);
@@ -168,12 +254,16 @@ class ProjectManager {
      */
     async deleteProject(projectId) {
         try {
+            if (this.currentProject?.id === projectId) {
+                this.invalidateOpenProjectRequests();
+            }
             await httpClient.delete(`/projects/${projectId}`);
             
             // 如果删除的是当前工程，清空当前工程
             if (this.currentProject && this.currentProject.id === projectId) {
-                this.closeProject();
+                await this.closeProject({ promptToSave: false });
             }
+            this.forgetProjectFromCaches(projectId);
             
             console.log('[ProjectManager] 工程删除成功:', projectId);
             return true;
@@ -186,11 +276,13 @@ class ProjectManager {
     /**
      * 关闭当前工程
      */
-    closeProject() {
-        if (this.unsavedChanges) {
+    async closeProject(options = {}) {
+        const { promptToSave = true } = options;
+        this.invalidateOpenProjectRequests();
+        if (this.unsavedChanges && promptToSave) {
             const confirm = window.confirm('工程有未保存的更改，是否保存？');
             if (confirm) {
-                this.saveProject();
+                await this.saveProject();
             }
         }
 
@@ -198,6 +290,7 @@ class ProjectManager {
         setCurrentProject(null);
         this.unsavedChanges = false;
         this.updateStatusBar(null);
+        return true;
     }
 
     /**

@@ -137,8 +137,72 @@ export class FlowEditorInteraction {
         });
     }
 
-    handleTemplateApplied(payload = null) {
+    async handleTemplateApplied(payload = null) {
         this.saveState();
+        await this.ensureProjectForAppliedTemplate(payload);
+    }
+
+    async ensureProjectForAppliedTemplate(payload = null) {
+        if (!this.projectManager || this.projectManager.getCurrentProject?.()?.id) {
+            return null;
+        }
+
+        const flow = payload?.serializedFlow
+            || (typeof this.canvas?.serialize === 'function' ? this.canvas.serialize() : null);
+        if (!this.hasSerializedFlowContent(flow) || typeof this.projectManager.createProject !== 'function') {
+            return null;
+        }
+
+        const template = payload?.template || {};
+        const projectName = this.buildTemplateProjectName(template);
+        const projectDescription = this.buildTemplateProjectDescription(template);
+
+        try {
+            const project = await this.projectManager.createProject(projectName, projectDescription);
+            if (typeof this.projectManager.updateFlow === 'function') {
+                this.projectManager.updateFlow(flow);
+            } else {
+                const currentProject = this.projectManager.getCurrentProject?.() || project;
+                if (currentProject) {
+                    currentProject.flow = flow;
+                }
+            }
+
+            if (typeof this.projectManager.saveProject === 'function') {
+                await this.projectManager.saveProject(this.projectManager.getCurrentProject?.() || project);
+            }
+
+            showToast(`已从模板创建工程：${project?.name || projectName}`, 'success');
+            return project;
+        } catch (error) {
+            console.error('[FlowEditorInteraction] 从模板创建工程失败:', error);
+            showToast(`模板已应用，但创建工程失败: ${error?.message || error}`, 'warning');
+            return null;
+        }
+    }
+
+    hasSerializedFlowContent(flow) {
+        const operators = flow?.operators || flow?.Operators || flow?.nodes || flow?.Nodes || [];
+        if (Array.isArray(operators)) {
+            return operators.length > 0;
+        }
+
+        return operators && typeof operators === 'object' && Object.keys(operators).length > 0;
+    }
+
+    buildTemplateProjectName(template = {}) {
+        const templateName = String(template?.name || template?.Name || '').trim();
+        const baseName = templateName || `模板工程_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`;
+        const projectName = templateName.endsWith('工程') ? templateName : `${baseName} 工程`;
+        return projectName.length > 80 ? projectName.slice(0, 80) : projectName;
+    }
+
+    buildTemplateProjectDescription(template = {}) {
+        const templateName = String(template?.name || template?.Name || '未命名模板').trim();
+        const description = String(template?.description || template?.Description || '').trim();
+        return description
+            ? `从模板“${templateName}”创建。${description}`
+            : `从模板“${templateName}”创建。`;
     }
 
     syncProjectFlow() {

@@ -11,6 +11,26 @@ namespace Acme.Product.Desktop.Tests;
 public class CameraProviderAdapterTests
 {
     [Theory]
+    [InlineData("Huaray", "MV-CA050-10GM", "GigE", false)]
+    [InlineData("MindVision", "MV-GE200", "GigE", false)]
+    [InlineData("Daheng Imaging", "MER2-503", "GigE", false)]
+    [InlineData("Hikvision", "MV-CA050-10GM", "GigE", true)]
+    [InlineData("Hikrobot", "MV-CS060", "GigE", true)]
+    [InlineData("Unknown", "MV-CA050-10GM", "GigE", true)]
+    [InlineData("Unknown", "MER2-503", "GigE", false)]
+    public void HikvisionDiscoveryFilter_ShouldRejectKnownThirdPartyGigECameras(
+        string manufacturer,
+        string model,
+        string interfaceType,
+        bool expected)
+    {
+        var method = typeof(HikvisionCamera).GetMethod("IsAcceptedHikvisionDevice", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+        method.Should().NotBeNull();
+        method!.Invoke(null, new object?[] { manufacturer, model, interfaceType }).Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData(0x01080008u, CameraPixelFormat.BayerGR8)]
     [InlineData(0x01080009u, CameraPixelFormat.BayerRG8)]
     [InlineData(0x0108000Au, CameraPixelFormat.BayerGB8)]

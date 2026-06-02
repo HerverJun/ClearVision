@@ -85,4 +85,16 @@
     </Content>
   </ItemGroup>
 
+  <PropertyGroup>
+    <HuaraySdkPath>$(MSBuildThisFileDirectory)..\..\lib\HuaraySDK\x64\</HuaraySdkPath>
+  </PropertyGroup>
+
+  <Target Name="CopyHuarayManagedSdkToPublish"
+          AfterTargets="Publish"
+          Condition="'$(PublishDir)' != '' and Exists('$(HuaraySdkPath)MVSDK_Net.dll')">
+    <Copy SourceFiles="$(HuaraySdkPath)MVSDK_Net.dll"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

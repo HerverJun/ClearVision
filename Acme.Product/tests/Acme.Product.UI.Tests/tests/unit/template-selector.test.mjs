@@ -261,6 +261,68 @@ test('FlowEditorInteraction syncs applied template flow into project manager', a
   assert.equal(updates[0], serializedFlow);
 });
 
+test('FlowEditorInteraction creates and saves a project when applying a template without current project', async () => {
+  installMinimalDom();
+  const { FlowEditorInteraction } = await import(
+    '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'
+  );
+
+  const created = [];
+  const updates = [];
+  const saves = [];
+  const serializedFlow = { operators: [{ id: 'from-template' }], connections: [] };
+  let currentProject = null;
+  const interaction = Object.create(FlowEditorInteraction.prototype);
+  interaction.history = [];
+  interaction.historyIndex = -1;
+  interaction.maxHistorySize = 50;
+  interaction.canvas = {
+    nodes: new Map([['from-template', { id: 'from-template', type: 'ImageAcquisition' }]]),
+    connections: [],
+    serialize() {
+      return serializedFlow;
+    }
+  };
+  interaction.projectManager = {
+    getCurrentProject() {
+      return currentProject;
+    },
+    async createProject(name, description) {
+      currentProject = { id: 'project-from-template', name, description };
+      created.push(currentProject);
+      return currentProject;
+    },
+    updateFlow(flow) {
+      if (!currentProject) {
+        return;
+      }
+
+      currentProject.flow = flow;
+      updates.push(flow);
+    },
+    async saveProject(project) {
+      saves.push(project);
+    }
+  };
+
+  await interaction.handleTemplateApplied({
+    template: {
+      id: 'template-1',
+      name: '视觉检测模板',
+      description: '用于快速生成检测流程'
+    },
+    serializedFlow
+  });
+
+  assert.equal(created.length, 1);
+  assert.equal(created[0].name, '视觉检测模板 工程');
+  assert.match(created[0].description, /从模板/);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0], serializedFlow);
+  assert.equal(saves.length, 1);
+  assert.equal(saves[0].flow, serializedFlow);
+});
+
 test('FlowEditorInteraction undo/redo restore syncs project flow and rebuilds connection index', async () => {
   const { FlowEditorInteraction } = await import(
     '../../../../src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js'

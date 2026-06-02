@@ -11,6 +11,7 @@ import serviceRegistry from './core/app/serviceRegistry.js';
 import { installLegacyGlobalAccessors } from './core/app/legacyGlobals.js';
 import { createViewManager } from './core/app/viewManager.js';
 import { buildResultDefects as buildBoundedResultDefects, getResultDefectCount } from './core/app/resultDefects.js';
+import { getFlowNodeCount } from './core/app/flowData.js';
 import { bindToolbarCommands } from './core/app/commandHandlers.js';
 import { createFlowCanvasAdapter } from './core/canvas/flowCanvasAdapter.js';
 import { createAiGenerationController } from './features/ai/aiGenerationController.js';
@@ -182,19 +183,6 @@ const AUTO_SAVE_DELAY = 5 * 60 * 1000;
 const LOCAL_DRAFT_BACKUP_KEY = 'cv_autosave_backup';
 const promptedLocalDraftKeys = new Set();
 let lastLocalDraftBackupSignature = null;
-
-function getFlowNodeCount(flow) {
-    const nodes = flow?.nodes || flow?.Nodes || [];
-    if (Array.isArray(nodes)) {
-        return nodes.length;
-    }
-
-    if (nodes && typeof nodes === 'object') {
-        return Object.keys(nodes).length;
-    }
-
-    return 0;
-}
 
 function getLocalDraftBackupSignature(project, flow) {
     const projectId = project?.id || '';
@@ -1250,9 +1238,14 @@ function handleNewProject(options = {}) {
         onClick: () => closeModal(modalOverlay)
     });
 
+    let createInFlight = false;
     const btnCreate = createButton({
         text: preserveCanvas ? '保存' : '创建',
-        onClick: () => {
+        onClick: async () => {
+            if (createInFlight) {
+                return;
+            }
+
             const name = nameInput.querySelector('input').value.trim();
             const desc = descInput.querySelector('input').value.trim();
 
@@ -1261,10 +1254,16 @@ function handleNewProject(options = {}) {
                 return;
             }
 
-            void createProject(name, desc, preserveCanvas).then(() => {
+            createInFlight = true;
+            btnCreate.disabled = true;
+            try {
+                await createProject(name, desc, preserveCanvas);
                 closeModal(modalOverlay);
-                void switchView('flow');
-            }).catch(() => {});
+                await switchView('flow');
+            } catch {
+                createInFlight = false;
+                btnCreate.disabled = false;
+            }
         }
     });
 
@@ -1525,11 +1524,19 @@ async function ensureAiPanel() {
         onApplied: (flow) => {
             const syncedFlow = syncCurrentProjectFlowFromCanvas() || flow;
             getAiGenerationController().publishApplied(syncedFlow);
+            void ensureProjectForAppliedFlow(syncedFlow, {
+                projectName: `AI生成工程_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`,
+                description: '由 AI 生成流程自动创建。'
+            });
         },
         onCanvasChanged: ({ flow } = {}) => {
             const syncedFlow = syncCurrentProjectFlowFromCanvas() || flow || null;
             if (syncedFlow) {
                 getAiGenerationController().publishApplied(syncedFlow);
+                void ensureProjectForAppliedFlow(syncedFlow, {
+                    projectName: `AI生成工程_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`,
+                    description: '由 AI 生成流程自动创建。'
+                });
             }
         }
     });
@@ -1686,6 +1693,27 @@ function syncCurrentProjectFlowFromCanvas() {
     return flow;
 }
 
+async function ensureProjectForAppliedFlow(flow, options = {}) {
+    if (getCurrentProject()?.id || getFlowNodeCount(flow) === 0) {
+        return null;
+    }
+
+    const projectName = options.projectName || `AI生成工程_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`;
+    const projectDescription = options.description || '由 AI 生成流程自动创建。';
+
+    try {
+        const project = await projectManager.createProject(projectName, projectDescription);
+        projectManager.updateFlow(flow);
+        await projectManager.saveProject(projectManager.getCurrentProject?.() || project);
+        showToast(`已创建工程：${project?.name || projectName}`, 'success');
+        return project;
+    } catch (error) {
+        console.error('[App] 应用流程后自动创建工程失败:', error);
+        showToast(`流程已应用，但创建工程失败: ${error?.message || error}`, 'warning');
+        return null;
+    }
+}
+
 function validateCurrentFlowForAction(action) {
     const panel = propertyPanel || serviceRegistry.get('propertyPanel');
     if (panel?.validateFlowForAction?.(flowCanvas, { action, showToast: true }) === false) {
@@ -1694,6 +1722,23 @@ function validateCurrentFlowForAction(action) {
 
     if (panel?.currentOperator && panel.applyChanges?.({ showToast: false }) === false) {
         return false;
+    }
+
+    return true;
+}
+
+function syncCurrentPropertyDraftForPersistence() {
+    const panel = propertyPanel || serviceRegistry.get('propertyPanel');
+    if (!panel?.currentOperator) {
+        return true;
+    }
+
+    if (typeof panel.syncDraftChanges === 'function') {
+        return panel.syncDraftChanges({ showToast: false }) !== false;
+    }
+
+    if (typeof panel.applyChanges === 'function') {
+        return panel.applyChanges({ showToast: false }) !== false;
     }
 
     return true;
@@ -1750,6 +1795,7 @@ async function triggerAutoSave() {
     const project = getCurrentProject();
     if (project && flowCanvas) {
         try {
+            syncCurrentPropertyDraftForPersistence();
             project.flow = flowCanvas.serialize();
             saveLocalDraftBackup(project, project.flow, 'manual');
             debugLogger.debug('[LocalDraftBackup] 手动触发本机草稿备份完成');
@@ -1812,7 +1858,7 @@ async function resolveProjectExportSource(projectId = null) {
 async function exportProjectToJson(projectId = null) {
     const currentProject = getCurrentProject();
     const targetProjectId = projectId || currentProject?.id || null;
-    if (currentProject && currentProject.id === targetProjectId && !validateCurrentFlowForAction('导出')) {
+    if (currentProject && currentProject.id === targetProjectId && !syncCurrentPropertyDraftForPersistence()) {
         return;
     }
 
@@ -2085,7 +2131,7 @@ async function importProjectFromJson(file) {
         }
         
         // 纭瀵煎叆
-        const confirmed = confirm(`确定要导入工程 "${importData.project.name || '未命名'}" 吗？\n当前未保存的更改将会丢失。`);
+        const confirmed = confirm(`确定要导入工程 "${importData.project.name || '未命名'}" 吗？\n如果当前工程有未保存的更改，系统会先询问是否保存。`);
         if (!confirmed) return;
         
         // 閫氳繃 projectManager 鍒涘缓鏂板伐绋嬶紙鐢卞悗绔敓鎴?ID锛?

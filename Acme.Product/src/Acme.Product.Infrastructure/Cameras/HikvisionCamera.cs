@@ -142,6 +142,7 @@ public class HikvisionCamera : ICameraProvider
     private CameraDeviceInfo? _currentDevice;
     private List<CameraDeviceInfo> _cachedDevices = new();
     private MV_CC_DEVICE_INFO_LIST _deviceList;
+    private readonly Dictionary<string, int> _deviceIndexBySerial = new(StringComparer.OrdinalIgnoreCase);
     private IntPtr _frameBufferPtr = IntPtr.Zero;
     private int _frameBufferSize;
     private int _targetDeviceIndex = -1;
@@ -160,6 +161,7 @@ public class HikvisionCamera : ICameraProvider
     public List<CameraDeviceInfo> EnumerateDevices()
     {
         _cachedDevices.Clear();
+        _deviceIndexBySerial.Clear();
         _deviceList = new MV_CC_DEVICE_INFO_LIST();
         _deviceList.pDeviceInfo = new IntPtr[256];
 
@@ -189,6 +191,11 @@ public class HikvisionCamera : ICameraProvider
                 string manufacturer = ExtractManufacturerName(deviceInfo);
                 string model = ExtractModelName(deviceInfo, interfaceType);
                 string userDefinedName = ExtractUserDefinedName(deviceInfo, i, manufacturer);
+                if (!IsAcceptedHikvisionDevice(manufacturer, model, interfaceType))
+                {
+                    Debug.WriteLine($"[HikvisionCamera] Skipped non-Hikvision device: manufacturer='{manufacturer}', model='{model}', serial='{serialNumber}'");
+                    continue;
+                }
 
                 _cachedDevices.Add(new CameraDeviceInfo
                 {
@@ -199,6 +206,10 @@ public class HikvisionCamera : ICameraProvider
                     IpAddress = ExtractIpAddress(deviceInfo),
                     InterfaceType = interfaceType
                 });
+                if (!string.IsNullOrWhiteSpace(serialNumber))
+                {
+                    _deviceIndexBySerial[serialNumber.Trim()] = i;
+                }
             }
 
             Debug.WriteLine($"[HikvisionCamera] Found {_cachedDevices.Count} devices");
@@ -219,8 +230,12 @@ public class HikvisionCamera : ICameraProvider
             {
                 if (deviceInfo.nTLayerType == MV_GIGE_DEVICE)
                 {
-                    // GigE layout may vary across SDK versions; try both common offsets.
-                    var sn = ExtractAsciiField(deviceInfo.SpecialInfo, 144, 16);
+                    // MV_GIGE_DEVICE_INFO commonly places chSerialNumber at offset 164.
+                    var sn = ExtractAsciiField(deviceInfo.SpecialInfo, 164, 16);
+                    if (!string.IsNullOrWhiteSpace(sn))
+                        return sn;
+                    // Keep legacy fallback offsets for older SDK layout assumptions.
+                    sn = ExtractAsciiField(deviceInfo.SpecialInfo, 144, 16);
                     if (!string.IsNullOrWhiteSpace(sn))
                         return sn;
                     sn = ExtractAsciiField(deviceInfo.SpecialInfo, 16, 16);
@@ -248,19 +263,24 @@ public class HikvisionCamera : ICameraProvider
                 deviceInfo.SpecialInfo != null &&
                 deviceInfo.SpecialInfo.Length > 0)
             {
-                var manufacturer = ExtractAsciiField(deviceInfo.SpecialInfo, 0, 32);
+                // MV_GIGE_DEVICE_INFO commonly places chManufacturerName at offset 20.
+                var manufacturer = ExtractAsciiField(deviceInfo.SpecialInfo, 20, 32);
                 if (!string.IsNullOrWhiteSpace(manufacturer))
                     return manufacturer;
 
-                // Some layouts contain IP fields before manufacturer name.
+                // Legacy fallbacks: some SDK wrappers expose variant layouts.
+                manufacturer = ExtractAsciiField(deviceInfo.SpecialInfo, 0, 32);
+                if (!string.IsNullOrWhiteSpace(manufacturer) && LooksLikeManufacturerName(manufacturer))
+                    return manufacturer;
+
                 manufacturer = ExtractAsciiField(deviceInfo.SpecialInfo, 16, 32);
-                if (!string.IsNullOrWhiteSpace(manufacturer))
+                if (!string.IsNullOrWhiteSpace(manufacturer) && LooksLikeManufacturerName(manufacturer))
                     return manufacturer;
             }
         }
         catch (Exception ex) { Debug.WriteLine($"[HikvisionCamera] ExtractManufacturerName failed: {ex.Message}"); }
 
-        return "Hikvision";
+        return "Unknown";
     }
 
     private string ExtractModelName(MV_CC_DEVICE_INFO deviceInfo, string interfaceType)
@@ -271,7 +291,13 @@ public class HikvisionCamera : ICameraProvider
                 deviceInfo.SpecialInfo != null &&
                 deviceInfo.SpecialInfo.Length > 0)
             {
-                var model = ExtractAsciiField(deviceInfo.SpecialInfo, 32, 32);
+                // MV_GIGE_DEVICE_INFO commonly places chModelName at offset 52.
+                var model = ExtractAsciiField(deviceInfo.SpecialInfo, 52, 32);
+                if (!string.IsNullOrWhiteSpace(model))
+                    return model;
+
+                // Legacy fallbacks.
+                model = ExtractAsciiField(deviceInfo.SpecialInfo, 32, 32);
                 if (!string.IsNullOrWhiteSpace(model))
                     return model;
 
@@ -293,7 +319,13 @@ public class HikvisionCamera : ICameraProvider
                 deviceInfo.SpecialInfo != null &&
                 deviceInfo.SpecialInfo.Length > 0)
             {
-                var userDefinedName = ExtractAsciiField(deviceInfo.SpecialInfo, 176, 16);
+                // MV_GIGE_DEVICE_INFO commonly places chUserDefinedName at offset 180.
+                var userDefinedName = ExtractAsciiField(deviceInfo.SpecialInfo, 180, 16);
+                if (!string.IsNullOrWhiteSpace(userDefinedName))
+                    return userDefinedName;
+
+                // Legacy fallbacks.
+                userDefinedName = ExtractAsciiField(deviceInfo.SpecialInfo, 176, 16);
                 if (!string.IsNullOrWhiteSpace(userDefinedName))
                     return userDefinedName;
 
@@ -306,6 +338,59 @@ public class HikvisionCamera : ICameraProvider
 
         var fallbackManufacturer = string.IsNullOrWhiteSpace(manufacturer) ? "Hikvision" : manufacturer;
         return $"{fallbackManufacturer} Camera {deviceIndex + 1}";
+    }
+
+    private static bool IsAcceptedHikvisionDevice(string? manufacturer, string? model, string? interfaceType)
+    {
+        var normalizedManufacturer = NormalizeDeviceText(manufacturer);
+        var normalizedModel = NormalizeDeviceText(model);
+
+        if (normalizedManufacturer.Contains("hikvision", StringComparison.OrdinalIgnoreCase) ||
+            normalizedManufacturer.Contains("hikrobot", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (IsKnownNonHikvisionManufacturer(normalizedManufacturer) ||
+            IsKnownNonHikvisionManufacturer(normalizedModel))
+        {
+            return false;
+        }
+
+        // Avoid opening third-party GigE Vision cameras through the Hikvision SDK unless
+        // the device metadata clearly identifies a Hikvision/Hikrobot camera.
+        if (string.Equals(interfaceType, "GigE", StringComparison.OrdinalIgnoreCase))
+        {
+            return normalizedModel.StartsWith("mv-c", StringComparison.OrdinalIgnoreCase) ||
+                   normalizedModel.StartsWith("hik", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // USB devices returned by the Hikvision SDK are much less likely to be cross-vendor
+        // GigE discoveries, and older SDK wrappers may not expose their vendor fields here.
+        return string.Equals(interfaceType, "USB3", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsKnownNonHikvisionManufacturer(string value)
+    {
+        return value.Contains("huaray", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("mindvision", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("daheng", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("basler", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("allied", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("flir", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("teledyne", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("ids", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeManufacturerName(string value)
+    {
+        var normalized = NormalizeDeviceText(value);
+        return normalized.Any(char.IsLetter) && !normalized.Contains('.') && normalized.Length <= 64;
+    }
+
+    private static string NormalizeDeviceText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
     }
 
     private string? ExtractIpAddress(MV_CC_DEVICE_INFO deviceInfo)
@@ -409,14 +494,9 @@ public class HikvisionCamera : ICameraProvider
             if (_cachedDevices.Count == 0)
                 EnumerateDevices();
 
-            _targetDeviceIndex = -1;
-            for (int i = 0; i < _cachedDevices.Count; i++)
+            if (!_deviceIndexBySerial.TryGetValue(serialNumber.Trim(), out _targetDeviceIndex))
             {
-                if (_cachedDevices[i].SerialNumber == serialNumber)
-                {
-                    _targetDeviceIndex = i;
-                    break;
-                }
+                _targetDeviceIndex = -1;
             }
 
             if (_targetDeviceIndex < 0 || _deviceList.pDeviceInfo[_targetDeviceIndex] == IntPtr.Zero)
@@ -447,7 +527,8 @@ public class HikvisionCamera : ICameraProvider
             AllocateFrameBuffer(bufferSize);
 
             _isConnected = true;
-            _currentDevice = _cachedDevices[_targetDeviceIndex];
+            _currentDevice = _cachedDevices.FirstOrDefault(device =>
+                string.Equals(device.SerialNumber, serialNumber, StringComparison.OrdinalIgnoreCase));
             Debug.WriteLine($"[HikvisionCamera] Opened: {serialNumber}");
             return true;
         }
