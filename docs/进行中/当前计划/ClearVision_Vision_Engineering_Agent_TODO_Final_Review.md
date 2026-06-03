@@ -1871,3 +1871,45 @@ dryrun_flow 预演
 [ ] dryrun_flow 与 replay_flow_with_frame 分工明确，避免把空桩仿真误当真实视觉效果验证。
 [ ] 前端通过 agentActionBridge.js 隔离跨模块动作，避免继续扩大 aiPanel.js。
 ```
+
+---
+
+## 17. 实施闭环记录（2026-06-03）
+
+本轮已完成 Vision Engineering Agent 的可运行闭环实现，范围如下：
+
+```text
+[x] Core: IVisionAgentTool / IVisionAgentToolRegistry / ToolDescriptor / ToolResult / ToolTrace / ToolContext / ToolPermission
+[x] Contract: AiFlowGenerationRequest 增加 PromptMode，GenerateFlowResponse 增加 ToolTrace / PendingActions
+[x] Agent: AgentPromptBuilder / VisionAgentProtocolParser / VisionAgentLoop / MaxToolRounds / ToolTrace 聚合
+[x] PromptMode: legacy_full_prompt / hybrid / agent_tools 已接入 GenerateFlow
+[x] Tools: operator catalog/schema/knowledge、template match/skeleton、inspect_current_flow、validate_flow、dryrun_flow、replay_flow_with_frame
+[x] Tools: camera bindings/discovery/test frame/draft binding、station status、runtime package precheck、runtime package manifest draft
+[x] Safety: 未引入 CMD / PowerShell / shell / 任意文件系统工具；ConfigDraft / DeploymentPrepare 仅返回 pending action
+[x] DI: 工具注册为 scoped 链路，ToolRegistry 不再误绑定项目内 legacy ILogger<T>
+[x] Desktop: 接入真实 Station status reader，基础 no-op reader 仅作为 fallback
+[x] Frontend: AI 面板新增 Agent 模式切换、ToolTrace 卡片、PendingAgentActionCard、agentActionBridge.js
+[x] Tests: GenerateFlowMessageHandler / AgentPromptBuilder / ProtocolParser / ToolRegistry / VisionAgentLoop 回归覆盖
+```
+
+验证结果：
+
+```text
+[x] node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js
+[x] node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/agentActionBridge.js
+[x] node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js
+[x] node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js
+[x] dotnet build ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj
+[x] ./scripts/run-dotnet-test-serial.ps1 -Project ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj -FullyQualifiedName GenerateFlowMessageHandlerTests,VisionAgentLoopTests
+[x] ./scripts/run-dotnet-test-serial.ps1 -Project ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj -FullyQualifiedName GenerateFlowMessageHandlerTests,VisionAgentLoopTests,AiApiClientMultimodalTests -NoBuild -NoRestore
+[x] ./scripts/run-dotnet-test-serial.ps1 -Project ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj -FullyQualifiedName GenerateFlowMessageHandlerTests,VisionAgentLoopTests,AiApiClientMultimodalTests,ReplayFlowWithFrameToolTests
+```
+
+当前保留边界：
+
+```text
+[x] 原生 OpenAI Chat Completions / Responses 与 Anthropic Messages provider tool_calls / tool_use 适配已实现；OpenAI-compatible / Ollama native 默认继续走 JSON tool_call/final_flow fallback，除非模型能力显式启用 SupportsToolCall。
+[x] replay_flow_with_frame 已消费 temporaryFrameId 并通过 IFlowExecutionService 注入缓存帧 Image 输入执行真实样本帧回放，返回结构化执行摘要。
+[x] PendingAgentActionCard 已通过 agentActionBridge.js 派发标准事件；Settings 监听 cameraBindingDraft.apply 并走相机绑定保存链路，Station 监听运行包 review 动作并刷新监控状态。
+[x] 本轮浏览器 file:// 静态预览被 Codex Browser 安全策略阻止，未绕过；前端验证以 JS 语法检查、Desktop build 和 focused tests 为准。
+```

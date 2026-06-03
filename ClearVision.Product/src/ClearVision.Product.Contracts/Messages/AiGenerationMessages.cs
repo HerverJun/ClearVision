@@ -56,6 +56,11 @@ public record GenerateFlowRequestPayload
     public string? RequirementMode { get; init; }
 
     /// <summary>
+    /// Optional prompt mode: legacy_full_prompt / hybrid / agent_tools.
+    /// </summary>
+    public string? PromptMode { get; init; }
+
+    /// <summary>
     /// 可选：用户在工作台中选择的模板策略。
     /// </summary>
     public GenerateFlowTemplateSelection? TemplateSelection { get; init; }
@@ -102,6 +107,8 @@ public record GenerateFlowResponse
     public string? RouterConfidence { get; init; }
     public List<string> BlockingClarificationFields { get; init; } = new();
     public List<string> NonBlockingMissingFields { get; init; } = new();
+    public List<GenerateFlowToolTrace> ToolTrace { get; init; } = new();
+    public List<GenerateFlowPendingAction> PendingActions { get; init; } = new();
 
     /// <summary>Active prompt template version ID at generation time.</summary>
     public string? PromptVersionId { get; init; }
@@ -269,6 +276,26 @@ public record GenerateFlowKnowledgeDiagnostic
     public List<string> RelatedFields { get; init; } = new();
     public string? OperatorId { get; init; }
     public string? RepairHint { get; init; }
+}
+
+public record GenerateFlowToolTrace
+{
+    public string ToolName { get; init; } = string.Empty;
+    public object? Arguments { get; init; }
+    public bool Success { get; init; }
+    public object? ResultSummary { get; init; }
+    public string? ErrorMessage { get; init; }
+    public long DurationMs { get; init; }
+    public string Permission { get; init; } = string.Empty;
+}
+
+public record GenerateFlowPendingAction
+{
+    public string ActionType { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string Summary { get; init; } = string.Empty;
+    public object? Payload { get; init; }
+    public bool RequiresUserConfirmation { get; init; } = true;
 }
 
 

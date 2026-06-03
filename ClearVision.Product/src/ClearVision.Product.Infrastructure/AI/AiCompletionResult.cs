@@ -24,6 +24,11 @@ public class AiCompletionResult
     /// Token usage reported by the API (null if not available).
     /// </summary>
     public AiTokenUsage? TokenUsage { get; set; }
+
+    /// <summary>
+    /// Native provider tool calls requested by the model.
+    /// </summary>
+    public List<AiNativeToolCall> ToolCalls { get; set; } = new();
 }
 
 /// <summary>
@@ -35,4 +40,26 @@ public class AiTokenUsage
     public int OutputTokens { get; set; }
     public int? CacheReadTokens { get; set; }
     public int? CacheWriteTokens { get; set; }
+}
+
+public sealed record AiNativeToolDefinition
+{
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public System.Text.Json.JsonElement ParametersSchema { get; init; }
+}
+
+public sealed record AiNativeToolCall
+{
+    public string Id { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public System.Text.Json.JsonElement Arguments { get; init; }
+    public string? ResponseItemId { get; init; }
+}
+
+public sealed record AiNativeToolResult
+{
+    public string ToolCallId { get; init; } = string.Empty;
+    public string Content { get; init; } = string.Empty;
+    public bool IsError { get; init; }
 }

@@ -61,6 +61,15 @@ public class AiModelCapabilities
         {
             // Anthropic response streaming is mature and commonly includes thinking deltas.
             caps.SupportsReasoningStream = true;
+            caps.SupportsToolCall = true;
+        }
+
+        if (providerKey.Contains("azure") ||
+            providerKey == "openai" ||
+            providerKey.Contains("openai api") ||
+            (providerKey.Contains("openai") && !providerKey.Contains("compatible")))
+        {
+            caps.SupportsToolCall = true;
         }
 
         if (modelKey.Contains("reasoner", StringComparison.OrdinalIgnoreCase))

@@ -76,6 +76,23 @@ public sealed class AiGenerationOrchestrator
         return connector.CompleteAsync(systemPrompt, messages, cancellationToken);
     }
 
+    public Task<AiCompletionResult> CompleteWithToolsAsync(
+        string systemPrompt,
+        List<ChatMessage> messages,
+        IReadOnlyList<AiNativeToolDefinition> tools,
+        AiModelConfig? modelConfig = null,
+        CancellationToken cancellationToken = default)
+    {
+        var model = modelConfig ?? ResolveGenerationModel();
+        var connector = _connectorFactory.CreateConnector(model);
+        if (connector is IAiToolCallingConnector toolCallingConnector)
+        {
+            return toolCallingConnector.CompleteWithToolsAsync(systemPrompt, messages, tools, cancellationToken);
+        }
+
+        return connector.CompleteAsync(systemPrompt, messages, cancellationToken);
+    }
+
     public Task<AiCompletionResult> StreamCompleteAsync(
         string systemPrompt,
         List<ChatMessage> messages,

@@ -2,6 +2,7 @@
 // AI 生成 DTO 定义
 // 定义 AI 流程生成请求与结果传输结构
 // 作者：蘅芜君
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Services;
 
 namespace ClearVision.Product.Core.DTOs;
@@ -21,6 +22,7 @@ public record AiFlowGenerationRequest(
 )
 {
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
+    public string PromptMode { get; init; } = AiPromptModes.LegacyFullPrompt;
 }
 
 public static class AiRequirementModes
@@ -218,6 +220,10 @@ public class AiFlowGenerationResult
     public string RouterConfidence { get; set; } = AiRouterConfidence.Low;
     public List<string> BlockingClarificationFields { get; set; } = new();
     public List<string> NonBlockingMissingFields { get; set; } = new();
+
+    public List<VisionAgentToolTrace> ToolTrace { get; set; } = new();
+
+    public List<VisionAgentPendingAction> PendingActions { get; set; } = new();
 }
 
 public static class AiTurnIntents
@@ -335,6 +341,8 @@ public class AiGeneratedFlowJson
     /// AI 输出的缺失资源（可选）
     /// </summary>
     public List<AiMissingResourceInfo> MissingResources { get; set; } = new();
+
+    public List<VisionAgentPendingAction> PendingActions { get; set; } = new();
 }
 
 public class AiRecommendedTemplateInfo

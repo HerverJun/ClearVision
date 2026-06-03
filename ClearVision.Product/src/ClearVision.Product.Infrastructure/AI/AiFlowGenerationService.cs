@@ -9,10 +9,12 @@ using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Contracts.Messages;
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.DryRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using Microsoft.Extensions.Hosting;
@@ -37,6 +39,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly ITemplateConstraintValidator _templateConstraintValidator;
     private readonly IAiFlowResponseParser _responseParser;
     private readonly DryRunService _dryRunService;
+    private readonly VisionAgentLoop? _visionAgentLoop;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly IPromptVersionManager _promptVersionManager;
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
@@ -67,6 +70,45 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IHostEnvironment hostEnvironment,
         IPromptVersionManager promptVersionManager,
         Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
+        : this(
+            aiOrchestrator,
+            promptBuilder,
+            conversationalFlowService,
+            validator,
+            layoutService,
+            operatorFactory,
+            templateService,
+            scenarioMatcher,
+            requirementBriefExtractor,
+            turnRouter,
+            templateConstraintValidator,
+            responseParser,
+            dryRunService,
+            null,
+            hostEnvironment,
+            promptVersionManager,
+            logger)
+    {
+    }
+
+    public AiFlowGenerationService(
+        AiGenerationOrchestrator aiOrchestrator,
+        PromptBuilder promptBuilder,
+        IConversationalFlowService conversationalFlowService,
+        IAiFlowValidator validator,
+        AutoLayoutService layoutService,
+        IOperatorFactory operatorFactory,
+        IFlowTemplateService templateService,
+        IScenarioMatcher scenarioMatcher,
+        IRequirementBriefExtractor requirementBriefExtractor,
+        IAiTurnRouter turnRouter,
+        ITemplateConstraintValidator templateConstraintValidator,
+        IAiFlowResponseParser responseParser,
+        DryRunService dryRunService,
+        VisionAgentLoop? visionAgentLoop,
+        IHostEnvironment hostEnvironment,
+        IPromptVersionManager promptVersionManager,
+        Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
     {
         _aiOrchestrator = aiOrchestrator;
         _promptBuilder = promptBuilder;
@@ -81,6 +123,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _templateConstraintValidator = templateConstraintValidator;
         _responseParser = responseParser;
         _dryRunService = dryRunService;
+        _visionAgentLoop = visionAgentLoop;
         _hostEnvironment = hostEnvironment;
         _promptVersionManager = promptVersionManager;
         _logger = logger;
@@ -245,12 +288,16 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         var selectionReason = _aiOrchestrator.ResolveSelectionReason();
         var options = activeModel.ToGenerationOptions();
         var capabilities = _aiOrchestrator.ResolveCapabilities(activeModel);
+        var promptMode = AiPromptModes.Normalize(request.PromptMode);
+        var useAgentTools = AiPromptModes.UsesAgentTools(promptMode) && _visionAgentLoop != null;
 
-        var systemPrompt = pipeline.Measure(
-            "prompt_context",
-            () => _promptBuilder.BuildSystemPrompt(request.Description, capabilities.SupportsJsonMode),
-            prompt => $"system prompt chars={prompt.Length}");
-        var referenceFlowSummary = ShouldIncludeReferenceFlowSummary(effectiveMode)
+        var systemPrompt = useAgentTools
+            ? string.Empty
+            : pipeline.Measure(
+                "prompt_context",
+                () => _promptBuilder.BuildSystemPrompt(request.Description, capabilities.SupportsJsonMode),
+                prompt => $"system prompt chars={prompt.Length}");
+        var referenceFlowSummary = !useAgentTools && ShouldIncludeReferenceFlowSummary(effectiveMode)
             ? AiPromptComposer.BuildReferenceFlowSummary(conversationContext.ExistingFlowJson)
             : string.Empty;
         var userMessage = AiPromptComposer.BuildUserPrompt(new AiPromptRequest(
@@ -258,13 +305,15 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             Mode: effectiveMode,
             AdditionalContext: request.AdditionalContext,
             InteractionInstructions: BuildTurnRoutePromptSection(turnRoute),
-            TemplatePriority: BuildTemplatePriorityPromptSection(templatePriority),
+            TemplatePriority: useAgentTools
+                ? BuildAgentTemplatePriorityPromptSection(templatePriority)
+                : BuildTemplatePriorityPromptSection(templatePriority),
             AttachmentContext: attachmentContext,
             SessionSummary: conversationContext.SessionSummary,
             ReferenceFlowSummary: referenceFlowSummary,
             RequirementBriefSection: BuildRequirementBriefPromptSection(requirementBrief)));
         GenerateFlowAttachmentReport promptTraceAttachmentReport = new();
-        var promptTrace = ShouldIncludePromptTrace(request.DebugPrompt)
+        var promptTrace = !useAgentTools && ShouldIncludePromptTrace(request.DebugPrompt)
             ? new AiPromptTrace
             {
                 Mode = effectiveMode.ToWireValue(),
@@ -308,7 +357,31 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
         if (promptTrace != null)
             promptTrace.AttachmentReport = promptTraceAttachmentReport;
-        var currentUserMessage = BuildUserChatMessage(userMessage, activeSendablePaths);
+        var currentUserMessage = useAgentTools
+            ? new ChatMessage("user", userMessage)
+            : BuildUserChatMessage(userMessage, activeSendablePaths);
+
+        if (useAgentTools)
+        {
+            return await RunAgentToolsFlowAsync(
+                request,
+                conversationContext,
+                detectedIntent,
+                turnRoute,
+                templatePriority,
+                requirementBrief,
+                progressMessages,
+                pipeline,
+                activePromptVersion,
+                activeModel,
+                capabilities,
+                options,
+                selectionReason,
+                userMessage,
+                promptTraceAttachmentReport,
+                ReportProgress,
+                cancellationToken);
+        }
 
         AiGeneratedFlowJson? generatedFlow = null;
         AiValidationResult? lastValidation = null;
@@ -959,6 +1032,292 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return debugPrompt || _hostEnvironment.IsDevelopment() || System.Diagnostics.Debugger.IsAttached;
     }
 
+    private async Task<AiFlowGenerationResult> RunAgentToolsFlowAsync(
+        AiFlowGenerationRequest request,
+        ConversationContext conversationContext,
+        string detectedIntent,
+        AiTurnRoute turnRoute,
+        TemplatePriorityContext templatePriority,
+        AiRequirementBrief requirementBrief,
+        IReadOnlyList<string> progressMessages,
+        AiGenerationPipelineContext pipeline,
+        PromptVersion activePromptVersion,
+        AiModelConfig activeModel,
+        AiModelCapabilities capabilities,
+        AiGenerationOptions options,
+        string selectionReason,
+        string userMessage,
+        GenerateFlowAttachmentReport attachmentReport,
+        Action<string> reportProgress,
+        CancellationToken cancellationToken)
+    {
+        reportProgress("Vision Agent 正在按需调用 ClearVision 内部工具...");
+        var stopwatch = Stopwatch.StartNew();
+        var agentResult = await _visionAgentLoop!.RunAsync(new VisionAgentLoopRequest
+        {
+            UserPrompt = userMessage,
+            Model = activeModel,
+            Capabilities = capabilities,
+            ToolContext = new VisionAgentToolContext
+            {
+                UserDescription = request.Description,
+                AdditionalContext = request.AdditionalContext,
+                SessionId = conversationContext.SessionId,
+                ExistingFlowJson = conversationContext.ExistingFlowJson,
+                PromptMode = AiPromptModes.Normalize(request.PromptMode),
+                DebugPrompt = request.DebugPrompt
+            }
+        }, cancellationToken);
+        stopwatch.Stop();
+
+        var estimatedInputTokens = agentResult.TokenUsage?.InputTokens
+            ?? EstimateTokens(agentResult.SystemPrompt) + EstimateTokens(agentResult.UserPrompt);
+        var estimatedOutputTokens = agentResult.TokenUsage?.OutputTokens
+            ?? EstimateTokens(agentResult.FinalContent);
+        pipeline.EstimatedInputTokens = estimatedInputTokens;
+        pipeline.EstimatedOutputTokens = estimatedOutputTokens;
+        pipeline.AddStage(
+            "agent_loop",
+            agentResult.Success ? "completed" : "failed",
+            agentResult.Success
+                ? $"toolRounds={agentResult.ToolRounds}, toolCalls={agentResult.ToolTrace.Count}, responseChars={agentResult.FinalContent.Length}"
+                : agentResult.ErrorMessage ?? "agent loop failed",
+            stopwatch.Elapsed,
+            new Dictionary<string, string>
+            {
+                ["provider"] = options.Provider,
+                ["model"] = options.Model,
+                ["promptMode"] = AiPromptModes.Normalize(request.PromptMode),
+                ["estimatedInputTokens"] = estimatedInputTokens.ToString(CultureInfo.InvariantCulture),
+                ["estimatedOutputTokens"] = estimatedOutputTokens.ToString(CultureInfo.InvariantCulture)
+            });
+
+        var promptTrace = ShouldIncludePromptTrace(request.DebugPrompt)
+            ? new AiPromptTrace
+            {
+                Mode = AiPromptModes.Normalize(request.PromptMode),
+                Provider = options.Provider,
+                Model = options.Model,
+                BaseUrl = options.BaseUrl,
+                Capabilities = capabilities.Clone(),
+                SystemPrompt = agentResult.SystemPrompt,
+                UserPrompt = agentResult.UserPrompt,
+                UsedReferenceFlowSummary = string.Empty,
+                PromptVersionId = activePromptVersion.Id.ToString(),
+                PromptVersionName = activePromptVersion.Name,
+                SelectionReason = selectionReason,
+                AttachmentReport = attachmentReport,
+                EstimatedInputTokens = estimatedInputTokens,
+                EstimatedOutputTokens = estimatedOutputTokens
+            }
+            : null;
+
+        if (!agentResult.Success)
+        {
+            return new AiFlowGenerationResult
+            {
+                Success = false,
+                ErrorMessage = agentResult.ErrorMessage,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+                FailureType = AiFlowGenerationResult.FailureTypeManualRetryRequired,
+                RetryCount = 0,
+                SessionId = conversationContext.SessionId,
+                DetectedIntent = detectedIntent,
+                PromptTrace = promptTrace,
+                RequirementBrief = requirementBrief,
+                GenerationMode = templatePriority.GenerationMode,
+                TemplateLockLevel = templatePriority.TemplateLockLevel,
+                TemplateCandidates = BuildTemplateCandidates(templatePriority),
+                StageTimeline = pipeline.Timeline.ToList(),
+                ToolTrace = agentResult.ToolTrace,
+                PendingActions = agentResult.PendingActions,
+                TurnIntent = turnRoute.TurnIntent,
+                InteractionState = AiInteractionStates.ManualRetry,
+                RouterConfidence = turnRoute.Confidence,
+                BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+                NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+            };
+        }
+
+        reportProgress("Vision Agent 已返回 final_flow，正在解析和复用现有校验链...");
+        var parseResult = pipeline.Measure(
+            "parse",
+            () => _responseParser.Parse(agentResult.FinalContent),
+            result => result.Success
+                ? $"operators={result.Flow!.Operators?.Count ?? 0}, connections={result.Flow.Connections?.Count ?? 0}, candidates={result.CandidateCount}"
+                : $"parse failed: {result.Code}, candidates={result.CandidateCount}");
+        var generatedFlow = parseResult.Flow;
+        if (generatedFlow == null)
+        {
+            var validation = BuildParseValidationResult(parseResult);
+            var diagnostics = BuildAttemptDiagnostics(1, "parse", validation, agentResult.FinalContent);
+            var manualRetry = CreateManualRetryResult(
+                stage: "agent_parse",
+                conversationContext.SessionId,
+                request.Description,
+                validation,
+                diagnostics,
+                retryCount: 0,
+                lastRawResponse: agentResult.FinalContent,
+                promptTrace,
+                progressMessages,
+                requirementBrief,
+                turnRoute,
+                templatePriority.GenerationMode,
+                templatePriority.TemplateLockLevel,
+                BuildTemplateCandidates(templatePriority),
+                pipeline.Timeline.ToList());
+            manualRetry.ToolTrace = agentResult.ToolTrace;
+            manualRetry.PendingActions = agentResult.PendingActions;
+            return manualRetry;
+        }
+
+        ApplyTemplateMetadata(generatedFlow, templatePriority);
+        ApplyModelEmbeddedNmsDefaults(generatedFlow);
+
+        var lastValidation = pipeline.Measure(
+            "validator",
+            () => _validator.Validate(generatedFlow),
+            validation => validation.IsValid
+                ? $"valid with warnings={validation.Warnings.Count}"
+                : $"errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
+        if (lastValidation.IsValid && templatePriority.IsTemplateFirst)
+        {
+            var templateGate = pipeline.Measure(
+                "template_gate",
+                () => _templateConstraintValidator.Validate(
+                    generatedFlow,
+                    templatePriority.Template,
+                    string.Equals(templatePriority.TemplateLockLevel, "strict", StringComparison.OrdinalIgnoreCase)),
+                validation => validation.IsValid
+                    ? $"template gate passed with warnings={validation.Warnings.Count}"
+                    : $"template gate errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
+            MergeValidationResult(lastValidation, templateGate);
+        }
+
+        if (!lastValidation.IsValid)
+        {
+            var diagnostics = BuildAttemptDiagnostics(1, "validation", lastValidation, agentResult.FinalContent);
+            var manualRetry = CreateManualRetryResult(
+                stage: "agent_validation",
+                conversationContext.SessionId,
+                request.Description,
+                lastValidation,
+                diagnostics,
+                retryCount: 0,
+                lastRawResponse: agentResult.FinalContent,
+                promptTrace,
+                progressMessages,
+                requirementBrief,
+                turnRoute,
+                templatePriority.GenerationMode,
+                templatePriority.TemplateLockLevel,
+                BuildTemplateCandidates(templatePriority),
+                pipeline.Timeline.ToList());
+            manualRetry.ToolTrace = agentResult.ToolTrace;
+            manualRetry.PendingActions = agentResult.PendingActions;
+            return manualRetry;
+        }
+
+        var (flowDto, actualOperatorIdMap) = ConvertToFlowDto(generatedFlow, request.Description);
+        pipeline.Measure(
+            "layout",
+            () => { _layoutService.ApplyLayout(flowDto); return true; },
+            _ => $"applied layout to {flowDto.Operators?.Count ?? 0} operators");
+
+        object? dryRunReport = null;
+        try
+        {
+            var dryRunStopwatch = Stopwatch.StartNew();
+            var flowEntity = ConvertDtoToEntity(flowDto);
+            var drResult = await _dryRunService.RunAsync(
+                flowEntity,
+                new Dictionary<string, object>(),
+                new DryRunStubRegistry(),
+                cancellationToken);
+            pipeline.AddStage(
+                "dryrun",
+                "completed",
+                $"success={drResult.IsSuccess}, coverage={drResult.CoveragePercentage:F1}%",
+                dryRunStopwatch.Elapsed);
+            dryRunReport = new
+            {
+                drResult.CoveragePercentage,
+                drResult.CoveredBranches,
+                drResult.TotalBranches,
+                drResult.IsSuccess
+            };
+        }
+        catch (Exception ex)
+        {
+            pipeline.AddStage("dryrun", "warning", ex.Message, TimeSpan.Zero);
+            _logger.LogWarning(ex, "Agent DryRun preview failed.");
+        }
+
+        var recommendedTemplate = ResolveRecommendedTemplate(generatedFlow, templatePriority);
+        var pendingParameters = BuildPendingParameters(generatedFlow, actualOperatorIdMap);
+        var missingResources = BuildMissingResources(generatedFlow, templatePriority);
+        var pendingActions = agentResult.PendingActions
+            .Concat(generatedFlow.PendingActions ?? new List<VisionAgentPendingAction>())
+            .ToList();
+        generatedFlow.PendingParameters = pendingParameters;
+
+        var assistantReply = BuildAssistantReply(generatedFlow, flowDto, recommendedTemplate);
+        var assistantPayload = new ConversationTurnPayload
+        {
+            Kind = "assistant_result",
+            Status = AiFlowGenerationResult.CompletionStatusCompleted,
+            InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
+            TurnIntent = turnRoute.TurnIntent,
+            RouterConfidence = turnRoute.Confidence,
+            BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
+            Reply = assistantReply,
+            Reasoning = ShouldIncludePromptTrace(request.DebugPrompt) ? agentResult.Reasoning : null,
+            Progress = progressMessages.ToList(),
+            RequirementBrief = requirementBrief,
+            ClarificationRequired = requirementBrief.ClarificationRequired
+        };
+
+        _conversationalFlowService.RecordAssistantResponse(
+            conversationContext.SessionId,
+            assistantReply,
+            JsonSerializer.Serialize(generatedFlow, _jsonOptions),
+            JsonSerializer.Serialize(flowDto, _jsonOptions),
+            assistantPayload);
+
+        return new AiFlowGenerationResult
+        {
+            Success = true,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+            Flow = flowDto,
+            AiExplanation = generatedFlow.Explanation,
+            Reasoning = ShouldIncludePromptTrace(request.DebugPrompt) ? agentResult.Reasoning : null,
+            ParametersNeedingReview = generatedFlow.ParametersNeedingReview,
+            RetryCount = 0,
+            SessionId = conversationContext.SessionId,
+            DetectedIntent = detectedIntent,
+            DryRunResult = dryRunReport,
+            RecommendedTemplate = recommendedTemplate,
+            GenerationMode = templatePriority.GenerationMode,
+            TemplateLockLevel = templatePriority.TemplateLockLevel,
+            PendingParameters = pendingParameters,
+            MissingResources = missingResources,
+            PendingActions = pendingActions,
+            ToolTrace = agentResult.ToolTrace,
+            PromptTrace = promptTrace,
+            RequirementBrief = requirementBrief,
+            TemplateCandidates = BuildTemplateCandidates(templatePriority),
+            StageTimeline = pipeline.Timeline.ToList(),
+            KnowledgeDiagnostics = ExtractKnowledgeDiagnostics(lastValidation),
+            TurnIntent = turnRoute.TurnIntent,
+            InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
+            RouterConfidence = turnRoute.Confidence,
+            BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
+            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+        };
+    }
+
     private static string BuildTurnRoutePromptSection(AiTurnRoute route)
     {
         var sb = new StringBuilder();
@@ -1036,6 +1395,32 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
 
         sb.AppendLine("Include recommendedTemplate, pendingParameters, and missingResources in the JSON output.");
+        return sb.ToString().Trim();
+    }
+
+    private static string BuildAgentTemplatePriorityPromptSection(TemplatePriorityContext templatePriority)
+    {
+        if (!templatePriority.IsTemplateFirst)
+            return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("templateFirst=true");
+        sb.AppendLine($"matchMode={templatePriority.MatchMode}");
+        sb.AppendLine($"generationMode={templatePriority.GenerationMode}");
+        sb.AppendLine($"templateLockLevel={templatePriority.TemplateLockLevel}");
+        if (!string.IsNullOrWhiteSpace(templatePriority.ScenarioKey))
+            sb.AppendLine($"scenarioKey={templatePriority.ScenarioKey}");
+        if (templatePriority.Template != null)
+        {
+            sb.AppendLine($"templateId={templatePriority.Template.Id}");
+            sb.AppendLine($"templateName={templatePriority.Template.Name}");
+            sb.AppendLine("Call get_flow_template_skeleton if the template backbone is needed.");
+        }
+        else
+        {
+            sb.AppendLine("Call match_flow_template to find a reusable template if needed.");
+        }
+
         return sb.ToString().Trim();
     }
 

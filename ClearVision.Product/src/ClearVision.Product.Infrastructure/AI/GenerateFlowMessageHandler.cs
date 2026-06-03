@@ -41,6 +41,7 @@ public class GenerateFlowMessageHandler
         IReadOnlyList<string>? attachments = null,
         string? requirementMode = null,
         AiTemplateSelectionInfo? templateSelection = null,
+        string? promptMode = null,
         Action<string, string>? onMessage = null,
         CancellationToken cancellationToken = default)
     {
@@ -68,7 +69,8 @@ public class GenerateFlowMessageHandler
                     DebugPrompt: debugPrompt,
                     TemplateSelection: templateSelection)
                 {
-                    RequirementMode = requirementMode ?? AiRequirementModes.Strict
+                    RequirementMode = requirementMode ?? AiRequirementModes.Strict,
+                    PromptMode = ClearVision.Product.Core.AI.Tools.AiPromptModes.Normalize(promptMode)
                 },
                 progressMsg => onMessage?.Invoke(
                     "GenerateFlowProgress",
@@ -126,6 +128,8 @@ public class GenerateFlowMessageHandler
                 RouterConfidence = result.RouterConfidence,
                 BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
                 NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
+                ToolTrace = MapToolTrace(result.ToolTrace),
+                PendingActions = MapPendingActions(result.PendingActions),
                 PromptVersionId = result.PromptTrace is AiPromptTrace pt ? pt.PromptVersionId : null,
                 PromptVersionName = result.PromptTrace is AiPromptTrace pt2 ? pt2.PromptVersionName : null
             };
@@ -226,6 +230,8 @@ public class GenerateFlowMessageHandler
             response.RouterConfidence,
             response.BlockingClarificationFields,
             response.NonBlockingMissingFields,
+            response.ToolTrace,
+            response.PendingActions,
             response.PromptVersionId,
             response.PromptVersionName,
             FailureType = failureType
@@ -497,6 +503,44 @@ public class GenerateFlowMessageHandler
             RelatedFields = d.RelatedFields?.ToList() ?? new List<string>(),
             OperatorId = d.OperatorId,
             RepairHint = d.RepairHint
+        }).ToList();
+    }
+
+    private static List<GenerateFlowToolTrace> MapToolTrace(
+        IReadOnlyCollection<ClearVision.Product.Core.AI.Tools.VisionAgentToolTrace>? trace)
+    {
+        if (trace == null || trace.Count == 0)
+        {
+            return new List<GenerateFlowToolTrace>();
+        }
+
+        return trace.Select(item => new GenerateFlowToolTrace
+        {
+            ToolName = item.ToolName,
+            Arguments = item.Arguments,
+            Success = item.Success,
+            ResultSummary = item.ResultSummary,
+            ErrorMessage = item.ErrorMessage,
+            DurationMs = item.DurationMs,
+            Permission = item.Permission
+        }).ToList();
+    }
+
+    private static List<GenerateFlowPendingAction> MapPendingActions(
+        IReadOnlyCollection<ClearVision.Product.Core.AI.Tools.VisionAgentPendingAction>? actions)
+    {
+        if (actions == null || actions.Count == 0)
+        {
+            return new List<GenerateFlowPendingAction>();
+        }
+
+        return actions.Select(item => new GenerateFlowPendingAction
+        {
+            ActionType = item.ActionType,
+            Title = item.Title,
+            Summary = item.Summary,
+            Payload = item.Payload,
+            RequiresUserConfirmation = item.RequiresUserConfirmation
         }).ToList();
     }
 

@@ -5,6 +5,7 @@ import {
     buildResultCardsFromOutputData,
     renderResultCardHtml
 } from '../results/portDataTypeRenderer.mjs';
+import { onAgentAction } from '../ai/agentActionBridge.js';
 
 class StationMonitorView {
     constructor(containerId) {
@@ -50,6 +51,9 @@ class StationMonitorView {
         this._relativeTimeCache = new Map();
         this.renderShell();
         this.bindEvents();
+        this._unsubscribeAgentAction = onAgentAction((detail) => {
+            void this.handleAgentAction(detail);
+        });
         this._visibilityHandler = this.handleVisibilityChange.bind(this);
         document.addEventListener('visibilitychange', this._visibilityHandler);
     }
@@ -78,7 +82,29 @@ class StationMonitorView {
 
     dispose() {
         this.deactivate();
+        this._unsubscribeAgentAction?.();
+        this._unsubscribeAgentAction = null;
         document.removeEventListener('visibilitychange', this._visibilityHandler);
+    }
+
+    async handleAgentAction(detail) {
+        const actionType = String(detail?.actionType || '').trim();
+        if (![
+            'runtimePackagePrecheck.review',
+            'runtimePackageManifestDraft.review'
+        ].includes(actionType)) {
+            return false;
+        }
+
+        this.commandStatusMessage = detail?.summary || detail?.title || 'AI runtime package review received.';
+        this.commandStatusLevel = 'info';
+        this.markDirty();
+        this.requestRender();
+        if (this.isActive) {
+            await this.refreshCurrentScope();
+        }
+
+        return true;
     }
 
     focusResultsWorkbench() {

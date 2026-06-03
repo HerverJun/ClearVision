@@ -10,7 +10,7 @@ namespace ClearVision.Product.Infrastructure.AI.Runtime;
 /// Stage A connector adapter that routes requests to the existing AiApiClient.
 /// This keeps behavior unchanged while switching the call site to the unified abstraction.
 /// </summary>
-public sealed class AiApiClientAdapterConnector : IAiConnector
+public sealed class AiApiClientAdapterConnector : IAiConnector, IAiToolCallingConnector
 {
     private readonly AiApiClient _apiClient;
     private readonly AiGenerationOptions _options;
@@ -36,6 +36,15 @@ public sealed class AiApiClientAdapterConnector : IAiConnector
         CancellationToken cancellationToken = default)
     {
         return _apiClient.StreamCompleteAsync(systemPrompt, messages, onChunk, _options, cancellationToken);
+    }
+
+    public Task<AiCompletionResult> CompleteWithToolsAsync(
+        string systemPrompt,
+        List<ChatMessage> messages,
+        IReadOnlyList<AiNativeToolDefinition> tools,
+        CancellationToken cancellationToken = default)
+    {
+        return _apiClient.CompleteWithToolsAsync(systemPrompt, messages, tools, _options, cancellationToken);
     }
 }
 
