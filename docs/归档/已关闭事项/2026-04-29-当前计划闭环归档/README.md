@@ -21,8 +21,8 @@ closed_at: "2026-04-29"
 
 ## 验证摘要
 
-- `Acme.Product.Infrastructure` build 通过。
-- `Acme.Product.Tests` build 通过。
+- `ClearVision.Product.Infrastructure` build 通过。
+- `ClearVision.Product.Tests` build 通过。
 - 定向测试批次 97/97 passed：`LLMConnectorSmokeTests, ImageAcquisitionServiceIntegrationTests, ImageStitchingOperatorTests, TimerStatisticsOperatorTests, SubpixelEdgeDetectionOperatorTests, DeepLearningOperatorTests`。
 - `DeepLearningProviderInferenceRunner`：CPU provider smoke 1/1 passed，`RealOnnxInference=true`。
 - `DeepLearningPostprocessPressureRunner`：1k/5k/10k candidates 压力场景 3/3 passed。
@@ -30,7 +30,7 @@ closed_at: "2026-04-29"
 - 质量飞轮 G3 dataset closure：20 个视觉核心算子、793 cases、0 failed。
 - 质量飞轮 G4 field replay：100 samples，连续 3 次 drill 通过，reproducible rate 90%，regressionized rate 70%。
 - 质量飞轮 G5 release gate：`release gate passed=True`，operator matrix 155/155 A，155/155 有证据信号，card TODO 为 0。
-- `Acme.OperatorLibrary.SmokeTests` 定向测试 `CoreOperatorContractTests`：13/13 passed。
+- `ClearVision.OperatorLibrary.SmokeTests` 定向测试 `CoreOperatorContractTests`：13/13 passed。
 
 ## 后续边界
 

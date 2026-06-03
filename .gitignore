@@ -100,6 +100,9 @@ notebooks/.ipynb_checkpoints/
 /ClearVision.Product/test_results/ui_*.json
 /ClearVision.Product/test_results/ui_*.md
 
+# Local document export images
+/docs/image/
+
 # Local scratch notes (keep repo clean)
 docs/temp.md
 

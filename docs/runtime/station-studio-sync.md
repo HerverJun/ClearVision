@@ -265,10 +265,10 @@ Minimum Alpha trial acceptance:
 
 ## Validation Checklist
 
-1. Restore: `dotnet restore Acme.Product/Acme.Product.sln`.
-2. Build: `dotnet build Acme.Product/Acme.Product.sln --no-restore`.
-3. Product tests: `& "./scripts/run-dotnet-test-serial.ps1" -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj"`.
-4. Desktop tests: `& "./scripts/run-dotnet-test-serial.ps1" -Project "Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj"`.
+1. Restore: `dotnet restore ClearVision.Product/ClearVision.Product.sln`.
+2. Build: `dotnet build ClearVision.Product/ClearVision.Product.sln --no-restore`.
+3. Product tests: `& "./scripts/run-dotnet-test-serial.ps1" -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj"`.
+4. Desktop tests: `& "./scripts/run-dotnet-test-serial.ps1" -Project "ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj"`.
 5. Broader gate entry: `& "./scripts/run-operator-library-industrial-gate.ps1" -Profile quick` (or use the targeted fixed regression scripts listed in `AGENTS.md`).
 6. Start Studio with ingress enabled and token configured.
 7. Start Station or the simulator with the same token.

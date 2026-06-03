@@ -35,7 +35,7 @@
 > [!WARNING]
 > 以下现状分析基于项目源码实际走读，纠正了先前评审中的部分误判。
 
-经过代码走读发现，现有 `Acme.Product` 项目的通信模块存在以下痛点：
+经过代码走读发现，现有 `ClearVision.Product` 项目的通信模块存在以下痛点：
 
 | 组件 | 现状分析 | 改进方案 |
 |------|----------|----------|
@@ -818,8 +818,8 @@ xx xx           ← 写入长度 (字数)
 ```
 ClearVision.sln
 │
-├── Acme.Product.Core/                    ← 现有核心层 (不动)
-├── Acme.Product.Infrastructure/          ← 现有基础设施层
+├── ClearVision.Product.Core/                    ← 现有核心层 (不动)
+├── ClearVision.Product.Infrastructure/          ← 现有基础设施层
 │   └── Operators/
 │       ├── ModbusCommunicationOperator.cs    ← 重构: 改用 ConnectionPoolManager
 │       ├── TcpCommunicationOperator.cs       ← 重构: 改用 ConnectionPoolManager
@@ -827,10 +827,10 @@ ClearVision.sln
 │       ├── SiemensS7CommunicationOperator.cs ← 【新建】S7 算子
 │       ├── MitsubishiMcCommunicationOperator.cs ← 【新建】MC 算子
 │       └── OmronFinsCommunicationOperator.cs ← 【新建】FINS 算子
-├── Acme.Product.Desktop/                 ← 现有桌面端
+├── ClearVision.Product.Desktop/                 ← 现有桌面端
 │
-├── Acme.PlcComm/                         ← 【新建】独立 PLC 通信类库
-│   ├── Acme.PlcComm.csproj
+├── ClearVision.PlcComm/                         ← 【新建】独立 PLC 通信类库
+│   ├── ClearVision.PlcComm.csproj
 │   ├── Core/                             ← 核心抽象
 │   │   ├── IPlcClient.cs
 │   │   ├── PlcBaseClient.cs
@@ -864,8 +864,8 @@ ClearVision.sln
 │       ├── FinsProtocol.cs
 │       └── FinsHandshake.cs
 │
-└── Acme.PlcComm.Tests/                   ← 【新建】通信库单元测试
-    ├── Acme.PlcComm.Tests.csproj
+└── ClearVision.PlcComm.Tests/                   ← 【新建】通信库单元测试
+    ├── ClearVision.PlcComm.Tests.csproj
     ├── Core/
     │   └── OperateResultTests.cs
     ├── AddressParsers/
@@ -884,12 +884,12 @@ ClearVision.sln
 ### 4.2 项目引用关系
 
 ```
-Acme.Product.Infrastructure  ──引用──→  Acme.PlcComm
-Acme.PlcComm.Tests           ──引用──→  Acme.PlcComm
+ClearVision.Product.Infrastructure  ──引用──→  ClearVision.PlcComm
+ClearVision.PlcComm.Tests           ──引用──→  ClearVision.PlcComm
 ```
 
 > [!NOTE]
-> `Acme.PlcComm` 是纯类库，**不依赖** `Acme.Product.Core` 或任何业务层。它只依赖 `Microsoft.Extensions.Logging.Abstractions` 和协议库 (如 S7NetPlus)。未来可独立打包为 NuGet。
+> `ClearVision.PlcComm` 是纯类库，**不依赖** `ClearVision.Product.Core` 或任何业务层。它只依赖 `Microsoft.Extensions.Logging.Abstractions` 和协议库 (如 S7NetPlus)。未来可独立打包为 NuGet。
 
 ---
 
@@ -1000,7 +1000,7 @@ var optimized = AddressOptimizer.Optimize(addresses, maxGap: 50);
 
 | 任务 | 交付物 | 验收标准 |
 |------|--------|---------|
-| 创建 `Acme.PlcComm` 类库项目 | `.csproj` + 项目引用配置 | 编译通过 |
+| 创建 `ClearVision.PlcComm` 类库项目 | `.csproj` + 项目引用配置 | 编译通过 |
 | 实现核心抽象 | `IPlcClient`, `PlcBaseClient`, `OperateResult<T>` | 单元测试覆盖 |
 | 实现通用模块 | `IByteTransform` (Big/Little), `PlcConnectionPool` | 字节序转换测试通过 |
 | 实现地址模型 | `PlcAddress`, `IAddressParser` 接口 | 接口定义完成 |

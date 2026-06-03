@@ -10,12 +10,12 @@ decision: "V1 只交付 schema-driven DeepLearning.Confidence 最小闭环，其
 sources:
   - "docs/进行中/当前计划/ClearVision-Station现场可调参数Profile机制TODO-2026-05-03.md"
   - "C:/Users/11234/.gemini/antigravity/brain/d463a10c-9ad6-4e59-ae46-f4686d7a304a/audit_report.md.resolved"
-  - "Acme.Product/src/Acme.Product.Runtime.Abstractions/RuntimeContracts.cs"
-  - "Acme.Product/src/Acme.Product.Runtime/RuntimePackageExporter.cs"
-  - "Acme.Product/src/Acme.Product.Runtime/RuntimePackageLoader.cs"
-  - "Acme.Product/src/Acme.Product.Runtime/RuntimeHost.cs"
-  - "Acme.Product/src/Acme.Product.Station/MainForm.cs"
-  - "Acme.Product/src/Acme.Product.Station/StationLocalSettingsStore.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Runtime.Abstractions/RuntimeContracts.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageExporter.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageLoader.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Runtime/RuntimeHost.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Station/MainForm.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Station/StationLocalSettingsStore.cs"
 ---
 
 # ClearVision Station 现场可调参数 / Profile 机制定稿 TODO
@@ -336,8 +336,8 @@ public sealed class RuntimeParameterOverride
 涉及文件：
 
 ```text
-Acme.Product/src/Acme.Product.Runtime.Abstractions/RuntimeContracts.cs
-Acme.Product/src/Acme.Product.Application/DTOs/OperatorDto.cs
+ClearVision.Product/src/ClearVision.Product.Runtime.Abstractions/RuntimeContracts.cs
+ClearVision.Product/src/ClearVision.Product.Application/DTOs/OperatorDto.cs
 ```
 
 任务：
@@ -359,9 +359,9 @@ Acme.Product/src/Acme.Product.Application/DTOs/OperatorDto.cs
 涉及文件：
 
 ```text
-Acme.Product/src/Acme.Product.Runtime/RuntimePackageExporter.cs
-Acme.Product/src/Acme.Product.Runtime/RuntimePackage.cs
-Acme.Product/src/Acme.Product.Runtime/RuntimePackageExportResult.cs
+ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageExporter.cs
+ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackage.cs
+ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageExportResult.cs
 ```
 
 任务：
@@ -388,11 +388,11 @@ Acme.Product/src/Acme.Product.Runtime/RuntimePackageExportResult.cs
 涉及文件：
 
 ```text
-Acme.Product/src/Acme.Product.Runtime/RuntimePackageLoader.cs
-Acme.Product/src/Acme.Product.Runtime/RuntimePackageValidator.cs
-Acme.Product/src/Acme.Product.Runtime/RuntimeHost.cs
-新增：Acme.Product/src/Acme.Product.Runtime/RuntimeParameterOverrideApplier.cs
-新增：Acme.Product/src/Acme.Product.Runtime/RuntimeParameterValidator.cs
+ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageLoader.cs
+ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageValidator.cs
+ClearVision.Product/src/ClearVision.Product.Runtime/RuntimeHost.cs
+新增：ClearVision.Product/src/ClearVision.Product.Runtime/RuntimeParameterOverrideApplier.cs
+新增：ClearVision.Product/src/ClearVision.Product.Runtime/RuntimeParameterValidator.cs
 ```
 
 任务：
@@ -426,8 +426,8 @@ Acme.Product/src/Acme.Product.Runtime/RuntimeHost.cs
 涉及文件：
 
 ```text
-Acme.Product/src/Acme.Product.Station/StationLocalSettingsStore.cs
-新增：Acme.Product/src/Acme.Product.Station/StationSiteProfileStore.cs
+ClearVision.Product/src/ClearVision.Product.Station/StationLocalSettingsStore.cs
+新增：ClearVision.Product/src/ClearVision.Product.Station/StationSiteProfileStore.cs
 ```
 
 任务：
@@ -457,9 +457,9 @@ Acme.Product/src/Acme.Product.Station/StationLocalSettingsStore.cs
 涉及文件：
 
 ```text
-Acme.Product/src/Acme.Product.Station/MainForm.cs
-新增：Acme.Product/src/Acme.Product.Station/RuntimeParameterPanel.cs
-新增：Acme.Product/src/Acme.Product.Station/RuntimeParameterControlFactory.cs
+ClearVision.Product/src/ClearVision.Product.Station/MainForm.cs
+新增：ClearVision.Product/src/ClearVision.Product.Station/RuntimeParameterPanel.cs
+新增：ClearVision.Product/src/ClearVision.Product.Station/RuntimeParameterControlFactory.cs
 ```
 
 任务：
@@ -502,8 +502,8 @@ Acme.Product/src/Acme.Product.Station/MainForm.cs
 涉及文件：
 
 ```text
-Acme.Product/tests/Acme.Product.Tests/Runtime/
-Acme.Product/tests/Acme.Product.Tests/Station/
+ClearVision.Product/tests/ClearVision.Product.Tests/Runtime/
+ClearVision.Product/tests/ClearVision.Product.Tests/Station/
 scripts/run-dotnet-test-serial.ps1
 ```
 
@@ -521,7 +521,7 @@ scripts/run-dotnet-test-serial.ps1
 
 ```powershell
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName RuntimeParameterOverrideApplierTests,RuntimeParameterValidatorTests,RuntimePackageLoaderTests,RuntimePackageExporterTests,StationSiteProfileStoreTests
 ```
 

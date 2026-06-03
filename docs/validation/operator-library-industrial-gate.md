@@ -67,7 +67,7 @@ If any selected gate returns a non-zero exit code, the top-level script exits no
 - The .NET SDK is selected by the repository `global.json`.
 - Existing environment variables are respected. If unset and available, the script uses repository-local `.dotnet-home` and `.dotnet/.nuget/packages`.
 - Performance gates honor existing `CV_MEASUREMENT_PERF_*` and `CV_DETECTION_PERF_*` variables. The top-level script can also set `-PerfGateProfile standard|acceptance|auto`.
-- Performance reports can be redirected with `-ReportDirectory` on the performance child scripts, `CV_MEASUREMENT_PERF_REPORT_DIR`, `CV_DETECTION_PERF_REPORT_DIR`, or generic `CV_PERF_REPORT_DIR`. The top-level industrial gate sets this to its timestamped `performance-reports` directory so it does not overwrite the tracked `Acme.Product/test_results/*_performance_budget_report.*` baseline files.
+- Performance reports can be redirected with `-ReportDirectory` on the performance child scripts, `CV_MEASUREMENT_PERF_REPORT_DIR`, `CV_DETECTION_PERF_REPORT_DIR`, or generic `CV_PERF_REPORT_DIR`. The top-level industrial gate sets this to its timestamped `performance-reports` directory so it does not overwrite the tracked `ClearVision.Product/test_results/*_performance_budget_report.*` baseline files.
 - The PLC gate delegates to `run-tests-plc-regression.ps1` and still depends on the communication simulators or test environment expected by those tests.
 
 ## NoBuild And NoRestore

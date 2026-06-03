@@ -1,10 +1,10 @@
 # FindContours 技术笔记
 
-> **对应算子**: `FindContoursOperator`  
-> **OperatorType**: `OperatorType.ContourDetection`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/FindContoursOperator.cs`  
-> **相关算子**: [Threshold](./04-Threshold-技术笔记.md)、[BlobDetection](./11-BlobDetection-技术笔记.md)、[ShapeMatching](./14-ShapeMatching-技术笔记.md)  
-> **阅读前置**: 本文档已针对0基础读者优化，无需前置知识  
+> **对应算子**: `FindContoursOperator`
+> **OperatorType**: `OperatorType.ContourDetection`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/FindContoursOperator.cs`
+> **相关算子**: [Threshold](./04-Threshold-技术笔记.md)、[BlobDetection](./11-BlobDetection-技术笔记.md)、[ShapeMatching](./14-ShapeMatching-技术笔记.md)
+> **阅读前置**: 本文档已针对0基础读者优化，无需前置知识
 > **核心来源**: ClearVision 当前实现、OpenCV `findContours`、经典轮廓与矩方法教材
 
 ---
@@ -86,7 +86,7 @@
     │  │  └─────┘  │   └───────┘  │
     │  └───────────┘              │
     └─────────────────────────────┘
-    
+
     轮廓0（最外层）
         ├── 轮廓1（外框内的实心区域）
         │       └── 轮廓2（区域1内的孔洞）
@@ -111,7 +111,7 @@
 ]
 ```
 
-**优点**：速度快，结果简单  
+**优点**：速度快，结果简单
 **缺点**：丢失内部结构信息
 
 ### 3.3 List 模式（全部平铺，无层级）
@@ -132,7 +132,7 @@
 ]
 ```
 
-**优点**：获取所有轮廓，无层级关系的简单处理  
+**优点**：获取所有轮廓，无层级关系的简单处理
 **缺点**：无法区分轮廓之间的嵌套关系
 
 ### 3.4 Tree 模式（完整层级树）
@@ -282,7 +282,7 @@ double area = Cv2.ContourArea(contour);
 **定义**：轮廓边界线的长度
 
 ```csharp
-// OpenCV方法  
+// OpenCV方法
 double perimeter = Cv2.ArcLength(contour, closed: true);
 // closed=true 表示闭合轮廓（首尾相连）
 ```
@@ -291,7 +291,7 @@ double perimeter = Cv2.ArcLength(contour, closed: true);
 
 ```
 ●────●    周长 = 所有线段长度之和
-│         
+│
 ●────●
 ```
 
@@ -403,7 +403,7 @@ hierarchy = [Next, Previous, First_Child, Parent]
 
 ```
 图像：                  层级结构：
-┌──────────────┐       
+┌──────────────┐
 │  ┌────────┐  │            Level 0: 轮廓0
 │  │  ┌──┐  │  │                │
 │  │  │░░│  │  │       ┌────────┴────────┐
@@ -415,7 +415,7 @@ hierarchy = [Next, Previous, First_Child, Parent]
 └──────────────┘
 
 轮廓0: 最外层边框
-轮廓1: 第一个白色矩形区域  
+轮廓1: 第一个白色矩形区域
 轮廓2: 矩形1内的黑色孔洞
 轮廓3: 另一个白色小矩形
 
@@ -532,8 +532,8 @@ BlobDetection 视角：
   │
   ▼
 目标是否有孔洞或嵌套？ ──是──→ 使用 FindContours (Tree模式)
-  │否                              
-  ▼                                
+  │否
+  ▼
 是否需要精确边界分析？ ──是──→ 使用 FindContours
   │否
   ▼
@@ -569,7 +569,7 @@ BlobDetection 视角：
 
 ### 9.1 轮廓是什么
 
-轮廓可以理解成前景区域的边界点集。  
+轮廓可以理解成前景区域的边界点集。
 一旦有了轮廓，你就可以算：
 
 - 面积
@@ -586,7 +586,7 @@ BlobDetection 视角：
 - `List`
 - `Tree`
 
-如果你只关心最外层边界，`External` 更简单。  
+如果你只关心最外层边界，`External` 更简单。
 如果你想保留层级关系，比如外轮廓与内孔洞，`Tree` 会更合适。
 
 ---
@@ -674,20 +674,20 @@ Threshold / Morphology
 
 ### 常见误区
 
-- **误区一**：轮廓就是目标  
+- **误区一**：轮廓就是目标
   轮廓只是目标边界的一种表示。
 
-- **误区二**：点越多越精确  
+- **误区二**：点越多越精确
   更多点也可能只是更多噪声和毛刺。
 
-- **误区三**：FindContours可以替代BlobDetection  
+- **误区三**：FindContours可以替代BlobDetection
   两者各有优势，见第7节对比。
 
 ---
 
 ## 14. 专业来源与延伸阅读
 
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/FindContoursOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/FindContoursOperator.cs`
 - ClearVision 本地资料: `../算子手册.md`、`../算子名片/ContourDetection.md`
 - OpenCV Documentation: *findContours*, contour approximation, moments
 - Bradski & Kaehler, *Learning OpenCV*, contour analysis

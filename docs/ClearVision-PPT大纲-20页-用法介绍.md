@@ -184,9 +184,9 @@ ClearVision 当前主要面向 Windows 桌面环境，启动后需要初始化�
 **启动命令**
 
 ```powershell
-dotnet restore .\Acme.Product\Acme.Product.sln --locked-mode
-dotnet build .\Acme.Product\Acme.Product.sln --configuration Debug --no-restore
-dotnet run --project .\Acme.Product\src\Acme.Product.Desktop\Acme.Product.Desktop.csproj --configuration Debug --no-build
+dotnet restore .\ClearVision.Product\ClearVision.Product.sln --locked-mode
+dotnet build .\ClearVision.Product\ClearVision.Product.sln --configuration Debug --no-restore
+dotnet run --project .\ClearVision.Product\src\ClearVision.Product.Desktop\ClearVision.Product.Desktop.csproj --configuration Debug --no-build
 ```
 
 **首次登录**

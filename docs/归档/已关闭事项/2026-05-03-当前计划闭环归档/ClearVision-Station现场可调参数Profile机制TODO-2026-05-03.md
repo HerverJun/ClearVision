@@ -9,12 +9,12 @@ superseded_by: "docs/进行中/当前计划/ClearVision-Station现场可调参�
 sources:
   - "docs/进行中/当前计划/ClearVision-ClearFrost分体式Runtime现场化落地TODO-2026-05-02.md"
   - "docs/进行中/当前计划/ClearVision-ClearFrost分体式Runtime现场化整合计划-2026-04-29.md"
-  - "Acme.Product/src/Acme.Product.Runtime.Abstractions/RuntimeContracts.cs"
-  - "Acme.Product/src/Acme.Product.Runtime/RuntimePackage.cs"
-  - "Acme.Product/src/Acme.Product.Runtime/RuntimePackageExporter.cs"
-  - "Acme.Product/src/Acme.Product.Runtime/RuntimePackageLoader.cs"
-  - "Acme.Product/src/Acme.Product.Runtime/RuntimeHost.cs"
-  - "Acme.Product/src/Acme.Product.Station/MainForm.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Runtime.Abstractions/RuntimeContracts.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackage.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageExporter.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Runtime/RuntimePackageLoader.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Runtime/RuntimeHost.cs"
+  - "ClearVision.Product/src/ClearVision.Product.Station/MainForm.cs"
 ---
 
 # ClearVision Station 现场可调参数 / Profile 覆盖机制 TODO
@@ -64,12 +64,12 @@ Deployment Profile / Site Profile
 
 | 位置 | 当前事实 | 对本 TODO 的影响 |
 |---|---|---|
-| `Acme.Product.Runtime.Abstractions/RuntimeContracts.cs` | 已有 `RuntimePackageManifest`、`RuntimeProfile`、`RuntimeFieldExtensions`、`StationLocalSettings` 等 DTO | 可在这里扩展现场参数 schema / profile 的跨项目契约 |
-| `Acme.Product.Runtime/RuntimePackage.cs` | 当前包加载后包含 `Manifest`、`Flow`、`RuntimeProfile`、`ValidationReport` | 需要新增 `ParameterSchema` 和 `DefaultSiteProfile` |
-| `Acme.Product.Runtime/RuntimePackageExporter.cs` | Studio 导出 Runtime Package 的核心入口已经存在 | 需要在导出包时生成现场可调参数 schema 和默认 profile |
-| `Acme.Product.Runtime/RuntimePackageLoader.cs` | Station 加载包的核心入口已经存在 | 需要加载并校验 `runtime-parameters.json` / `station-profile.default.json` |
-| `Acme.Product.Runtime/RuntimeHost.cs` | Station 运行包并执行流程 | 需要在运行前把现场 profile 覆盖到执行流副本，不直接污染包内默认 flow |
-| `Acme.Product.Station/MainForm.cs` | 当前已经硬编码了 `ONNX 参数` / `DeepLearning.Confidence` 控件 | 这块应迁移成通用参数面板的第一个样本 |
+| `ClearVision.Product.Runtime.Abstractions/RuntimeContracts.cs` | 已有 `RuntimePackageManifest`、`RuntimeProfile`、`RuntimeFieldExtensions`、`StationLocalSettings` 等 DTO | 可在这里扩展现场参数 schema / profile 的跨项目契约 |
+| `ClearVision.Product.Runtime/RuntimePackage.cs` | 当前包加载后包含 `Manifest`、`Flow`、`RuntimeProfile`、`ValidationReport` | 需要新增 `ParameterSchema` 和 `DefaultSiteProfile` |
+| `ClearVision.Product.Runtime/RuntimePackageExporter.cs` | Studio 导出 Runtime Package 的核心入口已经存在 | 需要在导出包时生成现场可调参数 schema 和默认 profile |
+| `ClearVision.Product.Runtime/RuntimePackageLoader.cs` | Station 加载包的核心入口已经存在 | 需要加载并校验 `runtime-parameters.json` / `station-profile.default.json` |
+| `ClearVision.Product.Runtime/RuntimeHost.cs` | Station 运行包并执行流程 | 需要在运行前把现场 profile 覆盖到执行流副本，不直接污染包内默认 flow |
+| `ClearVision.Product.Station/MainForm.cs` | 当前已经硬编码了 `ONNX 参数` / `DeepLearning.Confidence` 控件 | 这块应迁移成通用参数面板的第一个样本 |
 
 当前必须纠正的趋势：
 
@@ -259,7 +259,7 @@ Operator / Engineer
 ### 4.2 建议分层
 
 ```text
-Acme.Product.Runtime.Abstractions
+ClearVision.Product.Runtime.Abstractions
   RuntimeParameterSchema
   RuntimeParameterDefinition
   RuntimeParameterGroup
@@ -267,7 +267,7 @@ Acme.Product.Runtime.Abstractions
   RuntimeParameterOverride
   参数类型、控件类型、生效模式、权限枚举
 
-Acme.Product.Runtime
+ClearVision.Product.Runtime
   RuntimeParameterSchemaLoader
   RuntimeSiteProfileStore
   RuntimeParameterOverrideApplier
@@ -276,12 +276,12 @@ Acme.Product.Runtime
   RuntimePackageLoader 扩展
   RuntimeHost 覆盖应用入口
 
-Acme.Product.Desktop / Studio
+ClearVision.Product.Desktop / Studio
   参数开放配置 UI
   导出包时生成 schema
   导入现场 profile 并对比默认值
 
-Acme.Product.Station
+ClearVision.Product.Station
   通用参数面板
   Profile 本地保存/导入/导出/回滚
   运行前应用 profile
@@ -442,7 +442,7 @@ RuntimeFieldExtensions.DefaultSiteProfile = "station-profile.default.json"
 
 ### 6.1 Runtime Abstractions DTO
 
-在 `Acme.Product.Runtime.Abstractions` 增加契约：
+在 `ClearVision.Product.Runtime.Abstractions` 增加契约：
 
 ```text
 RuntimeParameterSchema
@@ -608,7 +608,7 @@ RuntimeParameterProfileController
 
 ### 7.3 移除 ONNX 专用逻辑
 
-需要从 `Acme.Product.Station/MainForm.cs` 迁移掉这些职责：
+需要从 `ClearVision.Product.Station/MainForm.cs` 迁移掉这些职责：
 
 ```text
 _onnxParameterDetailLabel
@@ -817,7 +817,7 @@ Station 的参数面板不应带来明显性能开销。实现时注意：
 
 ```powershell
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName RuntimePackageExporterTests,RuntimePackageLoaderTests,RuntimeParameterOverrideApplierTests `
   -NoBuild `
   -NoRestore
@@ -829,7 +829,7 @@ Station 的参数面板不应带来明显性能开销。实现时注意：
 
 ```powershell
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName StationSiteProfileStoreTests,RuntimeParameterValidatorTests
 ```
 

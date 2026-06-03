@@ -69,7 +69,7 @@ archived:
 
 任务：
 
-- [ ] 触发一次 CI，确认日志中可见 `Acme.Product.Tests.dll` 和 `Acme.Product.Desktop.Tests.dll` 测试数
+- [ ] 触发一次 CI，确认日志中可见 `ClearVision.Product.Tests.dll` 和 `ClearVision.Product.Desktop.Tests.dll` 测试数
 - [ ] 确认 CI artifact 收集了 `.trx` 文件
 - [ ] 在审计计划中登记 CI 证据链接
 

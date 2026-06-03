@@ -63,9 +63,9 @@ ClearVision 已经有比较完整的流程编辑、检测运行、结果展示�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js:936-942`：卡片中直接渲染 `Ping`、`重载`、`停止`、`部署`、`生成测试包并下发` 按钮。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js:673-701`：`handleStationAction` 针对 `ping/reload/stop/deploy/testDeploy` 直接分发动作。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js:716-733`：`createCommand` 和 `deployLatestPackage` 直接调用后端接口。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js:936-942`：卡片中直接渲染 `Ping`、`重载`、`停止`、`部署`、`生成测试包并下发` 按钮。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js:673-701`：`handleStationAction` 针对 `ping/reload/stop/deploy/testDeploy` 直接分发动作。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js:716-733`：`createCommand` 和 `deployLatestPackage` 直接调用后端接口。
 - 后端已有管理员校验，本项不是权限缺失结论；问题聚焦在现场误触防护和操作可理解性。
 
 #### 现场影响
@@ -93,9 +93,9 @@ ClearVision 已经有比较完整的流程编辑、检测运行、结果展示�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/index.html:83-85`：`results` 导航按钮带 `hidden`、`aria-hidden="true"` 和 `tabindex="-1"`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js:722-728`：最近结果使用 `slice(0, 8)`，只展示前 8 条。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js:1085-1106`：导出时提示“当前筛选结果包含 ... 但当前仅加载了 ... 条。将导出当前页面数据。”并在服务端报表不可用时回退到前端报表。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html:83-85`：`results` 导航按钮带 `hidden`、`aria-hidden="true"` 和 `tabindex="-1"`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js:722-728`：最近结果使用 `slice(0, 8)`，只展示前 8 条。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js:1085-1106`：导出时提示“当前筛选结果包含 ... 但当前仅加载了 ... 条。将导出当前页面数据。”并在服务端报表不可用时回退到前端报表。
 
 #### 现场影响
 
@@ -122,12 +122,12 @@ ClearVision 已经有比较完整的流程编辑、检测运行、结果展示�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/index.html:383-387`：状态显示包含“监控运行中”“更新于 10秒前”等静态初始内容。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/index.html:397-455`：良率、通过数、不良数、误报率、漏检率、平均耗时等卡片存在固定变化值，例如 `+5.2%`、`+6.1%`、`-1.5%`、`-0.8%`、`+0.8%`、`-0.1s`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/index.html:570-590`：CPK、MTBF 区域存在固定变化值，例如 `+0.05`、`+12h`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js:1759-1777`：高级分析接口未接入时使用 `noData` 或 `unavailable` 状态。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js:920-923`：趋势数据不足时保留默认曲线路径。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js:874-877`：雷达图数据不足时保留默认形状。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html:383-387`：状态显示包含“监控运行中”“更新于 10秒前”等静态初始内容。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html:397-455`：良率、通过数、不良数、误报率、漏检率、平均耗时等卡片存在固定变化值，例如 `+5.2%`、`+6.1%`、`-1.5%`、`-0.8%`、`+0.8%`、`-0.1s`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html:570-590`：CPK、MTBF 区域存在固定变化值，例如 `+0.05`、`+12h`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js:1759-1777`：高级分析接口未接入时使用 `noData` 或 `unavailable` 状态。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js:920-923`：趋势数据不足时保留默认曲线路径。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js:874-877`：雷达图数据不足时保留默认形状。
 
 #### 现场影响
 
@@ -154,7 +154,7 @@ ClearVision 已经有比较完整的流程编辑、检测运行、结果展示�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/core/httpClient.js:394-422`：连接失败信息包含“确认 Acme.Product.Desktop 已通过 Visual Studio F5 或 dotnet run 启动”，以及 `localStorage.setItem('cv_api_base_url', 'http://host:port')`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/core/httpClient.js:394-422`：连接失败信息包含“确认 ClearVision.Product.Desktop 已通过 Visual Studio F5 或 dotnet run 启动”，以及 `localStorage.setItem('cv_api_base_url', 'http://host:port')`。
 
 #### 现场影响
 
@@ -181,9 +181,9 @@ ClearVision 已经有比较完整的流程编辑、检测运行、结果展示�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js:1694-1725`：自动保存每 30 秒将流程保存到 `localStorage`，key 为 `cv_autosave_backup`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js:1710-1715`：检测运行中跳过自动保存。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js:1742-1757`：手动触发后提示“流程草稿已保存到本地缓存”。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js:1694-1725`：自动保存每 30 秒将流程保存到 `localStorage`，key 为 `cv_autosave_backup`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js:1710-1715`：检测运行中跳过自动保存。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js:1742-1757`：手动触发后提示“流程草稿已保存到本地缓存”。
 - 静态搜索中目前只看到 `cv_autosave_backup` 写入和提示，未看到清晰的恢复入口或冲突处理流程。
 
 #### 现场影响
@@ -211,8 +211,8 @@ ClearVision 已经有比较完整的流程编辑、检测运行、结果展示�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/operators/operatorLibrary.js:316-330`：`loadOperators` 失败后调用 `getDefaultOperators()` 并提示 `使用默认算子数据`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/operators/operatorLibrary.js:402-460`：默认算子数据包含图像采集、预处理、缺陷检测、尺寸测量、PLC 控制、AI 分类等样例算子。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/operators/operatorLibrary.js:316-330`：`loadOperators` 失败后调用 `getDefaultOperators()` 并提示 `使用默认算子数据`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/operators/operatorLibrary.js:402-460`：默认算子数据包含图像采集、预处理、缺陷检测、尺寸测量、PLC 控制、AI 分类等样例算子。
 
 #### 现场影响
 
@@ -238,10 +238,10 @@ ClearVision 已经有比较完整的流程编辑、检测运行、结果展示�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js:501-538`：设置中心侧栏和标题包含常量、存储、执行、设备、AI 等大量入口，主标题为“常量预设”。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js:3231-3233`：图像保存选项包含 `保存所有图像 (All)`、`不保存 (None)`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js:3287-3299`：执行配置中出现 `执行与控制 (Runtime)`、`Production Guards`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js:1443-1445`：AI 表格状态显示 `Active`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js:501-538`：设置中心侧栏和标题包含常量、存储、执行、设备、AI 等大量入口，主标题为“常量预设”。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js:3231-3233`：图像保存选项包含 `保存所有图像 (All)`、`不保存 (None)`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js:3287-3299`：执行配置中出现 `执行与控制 (Runtime)`、`Production Guards`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js:1443-1445`：AI 表格状态显示 `Active`。
 
 #### 现场影响
 
@@ -268,9 +268,9 @@ ClearVision 已经有比较完整的流程编辑、检测运行、结果展示�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/config/featureRegistry.js:7-15`：`storage.pathPicker` 标记为不可用，说明“Desktop directory picker is not wired yet; manual paths can still be persisted.”。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js:3205-3213`：默认保存路径输入框存在，“选择目录”按钮根据能力状态禁用。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js:3274-3275`：立即清理按钮也受功能可用性控制。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/config/featureRegistry.js:7-15`：`storage.pathPicker` 标记为不可用，说明“Desktop directory picker is not wired yet; manual paths can still be persisted.”。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js:3205-3213`：默认保存路径输入框存在，“选择目录”按钮根据能力状态禁用。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js:3274-3275`：立即清理按钮也受功能可用性控制。
 
 #### 现场影响
 
@@ -324,7 +324,7 @@ ROI、模型、标签是线序检测能否工作的重要前提。默认空值�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Application/Services/InspectionService.cs:472-476`：日志中出现 `娴佺▼鎵ц澶辫触`、`鍒ゅ畾缁撴灉` 等乱码。
+- `ClearVision.Product/src/ClearVision.Product.Application/Services/InspectionService.cs:472-476`：日志中出现 `娴佺▼鎵ц澶辫触`、`鍒ゅ畾缁撴灉` 等乱码。
 - `scripts/package-portable-deployment.ps1:232-234`：生成的批处理内容包含中文提示。
 - `scripts/package-portable-deployment.ps1:271-276`：对 `.bat` 文件使用 `Set-Content -Encoding ASCII` 写入，中文存在被替换或损坏风险。
 
@@ -352,7 +352,7 @@ AI 面板中存在“应用到环境”按钮。该文案对现场用户并不�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/ai/aiPanel.js:372-378`：建议卡片动作按钮显示 `应用到环境`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js:372-378`：建议卡片动作按钮显示 `应用到环境`。
 
 #### 现场影响
 
@@ -377,8 +377,8 @@ AI 建议本身就需要建立信任。动作文案不清会让用户不敢点�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/project/projectView.js:159-165`：空状态文案为“创建您的第一个工程开始视觉检测之旅”。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js:2298-2311`：欢迎界面包含“零代码搭建检测流程”“AI智能诊断与优化建议”等介绍性模块。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectView.js:159-165`：空状态文案为“创建您的第一个工程开始视觉检测之旅”。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js:2298-2311`：欢迎界面包含“零代码搭建检测流程”“AI智能诊断与优化建议”等介绍性模块。
 
 #### 现场影响
 
@@ -403,12 +403,12 @@ AI 建议本身就需要建立信任。动作文案不清会让用户不敢点�
 
 #### 证据
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/index.html:249`：导航或区域文本包含 `ANALYSIS`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/index.html:259`：结果区域文本包含 `RECENT RESULTS`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js:516-517`：驱动标签包含“相机驱动 (Camera)”“流程驱动 (PLC触发)”。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js:580`：耗时统计包含 `CYCLE TIME`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js:1898-1935`：导入导出中出现 `Project JSON`、`Runtime Package`。
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js:137`：状态文案包含 `等待真实 Station 结果`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html:249`：导航或区域文本包含 `ANALYSIS`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html:259`：结果区域文本包含 `RECENT RESULTS`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js:516-517`：驱动标签包含“相机驱动 (Camera)”“流程驱动 (PLC触发)”。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js:580`：耗时统计包含 `CYCLE TIME`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js:1898-1935`：导入导出中出现 `Project JSON`、`Runtime Package`。
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js:137`：状态文案包含 `等待真实 Station 结果`。
 
 #### 现场影响
 
@@ -464,15 +464,15 @@ AI 建议本身就需要建立信任。动作文案不清会让用户不敢点�
 可使用以下命令复核主要证据点：
 
 ```powershell
-rg -n "handleStationAction|deployLatestPackage|生成测试包并下发|停止|重载" Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js
-rg -n "nav-results|RECENT RESULTS|ANALYSIS" Acme.Product/src/Acme.Product.Desktop/wwwroot/index.html
-rg -n "当前仅加载|服务端报表|drawTrendChart|drawRadarChart|advanced" Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js
-rg -n "Visual Studio|dotnet run|localStorage.setItem" Acme.Product/src/Acme.Product.Desktop/wwwroot/src/core/httpClient.js
-rg -n "cv_autosave_backup|本地缓存" Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js
-rg -n "getDefaultOperators|使用默认算子数据" Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/operators/operatorLibrary.js
-rg -n "Production Guards|Runtime|保存所有图像|Active" Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js
+rg -n "handleStationAction|deployLatestPackage|生成测试包并下发|停止|重载" ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js
+rg -n "nav-results|RECENT RESULTS|ANALYSIS" ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html
+rg -n "当前仅加载|服务端报表|drawTrendChart|drawRadarChart|advanced" ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js
+rg -n "Visual Studio|dotnet run|localStorage.setItem" ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/core/httpClient.js
+rg -n "cv_autosave_backup|本地缓存" ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js
+rg -n "getDefaultOperators|使用默认算子数据" ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/operators/operatorLibrary.js
+rg -n "Production Guards|Runtime|保存所有图像|Active" ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js
 rg -n "RoiX|RoiY|RoiWidth|RoiHeight|ModelPath|LabelsPath|parametersNeedingReview" 线序检测/scenario-package-wire-sequence/template/terminal-wire-sequence-video-stream.flow.template.json
-rg -n "娴佺▼|鍒ゅ畾|Set-Content -Encoding ASCII" Acme.Product/src/Acme.Product.Application/Services/InspectionService.cs scripts/package-portable-deployment.ps1
+rg -n "娴佺▼|鍒ゅ畾|Set-Content -Encoding ASCII" ClearVision.Product/src/ClearVision.Product.Application/Services/InspectionService.cs scripts/package-portable-deployment.ps1
 ```
 
 ## 不作为本计划结论的范围

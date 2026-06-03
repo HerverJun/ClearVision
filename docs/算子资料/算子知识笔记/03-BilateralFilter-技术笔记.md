@@ -1,10 +1,10 @@
 # BilateralFilter 技术笔记
 
-> **对应算子**: `BilateralFilterOperator` / `OperatorType.BilateralFilter`  
-> **OperatorType**: `BilateralFilter`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/BilateralFilterOperator.cs`  
-> **相关算子**: [GaussianBlur](./01-GaussianBlur-技术笔记.md)、[MedianBlur](./02-MedianBlur-技术笔记.md)、[CannyEdge](./06-CannyEdge-技术笔记.md)  
-> **阅读前置**: 高斯滤波、像素邻域、边缘的概念  
+> **对应算子**: `BilateralFilterOperator` / `OperatorType.BilateralFilter`
+> **OperatorType**: `BilateralFilter`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/BilateralFilterOperator.cs`
+> **相关算子**: [GaussianBlur](./01-GaussianBlur-技术笔记.md)、[MedianBlur](./02-MedianBlur-技术笔记.md)、[CannyEdge](./06-CannyEdge-技术笔记.md)
+> **阅读前置**: 高斯滤波、像素邻域、边缘的概念
 > **核心来源**: Tomasi and Manduchi 1998、OpenCV Bilateral Filter 文档、Szeliski《Computer Vision》
 
 ---

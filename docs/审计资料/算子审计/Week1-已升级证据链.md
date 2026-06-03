@@ -28,8 +28,8 @@ updated: "2026-04-13"
 
 | 类别 | 复核结论 | 证据路径 | 复现方式 | 阻塞项 | 负责人 | 截止日期 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 匹配定位（8） | [x] 已完成当前口径复核，并绑定本周 phase42 批次结果；本轮不进入 Week2 缺陷池。 | `docs/审计资料/算子审计/TODO.md:35-36`；`算子资料/算子名片/CATALOG.md:107-117`；`test_results/phase42-regression-20260413-115751.trx` | `scripts/run-tests-phase42-regression.ps1`；`Acme.Product/tests/Acme.Product.Tests/Operators/PlanarMatchingOperatorTests.cs:1-275`；`Acme.Product/tests/Acme.Product.Tests/Operators/LocalDeformableMatchingPhase42Tests.cs:1-103` | 无 | C线负责人（证据与复核） | 2026-04-13 |
-| AI检测（6） | [-] 已绑定本周 `detection-all` 批次结果并通过，但仍缺工业验收签收与模型/阈值一致性说明，暂不转 `[x]`。 | `docs/审计资料/算子审计/TODO.md:35-36`；`算子资料/算子名片/CATALOG.md:62-70`；`test_results/detection-all-20260413-115808.trx` | `scripts/run-tests-detection-regression.ps1 -Gate all`；`Acme.Product/tests/Acme.Product.Tests/Operators/AnomalyDetectionOperatorTests.cs:1-249`；`Acme.Product/tests/Acme.Product.Tests/Operators/DeepLearningOperatorTests.cs:1-599`；`Acme.Product/tests/Acme.Product.Tests/Operators/SurfaceDefectDetectionOperatorTests.cs:1-81` | 待补工业验收签收记录、模型版本/阈值一致性说明。 | C线负责人（证据与复核） | 2026-04-17 |
+| 匹配定位（8） | [x] 已完成当前口径复核，并绑定本周 phase42 批次结果；本轮不进入 Week2 缺陷池。 | `docs/审计资料/算子审计/TODO.md:35-36`；`算子资料/算子名片/CATALOG.md:107-117`；`test_results/phase42-regression-20260413-115751.trx` | `scripts/run-tests-phase42-regression.ps1`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/PlanarMatchingOperatorTests.cs:1-275`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/LocalDeformableMatchingPhase42Tests.cs:1-103` | 无 | C线负责人（证据与复核） | 2026-04-13 |
+| AI检测（6） | [-] 已绑定本周 `detection-all` 批次结果并通过，但仍缺工业验收签收与模型/阈值一致性说明，暂不转 `[x]`。 | `docs/审计资料/算子审计/TODO.md:35-36`；`算子资料/算子名片/CATALOG.md:62-70`；`test_results/detection-all-20260413-115808.trx` | `scripts/run-tests-detection-regression.ps1 -Gate all`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/AnomalyDetectionOperatorTests.cs:1-249`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/DeepLearningOperatorTests.cs:1-599`；`ClearVision.Product/tests/ClearVision.Product.Tests/Operators/SurfaceDefectDetectionOperatorTests.cs:1-81` | 待补工业验收签收记录、模型版本/阈值一致性说明。 | C线负责人（证据与复核） | 2026-04-17 |
 
 ## 4. 回归脚本 -> 结果产物 -> 文档结论 映射表（本周已执行）
 
@@ -44,7 +44,7 @@ updated: "2026-04-13"
 ## 5. 当前缺口
 
 - AI检测当前只完成了“脚本 -> 结果产物 -> 文档结论”绑定，仍缺工业验收签收记录与模型/阈值一致性说明。
-- `HandEyeCalibrationValidator` 不再视为缺口；其验证覆盖已并入 `Acme.Product/tests/Acme.Product.Tests/Operators/HandEyeCalibrationOperatorTests.cs`。
+- `HandEyeCalibrationValidator` 不再视为缺口；其验证覆盖已并入 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators/HandEyeCalibrationOperatorTests.cs`。
 
 ## 6. 周内执行记录
 

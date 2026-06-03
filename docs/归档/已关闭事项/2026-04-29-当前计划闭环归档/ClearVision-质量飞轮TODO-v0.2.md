@@ -202,8 +202,8 @@ RegionUnion 等名片中的 TODO 字段全部补齐
 ```text
 dotnet:
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
-  -FullyQualifiedName "Acme.Product.Tests.Operators.Phase42RegionProcessingOperatorTests"
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
+  -FullyQualifiedName "ClearVision.Product.Tests.Operators.Phase42RegionProcessingOperatorTests"
 
 结果：
 21 passed, 0 failed

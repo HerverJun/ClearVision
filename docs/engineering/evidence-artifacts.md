@@ -25,8 +25,8 @@ External release bundles should include:
 
 - TRX and coverage reports for Product/Desktop/Operator smoke tests,
 - OperatorLibrary `.nupkg` and `.snupkg`,
-- `Acme.OperatorLibrary/SBOM.md`,
-- `Acme.OperatorLibrary/SBOM.spdx.json`,
-- `Acme.OperatorLibrary/THIRD-PARTY-NOTICES.md`,
-- dependency report from `Acme.OperatorLibrary/analyze-deps.ps1`,
+- `ClearVision.OperatorLibrary/SBOM.md`,
+- `ClearVision.OperatorLibrary/SBOM.spdx.json`,
+- `ClearVision.OperatorLibrary/THIRD-PARTY-NOTICES.md`,
+- dependency report from `ClearVision.OperatorLibrary/analyze-deps.ps1`,
 - model release-gate manifests when external ONNX artifacts are used.

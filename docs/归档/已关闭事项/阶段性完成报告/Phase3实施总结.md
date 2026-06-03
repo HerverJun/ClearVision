@@ -16,7 +16,7 @@ updated: "2026-03-19"
 ## 交付内容
 
 ### 1. DebugOptions 扩展
-**文件**: `Acme.Product.Core/Services/DebugOptions.cs`
+**文件**: `ClearVision.Product.Core/Services/DebugOptions.cs`
 
 新增属性：
 ```csharp
@@ -27,7 +27,7 @@ public Guid? BreakAtOperatorId { get; set; }
 ```
 
 ### 2. ExecuteFlowDebugAsync 修改
-**文件**: `Acme.Product.Infrastructure/Services/FlowExecutionService.cs`
+**文件**: `ClearVision.Product.Infrastructure/Services/FlowExecutionService.cs`
 
 在调试执行循环中添加了断点检查：
 ```csharp
@@ -42,7 +42,7 @@ if (options.BreakAtOperatorId.HasValue && op.Id == options.BreakAtOperatorId.Val
 ```
 
 ### 3. PreviewNode API 端点
-**文件**: `Acme.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs`
+**文件**: `ClearVision.Product.Desktop/Endpoints/PreviewNodeEndpoints.cs`
 
 新增端点：
 ```
@@ -76,7 +76,7 @@ POST /api/flows/preview-node
 ```
 
 ### 4. 前端集成
-**文件**: `Acme.Product.Desktop/wwwroot/src/features/inspection/inspectionController.js`
+**文件**: `ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionController.js`
 
 新增方法：
 ```javascript
@@ -142,7 +142,7 @@ POST /api/flows/preview-node
 ## 构建状态
 
 ```bash
-dotnet build src/Acme.Product.Desktop/Acme.Product.Desktop.csproj
+dotnet build src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj
 # ✅ 成功（0 错误，4 警告）
 ```
 

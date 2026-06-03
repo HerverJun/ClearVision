@@ -1,9 +1,9 @@
 # ClearVision 深度代码审查报告（第二版 · 逐行核实）
 
-> **审查日期**: 2026-05-21  
-> **审查范围**: Acme.Product（530+ C# 文件）、Acme.PlcComm、Runtime、Desktop、Station  
-> **审查视角**: 产线操作员、视觉工程师、产线管理员、运维人员  
-> **核实方法**: 对第一版报告的 15 个问题逐一读取原始代码行验证；对关键路径进行深度逐行排查  
+> **审查日期**: 2026-05-21
+> **审查范围**: ClearVision.Product（530+ C# 文件）、ClearVision.PlcComm、Runtime、Desktop、Station
+> **审查视角**: 产线操作员、视觉工程师、产线管理员、运维人员
+> **核实方法**: 对第一版报告的 15 个问题逐一读取原始代码行验证；对关键路径进行深度逐行排查
 > **核实结论**: 第一版 15 个问题全部属实，零误判；本版补充 6 个新发现的深层缺陷，并修正 1 处分类。
 
 ---
@@ -34,7 +34,7 @@
 
 ### 🔴 新增 1：ImageWrapper 引用计数存在真实竞态，可导致已释放图像被复用
 
-**位置**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/ImageWrapper.cs`
+**位置**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ImageWrapper.cs`
 
 ```csharp
 public ImageWrapper AddRef()
@@ -73,7 +73,7 @@ public void Release()
 
 ### 🔴 新增 2：多根算子共享输入时触发 "double release detected" 异常
 
-**位置**: `Acme.Product/src/Acme.Product.Infrastructure/Services/FlowExecutionService.cs`
+**位置**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/FlowExecutionService.cs`
 
 **根因**: 初始输入 `inputData` 以 `operatorOutputs[Guid.Empty]` 存储，但 `AnalyzeFanOutDegrees` / `ApplyFanOutRefCounts` **从不处理 `Guid.Empty`**。初始 ImageWrapper 的 `RefCount` 始终为 1。若流程中有 **多个无上游连接的根算子**（如两个独立分支都从同一输入图像开始），每个根算子的 `ExecuteWithLifecycleAsync` finally 块都会 `Release()` 一次。
 
@@ -85,7 +85,7 @@ public void Release()
 
 ### 🔴 新增 3：RuntimeHost.StopAsync 传入 CancellationToken 被取消后，状态永久卡在 Stopping
 
-**位置**: `Acme.Product/src/Acme.Product.Runtime/RuntimeHost.cs:202-288`
+**位置**: `ClearVision.Product/src/ClearVision.Product.Runtime/RuntimeHost.cs:202-288`
 
 ```csharp
 var completedTask = await Task.WhenAny(
@@ -103,7 +103,7 @@ var completedTask = await Task.WhenAny(
 
 ### 🔴 新增 4：RuntimeImageWriter / RuntimeResultRecordWriter DisposeAsync 可能无限挂起
 
-**位置**: `Acme.Product/src/Acme.Product.Runtime/RuntimeImageWriter.cs:1177-1194` 及 `RuntimeResultRecordWriter.cs:1015-1032`
+**位置**: `ClearVision.Product/src/ClearVision.Product.Runtime/RuntimeImageWriter.cs:1177-1194` 及 `RuntimeResultRecordWriter.cs:1015-1032`
 
 ```csharp
 public async ValueTask DisposeAsync()
@@ -131,7 +131,7 @@ public async ValueTask DisposeAsync()
 
 ### 🟡 新增 5：CameraFrameStreamCoordinator 的 "IsRunning=true 但未实际运行" 损坏状态
 
-**位置**: `Acme.Product/src/Acme.Product.Infrastructure/Cameras/CameraFrameStreamCoordinator.cs:511-608`
+**位置**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Cameras/CameraFrameStreamCoordinator.cs:511-608`
 
 ```csharp
 entry.IsRunning = true;                        // line 524
@@ -157,7 +157,7 @@ catch (Exception ex)
 
 ### 🟡 新增 6：空 catch 块真正吞掉异常且未记录日志
 
-**位置**: `Acme.Product/src/Acme.Product.Application/Services/OperatorService.cs:468-471`
+**位置**: `ClearVision.Product/src/ClearVision.Product.Application/Services/OperatorService.cs:468-471`
 
 ```csharp
 catch (Exception)
@@ -168,7 +168,7 @@ catch (Exception)
 
 **核实结果**: 注释说"记录日志"，但 catch 块内 **没有任何日志代码**。参数更新异常被完全静默吞掉。
 
-**位置**: `Acme.Product/src/Acme.Product.Application/Services/ProjectService.cs:81-84`
+**位置**: `ClearVision.Product/src/ClearVision.Product.Application/Services/ProjectService.cs:81-84`
 
 ```csharp
 catch

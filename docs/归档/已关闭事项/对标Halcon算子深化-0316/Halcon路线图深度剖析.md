@@ -876,7 +876,7 @@ public static class TestDataGenerator
 2. **选择第一个任务**：W1-1灰度重心法（已完成✅）或W1-3 Blob特征扩展
 3. **复制Prompt**：从第五节复制对应任务的Prompt
 4. **AI生成代码**：粘贴到ChatGPT/Claude
-5. **填入项目**：复制到Acme.Product.Infrastructure
+5. **填入项目**：复制到ClearVision.Product.Infrastructure
 6. **运行测试**：使用W0生成的测试数据
 7. **性能验证**：使用W0-1性能分析工具确认满足预算
 8. **提交代码**：Git commit

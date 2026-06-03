@@ -1,10 +1,10 @@
 # CannyEdge 技术笔记
 
-> **对应算子**: `CannyEdgeOperator`  
-> **OperatorType**: `OperatorType.EdgeDetection`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/CannyEdgeOperator.cs`  
-> **相关算子**: [GaussianBlur](./01-GaussianBlur-技术笔记.md)、[SubpixelEdgeDetection](./07-SubpixelEdgeDetection-技术笔记.md)、[FindContours](./12-FindContours-技术笔记.md)  
-> **阅读前置**: 建议先阅读本文第2章"前置概念科普"，无需数学基础  
+> **对应算子**: `CannyEdgeOperator`
+> **OperatorType**: `OperatorType.EdgeDetection`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CannyEdgeOperator.cs`
+> **相关算子**: [GaussianBlur](./01-GaussianBlur-技术笔记.md)、[SubpixelEdgeDetection](./07-SubpixelEdgeDetection-技术笔记.md)、[FindContours](./12-FindContours-技术笔记.md)
+> **阅读前置**: 建议先阅读本文第2章"前置概念科普"，无需数学基础
 > **核心来源**: ClearVision 当前实现、OpenCV `Canny`、Canny 1986
 
 ---
@@ -65,7 +65,7 @@ Sobel算子是Canny的眼睛，它用两个"小窗口"（卷积核）来检测�
 #### 水平Sobel核（检测垂直边缘）
 ```
 水平Sobel核 Gx          检测效果演示
-    ┌────────┐          
+    ┌────────┐
     │ -1  0  1│          原图区域          卷积结果
     │ -2  0  2│          ┌────┬────┬────┐
     │ -1  0  1│          │ 0  │128 │255 │   →   正值（亮边）
@@ -81,7 +81,7 @@ Sobel算子是Canny的眼睛，它用两个"小窗口"（卷积核）来检测�
 #### 垂直Sobel核（检测水平边缘）
 ```
 垂直Sobel核 Gy          检测效果演示
-    ┌────────┐          
+    ┌────────┐
     │ -1 -2 -1│          原图区域          卷积结果
     │  0  0  0│          ┌────┬────┬────┐
     │  1  2  1│          │255 │255 │255 │
@@ -143,7 +143,7 @@ Step 1: 找到梯度方向（边缘垂直方向）
   ───────────────
         ↑
     梯度方向（垂直于边缘）
-    
+
 Step 2: 沿梯度方向比较，只保留最大值
 
 处理前：                处理后：
@@ -182,7 +182,7 @@ Step 2: 沿梯度方向比较，只保留最大值
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘ │
 └─────────────────────────────────────────────────────────┘
                     ↓ 双阈值筛选
-                    
+
 ┌─────────────────────────────────────────────────────────┐
 │  ┌──────────┐              ┌──────────┐                │
 │  │ ▓▓▓▓▓▓▓▓ │   ┌──────┐   │ ▒▒▒▒▒▒▒▒ │                │
@@ -544,20 +544,20 @@ Gray / Blur
 
 ### 常见误区
 
-- **误区一**：Canny 只要调两个阈值就行  
+- **误区一**：Canny 只要调两个阈值就行
   实际上前面的平滑质量、输入对比度和 ROI 都很重要。
 
-- **误区二**：Canny 检出的边缘就是最终测量边  
+- **误区二**：Canny 检出的边缘就是最终测量边
   真正的精密测量通常还要继续细化到亚像素级。
 
-- **误区三**：阈值越低检测到的边缘越完整越好  
+- **误区三**：阈值越低检测到的边缘越完整越好
   过低的阈值会引入大量噪声，影响后续处理。
 
 ---
 
 ## 9. 专业来源与延伸阅读
 
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/CannyEdgeOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CannyEdgeOperator.cs`
 - ClearVision 本地资料: `../算子手册.md`、`../算子名片/EdgeDetection.md`
 - OpenCV Documentation: *Canny*
 - John Canny, *A Computational Approach to Edge Detection*, IEEE TPAMI, 1986

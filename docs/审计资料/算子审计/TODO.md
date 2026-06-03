@@ -9,7 +9,7 @@ updated: "2026-05-31"
 
 # 算子工业级审计 TODO
 
-- 当前执行状态：Week5 已于 2026-04-14 09:56（UTC+8）按用户指令提前启动，并于 2026-04-14 12:01（UTC+8）完成 D2、于 2026-04-14 12:20（UTC+8）启动 D3 静态首版盘点；2026-04-15（UTC+8）已完成 D3/D4/D5 的实验室闭环收口：`dotnet restore` up-to-date、`Acme.Product.Tests.csproj` 构建恢复正常、实验室收口批次 `test_results/week5-lab-audit-closure-20260415.trx` 共 `298/298` 通过。更早期全局 P0 遗留也已于同日通过 `test_results/week2-p0-lab-closure-20260415.trx`（`174/174` 通过）完成实验室口径补充收口。当前真实遗留仅保留真实现场阶段的签收事项，不再影响当前实验室口径结论。
+- 当前执行状态：Week5 已于 2026-04-14 09:56（UTC+8）按用户指令提前启动，并于 2026-04-14 12:01（UTC+8）完成 D2、于 2026-04-14 12:20（UTC+8）启动 D3 静态首版盘点；2026-04-15（UTC+8）已完成 D3/D4/D5 的实验室闭环收口：`dotnet restore` up-to-date、`ClearVision.Product.Tests.csproj` 构建恢复正常、实验室收口批次 `test_results/week5-lab-audit-closure-20260415.trx` 共 `298/298` 通过。更早期全局 P0 遗留也已于同日通过 `test_results/week2-p0-lab-closure-20260415.trx`（`174/174` 通过）完成实验室口径补充收口。当前真实遗留仅保留真实现场阶段的签收事项，不再影响当前实验室口径结论。
 - 最近一次正式启动入口：`docs/审计资料/算子审计/启动计划/Week5-长时启动计划.md`；Week5/Week6 执行结果默认回填 `Week5-审计台账.md`、`Week5-已升级证据链.md`、`Week6-修复优先级清单.md`、`Week5-审计周报.md`。
 - Week2/Week3/Week4 执行结果继续保留在 `Week2-审计台账.md`、`Week2-已升级证据链.md`、`Week3-修复优先级清单.md`、`Week2-审计周报.md` 作为历史基线。
 - Week1 已闭环完成；当前实验室范围内的 Week5 P1/P2 收尾已收口。真实现场阶段事项继续由 `Week5-入口卡片.md` 单独跟踪，不重开已审结范围。

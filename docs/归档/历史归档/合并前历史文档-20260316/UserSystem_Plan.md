@@ -30,10 +30,10 @@
 遵循现有 DDD Lite 分层架构，各层新增内容如下：
 
 ```
-Acme.Product.Core         → 实体 User、枚举 UserRole、接口 IUserRepository
-Acme.Product.Infrastructure → UserRepository、PasswordHasher、DbContext 扩展
-Acme.Product.Application   → AuthService、UserManagementService
-Acme.Product.Desktop       → AuthEndpoints、UserEndpoints、AuthMiddleware
+ClearVision.Product.Core         → 实体 User、枚举 UserRole、接口 IUserRepository
+ClearVision.Product.Infrastructure → UserRepository、PasswordHasher、DbContext 扩展
+ClearVision.Product.Application   → AuthService、UserManagementService
+ClearVision.Product.Desktop       → AuthEndpoints、UserEndpoints、AuthMiddleware
 Frontend (wwwroot)         → 登录页面、用户管理页面、权限感知 UI
 ```
 
@@ -96,7 +96,7 @@ sequenceDiagram
 | **[MODIFY]** | `Infrastructure/Data/VisionDbContext.cs` | 添加 `DbSet<User>`，配置实体映射和唯一索引 |
 | **[NEW]** | `Infrastructure/Repositories/UserRepository.cs` | 实现 `IUserRepository`，CRUD 操作 |
 | **[NEW]** | `Infrastructure/Services/PasswordHasher.cs` | 使用 `BCrypt.Net-Next` 进行密码哈希/验证 |
-| **[MODIFY]** | `Infrastructure/Acme.Product.Infrastructure.csproj` | 添加 `BCrypt.Net-Next` NuGet 包依赖 |
+| **[MODIFY]** | `Infrastructure/ClearVision.Product.Infrastructure.csproj` | 添加 `BCrypt.Net-Next` NuGet 包依赖 |
 
 **数据库初始化**: 应用启动时自动检查 Users 表，若为空则创建默认管理员 `admin / admin123`。
 

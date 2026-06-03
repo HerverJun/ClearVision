@@ -28,13 +28,13 @@ updated: "2026-04-15"
 
 | 审计口径 | 当前实现类 | 当前测试入口 | 启动结论 |
 | --- | --- | --- | --- |
-| `Filtering` | `GaussianBlurOperator` | `Acme.Product/tests/Acme.Product.Tests/Operators/OperatorTests.cs` 中的 `GaussianBlurOperatorTests` | 已确认存在实现与基础测试入口，但仍缺按审计口径命名/收口的直单测闭环。 |
-| `Thresholding` | `ThresholdOperator` | `Acme.Product/tests/Acme.Product.Tests/Operators/OperatorTests.cs` 中的 `ThresholdOperatorTests` | 已确认存在实现与基础测试入口，但仍需按 Week2 口径补批次绑定与同名收口。 |
+| `Filtering` | `GaussianBlurOperator` | `ClearVision.Product/tests/ClearVision.Product.Tests/Operators/OperatorTests.cs` 中的 `GaussianBlurOperatorTests` | 已确认存在实现与基础测试入口，但仍缺按审计口径命名/收口的直单测闭环。 |
+| `Thresholding` | `ThresholdOperator` | `ClearVision.Product/tests/ClearVision.Product.Tests/Operators/OperatorTests.cs` 中的 `ThresholdOperatorTests` | 已确认存在实现与基础测试入口，但仍需按 Week2 口径补批次绑定与同名收口。 |
 | `LaplacianSharpen` | `LaplacianSharpenOperator` | 暂未发现独立直单测文件 | 已确认实现入口，Week2 需要新补直单测。 |
 | `MorphologicalOperation` | `MorphologicalOperationOperator` | `Phase42MeasurementAndSignalOperatorTests` 中仅有联动覆盖 | 已确认实现入口，Week2 需要独立直单测收口。 |
 | `ImageBlend` | `ImageBlendOperator` | 暂未发现独立直单测文件 | 已确认实现入口，Week2 需要新补直单测。 |
 | `ImageDiff` | `ImageDiffOperator` | 暂未发现独立直单测文件 | 已确认实现入口，Week2 需要新补直单测。 |
-| `EdgeDetection` | `CannyEdgeOperator` | `Acme.Product/tests/Acme.Product.Tests/Operators/OperatorTests.cs` 中的 `CannyEdgeOperatorTests` | 已确认审计口径与实现命名不一致，Week2 需要补 `EdgeDetection` 审计口径直单测并与主链回归绑定。 |
+| `EdgeDetection` | `CannyEdgeOperator` | `ClearVision.Product/tests/ClearVision.Product.Tests/Operators/OperatorTests.cs` 中的 `CannyEdgeOperatorTests` | 已确认审计口径与实现命名不一致，Week2 需要补 `EdgeDetection` 审计口径直单测并与主链回归绑定。 |
 
 ## 4. A线待回填区（预处理直接单测）
 
@@ -59,7 +59,7 @@ updated: "2026-04-15"
 | 日期 | 计划动作 | 当前状态 | 备注 |
 | --- | --- | --- | --- |
 | 2026-04-13（周一） | Week2 提前启动、冻结 A/B/C 输入范围、确认实现/测试映射 | [x] | 已于 2026-04-13 12:52（UTC+8）启动；A/B 口径映射已冻结，C 线沿用 Week1 `detection-all` 批次作为起点。 |
-| 2026-04-13（周一） | A/B 首批审计口径直单测补齐并完成串行验证 | [x] | 已于 2026-04-13 13:54（UTC+8）完成首批验证：`FilteringOperatorTests`、`ThresholdingOperatorTests`、`LaplacianSharpenOperatorTests`、`MorphologicalOperationOperatorTests`、`ImageBlendOperatorTests`、`ImageDiffOperatorTests`、`EdgeDetectionOperatorTests` 共 `32` 个用例全部通过。当前环境并发 MSBuild/restore path walk 不稳定，先用 `dotnet build Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj --no-restore /m:1` 单核构建，再用 `scripts/run-dotnet-test-serial.ps1 -NoBuild -NoRestore` 完成验证。 |
+| 2026-04-13（周一） | A/B 首批审计口径直单测补齐并完成串行验证 | [x] | 已于 2026-04-13 13:54（UTC+8）完成首批验证：`FilteringOperatorTests`、`ThresholdingOperatorTests`、`LaplacianSharpenOperatorTests`、`MorphologicalOperationOperatorTests`、`ImageBlendOperatorTests`、`ImageDiffOperatorTests`、`EdgeDetectionOperatorTests` 共 `32` 个用例全部通过。当前环境并发 MSBuild/restore path walk 不稳定，先用 `dotnet build ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj --no-restore /m:1` 单核构建，再用 `scripts/run-dotnet-test-serial.ps1 -NoBuild -NoRestore` 完成验证。 |
 | 2026-04-13（周一） | B 线边缘主链回归复跑并绑定 Week2 批次结果 | [x] | 已于 2026-04-13 14:46（UTC+8）完成 `EdgeDetectionOperatorTests`、`ShadingCorrectionOperatorTests`、`SubpixelEdgeDetectionOperatorTests`、`ParallelLineFindOperatorTests`、`EdgeIntersectionOperatorTests` 共 `18` 个用例全部通过，并绑定 `test_results/week2-edge-mainchain-20260413-144604.trx`。 |
 | 2026-04-13（周一） | C 线 AI检测验收补证收敛为 1 条外部阻塞 | [-] | 已冻结 Week1 `detection-all-20260413-115808.trx` 为初始批次；当前仅保留 AI检测 Owner 补齐工业签收、模型版本、阈值和环境一致性材料这一条外部验收阻塞。 |
 | 2026-04-13（周一） | A/B 风险收敛并生成 Week3 移交结论 | [x] | A/B 缺口已闭环，不新增 Week3 修复项；仅保留 AI 检测验收阻塞进入 `Week3-修复优先级清单.md`。 |

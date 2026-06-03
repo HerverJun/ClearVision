@@ -32,7 +32,7 @@
 > 
 > 计划声称：*"缺少统一的 Center 和 Circle 对象"*，*"实际运行时输出分散字段 CenterX, CenterY, Radius"*。
 > 
-> **实际代码现状** ([CircleMeasurementOperator.cs](file:///c:/Users/A/Desktop/ClearVision/Acme.Product/src/Acme.Product.Infrastructure/Operators/CircleMeasurementOperator.cs#L129-L148))：
+> **实际代码现状** ([CircleMeasurementOperator.cs](file:///c:/Users/A/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CircleMeasurementOperator.cs#L129-L148))：
 > - ✅ 已输出 `Center = new Position(...)` (第 135-137 行)
 > - ✅ 已输出 `Circle = firstCircleData` (CircleData 对象) (第 146 行)
 > - ✅ 已输出 `CircleCount` (第 125 行)
@@ -62,7 +62,7 @@
 > [!WARNING]
 > **评审偏差**：计划中声称 *"声明的 ColorInfo 端口与实际输出完全脱节"*。
 > 
-> **实际代码现状** ([ColorDetectionOperator.cs](file:///c:/Users/A/Desktop/ClearVision/Acme.Product/src/Acme.Product.Infrastructure/Operators/ColorDetectionOperator.cs))：
+> **实际代码现状** ([ColorDetectionOperator.cs](file:///c:/Users/A/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ColorDetectionOperator.cs))：
 > - ✅ 三种模式均已输出 `ColorInfo` 键 (字典形式)
 >   - Average 模式 (第 140-147 行)：输出 `ColorInfo{ ColorSpace, AnalysisMode, AverageColor, Summary }`
 >   - Dominant 模式 (第 229-236 行)：输出 `ColorInfo{ ColorSpace, AnalysisMode, DominantColors, K }`

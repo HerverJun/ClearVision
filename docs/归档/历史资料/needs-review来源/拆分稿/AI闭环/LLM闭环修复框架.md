@@ -64,7 +64,7 @@ AiFlowValidator 输出结构化诊断
 
 ### 1. 结构化校验诊断
 
-`Acme.Product/src/Acme.Product.Core/Services/AiValidationResult.cs`
+`ClearVision.Product/src/ClearVision.Product.Core/Services/AiValidationResult.cs`
 
 当前 `AiValidationResult` 保留了原有的：
 
@@ -99,7 +99,7 @@ AiFlowValidator 输出结构化诊断
 
 ### 2. 定向修复 prompt
 
-`Acme.Product/src/Acme.Product.Infrastructure/AI/AiFlowGenerationService.cs`
+`ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowGenerationService.cs`
 
 重试 prompt 现在会显式带入：
 
@@ -173,21 +173,21 @@ AI 面板现在可以消费：
 
 ### 主链核心
 
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/AiFlowGenerationService.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/AiFlowValidator.cs`
-- `Acme.Product/src/Acme.Product.Core/Services/AiValidationResult.cs`
-- `Acme.Product/src/Acme.Product.Core/DTOs/AiGenerationDto.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowGenerationService.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowValidator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Core/Services/AiValidationResult.cs`
+- `ClearVision.Product/src/ClearVision.Product.Core/DTOs/AiGenerationDto.cs`
 
 ### 前后端消息桥
 
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs`
-- `Acme.Product/src/Acme.Product.Contracts/Messages/AiGenerationMessages.cs`
-- `Acme.Product/src/Acme.Product.Desktop/Handlers/WebMessageHandler.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs`
+- `ClearVision.Product/src/ClearVision.Product.Contracts/Messages/AiGenerationMessages.cs`
+- `ClearVision.Product/src/ClearVision.Product.Desktop/Handlers/WebMessageHandler.cs`
 
 ### 前端消费层
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/ai/aiPanel.js`
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/shared/styles/ai-panel.css`
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js`
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/shared/styles/ai-panel.css`
 
 ---
 

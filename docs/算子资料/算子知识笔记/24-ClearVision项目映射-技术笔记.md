@@ -20,7 +20,7 @@ ClearVision 里和工业现场系统观最相关的，不只是通信算子本�
 
 | 现场角色 | ClearVision 中更接近的模块 / 算子 | 面试里怎么讲 |
 |----------|-----------------------------------|--------------|
-| **上位机** | `Acme.Product.Desktop`、`FlowExecutionService`、`InspectionRuntimeCoordinator`、`GenerateFlowMessageHandler` | 负责界面、流程编排、运行时组织、结果展示 |
+| **上位机** | `ClearVision.Product.Desktop`、`FlowExecutionService`、`InspectionRuntimeCoordinator`、`GenerateFlowMessageHandler` | 负责界面、流程编排、运行时组织、结果展示 |
 | **相机** | `CameraManager`、`ImageAcquisition` | 负责图像采集和相机绑定 |
 | **PLC / 控制器通信** | `MitsubishiMcCommunication`、`ModbusCommunication`、`SiemensS7Communication`、`OmronFinsCommunication`、`TcpCommunication` | 负责读状态、写结果、同步配方或工艺参数 |
 | **业务结果门控** | `ResultJudgment`、必要时再接 `ConditionalBranch` | 负责把算法输出收口成现场能消费的 OK/NG 或数值结果 |

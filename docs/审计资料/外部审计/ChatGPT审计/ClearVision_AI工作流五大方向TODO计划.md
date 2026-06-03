@@ -130,9 +130,9 @@ ClearVision 已经有内置模板，但当前模板优先逻辑还偏窄：`AiFl
 
 建议新增/调整文件：
 
-- `Acme.Product/src/Acme.Product.Core/Entities/ScenarioDefinition.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/ScenarioMatcher.cs`
-- `Acme.Product/tests/Acme.Product.Tests/AI/ScenarioMatcherTests.cs`
+- `ClearVision.Product/src/ClearVision.Product.Core/Entities/ScenarioDefinition.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/ScenarioMatcher.cs`
+- `ClearVision.Product/tests/ClearVision.Product.Tests/AI/ScenarioMatcherTests.cs`
 
 TODO：
 
@@ -195,8 +195,8 @@ TODO：
 
 建议新增/调整文件：
 
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/TemplateConstraintValidator.cs`
-- `Acme.Product/tests/Acme.Product.Tests/AI/TemplateConstraintValidatorTests.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/TemplateConstraintValidator.cs`
+- `ClearVision.Product/tests/ClearVision.Product.Tests/AI/TemplateConstraintValidatorTests.cs`
 
 TODO：
 
@@ -476,8 +476,8 @@ TODO：
 
 建议新增文件：
 
-- `Acme.Product/src/Acme.Product.Core/DTOs/RequirementBriefDto.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/RequirementBriefExtractor.cs`
+- `ClearVision.Product/src/ClearVision.Product.Core/DTOs/RequirementBriefDto.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/RequirementBriefExtractor.cs`
 
 建议字段：
 
@@ -521,8 +521,8 @@ TODO：
 
 建议新增文件：
 
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/ClarificationEngine.cs`
-- `Acme.Product/tests/Acme.Product.Tests/AI/ClarificationEngineTests.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/ClarificationEngine.cs`
+- `ClearVision.Product/tests/ClearVision.Product.Tests/AI/ClarificationEngineTests.cs`
 
 TODO：
 
@@ -561,7 +561,7 @@ GenerateFlowResponse
 
 建议调整文件：
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/ai/aiPanel.js`
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js`
 - 对应 CSS 文件。
 
 TODO：

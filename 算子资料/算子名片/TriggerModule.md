@@ -61,7 +61,7 @@
 | 内存特征 (Memory Profile) | 主要由输出字典、集合和少量中间对象决定。 |
 
 ## 证据与失败契约 / Evidence & Failure Contracts
-- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。
+- 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。
 - Golden/回放证据：质量报告中存在通过的 baseline 证据。
 - 参数失败契约：源码包含 `ValidateParameters`，非法参数会被明确拦截或返回错误说明。
 - 执行失败契约：源码中发现 1 条 `OperatorExecutionOutput.Failure(...)` 路径。

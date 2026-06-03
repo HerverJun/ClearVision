@@ -1,10 +1,10 @@
 # PerspectiveTransform 技术笔记
 
-> **对应算子**: `PerspectiveTransformOperator`  
-> **OperatorType**: `OperatorType.PerspectiveTransform`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/PerspectiveTransformOperator.cs`  
-> **相关算子**: [19-CameraCalibration-技术笔记](./19-CameraCalibration-技术笔记.md)、[20-Undistort-技术笔记](./20-Undistort-技术笔记.md)、[14-ShapeMatching-技术笔记](./14-ShapeMatching-技术笔记.md)  
-> **阅读前置**: 平面单应性、四点映射、透视畸变  
+> **对应算子**: `PerspectiveTransformOperator`
+> **OperatorType**: `OperatorType.PerspectiveTransform`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/PerspectiveTransformOperator.cs`
+> **相关算子**: [19-CameraCalibration-技术笔记](./19-CameraCalibration-技术笔记.md)、[20-Undistort-技术笔记](./20-Undistort-技术笔记.md)、[14-ShapeMatching-技术笔记](./14-ShapeMatching-技术笔记.md)
+> **阅读前置**: 平面单应性、四点映射、透视畸变
 > **核心来源**: OpenCV `getPerspectiveTransform` / `warpPerspective` 文档、Szeliski《Computer Vision》、本仓库当前实现
 
 ---
@@ -29,7 +29,7 @@
 
 ```
 实际场景（俯视图）                    拍摄结果（图像中）
-                    
+
     手机                                      ┌──────────┐
      \                                        │          │
       \        A4纸                          │   梯形   │
@@ -112,16 +112,16 @@
 
 ```
 原图（畸变状态）                    目标图（矫正后）
-                                    
+
     p0 ━━━━━ p1                         P0 ━━━━━ P1
     ┃  斜拍  ┃      透视变换              ┃  正视  ┃
     ┃   的   ┃    ═══════════>           ┃  矩 形 ┃
     ┃  纸张  ┃                           ┃        ┃
     p3 ━━━━━ p2                         P3 ━━━━━ P2
-                                    
+
 点的对应关系：
 p0(左上) ───────────────> P0(左上, 0,0)
-p1(右上) ───────────────> P1(右上, w,0)  
+p1(右上) ───────────────> P1(右上, w,0)
 p2(右下) ───────────────> P2(右下, w,h)
 p3(左下) ───────────────> P3(左下, 0,h)
 ```
@@ -196,7 +196,7 @@ p3(左下) ───────────────> P3(左下, 0,h)
          ════════════════════════════
          解决：Undistort（畸变校正）
 
-第二层：拍摄角度的问题 ──────────────────> 透视变换  
+第二层：拍摄角度的问题 ──────────────────> 透视变换
          ↓ 斜着拍
     近大远小，梯形变形
          ════════════════════════════
@@ -205,7 +205,7 @@ p3(左下) ───────────────> P3(左下, 0,h)
 第三层：想知道实际尺寸 ──────────────────> 相机标定
          ↓ 像素是多少毫米？
     需要建立像素与真实世界的关系
-         ════════════════════════════  
+         ════════════════════════════
          解决：CameraCalibration（相机标定）
 ```
 
@@ -292,7 +292,7 @@ p3(左下) ───────────────> P3(左下, 0,h)
 
 **应用价值**：
 - 土地测量
-- 农作物监测  
+- 农作物监测
 - 城市规划
 - 灾害评估
 
@@ -333,7 +333,7 @@ p3(左下) ───────────────> P3(左下, 0,h)
 # 检测到身份证的四个角点（原图坐标）
 src_points = [
     (120, 150),   # 左上
-    (480, 130),   # 右上  
+    (480, 130),   # 右上
     (520, 380),   # 右下
     (80, 400)     # 左下
 ]
@@ -455,7 +455,7 @@ dst_points = [
     # 白板实际尺寸比例 16:9
     "OutputWidth": 1920,
     "OutputHeight": 1080,
-    
+
     # 四点通过前置算子（如ShapeMatching）自动检测
     "SrcPointsJson": "detected_from_contour",
     "DstPointsJson": "[[0,0],[1920,0],[1920,1080],[0,1080]]"
@@ -488,7 +488,7 @@ ClearVision 当前实现支持两种点输入方式：
 - 新方式: 输入端口 `SrcPoints` / `DstPoints` 或对应 JSON
 - 旧方式: 16 个独立参数 `SrcX1 ... DstY4`
 
-如果新方式存在且点数足够，代码优先走新方式；否则退回旧版 16 参数。  
+如果新方式存在且点数足够，代码优先走新方式；否则退回旧版 16 参数。
 最后统一调用：
 
 - `Cv2.GetPerspectiveTransform`
@@ -500,7 +500,7 @@ ClearVision 当前实现支持两种点输入方式：
 
 ## 9. 算法原理
 
-对于同一个平面，如果只是因为视角不同看起来变形成四边形，那么可以用一个 3x3 单应矩阵把它映射回规则平面。  
+对于同一个平面，如果只是因为视角不同看起来变形成四边形，那么可以用一个 3x3 单应矩阵把它映射回规则平面。
 这和相机标定不是一回事：透视变换只解决"平面上的四点映射关系"。
 
 ---

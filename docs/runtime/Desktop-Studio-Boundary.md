@@ -16,7 +16,7 @@ Runtime/Station must not introduce:
 - `Kestrel`
 - `wwwroot`
 - `MapVisionApiEndpoints`
-- `Acme.Product.Desktop` project references
+- `ClearVision.Product.Desktop` project references
 
 Review rule:
 

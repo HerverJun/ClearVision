@@ -87,7 +87,7 @@ python quality/tools/run_quality_suite.py --suite full155_quality_suite --run
 
 ```powershell
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName FeatureMatchOperatorBaseTests `
   -NoRestore
 ```
@@ -375,7 +375,7 @@ v4 结果（2026-04-29）：
 - `python quality/tools/run_quality_suite.py --suite public_benchmark_suite --run`
 - `python quality/tools/run_quality_suite.py --suite audit_suite --run`
 - `python quality/tools/run_quality_suite.py --suite full155_quality_suite --run`
-- `& "./scripts/run-dotnet-test-serial.ps1" -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" -FullyQualifiedName SurfaceDefectDetectionOperatorTests -NoBuild -NoRestore -Verbosity minimal`
+- `& "./scripts/run-dotnet-test-serial.ps1" -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" -FullyQualifiedName SurfaceDefectDetectionOperatorTests -NoBuild -NoRestore -Verbosity minimal`
 
 验收门槛：
 
@@ -645,7 +645,7 @@ Day 4 结论：PlanarMatching 作为 HPatches 对照已接通，但未超过 Aka
 - `python quality/tools/run_quality_suite.py --suite public_benchmark_suite --run`
 - `python quality/tools/run_quality_suite.py --suite audit_suite --run`
 - `python quality/tools/run_quality_suite.py --suite full155_quality_suite --run`
-- `& "./scripts/run-dotnet-test-serial.ps1" -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" -FullyQualifiedName PlanarMatchingOperatorTests,FeatureMatchOperatorBaseTests,OperatorContractReconciliationTests -Verbosity minimal`
+- `& "./scripts/run-dotnet-test-serial.ps1" -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" -FullyQualifiedName PlanarMatchingOperatorTests,FeatureMatchOperatorBaseTests,OperatorContractReconciliationTests -Verbosity minimal`
 
 ## 9. 暂停条件
 

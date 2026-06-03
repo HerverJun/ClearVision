@@ -18,10 +18,10 @@
 
 关键文件：
 
-- `Acme.Product/src/Acme.Product.Desktop/Handlers/WebMessageHandler.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/AiFlowGenerationService.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/AiApiClient.cs`
+- `ClearVision.Product/src/ClearVision.Product.Desktop/Handlers/WebMessageHandler.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowGenerationService.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiApiClient.cs`
 
 ### 2.2 并存的第二套接入架构
 
@@ -29,12 +29,12 @@
 
 关键文件：
 
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/Connectors/LLMConfiguration.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/Connectors/LLMConnectorFactory.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/Connectors/DynamicLLMConnector.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/Connectors/OpenAiConnector.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/Connectors/AzureOpenAiConnector.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/Connectors/OllamaConnector.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Connectors/LLMConfiguration.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Connectors/LLMConnectorFactory.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Connectors/DynamicLLMConnector.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Connectors/OpenAiConnector.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Connectors/AzureOpenAiConnector.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Connectors/OllamaConnector.cs`
 
 ### 2.3 主要问题
 
@@ -116,7 +116,7 @@
 改动：
 
 1. 新增抽象与 orchestrator 框架
-- 新建目录：`Acme.Product/src/Acme.Product.Infrastructure/AI/Runtime/`
+- 新建目录：`ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Runtime/`
 - 文件：
   - `IAiConnector.cs`
   - `IAiConnectorFactory.cs`
@@ -201,7 +201,7 @@
 改动：
 
 1. 后端 API 升级
-- 文件：`Acme.Product/src/Acme.Product.Desktop/Endpoints/SettingsEndpoints.cs`
+- 文件：`ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/SettingsEndpoints.cs`
 - 新增/扩展字段透传：
   - `protocol`
   - `authMode`
@@ -214,7 +214,7 @@
   - `priority`
 
 2. 前端设置页升级
-- 文件：`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js`
+- 文件：`ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js`
 - 表单新增高级配置折叠区。
 - Provider 下拉改为 `Protocol` 选项（保留旧值自动映射）。
 

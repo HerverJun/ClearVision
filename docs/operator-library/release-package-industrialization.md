@@ -2,14 +2,14 @@
 
 Date: 2026-04-29
 
-Scope: `Acme.OperatorLibrary` NuGet packaging, native runtime expectations, third-party notice/SBOM baseline, deployment matrix, and resource-lifecycle limits for ONNX/OCR/PLC/database operators.
+Scope: `ClearVision.OperatorLibrary` NuGet packaging, native runtime expectations, third-party notice/SBOM baseline, deployment matrix, and resource-lifecycle limits for ONNX/OCR/PLC/database operators.
 
 ## Package Contents
 
-`Acme.OperatorLibrary` is a source-linked package around ClearVision operator code:
+`ClearVision.OperatorLibrary` is a source-linked package around ClearVision operator code:
 
-- `Acme.OperatorLibrary/src/**` for package-facing abstractions and module index.
-- Source-linked operator/runtime code from `Acme.Product/src/Acme.Product.Contracts`, `Core`, `Infrastructure/Operators`, selected `Infrastructure` services, and `Acme.PlcComm`.
+- `ClearVision.OperatorLibrary/src/**` for package-facing abstractions and module index.
+- Source-linked operator/runtime code from `ClearVision.Product/src/ClearVision.Product.Contracts`, `Core`, `Infrastructure/Operators`, selected `Infrastructure` services, and `ClearVision.PlcComm`.
 - Root package documentation: `README.md`, `THIRD-PARTY-NOTICES.md`, and `SBOM.md`.
 - Symbols are emitted as `.snupkg` by `pack.ps1`.
 
@@ -17,17 +17,17 @@ The package does not include trained models, camera drivers, production database
 
 ## Restore Reproducibility
 
-`Acme.OperatorLibrary.csproj` sets `RestorePackagesWithLockFile=true` so NuGet can materialize a package graph lock file during restore. First-time lock creation is a reviewable source change:
+`ClearVision.OperatorLibrary.csproj` sets `RestorePackagesWithLockFile=true` so NuGet can materialize a package graph lock file during restore. First-time lock creation is a reviewable source change:
 
 ```powershell
-dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --use-lock-file
-git diff -- Acme.OperatorLibrary/packages.lock.json
+dotnet restore ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj --use-lock-file
+git diff -- ClearVision.OperatorLibrary/packages.lock.json
 ```
 
-After `Acme.OperatorLibrary/packages.lock.json` is generated, reviewed, and checked in, release and CI restores must use locked mode:
+After `ClearVision.OperatorLibrary/packages.lock.json` is generated, reviewed, and checked in, release and CI restores must use locked mode:
 
 ```powershell
-dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --locked-mode
+dotnet restore ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj --locked-mode
 ```
 
 Do not publish from a restore that updates the lock file unexpectedly. This document records the reproducibility gate but does not generate packages or modify `packages.lock.json`.
@@ -43,7 +43,7 @@ Do not publish from a restore that updates the lock file unexpectedly. This docu
 | SQL Server writes | `Microsoft.Data.SqlClient` | SNI native assets are pulled transitively. | Validate TLS/authentication policy against the target server. |
 | MySQL writes | `MySqlConnector` | Managed client. | Validate connection string and server timeout policy. |
 | Modbus TCP | `NModbus` | Managed TCP client over `TcpClient`; this package serializes requests per endpoint. | Validate against physical or simulated PLC endpoints. |
-| Serial/RTU/PLC | `System.IO.Ports`, `S7NetPlus`, `Acme.PlcComm` | Serial-port native assets may exist transitively, but Modbus RTU is documented as unsupported in the packaged operator. | Keep RTU disabled until serial-port lifecycle ownership is explicit. |
+| Serial/RTU/PLC | `System.IO.Ports`, `S7NetPlus`, `ClearVision.PlcComm` | Serial-port native assets may exist transitively, but Modbus RTU is documented as unsupported in the packaged operator. | Keep RTU disabled until serial-port lifecycle ownership is explicit. |
 
 ## Resource Lifecycle
 
@@ -110,8 +110,8 @@ Operator maturity is explicit:
 
 ## Release Checklist
 
-1. Run `./analyze-deps.ps1` in `Acme.OperatorLibrary`.
-2. Restore with `--locked-mode` after `Acme.OperatorLibrary/packages.lock.json` is checked in.
+1. Run `./analyze-deps.ps1` in `ClearVision.OperatorLibrary`.
+2. Restore with `--locked-mode` after `ClearVision.OperatorLibrary/packages.lock.json` is checked in.
 3. Run `./pack.ps1 -RunSmokeTest`.
 4. Unpack the generated `.nupkg` and confirm `README.md`, `THIRD-PARTY-NOTICES.md`, and `SBOM.md` are present.
 5. Confirm native runtime payloads match the deployment matrix.

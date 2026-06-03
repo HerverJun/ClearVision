@@ -202,7 +202,7 @@ L. 总体验证与文档
 建议位置：
 
 ```text
-Acme.Product/src/Acme.Product.Runtime.Abstractions/StationSync/
+ClearVision.Product/src/ClearVision.Product.Runtime.Abstractions/StationSync/
 ```
 
 新增文件：
@@ -389,10 +389,10 @@ Microsoft.AspNetCore.SignalR.Protocols.MessagePack
 ## B2. 新增目录
 
 ```text
-Acme.Product/src/Acme.Product.Desktop/Hubs/
+ClearVision.Product/src/ClearVision.Product.Desktop/Hubs/
   StationIngressHub.cs
 
-Acme.Product/src/Acme.Product.Desktop/Services/StationSync/
+ClearVision.Product/src/ClearVision.Product.Desktop/Services/StationSync/
   StationIngressAuthService.cs
   StationRegistryService.cs
   StationTelemetryBuffer.cs
@@ -400,7 +400,7 @@ Acme.Product/src/Acme.Product.Desktop/Services/StationSync/
   StationOfflineMonitorService.cs
   StationCommandQueue.cs
 
-Acme.Product/src/Acme.Product.Desktop/Endpoints/
+ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/
   StationMonitorEndpoints.cs
   StationMonitorEventEndpoints.cs
 ```
@@ -537,7 +537,7 @@ Microsoft.AspNetCore.SignalR.Protocols.MessagePack
 ## C2. 新增目录
 
 ```text
-Acme.Product/src/Acme.Product.Station/Sync/
+ClearVision.Product/src/ClearVision.Product.Station/Sync/
   StationSyncHostedService.cs
   StationHubClient.cs
   StationSyncOptions.cs
@@ -1286,7 +1286,7 @@ token 不进入审计明文
 建议：
 
 ```text
-Acme.Product/src/Acme.Product.Station.Simulator/
+ClearVision.Product/src/ClearVision.Product.Station.Simulator/
 ```
 
 如果新增项目成本过高，也可先放在 tools：

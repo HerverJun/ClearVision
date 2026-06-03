@@ -1,4 +1,4 @@
-# Acme.PlcComm 审计报告与开发路线图（不扩品牌）
+# ClearVision.PlcComm 审计报告与开发路线图（不扩品牌）
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -8,16 +8,16 @@
 - 判定依据：任务清单尚未开始勾选
 <!-- DOC_AUDIT_STATUS_END -->
 
-> 日期：2026-02-27  
-> 适用仓库：`ClearVision`  
-> 适用模块：`Acme.Product/src/Acme.PlcComm` 及其在算子层的集成  
+> 日期：2026-02-27
+> 适用仓库：`ClearVision`
+> 适用模块：`ClearVision.Product/src/ClearVision.PlcComm` 及其在算子层的集成
 > 当前决策：**暂不扩展 PLC 品牌支持**，仅聚焦欧姆龙（FINS）、西门子（S7）、三菱（MC）三类协议的稳定性与工程质量提升
 
 ---
 
 ## 1. 文档目标
 
-本文件用于指导 `Acme.PlcComm` 下一阶段开发，目标如下：
+本文件用于指导 `ClearVision.PlcComm` 下一阶段开发，目标如下：
 
 1. 明确当前实现与 HslCommunication、典型商用工业通信平台（Kepware/Softing）之间的差距。
 2. 给出基于现有代码事实的风险清单与优先级。
@@ -29,13 +29,13 @@
 
 ### 2.1 代码范围
 
-- `Acme.Product/src/Acme.PlcComm`
+- `ClearVision.Product/src/ClearVision.PlcComm`
   - `Core/`
   - `Interfaces/`
   - `Siemens/`
   - `Mitsubishi/`
   - `Omron/`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/`
   - `PlcCommunicationOperatorBase.cs`
   - `SiemensS7CommunicationOperator.cs`
   - `MitsubishiMcCommunicationOperator.cs`
@@ -51,18 +51,18 @@
 
 ## 3. 外部对标基准（资料来源）
 
-> 访问日期：2026-02-27  
+> 访问日期：2026-02-27
 > 说明：以下用于能力对标，不代表已在本项目中引入这些产品。
 
-1. HslCommunication 社区版仓库：  
+1. HslCommunication 社区版仓库：
    `https://github.com/HslCommunication-Community/HslCommunication-Community`
-2. PTC Kepware 产品页：  
+2. PTC Kepware 产品页：
    `https://www.ptc.com/en/store/kepware`
-3. PTC Intelligent Industrial Connectivity：  
+3. PTC Intelligent Industrial Connectivity：
    `https://www.ptc.com/en/products/kepware/intelligent-industrial-connectivity`
-4. Softing dataFEED OPC Suite：  
+4. Softing dataFEED OPC Suite：
    `https://industrial.softing.com/products/docker/datafeed-opc-suite.html`
-5. Softing 安全增强说明（证书/审计相关）：  
+5. Softing 安全增强说明（证书/审计相关）：
    `https://industrial.softing.com/products/docker/news/article/secure-communication-with-datafeed-opc-suite-version-v550.html`
 
 ---
@@ -71,7 +71,7 @@
 
 ### 4.1 总体判断
 
-`Acme.PlcComm` 已具备“可用的统一抽象 + 三协议接入”的基础框架，但与成熟商用品质相比，当前主要短板在：
+`ClearVision.PlcComm` 已具备“可用的统一抽象 + 三协议接入”的基础框架，但与成熟商用品质相比，当前主要短板在：
 
 1. 协议细节的正确性一致性（端序、长度语义、位读写语义）。
 2. 可靠性细节（断连清理、半包处理、重连机制精度）。
@@ -144,7 +144,7 @@
 
 ## 7.1 维度对比
 
-| 维度 | Acme.PlcComm（当前） | HslCommunication（社区生态） | 商用品（Kepware/Softing 等） |
+| 维度 | ClearVision.PlcComm（当前） | HslCommunication（社区生态） | 商用品（Kepware/Softing 等） |
 |---|---|---|---|
 | 协议覆盖 | 当前聚焦 S7/MC/FINS | 覆盖范围更广（按其仓库描述） | 通常更广，且有持续商业驱动维护 |
 | 架构抽象 | 有统一 `IPlcClient` 抽象 | 有成熟 API 与大量现成示例 | 以平台化接入、集中配置与统一管理为主 |
@@ -195,12 +195,12 @@
 
 ### 回填证据（2026-03-07）
 
-- 回归命令：`dotnet test Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj --filter "FullyQualifiedName~PlcComm" --no-restore`
+- 回归命令：`dotnet test ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj --filter "FullyQualifiedName~PlcComm" --no-restore`
 - 回归结果：`38` 通过，`0` 失败，覆盖 `AddressParserTests`、`FrameCodecTests`、`HalfPacketIntegrationTests`、`PlcBaseClientBehaviorTests`、`PlcClientFactoryTests`、`SiemensS7ClientBehaviorTests`、`PlcCommunicationOperatorBaseBehaviorTests`
-- P0-1 证据：`Acme.Product/src/Acme.PlcComm/Core/PlcBaseClient.cs` 已增加重复断开保护；`Acme.Product/tests/Acme.Product.Tests/PlcComm/PlcBaseClientBehaviorTests.cs` 覆盖 `DisconnectAsync`/`Dispose` 资源释放与重复调用场景
-- P0-2 / P0-3 证据：`Acme.Product/src/Acme.Product.Infrastructure/Operators/PlcCommunicationOperatorBase.cs` 已统一走 `ByteTransform` 且 `ReadAsync(address, length)` 固定按“元素个数”读取；`Acme.Product/tests/Acme.Product.Tests/PlcComm/PlcCommunicationOperatorBaseBehaviorTests.cs` 覆盖大端/小端 `Bool`、`Word`、`DWord`、`Float` 编解码与长度语义
-- P0-4 / P0-5 证据：`Acme.Product/src/Acme.PlcComm/Siemens/S7AddressParser.cs` 已支持 `MW0` / `DBX` 等地址；`Acme.Product/src/Acme.PlcComm/Siemens/SiemensS7Client.cs` 已显式处理位读写与心跳地址；`Acme.Product/tests/Acme.Product.Tests/PlcComm/SiemensS7ClientBehaviorTests.cs` 覆盖心跳地址、位读掩码、位写读改写与长度计算
-- P0-6 证据：`Acme.Product/src/Acme.PlcComm/Omron/FinsFrameBuilder.cs` 已按位/字访问分别计算写入长度；`Acme.Product/tests/Acme.Product.Tests/PlcComm/FrameCodecTests.cs` 覆盖 FINS 位写/字写长度与异常输入
+- P0-1 证据：`ClearVision.Product/src/ClearVision.PlcComm/Core/PlcBaseClient.cs` 已增加重复断开保护；`ClearVision.Product/tests/ClearVision.Product.Tests/PlcComm/PlcBaseClientBehaviorTests.cs` 覆盖 `DisconnectAsync`/`Dispose` 资源释放与重复调用场景
+- P0-2 / P0-3 证据：`ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/PlcCommunicationOperatorBase.cs` 已统一走 `ByteTransform` 且 `ReadAsync(address, length)` 固定按“元素个数”读取；`ClearVision.Product/tests/ClearVision.Product.Tests/PlcComm/PlcCommunicationOperatorBaseBehaviorTests.cs` 覆盖大端/小端 `Bool`、`Word`、`DWord`、`Float` 编解码与长度语义
+- P0-4 / P0-5 证据：`ClearVision.Product/src/ClearVision.PlcComm/Siemens/S7AddressParser.cs` 已支持 `MW0` / `DBX` 等地址；`ClearVision.Product/src/ClearVision.PlcComm/Siemens/SiemensS7Client.cs` 已显式处理位读写与心跳地址；`ClearVision.Product/tests/ClearVision.Product.Tests/PlcComm/SiemensS7ClientBehaviorTests.cs` 覆盖心跳地址、位读掩码、位写读改写与长度计算
+- P0-6 证据：`ClearVision.Product/src/ClearVision.PlcComm/Omron/FinsFrameBuilder.cs` 已按位/字访问分别计算写入长度；`ClearVision.Product/tests/ClearVision.Product.Tests/PlcComm/FrameCodecTests.cs` 覆盖 FINS 位写/字写长度与异常输入
 
 > 注：以上闭环基于代码级回归、协议帧/半包模拟与单元测试完成；真机兼容性验证仍按文档后续“真机验证里程碑”推进，但不再阻塞阶段 A 的 Correctness 收口。
 
@@ -222,12 +222,12 @@
 
 ### 回填证据（2026-03-07）
 
-- 回归命令：`dotnet test Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj --filter "FullyQualifiedName~PlcComm" --no-restore`
+- 回归命令：`dotnet test ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj --filter "FullyQualifiedName~PlcComm" --no-restore`
 - 回归结果：`48` 通过，`0` 失败
-- P1-1 证据：`Acme.Product/src/Acme.PlcComm/Core/PlcBaseClient.cs` 提供统一 `ReadExactAsync`；`Acme.Product/src/Acme.PlcComm/Mitsubishi/MitsubishiMcClient.cs` 与 `Acme.Product/src/Acme.PlcComm/Omron/OmronFinsClient.cs` 的响应读取点已全部切换；`Acme.Product/tests/Acme.Product.Tests/PlcComm/HalfPacketIntegrationTests.cs` 覆盖 `MC Write`、`MC Read`、`FINS Write`、`FINS Read` 的分片响应场景
-- P1-3 证据：`Acme.Product/src/Acme.PlcComm/Core/PlcBaseClient.cs` 的退避计算已使用 `Min(计算值, MaxRetryInterval)`；`Acme.Product/tests/Acme.Product.Tests/PlcComm/PlcBaseClientBehaviorTests.cs` 新增指数退避与固定间隔两组 `MaxRetryInterval` 钳制回归
-- P1-4 证据：`Acme.Product/src/Acme.PlcComm/Core/PlcBaseClient.cs` 已在连接失败、重连失败、读写失败、未连接读写场景统一触发 `RaiseError`；`Acme.Product/tests/Acme.Product.Tests/PlcComm/PlcBaseClientBehaviorTests.cs` 覆盖 `Read` / `Write` 失败、`PLC未连接` 场景的 `ErrorOccurred` 上抛
-- 额外修正：`Acme.Product/src/Acme.PlcComm/Mitsubishi/MitsubishiMcClient.cs` 已修复 MC 读响应 `dataLength` 取值偏移错误，避免分片读取时吞掉 payload
+- P1-1 证据：`ClearVision.Product/src/ClearVision.PlcComm/Core/PlcBaseClient.cs` 提供统一 `ReadExactAsync`；`ClearVision.Product/src/ClearVision.PlcComm/Mitsubishi/MitsubishiMcClient.cs` 与 `ClearVision.Product/src/ClearVision.PlcComm/Omron/OmronFinsClient.cs` 的响应读取点已全部切换；`ClearVision.Product/tests/ClearVision.Product.Tests/PlcComm/HalfPacketIntegrationTests.cs` 覆盖 `MC Write`、`MC Read`、`FINS Write`、`FINS Read` 的分片响应场景
+- P1-3 证据：`ClearVision.Product/src/ClearVision.PlcComm/Core/PlcBaseClient.cs` 的退避计算已使用 `Min(计算值, MaxRetryInterval)`；`ClearVision.Product/tests/ClearVision.Product.Tests/PlcComm/PlcBaseClientBehaviorTests.cs` 新增指数退避与固定间隔两组 `MaxRetryInterval` 钳制回归
+- P1-4 证据：`ClearVision.Product/src/ClearVision.PlcComm/Core/PlcBaseClient.cs` 已在连接失败、重连失败、读写失败、未连接读写场景统一触发 `RaiseError`；`ClearVision.Product/tests/ClearVision.Product.Tests/PlcComm/PlcBaseClientBehaviorTests.cs` 覆盖 `Read` / `Write` 失败、`PLC未连接` 场景的 `ErrorOccurred` 上抛
+- 额外修正：`ClearVision.Product/src/ClearVision.PlcComm/Mitsubishi/MitsubishiMcClient.cs` 已修复 MC 读响应 `dataLength` 取值偏移错误，避免分片读取时吞掉 payload
 
 ## 阶段 C：工程化补齐（P2，建议 1-2 周）
 
@@ -242,15 +242,15 @@
 
 ### 阶段验收标准
 
-1. `Acme.PlcComm` 至少具备协议层 + 客户端层 + 算子层三层自动化回归。
+1. `ClearVision.PlcComm` 至少具备协议层 + 客户端层 + 算子层三层自动化回归。
 2. 关键缺陷（P0/P1）有对应测试用例防回归。
 3. 文档与行为一致，无“参数存在但无效”的对外语义偏差。
 
 ### 阶段进展（2026-03-07）
-- [x] 新增 `Acme.Product/tests/Acme.Product.Tests/PlcComm/PlcCommunicationOperatorIntegrationTests.cs`
+- [x] 新增 `ClearVision.Product/tests/ClearVision.Product.Tests/PlcComm/PlcCommunicationOperatorIntegrationTests.cs`
 - [x] 已覆盖 `MC Read` / `MC Write` / `FINS Read` / `FINS Write` 的算子级端到端链路
 - [ ] `SiemensS7CommunicationOperator` 的算子级端到端集成仍待补齐
-- 回归命令：`dotnet test Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj --filter "FullyQualifiedName~PlcComm" --no-restore`
+- 回归命令：`dotnet test ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj --filter "FullyQualifiedName~PlcComm" --no-restore`
 - 回归结果：`48` 通过，`0` 失败
 
 ---
@@ -304,7 +304,7 @@
 
 ## 13. 当前基线记录
 
-1. 构建验证：`dotnet build Acme.Product/src/Acme.PlcComm/Acme.PlcComm.csproj` 成功。
+1. 构建验证：`dotnet build ClearVision.Product/src/ClearVision.PlcComm/ClearVision.PlcComm.csproj` 成功。
 2. 当前状态：阶段 A（P0 Correctness）与阶段 B（P1 Reliability）均已完成代码与测试收口，后续主线转入阶段 C / 真机联调。
 3. 测试现状：当前 PLC 专项回归已包含 `AddressParserTests`、`FrameCodecTests`、`HalfPacketIntegrationTests`、`PlcBaseClientBehaviorTests`、`PlcClientFactoryTests`、`SiemensS7ClientBehaviorTests`、`PlcCommunicationOperatorBaseBehaviorTests`、`PlcCommunicationOperatorIntegrationTests`，共 `48` 个用例。
 
@@ -320,14 +320,14 @@
 
 ## 附录 A：关键代码定位索引
 
-- `Acme.Product/src/Acme.PlcComm/Core/PlcBaseClient.cs`
-- `Acme.Product/src/Acme.PlcComm/Core/PlcAddress.cs`
-- `Acme.Product/src/Acme.PlcComm/Siemens/S7AddressParser.cs`
-- `Acme.Product/src/Acme.PlcComm/Siemens/SiemensS7Client.cs`
-- `Acme.Product/src/Acme.PlcComm/Mitsubishi/MitsubishiMcClient.cs`
-- `Acme.Product/src/Acme.PlcComm/Omron/FinsFrameBuilder.cs`
-- `Acme.Product/src/Acme.PlcComm/Omron/OmronFinsClient.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/PlcCommunicationOperatorBase.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/SiemensS7CommunicationOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/MitsubishiMcCommunicationOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/OmronFinsCommunicationOperator.cs`
+- `ClearVision.Product/src/ClearVision.PlcComm/Core/PlcBaseClient.cs`
+- `ClearVision.Product/src/ClearVision.PlcComm/Core/PlcAddress.cs`
+- `ClearVision.Product/src/ClearVision.PlcComm/Siemens/S7AddressParser.cs`
+- `ClearVision.Product/src/ClearVision.PlcComm/Siemens/SiemensS7Client.cs`
+- `ClearVision.Product/src/ClearVision.PlcComm/Mitsubishi/MitsubishiMcClient.cs`
+- `ClearVision.Product/src/ClearVision.PlcComm/Omron/FinsFrameBuilder.cs`
+- `ClearVision.Product/src/ClearVision.PlcComm/Omron/OmronFinsClient.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/PlcCommunicationOperatorBase.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/SiemensS7CommunicationOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MitsubishiMcCommunicationOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/OmronFinsCommunicationOperator.cs`

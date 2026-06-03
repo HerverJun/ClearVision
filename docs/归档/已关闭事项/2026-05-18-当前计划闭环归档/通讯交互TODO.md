@@ -10,13 +10,13 @@
 
 ## 代码现状复核
 
-Desktop 端已经具备“中央枢纽”的基础骨架。`Acme.Product.Desktop` 目标框架是 `net8.0-windows`，引用了 `Microsoft.Web.WebView2`，同时通过 `FrameworkReference Include="Microsoft.AspNetCore.App"` 内嵌了 ASP.NET Core；`Program.cs` 中直接 `WebApplication.CreateBuilder()`，配置 Kestrel、静态资源、认证中间件、健康检查、业务 API、分析接口和检查事件 SSE 端点。这说明 Studio 端**不需要另起一个旁路服务**，而是直接在现有 Desktop 后端里加一个 Station 入站 Hub 就够了。
+Desktop 端已经具备“中央枢纽”的基础骨架。`ClearVision.Product.Desktop` 目标框架是 `net8.0-windows`，引用了 `Microsoft.Web.WebView2`，同时通过 `FrameworkReference Include="Microsoft.AspNetCore.App"` 内嵌了 ASP.NET Core；`Program.cs` 中直接 `WebApplication.CreateBuilder()`，配置 Kestrel、静态资源、认证中间件、健康检查、业务 API、分析接口和检查事件 SSE 端点。这说明 Studio 端**不需要另起一个旁路服务**，而是直接在现有 Desktop 后端里加一个 Station 入站 Hub 就够了。
 
 不过，Desktop 现在的 Web 服务是**明确偏“内嵌本机 UI”场景**的，而不是面向局域网边缘节点的。`Program.cs` 现在用的是 `options.ListenLocalhost(_webPort)`，CORS 判断逻辑也只接受 loopback 主机名或 loopback IP，日志里输出的也是 `http://localhost:{port}`。这意味着你不能简单把现有服务“顺手开放到 LAN”就结束，还必须补上**配置化监听、机器鉴权、边缘节点接入隔离**。这也是 Kimi 说“把 localhost 改成 0.0.0.0”还不够完整的地方。
 
 Studio 前端到后端的实时模式，你其实已经有一个很值得复用的实现参照：`InspectionEventEndpoints.cs` 用 SSE 暴露 `/api/inspection/realtime/{projectId}/events`，支持 `Last-Event-ID` 重放、基于 `Channel` 的流式发送、以及每 30 秒一次心跳保活。这个模式非常适合被复用到“中央监控大屏”上。也就是说，**Station 到 Studio 用 SignalR，Studio 到 WebView2 页面继续走 REST + SSE**，这样你只需要新增一层“站点事件总线”，而不是把整套前后端通信一起重写。
 
-Station 端当前则非常清晰地还是“本地自治运行器”。`Acme.Product.Station` 的 `Program.cs` 只注册了 `RuntimeHost`、`StationLocalSettingsStore`、`StationSiteProfileStore` 和主窗体；项目文件只引用了 Hosting 和 Logging 包，没有 SignalR Client，也没有任何 ASP.NET 或网络客户端依赖；`MainForm.cs` 里 `BindRuntimeEvents()` 也是把 `_runtimeHost.SnapshotChanged` 和 `_runtimeHost.ResultAvailable` 仅仅绑定到本地 UI 刷新。这个现状很适合做“**加一个 HostedService 订阅事件并出站同步**”，而不适合做“把 MainForm 继续缝成一个大而全控制器”。
+Station 端当前则非常清晰地还是“本地自治运行器”。`ClearVision.Product.Station` 的 `Program.cs` 只注册了 `RuntimeHost`、`StationLocalSettingsStore`、`StationSiteProfileStore` 和主窗体；项目文件只引用了 Hosting 和 Logging 包，没有 SignalR Client，也没有任何 ASP.NET 或网络客户端依赖；`MainForm.cs` 里 `BindRuntimeEvents()` 也是把 `_runtimeHost.SnapshotChanged` 和 `_runtimeHost.ResultAvailable` 仅仅绑定到本地 UI 刷新。这个现状很适合做“**加一个 HostedService 订阅事件并出站同步**”，而不适合做“把 MainForm 继续缝成一个大而全控制器”。
 
 运行时抽象层给了你非常好的起点，但也暴露了两个要主动规避的坑。好处是：`RuntimeNormalizedResult` 已经包含运行号、包信息、图像 ID、检测结果、耗时、诊断信息、时间戳和主输出；`RuntimeHostSnapshot` 也已经带了 `SessionOkCount`、`SessionNgCount`、`SessionErrorCount`；`StationLocalSettings` 还带着 `StationId` 与 `LineName`。坑在于：`RuntimeNormalizedResult.PrimaryOutputs` 是 `Dictionary<string, object?>`，而 `OutputImageBytes` / `SourceImageBytes` 被 `[JsonIgnore]` 排除了，所以它**适合做本地运行时对象，不适合不经裁剪直接作为跨节点协议**。
 
@@ -44,8 +44,8 @@ Station 端当前则非常清晰地还是“本地自治运行器”。`Acme.Pro
 
 **改动建议**
 
-- 在 `Acme.Product/src/Acme.Product.Runtime.Abstractions/` 下新增一个 `Remote/` 或 `StationSync/` 目录。
-- **不要新建单独的 `Acme.Product.Network` 项目作为第一步**；对你这个仓库，最快路径是先把同步 DTO 也放在已有的 `Runtime.Abstractions` 里，因为它本来就是 Runtime / Station 共享抽象层。
+- 在 `ClearVision.Product/src/ClearVision.Product.Runtime.Abstractions/` 下新增一个 `Remote/` 或 `StationSync/` 目录。
+- **不要新建单独的 `ClearVision.Product.Network` 项目作为第一步**；对你这个仓库，最快路径是先把同步 DTO 也放在已有的 `Runtime.Abstractions` 里，因为它本来就是 Runtime / Station 共享抽象层。
 - 新增以下 DTO：
   - `StationRegistrationDto`
   - `StationHeartbeatDto`
@@ -74,9 +74,9 @@ Station 端当前则非常清晰地还是“本地自治运行器”。`Acme.Pro
 
 **改动建议**
 
-- 在 `Acme.Product.Desktop.csproj` 里新增：
+- 在 `ClearVision.Product.Desktop.csproj` 里新增：
   - `Microsoft.AspNetCore.SignalR.Protocols.MessagePack`
-- 在 `Acme.Product/src/Acme.Product.Desktop/` 下新增：
+- 在 `ClearVision.Product/src/ClearVision.Product.Desktop/` 下新增：
   - `Hubs/StationHub.cs`
   - `Services/StationRegistryService.cs`
   - `Services/StationTelemetryBuffer.cs`
@@ -131,10 +131,10 @@ Station 端当前则非常清晰地还是“本地自治运行器”。`Acme.Pro
 
 **改动建议**
 
-- 在 `Acme.Product.Station.csproj` 增加：
+- 在 `ClearVision.Product.Station.csproj` 增加：
   - `Microsoft.AspNetCore.SignalR.Client`
   - `Microsoft.AspNetCore.SignalR.Protocols.MessagePack`
-- 在 `Acme.Product/src/Acme.Product.Station/` 下新增：
+- 在 `ClearVision.Product/src/ClearVision.Product.Station/` 下新增：
   - `Sync/StationSyncOptions.cs`
   - `Sync/StationSyncHostedService.cs`
   - `Sync/StationHubClient.cs`

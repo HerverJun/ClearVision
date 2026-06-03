@@ -39,7 +39,7 @@ updated: "2026-04-15"
 
 | 类别 | 当前口径 | 文档证据 | 自动化/回归入口 | 当前结论 | 缺口 |
 | --- | --- | --- | --- | --- | --- |
-| `Texture` | Laws/GLCM 两类纹理特征在实验室样本下具备直接测试和专项性能验收入口。 | `算子资料/算子名片/LawsTextureFilter.md`；`算子资料/算子名片/GlcmTexture.md` | `scripts/run-dotnet-test-serial.ps1`（`GlcmTextureOperatorTests,LawsTextureFilterOperatorTests`）；`Acme.Product/tests/Acme.Product.Tests/Integration/Phase2SpecializedPerformanceAcceptanceTests.cs` | [x] 不入池 | 当前实验室口径下已形成最小复现与性能边界，无新增需 Week6 承接的问题。 |
+| `Texture` | Laws/GLCM 两类纹理特征在实验室样本下具备直接测试和专项性能验收入口。 | `算子资料/算子名片/LawsTextureFilter.md`；`算子资料/算子名片/GlcmTexture.md` | `scripts/run-dotnet-test-serial.ps1`（`GlcmTextureOperatorTests,LawsTextureFilterOperatorTests`）；`ClearVision.Product/tests/ClearVision.Product.Tests/Integration/Phase2SpecializedPerformanceAcceptanceTests.cs` | [x] 不入池 | 当前实验室口径下已形成最小复现与性能边界，无新增需 Week6 承接的问题。 |
 | `Analysis` | `DistanceTransform` 具备直接测试入口，当前实验室口径下无新增可信度阻塞。 | `算子资料/算子名片/DistanceTransform.md` | `scripts/run-dotnet-test-serial.ps1`（`DistanceTransformOperatorTests`） | [x] 不入池 | 保留为稳定能力项。 |
 | `AI Inspection` | `DetectionSequenceJudge` 已有直接测试和场景模板绑定，当前实验室口径下无新增规则边界问题。 | `算子资料/算子名片/DetectionSequenceJudge.md` | `scripts/run-dotnet-test-serial.ps1`（`DetectionSequenceJudgeOperatorTests`） | [x] 不入池 | 场景专项能力当前稳定。 |
 

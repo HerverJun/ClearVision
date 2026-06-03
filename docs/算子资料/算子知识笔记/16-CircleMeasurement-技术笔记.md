@@ -1,10 +1,10 @@
 # CircleMeasurement 技术笔记
 
-> **对应算子**: `CircleMeasurementOperator`  
-> **OperatorType**: `OperatorType.CircleMeasurement`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/CircleMeasurementOperator.cs`  
-> **相关算子**: [07-SubpixelEdgeDetection-技术笔记](./07-SubpixelEdgeDetection-技术笔记.md)、[15-CaliperTool-技术笔记](./15-CaliperTool-技术笔记.md)、[17-LineMeasurement-技术笔记](./17-LineMeasurement-技术笔记.md)  
-> **阅读前置**: 圆的基本概念、参数空间、投票机制  
+> **对应算子**: `CircleMeasurementOperator`
+> **OperatorType**: `OperatorType.CircleMeasurement`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CircleMeasurementOperator.cs`
+> **相关算子**: [07-SubpixelEdgeDetection-技术笔记](./07-SubpixelEdgeDetection-技术笔记.md)、[15-CaliperTool-技术笔记](./15-CaliperTool-技术笔记.md)、[17-LineMeasurement-技术笔记](./17-LineMeasurement-技术笔记.md)
+> **阅读前置**: 圆的基本概念、参数空间、投票机制
 > **核心来源**: OpenCV `HoughCircles` 文档、Gonzalez & Woods《Digital Image Processing》、本仓库当前实现
 
 ---
@@ -162,7 +162,7 @@ b ↑
 
 维度说明：
 ├── a: 圆心x坐标，范围 [0, image_width]
-├── b: 圆心y坐标，范围 [0, image_height]  
+├── b: 圆心y坐标，范围 [0, image_height]
 └── r: 圆半径，   范围 [MinRadius, MaxRadius]
 
 数组元素值 = 该 (a, b, r) 组合获得的票数
@@ -227,13 +227,13 @@ Accumulator:
 Dp = 1.0 (默认):
     累加器与图像同分辨率
     精度高，但计算量大
-    
+
     图像: 100×100  →  累加器: 100×100×(半径范围)
 
 Dp = 2.0:
     累加器分辨率减半
     计算快，但精度降低
-    
+
     图像: 100×100  →  累加器: 50×50×(半径范围)
 
 比喻：就像用粗筛子和细筛子筛沙子
@@ -531,7 +531,7 @@ PCB局部图像:
 - `Cv2.HoughCircles`
 - 对检测到的圆做绘制和结果输出
 
-也就是说，当前实现核心还是霍夫圆检测路径，而不是完整的椭圆拟合双分支实现。  
+也就是说，当前实现核心还是霍夫圆检测路径，而不是完整的椭圆拟合双分支实现。
 此外，代码里还会额外计算一个 `Circularity`，但这个圆度是通过 ROI 内再次做边缘与轮廓分析估计出来的，并不是 Hough 直接给出的原生结果。
 
 ---

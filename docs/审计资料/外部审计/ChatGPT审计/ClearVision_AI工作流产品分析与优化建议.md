@@ -777,8 +777,8 @@ AI 生成受控化
 
 - `README.md`：项目定位为 .NET 8 工业视觉检测与流程编排项目，包含桌面端、算子运行时、OperatorLibrary、质量评测与文档体系。
 - `docs/项目总览.md`：确认 155 个正式算子、Operator 元数据体系、质量矩阵与当前工程结构。
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/AiFlowGenerationService.cs`：确认 AI 生成服务包含多轮上下文、模板优先、附件、多模态能力判断、Validator、Dry-Run、推荐模板、待确认参数和缺失资源。
-- `Acme.Product/src/Acme.Product.Core/DTOs/AiGenerationDto.cs`：确认请求与响应结构包含 Description、AdditionalContext、SessionId、ExistingFlowJson、Attachments、Mode、DebugPrompt、DryRunResult、RecommendedTemplate、PendingParameters、MissingResources 等。
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/AiFlowValidator.cs`：确认校验逻辑覆盖算子类型、端口、类型兼容、环路、重复输入、参数范围、默认值、源算子和输出算子检查。
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowGenerationService.cs`：确认 AI 生成服务包含多轮上下文、模板优先、附件、多模态能力判断、Validator、Dry-Run、推荐模板、待确认参数和缺失资源。
+- `ClearVision.Product/src/ClearVision.Product.Core/DTOs/AiGenerationDto.cs`：确认请求与响应结构包含 Description、AdditionalContext、SessionId、ExistingFlowJson、Attachments、Mode、DebugPrompt、DryRunResult、RecommendedTemplate、PendingParameters、MissingResources 等。
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowValidator.cs`：确认校验逻辑覆盖算子类型、端口、类型兼容、环路、重复输入、参数范围、默认值、源算子和输出算子检查。
 - `quality/evals/reports/operator_quality_matrix.md`：确认算子证据体系较完整，但真实工业现场验证仍需补强。
 - `docs/面试/面试资产库/AI生成链路图.md`：确认当前 AI 边界被定义为 Prompt / 模板 / LLM / Validator / DryRun / 人工确认 / 应用的闭环。

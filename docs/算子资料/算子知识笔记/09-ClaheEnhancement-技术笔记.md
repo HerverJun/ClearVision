@@ -1,10 +1,10 @@
 # ClaheEnhancement 技术笔记
 
-> **对应算子**: `ClaheEnhancementOperator`  
-> **OperatorType**: `OperatorType.ClaheEnhancement`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/ClaheEnhancementOperator.cs`  
-> **相关算子**: [ColorConversion](./08-ColorConversion-技术笔记.md)、[AdaptiveThreshold](./05-AdaptiveThreshold-技术笔记.md)、[CannyEdge](./06-CannyEdge-技术笔记.md)  
-> **阅读前置**: 先知道直方图均衡化和局部对比度增强的大意即可  
+> **对应算子**: `ClaheEnhancementOperator`
+> **OperatorType**: `OperatorType.ClaheEnhancement`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ClaheEnhancementOperator.cs`
+> **相关算子**: [ColorConversion](./08-ColorConversion-技术笔记.md)、[AdaptiveThreshold](./05-AdaptiveThreshold-技术笔记.md)、[CannyEdge](./06-CannyEdge-技术笔记.md)
+> **阅读前置**: 先知道直方图均衡化和局部对比度增强的大意即可
 > **核心来源**: ClearVision 当前实现、OpenCV CLAHE、Zuiderveld 1994
 
 ---
@@ -61,7 +61,7 @@
     │╱                                        ╰────────────
     └────┬────┬────┬────┬────┬────┬────┬────┬────┬────→ 灰度值
          0   32   64   96  128  160  192  224  255
-              
+
          像素均匀分布在整个灰度范围
 ```
 
@@ -212,7 +212,7 @@
                        ┼
                    块(i+1,j+1)
 
-目标像素值 = w1×块(i,j)的值 + w2×块(i,j+1)的值 
+目标像素值 = w1×块(i,j)的值 + w2×块(i,j+1)的值
            + w3×块(i+1,j)的值 + w4×块(i+1,j+1)的值
 ```
 
@@ -225,14 +225,14 @@
 
 亮度
   ↑
-255│        ╭────╮                      
-   │       ╱      ╲                     
-128│──────╱────────╲────────────────    
-   │     ╱          ╲                   
-  0│────╱────────────╲────────────────  
+255│        ╭────╮
+   │       ╱      ╲
+128│──────╱────────╲────────────────
+   │     ╱          ╲
+  0│────╱────────────╲────────────────
    └────┬────┬────┬────┬────┬────┬──→ x
        块0  边界  块1  边界  块2  边界
-       
+
 块与块之间亮度平滑过渡，没有突变
 ```
 
@@ -266,7 +266,7 @@
 均衡化后：
 50 → 0 (黑)
 51 → 85
-52 → 170  
+52 → 170
 53 → 255 (白)
 
 结果：轻微的噪声变成了强烈的黑白斑块！
@@ -574,17 +574,17 @@ CLAHE 可以提升局部对比，但不等于真正解决了成像不均、阴�
 
 ### 常见误区
 
-- **误区一**：CLAHE 一定比普通均衡化好  
+- **误区一**：CLAHE 一定比普通均衡化好
   它更稳一些，但不代表在所有场景下都更适合。
-  
-- **误区二**：增强越强越容易检测  
+
+- **误区二**：增强越强越容易检测
   过度增强会先把误检养大。
 
 ---
 
 ## 13. 专业来源与延伸阅读
 
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/ClaheEnhancementOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ClaheEnhancementOperator.cs`
 - ClearVision 本地资料: `../算子手册.md`、`../算子名片/ClaheEnhancement.md`
 - OpenCV Documentation: *CLAHE*
 - Karel Zuiderveld, *Contrast Limited Adaptive Histogram Equalization*, Graphics Gems IV, 1994

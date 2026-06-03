@@ -28,17 +28,17 @@
 
 | 文件 / 类 / 函数 | 当前作用 | 对方案 A 的意义 | 本次建议 |
 |---|---|---|---|
-| `Acme.Product.Core/Cameras/ICamera.cs` | 已有单帧采集与连续采集抽象 | 是连续流的上层统一入口 | 保留，必要时增加 metadata / frame event 扩展 |
-| `Acme.Product.Core/Cameras/IIndustrialCamera.cs` | 支持工业相机控制、触发模式与帧事件 | 是 free-run / internal trigger 与 camera ts 的关键接口 | 增加“帧元数据 / 时间戳”暴露能力 |
-| `Acme.Product.Core/Cameras/CameraTriggerMode.cs` | 触发模式抽象 | 是单帧 / 连续模式映射边界 | 不建议直接破坏现义，建议新增独立 Continuous 配置层 |
-| `Acme.Product.Infrastructure/Cameras/CameraFrameStreamCoordinator.cs` | 已有共享 Producer、预览 session、帧序号、latest frame 发布 | 是连续流共享的最佳现有骨架 | 扩展为 latest + history，而不是只保留 latest |
-| `Acme.Product.Infrastructure/Services/ImageAcquisitionService.cs` | 已有 `AcquireFromCameraAsync` 和 frame-driven 获取共享帧逻辑 | 是“把连续帧注入现有 flow”最自然的服务层接入点 | 增加 `AcquireFromEnvelopeAsync` / `ConvertEnvelopeToImageAsync` |
-| `Acme.Product.Infrastructure/Models/PipelineFrame.cs` | 当前是流程内部图像载体 | 是把连续帧桥接到现有 operator 链的关键承接对象 | 扩展 ts / seq / source metadata，但避免成为原始帧缓冲本体 |
-| `Acme.Product.Infrastructure/Operators/ImageAcquisitionOperator.cs` | 当前从相机取图给后续算子 | 是兼容旧 flow 模板的核心位置 | 支持“若上下文已有外部注入帧，则直接消费” |
-| `Acme.Product.Infrastructure/Services/InspectionWorker.cs` | 当前按 cycle 驱动流程执行 | 是 runtime switch 与 shadow / primary 模式切换的理想入口 | 保留旧逻辑，新增连续模式分支或旁路 worker |
-| `Acme.Product.Infrastructure/Operators/DeepLearningOperator.cs` | 单帧模型推理 | 连续模式中仍复用，不必重写 | 复用，必要时增加异步调度统计 |
-| `Acme.Product.Infrastructure/Operators/DetectionSequenceJudgeOperator.cs` | 单帧线序判断 | 仍然是最终业务规则核心 | 保留原逻辑；外层新增 track 级多帧共识层 |
-| `Acme.Product.Infrastructure/Services/PreviewMetricsAnalyzer.cs` | 已有预览指标分析能力 | 可扩展为连续模式现场调试面板底层数据 | 增加 queue / latency / fps / drop 的埋点聚合 |
+| `ClearVision.Product.Core/Cameras/ICamera.cs` | 已有单帧采集与连续采集抽象 | 是连续流的上层统一入口 | 保留，必要时增加 metadata / frame event 扩展 |
+| `ClearVision.Product.Core/Cameras/IIndustrialCamera.cs` | 支持工业相机控制、触发模式与帧事件 | 是 free-run / internal trigger 与 camera ts 的关键接口 | 增加“帧元数据 / 时间戳”暴露能力 |
+| `ClearVision.Product.Core/Cameras/CameraTriggerMode.cs` | 触发模式抽象 | 是单帧 / 连续模式映射边界 | 不建议直接破坏现义，建议新增独立 Continuous 配置层 |
+| `ClearVision.Product.Infrastructure/Cameras/CameraFrameStreamCoordinator.cs` | 已有共享 Producer、预览 session、帧序号、latest frame 发布 | 是连续流共享的最佳现有骨架 | 扩展为 latest + history，而不是只保留 latest |
+| `ClearVision.Product.Infrastructure/Services/ImageAcquisitionService.cs` | 已有 `AcquireFromCameraAsync` 和 frame-driven 获取共享帧逻辑 | 是“把连续帧注入现有 flow”最自然的服务层接入点 | 增加 `AcquireFromEnvelopeAsync` / `ConvertEnvelopeToImageAsync` |
+| `ClearVision.Product.Infrastructure/Models/PipelineFrame.cs` | 当前是流程内部图像载体 | 是把连续帧桥接到现有 operator 链的关键承接对象 | 扩展 ts / seq / source metadata，但避免成为原始帧缓冲本体 |
+| `ClearVision.Product.Infrastructure/Operators/ImageAcquisitionOperator.cs` | 当前从相机取图给后续算子 | 是兼容旧 flow 模板的核心位置 | 支持“若上下文已有外部注入帧，则直接消费” |
+| `ClearVision.Product.Infrastructure/Services/InspectionWorker.cs` | 当前按 cycle 驱动流程执行 | 是 runtime switch 与 shadow / primary 模式切换的理想入口 | 保留旧逻辑，新增连续模式分支或旁路 worker |
+| `ClearVision.Product.Infrastructure/Operators/DeepLearningOperator.cs` | 单帧模型推理 | 连续模式中仍复用，不必重写 | 复用，必要时增加异步调度统计 |
+| `ClearVision.Product.Infrastructure/Operators/DetectionSequenceJudgeOperator.cs` | 单帧线序判断 | 仍然是最终业务规则核心 | 保留原逻辑；外层新增 track 级多帧共识层 |
+| `ClearVision.Product.Infrastructure/Services/PreviewMetricsAnalyzer.cs` | 已有预览指标分析能力 | 可扩展为连续模式现场调试面板底层数据 | 增加 queue / latency / fps / drop 的埋点聚合 |
 | `线序检测/scenario-package-wire-sequence/template/terminal-wire-sequence.flow.template.json` | 当前线序模板流 | 证明现有业务 flow 仍然以 `ImageAcquisition -> DL -> Judge` 为核心 | 不建议复制一套 flow，建议通过 `ImageAcquisitionOperator` 做注入兼容 |
 
 ### ClearFrost 中需要吸收但不宜直接照搬的点
@@ -90,35 +90,35 @@ ClearFrost 的以下文件更适合拿来做“反例与经验对照”：
 
 | 文件 | 建议改动 | 风险等级 | 回归重点 |
 |---|---|---|---|
-| `Acme.Product.Core/Cameras/ICamera.cs` | 评估是否增加 metadata 相关异步回调签名；尽量后向兼容 | 中 | 所有相机实现是否受影响 |
-| `Acme.Product.Core/Cameras/IIndustrialCamera.cs` | 增加 frame metadata / device timestamp 能力 | 高 | 所有工业相机适配器实现 |
-| `Acme.Product.Core/Cameras/CameraTriggerMode.cs` | 不直接嵌入业务连续模式；最多补充更清晰的 free-run 映射注释 | 低 | 避免破坏现有枚举含义 |
-| `Acme.Product.Infrastructure/Cameras/CameraFrameStreamCoordinator.cs` | 增加 `FrameEnvelope` 发布、ring buffer、drop 统计 | 高 | 预览 session 与 frame-driven 现有行为 |
-| `Acme.Product.Infrastructure/Services/ImageAcquisitionService.cs` | 新增从 `FrameEnvelope` 到 `ImageDto/PipelineFrame` 的转换 | 中 | 旧 acquire path 是否仍完全可用 |
-| `Acme.Product.Infrastructure/Models/PipelineFrame.cs` | 增加 `Sequence/TimestampSource/TrackId/CorrelationId` 等 metadata | 中 | 引用计数、dispose 与 UI 预览兼容 |
-| `Acme.Product.Infrastructure/Operators/ImageAcquisitionOperator.cs` | 支持 `ExecutionContext.ProvidedFrame` 优先 | 高 | 所有既有 flow 必须零配置继续运行 |
-| `Acme.Product.Infrastructure/Services/InspectionWorker.cs` | 增加 `SingleFrame / Shadow / Primary` 分支与旁路 worker | 高 | worker 生命周期、退出与 cancel 语义 |
-| `Acme.Product.Infrastructure/Operators/DeepLearningOperator.cs` | 增加异步推理埋点和队列 trace id 透传 | 中 | 推理耗时与异常传播 |
-| `Acme.Product.Infrastructure/Operators/DetectionSequenceJudgeOperator.cs` | 原逻辑不大改，仅补 metadata 输出 | 低 | 单帧判定行为不能变化 |
-| `Acme.Product.Infrastructure/Services/PreviewMetricsAnalyzer.cs` | 扩展连续模式指标项 | 低 | UI / preview 性能 |
+| `ClearVision.Product.Core/Cameras/ICamera.cs` | 评估是否增加 metadata 相关异步回调签名；尽量后向兼容 | 中 | 所有相机实现是否受影响 |
+| `ClearVision.Product.Core/Cameras/IIndustrialCamera.cs` | 增加 frame metadata / device timestamp 能力 | 高 | 所有工业相机适配器实现 |
+| `ClearVision.Product.Core/Cameras/CameraTriggerMode.cs` | 不直接嵌入业务连续模式；最多补充更清晰的 free-run 映射注释 | 低 | 避免破坏现有枚举含义 |
+| `ClearVision.Product.Infrastructure/Cameras/CameraFrameStreamCoordinator.cs` | 增加 `FrameEnvelope` 发布、ring buffer、drop 统计 | 高 | 预览 session 与 frame-driven 现有行为 |
+| `ClearVision.Product.Infrastructure/Services/ImageAcquisitionService.cs` | 新增从 `FrameEnvelope` 到 `ImageDto/PipelineFrame` 的转换 | 中 | 旧 acquire path 是否仍完全可用 |
+| `ClearVision.Product.Infrastructure/Models/PipelineFrame.cs` | 增加 `Sequence/TimestampSource/TrackId/CorrelationId` 等 metadata | 中 | 引用计数、dispose 与 UI 预览兼容 |
+| `ClearVision.Product.Infrastructure/Operators/ImageAcquisitionOperator.cs` | 支持 `ExecutionContext.ProvidedFrame` 优先 | 高 | 所有既有 flow 必须零配置继续运行 |
+| `ClearVision.Product.Infrastructure/Services/InspectionWorker.cs` | 增加 `SingleFrame / Shadow / Primary` 分支与旁路 worker | 高 | worker 生命周期、退出与 cancel 语义 |
+| `ClearVision.Product.Infrastructure/Operators/DeepLearningOperator.cs` | 增加异步推理埋点和队列 trace id 透传 | 中 | 推理耗时与异常传播 |
+| `ClearVision.Product.Infrastructure/Operators/DetectionSequenceJudgeOperator.cs` | 原逻辑不大改，仅补 metadata 输出 | 低 | 单帧判定行为不能变化 |
+| `ClearVision.Product.Infrastructure/Services/PreviewMetricsAnalyzer.cs` | 扩展连续模式指标项 | 低 | UI / preview 性能 |
 | `线序检测/scenario-package-wire-sequence/template/terminal-wire-sequence.flow.template.json` | 原则上不改；如需显示标记仅补 scenario metadata | 低 | 模板兼容性 |
 
 ### 建议新增的文件与命名空间
 
 为避免把连续模式逻辑散落到现有类中，建议新增以下文件组：
 
-- `Acme.Product.Core/Streaming/FrameEnvelope.cs`
-- `Acme.Product.Core/Streaming/FrameTimestampSource.cs`
-- `Acme.Product.Core/Continuous/ContinuousInspectionMode.cs`
-- `Acme.Product.Core/Continuous/ContinuousInspectionConfig.cs`
-- `Acme.Product.Infrastructure/Streaming/FrameRingBuffer.cs`
-- `Acme.Product.Infrastructure/Continuous/ArrivalDetector.cs`
-- `Acme.Product.Infrastructure/Continuous/LightweightTracker.cs`
-- `Acme.Product.Infrastructure/Continuous/InferenceScheduler.cs`
-- `Acme.Product.Infrastructure/Continuous/TrackConsensusJudge.cs`
-- `Acme.Product.Infrastructure/Continuous/ContinuousInspectionWorker.cs`
-- `Acme.Product.Infrastructure/Replay/FrameReplayRecorder.cs`
-- `Acme.Product.Infrastructure/Diagnostics/ContinuousMetricsCollector.cs`
+- `ClearVision.Product.Core/Streaming/FrameEnvelope.cs`
+- `ClearVision.Product.Core/Streaming/FrameTimestampSource.cs`
+- `ClearVision.Product.Core/Continuous/ContinuousInspectionMode.cs`
+- `ClearVision.Product.Core/Continuous/ContinuousInspectionConfig.cs`
+- `ClearVision.Product.Infrastructure/Streaming/FrameRingBuffer.cs`
+- `ClearVision.Product.Infrastructure/Continuous/ArrivalDetector.cs`
+- `ClearVision.Product.Infrastructure/Continuous/LightweightTracker.cs`
+- `ClearVision.Product.Infrastructure/Continuous/InferenceScheduler.cs`
+- `ClearVision.Product.Infrastructure/Continuous/TrackConsensusJudge.cs`
+- `ClearVision.Product.Infrastructure/Continuous/ContinuousInspectionWorker.cs`
+- `ClearVision.Product.Infrastructure/Replay/FrameReplayRecorder.cs`
+- `ClearVision.Product.Infrastructure/Diagnostics/ContinuousMetricsCollector.cs`
 
 这个拆法的核心目的，是让连续模式成为**能够独立关闭、独立测试、独立回滚**的一条旁路能力，而不是把现有单帧路径侵入式改坏。
 
@@ -341,7 +341,7 @@ public interface ITrackConsensusJudge
 这是兼容旧 flow 的最关键改动点。
 
 ```csharp
-// 接入点：Acme.Product.Infrastructure.Operators.ImageAcquisitionOperator
+// 接入点：ClearVision.Product.Infrastructure.Operators.ImageAcquisitionOperator
 public async Task ExecuteAsync(OperatorContext context, CancellationToken ct)
 {
     if (context.TryGetValue("ProvidedFrameEnvelope", out FrameEnvelope envelope))
@@ -375,7 +375,7 @@ public enum ContinuousInspectionMode
 ```
 
 ```csharp
-// 接入点：Acme.Product.Infrastructure.Services.InspectionWorker
+// 接入点：ClearVision.Product.Infrastructure.Services.InspectionWorker
 public async Task RunAsync(InspectionBinding binding, CancellationToken ct)
 {
     if (binding.ContinuousInspection?.Mode == ContinuousInspectionMode.Disabled)

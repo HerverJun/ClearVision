@@ -140,9 +140,9 @@ auditor: "GPT-5.5 Pro"
 
 ### 源码路径
 
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/CaliperToolOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/IndustrialCaliperKernel.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/ImageProcessing/SubPixelEdgeDetector.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CaliperToolOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/IndustrialCaliperKernel.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/ImageProcessing/SubPixelEdgeDetector.cs`
 
 ### 正向发现
 
@@ -196,7 +196,7 @@ CaliperTool 可以作为“受控场景准工业试用”算子推进，尤其�
 
 ### 源码路径
 
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/TemplateMatchOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/TemplateMatchOperator.cs`
 
 ### 正向发现
 
@@ -249,11 +249,11 @@ TemplateMatchOperator 在固定尺度、低旋转、模板稳定场景中可按�
 
 ### 源码路径
 
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/PlanarMatchingOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/HomographyVerificationHelper.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/Features/FeatureMatchOperatorBase.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/Features/AkazeFeatureMatchOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/Features/OrbFeatureMatchOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/PlanarMatchingOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/HomographyVerificationHelper.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/Features/FeatureMatchOperatorBase.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/Features/AkazeFeatureMatchOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/Features/OrbFeatureMatchOperator.cs`
 
 ### 正向发现
 
@@ -314,7 +314,7 @@ Feature/PlanarMatching 链路已经是合格工程 baseline，A/B replay 改进�
 
 ### 源码路径
 
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/DeepLearningOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/DeepLearningOperator.cs`
 - `quality/tools/DeepLearningCocoImageInferenceRunner/Program.cs`
 - `quality/tools/DeepLearningDetectionDatasetRunner/Program.cs`
 - `quality/tools/DeepLearningRuntimeBenchmarkRunner/Program.cs`
@@ -618,14 +618,14 @@ DeepLearningOperator 可以声明“runtime 工程框架已成型，真实模型
 
 ### 核心源码
 
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/CaliperToolOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/IndustrialCaliperKernel.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/ImageProcessing/SubPixelEdgeDetector.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/TemplateMatchOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/PlanarMatchingOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/HomographyVerificationHelper.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/Features/FeatureMatchOperatorBase.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/Features/AkazeFeatureMatchOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/Features/OrbFeatureMatchOperator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/Operators/DeepLearningOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CaliperToolOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/IndustrialCaliperKernel.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/ImageProcessing/SubPixelEdgeDetector.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/TemplateMatchOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/PlanarMatchingOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/HomographyVerificationHelper.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/Features/FeatureMatchOperatorBase.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/Features/AkazeFeatureMatchOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/Features/OrbFeatureMatchOperator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/DeepLearningOperator.cs`
 

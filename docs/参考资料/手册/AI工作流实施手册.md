@@ -1,4 +1,6 @@
-# ClearVision AI 自然语言生成工程功能  完整开发实施指导文档
+# ClearVision AI 自然语言生成工程功能  完整开发实施指导文档
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -20,14 +22,14 @@
 ## 关键项目信息速查
 
 ### 技术栈
-- **桌面宿主**：WinForms + WebView2，入口：`Acme.Product.Desktop/Program.cs`
-- **后端**：C# .NET 8，领域核心层 `Acme.Product.Core`，基础设施层 `Acme.Product.Infrastructure`，应用层 `Acme.Product.Application`
-- **前端**：HTML5/JS/CSS3，运行于 WebView2，核心画布：`Acme.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js`
-- **通信**：WebView2 双向消息，消息定义在 `Acme.Product.Contracts/Messages/`
-- **序列化**：`ProjectJsonSerializer.cs`，DTO 位于 `Acme.Product.Application/DTOs/`
+- **桌面宿主**：WinForms + WebView2，入口：`ClearVision.Product.Desktop/Program.cs`
+- **后端**：C# .NET 8，领域核心层 `ClearVision.Product.Core`，基础设施层 `ClearVision.Product.Infrastructure`，应用层 `ClearVision.Product.Application`
+- **前端**：HTML5/JS/CSS3，运行于 WebView2，核心画布：`ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js`
+- **通信**：WebView2 双向消息，消息定义在 `ClearVision.Product.Contracts/Messages/`
+- **序列化**：`ProjectJsonSerializer.cs`，DTO 位于 `ClearVision.Product.Application/DTOs/`
 
 ### 算子注册位置（当前 61+ 个算子，以 OperatorFactory 实际注册数量为准）
-`Acme.Product.Infrastructure/Services/OperatorFactory.cs`（`InitializeDefaultOperators()` 方法，约第 90 行起）
+`ClearVision.Product.Infrastructure/Services/OperatorFactory.cs`（`InitializeDefaultOperators()` 方法，约第 90 行起）
 
 ### 前端画布关键 API（已存在）
 ```javascript
@@ -96,7 +98,7 @@ canvas.serialize()                       // 序列化当前画布为 JSON
 
 ### 0.1 确认现有消息通信模式
 
-在 `Acme.Product.Contracts/Messages/` 目录下，找到至少一个已有的消息定义文件，理解其结构模式。现有的消息通信流程大致如下：
+在 `ClearVision.Product.Contracts/Messages/` 目录下，找到至少一个已有的消息定义文件，理解其结构模式。现有的消息通信流程大致如下：
 
 **前端 → 后端**（JS 调用 C#）：
 ```javascript
@@ -117,7 +119,7 @@ await webView.CoreWebView2.ExecuteScriptAsync(
 
 ### 0.2 确认 NuGet 包
 
-检查 `Acme.Product.Infrastructure` 的 `.csproj` 文件，确认以下包（若无则在后续阶段添加）：
+检查 `ClearVision.Product.Infrastructure` 的 `.csproj` 文件，确认以下包（若无则在后续阶段添加）：
 - `System.Net.Http`（内置，.NET 8 默认包含）
 - `System.Text.Json`（内置）
 
@@ -138,7 +140,7 @@ await webView.CoreWebView2.ExecuteScriptAsync(
 }
 ```
 
-配置文件路径（桌面应用）：`Acme.Product.Desktop/appsettings.json`（若不存在则创建）。
+配置文件路径（桌面应用）：`ClearVision.Product.Desktop/appsettings.json`（若不存在则创建）。
 
 ---
 
@@ -149,10 +151,10 @@ await webView.CoreWebView2.ExecuteScriptAsync(
 
 ### 1.1 创建配置类
 
-**文件路径**：`Acme.Product.Infrastructure/AI/AiGenerationOptions.cs`
+**文件路径**：`ClearVision.Product.Infrastructure/AI/AiGenerationOptions.cs`
 
 ```csharp
-namespace Acme.Product.Infrastructure.AI;
+namespace ClearVision.Product.Infrastructure.AI;
 
 /// <summary>
 /// AI 工作流生成功能的配置选项
@@ -205,10 +207,10 @@ public class AiGenerationOptions
 
 ### 1.2 创建 AI 生成结果 DTO
 
-**文件路径**：`Acme.Product.Application/DTOs/AiGenerationDto.cs`
+**文件路径**：`ClearVision.Product.Application/DTOs/AiGenerationDto.cs`
 
 ```csharp
-namespace Acme.Product.Application.DTOs;
+namespace ClearVision.Product.Application.DTOs;
 
 /// <summary>
 /// AI 生成工作流的请求参数
@@ -314,12 +316,12 @@ public class AiGeneratedConnection
 
 ### 1.3 创建服务接口
 
-**文件路径**：`Acme.Product.Core/Services/IAiFlowGenerationService.cs`
+**文件路径**：`ClearVision.Product.Core/Services/IAiFlowGenerationService.cs`
 
 ```csharp
-using Acme.Product.Application.DTOs;
+using ClearVision.Product.Application.DTOs;
 
-namespace Acme.Product.Core.Services;
+namespace ClearVision.Product.Core.Services;
 
 /// <summary>
 /// AI 工作流生成服务接口
@@ -348,10 +350,10 @@ public interface IAiFlowValidator
 }
 ```
 
-**文件路径**：`Acme.Product.Core/Services/ValidationResult.cs`
+**文件路径**：`ClearVision.Product.Core/Services/ValidationResult.cs`
 
 ```csharp
-namespace Acme.Product.Core.Services;
+namespace ClearVision.Product.Core.Services;
 
 public class ValidationResult
 {
@@ -371,10 +373,10 @@ public class ValidationResult
 
 ### 1.4 创建 WebView2 消息契约
 
-**文件路径**：`Acme.Product.Contracts/Messages/AiGenerationMessages.cs`
+**文件路径**：`ClearVision.Product.Contracts/Messages/AiGenerationMessages.cs`
 
 ```csharp
-namespace Acme.Product.Contracts.Messages;
+namespace ClearVision.Product.Contracts.Messages;
 
 /// <summary>
 /// 前端 → 后端：请求 AI 生成工作流
@@ -436,14 +438,14 @@ public record GenerateFlowProgress
 
 ### 2.1 构建 System Prompt（最关键的部分）
 
-**文件路径**：`Acme.Product.Infrastructure/AI/PromptBuilder.cs`
+**文件路径**：`ClearVision.Product.Infrastructure/AI/PromptBuilder.cs`
 
 System Prompt 分三部分：角色定义、算子目录、输出格式规范。
 
 ```csharp
-using Acme.Product.Core.Services;
+using ClearVision.Product.Core.Services;
 
-namespace Acme.Product.Infrastructure.AI;
+namespace ClearVision.Product.Infrastructure.AI;
 
 /// <summary>
 /// 构建发送给 AI 的 System Prompt
@@ -800,7 +802,7 @@ public class PromptBuilder
 **重要说明**：`_operatorFactory.GetAllMetadata()` 方法可能需要在 `IOperatorFactory` 接口中新增。请检查现有的 `IOperatorFactory` 接口定义，如果没有返回全部元数据的方法，需要添加：
 
 ```csharp
-// 在 Acme.Product.Core/Services/IOperatorFactory.cs 中新增
+// 在 ClearVision.Product.Core/Services/IOperatorFactory.cs 中新增
 IEnumerable<OperatorMetadata> GetAllMetadata();
 ```
 
@@ -811,7 +813,7 @@ public IEnumerable<OperatorMetadata> GetAllMetadata() => _metadata.Values;
 
 ### 2.2 实现 AI API 客户端
 
-**文件路径**：`Acme.Product.Infrastructure/AI/AiApiClient.cs`
+**文件路径**：`ClearVision.Product.Infrastructure/AI/AiApiClient.cs`
 
 ```csharp
 using System.Net.Http.Headers;
@@ -819,7 +821,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 
-namespace Acme.Product.Infrastructure.AI;
+namespace ClearVision.Product.Infrastructure.AI;
 
 /// <summary>
 /// AI API 调用客户端（支持 Anthropic Claude 和 OpenAI）
@@ -964,14 +966,14 @@ public class AiApiClient
 
 ### 3.1 实现校验器
 
-**文件路径**：`Acme.Product.Infrastructure/AI/AiFlowValidator.cs`
+**文件路径**：`ClearVision.Product.Infrastructure/AI/AiFlowValidator.cs`
 
 ```csharp
-using Acme.Product.Application.DTOs;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Services;
+using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 
-namespace Acme.Product.Infrastructure.AI;
+namespace ClearVision.Product.Infrastructure.AI;
 
 /// <summary>
 /// 校验 AI 生成的工作流是否满足所有约束
@@ -1244,12 +1246,12 @@ public class AiFlowValidator : IAiFlowValidator
 
 ### 4.1 实现自动布局服务
 
-**文件路径**：`Acme.Product.Infrastructure/AI/AutoLayoutService.cs`
+**文件路径**：`ClearVision.Product.Infrastructure/AI/AutoLayoutService.cs`
 
 ```csharp
-using Acme.Product.Application.DTOs;
+using ClearVision.Product.Application.DTOs;
 
-namespace Acme.Product.Infrastructure.AI;
+namespace ClearVision.Product.Infrastructure.AI;
 
 /// <summary>
 /// 为 AI 生成的算子自动计算画布坐标（拓扑分层布局）
@@ -1352,17 +1354,17 @@ public class AutoLayoutService
 
 ### 4.2 实现核心生成服务
 
-**文件路径**：`Acme.Product.Infrastructure/AI/AiFlowGenerationService.cs`
+**文件路径**：`ClearVision.Product.Infrastructure/AI/AiFlowGenerationService.cs`
 
 ```csharp
 using System.Text.Json;
-using Acme.Product.Application.DTOs;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Services;
+using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Acme.Product.Infrastructure.AI;
+namespace ClearVision.Product.Infrastructure.AI;
 
 public class AiFlowGenerationService : IAiFlowGenerationService
 {
@@ -1603,7 +1605,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 }
 ```
 
-**注意**：`OperatorDto`、`ConnectionDto`、`OperatorFlowDto` 是项目中已有的 DTO 类。上述代码中的属性名（`Id`、`Type`、`Name`、`X`、`Y`、`Parameters`、`SourceOperatorId`、`SourcePortIndex` 等）需要与实际 DTO 的属性名保持一致，请在实现前确认 `Acme.Product.Application/DTOs/` 目录下的实际字段名，如有不一致则以实际字段名为准。
+**注意**：`OperatorDto`、`ConnectionDto`、`OperatorFlowDto` 是项目中已有的 DTO 类。上述代码中的属性名（`Id`、`Type`、`Name`、`X`、`Y`、`Parameters`、`SourceOperatorId`、`SourcePortIndex` 等）需要与实际 DTO 的属性名保持一致，请在实现前确认 `ClearVision.Product.Application/DTOs/` 目录下的实际字段名，如有不一致则以实际字段名为准。
 
 ### 阶段四验收标准
 - [ ] `AutoLayoutService` 能为 5 个算子的串行流程正确分配不重叠的坐标
@@ -1619,14 +1621,14 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
 ### 5.1 创建扩展方法
 
-**文件路径**：`Acme.Product.Infrastructure/AI/AiGenerationServiceExtensions.cs`
+**文件路径**：`ClearVision.Product.Infrastructure/AI/AiGenerationServiceExtensions.cs`
 
 ```csharp
-using Acme.Product.Core.Services;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Acme.Product.Infrastructure.AI;
+namespace ClearVision.Product.Infrastructure.AI;
 
 public static class AiGenerationServiceExtensions
 {
@@ -1657,7 +1659,7 @@ public static class AiGenerationServiceExtensions
 
 ### 5.2 在入口点注册
 
-在 `Acme.Product.Desktop/Program.cs` 或主服务注册位置（找到现有的 `services.Add...` 调用），添加：
+在 `ClearVision.Product.Desktop/Program.cs` 或主服务注册位置（找到现有的 `services.Add...` 调用），添加：
 
 ```csharp
 // 在现有服务注册代码附近添加
@@ -1677,16 +1679,16 @@ services.AddAiFlowGeneration(configuration);
 
 ### 6.1 创建消息处理器
 
-**文件路径**：`Acme.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs`
+**文件路径**：`ClearVision.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs`
 
 ```csharp
 using System.Text.Json;
-using Acme.Product.Application.DTOs;
-using Acme.Product.Contracts.Messages;
-using Acme.Product.Core.Services;
+using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Contracts.Messages;
+using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 
-namespace Acme.Product.Infrastructure.AI;
+namespace ClearVision.Product.Infrastructure.AI;
 
 /// <summary>
 /// 处理前端发来的 GenerateFlow 消息
@@ -1784,7 +1786,7 @@ services.AddScoped<GenerateFlowMessageHandler>();
 
 ### 7.1 创建 AI 生成对话框组件
 
-**文件路径**：`Acme.Product.Desktop/wwwroot/src/features/ai-generation/aiGenerationDialog.js`
+**文件路径**：`ClearVision.Product.Desktop/wwwroot/src/features/ai-generation/aiGenerationDialog.js`
 
 ```javascript
 /**
@@ -2324,28 +2326,28 @@ _saveToHistory(description) {
 
 | 文件路径 | 说明 |
 |----------|------|
-| `Acme.Product.Infrastructure/AI/AiGenerationOptions.cs` | 配置类 |
-| `Acme.Product.Infrastructure/AI/PromptBuilder.cs` | Prompt 构建器 |
-| `Acme.Product.Infrastructure/AI/AiApiClient.cs` | AI API 客户端 |
-| `Acme.Product.Infrastructure/AI/AiFlowValidator.cs` | 校验器 |
-| `Acme.Product.Infrastructure/AI/AutoLayoutService.cs` | 自动布局 |
-| `Acme.Product.Infrastructure/AI/AiFlowGenerationService.cs` | 核心生成服务 |
-| `Acme.Product.Infrastructure/AI/AiGenerationServiceExtensions.cs` | DI 注册扩展 |
-| `Acme.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs` | 消息处理器 |
-| `Acme.Product.Application/DTOs/AiGenerationDto.cs` | 请求/响应 DTO |
-| `Acme.Product.Core/Services/IAiFlowGenerationService.cs` | 服务接口 |
-| `Acme.Product.Core/Services/ValidationResult.cs` | 校验结果类 |
-| `Acme.Product.Contracts/Messages/AiGenerationMessages.cs` | 消息契约 |
-| `Acme.Product.Desktop/wwwroot/src/features/ai-generation/aiGenerationDialog.js` | 前端对话框组件 |
+| `ClearVision.Product.Infrastructure/AI/AiGenerationOptions.cs` | 配置类 |
+| `ClearVision.Product.Infrastructure/AI/PromptBuilder.cs` | Prompt 构建器 |
+| `ClearVision.Product.Infrastructure/AI/AiApiClient.cs` | AI API 客户端 |
+| `ClearVision.Product.Infrastructure/AI/AiFlowValidator.cs` | 校验器 |
+| `ClearVision.Product.Infrastructure/AI/AutoLayoutService.cs` | 自动布局 |
+| `ClearVision.Product.Infrastructure/AI/AiFlowGenerationService.cs` | 核心生成服务 |
+| `ClearVision.Product.Infrastructure/AI/AiGenerationServiceExtensions.cs` | DI 注册扩展 |
+| `ClearVision.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs` | 消息处理器 |
+| `ClearVision.Product.Application/DTOs/AiGenerationDto.cs` | 请求/响应 DTO |
+| `ClearVision.Product.Core/Services/IAiFlowGenerationService.cs` | 服务接口 |
+| `ClearVision.Product.Core/Services/ValidationResult.cs` | 校验结果类 |
+| `ClearVision.Product.Contracts/Messages/AiGenerationMessages.cs` | 消息契约 |
+| `ClearVision.Product.Desktop/wwwroot/src/features/ai-generation/aiGenerationDialog.js` | 前端对话框组件 |
 
 ### 修改文件
 
 | 文件路径 | 修改内容 |
 |----------|----------|
-| `Acme.Product.Core/Services/IOperatorFactory.cs` | 新增 `GetAllMetadata()` 方法声明 |
-| `Acme.Product.Infrastructure/Services/OperatorFactory.cs` | 实现 `GetAllMetadata()` |
-| `Acme.Product.Desktop/appsettings.json` | 新增 `AiFlowGeneration` 配置节 |
-| `Acme.Product.Desktop/Program.cs` | 注册 AI 生成服务 `AddAiFlowGeneration()` |
+| `ClearVision.Product.Core/Services/IOperatorFactory.cs` | 新增 `GetAllMetadata()` 方法声明 |
+| `ClearVision.Product.Infrastructure/Services/OperatorFactory.cs` | 实现 `GetAllMetadata()` |
+| `ClearVision.Product.Desktop/appsettings.json` | 新增 `AiFlowGeneration` 配置节 |
+| `ClearVision.Product.Desktop/Program.cs` | 注册 AI 生成服务 `AddAiFlowGeneration()` |
 | 现有消息路由文件 | 注册 `GenerateFlow` 消息处理器 |
 | 前端工具栏文件 | 添加"AI 生成"按钮 |
 | 前端主入口文件 | 初始化 `AiGenerationDialog` |

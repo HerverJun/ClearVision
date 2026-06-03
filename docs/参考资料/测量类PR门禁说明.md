@@ -59,9 +59,9 @@ updated: "2026-04-12"
 
 ## 结果物
 
-- `Acme.Product/test_results/measurement_performance_budget_report.md`
-- `Acme.Product/test_results/measurement_performance_budget_report.json`
-- `Acme.Product/test_results/measurement_operator_benchmark_report.md`
+- `ClearVision.Product/test_results/measurement_performance_budget_report.md`
+- `ClearVision.Product/test_results/measurement_performance_budget_report.json`
+- `ClearVision.Product/test_results/measurement_operator_benchmark_report.md`
 
 ## 说明
 

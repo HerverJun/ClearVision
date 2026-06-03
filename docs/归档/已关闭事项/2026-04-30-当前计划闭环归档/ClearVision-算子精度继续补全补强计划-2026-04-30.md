@@ -587,7 +587,7 @@ python quality/tools/run_algorithm_ab_replay.py `
 
 ```powershell
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName "FeatureMatchOperatorBaseTests","PlanarMatchingOperatorTests","DeepLearningOperatorTests" `
   -Verbosity minimal
 ```

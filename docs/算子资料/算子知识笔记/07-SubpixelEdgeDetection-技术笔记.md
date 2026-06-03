@@ -1,10 +1,10 @@
 # SubpixelEdgeDetection 技术笔记
 
-> **对应算子**: `SubpixelEdgeDetectionOperator`  
-> **OperatorType**: `OperatorType.SubpixelEdgeDetection`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/SubpixelEdgeDetectionOperator.cs`  
-> **相关算子**: [CannyEdge](./06-CannyEdge-技术笔记.md)、[CaliperTool](./15-CaliperTool-技术笔记.md)、[LineMeasurement](./17-LineMeasurement-技术笔记.md)  
-> **阅读前置**: 先理解像素级边缘和梯度方向，再看这篇会更轻松  
+> **对应算子**: `SubpixelEdgeDetectionOperator`
+> **OperatorType**: `OperatorType.SubpixelEdgeDetection`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/SubpixelEdgeDetectionOperator.cs`
+> **相关算子**: [CannyEdge](./06-CannyEdge-技术笔记.md)、[CaliperTool](./15-CaliperTool-技术笔记.md)、[LineMeasurement](./17-LineMeasurement-技术笔记.md)
+> **阅读前置**: 先理解像素级边缘和梯度方向，再看这篇会更轻松
 > **核心来源**: ClearVision 当前实现、Steger 方法、OpenCV 梯度与亚像素插值相关文献
 
 ---
@@ -50,7 +50,7 @@
          ↓                    ↓
     |   1cm                  |   4cm
     ·←─70%─→·               ·←40%→·
-    
+
     亚像素位置 = 1.7cm      亚像素位置 = 4.4cm
     宽度 = 4.4 - 1.7 = 2.7cm（更接近真实3.7cm中的比例关系）
 ```
@@ -68,7 +68,7 @@
      └───┘  └───┘  └───┘  └───┘  └───┘
        ↑     ↑      ↑      ↑      ↑
      像素级检测会说"边缘在120列或121列"
-     
+
      亚像素检测会说"边缘约在120.35列"（在120和121之间35%的位置）
 ```
 
@@ -104,7 +104,7 @@
     | /  |  \                           | /  | ·  \     · 表示亚像素位置
 121 |/   ○   \                        121|/   ○    \
     |                                    |
-    
+
 边缘呈现"锯齿状"                      边缘呈现平滑曲线
 ```
 
@@ -122,12 +122,12 @@
 
 ClearVision 当前实现不是单一路径，而是两大分支：
 
-1. `Method=Steger`  
+1. `Method=Steger`
    使用 `StegerSubpixelEdgeDetector`
-2. `Method=GradientInterp / GaussianFit`  
+2. `Method=GradientInterp / GaussianFit`
    先做灰度化、GaussianBlur、Canny、FindContours、Sobel，再沿梯度方向做一维细化
 
-所以这个算子不能简单理解成"更高级的 Canny"。  
+所以这个算子不能简单理解成"更高级的 Canny"。
 它的真实口径是：**先得到候选边缘，再把边缘点往亚像素位置细化**。
 
 ---
@@ -199,7 +199,7 @@ offset = (80 - 60) / (2 × (80 - 200 + 60))
   │
   └────────────────────→ 位置x
     -2   -1   0   1   2
-    
+
 高斯分布: 中间高，两边低，变化平滑
 ```
 
@@ -231,7 +231,7 @@ offset = (80 - 60) / (2 × (80 - 200 + 60))
     ─────┼/────────────────┼─────
          │                 │
     ↓y   │                 │
-    
+
 梯度方向：垂直于边缘，指向灰度增加最快的方向
 ```
 
@@ -263,7 +263,7 @@ offset = (80 - 60) / (2 × (80 - 200 + 60))
     P₊₁  ●
     P₊₂ ●
          │
-         
+
 实际采样位置（考虑梯度角度）：
 
          P₋₂
@@ -292,7 +292,7 @@ offset = (80 - 60) / (2 × (80 - 200 + 60))
  │
  └──┬──┬──┬──┬──┬──┬──┬──┬──→ 位置
    P₋₂ P₋₁ P₀ P₊₁ P₊₂
-   
+
 边缘就在灰度变化最陡峭的位置
 
 
@@ -330,7 +330,7 @@ for (int i = -2; i <= 2; i++) {
     // 计算采样点位置（亚像素坐标）
     sampleX = x + i * cos(gradientDirection)
     sampleY = y + i * sin(gradientDirection)
-    
+
     // 双线性插值获取灰度值
     samples[i] = BilinearInterpolate(image, sampleX, sampleY)
 }
@@ -345,7 +345,7 @@ subpixelY = y + offset * sin(gradientDirection)
 
 #### 5.3.1 Steger方法是什么？
 
-传统的边缘检测找的是**灰度跳变边界**（如从黑到白的过渡）。  
+传统的边缘检测找的是**灰度跳变边界**（如从黑到白的过渡）。
 Steger方法找的是**线条中心**（如一根细线的骨架）。
 
 ```
@@ -389,7 +389,7 @@ Hessian矩阵形式：
 H   =   │                      │
         │  ∂²I/∂y∂x  ∂²I/∂y²  │
         └                ┘
-        
+
 其中 I 是图像灰度函数
 ```
 
@@ -442,7 +442,7 @@ I(x + t·n) ≈ I(x) + t·nᵀ·∇I + (t²/2)·nᵀ·H·n
     P₋₁  │  P₊₁
          P₀ ← 当前点
          │
-         
+
 如果在P₀点沿n方向的灰度截面是：
 
 灰度
@@ -452,7 +452,7 @@ I(x + t·n) ≈ I(x) + t·nᵀ·∇I + (t²/2)·nᵀ·H·n
  │────╯     ╰────
  │   P₋₁ P₀ P₊₁
  └──┬──┬──┬──→
-    
+
 且P₀是最高点 → 这就是线条中心！
 ```
 
@@ -621,20 +621,20 @@ Gray
 
 ### 常见误区
 
-- **误区一**：亚像素一定更准  
+- **误区一**：亚像素一定更准
   只有在成像质量和梯度结构足够好时才成立。
-  
-- **误区二**：方法名只是不同实现细节  
+
+- **误区二**：方法名只是不同实现细节
   实际上 `Steger` 和 `GradientInterp / GaussianFit` 的数学假设并不一样。
-  
-- **误区三**：亚像素可以突破物理分辨率极限  
+
+- **误区三**：亚像素可以突破物理分辨率极限
   亚像素是**估计**，不是**创造**。如果图像本身模糊，亚像素也无法恢复丢失的信息。
 
 ---
 
 ## 12. 专业来源与延伸阅读
 
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/SubpixelEdgeDetectionOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/SubpixelEdgeDetectionOperator.cs`
 - ClearVision 本地资料: `../算子手册.md`、`../算子名片/SubpixelEdgeDetection.md`
 - Carsten Steger, *An Unbiased Detector of Curvilinear Structures*, IEEE TPAMI, 1998
 - OpenCV Documentation: Sobel, Canny, contour extraction

@@ -1,7 +1,7 @@
 编写面向 opencode 的详细开发指导 markdown 文档# ClearVision Phase 1 — 关键能力补齐 开发指导手册
 
-> **适用于**: opencode / AI 编码助手  
-> **目标**: 补齐 5 个工业视觉检测核心算子  
+> **适用于**: opencode / AI 编码助手
+> **目标**: 补齐 5 个工业视觉检测核心算子
 > **审计版本**: v2.0 (2026-02-13)
 
 ---
@@ -12,19 +12,19 @@
 
 | # | 文件 | 绝对路径 | 作用 |
 |:-:|------|---------|------|
-| 1 | [OperatorEnums.cs](file:///c:/Users/11234/Desktop/ClearVision/Acme.Product/src/Acme.Product.Core/Enums/OperatorEnums.cs) | `src\Acme.Product.Core\Enums\` | 添加枚举值 |
-| 2 | **新算子.cs** | `src\Acme.Product.Infrastructure\Operators\` | 实现算子 |
-| 3 | [OperatorFactory.cs](file:///c:/Users/11234/Desktop/ClearVision/Acme.Product/src/Acme.Product.Infrastructure/Services/OperatorFactory.cs) | `src\Acme.Product.Infrastructure\Services\` | 注册元数据 |
-| 4 | [DependencyInjection.cs](file:///c:/Users/11234/Desktop/ClearVision/Acme.Product/src/Acme.Product.Desktop/DependencyInjection.cs) | `src\Acme.Product.Desktop\` | DI 注册 |
-| 5 | **新测试.cs** | `tests\Acme.Product.Tests\Operators\` | 单元测试 |
+| 1 | [OperatorEnums.cs](file:///c:/Users/11234/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Core/Enums/OperatorEnums.cs) | `src\ClearVision.Product.Core\Enums\` | 添加枚举值 |
+| 2 | **新算子.cs** | `src\ClearVision.Product.Infrastructure\Operators\` | 实现算子 |
+| 3 | [OperatorFactory.cs](file:///c:/Users/11234/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/OperatorFactory.cs) | `src\ClearVision.Product.Infrastructure\Services\` | 注册元数据 |
+| 4 | [DependencyInjection.cs](file:///c:/Users/11234/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Desktop/DependencyInjection.cs) | `src\ClearVision.Product.Desktop\` | DI 注册 |
+| 5 | **新测试.cs** | `tests\ClearVision.Product.Tests\Operators\` | 单元测试 |
 
 **参考文件**（必须先阅读再开发）：
 
 | 文件 | 作用 | 为何重要 |
 |------|------|---------|
-| [OperatorBase.cs](file:///c:/Users/11234/Desktop/ClearVision/Acme.Product/src/Acme.Product.Infrastructure/Operators/OperatorBase.cs) (494行) | 算子抽象基类 | 所有 `GetParam`/`TryGetInputImage`/`CreateImageOutput` 方法都在这里 |
-| [ImageWrapper.cs](file:///c:/Users/11234/Desktop/ClearVision/Acme.Product/src/Acme.Product.Infrastructure/Operators/ImageWrapper.cs) (259行) | 零拷贝图像传递 | **构造器会 Clone() Mat**，理解此行为是避免内存泄漏的关键 |
-| [FlowExecutionService.cs](file:///c:/Users/11234/Desktop/ClearVision/Acme.Product/src/Acme.Product.Infrastructure/Services/FlowExecutionService.cs) (619行) | 流程执行引擎 | 理解 `PrepareOperatorInputs` 如何路由数据 |
+| [OperatorBase.cs](file:///c:/Users/11234/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/OperatorBase.cs) (494行) | 算子抽象基类 | 所有 `GetParam`/`TryGetInputImage`/`CreateImageOutput` 方法都在这里 |
+| [ImageWrapper.cs](file:///c:/Users/11234/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ImageWrapper.cs) (259行) | 零拷贝图像传递 | **构造器会 Clone() Mat**，理解此行为是避免内存泄漏的关键 |
+| [FlowExecutionService.cs](file:///c:/Users/11234/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/FlowExecutionService.cs) (619行) | 流程执行引擎 | 理解 `PrepareOperatorInputs` 如何路由数据 |
 
 ---
 
@@ -33,13 +33,13 @@
 ### 2.1 算子骨架模板 (必须严格遵循)
 
 ```csharp
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Operators;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
-namespace Acme.Product.Infrastructure.Operators;
+namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
 /// {算子中文名} - {一句话描述}
@@ -142,8 +142,8 @@ FlowExecutionService.PrepareOperatorInputs()
 
 ### 任务 1: 几何拟合 (GeometricFitting) — 最简单，先做
 
-> **枚举**: `GeometricFitting = 41`  
-> **文件**: `GeometricFittingOperator.cs`  
+> **枚举**: `GeometricFitting = 41`
+> **文件**: `GeometricFittingOperator.cs`
 > **难度**: ⭐⭐ 低
 
 #### 1.1 枚举定义
@@ -256,8 +256,8 @@ services.AddSingleton<IOperatorExecutor, GeometricFittingOperator>();
 
 ### 任务 2: ROI 管理器 (RoiManager)
 
-> **枚举**: `RoiManager = 42`  
-> **文件**: `RoiManagerOperator.cs`  
+> **枚举**: `RoiManager = 42`
+> **文件**: `RoiManagerOperator.cs`
 > **难度**: ⭐⭐ 低
 
 #### 2.1 枚举定义
@@ -336,15 +336,15 @@ _metadata[OperatorType.RoiManager] = new OperatorMetadata
 ```
 
 > [!IMPORTANT]
-> 输出 Mask 时也用 `ImageWrapper`：`additionalData["Mask"] = new ImageWrapper(maskMat);`  
+> 输出 Mask 时也用 `ImageWrapper`：`additionalData["Mask"] = new ImageWrapper(maskMat);`
 > 下游算子可通过 `TryGetInputImage(inputs, "Mask", out var mask)` 获取。
 
 ---
 
 ### 任务 3: 形状匹配 (ShapeMatching) — 核心难点
 
-> **枚举**: `ShapeMatching = 43`  
-> **文件**: `ShapeMatchingOperator.cs`  
+> **枚举**: `ShapeMatching = 43`
+> **文件**: `ShapeMatchingOperator.cs`
 > **难度**: ⭐⭐⭐⭐ 高
 
 #### 3.1 枚举与元数据
@@ -422,7 +422,7 @@ _metadata[OperatorType.ShapeMatching] = new OperatorMetadata
 ```
 
 > [!TIP]
-> 使用 `Parallel.For` 并行化阶段二和阶段三的循环，显著加速大角度范围搜索。  
+> 使用 `Parallel.For` 并行化阶段二和阶段三的循环，显著加速大角度范围搜索。
 > 注意: `Cv2.MatchTemplate` 本身是线程安全的，但结果 `Mat` 不是，每个线程需要自己的 result Mat。
 
 #### 3.3 模板获取逻辑
@@ -455,8 +455,8 @@ if (templateMat == null || templateMat.Empty())
 
 ### 任务 4: 亚像素边缘提取 (SubpixelEdgeDetection)
 
-> **枚举**: `SubpixelEdgeDetection = 44`  
-> **文件**: `SubpixelEdgeDetectionOperator.cs`  
+> **枚举**: `SubpixelEdgeDetection = 44`
+> **文件**: `SubpixelEdgeDetectionOperator.cs`
 > **难度**: ⭐⭐⭐ 中
 
 #### 4.1 枚举与元数据
@@ -523,15 +523,15 @@ _metadata[OperatorType.SubpixelEdgeDetection] = new OperatorMetadata
 ```
 
 > [!NOTE]
-> 输出数据格式建议: `List<Dictionary<string, object>>` 每个元素含 `{ "X": float, "Y": float, "Strength": float }`  
+> 输出数据格式建议: `List<Dictionary<string, object>>` 每个元素含 `{ "X": float, "Y": float, "Strength": float }`
 > 这样下游的几何拟合算子可以直接通过 `TryGetInputValue<object>(inputs, "Edges", out var edges)` 获取。
 
 ---
 
 ### 任务 5: 相机标定改进 (CameraCalibration — 修改现有算子)
 
-> **文件**: [CameraCalibrationOperator.cs](file:///c:/Users/11234/Desktop/ClearVision/Acme.Product/src/Acme.Product.Infrastructure/Operators/CameraCalibrationOperator.cs)  
-> **类型**: 修改现有算子（枚举值 `CameraCalibration = 24` 保持不变）  
+> **文件**: [CameraCalibrationOperator.cs](file:///c:/Users/11234/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CameraCalibrationOperator.cs)
+> **类型**: 修改现有算子（枚举值 `CameraCalibration = 24` 保持不变）
 > **难度**: ⭐⭐⭐ 中
 
 #### 5.1 改进点
@@ -609,17 +609,17 @@ if (mode == "FolderCalibration")
 
 ## 四、单元测试模板
 
-每个算子至少需要以下 3 类测试。参考现有 [OperatorTests.cs](file:///c:/Users/11234/Desktop/ClearVision/Acme.Product/tests/Acme.Product.Tests/Operators/OperatorTests.cs)：
+每个算子至少需要以下 3 类测试。参考现有 [OperatorTests.cs](file:///c:/Users/11234/Desktop/ClearVision/ClearVision.Product/tests/ClearVision.Product.Tests/Operators/OperatorTests.cs)：
 
 ```csharp
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace Acme.Product.Tests.Operators;
+namespace ClearVision.Product.Tests.Operators;
 
 public class GeometricFittingOperatorTests
 {
@@ -667,11 +667,11 @@ public class GeometricFittingOperatorTests
 
 ```powershell
 # 编译验证
-cd c:\Users\11234\Desktop\ClearVision\Acme.Product
-dotnet build src\Acme.Product.Infrastructure\Acme.Product.Infrastructure.csproj
+cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
+dotnet build src\ClearVision.Product.Infrastructure\ClearVision.Product.Infrastructure.csproj
 
 # 运行单元测试
-dotnet test tests\Acme.Product.Tests\Acme.Product.Tests.csproj --filter "FullyQualifiedName~GeometricFitting"
+dotnet test tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj --filter "FullyQualifiedName~GeometricFitting"
 
 # 全量构建 (所有算子完成后)
 dotnet build

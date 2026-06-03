@@ -9,7 +9,7 @@ updated: "2026-04-29"
 
 # ClearVision AI 密钥本地配置说明
 
-`Acme.Product/src/Acme.Product.Desktop/appsettings.json` 只保留非敏感默认值，不再提交真实 `AiFlowGeneration.ApiKey`。
+`ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json` 只保留非敏感默认值，不再提交真实 `AiFlowGeneration.ApiKey`。
 
 本地开发和 CI/发布环境需要调用 AI 服务时，使用环境变量覆盖配置：
 

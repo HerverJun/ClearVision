@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "pluginId": "clearvision.operator-library",
-  "packageId": "Acme.OperatorLibrary",
+  "packageId": "ClearVision.OperatorLibrary",
   "packageVersion": "1.0.2",
   "displayName": "ClearVision Operator Library",
   "description": "Package-facing ClearVision operator set.",
@@ -21,7 +21,7 @@
   "operators": [
     {
       "operatorType": "TemplateMatching",
-      "runtimeTypeName": "Acme.Product.Infrastructure.Operators.TemplateMatchOperator",
+      "runtimeTypeName": "ClearVision.Product.Infrastructure.Operators.TemplateMatchOperator",
       "maturity": "Experimental",
       "enabledByDefault": true,
       "tags": [
@@ -30,7 +30,7 @@
     },
     {
       "operatorType": "MqttPublish",
-      "runtimeTypeName": "Acme.Product.Infrastructure.Operators.MqttPublishOperator",
+      "runtimeTypeName": "ClearVision.Product.Infrastructure.Operators.MqttPublishOperator",
       "maturity": "PlaceholderDisabled",
       "enabledByDefault": false,
       "tags": [

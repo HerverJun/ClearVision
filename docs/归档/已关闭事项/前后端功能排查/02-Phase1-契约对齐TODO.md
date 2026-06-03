@@ -35,13 +35,13 @@ updated: "2026-03-20"
   - 历史列表现在由后端返回 `items + totalCount + pageIndex + pageSize`，前端翻页直接驱动服务端重新取页。
   - 时间过滤场景也统一走分页查询，不再绕开 `pageIndex` / `pageSize`。
 - 证据：
-  - [`app.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js#L689-L691)
-  - [`ApiEndpoints.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Endpoints/ApiEndpoints.cs#L237-L240)
-  - [`InspectionResultRepository.cs`](../../../Acme.Product/src/Acme.Product.Infrastructure/Repositories/InspectionResultRepository.cs#L21-L27)
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L23-L27)
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L400-L400)
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L661-L663)
-  - [`InspectionService.cs`](../../../Acme.Product/src/Acme.Product.Application/Services/InspectionService.cs#L310-L314)
+  - [`app.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js#L689-L691)
+  - [`ApiEndpoints.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/ApiEndpoints.cs#L237-L240)
+  - [`InspectionResultRepository.cs`](../../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Repositories/InspectionResultRepository.cs#L21-L27)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L23-L27)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L400-L400)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L661-L663)
+  - [`InspectionService.cs`](../../../ClearVision.Product/src/ClearVision.Product.Application/Services/InspectionService.cs#L310-L314)
 - 主要缺口：
   - 已完成分页契约收口；后续只需继续减少结果页本地缓存态和服务端正式数据流并存的范围。
 
@@ -56,12 +56,12 @@ updated: "2026-03-20"
   - 当前在服务端登出失败时，会把“本地已清理、服务端可能仍在线”的提示带到登录页，用户可见反馈已补上。
   - 已存在针对登出端点和服务端会话失效的自动化测试。
 - 证据：
-  - [`auth.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/auth/auth.js#L88-L102)
-  - [`login.html`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/login.html#L116-L152)
-  - [`AuthEndpoints.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Endpoints/AuthEndpoints.cs#L47-L55)
-  - [`AuthService.cs`](../../../Acme.Product/src/Acme.Product.Application/Services/AuthService.cs#L113-L136)
-  - [`AuthServiceTests.cs`](../../../Acme.Product/tests/Acme.Product.Tests/Services/AuthServiceTests.cs#L108-L128)
-  - [`AuthEndpointsTests.cs`](../../../Acme.Product/tests/Acme.Product.Desktop.Tests/AuthEndpointsTests.cs#L16-L30)
+  - [`auth.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/auth/auth.js#L88-L102)
+  - [`login.html`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/login.html#L116-L152)
+  - [`AuthEndpoints.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/AuthEndpoints.cs#L47-L55)
+  - [`AuthService.cs`](../../../ClearVision.Product/src/ClearVision.Product.Application/Services/AuthService.cs#L113-L136)
+  - [`AuthServiceTests.cs`](../../../ClearVision.Product/tests/ClearVision.Product.Tests/Services/AuthServiceTests.cs#L108-L128)
+  - [`AuthEndpointsTests.cs`](../../../ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/AuthEndpointsTests.cs#L16-L30)
 
 ### 3. `[前后端]` 统一 AI 历史会话可回放结构
 
@@ -72,13 +72,13 @@ updated: "2026-03-20"
   - 前端会优先恢复 `currentCanvasFlowJson`，缺快照时会给出明确提示。
   - 已看到后端消息入口和回归测试覆盖。
 - 证据：
-  - [`AiFlowGenerationService.cs`](../../../Acme.Product/src/Acme.Product.Infrastructure/AI/AiFlowGenerationService.cs#L215-L219)
-  - [`ConversationalFlowService.cs`](../../../Acme.Product/src/Acme.Product.Infrastructure/AI/ConversationalFlowService.cs#L209-L214)
-  - [`ConversationalFlowService.cs`](../../../Acme.Product/src/Acme.Product.Infrastructure/AI/ConversationalFlowService.cs#L413-L413)
-  - [`aiPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/ai/aiPanel.js#L1054-L1065)
-  - [`aiPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/ai/aiPanel.js#L637-L646)
-  - [`WebMessageHandler.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Handlers/WebMessageHandler.cs#L683-L714)
-  - [`ConversationalFlowServiceTests.cs`](../../../Acme.Product/tests/Acme.Product.Tests/AI/ConversationalFlowServiceTests.cs#L64-L125)
+  - [`AiFlowGenerationService.cs`](../../../ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowGenerationService.cs#L215-L219)
+  - [`ConversationalFlowService.cs`](../../../ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/ConversationalFlowService.cs#L209-L214)
+  - [`ConversationalFlowService.cs`](../../../ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/ConversationalFlowService.cs#L413-L413)
+  - [`aiPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js#L1054-L1065)
+  - [`aiPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js#L637-L646)
+  - [`WebMessageHandler.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Handlers/WebMessageHandler.cs#L683-L714)
+  - [`ConversationalFlowServiceTests.cs`](../../../ClearVision.Product/tests/ClearVision.Product.Tests/AI/ConversationalFlowServiceTests.cs#L64-L125)
 
 ### 4. `[前后端]` 相机绑定列表只展示真实状态
 
@@ -89,16 +89,16 @@ updated: "2026-03-20"
   - 前端新增绑定时已移除硬写 `connectionStatus: 'Unknown'`，保存后会重新回读后端状态。
   - 发现设备弹窗现在会优先消费设备枚举返回的 `ipAddress`；当底层 SDK 能提供真 IP 时，前端已不再回退到伪值。
 - 证据：
-  - [`SettingsEndpoints.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Endpoints/SettingsEndpoints.cs#L247-L250)
-  - [`AppConfig.cs`](../../../Acme.Product/src/Acme.Product.Core/Entities/AppConfig.cs#L179-L216)
-  - [`ICamera.cs`](../../../Acme.Product/src/Acme.Product.Core/Cameras/ICamera.cs#L46-L51)
-  - [`SettingsEndpoints.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Endpoints/SettingsEndpoints.cs#L326-L331)
-  - [`IIndustrialCamera.cs`](../../../Acme.Product/src/Acme.Product.Core/Cameras/IIndustrialCamera.cs#L134-L162)
-  - [`SettingsEndpoints.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Endpoints/SettingsEndpoints.cs#L370-L378)
-  - [`HikvisionCamera.cs`](../../../Acme.Product/src/Acme.Product.Infrastructure/Cameras/HikvisionCamera.cs#L192-L198)
-  - [`MindVisionCamera.cs`](../../../Acme.Product/src/Acme.Product.Infrastructure/Cameras/MindVisionCamera.cs#L105-L113)
-  - [`settingsView.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L975-L1006)
-  - [`settingsView.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L1045-L1053)
+  - [`SettingsEndpoints.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/SettingsEndpoints.cs#L247-L250)
+  - [`AppConfig.cs`](../../../ClearVision.Product/src/ClearVision.Product.Core/Entities/AppConfig.cs#L179-L216)
+  - [`ICamera.cs`](../../../ClearVision.Product/src/ClearVision.Product.Core/Cameras/ICamera.cs#L46-L51)
+  - [`SettingsEndpoints.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/SettingsEndpoints.cs#L326-L331)
+  - [`IIndustrialCamera.cs`](../../../ClearVision.Product/src/ClearVision.Product.Core/Cameras/IIndustrialCamera.cs#L134-L162)
+  - [`SettingsEndpoints.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/SettingsEndpoints.cs#L370-L378)
+  - [`HikvisionCamera.cs`](../../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Cameras/HikvisionCamera.cs#L192-L198)
+  - [`MindVisionCamera.cs`](../../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Cameras/MindVisionCamera.cs#L105-L113)
+  - [`settingsView.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L975-L1006)
+  - [`settingsView.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L1045-L1053)
 - 备注：
   - 当前 UI 已不再伪造连接状态或伪造 IP；发现接口若拿不到 IP，将保持为空值而非继续造假。
 
@@ -110,8 +110,8 @@ updated: "2026-03-20"
   - JS 层已经不再给置信度硬塞默认百分比，缺失时展示缺省态。
   - 原先样式层残留的固定“示例范围”区间也已删除，不再继续给用户制造“这是正式阈值范围”的误解。
 - 证据：
-  - [`analysisCardsPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/inspection/analysisCardsPanel.js)
-  - [`analysisCards.css`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/shared/styles/analysisCards.css)
+  - [`analysisCardsPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/analysisCardsPanel.js)
+  - [`analysisCards.css`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/shared/styles/analysisCards.css)
 
 ### 6. `[前后端]` 明确“清空记录”的真实语义
 
@@ -122,9 +122,9 @@ updated: "2026-03-20"
   - 确认文案和成功提示都明确说明不会删除后端历史记录。
   - 实际行为也仅清空前端当前视图数据。
 - 证据：
-  - [`index.html`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/index.html#L639-L643)
-  - [`app.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js#L664-L669)
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L430-L438)
+  - [`index.html`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html#L639-L643)
+  - [`app.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js#L664-L669)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L430-L438)
 
 ### 7. `[前端]` 更正“工程已自动保存”提示
 
@@ -134,8 +134,8 @@ updated: "2026-03-20"
   - 自动保存仍然只写入本地 `localStorage` 草稿。
   - 用户可见提示已明确写成“流程草稿已保存到本地缓存”，失败提示也指向本地缓存。
 - 证据：
-  - [`app.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js#L1438-L1444)
-  - [`app.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js#L1472-L1482)
+  - [`app.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js#L1438-L1444)
+  - [`app.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js#L1472-L1482)
 
 ### 8. `[前后端]` 补齐普通用户自助改密能力
 
@@ -147,13 +147,13 @@ updated: "2026-03-20"
   - `/api/auth/change-password` 失败时已返回稳定 `ErrorCode`，便于前端和回归脚本识别具体失败原因。
   - 已存在应用层与端点层自动化测试覆盖弱密码、密码复用和成功修改场景。
 - 证据：
-  - [`settingsView.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L1334-L1335)
-  - [`settingsView.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L2227-L2237)
-  - [`settingsView.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L1927-L1928)
-  - [`AuthEndpoints.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Endpoints/AuthEndpoints.cs#L81-L152)
-  - [`AuthService.cs`](../../../Acme.Product/src/Acme.Product.Application/Services/AuthService.cs#L183-L259)
-  - [`AuthServiceTests.cs`](../../../Acme.Product/tests/Acme.Product.Tests/Services/AuthServiceTests.cs#L130-L185)
-  - [`AuthEndpointsTests.cs`](../../../Acme.Product/tests/Acme.Product.Desktop.Tests/AuthEndpointsTests.cs#L32-L82)
+  - [`settingsView.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L1334-L1335)
+  - [`settingsView.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L2227-L2237)
+  - [`settingsView.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L1927-L1928)
+  - [`AuthEndpoints.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/AuthEndpoints.cs#L81-L152)
+  - [`AuthService.cs`](../../../ClearVision.Product/src/ClearVision.Product.Application/Services/AuthService.cs#L183-L259)
+  - [`AuthServiceTests.cs`](../../../ClearVision.Product/tests/ClearVision.Product.Tests/Services/AuthServiceTests.cs#L130-L185)
+  - [`AuthEndpointsTests.cs`](../../../ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/AuthEndpointsTests.cs#L32-L82)
 
 ### 9. `[前后端]` 让结果页开始消费后端分析能力
 
@@ -171,16 +171,16 @@ updated: "2026-03-20"
   - 当前结果页已经实现“分页、筛选、统计、趋势、报告、导出”主链路优先回源到服务端分析/历史接口。
   - 已有 Playwright 回归覆盖 `serverPaged + status` 筛选会回源刷新服务端历史与分析。
 - 证据：
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L165-L201)
-  - [`Program.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Program.cs#L253-L272)
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L909-L909)
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L1201-L1261)
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L432-L445)
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L1017-L1057)
-  - [`resultPanel.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L148-L177)
-  - [`ApiEndpoints.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Endpoints/ApiEndpoints.cs#L208-L220)
-  - [`Program.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Program.cs#L256-L275)
-  - [`high-frequency-regression.spec.ts`](../../../Acme.Product/tests/Acme.Product.UI.Tests/tests/e2e/high-frequency-regression.spec.ts#L408-L421)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L165-L201)
+  - [`Program.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs#L253-L272)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L909-L909)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L1201-L1261)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L432-L445)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L1017-L1057)
+  - [`resultPanel.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js#L148-L177)
+  - [`ApiEndpoints.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/ApiEndpoints.cs#L208-L220)
+  - [`Program.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs#L256-L275)
+  - [`high-frequency-regression.spec.ts`](../../../ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/e2e/high-frequency-regression.spec.ts#L408-L421)
 
 ### 10. `[联调]` 确定标定能力的唯一保留路线
 
@@ -191,11 +191,11 @@ updated: "2026-03-20"
   - 设置页中的 `HandEyeCalibWizard` 现在既是唯一公开主入口，也是唯一保留协议路径。
   - 旧 HTTP `/api/calibration/*` 端点已从后端移除，旧 `calibrationWizard.js` / `calibrationWizard.css` 也已删除，仓库内不再保留公开双轨实现。
 - 证据：
-  - [`index.html`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/index.html)
-  - [`settingsView.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L831-L837)
-  - [`handEyeCalibWizard.js`](../../../Acme.Product/src/Acme.Product.Desktop/wwwroot/src/core/calibration/handEyeCalibWizard.js#L411-L470)
-  - [`ApiEndpoints.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Endpoints/ApiEndpoints.cs)
-  - [`WebMessageHandler.cs`](../../../Acme.Product/src/Acme.Product.Desktop/Handlers/WebMessageHandler.cs#L247-L251)
+  - [`index.html`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/index.html)
+  - [`settingsView.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/settings/settingsView.js#L831-L837)
+  - [`handEyeCalibWizard.js`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/core/calibration/handEyeCalibWizard.js#L411-L470)
+  - [`ApiEndpoints.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/ApiEndpoints.cs)
+  - [`WebMessageHandler.cs`](../../../ClearVision.Product/src/ClearVision.Product.Desktop/Handlers/WebMessageHandler.cs#L247-L251)
 
 ## 阶段完成标准
 

@@ -28,7 +28,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] 为 `InspectionResultBackgroundService` 增加失败重试、死信/本地 JSONL spool 和健康告警。
 - [ ] `SaveBatchAsync` 失败时不得清空 batch；重启后应能回放未持久化结果。
 - [ ] 增加仓储写入失败、SQLite 短暂锁、进程重启后的回放测试。
-- 依据：`Acme.Product/src/Acme.Product.Infrastructure/Services/InspectionResultBackgroundService.cs`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/InspectionResultBackgroundService.cs`
 
 ### P0-2 StationSync 结果队列容量真正生效
 
@@ -36,7 +36,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] 队列满时保护 Runtime 回调延迟：记录 drop/backpressure 计数，不阻塞检测主路径。
 - [ ] 将 dropped result summaries、backpressure events、spool trimming range 暴露到 health/log/alarm。
 - [ ] 更新 `docs/runtime/station-studio-sync.md`，让代码、文档和 SOP 口径一致。
-- 依据：`Acme.Product/src/Acme.Product.Station/Sync/StationSyncHostedService.cs`、`StationSpoolStore.cs`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Station/Sync/StationSyncHostedService.cs`、`StationSpoolStore.cs`
 
 ### P0-3 CI 不再绕过串行测试 runner
 
@@ -50,7 +50,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] OperatorLibrary CI/release restore 使用 `--locked-mode`。
 - [ ] 明确 `packages.lock.json` 的更新流程：依赖升级 PR 必须包含 lock diff。
 - [ ] `pack.ps1 -RunSmokeTest` 与 CI 包 smoke 使用同一包版本和 locked restore 口径。
-- 依据：`Acme.OperatorLibrary/Acme.OperatorLibrary.csproj`、`Acme.OperatorLibrary/packages.lock.json`
+- 依据：`ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj`、`ClearVision.OperatorLibrary/packages.lock.json`
 
 ### P0-5 Station 命令、部署、测试包端点补权限
 
@@ -58,21 +58,21 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] `POST /api/stations/{stationId}/deploy-package` 增加同级角色校验与审计。
 - [ ] `POST /api/station-packages/test` 不应对普通登录用户开放。
 - [ ] `AuthMiddleware` 当前把 session 放在 `HttpContext.Items["CurrentUser"]`，Station endpoints 不要继续依赖 `context.User?.Identity?.Name` 的空值。
-- 依据：`Acme.Product/src/Acme.Product.Desktop/Endpoints/StationEndpoints.cs`、`AuthMiddleware.cs`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/StationEndpoints.cs`、`AuthMiddleware.cs`
 
 ### P0-6 结果面板移除假高级分析
 
 - [ ] 删除或禁用 `resultPanel.js` 中 mock CPK、MTBF、缺陷聚类等占位数据。
 - [ ] 已接后端的数据只走现有 `/api/analysis/statistics|defect-distribution|trend|report/{projectId}`。
 - [ ] 未接通的高级分析按钮显示“暂无数据/未接入”，不得展示固定样例值。
-- 依据：`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js`
 
 ### P0-7 算子正式口径对齐
 
 - [x] 处理 `FrameChangeTrigger` 已进入 156 正式算子目录/名片/质量矩阵后的证据缺口。
 - [x] 正式口径已补 contract、dataset、field-substitute replay、名片、目录、质量矩阵、suite evidence。
 - [x] 如果仅内部使用：不适用；当前按正式 156 算子闭环。
-- 依据：`Acme.Product/src/Acme.Product.Infrastructure/Operators/FrameChangeTriggerOperator.cs`、`docs/算子资料/算子目录.md`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/FrameChangeTriggerOperator.cs`、`docs/算子资料/算子目录.md`
 
 ### P0-8 工业验证声明设硬门禁
 
@@ -93,7 +93,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] 修复 Station Monitor、PLC endpoint、runtime/log、部署 bat/README、根目录规范文档中的 mojibake。
 - [ ] 统一脚本生成文本编码；现场 bat 可保留 ASCII，面向人读的 md/txt 使用 UTF-8。
 - [ ] 增加轻量编码扫描脚本，至少检查 `U+FFFD replacement character`、常见 mojibake 片段和不可读中文。
-- 依据：`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js`、`scripts/package-portable-deployment.ps1`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js`、`scripts/package-portable-deployment.ps1`
 
 ### P0-11 PLC 虚拟联调入口收口
 
@@ -216,14 +216,14 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] 不再直接 `Enum.GetValues<OperatorType>()` 全量曝光包侧模块。
 - [ ] 对齐 `OperatorTypeAliasResolver`、正式 catalog 或 `OperatorMetadataScanner`。
 - [ ] legacy alias 和未纳入正式质量矩阵的算子必须显式标注。
-- 依据：`Acme.OperatorLibrary/src/Acme.OperatorLibrary.Modules/OperatorModuleCatalog.cs`
+- 依据：`ClearVision.OperatorLibrary/src/ClearVision.OperatorLibrary.Modules/OperatorModuleCatalog.cs`
 
 ### P1-17 包级代表性验收扩展
 
-- [ ] `Acme.OperatorLibrary` smoke/acceptance 增加匹配、Region/Morphology、频域、SemanticSegmentation、AnomalyDetection、SurfaceDefectDetection 的最小路径。
+- [ ] `ClearVision.OperatorLibrary` smoke/acceptance 增加匹配、Region/Morphology、频域、SemanticSegmentation、AnomalyDetection、SurfaceDefectDetection 的最小路径。
 - [ ] 每类至少覆盖正常、参数错误或资源缺失、输出契约。
 - [ ] 维持 smoke 可快速运行，重数据集验证放质量 suite。
-- 依据：`Acme.OperatorLibrary/tests/Acme.OperatorLibrary.SmokeTests/RepresentativeOperatorAcceptanceTests.cs`
+- 依据：`ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests/RepresentativeOperatorAcceptanceTests.cs`
 
 ### P1-18 质量等级拆成两条线
 
@@ -244,7 +244,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] 评估 `global.json` 的 `rollForward: latestMajor` 是否应改为更保守策略。
 - [ ] 消化或删除 SDK 10 csc workaround 的长期依赖。
 - [ ] 文档统一 `.NET SDK 9.0.300` 与实际 CI runner 解析结果。
-- 依据：`global.json`、`Acme.Product/Directory.Build.targets`
+- 依据：`global.json`、`ClearVision.Product/Directory.Build.targets`
 
 ### P1-21 工业 gate 进入 CI
 
@@ -258,7 +258,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] CI 除 `npx playwright test` 外，补跑 `npm run test:unit`。
 - [ ] `test:preview-smoke` 放入 PR quick 或 nightly，并明确失败 artifact。
 - [ ] Station Monitor 前端增加最小渲染和 SSE event apply 单测。
-- 依据：`Acme.Product/tests/Acme.Product.UI.Tests/package.json`
+- 依据：`ClearVision.Product/tests/ClearVision.Product.UI.Tests/package.json`
 
 ### P1-23 发布包口径统一
 
@@ -271,10 +271,10 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 
 ### P2-1 Runtime 依赖边界瘦身
 
-- [ ] 逐步减少 `Acme.Product.Runtime` 对 `Application` / `Infrastructure` 的直接引用。
+- [ ] 逐步减少 `ClearVision.Product.Runtime` 对 `Application` / `Infrastructure` 的直接引用。
 - [ ] 明确 Runtime 的纯运行依赖面和 Desktop/Station 宿主依赖面。
 - [ ] 用 architecture guard 防止 Runtime 引入 WebView2/Kestrel/wwwroot/Desktop。
-- 依据：`Acme.Product/src/Acme.Product.Runtime/Acme.Product.Runtime.csproj`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Runtime/ClearVision.Product.Runtime.csproj`
 
 ### P2-2 前端全局变量退场
 
@@ -323,7 +323,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] Markdown SBOM 之外补 CycloneDX 或 SPDX artifact。
 - [ ] release artifact 中同时包含 SBOM、THIRD-PARTY-NOTICES、dependency-report。
 - [ ] 自动输出依赖漏洞和许可证待审清单，特别跟踪 `S7NetPlus` license metadata 缺口。
-- 依据：`Acme.OperatorLibrary/SBOM.md`、`THIRD-PARTY-NOTICES.md`、`analyze-deps.ps1`
+- 依据：`ClearVision.OperatorLibrary/SBOM.md`、`THIRD-PARTY-NOTICES.md`、`analyze-deps.ps1`
 
 ### P2-9 Coverage 从 artifact 变成趋势
 
@@ -337,7 +337,7 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 - [ ] 评估 Product solution 的 lock-file 策略。
 - [ ] 考虑中央包版本管理，减少 csproj 依赖版本漂移。
 - [ ] NuGet audit 与 locked restore 在 release 前至少 dry run。
-- 依据：`Acme.Product/Acme.Product.sln`、`nuget.config`
+- 依据：`ClearVision.Product/ClearVision.Product.sln`、`nuget.config`
 
 ### P2-11 虚拟 PLC 脚本易用性
 
@@ -365,16 +365,16 @@ scope: "基于现有 ClearVision 功能的稳定性、质量、现场化、验�
 ## 推荐验证命令
 
 ```powershell
-dotnet build Acme.Product/Acme.Product.sln --configuration Debug
+dotnet build ClearVision.Product/ClearVision.Product.sln --configuration Debug
 
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName RuntimeMvpTests,StationSyncContractsSerializationTests `
   -NoRestore `
   -Verbosity minimal
 
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj" `
   -FullyQualifiedName StationRegistryServiceTests,StationEndpointsTests,StationIngressSecurityTests `
   -NoRestore `
   -Verbosity minimal
@@ -383,7 +383,7 @@ dotnet build Acme.Product/Acme.Product.sln --configuration Debug
 
 & "./scripts/run-operator-library-industrial-gate.ps1" -Profile quick -NoBuild -NoRestore
 
-Push-Location Acme.Product/tests/Acme.Product.UI.Tests
+Push-Location ClearVision.Product/tests/ClearVision.Product.UI.Tests
 npm run test:unit
 npx playwright test
 Pop-Location

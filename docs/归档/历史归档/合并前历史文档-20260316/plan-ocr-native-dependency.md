@@ -30,7 +30,7 @@
 为了一劳永逸且优雅地解决带有大量 C++ 非托管依赖在 xUnit 测试中运行的问题，必须避免硬拷贝文件，我们将采用下述现代 .NET 的机制解决：
 
 ### 阶段一：环境深度还原清理 (Clean Environment)
-- 彻底清理测试模块 `Acme.Product.Tests` 的全部残留代码，移除掉我刚才留在 `OcrRecognitionOperatorTests.cs` 中脏乱差的复制逻辑、`PATH` 修改和 Win32 API 声明。
+- 彻底清理测试模块 `ClearVision.Product.Tests` 的全部残留代码，移除掉我刚才留在 `OcrRecognitionOperatorTests.cs` 中脏乱差的复制逻辑、`PATH` 修改和 Win32 API 声明。
 - 完全删除掉已经被 C++ 文件污染了的 `bin` 文件夹。
 
 ### 阶段二：利用 `NativeLibrary.SetDllImportResolver` 手动干预加载

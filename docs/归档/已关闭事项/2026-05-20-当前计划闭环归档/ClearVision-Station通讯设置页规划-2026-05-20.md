@@ -13,7 +13,7 @@
   - Station 侧保存 `StationSync` 覆盖配置到 `%LocalAppData%\ClearVisionStation\station-sync-settings.json`。
   - `appsettings.json` 继续作为默认值和部署模板，不由 UI 回写。
 - 启动读取逻辑：
-  - Studio 启动时，在 `Acme.Product/src/Acme.Product.Desktop/Program.cs` 解析 Kestrel 监听前读取持久化 `StationIngress` 覆盖值。
+  - Studio 启动时，在 `ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs` 解析 Kestrel 监听前读取持久化 `StationIngress` 覆盖值。
   - Station 启动时在默认 `appsettings.json` 之后加载本机 `station-sync-settings.json`，让 UI 保存值覆盖默认配置。
 - 模式映射固定为：
   - `Disabled`：Studio ingress 关闭，本机 Station sync 关闭。
@@ -51,7 +51,7 @@
   - 设置页能切换到“Station 设置”，选择本机通讯后展示 `127.0.0.1:<port>`。
   - 保存成功后显示“Studio/Station 需重启生效”提示。
   - token 默认掩码，点击显示/复制只对 Admin 生效。
-- 目标测试命令使用现有串行脚本，优先跑 `Acme.Product.Desktop.Tests` 中新增 Station 通讯配置相关测试。
+- 目标测试命令使用现有串行脚本，优先跑 `ClearVision.Product.Desktop.Tests` 中新增 Station 通讯配置相关测试。
 
 ## Assumptions
 

@@ -1,4 +1,7 @@
-﻿# ClearVision Phase 2 — 测试基础设施建设 开发指导手册
+﻿# ClearVision Phase 2 — 测试基础设施建设 开发指导手册
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -10,8 +13,8 @@
 
 
 
-> **适用于**: opencode / AI 编码助手  
-> **前置**: Phase 1（关键能力补齐）已完成  
+> **适用于**: opencode / AI 编码助手
+> **前置**: Phase 1（关键能力补齐）已完成
 > **目标**: 为所有 39+ 个算子建立系统化的测试覆盖
 
 ---
@@ -47,7 +50,7 @@
 ## 二、开发规范
 
 ### 2.1 文件位置
-所有测试放在 `tests\Acme.Product.Tests\Operators\` 目录下。
+所有测试放在 `tests\ClearVision.Product.Tests\Operators\` 目录下。
 
 ### 2.2 命名约定
 - 文件名: `{算子名}OperatorTests.cs`
@@ -65,11 +68,11 @@
 以下是创建测试用 OpenCV Mat 的辅助方法，**请在一个共享的 `TestHelpers.cs` 中创建**：
 
 ```csharp
-// tests\Acme.Product.Tests\Operators\TestHelpers.cs
-using Acme.Product.Infrastructure.Operators;
+// tests\ClearVision.Product.Tests\Operators\TestHelpers.cs
+using ClearVision.Product.Infrastructure.Operators;
 using OpenCvSharp;
 
-namespace Acme.Product.Tests.Operators;
+namespace ClearVision.Product.Tests.Operators;
 
 public static class TestHelpers
 {
@@ -130,14 +133,14 @@ public static class TestHelpers
 #### 3.1 MedianBlurOperatorTests.cs
 
 ```csharp
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace Acme.Product.Tests.Operators;
+namespace ClearVision.Product.Tests.Operators;
 
 public class MedianBlurOperatorTests
 {
@@ -254,9 +257,12 @@ public class MedianBlurOperatorTests
 ## 五、构建验证
 
 ```powershell
-cd c:\Users\11234\Desktop\ClearVision\Acme.Product
+cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
 
-# 编译测试项目
+# 编译测试项目
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -267,9 +273,12 @@ cd c:\Users\11234\Desktop\ClearVision\Acme.Product
 <!-- DOC_AUDIT_STATUS_END -->
 
 
-dotnet build tests\Acme.Product.Tests\Acme.Product.Tests.csproj
+dotnet build tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj
 
-# 运行所有测试
+# 运行所有测试
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -280,9 +289,12 @@ dotnet build tests\Acme.Product.Tests\Acme.Product.Tests.csproj
 <!-- DOC_AUDIT_STATUS_END -->
 
 
-dotnet test tests\Acme.Product.Tests\Acme.Product.Tests.csproj --verbosity normal
+dotnet test tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj --verbosity normal
 
-# 按组运行
+# 按组运行
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）

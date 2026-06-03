@@ -2,7 +2,7 @@
 
 > **对应算子**: `GaussianBlurOperator` / `OperatorType.Filtering`
 > **OperatorType**: `Filtering`（仓库枚举里同时存在 `GaussianBlur`，但当前类返回的是 `Filtering`）
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/GaussianBlurOperator.cs`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/GaussianBlurOperator.cs`
 > **相关算子**: [MedianBlur](./02-MedianBlur-技术笔记.md)、[BilateralFilter](./03-BilateralFilter-技术笔记.md)、[CannyEdge](./06-CannyEdge-技术笔记.md)
 > **阅读前置**: 灰度图、卷积、噪声的基本概念
 > **核心来源**: OpenCV Gaussian Blur 文档、Szeliski《Computer Vision》、Bradski & Kaehler《Learning OpenCV》

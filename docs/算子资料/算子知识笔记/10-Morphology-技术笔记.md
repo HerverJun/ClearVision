@@ -2,7 +2,7 @@
 
 > **对应算子**: `MorphologyOperator`（兼容旧流程） / `MorphologicalOperationOperator`（新流程推荐）
 > **OperatorType**: `OperatorType.Morphology` / `OperatorType.MorphologicalOperation`
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/MorphologyOperator.cs`、`Acme.Product/src/Acme.Product.Infrastructure/Operators/MorphologicalOperationOperator.cs`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MorphologyOperator.cs`、`ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MorphologicalOperationOperator.cs`
 > **相关算子**: [Threshold](./04-Threshold-技术笔记.md)、[AdaptiveThreshold](./05-AdaptiveThreshold-技术笔记.md)、[BlobDetection](./11-BlobDetection-技术笔记.md)
 > **阅读前置**: 先理解前景/背景二值图，会更容易理解腐蚀和膨胀
 > **核心来源**: ClearVision 当前实现、OpenCV morphology、Gonzalez & Woods《Digital Image Processing》
@@ -690,8 +690,8 @@ Threshold / AdaptiveThreshold
 
 ## 12. 专业来源与延伸阅读
 
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/MorphologyOperator.cs`
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/MorphologicalOperationOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MorphologyOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MorphologicalOperationOperator.cs`
 - ClearVision 本地资料: `../算子手册.md`、`../算子名片/Morphology.md`
 - OpenCV Documentation: morphological transformations
 - Gonzalez & Woods, *Digital Image Processing*, morphology chapters

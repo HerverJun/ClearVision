@@ -41,7 +41,7 @@ source_path: "docs/进行中/当前计划/0407-Qwen排查未闭环TODO.md"
 
 ### 未闭环证据
 
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/Connectors/OpenAiConnector.cs` 构造函数仍直接修改传入的 `_httpClient.BaseAddress`、`DefaultRequestHeaders`、`Timeout`。
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Connectors/OpenAiConnector.cs` 构造函数仍直接修改传入的 `_httpClient.BaseAddress`、`DefaultRequestHeaders`、`Timeout`。
 - `Dispose()` 仍无条件 `_httpClient?.Dispose()`，外部注入的共享 `HttpClient` 仍可能被释放。
 
 ### TODO

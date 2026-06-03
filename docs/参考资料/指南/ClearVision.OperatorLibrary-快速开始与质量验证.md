@@ -1,21 +1,21 @@
-# Acme.OperatorLibrary 快速开始与质量验证
+# ClearVision.OperatorLibrary 快速开始与质量验证
 
 > 面向 ClearVision 算子库消费方、维护者和 CI/benchmark 接入者。本文只记录当前仓库已经存在的入口，不承诺尚未实现的 API。
 
 ## 1. 适用范围
 
-`Acme.OperatorLibrary` 是 ClearVision 算子实现层的 NuGet 包装工程。源码仍主要来自 `Acme.Product/src/Acme.Product.Infrastructure`，包工程通过 MSBuild linked compile items 复用现有实现。
+`ClearVision.OperatorLibrary` 是 ClearVision 算子实现层的 NuGet 包装工程。源码仍主要来自 `ClearVision.Product/src/ClearVision.Product.Infrastructure`，包工程通过 MSBuild linked compile items 复用现有实现。
 
 当前包关注：
 
 - 图像处理、测量、标定、通信、流程控制、AI 等主要算子族。
-- 面向消费端的模块索引：`Acme.OperatorLibrary.ImageProcessing`、`Measurement`、`Calibration`、`Communication`、`FlowControl`、`AI`。
-- 包验收测试：`Acme.OperatorLibrary/tests/Acme.OperatorLibrary.SmokeTests`。
+- 面向消费端的模块索引：`ClearVision.OperatorLibrary.ImageProcessing`、`Measurement`、`Calibration`、`Communication`、`FlowControl`、`AI`。
+- 包验收测试：`ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests`。
 - 质量飞轮证据：`quality/evals/reports/*_baseline.*` 与 `operator_quality_matrix.md`。
 
 ## 2. 本地打包与引用
 
-在 `Acme.OperatorLibrary` 目录运行：
+在 `ClearVision.OperatorLibrary` 目录运行：
 
 ```powershell
 ./pack.ps1
@@ -24,19 +24,19 @@
 默认输出：
 
 ```text
-Acme.OperatorLibrary/nupkg/Acme.OperatorLibrary.1.0.2.nupkg
+ClearVision.OperatorLibrary/nupkg/ClearVision.OperatorLibrary.1.0.2.nupkg
 ```
 
 消费项目可添加本地包源并引用当前版本：
 
 ```xml
 <packageSources>
-  <add key="local-operator-library" value="path/to/Acme.OperatorLibrary/nupkg" />
+  <add key="local-operator-library" value="path/to/ClearVision.OperatorLibrary/nupkg" />
 </packageSources>
 ```
 
 ```xml
-<PackageReference Include="Acme.OperatorLibrary" Version="1.0.2" />
+<PackageReference Include="ClearVision.OperatorLibrary" Version="1.0.2" />
 ```
 
 如需验证包可安装、可 restore、且代表性算子可执行，使用：
@@ -56,7 +56,7 @@ CI 或发布流水线需要注入版本和源码追踪信息时，可使用：
   -RunSmokeTest
 ```
 
-`pack.ps1` 也会读取 `ACME_OPERATORLIB_PACKAGE_VERSION`、`GITHUB_SHA`、`GITHUB_REF_NAME`、`BUILD_SOURCEVERSION`、`BUILD_SOURCEBRANCHNAME` 等常见 CI 环境变量。
+`pack.ps1` 也会读取 `CLEARVISION_OPERATORLIB_PACKAGE_VERSION`、`GITHUB_SHA`、`GITHUB_REF_NAME`、`BUILD_SOURCEVERSION`、`BUILD_SOURCEBRANCHNAME` 等常见 CI 环境变量。
 
 ## 3. 消费端最小示例
 
@@ -65,11 +65,11 @@ CI 或发布流水线需要注入版本和源码追踪信息时，可使用：
 模块索引用于让消费端按大类展示或筛选 `OperatorType`，不负责创建完整流程。
 
 ```csharp
-using Acme.OperatorLibrary.Modules;
-using Acme.Product.Core.Enums;
+using ClearVision.OperatorLibrary.Modules;
+using ClearVision.Product.Core.Enums;
 
-var imageOperators = Acme.OperatorLibrary.ImageProcessing.Operators.Types;
-var measurementOperators = Acme.OperatorLibrary.Measurement.Operators.Types;
+var imageOperators = ClearVision.OperatorLibrary.ImageProcessing.Operators.Types;
+var measurementOperators = ClearVision.OperatorLibrary.Measurement.Operators.Types;
 
 var meanFilterModule = OperatorModuleCatalog.GetModule(OperatorType.MeanFilter);
 var caliperModule = OperatorModuleCatalog.GetModule(OperatorType.CaliperTool);
@@ -85,10 +85,10 @@ Console.WriteLine($"CaliperTool => {caliperModule}");
 下面示例沿用包验收测试中的调用方式：构造 `Operator`、补齐参数、传入 `ImageWrapper`，再调用具体 executor。
 
 ```csharp
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.ValueObjects;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenCvSharp;
 
@@ -135,22 +135,22 @@ Console.WriteLine($"Output keys: {string.Join(", ", result.OutputData!.Keys)}");
 
 ```powershell
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.OperatorLibrary/tests/Acme.OperatorLibrary.SmokeTests/Acme.OperatorLibrary.SmokeTests.csproj"
+  -Project "ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests/ClearVision.OperatorLibrary.SmokeTests.csproj"
 ```
 
 若同一会话中该项目已经成功 build，后续窄范围复跑可加：
 
 ```powershell
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.OperatorLibrary/tests/Acme.OperatorLibrary.SmokeTests/Acme.OperatorLibrary.SmokeTests.csproj" `
-  -FullyQualifiedName "Acme.OperatorLibrary.SmokeTests.RepresentativeOperatorAcceptanceTests" `
+  -Project "ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests/ClearVision.OperatorLibrary.SmokeTests.csproj" `
+  -FullyQualifiedName "ClearVision.OperatorLibrary.SmokeTests.RepresentativeOperatorAcceptanceTests" `
   -NoBuild `
   -NoRestore
 ```
 
 ### 4.2 产品侧回归测试
 
-算子包复用产品侧实现，因此涉及核心行为时也应关注 `Acme.Product/tests/Acme.Product.Tests`。已有固定脚本包括：
+算子包复用产品侧实现，因此涉及核心行为时也应关注 `ClearVision.Product/tests/ClearVision.Product.Tests`。已有固定脚本包括：
 
 ```powershell
 ./scripts/run-tests-services-regression.ps1
@@ -196,7 +196,7 @@ quality/evals/reports/operator_quality_matrix.md
 当前 benchmark 证据有两类：
 
 1. 质量 runner 产物：`quality/evals/reports/*_baseline.json` 与 `*_baseline.md`。
-2. 产品测试产物：`Acme.Product/test_results/*benchmark_report.md`。
+2. 产品测试产物：`ClearVision.Product/test_results/*benchmark_report.md`。
 
 通用 baseline benchmark 入口：
 
@@ -209,10 +209,10 @@ dotnet run --project scripts/BaselineBenchmark/BaselineBenchmark.csproj -- `
 
 产品侧已有 benchmark 测试会生成报告：
 
-- `Acme.Product/test_results/operator_benchmark_report.md`
-- `Acme.Product/test_results/calibration_operator_benchmark_report.md`
-- `Acme.Product/test_results/measurement_operator_benchmark_report.md`
-- `Acme.Product/test_results/preprocessing_benchmark_report.md`
+- `ClearVision.Product/test_results/operator_benchmark_report.md`
+- `ClearVision.Product/test_results/calibration_operator_benchmark_report.md`
+- `ClearVision.Product/test_results/measurement_operator_benchmark_report.md`
+- `ClearVision.Product/test_results/preprocessing_benchmark_report.md`
 
 单次本机 benchmark 只能说明当前机器、当前输入、当前迭代次数下的趋势。用于 CI 或发布判断时，应同时看：
 

@@ -6,7 +6,7 @@ Phase 1 的 4 个算子文件和枚举已创建，但缺少 DI 注册、工厂�
 
 ## 1. DI 注册 (DependencyInjection.cs)
 
-在 `src\Acme.Product.Desktop\DependencyInjection.cs` 的 `// Phase 3 新增算子` 注释之前添加：
+在 `src\ClearVision.Product.Desktop\DependencyInjection.cs` 的 `// Phase 3 新增算子` 注释之前添加：
 
 ```csharp
 // Phase 1 关键能力补齐
@@ -20,7 +20,7 @@ services.AddSingleton<IOperatorExecutor, SubpixelEdgeDetectionOperator>();
 
 ## 2. 工厂元数据 (OperatorFactory.cs)
 
-在 `src\Acme.Product.Infrastructure\Services\OperatorFactory.cs` 的 `InitializeDefaultOperators()` 方法末尾添加以下 4 段元数据。注意：必须放在方法内部、大括号关闭之前。
+在 `src\ClearVision.Product.Infrastructure\Services\OperatorFactory.cs` 的 `InitializeDefaultOperators()` 方法末尾添加以下 4 段元数据。注意：必须放在方法内部、大括号关闭之前。
 
 ### 2.1 几何拟合
 
@@ -191,7 +191,7 @@ _metadata[OperatorType.SubpixelEdgeDetection] = new OperatorMetadata
 
 ## 3. CameraCalibration 改进 (CameraCalibrationOperator.cs)
 
-修改 `src\Acme.Product.Infrastructure\Operators\CameraCalibrationOperator.cs`：
+修改 `src\ClearVision.Product.Infrastructure\Operators\CameraCalibrationOperator.cs`：
 
 1. 在 `OperatorFactory.cs` 中 `CameraCalibration` (枚举值24) 的元数据 Parameters 列表里追加 3 个参数：
 
@@ -216,17 +216,17 @@ new() { Name = "CalibrationOutputPath", DisplayName = "标定结果保存路径"
 
 ## 4. 单元测试
 
-在 `tests\Acme.Product.Tests\Operators\` 下创建 4 个测试文件，每个至少包含 3 个测试。模板如下（替换类名和枚举值）：
+在 `tests\ClearVision.Product.Tests\Operators\` 下创建 4 个测试文件，每个至少包含 3 个测试。模板如下（替换类名和枚举值）：
 
 ```csharp
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace Acme.Product.Tests.Operators;
+namespace ClearVision.Product.Tests.Operators;
 
 public class {算子名}OperatorTests
 {
@@ -275,7 +275,7 @@ public class {算子名}OperatorTests
 全部修改完成后运行：
 
 ```powershell
-cd c:\Users\11234\Desktop\ClearVision\Acme.Product
+cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
 dotnet build
 dotnet test
 ```

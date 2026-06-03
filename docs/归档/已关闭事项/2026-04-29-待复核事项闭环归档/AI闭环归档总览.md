@@ -52,12 +52,12 @@ AI 这条待复核线按“工作流生成主链”口径关闭。
 
 ## 证据入口
 
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/AiFlowGenerationService.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/AiFlowValidator.cs`
-- `Acme.Product/src/Acme.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs`
-- `Acme.Product/src/Acme.Product.Contracts/Messages/AiGenerationMessages.cs`
-- `Acme.Product/tests/Acme.Product.Tests/AI/GenerateFlowMessageHandlerTests.cs`
-- `Acme.Product/tests/Acme.Product.Tests/AI/AiFlowGenerationServiceManualRetryTests.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowGenerationService.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiFlowValidator.cs`
+- `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs`
+- `ClearVision.Product/src/ClearVision.Product.Contracts/Messages/AiGenerationMessages.cs`
+- `ClearVision.Product/tests/ClearVision.Product.Tests/AI/GenerateFlowMessageHandlerTests.cs`
+- `ClearVision.Product/tests/ClearVision.Product.Tests/AI/AiFlowGenerationServiceManualRetryTests.cs`
 
 ## 后续边界
 

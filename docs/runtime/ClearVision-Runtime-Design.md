@@ -2,22 +2,22 @@
 
 ## Boundary
 
-- `Acme.Product.Desktop`
+- `ClearVision.Product.Desktop`
   - Studio only.
   - Owns WinForms host, WebView2, Kestrel, static `wwwroot`, auth/web endpoints, AI authoring entry points.
-- `Acme.Product.Runtime.Abstractions`
+- `ClearVision.Product.Runtime.Abstractions`
   - Stable runtime package contracts and normalized runtime result DTOs.
-- `Acme.Product.Runtime`
+- `ClearVision.Product.Runtime`
   - Runtime package export/load/validation.
   - Runtime host state machine, single-run/folder replay loop, bounded JSONL/image persistence.
   - Result normalization on top of shared `IFlowExecutionService`.
-- `Acme.Product.Station`
+- `ClearVision.Product.Station`
   - Native WinForms operator console.
   - No WebView2, no Kestrel, no `wwwroot`, no Desktop reference.
 
 ## Shared execution
 
-- Shared runtime DI now lives in `Acme.Product.Infrastructure.DependencyInjection.VisionRuntimeServiceCollectionExtensions`.
+- Shared runtime DI now lives in `ClearVision.Product.Infrastructure.DependencyInjection.VisionRuntimeServiceCollectionExtensions`.
 - Desktop keeps `AddVisionServices(...)` as a thin wrapper.
 - Runtime/Station reuse the same `FlowExecutionService`, operator factory, variable context, and executor registrations.
 

@@ -1,10 +1,10 @@
 # TemplateMatch 技术笔记
 
-> **对应算子**: `TemplateMatchOperator`  
-> **OperatorType**: `OperatorType.TemplateMatching`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/TemplateMatchOperator.cs`  
-> **相关算子**: [ShapeMatching](./14-ShapeMatching-技术笔记.md)、[CaliperTool](./15-CaliperTool-技术笔记.md)、[ColorConversion](./08-ColorConversion-技术笔记.md)  
-> **阅读前置**: 本文从零开始讲解，无需任何背景知识  
+> **对应算子**: `TemplateMatchOperator`
+> **OperatorType**: `OperatorType.TemplateMatching`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/TemplateMatchOperator.cs`
+> **相关算子**: [ShapeMatching](./14-ShapeMatching-技术笔记.md)、[CaliperTool](./15-CaliperTool-技术笔记.md)、[ColorConversion](./08-ColorConversion-技术笔记.md)
+> **阅读前置**: 本文从零开始讲解，无需任何背景知识
 > **核心来源**: ClearVision 当前实现、OpenCV `matchTemplate`、经典模板匹配教材
 
 ---
@@ -379,7 +379,7 @@ $$R_{ccoeff\_normed}(x,y) = \frac{\sum_{x',y'} T'(x',y') \cdot I'(x+x', y+y')}{\
 
 ```
 原始像素值:          归一化后（去除亮度影响）:
-                    
+
 强度                 形状
 ↑                    ↑
 │    ╱╲              │    ╱╲
@@ -398,7 +398,7 @@ ClearVision 当前实现中：
 
 ```csharp
 // 如果是 SqDiff/SqDiffNormed 方法，分数转换为正向分数
-if (method == TemplateMatchModes.SqDiff || 
+if (method == TemplateMatchModes.SqDiff ||
     method == TemplateMatchModes.SqDiffNormed)
 {
     score = 1.0 - minVal;  // 把最小值转换为"相似度"
@@ -707,7 +707,7 @@ ClearVision 当前实现是标准灰度模板匹配路线：
 
 ### 9.1 模板匹配到底在比什么
 
-它比较的是搜索图局部窗口与模板图在某种相似度度量下的接近程度。  
+它比较的是搜索图局部窗口与模板图在某种相似度度量下的接近程度。
 常见方法包括相关、归一化相关、平方差等（详见第4节）。
 
 ### 9.2 为什么它简单但好用
@@ -813,20 +813,20 @@ Gray / Normalize
 
 ### 常见误区
 
-- **误区一**：模板匹配就是"万用定位"  
+- **误区一**：模板匹配就是"万用定位"
   它很适合稳定模板，不适合大变形大旋转。
-  
-- **误区二**：分数低一定是阈值设错了  
+
+- **误区二**：分数低一定是阈值设错了
   很多时候是模板本身已经不适合当前现场。
-  
-- **误区三**：模板越小计算越快  
+
+- **误区三**：模板越小计算越快
   模板越小，结果图越大，计算量不一定减少。
 
 ---
 
 ## 14. 专业来源与延伸阅读
 
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/TemplateMatchOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/TemplateMatchOperator.cs`
 - ClearVision 本地资料: `../算子手册.md`、`../算子名片/TemplateMatching.md`
 - OpenCV Documentation: *matchTemplate*
 - Bradski & Kaehler, *Learning OpenCV*, template matching chapters

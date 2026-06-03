@@ -32,7 +32,7 @@
 
 | 属性 | 内容 |
 |---|---|
-| **源码位置** | `Acme.Product/src/Acme.Product.Infrastructure/ImageProcessing/SubPixelEdgeDetector.cs`，第 184–289 行 |
+| **源码位置** | `ClearVision.Product/src/ClearVision.Product.Infrastructure/ImageProcessing/SubPixelEdgeDetector.cs`，第 184–289 行 |
 | **问题类型** | 命名与算法实现严重不符，误导性强 |
 | **详细描述** | 该方法声称实现 "Zernike-style moment based subpixel edge localization"，但实际计算的是梯度幅值的一阶空间矩（类似于灰度重心法在梯度域的变种），并非 Zernike 正交矩。真正的 Zernike 矩边缘检测需要构造 Zernike 正交多项式核（Z11、Z20、Z31 等），在图像上进行卷积，利用旋转不变性求解边缘参数。当前实现仅对梯度幅值做加权平均 `z11 += grad * ((i-center)/r)`，没有正交基、没有阶数概念、没有旋转不变性。 |
 | **精度影响** | 对于理想阶跃边缘，该方法和重心法表现接近，能达到 0.1px 左右；但对于噪声图像或倾斜边缘，由于缺乏 Zernike 矩的旋转不变性和高阶信息，精度会明显低于真正的 Zernike 实现。 |
@@ -59,7 +59,7 @@ public float DetectZernike(Mat roi, int maskSize = 5)
 
 | 属性 | 内容 |
 |---|---|
-| **源码位置** | `Acme.Product/src/Acme.Product.Infrastructure/ImageProcessing/StegerSubpixelEdgeDetector.cs` |
+| **源码位置** | `ClearVision.Product/src/ClearVision.Product.Infrastructure/ImageProcessing/StegerSubpixelEdgeDetector.cs` |
 | **问题类型** | 实现正确，但测试覆盖待验证 |
 | **详细描述** | Steger 法的实现符合经典文献：可分离高斯核、一阶/二阶导数核、Hessian 特征值分解、法向量归一化、二次泰勒展开求亚像素偏移。`NumericalEpsilon = 1e-10` 在 double 精度下足够。`FitCircle` 和 `FitLine` 使用代数法（Kasa 法），对于圆拟合在边缘点分布不均匀时可能产生偏差，但 RMSE 已输出，可供诊断。 |
 | **精度影响** | 对于高对比度边缘，Steger 法精度可达 0.01px；对于低对比度或强噪声图像，Hessian 特征值可能接近 epsilon，导致边缘点丢失。 |
@@ -74,7 +74,7 @@ public float DetectZernike(Mat roi, int maskSize = 5)
 
 | 属性 | 内容 |
 |---|---|
-| **源码位置** | `Acme.Product/src/Acme.Product.Infrastructure/Operators/IndustrialCaliperKernel.cs`，第 276 行 |
+| **源码位置** | `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/IndustrialCaliperKernel.cs`，第 276 行 |
 | **问题类型** | 参数截断未告警，大 σ 时频谱泄漏 |
 | **详细描述** | `var radius = Math.Clamp((int)Math.Ceiling(sigma * 3.0), 1, 8);` 当 σ > 2.7 时，radius 被截断为 8，而 3σ 法则实际需要 radius = ceil(3σ)。例如 σ=4 时需要 radius=12，截断到 8 后高斯核尾部被切断，归一化后频谱泄漏，平滑后的 profile 在边缘附近出现振铃。 |
 | **精度影响** | σ 较大时（如强噪声图像需要大模糊），边缘定位可能产生系统性偏差，亚像素精度从 ~0.05px 退化到 ~0.2px。 |
@@ -158,7 +158,7 @@ private static double[] GaussianSmooth(IReadOnlyList<double> profile, double sig
 
 | 属性 | 内容 |
 |---|---|
-| **源码位置** | `Acme.Product/src/Acme.Product.Infrastructure/Calibration/IntrinsicsCalibrationRuntime.cs` |
+| **源码位置** | `ClearVision.Product/src/ClearVision.Product.Infrastructure/Calibration/IntrinsicsCalibrationRuntime.cs` |
 | **问题类型** | 静态校验完善，但运行时监控缺失 |
 | **详细描述** | `TryCreate` 对 camera matrix、distortion coefficients、image size 做了非常严格的静态校验（有限性、正性、模型长度、齐次坐标最后一行 [0,0,1] ±1e-9）。但在标定运行期间（如连续生产过程中），没有机制检测标定参数是否因温度、振动等因素发生漂移。 |
 | **工业验收风险** | 中。长期运行后标定漂移可能导致像素→世界坐标转换系统性偏差，影响测量精度。 |

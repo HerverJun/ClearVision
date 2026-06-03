@@ -7,13 +7,13 @@
   "Images": [
     {
       "Name": "shapes_composite.png",
-      "Path": "C:\\Users\\11234\\Desktop\\ClearVision\\Acme.Product\\tests\\TestData\\shapes_composite.png",
+      "Path": "C:\\Users\\11234\\Desktop\\ClearVision\\ClearVision.Product\\tests\\TestData\\shapes_composite.png",
       "Width": 512,
       "Height": 512
     },
     {
       "Name": "iso12233_slant_edge_512.png",
-      "Path": "C:\\Users\\11234\\Desktop\\ClearVision\\Acme.Product\\tests\\TestData\\iso12233_slant_edge_512.png",
+      "Path": "C:\\Users\\11234\\Desktop\\ClearVision\\ClearVision.Product\\tests\\TestData\\iso12233_slant_edge_512.png",
       "Width": 512,
       "Height": 512
     }

@@ -1,4 +1,7 @@
-﻿# ClearVision Phase 5 — 前端 UI 增强与端到端测试
+﻿# ClearVision Phase 5 — 前端 UI 增强与端到端测试
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -10,8 +13,8 @@
 
 
 
-> **适用于**: opencode / AI 编码助手  
-> **前置**: Phase 1-4 已完成（46 个算子、连接池、超时保护）  
+> **适用于**: opencode / AI 编码助手
+> **前置**: Phase 1-4 已完成（46 个算子、连接池、超时保护）
 > **目标**: 提升前端体验、补充集成测试、确保全量构建 0 errors
 
 ---
@@ -19,7 +22,7 @@
 ## 一、修复全量编译（如仍有问题）
 
 ```powershell
-cd c:\Users\11234\Desktop\ClearVision\Acme.Product
+cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
 Get-ChildItem -Path . -Include bin,obj -Recurse -Directory | Remove-Item -Recurse -Force
 dotnet build
 ```
@@ -38,7 +41,7 @@ Get-ChildItem -Recurse -Include *.cs | Select-String "class CreateProjectRequest
 
 ### 2.1 检查当前实现
 
-文件: `src\Acme.Product.Desktop\wwwroot\src\features\flow-editor\` 或 `src\shared\`
+文件: `src\ClearVision.Product.Desktop\wwwroot\src\features\flow-editor\` 或 `src\shared\`
 
 搜索 `renderParameter` 或 `createParameterInput` 方法，找到根据 `dataType` 分支渲染参数的逻辑。
 
@@ -53,7 +56,7 @@ if (param.dataType === 'file' || param.dataType === 'folder') {
     container.className = 'param-file-group';
     container.style.display = 'flex';
     container.style.gap = '4px';
-    
+
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'param-input';
@@ -61,16 +64,16 @@ if (param.dataType === 'file' || param.dataType === 'folder') {
     input.placeholder = param.dataType === 'folder' ? '选择文件夹...' : '选择文件...';
     input.readOnly = true;
     input.style.flex = '1';
-    
+
     const btn = document.createElement('button');
     btn.className = 'btn-outline btn-sm';
     btn.textContent = '浏览';
     btn.onclick = async () => {
         // 调用后端文件选择器
-        const command = param.dataType === 'folder' 
-            ? 'PickFolderCommand' 
+        const command = param.dataType === 'folder'
+            ? 'PickFolderCommand'
             : 'PickFileCommand';
-        
+
         try {
             const result = await window.chrome.webview.hostObjects.bridge.SendCommand(
                 JSON.stringify({ Command: command, Parameters: {} })
@@ -85,7 +88,7 @@ if (param.dataType === 'file' || param.dataType === 'folder') {
             console.error('文件选择失败:', e);
         }
     };
-    
+
     container.appendChild(input);
     container.appendChild(btn);
     return container;
@@ -140,18 +143,18 @@ const iconMap = {
 
 ### 4.1 基础流程测试
 
-文件: `tests\Acme.Product.Tests\Integration\BasicFlowIntegrationTests.cs`
+文件: `tests\ClearVision.Product.Tests\Integration\BasicFlowIntegrationTests.cs`
 
 ```csharp
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Infrastructure.Operators;
-using Acme.Product.Infrastructure.Services;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace Acme.Product.Tests.Integration;
+namespace ClearVision.Product.Tests.Integration;
 
 /// <summary>
 /// 端到端流程集成测试 — 验证多算子串联执行
@@ -164,21 +167,21 @@ public class BasicFlowIntegrationTests
         // Arrange: 创建两个算子
         var blurOp = new Operator("高斯模糊", OperatorType.GaussianBlur, 0, 0);
         var threshOp = new Operator("阈值", OperatorType.Threshold, 200, 0);
-        
+
         var blurExecutor = new GaussianBlurOperator(new Mock<ILogger<GaussianBlurOperator>>().Object);
         var threshExecutor = new ThresholdOperator(new Mock<ILogger<ThresholdOperator>>().Object);
-        
+
         // 创建测试输入图像
         using var testImage = TestHelpers.CreateGradientTestImage();
         var inputs = new Dictionary<string, object> { { "Image", testImage } };
-        
+
         // Act: 串联执行
         var blurResult = await blurExecutor.ExecuteAsync(blurOp, inputs);
         blurResult.IsSuccess.Should().BeTrue("高斯模糊应成功");
-        
+
         var threshResult = await threshExecutor.ExecuteAsync(threshOp, blurResult.OutputData);
         threshResult.IsSuccess.Should().BeTrue("阈值处理应成功");
-        
+
         // Assert: 输出包含图像
         threshResult.OutputData.Should().ContainKey("Image");
     }
@@ -188,35 +191,35 @@ public class BasicFlowIntegrationTests
     {
         var colorOp = new Operator("颜色转换", OperatorType.ColorConversion, 0, 0);
         var atOp = new Operator("自适应阈值", OperatorType.AdaptiveThreshold, 200, 0);
-        
+
         var colorExec = new ColorConversionOperator(new Mock<ILogger<ColorConversionOperator>>().Object);
         var atExec = new AdaptiveThresholdOperator(new Mock<ILogger<AdaptiveThresholdOperator>>().Object);
-        
+
         using var testImage = TestHelpers.CreateShapeTestImage();
         var inputs = new Dictionary<string, object> { { "Image", testImage } };
-        
+
         var r1 = await colorExec.ExecuteAsync(colorOp, inputs);
         r1.IsSuccess.Should().BeTrue();
-        
+
         var r2 = await atExec.ExecuteAsync(atOp, r1.OutputData);
         r2.IsSuccess.Should().BeTrue();
     }
-    
+
     [Fact]
     public async Task FindContours_Then_ContourMeasurement_Pipeline()
     {
         var findOp = new Operator("轮廓检测", OperatorType.FindContours, 0, 0);
         var measureOp = new Operator("轮廓测量", OperatorType.ContourMeasurement, 200, 0);
-        
+
         var findExec = new FindContoursOperator(new Mock<ILogger<FindContoursOperator>>().Object);
         var measureExec = new ContourMeasurementOperator(new Mock<ILogger<ContourMeasurementOperator>>().Object);
-        
+
         using var testImage = TestHelpers.CreateShapeTestImage();
         var inputs = new Dictionary<string, object> { { "Image", testImage } };
-        
+
         var r1 = await findExec.ExecuteAsync(findOp, inputs);
         r1.IsSuccess.Should().BeTrue();
-        
+
         var r2 = await measureExec.ExecuteAsync(measureOp, r1.OutputData);
         r2.IsSuccess.Should().BeTrue();
     }
@@ -233,11 +236,11 @@ public class ColorDetectionIntegrationTests
     {
         var op = new Operator("颜色检测", OperatorType.ColorDetection, 0, 0);
         var executor = new ColorDetectionOperator(new Mock<ILogger<ColorDetectionOperator>>().Object);
-        
+
         // 纯红色图像
         using var redImage = TestHelpers.CreateTestImage(color: new OpenCvSharp.Scalar(0, 0, 255));
         var inputs = new Dictionary<string, object> { { "Image", redImage } };
-        
+
         var result = await executor.ExecuteAsync(op, inputs);
         result.IsSuccess.Should().BeTrue();
     }
@@ -248,7 +251,7 @@ public class ColorDetectionIntegrationTests
 
 ## 五、性能基准（可选）
 
-如果时间允许，创建 `tests\Acme.Product.Tests\Benchmarks\OperatorBenchmarks.cs`：
+如果时间允许，创建 `tests\ClearVision.Product.Tests\Benchmarks\OperatorBenchmarks.cs`：
 
 ```csharp
 // 仅做简单计时，不需要 BenchmarkDotNet
@@ -261,11 +264,11 @@ public class OperatorPerformanceTests
         var executor = new GaussianBlurOperator(new Mock<ILogger<GaussianBlurOperator>>().Object);
         using var testImage = TestHelpers.CreateTestImage(1920, 1080); // 1080p
         var inputs = new Dictionary<string, object> { { "Image", testImage } };
-        
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var result = await executor.ExecuteAsync(op, inputs);
         sw.Stop();
-        
+
         result.IsSuccess.Should().BeTrue();
         sw.ElapsedMilliseconds.Should().BeLessThan(100, "1080p 高斯模糊应在 100ms 内完成");
     }
@@ -277,9 +280,12 @@ public class OperatorPerformanceTests
 ## 六、构建验证
 
 ```powershell
-cd c:\Users\11234\Desktop\ClearVision\Acme.Product
+cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
 
-# 全量构建
+# 全量构建
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -292,7 +298,10 @@ cd c:\Users\11234\Desktop\ClearVision\Acme.Product
 
 dotnet build
 
-# 全量测试（含集成测试）
+# 全量测试（含集成测试）
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）

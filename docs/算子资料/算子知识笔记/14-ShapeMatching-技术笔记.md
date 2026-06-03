@@ -1,10 +1,10 @@
 # ShapeMatching 技术笔记（零基础友好版）
 
-> **对应算子**: `ShapeMatchingOperator`  
-> **OperatorType**: `OperatorType.ShapeMatching`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/ShapeMatchingOperator.cs`  
-> **相关算子**: [TemplateMatch](./13-TemplateMatch-技术笔记.md)、[FindContours](./12-FindContours-技术笔记.md)、[PerspectiveTransform](./18-PerspectiveTransform-技术笔记.md)  
-> **阅读前置**: 了解基础的模板匹配概念  
+> **对应算子**: `ShapeMatchingOperator`
+> **OperatorType**: `OperatorType.ShapeMatching`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ShapeMatchingOperator.cs`
+> **相关算子**: [TemplateMatch](./13-TemplateMatch-技术笔记.md)、[FindContours](./12-FindContours-技术笔记.md)、[PerspectiveTransform](./18-PerspectiveTransform-技术笔记.md)
+> **阅读前置**: 了解基础的模板匹配概念
 > **核心来源**: ClearVision 当前实现、金字塔 coarse-to-fine 搜索思想、经典模板匹配与几何搜索文献
 
 ---
@@ -271,35 +271,35 @@
 【图像金字塔结构 - ASCII示意图】
 
 Level 0 (原图):                    金字塔层级越高，图像越小
-┌─────────────────────────┐        
-│                         │        
+┌─────────────────────────┐
+│                         │
 │    1000 × 1000 像素      │        ← 最高分辨率，细节丰富
-│    (100% 尺寸)           │        
-│                         │        
-└─────────────────────────┘        
-           │                        
-           ▼ downsample 1/2         
-┌─────────────┐                    
-│             │                    
+│    (100% 尺寸)           │
+│                         │
+└─────────────────────────┘
+           │
+           ▼ downsample 1/2
+┌─────────────┐
+│             │
 │  500 × 500   │                    ← 中等分辨率
-│  (50% 尺寸)  │                    
-│             │                    
-└─────────────┘                    
-           │                        
-           ▼ downsample 1/2         
-┌───────┐                          
-│       │                          
+│  (50% 尺寸)  │
+│             │
+└─────────────┘
+           │
+           ▼ downsample 1/2
+┌───────┐
+│       │
 │ 250×250│                          ← 低分辨率，但搜索更快
-│(25%尺寸)│                          
-│       │                          
-└───────┘                          
-           │                        
-           ▼ downsample 1/2         
-┌────┐                             
-│    │                             
+│(25%尺寸)│
+│       │
+└───────┘
+           │
+           ▼ downsample 1/2
+┌────┐
+│    │
 │125×125│                             ← 最低分辨率，用于快速定位
-│    │                             
-└────┘                             
+│    │
+└────┘
 ```
 
 ### 4.3 Coarse-to-Fine搜索过程详解
@@ -321,7 +321,7 @@ Level 0 (原图):                    金字塔层级越高，图像越小
 │  ~ ○ ~ ~ ~  │               ▼
 │  ~ ~ ~ ~ ~  │         在整幅图上滑动搜索
 └─────────────┘
-         
+
 ○ = 可能的匹配位置（粗定位）
 搜索速度很快，但精度较低
 
@@ -577,7 +577,7 @@ NCC公式：
 0.8-0.9        很好匹配                模板 ┌───┐  图像 ┌───┐
                                        │A B│       │A+B│  ← 轻微模糊
 0.7-0.8        良好匹配                │C D│       │C+D│
-                                       └───┘       └───┘  
+                                       └───┘       └───┘
 0.6-0.7        勉强可接受              模板 ┌───┐  图像 ┌───┐
                                        │A B│       │? ?│  ← 部分遮挡
 0.5-0.6        较差匹配                │C D│       │? ?│
@@ -669,15 +669,15 @@ ShapeMatching:
   AngleStart: -180        # 从-180度开始
   AngleExtent: 360        # 覆盖360度
   AngleStep: 5            # 每5度一个候选，共73个角度
-  
+
   # 尺度设置（芯片大小相对固定）
   ScaleMin: 0.95
   ScaleMax: 1.05
   ScaleStep: 0.02
-  
+
   # 金字塔
   NumLevels: 3            # 3层金字塔平衡速度和精度
-  
+
   # 匹配阈值
   MinScore: 0.75          # 要求75%以上相似度
   MaxMatches: 10          # 最多检测10个芯片
@@ -738,12 +738,12 @@ ShapeMatching:
   AngleStart: -10
   AngleExtent: 20
   AngleStep: 2
-  
+
   # 尺度范围覆盖所有规格
   ScaleMin: 0.6      # 比小号(0.67)稍小，留余量
   ScaleMax: 1.4      # 比大号(1.33)稍大，留余量
   ScaleStep: 0.05    # 步长小一些，精确区分
-  
+
   # 其他参数
   NumLevels: 3
   MinScore: 0.8
@@ -807,15 +807,15 @@ ShapeMatching:
   AngleStart: -180
   AngleExtent: 360
   AngleStep: 2           # 先粗搜，步长2度
-  
+
   # 尺度（零件大小固定）
   ScaleMin: 0.98
   ScaleMax: 1.02
   ScaleStep: 0.01
-  
+
   # 金字塔
   NumLevels: 4           # 多层金字塔保证精度
-  
+
   # 匹配
   MinScore: 0.85
   MaxMatches: 1
@@ -889,7 +889,7 @@ ResistorMatcher:
   ScaleMax: 1.1
   MaxMatches: 10         # 可能有多个电阻
 
-# 电容模板配置  
+# 电容模板配置
 CapacitorMatcher:
   Template: "capacitor.png"
   AngleStart: 0          # 电容通常是圆的，角度不重要
@@ -1092,20 +1092,20 @@ n它能更好处理旋转和尺度变化，但对**严重非刚性形变**（如
 
 ### 常见误区
 
-- **误区一**：ShapeMatching 完全替代 TemplateMatch  
+- **误区一**：ShapeMatching 完全替代 TemplateMatch
   如果目标本来很稳定，普通模板匹配更简单更快。
-  
-- **误区二**：鲁棒就意味着不需要前处理  
+
+- **误区二**：鲁棒就意味着不需要前处理
   成像质量差时，任何匹配都会难受。
-  
-- **误区三**：金字塔层数越多越好  
+
+- **误区三**：金字塔层数越多越好
   模板太小时层数太多反而丢失信息。
 
 ---
 
 ## 12. 专业来源与延伸阅读
 
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/ShapeMatchingOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ShapeMatchingOperator.cs`
 - ClearVision 本地资料: `../算子手册.md`、`../算子名片/ShapeMatching.md`
 - OpenCV Documentation: image pyramids, geometric transforms, template matching
 - Szeliski, *Computer Vision: Algorithms and Applications*, coarse-to-fine search

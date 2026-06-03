@@ -192,7 +192,7 @@ class ColorGradientPyramid {
 
 #### 问题1: PyramidShapeMatchOperator 名不副实
 
-**当前代码** (Acme.Product/Infrastructure/Operators/Features/PyramidShapeMatchOperator.cs:54):
+**当前代码** (ClearVision.Product/Infrastructure/Operators/Features/PyramidShapeMatchOperator.cs:54):
 
 ```csharp
 protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(...)
@@ -2391,7 +2391,7 @@ public class PyramidShapeMatchOperator : OperatorBase
 ### 7.3 命名空间规划
 
 ```
-Acme.Product.Infrastructure/
+ClearVision.Product.Infrastructure/
 ├── ImageProcessing/
 │   ├── GradientShapeMatcher.cs          (保留, 降级方案)
 │   ├── LineModShapeMatcher.cs           [新增] LINEMOD 核心算法

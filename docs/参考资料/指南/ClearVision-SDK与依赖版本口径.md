@@ -46,8 +46,8 @@ updated: "2026-05-09"
 ```powershell
 .\scripts\dotnet.ps1 --version
 .\scripts\dotnet.ps1 -PrintPath
-.\scripts\dotnet.ps1 restore Acme.Product/Acme.Product.sln --locked-mode
-.\scripts\dotnet.ps1 build Acme.Product/Acme.Product.sln --configuration Debug --no-restore
-.\scripts\dotnet.ps1 restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --locked-mode
-.\scripts\dotnet.ps1 build Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --configuration Release --no-restore
+.\scripts\dotnet.ps1 restore ClearVision.Product/ClearVision.Product.sln --locked-mode
+.\scripts\dotnet.ps1 build ClearVision.Product/ClearVision.Product.sln --configuration Debug --no-restore
+.\scripts\dotnet.ps1 restore ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj --locked-mode
+.\scripts\dotnet.ps1 build ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj --configuration Release --no-restore
 ```

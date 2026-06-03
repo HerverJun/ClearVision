@@ -2,7 +2,7 @@
 
 > **对应算子**: `BlobDetectionOperator` / `OperatorType.BlobAnalysis`
 > **OperatorType**: `OperatorType.BlobAnalysis`
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/BlobDetectionOperator.cs`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/BlobDetectionOperator.cs`
 > **相关算子**: [Threshold](./04-Threshold-技术笔记.md)、[Morphology](./10-Morphology-技术笔记.md)、[FindContours](./12-FindContours-技术笔记.md)
 > **阅读前置**: 本文档从零基础讲起，无需前置知识
 > **核心来源**: ClearVision 当前实现、OpenCV connected components / contours、经典形状特征教材
@@ -744,7 +744,7 @@ Gray / Color Filter
 
 ## 14. 专业来源与延伸阅读
 
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/BlobDetectionOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/BlobDetectionOperator.cs`
 - ClearVision 本地资料: `../算子手册.md`、`../算子名片/BlobAnalysis.md`
 - OpenCV Documentation: connected components, contours, moments
 - Gonzalez & Woods, *Digital Image Processing*, connected component labeling and morphology

@@ -88,7 +88,7 @@ P4：站点拓扑、安全审计、仿真压测
 ### 建议目录
 
 ```text
-Acme.Product/src/Acme.Product.Runtime.Abstractions/
+ClearVision.Product/src/ClearVision.Product.Runtime.Abstractions/
   StationSync/
     StationSyncConstants.cs
     StationRegistrationDto.cs
@@ -276,7 +276,7 @@ StationCommandStatus
 ### 建议目录
 
 ```text
-Acme.Product/src/Acme.Product.Desktop/
+ClearVision.Product/src/ClearVision.Product.Desktop/
   Hubs/
     StationIngressHub.cs
 
@@ -394,7 +394,7 @@ Station 启动后主动连接中心 Studio，订阅 `RuntimeHost` 事件，把�
 ### 建议目录
 
 ```text
-Acme.Product/src/Acme.Product.Station/
+ClearVision.Product/src/ClearVision.Product.Station/
   Sync/
     StationSyncOptions.cs
     StationSyncHostedService.cs
@@ -1334,7 +1334,7 @@ CollectLogs
 ### 建议项目
 
 ```text
-Acme.Product/src/Acme.Product.Station.Simulator/
+ClearVision.Product/src/ClearVision.Product.Station.Simulator/
 ```
 
 ### 功能

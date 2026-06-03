@@ -1,4 +1,7 @@
-﻿# ClearVision Phase 4 — 生产就绪性提升
+﻿# ClearVision Phase 4 — 生产就绪性提升
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -10,8 +13,8 @@
 
 
 
-> **适用于**: opencode / AI 编码助手  
-> **前置**: Phase 1-3 已完成（46 个算子，34 个测试文件）  
+> **适用于**: opencode / AI 编码助手
+> **前置**: Phase 1-3 已完成（46 个算子，34 个测试文件）
 > **目标**: 修复遗留编译问题、完善通信健壮性、提升系统稳定性
 
 ---
@@ -23,7 +26,7 @@
 ### 1.1 排查并修复
 
 ```powershell
-cd c:\Users\11234\Desktop\ClearVision\Acme.Product
+cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
 dotnet clean
 dotnet build 2>&1 | Out-File -Encoding utf8 build_full.txt
 ```
@@ -71,26 +74,26 @@ private async Task<TcpClient> GetOrCreateConnection(string host, int port, int t
 {
     var key = $"{host}:{port}";
     var lockObj = _connectionLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
-    
+
     await lockObj.WaitAsync(ct);
     try
     {
         if (_connectionPool.TryGetValue(key, out var existing) && existing.Connected)
             return existing;
-        
+
         // 清理旧连接
         if (existing != null)
         {
             try { existing.Close(); } catch { }
             _connectionPool.TryRemove(key, out _);
         }
-        
+
         // 建立新连接
         var client = new TcpClient();
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeoutMs);
         await client.ConnectAsync(host, port, cts.Token);
-        
+
         _connectionPool[key] = client;
         _logger.LogInformation("Modbus 连接已建立: {Key}", key);
         return client;
@@ -135,7 +138,7 @@ private bool IsConnectionAlive(TcpClient client)
 检查并确认 `DataType = "file"` 的参数在前端属性面板中能正确显示文件选择按钮。
 
 涉及文件：
-- `src\Acme.Product.Desktop\wwwroot\src\features\propertyPanel.js` — 检查 `renderParameter` 方法
+- `src\ClearVision.Product.Desktop\wwwroot\src\features\propertyPanel.js` — 检查 `renderParameter` 方法
 - 需要确认 `file` 类型参数会渲染一个带按钮的文件路径输入框
 
 如果前端不支持 `file` 类型，则：
@@ -144,8 +147,8 @@ private bool IsConnectionAlive(TcpClient client)
 // propertyPanel.js 中的 renderParameter 方法里补充:
 case 'file':
     return `<div class="param-file-group">
-        <input type="text" class="param-input" id="param-${param.name}" 
-               value="${param.value || param.defaultValue || ''}" 
+        <input type="text" class="param-input" id="param-${param.name}"
+               value="${param.value || param.defaultValue || ''}"
                placeholder="选择文件..." readonly />
         <button class="btn-file-pick" onclick="pickFile('${param.name}')">浏览</button>
     </div>`;
@@ -157,7 +160,7 @@ case 'file':
 
 ### 4.1 检查并行执行的线程安全
 
-文件: `src\Acme.Product.Infrastructure\Services\FlowExecutionService.cs`
+文件: `src\ClearVision.Product.Infrastructure\Services\FlowExecutionService.cs`
 
 确认 `ExecuteFlowAsync` 中的并行分支执行（如果有 `Parallel`/`Task.WhenAll`）是否正确隔离了每个分支的 `inputs` 字典。
 
@@ -211,7 +214,7 @@ _logger.LogInformation("{OperatorName} 开始执行, 参数: FitType={FitType}, 
 搜索检查：
 
 ```powershell
-Get-ChildItem -Path src\Acme.Product.Infrastructure\Operators -Include *.cs -Recurse | Select-String "Console.Write"
+Get-ChildItem -Path src\ClearVision.Product.Infrastructure\Operators -Include *.cs -Recurse | Select-String "Console.Write"
 ```
 
 如找到任何 `Console.Write`，全部替换为 `_logger.LogDebug` 或 `_logger.LogError`。
@@ -221,9 +224,12 @@ Get-ChildItem -Path src\Acme.Product.Infrastructure\Operators -Include *.cs -Rec
 ## 六、构建验证
 
 ```powershell
-cd c:\Users\11234\Desktop\ClearVision\Acme.Product
+cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
 
-# 清理后全量构建
+# 清理后全量构建
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -237,7 +243,10 @@ cd c:\Users\11234\Desktop\ClearVision\Acme.Product
 dotnet clean
 dotnet build
 
-# 全量测试
+# 全量测试
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -250,7 +259,10 @@ dotnet build
 
 dotnet test
 
-# 确认算子总数
+# 确认算子总数
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -261,8 +273,11 @@ dotnet test
 <!-- DOC_AUDIT_STATUS_END -->
 
 
-Get-ChildItem -Path src\Acme.Product.Infrastructure\Operators -Include *Operator.cs -Recurse | Measure-Object
-# 预期: 约 41 个算子文件（含 OperatorBase.cs）
+Get-ChildItem -Path src\ClearVision.Product.Infrastructure\Operators -Include *Operator.cs -Recurse | Measure-Object
+# 预期: 约 41 个算子文件（含 OperatorBase.cs）
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）

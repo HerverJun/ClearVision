@@ -10,7 +10,7 @@ updated: "2026-04-29"
 
 ## 当前包边界
 
-`Acme.OperatorLibrary` 当前是兼容全量包，目标框架为 `net8.0`，通过 MSBuild linked compile items 复用主工程的算子、Core contracts、PLC、图像处理、标定、点云和部分 AI runtime 代码。
+`ClearVision.OperatorLibrary` 当前是兼容全量包，目标框架为 `net8.0`，通过 MSBuild linked compile items 复用主工程的算子、Core contracts、PLC、图像处理、标定、点云和部分 AI runtime 代码。
 
 当前直接依赖族：
 
@@ -33,15 +33,15 @@ updated: "2026-04-29"
 
 | 包 | 内容 | 迁移优先级 |
 |---|---|---|
-| `Acme.OperatorLibrary.Abstractions` | Operator metadata、Core enums、输入输出契约、模块索引 | 高 |
-| `Acme.OperatorLibrary.VisionCore` | OpenCV 图像处理、测量、匹配、标定基础能力 | 高 |
-| `Acme.OperatorLibrary.AI` | DeepLearning、OCR、ONNX/Paddle 相关算子 | 中 |
-| `Acme.OperatorLibrary.Communication` | PLC、Modbus、串口通信算子 | 中 |
-| `Acme.OperatorLibrary` | 兼容全量包，聚合或保留当前行为 | 必须保留 |
+| `ClearVision.OperatorLibrary.Abstractions` | Operator metadata、Core enums、输入输出契约、模块索引 | 高 |
+| `ClearVision.OperatorLibrary.VisionCore` | OpenCV 图像处理、测量、匹配、标定基础能力 | 高 |
+| `ClearVision.OperatorLibrary.AI` | DeepLearning、OCR、ONNX/Paddle 相关算子 | 中 |
+| `ClearVision.OperatorLibrary.Communication` | PLC、Modbus、串口通信算子 | 中 |
+| `ClearVision.OperatorLibrary` | 兼容全量包，聚合或保留当前行为 | 必须保留 |
 
 ## 版本策略
 
-- `1.x`：保留当前 `Acme.OperatorLibrary` 全量包兼容性。
+- `1.x`：保留当前 `ClearVision.OperatorLibrary` 全量包兼容性。
 - `1.x` 后续 minor：新增拆分包时不移除全量包 API。
 - `2.0`：只有在消费方迁移验证完成后，才考虑重新定义默认包边界。
 
@@ -50,5 +50,5 @@ updated: "2026-04-29"
 本轮已保留当前 `pack + smoke` 流程，不改变包名、版本前缀和 smoke test 项目入口。
 
 ```powershell
-dotnet build Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --configuration Release
+dotnet build ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj --configuration Release
 ```

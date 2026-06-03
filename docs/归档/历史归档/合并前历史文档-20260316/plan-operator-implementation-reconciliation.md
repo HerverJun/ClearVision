@@ -12,7 +12,7 @@
 
 ## 2. 排查范围
 
-- 代码范围：`Acme.Product/src/Acme.Product.Infrastructure/Operators/**/*.cs`
+- 代码范围：`ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/**/*.cs`
 - 文档范围：`docs/operators/*.md`
 - 交叉参考：`docs/AlgorithmAudit/*.md`
 - 目录索引参考：`docs/OPERATOR_CATALOG.md`、`docs/operators/CATALOG.md`

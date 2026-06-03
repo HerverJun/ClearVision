@@ -14,7 +14,7 @@ updated: "2026-03-20"
 
 ## 演示入口
 
-- 自动化用例：`Acme.Product/tests/Acme.Product.Tests/Integration/Stage3_EndToEndDemoIntegrationTests.cs`
+- 自动化用例：`ClearVision.Product/tests/ClearVision.Product.Tests/Integration/Stage3_EndToEndDemoIntegrationTests.cs`
 - 相关算子：
   - `SemanticSegmentationOperator`
   - `AnomalyDetectionOperator`

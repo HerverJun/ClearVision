@@ -497,13 +497,13 @@ python quality/tools/build_detection_precision_v3.py
 构建：
 
 ```powershell
-dotnet build Acme.OperatorLibrary/Acme.OperatorLibrary.csproj -v minimal --no-restore
+dotnet build ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj -v minimal --no-restore
 ```
 
 目标单测按项目串行运行，避免同一 `.csproj` 并发：
 
 ```powershell
-& "./scripts/run-dotnet-test-serial.ps1" -Project "Acme.OperatorLibrary.Tests/Acme.OperatorLibrary.Tests.csproj" -FullyQualifiedName SurfaceDefectDetectionOperatorTests,AnomalyDetectionOperatorTests,DeepLearningOperatorTests,EdgeDetectionOperatorTests -NoBuild -NoRestore
+& "./scripts/run-dotnet-test-serial.ps1" -Project "ClearVision.OperatorLibrary.Tests/ClearVision.OperatorLibrary.Tests.csproj" -FullyQualifiedName SurfaceDefectDetectionOperatorTests,AnomalyDetectionOperatorTests,DeepLearningOperatorTests,EdgeDetectionOperatorTests -NoBuild -NoRestore
 ```
 
 数据和 suite 校验：
@@ -581,7 +581,7 @@ python quality/tools/run_quality_suite.py --suite algorithm_improvement_suite --
 
 ### 验证记录
 
-- `dotnet build Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj -v minimal --no-restore` 通过，只有既有 warning。
+- `dotnet build ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj -v minimal --no-restore` 通过，只有既有 warning。
 - 单进程目标测试通过：`AnomalyDetectionOperatorTests` 与 `FeatureMatchOperatorBaseTests` 共 `19` 个测试，`0` failed。
 - `python -m py_compile` 覆盖本轮新增/更新报表脚本，通过。
 - 以下报表 `--validate-only` 通过：

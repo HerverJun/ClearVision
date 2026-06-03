@@ -2,7 +2,7 @@
 
 > **对应算子**: `ColorConversionOperator`
 > **OperatorType**: `OperatorType.ColorConversion`
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/ColorConversionOperator.cs`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ColorConversionOperator.cs`
 > **相关算子**: [Threshold](./04-Threshold-技术笔记.md)、[ClaheEnhancement](./09-ClaheEnhancement-技术笔记.md)、[BlobDetection](./11-BlobDetection-技术笔记.md)
 > **阅读前置**: 无需前置知识，本文档从零开始讲解颜色空间概念
 > **核心来源**: ClearVision 当前实现、OpenCV `cvtColor`、Szeliski《Computer Vision》
@@ -977,7 +977,7 @@ red_mask = mask1 | mask2  # 合并两个区间
 
 ## 12. 专业来源与延伸阅读
 
-- ClearVision 本地实现: `../../Acme.Product/src/Acme.Product.Infrastructure/Operators/ColorConversionOperator.cs`
+- ClearVision 本地实现: `../../ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ColorConversionOperator.cs`
 - ClearVision 本地资料: `../算子手册.md`、`../算子名片/ColorConversion.md`
 - OpenCV Documentation: *cvtColor*
 - Szeliski, *Computer Vision: Algorithms and Applications*, image representations

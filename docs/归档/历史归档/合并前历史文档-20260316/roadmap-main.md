@@ -117,7 +117,7 @@ DAG 中若有 3 个扇出（图像同时发给 YOLO / 模板匹配 / 条码识�
 不同算子产生的图像尺寸不同（原图、ROI 裁剪图、缩放图...），因此不能用单一队列，必须按 `(width, height, channels, type)` 组合分桶管理：
 
 ```csharp
-// Acme.Product.Infrastructure/Memory/MatPool.cs（新建文件）
+// ClearVision.Product.Infrastructure/Memory/MatPool.cs（新建文件）
 
 /// <summary>
 /// OpenCvSharp.Mat 的分桶内存池。
@@ -229,7 +229,7 @@ public sealed class MatPool : IDisposable
 **改造 ImageWrapper —— 将内存池引入 CoW 路径**
 
 ```csharp
-// Acme.Product.Core/ValueObjects/ImageWrapper.cs
+// ClearVision.Product.Core/ValueObjects/ImageWrapper.cs
 
 public sealed class ImageWrapper : IDisposable
 {
@@ -325,7 +325,7 @@ public sealed class ImageWrapper : IDisposable
 **OperatorBase —— 框架层约定（不变，附开发规范注释）**
 
 ```csharp
-// Acme.Product.Infrastructure/Operators/OperatorBase.cs
+// ClearVision.Product.Infrastructure/Operators/OperatorBase.cs
 public abstract class OperatorBase : IOperatorExecutor
 {
     public async Task<OperatorExecutionResult> ExecuteWithLifecycleAsync(
@@ -440,7 +440,7 @@ ForEach.IoMode = Sequential  → 含 I/O 的串行子图，退化为顺序 forea
 #### ForEachOperator 实现
 
 ```csharp
-// Acme.Product.Infrastructure/Operators/ForEachOperator.cs
+// ClearVision.Product.Infrastructure/Operators/ForEachOperator.cs
 public class ForEachOperator : OperatorBase
 {
     private readonly IFlowExecutionService _subFlowExecutor;
@@ -790,7 +790,7 @@ V3 的 DryRun 对通信算子统一返回 `{ ValidationPassed=true, DryRun_Inter
 #### V4 方案：Stub Registry（双向数据挡板）
 
 ```csharp
-// Acme.Product.Infrastructure/AI/DryRun/DryRunStubRegistry.cs
+// ClearVision.Product.Infrastructure/AI/DryRun/DryRunStubRegistry.cs
 
 /// <summary>
 /// 仿真数据挡板注册表。
@@ -1261,7 +1261,7 @@ foreach (var layer in executionLayers)
 在 `PortDataType` 枚举中新增：
 
 ```csharp
-// Acme.Product.Core/Enums/OperatorEnums.cs
+// ClearVision.Product.Core/Enums/OperatorEnums.cs
 public enum PortDataType
 {
     Image = 0,
@@ -1307,7 +1307,7 @@ public enum PortDataType
 **解决方案：新增复合几何端口类型**
 
 ```csharp
-// Acme.Product.Core/ValueObjects/VisionValueObjects.cs
+// ClearVision.Product.Core/ValueObjects/VisionValueObjects.cs
 // 新增 C# 结构体
 public record struct CircleData(float CenterX, float CenterY, float Radius);
 public record struct LineData(float X1, float Y1, float X2, float Y2, float Angle);

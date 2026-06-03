@@ -1,4 +1,7 @@
-﻿# ClearVision Phase 3 — 算法深度提升与遗留问题修复
+﻿# ClearVision Phase 3 — 算法深度提升与遗留问题修复
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -10,8 +13,8 @@
 
 
 
-> **适用于**: opencode / AI 编码助手  
-> **前置**: Phase 1（关键能力补齐）✅，Phase 2（测试基础设施）✅  
+> **适用于**: opencode / AI 编码助手
+> **前置**: Phase 1（关键能力补齐）✅，Phase 2（测试基础设施）✅
 > **目标**: 修复编译错误、提升算法深度、完善遗留功能
 
 ---
@@ -22,17 +25,20 @@
 
 ### 错误定位
 
-文件: `src\Acme.Product.Application\Services\ProjectService.cs`  
+文件: `src\ClearVision.Product.Application\Services\ProjectService.cs`
 行 33, 35: `'CreateProjectRequest' 未包含 'Flow' 的定义`
 
 ### 排查步骤
 
-1. 先阅读 `src\Acme.Product.Application\DTOs\ProjectDto.cs` 的 `CreateProjectRequest` 类 — 第 65 行已有 `Flow` 属性
+1. 先阅读 `src\ClearVision.Product.Application\DTOs\ProjectDto.cs` 的 `CreateProjectRequest` 类 — 第 65 行已有 `Flow` 属性
 2. 检查是否有**重复的 `CreateProjectRequest` 定义**在其他文件中（可能是旧版本冲突）
 
 ```powershell
-cd c:\Users\11234\Desktop\ClearVision\Acme.Product
-# 搜索所有 CreateProjectRequest 定义
+cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
+# 搜索所有 CreateProjectRequest 定义
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -60,7 +66,7 @@ dotnet build
 
 ## 一、CameraCalibration 文件夹标定（Phase 1 遗留）
 
-> 文件: [CameraCalibrationOperator.cs](file:///c:/Users/11234/Desktop/ClearVision/Acme.Product/src/Acme.Product.Infrastructure/Operators/CameraCalibrationOperator.cs)  
+> 文件: [CameraCalibrationOperator.cs](file:///c:/Users/11234/Desktop/ClearVision/ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/CameraCalibrationOperator.cs)
 > 枚举: `CameraCalibration = 24`（已有）
 
 ### 1.1 在 OperatorFactory.cs 中补充参数
@@ -89,7 +95,7 @@ if (mode == "FolderCalibration")
 {
     var imageFolder = GetStringParam(@operator, "ImageFolder", "");
     var outputPath = GetStringParam(@operator, "CalibrationOutputPath", "calibration_result.json");
-    
+
     if (string.IsNullOrEmpty(imageFolder) || !Directory.Exists(imageFolder))
         return Task.FromResult(OperatorExecutionOutput.Failure("标定图片文件夹不存在"));
 
@@ -143,8 +149,8 @@ if (mode == "FolderCalibration")
         { "CameraMatrix", MatTo2DArray(cameraMatrix) },
         { "DistCoeffs", MatTo1DArray(distCoeffs) }
     };
-    
-    var json = System.Text.Json.JsonSerializer.Serialize(calibData, 
+
+    var json = System.Text.Json.JsonSerializer.Serialize(calibData,
         new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
     File.WriteAllText(outputPath, json);
 
@@ -201,7 +207,7 @@ private double[] MatTo1DArray(Mat mat)
 
 ## 二、码识别优化 (CodeRecognitionOperator)
 
-> 文件: `src\Acme.Product.Infrastructure\Operators\CodeRecognitionOperator.cs`  
+> 文件: `src\ClearVision.Product.Infrastructure\Operators\CodeRecognitionOperator.cs`
 > 当前问题: `MatToBitmap()` 中做了 `mat.ToBytes(".png")` 编码，违背零拷贝设计
 
 ### 2.1 替换 MatToBitmap 实现
@@ -212,22 +218,22 @@ private double[] MatTo1DArray(Mat mat)
 private System.Drawing.Bitmap MatToBitmapDirect(Mat mat)
 {
     // 转为连续的 BGR 格式
-    using var bgr = mat.Type() == MatType.CV_8UC1 
-        ? new Mat() 
+    using var bgr = mat.Type() == MatType.CV_8UC1
+        ? new Mat()
         : mat;
-    
+
     if (mat.Type() == MatType.CV_8UC1)
         Cv2.CvtColor(mat, bgr, ColorConversionCodes.GRAY2BGR);
-    
+
     var bitmap = new System.Drawing.Bitmap(
         bgr.Width, bgr.Height,
         System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-    
+
     var bmpData = bitmap.LockBits(
         new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
         System.Drawing.Imaging.ImageLockMode.WriteOnly,
         System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-    
+
     try
     {
         if (bgr.IsContinuous() && bmpData.Stride == bgr.Step())
@@ -262,13 +268,13 @@ private System.Drawing.Bitmap MatToBitmapDirect(Mat mat)
     {
         bitmap.UnlockBits(bmpData);
     }
-    
+
     return bitmap;
 }
 ```
 
-> [!IMPORTANT]  
-> 需要在 `Acme.Product.Infrastructure.csproj` 中启用 `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>`。  
+> [!IMPORTANT]
+> 需要在 `ClearVision.Product.Infrastructure.csproj` 中启用 `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>`。
 > 如果不想用 unsafe，保留当前 PNG 编解码方案也可以（功能不受影响，仅性能差异）。
 
 ### 2.2 启用多码识别
@@ -290,7 +296,7 @@ if (results != null && results.Length > 0)
         { "Format", r.BarcodeFormat.ToString() },
         { "Points", r.ResultPoints?.Select(p => new { X = p.X, Y = p.Y }).ToArray() ?? Array.Empty<object>() }
     }).ToList();
-    
+
     additionalData["Codes"] = codeResults;
     additionalData["CodeCount"] = codeResults.Count;
     additionalData["Text"] = results[0].Text; // 保持向后兼容
@@ -301,7 +307,7 @@ if (results != null && results.Length > 0)
 
 ## 三、深度学习扩展 — 自定义类别标签
 
-> 文件: `src\Acme.Product.Infrastructure\Operators\DeepLearningOperator.cs`  
+> 文件: `src\ClearVision.Product.Infrastructure\Operators\DeepLearningOperator.cs`
 > 当前问题: COCO 80 类硬编码，用户自定义模型无法显示正确标签
 
 ### 3.1 新增参数
@@ -358,8 +364,8 @@ if (string.IsNullOrEmpty(labelFile))
 
 ## 四、颜色检测算子（新增）
 
-> **枚举**: `ColorDetection = 45`  
-> **文件**: `ColorDetectionOperator.cs`  
+> **枚举**: `ColorDetection = 45`
+> **文件**: `ColorDetectionOperator.cs`
 > **难度**: ⭐⭐ 低
 
 ### 4.1 枚举 + DI + 工厂
@@ -451,8 +457,8 @@ _metadata[OperatorType.ColorDetection] = new OperatorMetadata
 
 ## 五、串口通信算子（新增）
 
-> **枚举**: `SerialCommunication = 46`  
-> **文件**: `SerialCommunicationOperator.cs`  
+> **枚举**: `SerialCommunication = 46`
+> **文件**: `SerialCommunicationOperator.cs`
 > **难度**: ⭐⭐ 低
 
 ### 5.1 枚举 + DI + 工厂
@@ -558,7 +564,7 @@ using var port = new SerialPort(portName, baudRate, parity, dataBits, stopBits)
 try
 {
     port.Open();
-    
+
     // 发送
     if (!string.IsNullOrEmpty(sendData))
     {
@@ -567,7 +573,7 @@ try
             : System.Text.Encoding.GetEncoding(encoding).GetBytes(sendData);
         port.Write(bytes, 0, bytes.Length);
     }
-    
+
     // 接收
     await Task.Delay(100, cancellationToken); // 等待设备响应
     string response = "";
@@ -579,7 +585,7 @@ try
             ? BitConverter.ToString(buffer).Replace("-", " ")
             : System.Text.Encoding.GetEncoding(encoding).GetString(buffer);
     }
-    
+
     var output = new Dictionary<string, object>
     {
         { "Response", response },
@@ -612,9 +618,12 @@ catch (Exception ex)
 ## 七、构建验证
 
 ```powershell
-cd c:\Users\11234\Desktop\ClearVision\Acme.Product
+cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
 
-# 全量构建 — 必须 0 errors
+# 全量构建 — 必须 0 errors
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -627,7 +636,10 @@ cd c:\Users\11234\Desktop\ClearVision\Acme.Product
 
 dotnet build
 
-# 运行所有测试
+# 运行所有测试
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）
@@ -640,7 +652,10 @@ dotnet build
 
 dotnet test
 
-# 单独测试新增算子
+# 单独测试新增算子
+
+
+
 
 <!-- DOC_AUDIT_STATUS_START -->
 ## 文档审计状态（自动更新）

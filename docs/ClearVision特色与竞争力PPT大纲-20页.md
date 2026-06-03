@@ -35,7 +35,7 @@ PPT 的主线建议分成四章：
 | AI 不是只拼 prompt | Prompt composer、parser、validator、DryRun、manual retry、模型配置与测试覆盖 |
 | 现场链路成型 | Runtime package、Station sync、spool、health、deploy、audit |
 | 有可讲的样板场景 | 端子线序检测场景包：模板、规则、标签、版本、样例、FAQ |
-| 可复用交付资产 | `Acme.OperatorLibrary` NuGet 包、SBOM、第三方声明、锁文件和 smoke test |
+| 可复用交付资产 | `ClearVision.OperatorLibrary` NuGet 包、SBOM、第三方声明、锁文件和 smoke test |
 
 ## 3. 逐页规划
 
@@ -287,7 +287,7 @@ Studio 当前覆盖：
 
 **证据来源**
 
-- `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/`
+- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/`
 - 产品审计报告 4.1 Studio 主工作台
 
 ---
@@ -689,7 +689,7 @@ ClearVision 的质量体系是重要竞争力，尤其适合对比黑盒软件�
 
 OperatorLibrary 当前能力：
 
-- 独立 NuGet 包：`Acme.OperatorLibrary`
+- 独立 NuGet 包：`ClearVision.OperatorLibrary`
 - 版本基线：`1.0.2`
 - 复用主工程算子源码，使用 MSBuild linked compile items
 - 覆盖图像处理、测量、标定、通信、流程控制、AI
@@ -707,7 +707,7 @@ OperatorLibrary 当前能力：
 
 **证据来源**
 
-- `Acme.OperatorLibrary/README.md`
+- `ClearVision.OperatorLibrary/README.md`
 - `docs/operator-library/release-package-industrialization.md`
 
 ---
@@ -857,7 +857,7 @@ ClearVision 的价值：让工业视觉流程更快搭建、更可复用、更�
 - `docs/runtime/station-studio-sync.md`
 - `docs/engineering/ci-quality-gates.md`
 - `quality/evals/reports/operator_quality_matrix.md`
-- `Acme.OperatorLibrary/README.md`
+- `ClearVision.OperatorLibrary/README.md`
 - `线序检测/scenario-package-wire-sequence/README.md`
 - `线序检测/scenario-package-wire-sequence/template/terminal-wire-sequence.flow.template.json`
 - `线序检测/scenario-package-wire-sequence/rules/sequence-rule.v1.json`

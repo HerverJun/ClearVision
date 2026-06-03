@@ -54,9 +54,9 @@
 
 ### 本轮新增验证
 
-- `Acme.Product/tests/Acme.Product.Tests/AI/LLMConnectorSmokeTests.cs`
-- `Acme.Product/tests/Acme.Product.Tests/AI/PromptVersionManagerTests.cs`
-- `Acme.Product/tests/Acme.Product.Tests/AI/AIGeneratedFlowVersionManagerTests.cs`
+- `ClearVision.Product/tests/ClearVision.Product.Tests/AI/LLMConnectorSmokeTests.cs`
+- `ClearVision.Product/tests/ClearVision.Product.Tests/AI/PromptVersionManagerTests.cs`
+- `ClearVision.Product/tests/ClearVision.Product.Tests/AI/AIGeneratedFlowVersionManagerTests.cs`
 
 ---
 ## 总览

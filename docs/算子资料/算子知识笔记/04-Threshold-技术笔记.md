@@ -1,10 +1,10 @@
 # Threshold 技术笔记
 
-> **对应算子**: `ThresholdOperator` / `OperatorType.Thresholding`  
-> **OperatorType**: `Thresholding`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/ThresholdOperator.cs`  
-> **相关算子**: [AdaptiveThreshold](./05-AdaptiveThreshold-技术笔记.md)、[Morphology](./10-Morphology-技术笔记.md)、[BlobDetection](./11-BlobDetection-技术笔记.md)  
-> **阅读前置**: 灰度图、直方图、前景与背景  
+> **对应算子**: `ThresholdOperator` / `OperatorType.Thresholding`
+> **OperatorType**: `Thresholding`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/ThresholdOperator.cs`
+> **相关算子**: [AdaptiveThreshold](./05-AdaptiveThreshold-技术笔记.md)、[Morphology](./10-Morphology-技术笔记.md)、[BlobDetection](./11-BlobDetection-技术笔记.md)
+> **阅读前置**: 灰度图、直方图、前景与背景
 > **核心来源**: OpenCV Threshold 文档、Otsu 1979、Gonzalez & Woods《Digital Image Processing》
 
 ---
@@ -86,7 +86,7 @@
   │ ████████████████████████
   └────────────────────────→ 亮度值
     0   50   100  150  200  255
-    
+
     说明：只有一个峰，前景背景混在一起
           阈值分割效果会很差！
 ```

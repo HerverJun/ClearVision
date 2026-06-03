@@ -1,8 +1,8 @@
 # ClearVision 深度代码审查报告
 
-> **审查日期**: 2026-05-21  
-> **审查范围**: Acme.Product（530+ C# 文件）、Acme.PlcComm、Runtime、Desktop、Station 等核心模块  
-> **审查视角**: 产线操作员、视觉工程师、产线管理员、运维人员  
+> **审查日期**: 2026-05-21
+> **审查范围**: ClearVision.Product（530+ C# 文件）、ClearVision.PlcComm、Runtime、Desktop、Station 等核心模块
+> **审查视角**: 产线操作员、视觉工程师、产线管理员、运维人员
 > **审查人**: Kimi Code CLI (AI Agent)
 
 ---
@@ -273,7 +273,7 @@ await File.WriteAllBytesAsync(targetPath, result.OutputImage, cancellationToken)
 
 ### 🟡 问题 14：Dead Code 污染严重，增加维护成本
 
-**位置**: `Acme.PlcComm/Core/PlcBaseClient.cs` 及 `FrameBuilder` 系列
+**位置**: `ClearVision.PlcComm/Core/PlcBaseClient.cs` 及 `FrameBuilder` 系列
 
 **现场影响**:
 - 新入职的视觉工程师看到两套 PLC 协议栈（自定义 TCP + HSL 包装），无法判断该改哪边。

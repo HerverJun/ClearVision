@@ -10,24 +10,24 @@
 
 验证证据：
 
-- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js`：通过。
-- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js`：通过。
-- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js`：通过。
-- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js`：通过。
-- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/core/i18n/resources.js`：通过。
-- `node --check Acme.Product/src/Acme.Product.Desktop/wwwroot/src/core/logging/debugLogger.js`：通过。
+- `node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/inspection/inspectionPanel.js`：通过。
+- `node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js`：通过。
+- `node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js`：通过。
+- `node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js`：通过。
+- `node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/core/i18n/resources.js`：通过。
+- `node --check ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/core/logging/debugLogger.js`：通过。
 - `& ./scripts/check-text-encoding.ps1`：通过，扫描 620 个活跃文本文件。
-- `dotnet restore Acme.Product/Acme.Product.sln --locked-mode`：通过。
-- `dotnet build Acme.Product/Acme.Product.sln --configuration Debug --no-restore`：通过，0 warnings，0 errors。
-- `& ./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj -FullyQualifiedName OperatorPluginManifestCompatibilityTests,MqttPublishOperatorTests -NoBuild -NoRestore -Verbosity minimal`：通过，7/7。
-- `& ./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj -FullyQualifiedName VisionDatabaseInitializerTests,WebMessageHandlerTests -NoBuild -NoRestore -Verbosity minimal`：通过，5/5。
-- `& ./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj -FullyQualifiedName VariableContextScopeTests,JsonFileProjectFlowStorageTests,JsonConfigurationServiceTests,InspectionResultBackgroundServiceTests,InMemoryEventStoreTests,RuntimePackageExporterValidationTests,InspectionResultRepositoryTests,VirtualMcFinsPlcConnectionTests -NoBuild -NoRestore -Verbosity minimal`：通过，27/27。
-- `& ./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj -FullyQualifiedName StationEndpointsTests -NoBuild -NoRestore -Verbosity minimal`：通过，7/7。
-- `dotnet restore Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --locked-mode`：通过。
-- `dotnet build Acme.OperatorLibrary/Acme.OperatorLibrary.csproj --configuration Release --no-restore`：通过，0 errors。
-- `& ./Acme.OperatorLibrary/pack.ps1 -Configuration Release -RunSmokeTest`：通过，OperatorLibrary package acceptance 40/40。
+- `dotnet restore ClearVision.Product/ClearVision.Product.sln --locked-mode`：通过。
+- `dotnet build ClearVision.Product/ClearVision.Product.sln --configuration Debug --no-restore`：通过，0 warnings，0 errors。
+- `& ./scripts/run-dotnet-test-serial.ps1 -Project ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj -FullyQualifiedName OperatorPluginManifestCompatibilityTests,MqttPublishOperatorTests -NoBuild -NoRestore -Verbosity minimal`：通过，7/7。
+- `& ./scripts/run-dotnet-test-serial.ps1 -Project ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj -FullyQualifiedName VisionDatabaseInitializerTests,WebMessageHandlerTests -NoBuild -NoRestore -Verbosity minimal`：通过，5/5。
+- `& ./scripts/run-dotnet-test-serial.ps1 -Project ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj -FullyQualifiedName VariableContextScopeTests,JsonFileProjectFlowStorageTests,JsonConfigurationServiceTests,InspectionResultBackgroundServiceTests,InMemoryEventStoreTests,RuntimePackageExporterValidationTests,InspectionResultRepositoryTests,VirtualMcFinsPlcConnectionTests -NoBuild -NoRestore -Verbosity minimal`：通过，27/27。
+- `& ./scripts/run-dotnet-test-serial.ps1 -Project ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj -FullyQualifiedName StationEndpointsTests -NoBuild -NoRestore -Verbosity minimal`：通过，7/7。
+- `dotnet restore ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj --locked-mode`：通过。
+- `dotnet build ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj --configuration Release --no-restore`：通过，0 errors。
+- `& ./ClearVision.OperatorLibrary/pack.ps1 -Configuration Release -RunSmokeTest`：通过，OperatorLibrary package acceptance 40/40。
 - `& ./scripts/run-tests-plc-regression.ps1 -Virtual -NoBuild -NoRestore -Verbosity minimal`：通过，虚拟 Modbus 与 MC/FINS smoke 均通过，PLC 回归 76/76。
-- `dotnet build Acme.OperatorLibrary/tests/Acme.OperatorLibrary.SmokeTests/Acme.OperatorLibrary.SmokeTests.csproj --no-restore -p:AcmeOperatorLibraryPackageVersion=1.0.2`：通过。
+- `dotnet build ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests/ClearVision.OperatorLibrary.SmokeTests.csproj --no-restore -p:ClearVisionOperatorLibraryPackageVersion=1.0.2`：通过。
 - `& ./scripts/run-operator-library-industrial-gate.ps1 -Profile quick -NoBuild -NoRestore -Verbosity minimal`：通过；Operator smoke 40/40，measurement 144/144，calibration 80/80，detection 126/126，PLC 72/72。
 
 实现说明：
@@ -45,7 +45,7 @@
 
 | 领域 | 复核状态 | 回填结论 |
 |---|---|---|
-| T0 依赖治理 | `Acme.Product/Directory.Packages.props` 与 Product `packages.lock.json` 已落地；Product CI restore 使用 `--locked-mode`；OperatorLibrary 继续使用 lock-file。 | 完成。 |
+| T0 依赖治理 | `ClearVision.Product/Directory.Packages.props` 与 Product `packages.lock.json` 已落地；Product CI restore 使用 `--locked-mode`；OperatorLibrary 继续使用 lock-file。 | 完成。 |
 | T1/P1-7 数据库 schema | 已生成标准 EF migration；`VisionDatabaseInitializer` 走 `MigrateAsync`，旧库 adoption DDL 仅在无 migration history 的遗留 SQLite 库接管时执行。 | 完成；legacy adoption 为兼容路径，不再作为常规 schema 来源。 |
 | T2 桥接与热点拆分 | `WebMessageHandler` 已拆出多个 feature handler；`Program.cs` 已迁出 demo/analysis endpoint 注册；前端保留 app 编排层并补 debug/i18n 基础设施。 | 完成；后续更细的 app shell 拆分作为增量维护项。 |
 | T3 配置校验 | `StartupOptionsValidators`、`ValidateOnStart` 与 `IValidateOptions<T>` 注册已覆盖 StationIngress/AiGeneration。 | 完成。 |
@@ -56,11 +56,11 @@
 
 复核验证补充：
 
-- `dotnet build Acme.Product/Acme.Product.sln --configuration Debug --no-restore`：通过，0 warnings，0 errors。
+- `dotnet build ClearVision.Product/ClearVision.Product.sln --configuration Debug --no-restore`：通过，0 warnings，0 errors。
 - `& "./scripts/check-text-encoding.ps1"`：通过，扫描 620 个文件；默认根目录已覆盖 Application、Desktop、Infrastructure、Runtime、Station、Desktop.Package 和前端 `wwwroot/src`。
 - 手工 `rg` 复核活跃源码中的常见 mojibake 片段：未发现剩余命中。
-- `rg --files Acme.Product -g packages.lock.json` 已发现 Product solution 各项目 lock file；`dotnet restore Acme.Product/Acme.Product.sln --locked-mode` 通过。
-- `rg --files Acme.OperatorLibrary | rg -i 'sbom|spdx|cyclonedx|bom'` 确认 `Acme.OperatorLibrary/SBOM.spdx.json` 已存在。
+- `rg --files ClearVision.Product -g packages.lock.json` 已发现 Product solution 各项目 lock file；`dotnet restore ClearVision.Product/ClearVision.Product.sln --locked-mode` 通过。
+- `rg --files ClearVision.OperatorLibrary | rg -i 'sbom|spdx|cyclonedx|bom'` 确认 `ClearVision.OperatorLibrary/SBOM.spdx.json` 已存在。
 
 剩余最小动作：
 
@@ -70,7 +70,7 @@
 
 本次审查先使用已启用连接器 **github** 对指定仓库 `HerverJun/ClearVision` 做了代码与文档核查，并在仓库证据基础上，补充参考了少量官方资料来校准工程最佳实践。综合判断：**ClearVision 已经具备“工业视觉平台雏形”的工程骨架**，而不是单纯的算法 Demo。当前仓库同时具备桌面端主应用、独立算子库、Station/Runtime 方向、质量矩阵、性能与回归门禁、文档体系，以及比较完整的 CI 工作流。正式算子口径为 **155 个**，质量矩阵也已经把算子证据治理制度化。
 
-我认为当前最值得优先投入的，不是“再堆功能”，而是把**依赖治理、数据库 schema 生命周期、前后端高复杂度热点、配置校验、可观测性与质量门禁**这几条主干能力收紧。这里面的核心原因是：仓库已经足够大，继续增长时，**工程一致性和发布可信度**会比单个算子新增更快成为瓶颈。当前可以直接看到的高风险信号包括：`global.json` 固定为 `.NET SDK 9.0.300`，但 `Acme.OperatorLibrary/README.md` 仍写“按仓库 global.json 使用 10.0.101”，主项目还存在 `Microsoft.Extensions.* 10.0.0`、`EF Core 8.0.0`、以及 `Microsoft.AspNetCore.Http 2.2.x` 这类跨代依赖混用；数据库启动链路同时使用 `Migrate()`、`EnsureCreated()` 和手工 `ExecuteSqlRawAsync` 补表/补列；前端 `app.js`、桥接层 `WebMessageHandler.cs`、启动入口 `Program.cs` 都已经承担了过多职责。
+我认为当前最值得优先投入的，不是“再堆功能”，而是把**依赖治理、数据库 schema 生命周期、前后端高复杂度热点、配置校验、可观测性与质量门禁**这几条主干能力收紧。这里面的核心原因是：仓库已经足够大，继续增长时，**工程一致性和发布可信度**会比单个算子新增更快成为瓶颈。当前可以直接看到的高风险信号包括：`global.json` 固定为 `.NET SDK 9.0.300`，但 `ClearVision.OperatorLibrary/README.md` 仍写“按仓库 global.json 使用 10.0.101”，主项目还存在 `Microsoft.Extensions.* 10.0.0`、`EF Core 8.0.0`、以及 `Microsoft.AspNetCore.Http 2.2.x` 这类跨代依赖混用；数据库启动链路同时使用 `Migrate()`、`EnsureCreated()` 和手工 `ExecuteSqlRawAsync` 补表/补列；前端 `app.js`、桥接层 `WebMessageHandler.cs`、启动入口 `Program.cs` 都已经承担了过多职责。
 
 好消息是，仓库也显示出明显的“正在往正确方向收敛”：主 solution 已把测试项目重新纳入，CI 已显式执行产品测试、桌面测试、检测回归/稳定性/性能门、UI 测试、OperatorLibrary 打包与 smoke test；安全侧已有 secret scan、会话/登录链路更收紧、AI key 改为 DPAPI 文件保护；质量侧已有算子矩阵和运行时/性能脚本。也就是说，**ClearVision 不是缺基础设施，而是需要把现有基础设施从“存在”升级到“严格、一致、可执行”。**
 
@@ -115,23 +115,23 @@
 
 | 改进方向 | 优先级 | 影响 | 难度估算 | 主要位置 |
 |---|---|---:|---:|---|
-| 依赖治理与版本口径统一 | P0 | 高 | 24–40h | `global.json`、`Acme.Product/*.csproj`、`Acme.OperatorLibrary/README.md` |
+| 依赖治理与版本口径统一 | P0 | 高 | 24–40h | `global.json`、`ClearVision.Product/*.csproj`、`ClearVision.OperatorLibrary/README.md` |
 | 数据库 schema 生命周期收敛 | P0 | 高 | 24–40h | `Program.cs`、EF Core 数据层 |
 | 前后端桥接与流程编辑热点拆分 | P0 | 高 | 32–56h | `Program.cs`、`WebMessageHandler.cs`、`app.js`、flow editor 相关 |
 | 配置校验与启动失败前置 | P0 | 高 | 16–24h | `appsettings.json`、`JsonConfigurationService.cs`、站点/AI 配置 |
 | 测试策略、覆盖率与质量门升级 | P1 | 高 | 24–40h | `ci.yml`、测试 csproj、质量矩阵 |
 | 可观测性、性能与资源治理 | P1 | 中高 | 24–48h | `Program.cs`、`MatPool.cs`、运行时/站点链路 |
 | 第三方集成分级与插件化 | P1 | 中高 | 32–64h | `OperatorMetadataScanner.cs`、`MqttPublishOperator.cs`、OperatorLibrary |
-| 文档、兼容性矩阵与国际化整理 | P2 | 中 | 24–36h | `README.md`、`docs/项目总览.md`、`Acme.OperatorLibrary/README.md`、前端文案 |
+| 文档、兼容性矩阵与国际化整理 | P2 | 中 | 24–36h | `README.md`、`docs/项目总览.md`、`ClearVision.OperatorLibrary/README.md`、前端文案 |
 
 **方向：依赖治理与版本口径统一**
-**问题描述：** 当前仓库依赖治理最大的风险，不是“包太多”，而是**版本基线没有真正统一**。`global.json` 固定的是 `.NET SDK 9.0.300`，根 README 也沿用这一口径；但 `Acme.OperatorLibrary/README.md` 又写成“按仓库 global.json 使用 10.0.101”。同时，主工程存在 `Microsoft.Extensions.* 10.0.0`、`EF Core 8.0.0`、`System.IO.Ports 8.0.0`，以及 `Microsoft.AspNetCore.Http 2.2.2 / Abstractions 2.2.0` 这类跨代依赖并存。这样会直接增加 restore、分析器、编译器和运行时行为不一致的概率。
+**问题描述：** 当前仓库依赖治理最大的风险，不是“包太多”，而是**版本基线没有真正统一**。`global.json` 固定的是 `.NET SDK 9.0.300`，根 README 也沿用这一口径；但 `ClearVision.OperatorLibrary/README.md` 又写成“按仓库 global.json 使用 10.0.101”。同时，主工程存在 `Microsoft.Extensions.* 10.0.0`、`EF Core 8.0.0`、`System.IO.Ports 8.0.0`，以及 `Microsoft.AspNetCore.Http 2.2.2 / Abstractions 2.2.0` 这类跨代依赖并存。这样会直接增加 restore、分析器、编译器和运行时行为不一致的概率。
 **影响评估：** 高。
 **建议的改进措施：** 统一 SDK 口径、引入 `Directory.Packages.props` 做中央包管理、梳理跨代包并优先清理遗留的 ASP.NET 2.2 依赖；OperatorLibrary 的 lock-file 流程从“文档声明”升级成“真正入库并在 CI 中使用 locked mode”。NuGet 多项目仓库本来就推荐使用中央包管理。Microsoft Learn 中央包管理文档
 **实现难度：** 24–40 小时。
 **优先级：** P0。
 **可能的回归风险：** restore 冲突、Analyzer 规则变化、个别 Native/runtime 依赖版本不兼容。
-**相关文件/代码位置引用：** `global.json`、`Acme.Product/src/Acme.Product.Application/Acme.Product.Application.csproj`、`Acme.Product/src/Acme.Product.Infrastructure/Acme.Product.Infrastructure.csproj`、`Acme.Product/src/Acme.Product.Desktop/Acme.Product.Desktop.csproj`、`Acme.OperatorLibrary/Acme.OperatorLibrary.csproj`、`Acme.OperatorLibrary/README.md`。
+**相关文件/代码位置引用：** `global.json`、`ClearVision.Product/src/ClearVision.Product.Application/ClearVision.Product.Application.csproj`、`ClearVision.Product/src/ClearVision.Product.Infrastructure/ClearVision.Product.Infrastructure.csproj`、`ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj`、`ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj`、`ClearVision.OperatorLibrary/README.md`。
 
 **方向：数据库 schema 生命周期收敛**
 **问题描述：** 当前启动链路在 `Program.cs` 中同时存在 `Migrate()`、`EnsureCreated()`、`PRAGMA`、以及手工 `ExecuteSqlRawAsync` 创建表/索引和补列的逻辑。这个组合当前看起来很灵活，但继续演进会让 schema 变更来源分散、迁移快照不完整、环境差异不可追溯。EF Core 官方也明确提醒：如果要走 migrations，就不要再用 `EnsureCreated` 初始化同一个 schema。 Microsoft Learn EF Core EnsureCreated 文档 Microsoft Learn EF Core Migrations 文档
@@ -140,7 +140,7 @@
 **实现难度：** 24–40 小时。
 **优先级：** P0。
 **可能的回归风险：** 现有 SQLite 本地库升级时数据迁移失败；旧环境首次启动时间变长。
-**相关文件/代码位置引用：** `Acme.Product/src/Acme.Product.Desktop/Program.cs`、数据层与迁移目录。
+**相关文件/代码位置引用：** `ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs`、数据层与迁移目录。
 
 **方向：前后端桥接与流程编辑热点拆分**
 **问题描述：** 宏观分层是好的，但高复杂度代码已经明显集中在 `Program.cs`、`WebMessageHandler.cs` 和前端 `app.js`。当前 `WebMessageHandler` 同时处理 WebView2 消息、文件对话框、流程更新、AI 生成、检查结果推送、会话管理等多种职责；`app.js` 既做初始化、导航、状态、结果、AI、Flow UI，又兜底错误捕获；`Program.cs` 一边做桌面启动，一边做宿主 Web API、数据库初始化、静态文件、CORS、端口管理。这样的结构在功能扩张时会放大回归面。
@@ -149,7 +149,7 @@
 **实现难度：** 32–56 小时。
 **优先级：** P0。
 **可能的回归风险：** WebView2 和本地 API 的集成时序变化、前端事件总线监听顺序变化。
-**相关文件/代码位置引用：** `Acme.Product/src/Acme.Product.Desktop/Program.cs`、`Acme.Product/src/Acme.Product.Desktop/Handlers/WebMessageHandler.cs`、`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js`、`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js`。
+**相关文件/代码位置引用：** `ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs`、`ClearVision.Product/src/ClearVision.Product.Desktop/Handlers/WebMessageHandler.cs`、`ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js`、`ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js`。
 
 **方向：配置校验与启动失败前置**
 **问题描述：** 当前 `appsettings.json` 已经收敛了 AI、StationIngress 等配置，`JsonConfigurationService` 也会读写 `config.json`；AI key 还通过 DPAPI 拆分保存，这一点是加分项。但配置装载主要依赖“读取后 Normalize”和运行期容错，缺少统一的“启动即验证”。一旦 `StationIngress`、AI provider、端口、路径或 schema 配置不合法，很多错误会推迟到运行中才暴露。
@@ -158,7 +158,7 @@
 **实现难度：** 16–24 小时。
 **优先级：** P0。
 **可能的回归风险：** 以前能启动但配置不规范的环境会在升级后直接 fail-fast，需要提供迁移提示。
-**相关文件/代码位置引用：** `Acme.Product/src/Acme.Product.Desktop/appsettings.json`、`Acme.Product/src/Acme.Product.Infrastructure/Services/JsonConfigurationService.cs`、`Acme.Product/src/Acme.Product.Infrastructure/AI/AiConfigStore.cs`、`Acme.Product/src/Acme.Product.Infrastructure/AI/AiApiKeySecretStore.cs`。
+**相关文件/代码位置引用：** `ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json`、`ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/JsonConfigurationService.cs`、`ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiConfigStore.cs`、`ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiApiKeySecretStore.cs`。
 
 **方向：测试策略、覆盖率与质量门升级**
 **问题描述：** 与 4 月审计相比，CI 现在已经明显进步：主 solution 已包含测试项目，CI 也显式跑了产品测试和桌面测试，并且有检测回归/精度/稳定性/性能门、UI 测试、OperatorLibrary smoke test 和工件上传。但仓库里仍看不到**覆盖率目标值**、**失败预算**、**格式检查硬阻断**这些“最后一公里”的制度化数据；而且产品测试项目里还混入了 Playwright/NUnit/Testcontainers 这类更重的依赖，说明测试分层仍可再整理。
@@ -167,7 +167,7 @@
 **实现难度：** 24–40 小时。
 **优先级：** P1。
 **可能的回归风险：** PR 失败率会在收紧门禁后提升、构建时间变长、历史遗留格式问题集中暴露。
-**相关文件/代码位置引用：** `.github/workflows/ci.yml`、`Acme.Product/Acme.Product.sln`、`Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj`、`Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj`、`quality/evals/reports/operator_quality_matrix.md`。
+**相关文件/代码位置引用：** `.github/workflows/ci.yml`、`ClearVision.Product/ClearVision.Product.sln`、`ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj`、`ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj`、`quality/evals/reports/operator_quality_matrix.md`。
 
 **方向：可观测性、性能与资源治理**
 **问题描述：** 当前仓库已经有 `MatPool`、Operator benchmark、检测性能 gate、MemoryLeakTest 脚本、Serilog 文件日志和 `/health`，说明你已经开始做“性能工程化”。但这些能力还没有被统一成一套**线上/现场可观测性**：例如 `MatPool` 虽然有 hit/miss/current bytes 计数，却没有稳定暴露成 metrics；`Program.cs` 和 GPU/OCR/硬件探测链路还有同步等待与阻塞 I/O；仓库入口中也看不到统一追踪/指标方案。OpenTelemetry .NET 已经把 traces / metrics / logs 作为稳定能力提供出来，很适合在你这个体量的桌面宿主 + 本地 API + Runtime/Station 组合里做轻量接入。 OpenTelemetry .NET 文档
@@ -176,16 +176,16 @@
 **实现难度：** 24–48 小时。
 **优先级：** P1。
 **可能的回归风险：** 可观测代码引入额外开销；日志量上升导致磁盘写放大。
-**相关文件/代码位置引用：** `Acme.Product/src/Acme.Product.Desktop/Program.cs`、`Acme.Product/src/Acme.Product.Infrastructure/Memory/MatPool.cs`、`scripts/MemoryLeakTest/Program.cs`、`Acme.Product/src/Acme.Product.Infrastructure/Services/GpuAvailabilityChecker.cs`。
+**相关文件/代码位置引用：** `ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs`、`ClearVision.Product/src/ClearVision.Product.Infrastructure/Memory/MatPool.cs`、`scripts/MemoryLeakTest/Program.cs`、`ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/GpuAvailabilityChecker.cs`。
 
 **方向：第三方集成分级与插件化**
-**问题描述：** ClearVision 的第三方集成面很宽：OpenCV、ONNX、PaddleOCR、数据库、PLC、相机 SDK、Modbus、S7、MQTT 都有触点；这既是平台优势，也是维护难点。当前可以看到两类明显信号：一类是 `OperatorMetadataScanner` 和 `Acme.OperatorLibrary` 已经让“算子”具备抽象扩展能力；另一类是某些集成尚停留在“接口已出现、运行时未真正启用”，例如 `MqttPublishOperator` 当前会直接返回未启用失败。算子库文档也明确说 Windows 是唯一完整记录的 native profile，SBOM 还是 Markdown 版，某些依赖还要人工 license review。
+**问题描述：** ClearVision 的第三方集成面很宽：OpenCV、ONNX、PaddleOCR、数据库、PLC、相机 SDK、Modbus、S7、MQTT 都有触点；这既是平台优势，也是维护难点。当前可以看到两类明显信号：一类是 `OperatorMetadataScanner` 和 `ClearVision.OperatorLibrary` 已经让“算子”具备抽象扩展能力；另一类是某些集成尚停留在“接口已出现、运行时未真正启用”，例如 `MqttPublishOperator` 当前会直接返回未启用失败。算子库文档也明确说 Windows 是唯一完整记录的 native profile，SBOM 还是 Markdown 版，某些依赖还要人工 license review。
 **影响评估：** 中高。
 **建议的改进措施：** 把第三方能力明确分成“已交付 / 实验性 / 占位未启用”三级，在 UI、元数据和文档中同时体现；对 OperatorLibrary 增加更清晰的模块边界和外部插件装配协议；对 MQTT 这类占位能力，要么真正落地，要么从默认目录中隐藏并打 Experimental 标签。
 **实现难度：** 32–64 小时。
 **优先级：** P1。
 **可能的回归风险：** 元数据口径变化会影响前端算子目录、旧项目反序列化和包消费者。
-**相关文件/代码位置引用：** `Acme.Product/src/Acme.Product.Infrastructure/Services/OperatorMetadataScanner.cs`、`Acme.OperatorLibrary/Acme.OperatorLibrary.csproj`、`Acme.Product/src/Acme.Product.Infrastructure/Operators/MqttPublishOperator.cs`、`docs/operator-library/release-package-industrialization.md`。
+**相关文件/代码位置引用：** `ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/OperatorMetadataScanner.cs`、`ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj`、`ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MqttPublishOperator.cs`、`docs/operator-library/release-package-industrialization.md`。
 
 **方向：文档、兼容性矩阵与国际化整理**
 **问题描述：** 你的文档体系本身很强，但已经开始出现“强治理体系常见的治理收束期问题”：即**事实本身越来越多，入口之间不再完全同步**。这里最典型的例子，就是根 README、项目总览、OperatorLibrary README、整合 TODO 之间的版本和状态口径不完全一致；前端则能看到大量中文硬编码文案，说明默认目标用户显然是中文环境，但进一步的资源化与多语言策略没有成体系表达。应用部署侧也很明确是 `net8.0-windows + WinForms + WebView2 + win-x64 self-contained`，这很好，但兼容性矩阵还没有整理成正式的“支持 / 不支持 / 需外部条件”的统一清单。
@@ -194,7 +194,7 @@
 **实现难度：** 24–36 小时。
 **优先级：** P2。
 **可能的回归风险：** 文档链接和前端显示文本变化引发已有截图、测试快照和培训材料失效。
-**相关文件/代码位置引用：** `README.md`、`docs/项目总览.md`、`Acme.OperatorLibrary/README.md`、`docs/进行中/当前计划/ClearVision-最终整合TODO-2026-05-03.md`、`Acme.Product/src/Acme.Product.Desktop/wwwroot/login.html`、`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js`。
+**相关文件/代码位置引用：** `README.md`、`docs/项目总览.md`、`ClearVision.OperatorLibrary/README.md`、`docs/进行中/当前计划/ClearVision-最终整合TODO-2026-05-03.md`、`ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/login.html`、`ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js`。
 
 ## 一次性长任务执行方式
 
@@ -252,11 +252,11 @@
 - 依赖关系：`无`
 - 相关文件：
   - `global.json`
-  - `Acme.Product/src/Acme.Product.Application/Acme.Product.Application.csproj`
-  - `Acme.Product/src/Acme.Product.Infrastructure/Acme.Product.Infrastructure.csproj`
-  - `Acme.Product/src/Acme.Product.Desktop/Acme.Product.Desktop.csproj`
-  - `Acme.OperatorLibrary/Acme.OperatorLibrary.csproj`
-  - `Acme.OperatorLibrary/README.md`
+  - `ClearVision.Product/src/ClearVision.Product.Application/ClearVision.Product.Application.csproj`
+  - `ClearVision.Product/src/ClearVision.Product.Infrastructure/ClearVision.Product.Infrastructure.csproj`
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj`
+  - `ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj`
+  - `ClearVision.OperatorLibrary/README.md`
 
 **验收标准**
 
@@ -271,7 +271,7 @@
 - [x] 建立 `Directory.Packages.props`，迁移公共版本定义。
 - [x] 对 `Microsoft.Extensions.* / EF Core / ASP.NET / 测试 SDK` 做统一版本策略。
 - [x] 评估 OperatorLibrary 与主工程的共享依赖是否使用同一 lane。
-- [x] 修正 `Acme.OperatorLibrary/README.md` 的 SDK 描述。
+- [x] 修正 `ClearVision.OperatorLibrary/README.md` 的 SDK 描述。
 - [x] 生成并评审 `packages.lock.json`（至少 OperatorLibrary 一侧先落地）。
 - [x] CI 增加 locked restore 或至少增加锁文件一致性检查。
 
@@ -290,8 +290,8 @@
 - 估算工时：`24–40h`
 - 依赖关系：`T0`
 - 相关文件：
-  - `Acme.Product/src/Acme.Product.Desktop/Program.cs`
-  - `Acme.Product/src/Acme.Product.Infrastructure/Data/`（迁移与 DbContext 相关目录）
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Infrastructure/Data/`（迁移与 DbContext 相关目录）
 
 **验收标准**
 
@@ -326,10 +326,10 @@
 - 估算工时：`32–56h`
 - 依赖关系：`T0`
 - 相关文件：
-  - `Acme.Product/src/Acme.Product.Desktop/Program.cs`
-  - `Acme.Product/src/Acme.Product.Desktop/Handlers/WebMessageHandler.cs`
-  - `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js`
-  - `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js`
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/Handlers/WebMessageHandler.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js`
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/flowEditorInteraction.js`
 
 **验收标准**
 
@@ -362,10 +362,10 @@
 - 估算工时：`16–24h`
 - 依赖关系：`T0`
 - 相关文件：
-  - `Acme.Product/src/Acme.Product.Desktop/appsettings.json`
-  - `Acme.Product/src/Acme.Product.Infrastructure/Services/JsonConfigurationService.cs`
-  - `Acme.Product/src/Acme.Product.Infrastructure/AI/AiConfigStore.cs`
-  - `Acme.Product/src/Acme.Product.Infrastructure/AI/AiApiKeySecretStore.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/appsettings.json`
+  - `ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/JsonConfigurationService.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiConfigStore.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/AiApiKeySecretStore.cs`
 
 **验收标准**
 
@@ -399,9 +399,9 @@
 - 依赖关系：`T0、T1、T2`
 - 相关文件：
   - `.github/workflows/ci.yml`
-  - `Acme.Product/Acme.Product.sln`
-  - `Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj`
-  - `Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj`
+  - `ClearVision.Product/ClearVision.Product.sln`
+  - `ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj`
+  - `ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj`
   - `quality/evals/reports/operator_quality_matrix.md`
 
 **验收标准**
@@ -435,10 +435,10 @@
 - 估算工时：`24–48h`
 - 依赖关系：`T1、T2、T3`
 - 相关文件：
-  - `Acme.Product/src/Acme.Product.Desktop/Program.cs`
-  - `Acme.Product/src/Acme.Product.Infrastructure/Memory/MatPool.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/Program.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Infrastructure/Memory/MatPool.cs`
   - `scripts/MemoryLeakTest/Program.cs`
-  - `Acme.Product/src/Acme.Product.Infrastructure/Services/GpuAvailabilityChecker.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/GpuAvailabilityChecker.cs`
 
 **验收标准**
 
@@ -471,9 +471,9 @@
 - 估算工时：`32–64h`
 - 依赖关系：`T0、T2、T5`
 - 相关文件：
-  - `Acme.Product/src/Acme.Product.Infrastructure/Services/OperatorMetadataScanner.cs`
-  - `Acme.Product/src/Acme.Product.Infrastructure/Operators/MqttPublishOperator.cs`
-  - `Acme.OperatorLibrary/Acme.OperatorLibrary.csproj`
+  - `ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/OperatorMetadataScanner.cs`
+  - `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/MqttPublishOperator.cs`
+  - `ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj`
   - `docs/operator-library/release-package-industrialization.md`
 
 **验收标准**
@@ -509,10 +509,10 @@
 - 相关文件：
   - `README.md`
   - `docs/项目总览.md`
-  - `Acme.OperatorLibrary/README.md`
+  - `ClearVision.OperatorLibrary/README.md`
   - `docs/进行中/当前计划/ClearVision-最终整合TODO-2026-05-03.md`
-  - `Acme.Product/src/Acme.Product.Desktop/wwwroot/login.html`
-  - `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/app.js`
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/login.html`
+  - `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/app.js`
 
 **验收标准**
 
@@ -562,7 +562,7 @@
 - [x] 为 `InspectionResultBackgroundService` 增加失败重试、死信/本地 JSONL spool 和健康告警。
 - [x] `SaveBatchAsync` 失败时不得清空 batch；重启后应能回放未持久化结果。
 - [x] 增加仓储写入失败、SQLite 短暂锁、进程重启后的回放测试。
-- 依据：`Acme.Product/src/Acme.Product.Infrastructure/Services/InspectionResultBackgroundService.cs`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Infrastructure/Services/InspectionResultBackgroundService.cs`
 
 ##### P0-2 StationSync 结果队列容量真正生效
 
@@ -570,7 +570,7 @@
 - [x] 队列满时保护 Runtime 回调延迟：记录 drop/backpressure 计数，不阻塞检测主路径。
 - [x] 将 dropped result summaries、backpressure events、spool trimming range 暴露到 health/log/alarm。
 - [x] 更新 `docs/runtime/station-studio-sync.md`，让代码、文档和 SOP 口径一致。
-- 依据：`Acme.Product/src/Acme.Product.Station/Sync/StationSyncHostedService.cs`、`StationSpoolStore.cs`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Station/Sync/StationSyncHostedService.cs`、`StationSpoolStore.cs`
 
 ##### P0-3 CI 不再绕过串行测试 runner
 
@@ -584,7 +584,7 @@
 - [x] OperatorLibrary CI/release restore 使用 `--locked-mode`。
 - [x] 明确 `packages.lock.json` 的更新流程：依赖升级 PR 必须包含 lock diff。
 - [x] `pack.ps1 -RunSmokeTest` 与 CI 包 smoke 使用同一包版本；当前同版本 nupkg 验收使用临时 NuGet lock，主项目 restore 保持 checked-in lock。
-- 依据：`Acme.OperatorLibrary/Acme.OperatorLibrary.csproj`、`Acme.OperatorLibrary/packages.lock.json`
+- 依据：`ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj`、`ClearVision.OperatorLibrary/packages.lock.json`
 
 ##### P0-5 Station 命令、部署、测试包端点补权限
 
@@ -592,21 +592,21 @@
 - [x] `POST /api/stations/{stationId}/deploy-package` 增加同级角色校验与审计。
 - [x] `POST /api/station-packages/test` 不应对普通登录用户开放。
 - [x] `AuthMiddleware` 当前把 session 放在 `HttpContext.Items["CurrentUser"]`，Station endpoints 不要继续依赖 `context.User?.Identity?.Name` 的空值。
-- 依据：`Acme.Product/src/Acme.Product.Desktop/Endpoints/StationEndpoints.cs`、`AuthMiddleware.cs`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/StationEndpoints.cs`、`AuthMiddleware.cs`
 
 ##### P0-6 结果面板移除假高级分析
 
 - [x] 删除或禁用 `resultPanel.js` 中 mock CPK、MTBF、缺陷聚类等占位数据。
 - [x] 已接后端的数据只走现有 `/api/analysis/statistics|defect-distribution|trend|report/{projectId}`。
 - [x] 未接通的高级分析按钮显示“暂无数据/未接入”，不得展示固定样例值。
-- 依据：`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/results/resultPanel.js`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/results/resultPanel.js`
 
 ##### P0-7 算子正式口径对齐
 
 - [x] 处理 `FrameChangeTrigger` 已实现但未进入 155 正式算子目录/名片/质量矩阵的问题。
 - [x] 如果正式发布：补名片、目录、版本记录、质量矩阵、suite evidence。
 - [x] 如果仅内部使用：在文档生成器和质量矩阵中显式排除，并说明原因。
-- 依据：`Acme.Product/src/Acme.Product.Infrastructure/Operators/FrameChangeTriggerOperator.cs`、`docs/算子资料/算子目录.md`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/FrameChangeTriggerOperator.cs`、`docs/算子资料/算子目录.md`
 
 ##### P0-8 工业验证声明设硬门禁
 
@@ -627,7 +627,7 @@
 - [x] 修复 Station Monitor、PLC endpoint、runtime/log、部署 bat/README、根目录规范文档中的 mojibake。（本轮补齐 Application、Desktop、Infrastructure、Runtime、Station 等活跃源码漏点。）
 - [x] 统一脚本生成文本编码；现场 bat 可保留 ASCII，面向人读的 md/txt 使用 UTF-8。（活跃文本文件通过严格 UTF-8 读取检查。）
 - [x] 增加轻量编码扫描脚本，至少检查 `U+FFFD replacement character`、常见 mojibake 片段和不可读中文。（默认扫描根已扩展，当前通过 620 文件扫描。）
-- 依据：`Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js`、`scripts/package-portable-deployment.ps1`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/stations/stationMonitorView.js`、`scripts/package-portable-deployment.ps1`
 
 > 2026-05-09 收口回填：`scripts/check-text-encoding.ps1` 已覆盖 Application、Desktop、Infrastructure、Runtime、Station、Desktop.Package 和前端 `wwwroot/src`，可作为关闭证据。
 
@@ -752,14 +752,14 @@
 - [x] 不再直接 `Enum.GetValues<OperatorType>()` 全量曝光包侧模块。
 - [x] 对齐 `OperatorTypeAliasResolver`、正式 catalog 或 `OperatorMetadataScanner`。
 - [x] legacy alias 和未纳入正式质量矩阵的算子必须显式标注。
-- 依据：`Acme.OperatorLibrary/src/Acme.OperatorLibrary.Modules/OperatorModuleCatalog.cs`
+- 依据：`ClearVision.OperatorLibrary/src/ClearVision.OperatorLibrary.Modules/OperatorModuleCatalog.cs`
 
 ##### P1-17 包级代表性验收扩展
 
-- [x] `Acme.OperatorLibrary` smoke/acceptance 增加匹配、Region/Morphology、频域、SemanticSegmentation、AnomalyDetection、SurfaceDefectDetection 的最小路径。
+- [x] `ClearVision.OperatorLibrary` smoke/acceptance 增加匹配、Region/Morphology、频域、SemanticSegmentation、AnomalyDetection、SurfaceDefectDetection 的最小路径。
 - [x] 每类至少覆盖正常、参数错误或资源缺失、输出契约。
 - [x] 维持 smoke 可快速运行，重数据集验证放质量 suite。
-- 依据：`Acme.OperatorLibrary/tests/Acme.OperatorLibrary.SmokeTests/RepresentativeOperatorAcceptanceTests.cs`
+- 依据：`ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests/RepresentativeOperatorAcceptanceTests.cs`
 
 ##### P1-18 质量等级拆成两条线
 
@@ -780,7 +780,7 @@
 - [x] 评估 `global.json` 的 `rollForward: latestMajor` 是否应改为更保守策略。
 - [x] 消化或删除 SDK 10 csc workaround 的历史依赖。
 - [x] 文档统一 `.NET SDK 9.0.300` 与实际 CI runner 解析结果。
-- 依据：`global.json`、`Acme.Product/Directory.Build.targets`
+- 依据：`global.json`、`ClearVision.Product/Directory.Build.targets`
 
 ##### P1-21 工业 gate 进入 CI
 
@@ -794,7 +794,7 @@
 - [x] CI 除 `npx playwright test` 外，补跑 `npm run test:unit`。
 - [x] `test:preview-smoke` 放入 PR quick 或 nightly，并明确失败 artifact。
 - [x] Station Monitor 前端增加最小渲染和 SSE event apply 单测。
-- 依据：`Acme.Product/tests/Acme.Product.UI.Tests/package.json`
+- 依据：`ClearVision.Product/tests/ClearVision.Product.UI.Tests/package.json`
 
 ##### P1-23 发布包口径统一
 
@@ -807,10 +807,10 @@
 
 ##### P2-1 Runtime 依赖边界瘦身
 
-- [x] 逐步减少 `Acme.Product.Runtime` 对 `Application` / `Infrastructure` 的直接引用。（已移除对 `Infrastructure` 的直接项目引用；`Application` 仍作为 DTO/执行服务契约边界保留。）
+- [x] 逐步减少 `ClearVision.Product.Runtime` 对 `Application` / `Infrastructure` 的直接引用。（已移除对 `Infrastructure` 的直接项目引用；`Application` 仍作为 DTO/执行服务契约边界保留。）
 - [x] 明确 Runtime 的纯运行依赖面和 Desktop/Station 宿主依赖面。
 - [x] 用 architecture guard 防止 Runtime 引入 WebView2/Kestrel/wwwroot/Desktop。
-- 依据：`Acme.Product/src/Acme.Product.Runtime/Acme.Product.Runtime.csproj`
+- 依据：`ClearVision.Product/src/ClearVision.Product.Runtime/ClearVision.Product.Runtime.csproj`
 
 > 2026-05-09 收口回填：Runtime 已移除 Infrastructure 直接依赖，并继续通过 architecture guard 防止引入 Desktop/WebView/Kestrel/wwwroot；Application DTO 解耦作为下一阶段增强。
 
@@ -861,7 +861,7 @@
 - [x] Markdown SBOM 之外补 CycloneDX 或 SPDX artifact。
 - [x] release artifact 中同时包含 SBOM、THIRD-PARTY-NOTICES、dependency-report。
 - [x] 自动输出依赖漏洞和许可证待审清单，特别跟踪 `S7NetPlus` license metadata 缺口。
-- 依据：`Acme.OperatorLibrary/SBOM.md`、`THIRD-PARTY-NOTICES.md`、`analyze-deps.ps1`
+- 依据：`ClearVision.OperatorLibrary/SBOM.md`、`THIRD-PARTY-NOTICES.md`、`analyze-deps.ps1`
 
 ##### P2-9 Coverage 从 artifact 变成趋势
 
@@ -874,8 +874,8 @@
 
 - [x] 评估 Product solution 的 lock-file 策略。
 - [x] 考虑中央包版本管理，减少 csproj 依赖版本漂移。
-- [x] NuGet audit 与 locked restore 在 release 前至少 dry run。（Product solution lock files 已入库，`dotnet restore Acme.Product/Acme.Product.sln --locked-mode` 通过。）
-- 依据：`Acme.Product/Acme.Product.sln`、`nuget.config`
+- [x] NuGet audit 与 locked restore 在 release 前至少 dry run。（Product solution lock files 已入库，`dotnet restore ClearVision.Product/ClearVision.Product.sln --locked-mode` 通过。）
+- 依据：`ClearVision.Product/ClearVision.Product.sln`、`nuget.config`
 
 ##### P2-11 虚拟 PLC 脚本易用性
 
@@ -905,16 +905,16 @@
 #### 推荐验证命令
 
 ```powershell
-dotnet build Acme.Product/Acme.Product.sln --configuration Debug
+dotnet build ClearVision.Product/ClearVision.Product.sln --configuration Debug
 
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName RuntimeMvpTests,StationSyncContractsSerializationTests `
   -NoRestore `
   -Verbosity minimal
 
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj" `
   -FullyQualifiedName StationRegistryServiceTests,StationEndpointsTests,StationIngressSecurityTests `
   -NoRestore `
   -Verbosity minimal
@@ -923,7 +923,7 @@ dotnet build Acme.Product/Acme.Product.sln --configuration Debug
 
 & "./scripts/run-operator-library-industrial-gate.ps1" -Profile quick -NoBuild -NoRestore
 
-Push-Location Acme.Product/tests/Acme.Product.UI.Tests
+Push-Location ClearVision.Product/tests/ClearVision.Product.UI.Tests
 npm run test:unit
 npx playwright test
 Pop-Location

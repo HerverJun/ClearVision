@@ -1,10 +1,10 @@
 # LineMeasurement 技术笔记
 
-> **对应算子**: `LineMeasurementOperator`  
-> **OperatorType**: `OperatorType.LineMeasurement`  
-> **代码依据**: `Acme.Product/src/Acme.Product.Infrastructure/Operators/LineMeasurementOperator.cs`  
-> **相关算子**: [06-CannyEdge-技术笔记](./06-CannyEdge-技术笔记.md)、[07-SubpixelEdgeDetection-技术笔记](./07-SubpixelEdgeDetection-技术笔记.md)、[15-CaliperTool-技术笔记](./15-CaliperTool-技术笔记.md)  
-> **阅读前置**: 霍夫直线、线段长度、角度  
+> **对应算子**: `LineMeasurementOperator`
+> **OperatorType**: `OperatorType.LineMeasurement`
+> **代码依据**: `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/LineMeasurementOperator.cs`
+> **相关算子**: [06-CannyEdge-技术笔记](./06-CannyEdge-技术笔记.md)、[07-SubpixelEdgeDetection-技术笔记](./07-SubpixelEdgeDetection-技术笔记.md)、[15-CaliperTool-技术笔记](./15-CaliperTool-技术笔记.md)
+> **阅读前置**: 霍夫直线、线段长度、角度
 > **核心来源**: OpenCV `HoughLines` / `HoughLinesP` 文档、Szeliski《Computer Vision》、本仓库当前实现
 
 ---
@@ -47,7 +47,7 @@
     │        ╲                      │
     │         ╲                     │
     └──────────────→ x              └──────────────→ ρ
-    
+
     A,B,C,D四点共线                  四点都在同一个(ρ,θ)位置投票
                                     票数100票 > 阈值 → 检测到直线！
 ```
@@ -74,7 +74,7 @@
         │                              │ ╱      图像空间中经过
         └────────→ x                   │╱       点(x₀,y₀)的所有直线
                                       ├──────────→ ρ (距离)
-                                      
+
 映射关系：图像空间的一条直线 ↔ 参数空间的一个点
          图像空间的一个点   ↔ 参数空间的一条正弦曲线
 
@@ -88,7 +88,7 @@
     │  ●────●                        │    ／＼
     │                                 │   ／  ＼
     └───────→ x                      └──────────→ ρ
-    
+
     A、B、C三点在                     三条正弦曲线在(ρ₀,θ₀)相交
     同一条直线上                       说明三点共线！
 ```
@@ -214,7 +214,7 @@
     │  × ↗ │d₁│      d = 点到直线的垂直距离
     │× ↗   │  │
     └────────────→ x
-    
+
     目标：找到一条直线，使得 d₁² + d₂² + ... + dn² 最小
 ```
 
@@ -266,13 +266,13 @@ b = (Σyi - k·Σxi) / n
 
 1. **不知道直线在哪里**
    - 例：在整张图中找所有可能的直线
-   
+
 2. **需要找多条直线**
    - 例：检测建筑立面中的所有水平线和垂直线
-   
+
 3. **要找主导方向**
    - 例：纸张纠偏（找纸张的旋转角度）
-   
+
 4. **直线较长且明显**
    - 例：车道线检测、钢轨检测
 
@@ -296,13 +296,13 @@ b = (Σyi - k·Σxi) / n
 
 1. **知道大致位置**
    - 例：零件边缘距离测量（边缘应该在某个区域内）
-   
+
 2. **需要高精度测量**
    - 例：精密零件的尺寸检测（亚像素级）
-   
+
 3. **边缘可能被遮挡或断裂**
    - 例：检测有缺口的边缘
-   
+
 4. **形状不是直线**
    - 例：圆孔、弧边的检测
 
@@ -509,7 +509,7 @@ foreach (var line in lines)
 
 ## 8. 算法原理
 
-霍夫直线的核心思想是让边缘点在参数空间里投票，找出最可能的直线。  
+霍夫直线的核心思想是让边缘点在参数空间里投票，找出最可能的直线。
 标准霍夫更偏向全局直线表示；概率霍夫更偏向直接输出有限线段。
 
 因此它适合：

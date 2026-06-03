@@ -118,13 +118,13 @@
 - [x] 安装 OpenCvSharp4
 
 #### 1.2 解决方案结构 ✅
-- [x] 创建解决方案 `Acme.Product.sln`
-- [x] `Acme.Product.Core` - 领域层
-- [x] `Acme.Product.Application` - 应用层
-- [x] `Acme.Product.Infrastructure` - 基础设施层
-- [x] `Acme.Product.Contracts` - 共享契约
-- [x] `Acme.Product.Desktop` - 宿主应用
-- [x] `Acme.Product.Tests` - 测试项目
+- [x] 创建解决方案 `ClearVision.Product.sln`
+- [x] `ClearVision.Product.Core` - 领域层
+- [x] `ClearVision.Product.Application` - 应用层
+- [x] `ClearVision.Product.Infrastructure` - 基础设施层
+- [x] `ClearVision.Product.Contracts` - 共享契约
+- [x] `ClearVision.Product.Desktop` - 宿主应用
+- [x] `ClearVision.Product.Tests` - 测试项目
 
 #### 1.3 基础配置 ✅
 - [x] 配置 `.editorconfig`
@@ -358,7 +358,7 @@ wwwroot/
 
 #### 阶段 7：发布与部署最小闭环（保留项）
 
-- [x] Release 构建基线复核：`Acme.Product.sln` 与 `Acme.OperatorLibrary.sln` Release 构建通过
+- [x] Release 构建基线复核：`ClearVision.Product.sln` 与 `ClearVision.OperatorLibrary.sln` Release 构建通过
 - [x] 关键稳定性回归：流程执行 / AI 配置隔离 / 桌面测试冒烟通过
 - [x] UI E2E 链路完成一轮冒烟验证（登录前置链路已补）
 - [x] 发布说明与索引文档同步到最新状态
@@ -406,7 +406,7 @@ wwwroot/
 | 文档名称 | 说明 | 最后更新 |
 |----------|------|----------|
 | [USER_GUIDE.md](./USER_GUIDE.md) | 用户使用指南 | 2026-02-04 |
-| [DEVELOPMENT_RULES.md](./Acme.Product/DEVELOPMENT_RULES.md) | 开发规则与规范 | 2026-01-31 |
+| [DEVELOPMENT_RULES.md](./ClearVision.Product/DEVELOPMENT_RULES.md) | 开发规则与规范 | 2026-01-31 |
 | [项目年度总结报告-管理层版.md](./项目年度总结报告-管理层版.md) | 管理层汇报文档 | 2026-02-06 |
 | [项目核心创新点总结.md](./项目核心创新点总结.md) | 技术创新总结 | 2026-02-06 |
 | [逻辑问题排查与修复计划.md](./逻辑问题排查与修复计划.md) | 问题修复计划 | 2026-02-08 |

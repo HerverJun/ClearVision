@@ -20,21 +20,21 @@
 
 | 步骤 | 文件路径 | 操作 |
 |---:|------|------|
-| ① | `Acme.Product.Core/Enums/OperatorEnums.cs` | 在 `OperatorType` 枚举中添加新值（当前最大值 = 84，从 **90** 开始分配） |
-| ② | `Acme.Product.Infrastructure/Operators/` | 创建算子类，继承 `OperatorBase`，实现 `ExecuteCoreAsync` 和 `ValidateParameters` |
-| ③ | `Acme.Product.Infrastructure/Services/OperatorFactory.cs` | 在 `InitializeDefaultOperators()` 方法末尾添加 `_metadata[OperatorType.Xxx] = new OperatorMetadata{...}` |
-| ④ | `Acme.Product.Desktop/DependencyInjection.cs` | 添加 `services.AddSingleton<IOperatorExecutor, XxxOperator>();` |
+| ① | `ClearVision.Product.Core/Enums/OperatorEnums.cs` | 在 `OperatorType` 枚举中添加新值（当前最大值 = 84，从 **90** 开始分配） |
+| ② | `ClearVision.Product.Infrastructure/Operators/` | 创建算子类，继承 `OperatorBase`，实现 `ExecuteCoreAsync` 和 `ValidateParameters` |
+| ③ | `ClearVision.Product.Infrastructure/Services/OperatorFactory.cs` | 在 `InitializeDefaultOperators()` 方法末尾添加 `_metadata[OperatorType.Xxx] = new OperatorMetadata{...}` |
+| ④ | `ClearVision.Product.Desktop/DependencyInjection.cs` | 添加 `services.AddSingleton<IOperatorExecutor, XxxOperator>();` |
 
 ### 算子类签名模板
 ```csharp
-// 文件: Acme.Product.Infrastructure/Operators/XxxOperator.cs
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Operators;
+// 文件: ClearVision.Product.Infrastructure/Operators/XxxOperator.cs
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
-namespace Acme.Product.Infrastructure.Operators;
+namespace ClearVision.Product.Infrastructure.Operators;
 
 public class XxxOperator : OperatorBase
 {
@@ -120,20 +120,20 @@ _metadata[OperatorType.Xxx] = new OperatorMetadata
 ### 1.1 目标架构
 
 ```
-Acme.Product.Core/Cameras/
+ClearVision.Product.Core/Cameras/
 ├── ICamera.cs                  （已有，保持不变）
 ├── IIndustrialCamera.cs        【新增】扩展接口
 ├── ICameraManager.cs           【新增】管理器接口
 └── ICameraProvider.cs          【新增】发现/创建抽象
 
-Acme.Product.Infrastructure/Cameras/
+ClearVision.Product.Infrastructure/Cameras/
 ├── MockCamera.cs               （已有，保持不变）
 ├── HikvisionCamera.cs          【新增】移植自清霜V3
 ├── MindVisionCamera.cs         【新增】移植自清霜V3
 ├── CameraProviderFactory.cs    【新增】工厂类
 └── CameraManager.cs            【新增】统一管理器
 
-Acme.Product.Infrastructure/DLL/
+ClearVision.Product.Infrastructure/DLL/
 ├── MVSDK.dll                   【新增】华睿SDK（从 清霜V3/x64依赖包 复制）
 └── MvCameraControl.Net.dll     【新增】海康SDK（从 清霜V3/x64依赖包 复制）
 ```
@@ -142,7 +142,7 @@ Acme.Product.Infrastructure/DLL/
 
 #### Step 1: SDK依赖引入
 
-**文件**: `Acme.Product.Infrastructure/Acme.Product.Infrastructure.csproj`
+**文件**: `ClearVision.Product.Infrastructure/ClearVision.Product.Infrastructure.csproj`
 
 在 `<ItemGroup>` 中追加：
 ```xml
@@ -163,10 +163,10 @@ Acme.Product.Infrastructure/DLL/
 
 #### Step 2: 定义扩展接口
 
-**文件**: `Acme.Product.Core/Cameras/IIndustrialCamera.cs` 【新增】
+**文件**: `ClearVision.Product.Core/Cameras/IIndustrialCamera.cs` 【新增】
 
 ```csharp
-namespace Acme.Product.Core.Cameras;
+namespace ClearVision.Product.Core.Cameras;
 
 public interface IIndustrialCamera : ICamera
 {
@@ -184,10 +184,10 @@ public class CameraFrameReceivedEventArgs : EventArgs
 }
 ```
 
-**文件**: `Acme.Product.Core/Cameras/ICameraManager.cs` 【新增】
+**文件**: `ClearVision.Product.Core/Cameras/ICameraManager.cs` 【新增】
 
 ```csharp
-namespace Acme.Product.Core.Cameras;
+namespace ClearVision.Product.Core.Cameras;
 
 public interface ICameraManager : IDisposable
 {
@@ -200,10 +200,10 @@ public interface ICameraManager : IDisposable
 
 #### Step 3: 移植相机适配器
 
-**文件**: `Acme.Product.Infrastructure/Cameras/HikvisionCamera.cs` 【新增】
+**文件**: `ClearVision.Product.Infrastructure/Cameras/HikvisionCamera.cs` 【新增】
 - **来源**: `清霜V3/ClearFrost/Hardware/Camera/HikvisionCamera.cs`（461行）
 - **移植要点**:
-  1. 命名空间改为 `Acme.Product.Infrastructure.Cameras`
+  1. 命名空间改为 `ClearVision.Product.Infrastructure.Cameras`
   2. 实现 `IIndustrialCamera` 接口
   3. 构造函数注入 `ILogger<HikvisionCamera>`
   4. 保留 `_hDevice` 句柄管理和 `ConvertPixelType` 方法
@@ -212,25 +212,25 @@ public interface ICameraManager : IDisposable
 > [!WARNING]
 > 清霜V3中的 `HikvisionCamera` 使用了全局静态回调委托。在ClearVision中**必须**改为实例级别的委托，避免多个相机实例之间的回调冲突。参考 `HikvisionCamera.cs:L120-L180`。
 
-**文件**: `Acme.Product.Infrastructure/Cameras/MindVisionCamera.cs` 【新增】
+**文件**: `ClearVision.Product.Infrastructure/Cameras/MindVisionCamera.cs` 【新增】
 - **来源**: 清霜V3对应文件
 - **移植要点**: 与海康相似，确保 `MVSDK.CameraInit()` / `MVSDK.CameraUnInit()` 在 `Dispose()` 中正确配对调用。
 
 #### Step 4: 工厂类和管理器
 
-**文件**: `Acme.Product.Infrastructure/Cameras/CameraProviderFactory.cs` 【新增】
+**文件**: `ClearVision.Product.Infrastructure/Cameras/CameraProviderFactory.cs` 【新增】
 - **来源**: `清霜V3/ClearFrost/Hardware/Camera/CameraProviderFactory.cs`（240行）
 - 实现 `DiscoverAll()` 静态方法
 - 包裹 try-catch：当某品牌SDK未安装时，不影响其他品牌的枚举
 
-**文件**: `Acme.Product.Infrastructure/Cameras/CameraManager.cs` 【新增】
+**文件**: `ClearVision.Product.Infrastructure/Cameras/CameraManager.cs` 【新增】
 - 注册为 `Singleton`：在 `DependencyInjection.cs` 中 `services.AddSingleton<ICameraManager, CameraManager>();`
 - **来源**: `清霜V3/ClearFrost/Hardware/Camera/CameraManager.cs`（468行）
 - 内部持有 `ConcurrentDictionary<string, ICamera>` 管理已连接相机
 
 #### Step 5: 改造图像采集算子
 
-**文件**: `Acme.Product.Infrastructure/Operators/ImageAcquisitionOperator.cs` 【修改】
+**文件**: `ClearVision.Product.Infrastructure/Operators/ImageAcquisitionOperator.cs` 【修改】
 - 构造函数增加 `ICameraManager cameraManager` 注入参数
 - 在 `ExecuteCoreAsync` 中，当 `sourceType == "camera"` 时：
   ```csharp
@@ -258,25 +258,25 @@ public interface ICameraManager : IDisposable
 ### 2.2 文件结构
 
 ```
-Acme.Product.Infrastructure/Operators/Features/      【新建目录】
+ClearVision.Product.Infrastructure/Operators/Features/      【新建目录】
 ├── FeatureMatchOperatorBase.cs                       【新增】特征匹配泛型基类
 ├── AkazeFeatureMatchOperator.cs                      【新增】
 ├── OrbFeatureMatchOperator.cs                        【新增】
 ├── GradientShapeMatchOperator.cs                     【新增】
 └── PyramidShapeMatchOperator.cs                      【新增】
 
-Acme.Product.Infrastructure/ImageProcessing/          【新建目录】
+ClearVision.Product.Infrastructure/ImageProcessing/          【新建目录】
 └── RobustOrbExtractor.cs                             【新增】ORB自适应网格提取
 ```
 
 > [!NOTE]
-> 命名空间统一为 `Acme.Product.Infrastructure.Operators`，不增加 `.Features` 子命名空间。这与现有算子保持一致（所有算子都在同一命名空间下）。
+> 命名空间统一为 `ClearVision.Product.Infrastructure.Operators`，不增加 `.Features` 子命名空间。这与现有算子保持一致（所有算子都在同一命名空间下）。
 
 ### 2.3 Step 1: 移植特征匹配基类
 
-**文件**: `Acme.Product.Infrastructure/Operators/Features/FeatureMatchOperatorBase.cs` 【新增】
+**文件**: `ClearVision.Product.Infrastructure/Operators/Features/FeatureMatchOperatorBase.cs` 【新增】
 - **来源**: `清霜V3/ClearFrost/Vision/Operators/FeatureMatchOpBase.cs`（404行）
-- **命名空间**: `Acme.Product.Infrastructure.Operators`
+- **命名空间**: `ClearVision.Product.Infrastructure.Operators`
 - **改造要点**:
 
 | 清霜V3原始写法 | ClearVision适配写法 |
@@ -307,7 +307,7 @@ Acme.Product.Infrastructure/ImageProcessing/          【新建目录】
 - `OperatorType => OperatorType.OrbFeatureMatch` (枚举值 91)
 - **依赖**: `RobustOrbExtractor.cs`（务必同步移植）
 
-**文件**: `Acme.Product.Infrastructure/ImageProcessing/RobustOrbExtractor.cs` 【新增】
+**文件**: `ClearVision.Product.Infrastructure/ImageProcessing/RobustOrbExtractor.cs` 【新增】
 - **来源**: 清霜V3对应文件
 - 纯工具类，无需DI注册，直接被 `OrbFeatureMatchOperator` 内部 `new` 使用
 
@@ -380,7 +380,7 @@ Acme.Product.Infrastructure/ImageProcessing/          【新建目录】
 
 ### 3.1 现状评估
 
-ClearVision的 `Acme.PlcComm` 库**已经非常完善**：
+ClearVision的 `ClearVision.PlcComm` 库**已经非常完善**：
 - `IPlcClient` 接口拥有 `ReadAsync<T>` / `WriteAsync<T>` 泛型读写、`PingAsync` 心跳检测、`ReconnectPolicy` 重连策略
 - `PlcClientFactory` 已支持 `S7://` / `MC://` / `FINS://` 连接字符串
 - 三个具体实现 `SiemensS7Client` / `MitsubishiMcClient` / `OmronFinsClient`
@@ -391,7 +391,7 @@ ClearVision的 `Acme.PlcComm` 库**已经非常完善**：
 
 | 改进项 | 来源 | 实施方式 |
 |--------|------|---------|
-| 串口Modbus RTU | `PlcAdapters.cs` 中的 `ModbusRtuAdapter` | 在Acme.PlcComm中新增 `ModbusRtuClient` 实现 `IPlcClient` |
+| 串口Modbus RTU | `PlcAdapters.cs` 中的 `ModbusRtuAdapter` | 在ClearVision.PlcComm中新增 `ModbusRtuClient` 实现 `IPlcClient` |
 | 连接字符串扩展 | - | 在 `PlcClientFactory.CreateFromConnectionString` 中增加 `"MODBUSRTU://"` 分支 |
 
 > [!IMPORTANT]
@@ -413,7 +413,7 @@ ClearVision的 `Acme.PlcComm` 库**已经非常完善**：
 
 #### Step 1: 扩展执行上下文
 
-**文件**: `Acme.Product.Core/Services/IFlowExecutionService.cs` 【修改】
+**文件**: `ClearVision.Product.Core/Services/IFlowExecutionService.cs` 【修改】
 - 新增方法签名：
 ```csharp
 Task<FlowExecutionResult> ExecuteFlowDebugAsync(
@@ -422,9 +422,9 @@ Task<FlowExecutionResult> ExecuteFlowDebugAsync(
     CancellationToken cancellationToken = default);
 ```
 
-**文件**: `Acme.Product.Core/Services/DebugOptions.cs` 【新增】
+**文件**: `ClearVision.Product.Core/Services/DebugOptions.cs` 【新增】
 ```csharp
-namespace Acme.Product.Core.Services;
+namespace ClearVision.Product.Core.Services;
 
 public class DebugOptions
 {
@@ -439,7 +439,7 @@ public class DebugOptions
 
 #### Step 2: 改造 FlowExecutionService
 
-**文件**: `Acme.Product.Infrastructure/Services/FlowExecutionService.cs` 【修改】
+**文件**: `ClearVision.Product.Infrastructure/Services/FlowExecutionService.cs` 【修改】
 - 在 `ExecuteOperatorInternalAsync` 方法中，算子执行后：
   ```csharp
   // 调试模式：缓存中间结果
@@ -478,7 +478,7 @@ public class DebugOptions
 
 #### Step 1: 智能检测服务
 
-**文件**: `Acme.Product.Infrastructure/Services/IntelligentDetectionService.cs` 【新增】
+**文件**: `ClearVision.Product.Infrastructure/Services/IntelligentDetectionService.cs` 【新增】
 - **不是一个算子**，而是一个 `Service` 层组件
 - 注册方式：`services.AddScoped<IIntelligentDetectionService, IntelligentDetectionService>();`
 - 核心方法：
@@ -515,7 +515,7 @@ public async Task<DetectionResult> ExecuteWithRetryAsync(
 
 **枚举**: `DualModalVoting = 94`
 
-**文件**: `Acme.Product.Infrastructure/Operators/DualModalVotingOperator.cs` 【新增】
+**文件**: `ClearVision.Product.Infrastructure/Operators/DualModalVotingOperator.cs` 【新增】
 - 输入端口：`DLResult` (深度学习结果), `TraditionalResult` (传统算法结果)
 - 输出端口：`FinalResult` (最终判定)
 - 参数：`VotingStrategy` (enum: "Unanimous" / "Majority" / "WeightedAverage")
@@ -527,14 +527,14 @@ public async Task<DetectionResult> ExecuteWithRetryAsync(
 ### 自动验证
 1. **编译检查**: 执行 `dotnet build` 确保所有新增文件编译通过，无错误
    ```powershell
-   cd c:\Users\11234\Desktop\ClearVision\Acme.Product
+   cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
    dotnet build --no-restore
    ```
 
 2. **现有测试**: 执行现有单元测试确保未破坏已有功能
    ```powershell
-   cd c:\Users\11234\Desktop\ClearVision\Acme.Product
-   dotnet test tests/Acme.Product.Tests/ --no-build
+   cd c:\Users\11234\Desktop\ClearVision\ClearVision.Product
+   dotnet test tests/ClearVision.Product.Tests/ --no-build
    ```
 
 ### 手动验证

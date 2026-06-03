@@ -10,7 +10,7 @@
 | Product TFM | `net8.0-windows` for Desktop, `net8.0` for shared/runtime libraries. |
 | UI runtime | WebView2 inside WinForms Desktop. |
 | Database | SQLite for local Studio/Station persistence. |
-| Operator package | `Acme.OperatorLibrary` package baseline `1.0.2`, `net8.0`. |
+| Operator package | `ClearVision.OperatorLibrary` package baseline `1.0.2`, `net8.0`. |
 | Station sync | Opt-in outbound SignalR/HTTP from Station to Studio. |
 
 ## Conditional
