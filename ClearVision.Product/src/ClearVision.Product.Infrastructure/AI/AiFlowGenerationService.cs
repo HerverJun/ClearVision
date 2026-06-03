@@ -1058,6 +1058,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     {
         reportProgress("Vision Agent 正在按需调用 ClearVision 内部工具...");
         var stopwatch = Stopwatch.StartNew();
+        var allowRuntimePreviewTools = request.AllowRuntimePreviewTools || options.EnableRuntimePreviewTools;
+        var agentAllowedPermissions = BuildAgentAllowedPermissions(allowRuntimePreviewTools);
         var agentResult = await _visionAgentLoop!.RunAsync(new VisionAgentLoopRequest
         {
             UserPrompt = userMessage,
@@ -1071,7 +1073,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 ExistingFlowJson = conversationContext.ExistingFlowJson,
                 PromptMode = AiPromptModes.Normalize(request.PromptMode),
                 DebugPrompt = request.DebugPrompt,
-                AllowedPermissions = BuildAgentAllowedPermissions()
+                AllowedPermissions = agentAllowedPermissions
             },
             Progress = progress => reportProgress($"{progress.Stage}|{progress.Message}")
         }, cancellationToken);
@@ -1156,6 +1158,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 : $"parse failed: {result.Code}, candidates={result.CandidateCount}");
         var generatedFlow = parseResult.Flow;
         AiValidationResult? lastValidation = null;
+        var repairAttempts = 0;
         if (generatedFlow == null)
         {
             var validation = BuildParseValidationResult(parseResult);
@@ -1171,6 +1174,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 "parse",
                 templatePriority,
                 pipeline,
+                allowRuntimePreviewTools,
                 reportProgress,
                 cancellationToken);
             if (!repair.Success)
@@ -1199,6 +1203,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             agentResult = repair.AgentResult!;
             generatedFlow = repair.GeneratedFlow!;
             lastValidation = repair.Validation!;
+            repairAttempts += repair.RepairAttempts;
             if (promptTrace != null)
             {
                 promptTrace.SystemPrompt = agentResult.SystemPrompt;
@@ -1247,6 +1252,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 "validation",
                 templatePriority,
                 pipeline,
+                allowRuntimePreviewTools,
                 reportProgress,
                 cancellationToken);
             if (!repair.Success)
@@ -1275,6 +1281,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             agentResult = repair.AgentResult!;
             generatedFlow = repair.GeneratedFlow!;
             lastValidation = repair.Validation!;
+            repairAttempts += repair.RepairAttempts;
             if (promptTrace != null)
             {
                 promptTrace.SystemPrompt = agentResult.SystemPrompt;
@@ -1358,7 +1365,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             AiExplanation = generatedFlow.Explanation,
             Reasoning = ShouldIncludePromptTrace(request.DebugPrompt) ? agentResult.Reasoning : null,
             ParametersNeedingReview = generatedFlow.ParametersNeedingReview,
-            RetryCount = 0,
+            RetryCount = repairAttempts,
             SessionId = conversationContext.SessionId,
             DetectedIntent = detectedIntent,
             DryRunResult = dryRunReport,
@@ -1394,6 +1401,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         string failureStage,
         TemplatePriorityContext templatePriority,
         AiGenerationPipelineContext pipeline,
+        bool allowRuntimePreviewTools,
         Action<string> reportProgress,
         CancellationToken cancellationToken)
     {
@@ -1429,7 +1437,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     ExistingFlowJson = conversationContext.ExistingFlowJson,
                     PromptMode = AiPromptModes.Normalize(request.PromptMode),
                     DebugPrompt = request.DebugPrompt,
-                    AllowedPermissions = BuildAgentAllowedPermissions()
+                    AllowedPermissions = BuildAgentAllowedPermissions(allowRuntimePreviewTools)
                 },
                 Progress = progress => reportProgress($"{progress.Stage}|{progress.Message}")
             }, cancellationToken);
@@ -1537,14 +1545,23 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             AgentFinalRepairAttempts);
     }
 
-    private static HashSet<VisionAgentToolPermission> BuildAgentAllowedPermissions() =>
-    [
-        VisionAgentToolPermission.ReadOnly,
-        VisionAgentToolPermission.Simulation,
-        VisionAgentToolPermission.RuntimePreview,
-        VisionAgentToolPermission.ConfigDraft,
-        VisionAgentToolPermission.DeploymentPrepare
-    ];
+    private static HashSet<VisionAgentToolPermission> BuildAgentAllowedPermissions(bool allowRuntimePreviewTools)
+    {
+        var permissions = new HashSet<VisionAgentToolPermission>
+        {
+            VisionAgentToolPermission.ReadOnly,
+            VisionAgentToolPermission.Simulation,
+            VisionAgentToolPermission.ConfigDraft,
+            VisionAgentToolPermission.DeploymentPrepare
+        };
+
+        if (allowRuntimePreviewTools)
+        {
+            permissions.Add(VisionAgentToolPermission.RuntimePreview);
+        }
+
+        return permissions;
+    }
 
     private static string BuildAgentFinalRepairPrompt(
         string originalDescription,
@@ -1623,12 +1640,13 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         var toolDryRunTrace = toolTrace
             .Where(item =>
                 string.Equals(item.ToolName, "dryrun_flow", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(item.ToolName, "replay_flow_with_frame", StringComparison.OrdinalIgnoreCase))
+                string.Equals(item.ToolName, "replay_flow_with_frame", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(item.ToolName, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase))
             .Select(item => new
             {
                 item.ToolName,
                 item.Success,
-                item.ResultSummary,
+                ResultSummary = item.ValidationPreviewSummary ?? item.ResultSummary,
                 item.ErrorMessage,
                 item.DurationMs,
                 item.ToolCallingMode
@@ -1641,6 +1659,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             StructuralDryRun = FindLastToolResult(toolTrace, "dryrun_flow"),
             FrameReplay = FindLastToolResult(toolTrace, "replay_flow_with_frame"),
             FinalDryRun = finalDryRun,
+            RuntimePackagePrecheck = FindLastToolResult(toolTrace, "runtime_package_precheck"),
             ToolDryRunTrace = toolDryRunTrace
         };
     }
@@ -1651,7 +1670,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     {
         return toolTrace
             .LastOrDefault(item => string.Equals(item.ToolName, toolName, StringComparison.OrdinalIgnoreCase))
-            ?.ResultSummary;
+            is { } trace
+                ? trace.ValidationPreviewSummary ?? trace.ResultSummary
+                : null;
     }
 
     private static string BuildTurnRoutePromptSection(AiTurnRoute route)

@@ -83,6 +83,9 @@ public class AiModelConfig
     /// <summary>Tool calling mode: auto | native | json_fallback | disabled.</summary>
     public string? ToolCallingMode { get; set; }
 
+    /// <summary>Allows runtime-preview tools such as camera capture/replay for this model profile.</summary>
+    public bool EnableRuntimePreviewTools { get; set; }
+
     public AiModelCapabilities GetEffectiveCapabilities()
     {
         var capabilities = Capabilities?.Clone() ?? AiModelCapabilities.Infer(Provider, Model);
@@ -316,6 +319,7 @@ public class AiModelConfig
             ExtraBody = CloneJsonMap(ExtraBody),
             Capabilities = GetEffectiveCapabilities(),
             ToolCallingMode = AiToolCallingModes.Normalize(ToolCallingMode),
+            EnableRuntimePreviewTools = EnableRuntimePreviewTools,
             ReasoningMode = Reasoning?.Mode ?? AiReasoningModes.Auto,
             ReasoningEffort = Reasoning?.Effort ?? AiReasoningEfforts.Medium,
             TimeoutSeconds = TimeoutMs / 1000,

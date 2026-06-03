@@ -53,20 +53,28 @@ public sealed class VisionAgentLoopTests
             .Should().Be("ImageAcquisition");
     }
 
-    [Fact(DisplayName = "VisionAgentToolRegistry should deny tools outside allowed permissions")]
+    [Fact(DisplayName = "VisionAgentToolRegistry should deny tools with unified tool_permission_denied code")]
     public async Task VisionAgentToolRegistry_ShouldDenyDisallowedPermissions()
     {
-        var tool = new FakeVisionAgentTool(
+        var configDraftTool = new FakeVisionAgentTool(
             "draft_camera_binding",
             VisionAgentToolPermission.ConfigDraft,
             VisionAgentToolResult.Ok(new { ok = true }));
+        var configWriteTool = new FakeVisionAgentTool(
+            "write_camera_binding",
+            VisionAgentToolPermission.ConfigWrite,
+            VisionAgentToolResult.Ok(new { ok = true }));
+        var deployTool = new FakeVisionAgentTool(
+            "deploy_runtime_package",
+            VisionAgentToolPermission.DeploymentPrepare,
+            VisionAgentToolResult.Ok(new { ok = true }));
         var registry = new VisionAgentToolRegistry(
-            [tool],
+            [configDraftTool, configWriteTool, deployTool],
             Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentToolRegistry>>());
 
         using var argsDoc = JsonDocument.Parse("{}");
-        var result = await registry.ExecuteAsync(
-            tool.Name,
+        var disallowedPermission = await registry.ExecuteAsync(
+            configDraftTool.Name,
             new VisionAgentToolContext
             {
                 AllowedPermissions = new HashSet<VisionAgentToolPermission>
@@ -76,10 +84,38 @@ public sealed class VisionAgentLoopTests
             },
             argsDoc.RootElement,
             CancellationToken.None);
+        var configWrite = await registry.ExecuteAsync(
+            configWriteTool.Name,
+            new VisionAgentToolContext
+            {
+                AllowedPermissions = new HashSet<VisionAgentToolPermission>
+                {
+                    VisionAgentToolPermission.ConfigWrite
+                }
+            },
+            argsDoc.RootElement,
+            CancellationToken.None);
+        var deploymentNotPrecheck = await registry.ExecuteAsync(
+            deployTool.Name,
+            new VisionAgentToolContext
+            {
+                AllowedPermissions = new HashSet<VisionAgentToolPermission>
+                {
+                    VisionAgentToolPermission.DeploymentPrepare
+                }
+            },
+            argsDoc.RootElement,
+            CancellationToken.None);
 
-        result.Success.Should().BeFalse();
-        result.ErrorCode.Should().Be("permission_denied");
-        tool.ExecuteCount.Should().Be(0);
+        disallowedPermission.Success.Should().BeFalse();
+        disallowedPermission.ErrorCode.Should().Be("tool_permission_denied");
+        configWrite.Success.Should().BeFalse();
+        configWrite.ErrorCode.Should().Be("tool_permission_denied");
+        deploymentNotPrecheck.Success.Should().BeFalse();
+        deploymentNotPrecheck.ErrorCode.Should().Be("tool_permission_denied");
+        configDraftTool.ExecuteCount.Should().Be(0);
+        configWriteTool.ExecuteCount.Should().Be(0);
+        deployTool.ExecuteCount.Should().Be(0);
     }
 
     [Fact(DisplayName = "VisionAgentLoop should execute JSON tool call and return trace with pending actions")]

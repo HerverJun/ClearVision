@@ -102,7 +102,8 @@ public class GenerateFlowMessageHandlerTests
             debugPrompt: true,
             requirementMode: "draft",
             templateSelection: templateSelection,
-            promptMode: AiPromptModes.AgentTools);
+            promptMode: AiPromptModes.AgentTools,
+            allowRuntimePreviewTools: true);
 
         await generationService.Received(1).GenerateFlowAsync(
             Arg.Is<AiFlowGenerationRequest>(request =>
@@ -110,6 +111,7 @@ public class GenerateFlowMessageHandlerTests
                 request.DebugPrompt &&
                 request.RequirementMode == "draft" &&
                 request.PromptMode == AiPromptModes.AgentTools &&
+                request.AllowRuntimePreviewTools &&
                 request.TemplateSelection != null &&
                 request.TemplateSelection.Mode == "template_adapt" &&
                 request.TemplateSelection.ScenarioKey == "carton-appearance-inspection"),
@@ -147,6 +149,18 @@ public class GenerateFlowMessageHandlerTests
                         DurationMs = 7,
                         Permission = VisionAgentToolPermission.ConfigDraft.ToString(),
                         ToolCallingMode = "JSON fallback"
+                    },
+                    new VisionAgentToolTrace
+                    {
+                        ToolName = "capture_test_frame",
+                        Arguments = new { cameraBindingId = "cam-1" },
+                        Success = false,
+                        ResultSummary = new { success = false, errorCode = "tool_permission_denied" },
+                        ErrorCode = "tool_permission_denied",
+                        ErrorMessage = "RuntimePreview tools are not enabled.",
+                        DurationMs = 1,
+                        Permission = VisionAgentToolPermission.RuntimePreview.ToString(),
+                        ToolCallingMode = "Native"
                     }
                 ],
                 PendingActions =
@@ -163,6 +177,7 @@ public class GenerateFlowMessageHandlerTests
                 ValidationPreview = new AiValidationPreview
                 {
                     FrameReplay = new { replaySucceeded = true, usedEntryOperatorTempId = "cam_entry" },
+                    RuntimePackagePrecheck = new { ready = false, blockingIssues = new[] { "station offline" } },
                     ToolDryRunTrace = [new { toolName = "replay_flow_with_frame" }]
                 }
             }));
@@ -173,10 +188,12 @@ public class GenerateFlowMessageHandlerTests
 
         using var doc = JsonDocument.Parse(resultJson);
         var trace = doc.RootElement.GetProperty("toolTrace");
-        trace.GetArrayLength().Should().Be(1);
+        trace.GetArrayLength().Should().Be(2);
         trace[0].GetProperty("toolName").GetString().Should().Be("draft_camera_binding");
         trace[0].GetProperty("permission").GetString().Should().Be("ConfigDraft");
         trace[0].GetProperty("toolCallingMode").GetString().Should().Be("JSON fallback");
+        trace[1].GetProperty("errorCode").GetString().Should().Be("tool_permission_denied");
+        trace[1].GetProperty("errorMessage").GetString().Should().Be("RuntimePreview tools are not enabled.");
 
         var actions = doc.RootElement.GetProperty("pendingActions");
         actions.GetArrayLength().Should().Be(1);
@@ -188,6 +205,11 @@ public class GenerateFlowMessageHandlerTests
             .GetProperty("usedEntryOperatorTempId")
             .GetString()
             .Should().Be("cam_entry");
+        doc.RootElement.GetProperty("validationPreview")
+            .GetProperty("runtimePackagePrecheck")
+            .GetProperty("blockingIssues")[0]
+            .GetString()
+            .Should().Be("station offline");
     }
 
     [Fact(DisplayName = "GenerateFlowMessageHandler should forward attachment report message")]

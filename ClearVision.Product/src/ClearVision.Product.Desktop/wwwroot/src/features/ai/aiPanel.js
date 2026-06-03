@@ -114,6 +114,7 @@ export class AiPanel {
         this.pendingManualRetry = null;
         this.requirementMode = this._loadRequirementMode();
         this.promptMode = this._loadPromptMode();
+        this.allowRuntimePreviewTools = Boolean(options.allowRuntimePreviewTools);
 
         // 工作台状态机
         this.workbenchState = AiWorkbenchStates.IDLE;
@@ -660,6 +661,7 @@ export class AiPanel {
                     mode: resolvedMode,
                     requirementMode: this.requirementMode,
                     promptMode: this.promptMode,
+                    allowRuntimePreviewTools: Boolean(this.allowRuntimePreviewTools),
                     templateSelection: normalizedTemplateSelection,
                     debugPrompt: this._shouldRequestPromptTrace(),
                     requestId,
@@ -1663,6 +1665,8 @@ export class AiPanel {
                 arguments: item?.arguments ?? item?.Arguments ?? null,
                 success: Boolean(item?.success ?? item?.Success),
                 resultSummary: item?.resultSummary ?? item?.ResultSummary ?? null,
+                validationPreviewSummary: item?.validationPreviewSummary ?? item?.ValidationPreviewSummary ?? null,
+                errorCode: String(item?.errorCode ?? item?.ErrorCode ?? '').trim(),
                 errorMessage: String(item?.errorMessage ?? item?.ErrorMessage ?? '').trim(),
                 durationMs: Number.isFinite(duration) ? duration : 0,
                 permission: String(item?.permission ?? item?.Permission ?? '').trim(),
@@ -1722,7 +1726,9 @@ export class AiPanel {
                         const statusIcon = item.success ? '&#10003;' : '&#10007;';
                         const summary = item.success
                             ? this._formatTraceInlineValue(item.resultSummary)
-                            : (item.errorMessage || this._formatTraceInlineValue(item.resultSummary));
+                            : ([item.errorCode, item.errorMessage || this._formatTraceInlineValue(item.resultSummary)]
+                                .filter(Boolean)
+                                .join(': '));
                         const modeLabel = item.toolCallingMode ? ` · Tool Calling: ${item.toolCallingMode}` : '';
                         const debugHtml = debugMode
                             ? `
@@ -5749,6 +5755,7 @@ export class AiPanel {
             validationPreview.structuralDryRun || validationPreview.StructuralDryRun ||
             validationPreview.frameReplay || validationPreview.FrameReplay ||
             validationPreview.finalDryRun || validationPreview.FinalDryRun ||
+            validationPreview.runtimePackagePrecheck || validationPreview.RuntimePackagePrecheck ||
             (validationPreview.toolDryRunTrace || validationPreview.ToolDryRunTrace || []).length > 0
         );
         const hasContent = diagnostics.length > 0 || manualRetry?.required || dryRun || hasPreview || knowledgeDiags.length > 0;
@@ -5815,11 +5822,13 @@ export class AiPanel {
             const structuralDryRun = validationPreview.structuralDryRun || validationPreview.StructuralDryRun || null;
             const frameReplay = validationPreview.frameReplay || validationPreview.FrameReplay || null;
             const finalDryRun = validationPreview.finalDryRun || validationPreview.FinalDryRun || null;
+            const runtimePackagePrecheck = validationPreview.runtimePackagePrecheck || validationPreview.RuntimePackagePrecheck || null;
             const toolDryRunTrace = validationPreview.toolDryRunTrace || validationPreview.ToolDryRunTrace || [];
             const previewRows = [
                 ['结构预演', structuralDryRun],
                 ['真实帧回放', frameReplay],
-                ['部署预检查 dry-run', finalDryRun]
+                ['最终 DryRun', finalDryRun],
+                ['部署预检查', runtimePackagePrecheck]
             ].filter(([, value]) => value);
 
             sections.push(`

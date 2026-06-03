@@ -40,6 +40,56 @@ public sealed class VisionAgentHardeningToolTests
 
         result.Success.Should().BeFalse();
         result.ErrorCode.Should().Be("unsupported_trigger_mode_for_test_frame");
+        JsonSerializer.Serialize(result.Data).Should().Contain("software_only");
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+    }
+
+    [Fact(DisplayName = "capture_test_frame configured_trigger_snapshot should remain unsupported without touching camera")]
+    public async Task CaptureTestFrame_ConfiguredTriggerSnapshot_ShouldRemainUnsupported()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        var tool = new CameraTestFrameTool(cameraManager, new VisionAgentTemporaryFrameStore());
+        using var args = JsonDocument.Parse("""{"cameraBindingId":"cam-ext","captureMode":"configured_trigger_snapshot"}""");
+
+        var result = await tool.ExecuteAsync(
+            new VisionAgentToolContext
+            {
+                AllowedPermissions = new HashSet<VisionAgentToolPermission> { VisionAgentToolPermission.RuntimePreview }
+            },
+            args.RootElement,
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("unsupported_capture_mode");
+        cameraManager.DidNotReceive().GetBindings();
+        await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
+    }
+
+    [Fact(DisplayName = "capture_test_frame should be denied by registry without RuntimePreview permission")]
+    public async Task CaptureTestFrame_ShouldBeDeniedWithoutRuntimePreviewPermission()
+    {
+        var cameraManager = Substitute.For<ICameraManager>();
+        var registry = new VisionAgentToolRegistry(
+            [new CameraTestFrameTool(cameraManager, new VisionAgentTemporaryFrameStore())],
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentToolRegistry>>());
+        using var args = JsonDocument.Parse("""{"cameraBindingId":"cam-1"}""");
+
+        var result = await registry.ExecuteAsync(
+            "capture_test_frame",
+            new VisionAgentToolContext
+            {
+                AllowedPermissions = new HashSet<VisionAgentToolPermission>
+                {
+                    VisionAgentToolPermission.ReadOnly,
+                    VisionAgentToolPermission.Simulation
+                }
+            },
+            args.RootElement,
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("tool_permission_denied");
+        cameraManager.DidNotReceive().GetBindings();
         await cameraManager.DidNotReceive().GetOrCreateByBindingAsync(Arg.Any<string>());
     }
 

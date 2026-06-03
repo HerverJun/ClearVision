@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.AI.Tools;
@@ -643,6 +644,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             onProgress: progress.Add);
 
         result.Success.Should().BeTrue();
+        result.RetryCount.Should().Be(1);
         result.ManualRetry.Should().BeNull();
         result.StageTimeline.Should().Contain(item => item.Stage == "agent_final_repair");
         progress.Should().Contain(item => item.StartsWith("agent_repair|", StringComparison.Ordinal));
@@ -719,6 +721,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             });
 
         result.Success.Should().BeTrue(result.ErrorMessage ?? result.FailureType ?? "agent template gate repair should succeed");
+        result.RetryCount.Should().Be(1);
         result.ManualRetry.Should().BeNull();
         result.StageTimeline.Should().Contain(item => item.Stage == "template_gate");
         result.StageTimeline.Should().Contain(item => item.Stage == "agent_final_repair");
@@ -736,6 +739,213 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             "repairHint")
             .Should()
             .BeTrue();
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync agent_tools should deny RuntimePreview tools unless explicitly authorized")]
+    public async Task GenerateFlowAsync_AgentTools_ShouldDenyRuntimePreviewToolsByDefault()
+    {
+        var captureTool = new CountingVisionAgentTool(
+            "capture_test_frame",
+            VisionAgentToolPermission.RuntimePreview,
+            VisionAgentToolResult.Ok(new { temporaryFrameId = "tmp_frame_1" }));
+        var replayTool = new CountingVisionAgentTool(
+            "replay_flow_with_frame",
+            VisionAgentToolPermission.RuntimePreview,
+            VisionAgentToolResult.Ok(new { replayExecuted = true, replaySucceeded = true }));
+        var connector = Substitute.For<IAiConnector>();
+        connector.CompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = """
+                    {
+                      "kind": "tool_call",
+                      "toolCalls": [
+                        { "id": "capture_1", "name": "capture_test_frame", "arguments": { "cameraBindingId": "cam-1" } },
+                        { "id": "replay_1", "name": "replay_flow_with_frame", "arguments": { "temporaryFrameId": "tmp_frame_1", "flow": {} } }
+                      ]
+                    }
+                    """
+                }),
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }));
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+        var service = CreateService(
+            connector,
+            validator,
+            new ConversationalFlowService(_tempRoot),
+            useRealOperatorFactory: true,
+            useVisionAgentLoop: true,
+            visionAgentTools: [captureTool, replayTool]);
+
+        var result = await service.GenerateFlowAsync(
+            new AiFlowGenerationRequest(
+                "Generate a flow and try runtime preview.",
+                SessionId: "agent-runtime-preview-denied")
+            {
+                PromptMode = AiPromptModes.AgentTools
+            });
+
+        result.Success.Should().BeTrue();
+        captureTool.ExecuteCount.Should().Be(0);
+        replayTool.ExecuteCount.Should().Be(0);
+        result.ToolTrace.Should().HaveCount(2);
+        result.ToolTrace.Should().OnlyContain(trace => trace.Success == false);
+        result.ToolTrace.Should().OnlyContain(trace => trace.ErrorCode == "tool_permission_denied");
+        JsonSerializer.Serialize(result.ToolTrace.Select(trace => trace.ResultSummary))
+            .Should()
+            .Contain("tool_permission_denied");
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync agent_tools should execute RuntimePreview tools when explicitly authorized")]
+    public async Task GenerateFlowAsync_AgentTools_ShouldAllowRuntimePreviewToolsWhenAuthorized()
+    {
+        var captureTool = new CountingVisionAgentTool(
+            "capture_test_frame",
+            VisionAgentToolPermission.RuntimePreview,
+            VisionAgentToolResult.Ok(new { temporaryFrameId = "tmp_frame_1" }));
+        var connector = Substitute.For<IAiConnector>();
+        connector.CompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = """
+                    {
+                      "kind": "tool_call",
+                      "toolCalls": [
+                        { "id": "capture_1", "name": "capture_test_frame", "arguments": { "cameraBindingId": "cam-1" } }
+                      ]
+                    }
+                    """
+                }),
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }));
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+        var service = CreateService(
+            connector,
+            validator,
+            new ConversationalFlowService(_tempRoot),
+            useRealOperatorFactory: true,
+            useVisionAgentLoop: true,
+            visionAgentTools: [captureTool]);
+
+        var result = await service.GenerateFlowAsync(
+            new AiFlowGenerationRequest(
+                "Generate a flow and capture a test frame.",
+                SessionId: "agent-runtime-preview-allowed")
+            {
+                PromptMode = AiPromptModes.AgentTools,
+                AllowRuntimePreviewTools = true
+            });
+
+        result.Success.Should().BeTrue();
+        captureTool.ExecuteCount.Should().Be(1);
+        result.ToolTrace.Should().ContainSingle(trace =>
+            trace.ToolName == "capture_test_frame" &&
+            trace.Success);
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync should preserve full lightweight replay and runtime precheck summaries in ValidationPreview")]
+    public async Task GenerateFlowAsync_ShouldPreserveFullValidationPreviewSummaries()
+    {
+        var longWarning = new string('x', 900);
+        var replayTool = new CountingVisionAgentTool(
+            "replay_flow_with_frame",
+            VisionAgentToolPermission.RuntimePreview,
+            VisionAgentToolResult.Ok(new
+            {
+                replayExecuted = true,
+                replaySucceeded = true,
+                isSuccess = true,
+                usedEntryOperatorTempId = "cam_entry",
+                frame = new { temporaryFrameId = "tmp_frame_1", byteLength = 1234, width = 640, height = 480 },
+                scoreSummary = new { Score = 0.91, MatchScore = 0.88 },
+                operatorResults = new[]
+                {
+                    new
+                    {
+                        operatorName = "TemplateMatch",
+                        isSuccess = true,
+                        scores = new { MatchScore = 0.88 }
+                    }
+                },
+                warnings = new[] { longWarning },
+                errorMessage = string.Empty
+            }));
+        var precheckTool = new CountingVisionAgentTool(
+            "runtime_package_precheck",
+            VisionAgentToolPermission.DeploymentPrepare,
+            VisionAgentToolResult.Ok(new
+            {
+                ready = false,
+                blockingIssues = new[] { "station offline" },
+                warnings = new[] { "replay should be reviewed" },
+                requiredUserActions = new[] { "Bring station online." }
+            }));
+        var connector = Substitute.For<IAiConnector>();
+        connector.CompleteAsync(
+                Arg.Any<string>(),
+                Arg.Any<List<ChatMessage>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = """
+                    {
+                      "kind": "tool_call",
+                      "toolCalls": [
+                        { "id": "replay_1", "name": "replay_flow_with_frame", "arguments": { "temporaryFrameId": "tmp_frame_1", "entryOperatorTempId": "cam_entry", "flow": {} } },
+                        { "id": "precheck_1", "name": "runtime_package_precheck", "arguments": { "flow": {}, "targetStationId": "station-1" } }
+                      ]
+                    }
+                    """
+                }),
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }));
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>()).Returns(new AiValidationResult());
+        var service = CreateService(
+            connector,
+            validator,
+            new ConversationalFlowService(_tempRoot),
+            useRealOperatorFactory: true,
+            useVisionAgentLoop: true,
+            visionAgentTools: [replayTool, precheckTool]);
+
+        var result = await service.GenerateFlowAsync(
+            new AiFlowGenerationRequest(
+                "Generate a flow and run replay/precheck.",
+                SessionId: "agent-validation-preview-full")
+            {
+                PromptMode = AiPromptModes.AgentTools,
+                AllowRuntimePreviewTools = true
+            });
+
+        result.Success.Should().BeTrue();
+        result.ValidationPreview.Should().NotBeNull();
+        var frameReplayJson = JsonSerializer.Serialize(result.ValidationPreview!.FrameReplay);
+        frameReplayJson.Should().Contain("cam_entry");
+        frameReplayJson.Should().Contain(longWarning);
+        frameReplayJson.Should().Contain("scoreSummary");
+        frameReplayJson.Should().Contain("operatorResults");
+        JsonSerializer.Serialize(result.ValidationPreview.RuntimePackagePrecheck)
+            .Should()
+            .Contain("station offline");
+        result.ValidationPreview.ToolDryRunTrace.Should().HaveCount(2);
     }
 
     [Fact]
@@ -1772,7 +1982,9 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         IRequirementBriefExtractor? requirementBriefExtractor = null,
         bool useRealOperatorFactory = false,
         bool useVisionAgentLoop = false,
-        IReadOnlyList<AiValidationResult>? templateConstraintResults = null)
+        IReadOnlyList<AiValidationResult>? templateConstraintResults = null,
+        IReadOnlyList<IVisionAgentTool>? visionAgentTools = null,
+        bool enableRuntimePreviewTools = false)
     {
         var modelSelector = Substitute.For<IAiModelSelector>();
         modelSelector.SelectGenerationModel().Returns(new AiModelConfig
@@ -1780,7 +1992,8 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             Name = "Test Model",
             Provider = "OpenAI Compatible",
             Model = "test-model",
-            TimeoutMs = 30_000
+            TimeoutMs = 30_000,
+            EnableRuntimePreviewTools = enableRuntimePreviewTools
         });
 
         var connectorFactory = Substitute.For<IAiConnectorFactory>();
@@ -1855,7 +2068,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
                 new AiGenerationOrchestrator(modelSelector, connectorFactory),
                 new AgentPromptBuilder(),
                 new VisionAgentToolRegistry(
-                    Array.Empty<IVisionAgentTool>(),
+                    visionAgentTools ?? Array.Empty<IVisionAgentTool>(),
                     Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentToolRegistry>>()),
                 new VisionAgentProtocolParser(),
                 Options.Create(new VisionAgentLoopOptions
@@ -1892,6 +2105,40 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             "\n",
             messages.Select(message => message.Content ?? string.Empty));
         return tokens.All(token => text.Contains(token, StringComparison.Ordinal));
+    }
+
+    private sealed class CountingVisionAgentTool : IVisionAgentTool
+    {
+        private readonly VisionAgentToolResult _result;
+
+        public CountingVisionAgentTool(
+            string name,
+            VisionAgentToolPermission permission,
+            VisionAgentToolResult result)
+        {
+            Name = name;
+            Permission = permission;
+            _result = result;
+            using var schema = JsonDocument.Parse("""{"type":"object","properties":{}}""");
+            ParametersSchema = schema.RootElement.Clone();
+        }
+
+        public string Name { get; }
+        public string DisplayName => Name;
+        public string Description => "Test tool";
+        public string Category => "test";
+        public VisionAgentToolPermission Permission { get; }
+        public JsonElement ParametersSchema { get; }
+        public int ExecuteCount { get; private set; }
+
+        public Task<VisionAgentToolResult> ExecuteAsync(
+            VisionAgentToolContext context,
+            JsonElement arguments,
+            CancellationToken cancellationToken)
+        {
+            ExecuteCount++;
+            return Task.FromResult(_result);
+        }
     }
 
     private static ScenarioMatchResult BuildPackagingScenarioMatch(double confidence)

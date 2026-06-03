@@ -173,6 +173,7 @@ public sealed class CameraTestFrameTool : VisionAgentToolBase
           "required": ["cameraBindingId"],
           "properties": {
             "cameraBindingId": { "type": "string" },
+            "captureMode": { "type": "string", "enum": ["software_only", "configured_trigger_snapshot"] },
             "timeoutMs": { "type": "integer", "minimum": 500, "maximum": 60000 }
           }
         }
@@ -187,6 +188,15 @@ public sealed class CameraTestFrameTool : VisionAgentToolBase
         if (string.IsNullOrWhiteSpace(bindingId))
         {
             return VisionAgentToolResult.Fail("camera_binding_required", "cameraBindingId is required.");
+        }
+
+        var captureMode = NormalizeCaptureMode(ReadString(arguments, "captureMode"));
+        if (captureMode == "configured_trigger_snapshot")
+        {
+            return VisionAgentToolResult.Fail(
+                "unsupported_capture_mode",
+                "configured_trigger_snapshot is not enabled for Vision Agent v1 test frames.",
+                new { cameraBindingId = bindingId, captureMode });
         }
 
         var binding = _cameraManager.FindBinding(bindingId);
@@ -210,6 +220,7 @@ public sealed class CameraTestFrameTool : VisionAgentToolBase
                 {
                     cameraBindingId = binding.Id,
                     binding.DisplayName,
+                    captureMode,
                     triggerMode = binding.TriggerMode,
                     softwareTriggerSource = binding.SoftwareTriggerSource
                 });
@@ -285,8 +296,17 @@ public sealed class CameraTestFrameTool : VisionAgentToolBase
             parameters.PixelFormat,
             triggerMode = binding.TriggerMode,
             softwareTriggerSource = binding.SoftwareTriggerSource,
+            captureMode,
             frameStore = _frameStore.GetStats()
         });
+    }
+
+    private static string NormalizeCaptureMode(string? captureMode)
+    {
+        var normalized = (captureMode ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized == "configured_trigger_snapshot"
+            ? "configured_trigger_snapshot"
+            : "software_only";
     }
 }
 

@@ -76,6 +76,8 @@ public class AiGenerationOptions
 
     public string ToolCallingMode { get; set; } = AiToolCallingModes.Auto;
 
+    public bool EnableRuntimePreviewTools { get; set; }
+
     public string ReasoningMode { get; set; } = AiReasoningModes.Auto;
 
     public string ReasoningEffort { get; set; } = AiReasoningEfforts.Medium;

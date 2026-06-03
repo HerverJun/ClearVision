@@ -23,6 +23,7 @@ public record AiFlowGenerationRequest(
 {
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
     public string PromptMode { get; init; } = AiPromptModes.LegacyFullPrompt;
+    public bool AllowRuntimePreviewTools { get; init; }
 }
 
 public static class AiRequirementModes
@@ -233,6 +234,7 @@ public class AiValidationPreview
     public object? StructuralDryRun { get; set; }
     public object? FrameReplay { get; set; }
     public object? FinalDryRun { get; set; }
+    public object? RuntimePackagePrecheck { get; set; }
     public List<object> ToolDryRunTrace { get; set; } = new();
 }
 

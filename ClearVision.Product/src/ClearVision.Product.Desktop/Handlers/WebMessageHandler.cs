@@ -346,6 +346,9 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 ?? TryGetMessageString(doc.RootElement, "requirementMode");
             var promptMode = TryGetMessageString(payload, "promptMode")
                 ?? TryGetMessageString(doc.RootElement, "promptMode");
+            var allowRuntimePreviewTools = TryGetBoolean(payload, "allowRuntimePreviewTools") ??
+                                           TryGetBoolean(doc.RootElement, "allowRuntimePreviewTools") ??
+                                           false;
             var templateSelection = TryGetTemplateSelection(payload);
             var existingFlowJson = TryGetExistingFlowJson(payload);
             var attachments = payload.TryGetProperty("attachments", out var attachmentElement) &&
@@ -375,6 +378,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 requirementMode,
                 templateSelection,
                 promptMode,
+                allowRuntimePreviewTools,
                 onMessage: (type, payload) =>
                 {
                     // payload 已是 JSON 字符串，直接拼接外层 envelope，避免反序列化再序列化的额外开销。

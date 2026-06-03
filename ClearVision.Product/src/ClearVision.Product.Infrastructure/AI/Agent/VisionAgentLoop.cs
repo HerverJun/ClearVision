@@ -265,6 +265,8 @@ public sealed class VisionAgentLoop
                 Arguments = context.DebugPrompt ? JsonSerializer.Deserialize<object>(call.Arguments.GetRawText()) : SummarizeArguments(call.Arguments),
                 Success = result.Success,
                 ResultSummary = SummarizeResult(result),
+                ValidationPreviewSummary = BuildValidationPreviewSummary(call.Name, result),
+                ErrorCode = result.ErrorCode,
                 ErrorMessage = result.ErrorMessage,
                 DurationMs = stopwatch.ElapsedMilliseconds,
                 Permission = permission,
@@ -336,6 +338,46 @@ public sealed class VisionAgentLoop
             charLength = json.Length,
             pendingActionCount = result.PendingActions.Count
         };
+    }
+
+    private static object? BuildValidationPreviewSummary(string toolName, VisionAgentToolResult result)
+    {
+        if (!IsValidationPreviewTool(toolName))
+        {
+            return null;
+        }
+
+        if (!result.Success)
+        {
+            return CloneJsonCompatible(new
+            {
+                success = false,
+                errorCode = result.ErrorCode,
+                errorMessage = result.ErrorMessage,
+                data = result.Data
+            });
+        }
+
+        return CloneJsonCompatible(result.Data);
+    }
+
+    private static bool IsValidationPreviewTool(string toolName)
+    {
+        return string.Equals(toolName, "dryrun_flow", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(toolName, "replay_flow_with_frame", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(toolName, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static object? CloneJsonCompatible(object? value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        return JsonSerializer.Deserialize<object>(
+            JsonSerializer.Serialize(value, JsonOptions),
+            JsonOptions);
     }
 
     private static int CountToolIssues(object? data)

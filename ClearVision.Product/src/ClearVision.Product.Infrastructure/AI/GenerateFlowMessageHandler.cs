@@ -42,6 +42,7 @@ public class GenerateFlowMessageHandler
         string? requirementMode = null,
         AiTemplateSelectionInfo? templateSelection = null,
         string? promptMode = null,
+        bool allowRuntimePreviewTools = false,
         Action<string, string>? onMessage = null,
         CancellationToken cancellationToken = default)
     {
@@ -71,7 +72,8 @@ public class GenerateFlowMessageHandler
                     TemplateSelection: templateSelection)
                 {
                     RequirementMode = requirementMode ?? AiRequirementModes.Strict,
-                    PromptMode = ClearVision.Product.Core.AI.Tools.AiPromptModes.Normalize(promptMode)
+                    PromptMode = ClearVision.Product.Core.AI.Tools.AiPromptModes.Normalize(promptMode),
+                    AllowRuntimePreviewTools = allowRuntimePreviewTools
                 },
                 progressMsg => onMessage?.Invoke(
                     "GenerateFlowProgress",
@@ -549,6 +551,8 @@ public class GenerateFlowMessageHandler
             Arguments = item.Arguments,
             Success = item.Success,
             ResultSummary = item.ResultSummary,
+            ValidationPreviewSummary = item.ValidationPreviewSummary,
+            ErrorCode = item.ErrorCode,
             ErrorMessage = item.ErrorMessage,
             DurationMs = item.DurationMs,
             Permission = item.Permission,
@@ -568,6 +572,7 @@ public class GenerateFlowMessageHandler
             StructuralDryRun = preview.StructuralDryRun,
             FrameReplay = preview.FrameReplay,
             FinalDryRun = preview.FinalDryRun,
+            RuntimePackagePrecheck = preview.RuntimePackagePrecheck,
             ToolDryRunTrace = preview.ToolDryRunTrace?.ToList() ?? new List<object>()
         };
     }

@@ -58,7 +58,7 @@ public sealed class VisionAgentToolRegistry : IVisionAgentToolRegistry
         if (tool.Permission == VisionAgentToolPermission.ConfigWrite)
         {
             return VisionAgentToolResult.Fail(
-                "permission_denied",
+                "tool_permission_denied",
                 $"Tool '{tool.Name}' requires ConfigWrite, which is never allowed for Vision Agent v1.");
         }
 
@@ -66,14 +66,14 @@ public sealed class VisionAgentToolRegistry : IVisionAgentToolRegistry
             !string.Equals(tool.Name, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase))
         {
             return VisionAgentToolResult.Fail(
-                "permission_denied",
+                "tool_permission_denied",
                 $"Tool '{tool.Name}' requests DeploymentPrepare, but Vision Agent v1 only allows deployment precheck.");
         }
 
         if (!context.AllowedPermissions.Contains(tool.Permission))
         {
             return VisionAgentToolResult.Fail(
-                "permission_denied",
+                "tool_permission_denied",
                 $"Tool '{tool.Name}' requires permission '{tool.Permission}', which is not allowed in this session.");
         }
 

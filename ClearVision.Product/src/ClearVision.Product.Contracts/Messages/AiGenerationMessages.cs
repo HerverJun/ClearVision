@@ -61,6 +61,11 @@ public record GenerateFlowRequestPayload
     public string? PromptMode { get; init; }
 
     /// <summary>
+    /// Explicitly allows runtime-preview tools such as capture_test_frame / replay_flow_with_frame for this request.
+    /// </summary>
+    public bool? AllowRuntimePreviewTools { get; init; }
+
+    /// <summary>
     /// 可选：用户在工作台中选择的模板策略。
     /// </summary>
     public GenerateFlowTemplateSelection? TemplateSelection { get; init; }
@@ -285,6 +290,8 @@ public record GenerateFlowToolTrace
     public object? Arguments { get; init; }
     public bool Success { get; init; }
     public object? ResultSummary { get; init; }
+    public object? ValidationPreviewSummary { get; init; }
+    public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
     public long DurationMs { get; init; }
     public string Permission { get; init; } = string.Empty;
@@ -296,6 +303,7 @@ public record GenerateFlowValidationPreview
     public object? StructuralDryRun { get; init; }
     public object? FrameReplay { get; init; }
     public object? FinalDryRun { get; init; }
+    public object? RuntimePackagePrecheck { get; init; }
     public List<object> ToolDryRunTrace { get; init; } = new();
 }
 
