@@ -49,7 +49,7 @@ This emits 100 cases per Region boolean operator, including `RegionUnion`.
 
 ## Evidence
 
-- `Acme.Product.Tests.Operators.Phase42RegionProcessingOperatorTests`: 21 tests passed.
+- `ClearVision.Product.Tests.Operators.Phase42RegionProcessingOperatorTests`: 21 tests passed.
 - 400 Region cases generated in smoke output, including 100 `RegionUnion` cases.
 - Metrics smoke run produced `Passed=true` for a generated `RegionUnion` case.
 - .NET golden runner executed 100 `RegionUnion` cases through `RegionUnionOperator`: 100 passed, 0 failed.

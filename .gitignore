@@ -82,9 +82,9 @@ artifacts/
 publish/
 
 # Local build snapshots / ad hoc verification output
-/Acme.Product/build_check/
-/Acme.Product/temp_build_out/
-/Acme.Product/temp_test_out/
+/ClearVision.Product/build_check/
+/ClearVision.Product/temp_build_out/
+/ClearVision.Product/temp_test_out/
 
 # Notebook checkpoints
 notebooks/.ipynb_checkpoints/
@@ -96,9 +96,9 @@ notebooks/.ipynb_checkpoints/
 /vision.db
 
 # UI regression artifacts
-/Acme.Product/test_results/ui_*.png
-/Acme.Product/test_results/ui_*.json
-/Acme.Product/test_results/ui_*.md
+/ClearVision.Product/test_results/ui_*.png
+/ClearVision.Product/test_results/ui_*.json
+/ClearVision.Product/test_results/ui_*.md
 
 # Local scratch notes (keep repo clean)
 docs/temp.md

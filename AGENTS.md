@@ -20,7 +20,7 @@
 ## Example
 ```powershell
 ./scripts/run-dotnet-test-serial.ps1 `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName FlowExecutionServiceTests,ConnectionPoolManagerTests,InspectionRuntimeCoordinatorTests `
   -NoBuild `
   -NoRestore

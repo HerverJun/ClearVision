@@ -7,7 +7,7 @@ echo.
 
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR:~0,-1%"
-set "ACME_DIR=%PROJECT_ROOT%\Acme.Product"
+set "CLEARVISION_DIR=%PROJECT_ROOT%\ClearVision.Product"
 
 echo [1/3] 正在清理根目录的构建日志...
 cd /d "%PROJECT_ROOT%"
@@ -21,13 +21,13 @@ if exist "build_sln*.txt" del /F /Q "build_sln*.txt" 2>nul
 echo √ 根目录日志文件已清理
 
 echo.
-echo [2/3] 正在清理 Acme.Product 目录的构建日志...
-cd /d "%ACME_DIR%"
+echo [2/3] 正在清理 ClearVision.Product 目录的构建日志...
+cd /d "%CLEARVISION_DIR%"
 if exist "build*.txt" del /F /Q "build*.txt" 2>nul
 if exist "build*.log" del /F /Q "build*.log" 2>nul
 if exist "msbuild.log" del /F /Q "msbuild.log" 2>nul
 if exist "run.log" del /F /Q "run.log" 2>nul
-echo √ Acme.Product 目录日志文件已清理
+echo √ ClearVision.Product 目录日志文件已清理
 
 echo.
 echo [3/3] 正在清理发布目录...

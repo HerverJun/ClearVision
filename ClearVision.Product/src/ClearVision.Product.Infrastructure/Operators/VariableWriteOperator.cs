@@ -1,0 +1,146 @@
+// VariableWriteOperator.cs
+// 变量写入算子 - 写入值到全局变量表
+// 作者：蘅芜君
+
+using ClearVision.Product.Core.Attributes;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
+using Microsoft.Extensions.Logging;
+namespace ClearVision.Product.Infrastructure.Operators;
+
+/// <summary>
+/// 变量写入算子 - 写入值到全局变量表
+/// 【第三优先级】变量表/全局上下文功能
+/// </summary>
+[OperatorMeta(
+    DisplayName = "变量写入",
+    Description = "写入值到全局变量表",
+    Category = "变量",
+    IconName = "variable-write"
+)]
+[InputPort("Value", "值", PortDataType.Any, IsRequired = false)]
+[OutputPort("VariableName", "变量名", PortDataType.String)]
+[OutputPort("Value", "写入的值", PortDataType.Any)]
+[OutputPort("CycleCount", "循环计数", PortDataType.Integer)]
+[OperatorParam("VariableName", "变量名", "string", Description = "要写入的变量名称", DefaultValue = "")]
+[OperatorParam("DataType", "数据类型", "enum", DefaultValue = "String", Options = new[] { "String|字符串", "Int|整数", "Double|浮点数", "Bool|布尔值" })]
+[OperatorParam("UseInputValue", "使用输入值", "bool", Description = "优先使用上游输入的值，否则使用下方静态值", DefaultValue = true)]
+[OperatorParam("StaticValue", "静态值", "string", Description = "当没有上游输入时使用的值", DefaultValue = "0")]
+public class VariableWriteOperator : OperatorBase
+{
+    private readonly IVariableContext _variableContext;
+
+    public override OperatorType OperatorType => OperatorType.VariableWrite;
+
+    public VariableWriteOperator(
+        ILogger<VariableWriteOperator> logger,
+        IVariableContext variableContext) : base(logger)
+    {
+        _variableContext = variableContext;
+    }
+
+    protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
+        Operator @operator,
+        Dictionary<string, object>? inputs,
+        CancellationToken cancellationToken)
+    {
+        var variableName = GetStringParam(@operator, "VariableName", "");
+        var dataType = GetStringParam(@operator, "DataType", "String");
+        var useInputValue = GetBoolParam(@operator, "UseInputValue", true);
+
+        if (string.IsNullOrWhiteSpace(variableName))
+        {
+            return Task.FromResult(OperatorExecutionOutput.Failure("变量名不能为空"));
+        }
+
+        object value;
+
+        if (useInputValue && inputs != null)
+        {
+            // 优先使用上游输入
+            if (inputs.TryGetValue("Value", out var inputValue))
+            {
+                value = inputValue;
+            }
+            else if (inputs.TryGetValue(variableName, out var namedValue))
+            {
+                value = namedValue;
+            }
+            else
+            {
+                // 使用参数面板中的静态值
+                value = GetStaticValue(@operator, dataType);
+            }
+        }
+        else
+        {
+            // 使用参数面板中的静态值
+            value = GetStaticValue(@operator, dataType);
+        }
+
+        // 写入变量
+        switch (dataType.ToLower())
+        {
+            case "int":
+            case "integer":
+                _variableContext.SetValue(variableName, Convert.ToInt64(value));
+                break;
+            case "double":
+            case "float":
+                _variableContext.SetValue(variableName, Convert.ToDouble(value));
+                break;
+            case "bool":
+            case "boolean":
+                _variableContext.SetValue(variableName, Convert.ToBoolean(value));
+                break;
+            default:
+                _variableContext.SetValue(variableName, value?.ToString() ?? "");
+                break;
+        }
+
+        Logger.LogInformation("[VariableWrite] 写入变量 {VariableName} = {Value}", variableName, value);
+
+        return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+        {
+            { "VariableName", variableName },
+            { "Value", value! },
+            { "CycleCount", _variableContext.CycleCount }
+        }));
+    }
+
+    private object GetStaticValue(Operator @operator, string dataType)
+    {
+        var staticValue = GetStringParam(@operator, "StaticValue", "");
+
+        switch (dataType.ToLower())
+        {
+            case "int":
+            case "integer":
+                return long.TryParse(staticValue, out var intVal) ? intVal : 0L;
+            case "double":
+            case "float":
+                return double.TryParse(staticValue, out var doubleVal) ? doubleVal : 0.0;
+            case "bool":
+            case "boolean":
+                return bool.TryParse(staticValue, out var boolVal) ? boolVal : false;
+            default:
+                return staticValue;
+        }
+    }
+
+    public override ValidationResult ValidateParameters(Operator @operator)
+    {
+        var variableName = GetStringParam(@operator, "VariableName", "");
+        if (string.IsNullOrWhiteSpace(variableName))
+            return ValidationResult.Invalid("变量名不能为空");
+
+        var validTypes = new[] { "string", "int", "integer", "double", "float", "bool", "boolean" };
+        var dataType = GetStringParam(@operator, "DataType", "String").ToLower();
+        if (!validTypes.Contains(dataType))
+            return ValidationResult.Invalid($"不支持的数据类型: {dataType}");
+
+        return ValidationResult.Valid();
+    }
+}

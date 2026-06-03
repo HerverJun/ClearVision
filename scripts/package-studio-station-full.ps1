@@ -64,7 +64,7 @@ $stationStaging = Join-Path $tmpPublishRoot "Station"
 
 # 3. Compile and publish ClearVision Studio (FULL)
 Write-Host "[3/5] Publishing ClearVision Studio [FULL]..." -ForegroundColor Yellow
-$studioProject = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Desktop\Acme.Product.Desktop.csproj"
+$studioProject = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\ClearVision.Product.Desktop.csproj"
 
 & $dotnetPath publish $studioProject `
     -c $Configuration `
@@ -91,7 +91,7 @@ Write-Host "  [OK] Studio FULL package successfully created: $studioZipPath" -Fo
 
 # 4. Compile and publish ClearVision Station (FULL)
 Write-Host "[4/5] Publishing ClearVision Station [FULL]..." -ForegroundColor Yellow
-$stationProject = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Station\Acme.Product.Station.csproj"
+$stationProject = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Station\ClearVision.Product.Station.csproj"
 
 & $dotnetPath publish $stationProject `
     -c $Configuration `

@@ -73,10 +73,10 @@ function Get-OperatorCatalog {
 }
 
 $repoRoot = Get-RepoRoot
-$visualPath = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Desktop\wwwroot\src\shared\operatorVisuals.js"
-$enumPath = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Core\Enums\OperatorEnums.cs"
-$appPath = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Desktop\wwwroot\src\app.js"
-$flowEditorPath = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Desktop\wwwroot\src\features\flow-editor\flowEditorInteraction.js"
+$visualPath = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\wwwroot\src\shared\operatorVisuals.js"
+$enumPath = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Core\Enums\OperatorEnums.cs"
+$appPath = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\wwwroot\src\app.js"
+$flowEditorPath = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\wwwroot\src\features\flow-editor\flowEditorInteraction.js"
 $visualContent = Get-Content -Path $visualPath -Raw -Encoding UTF8
 $enumContent = Get-Content -Path $enumPath -Raw -Encoding UTF8
 $catalog = Get-OperatorCatalog -RepoRoot $repoRoot

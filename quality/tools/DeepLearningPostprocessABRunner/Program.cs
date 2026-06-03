@@ -2,7 +2,7 @@ using System.Collections;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.ML.OnnxRuntime.Tensors;
 

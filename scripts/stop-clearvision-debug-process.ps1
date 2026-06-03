@@ -18,10 +18,10 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $RepoRoot = (Resolve-Path (Join-Path $scriptRoot "..")).Path
 }
 
-$targetExe = Join-Path $RepoRoot "Acme.Product\src\Acme.Product.Desktop\bin\Debug\net8.0-windows\win-x64\Acme.Product.Desktop.exe"
+$targetExe = Join-Path $RepoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64\ClearVision.Product.Desktop.exe"
 $targetExe = [System.IO.Path]::GetFullPath($targetExe)
 
-$processes = Get-Process -Name "Acme.Product.Desktop" -ErrorAction SilentlyContinue |
+$processes = Get-Process -Name "ClearVision.Product.Desktop" -ErrorAction SilentlyContinue |
     Where-Object {
         try {
             $_.Path -and ([System.IO.Path]::GetFullPath($_.Path) -ieq $targetExe)

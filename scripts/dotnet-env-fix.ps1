@@ -280,8 +280,8 @@ if (Test-Path $ProjectConfigPath) {
     Write-Warn "No project-level nuget.config found"
 }
 
-# Check Acme.OperatorLibrary nuget.config
-$opLibConfig = Join-Path $RepoRoot "Acme.OperatorLibrary\nuget.config"
+# Check ClearVision.OperatorLibrary nuget.config
+$opLibConfig = Join-Path $RepoRoot "ClearVision.OperatorLibrary\nuget.config"
 if (Test-Path $opLibConfig) {
     Write-Pass "OperatorLibrary nuget.config exists"
 } else {
@@ -300,7 +300,7 @@ if (Test-Path $LocalFallbackDir) {
 
 # --- 6. Directory.Build.props check ---
 Write-Header "6. MSBuild Configuration"
-$dbpPath = Join-Path $RepoRoot "Acme.Product\Directory.Build.props"
+$dbpPath = Join-Path $RepoRoot "ClearVision.Product\Directory.Build.props"
 if (Test-Path $dbpPath) {
     $dbpContent = Get-Content $dbpPath -Raw
     if ($dbpContent -match "MSBuildEnableWorkloadResolver.*false") {
@@ -514,8 +514,8 @@ Write-Host "  Issues found and addressed: $issueCount" -ForegroundColor $color
 if ($issueCount -eq 0) {
     Write-Host ""
     Write-Host "  Environment looks healthy. You can now run:" -ForegroundColor Green
-    Write-Host "    .\scripts\dotnet.ps1 restore .\Acme.Product\Acme.Product.sln --locked-mode" -ForegroundColor White
-    Write-Host "    .\scripts\dotnet.ps1 build .\Acme.Product\Acme.Product.sln --configuration Debug --no-restore" -ForegroundColor White
+    Write-Host "    .\scripts\dotnet.ps1 restore .\ClearVision.Product\ClearVision.Product.sln --locked-mode" -ForegroundColor White
+    Write-Host "    .\scripts\dotnet.ps1 build .\ClearVision.Product\ClearVision.Product.sln --configuration Debug --no-restore" -ForegroundColor White
 } else {
     Write-Host ""
     Write-Host "  Some issues could not be auto-fixed. Manual steps:" -ForegroundColor Yellow

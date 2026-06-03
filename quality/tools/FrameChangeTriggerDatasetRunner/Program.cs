@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Operators;
 using OpenCvSharp;
 
 var options = RunnerOptions.Parse(args);

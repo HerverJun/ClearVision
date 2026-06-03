@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
-using Acme.Product.Infrastructure.AI;
-using Acme.Product.Infrastructure.Services;
+using ClearVision.Product.Infrastructure.AI;
+using ClearVision.Product.Infrastructure.Services;
 
 var options = RunnerOptions.Parse(args);
 if (options.ShowHelp)
@@ -72,7 +72,7 @@ static string ResolveWorkspaceRoot()
     var current = new DirectoryInfo(AppContext.BaseDirectory);
     while (current != null)
     {
-        var candidate = Path.Combine(current.FullName, "Acme.Product");
+        var candidate = Path.Combine(current.FullName, "ClearVision.Product");
         if (Directory.Exists(candidate))
             return current.FullName;
 

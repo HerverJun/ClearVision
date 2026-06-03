@@ -6,9 +6,9 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/Acme.Product/src/Acme.Product.Desktop/bin/Debug/net8.0-windows/win-x64/Acme.Product.Desktop.dll",
+      "program": "${workspaceFolder}/ClearVision.Product/src/ClearVision.Product.Desktop/bin/Debug/net8.0-windows/win-x64/ClearVision.Product.Desktop.dll",
       "args": [],
-      "cwd": "${workspaceFolder}/Acme.Product/src/Acme.Product.Desktop/bin/Debug/net8.0-windows/win-x64",
+      "cwd": "${workspaceFolder}/ClearVision.Product/src/ClearVision.Product.Desktop/bin/Debug/net8.0-windows/win-x64",
       "console": "internalConsole",
       "stopAtEntry": false,
       "env": {
@@ -20,9 +20,9 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build-station",
-      "program": "${workspaceFolder}/Acme.Product/src/Acme.Product.Station/bin/Debug/net8.0-windows/Acme.Product.Station.dll",
+      "program": "${workspaceFolder}/ClearVision.Product/src/ClearVision.Product.Station/bin/Debug/net8.0-windows/ClearVision.Product.Station.dll",
       "args": [],
-      "cwd": "${workspaceFolder}/Acme.Product/src/Acme.Product.Station/bin/Debug/net8.0-windows",
+      "cwd": "${workspaceFolder}/ClearVision.Product/src/ClearVision.Product.Station/bin/Debug/net8.0-windows",
       "console": "internalConsole",
       "stopAtEntry": false,
       "env": {

@@ -19,7 +19,7 @@ ClearVision 是一个面向工业视觉检测的 .NET 平台工程，覆盖桌�
 - Windows 桌面 Studio：WinForms + WebView2 前端，提供项目管理、流程编辑、算子配置、图像预览、检测执行和结果看板。
 - 本地运行时服务：桌面端内嵌 ASP.NET Core endpoints，承载项目、模板、算子预览、实时检测、Station 管理和配置接口。
 - 工业视觉算子库：覆盖图像处理、测量、标定、通信、流程控制、AI 等模块，当前公开算子目录以 156 个算子类型为核心边界。
-- 可打包 OperatorLibrary：`Acme.OperatorLibrary` 可独立构建为 NuGet 包，当前包版本基线为 `1.0.2`。
+- 可打包 OperatorLibrary：`ClearVision.OperatorLibrary` 可独立构建为 NuGet 包，当前包版本基线为 `1.0.2`。
 - Station 现场链路：支持运行包导出、Station 同步、健康状态、结果摘要、命令下发与审计记录。
 - 质量证据体系：使用 contract、golden、dataset、field replay、benchmark 和 CI gate 区分功能成熟度与证据成熟度。
 
@@ -50,19 +50,19 @@ flowchart LR
     Package --> Station[Station 现场端]
     Station --> Results[结果 / 健康 / 审计]
     Results --> Studio
-    Operators --> NuGet[Acme.OperatorLibrary]
+    Operators --> NuGet[ClearVision.OperatorLibrary]
 ```
 
 ## 仓库结构
 
 | 路径 | 说明 |
 | --- | --- |
-| `Acme.Product/` | ClearVision 主应用解决方案，包含桌面端、运行时、Station、核心领域与基础设施代码 |
-| `Acme.Product/src/Acme.Product.Desktop/` | Windows 桌面入口、WebView2 宿主、本地 API 和前端静态资源 |
-| `Acme.Product/src/Acme.Product.Runtime/` | 流程执行、运行包导出与运行时服务 |
-| `Acme.Product/src/Acme.Product.Station/` | 现场 Station 端同步与运行界面 |
-| `Acme.Product/src/Acme.Product.Infrastructure/Operators/` | 主要视觉算子实现 |
-| `Acme.OperatorLibrary/` | 可独立打包的工业视觉算子 NuGet 项目 |
+| `ClearVision.Product/` | ClearVision 主应用解决方案，包含桌面端、运行时、Station、核心领域与基础设施代码 |
+| `ClearVision.Product/src/ClearVision.Product.Desktop/` | Windows 桌面入口、WebView2 宿主、本地 API 和前端静态资源 |
+| `ClearVision.Product/src/ClearVision.Product.Runtime/` | 流程执行、运行包导出与运行时服务 |
+| `ClearVision.Product/src/ClearVision.Product.Station/` | 现场 Station 端同步与运行界面 |
+| `ClearVision.Product/src/ClearVision.Product.Infrastructure/Operators/` | 主要视觉算子实现 |
+| `ClearVision.OperatorLibrary/` | 可独立打包的工业视觉算子 NuGet 项目 |
 | `quality/` | 数据集、回放、质量矩阵、benchmark 和质量 gate 资产 |
 | `models/` | 模型目录与模型发布说明 |
 | `docs/` | 架构、运行时、质量、发布、工程治理文档 |
@@ -85,10 +85,10 @@ git clone https://github.com/HerverJun/ClearVision.git
 cd ClearVision
 
 & ".\scripts\dotnet.ps1" -InstallIfMissing --version
-& ".\scripts\dotnet.ps1" restore .\Acme.Product\Acme.Product.sln --locked-mode
-& ".\scripts\dotnet.ps1" build .\Acme.Product\Acme.Product.sln --configuration Debug --no-restore
+& ".\scripts\dotnet.ps1" restore .\ClearVision.Product\ClearVision.Product.sln --locked-mode
+& ".\scripts\dotnet.ps1" build .\ClearVision.Product\ClearVision.Product.sln --configuration Debug --no-restore
 
-& ".\Acme.Product\src\Acme.Product.Desktop\bin\Debug\net8.0-windows\win-x64\Acme.Product.Desktop.exe"
+& ".\ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64\ClearVision.Product.Desktop.exe"
 ```
 
 如果本机同时存在 `C:\Program Files\dotnet` 和 `%LOCALAPPDATA%\Microsoft\dotnet`，不要直接依赖 PATH 中的裸 `dotnet`。仓库脚本会读取 `global.json`，优先选择包含 SDK `9.0.300` 的 dotnet host；`-InstallIfMissing` 会补齐 SDK `9.0.300` 和 .NET 8 Core / ASP.NET / WindowsDesktop runtime，避免两台机器因为 PATH 顺序不同而使用不同 SDK 或运行时。
@@ -101,7 +101,7 @@ AI 流程生成相关密钥默认不写入仓库。需要联调时，请在本�
 
 ```powershell
 & "./scripts/run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -Configuration Debug `
   -NoRestore `
   -Verbosity minimal
@@ -113,8 +113,8 @@ AI 流程生成相关密钥默认不写入仓库。需要联调时，请在本�
 OperatorLibrary 打包与 smoke 验证：
 
 ```powershell
-& ".\scripts\dotnet.ps1" build .\Acme.OperatorLibrary\Acme.OperatorLibrary.csproj --configuration Release
-& ".\Acme.OperatorLibrary\pack.ps1" -Configuration Release -RunSmokeTest
+& ".\scripts\dotnet.ps1" build .\ClearVision.OperatorLibrary\ClearVision.OperatorLibrary.csproj --configuration Release
+& ".\ClearVision.OperatorLibrary\pack.ps1" -Configuration Release -RunSmokeTest
 ```
 
 质量套件入口：
@@ -126,19 +126,19 @@ python .\quality\tools\run_quality_suite.py --suite quick_contract_suite --valid
 
 ## OperatorLibrary
 
-`Acme.OperatorLibrary` 将 ClearVision 的算子层以 NuGet 包形式交付，方便在宿主外复用图像处理、测量、标定、通信、流程控制和 AI 算子。
+`ClearVision.OperatorLibrary` 将 ClearVision 的算子层以 NuGet 包形式交付，方便在宿主外复用图像处理、测量、标定、通信、流程控制和 AI 算子。
 
 包项目采用 MSBuild linked compile items 复用主工程源码，同时保留独立的 package metadata、SBOM、third-party notices、smoke tests 和版本注入能力。
 
 ```powershell
-& ".\Acme.OperatorLibrary\pack.ps1" `
+& ".\ClearVision.OperatorLibrary\pack.ps1" `
   -PackageVersion "1.0.2-ci.local" `
   -RepositoryBranch "main" `
   -RepositoryCommit "local" `
   -RunSmokeTest
 ```
 
-更多说明见 [Acme.OperatorLibrary README](./Acme.OperatorLibrary/README.md)。
+更多说明见 [ClearVision.OperatorLibrary README](./ClearVision.OperatorLibrary/README.md)。
 
 ## 质量与发布边界
 
@@ -170,4 +170,4 @@ CI 当前覆盖构建、编码扫描、密钥扫描、单元测试、桌面端�
 
 ## 许可证
 
-`Acme.OperatorLibrary` 的 NuGet metadata 当前声明为 MIT license expression。若整个仓库需要对外正式发布，请以根目录许可证文件为准，并在发布前补齐对应的 `LICENSE` 文件。
+`ClearVision.OperatorLibrary` 的 NuGet metadata 当前声明为 MIT license expression。若整个仓库需要对外正式发布，请以根目录许可证文件为准，并在发布前补齐对应的 `LICENSE` 文件。

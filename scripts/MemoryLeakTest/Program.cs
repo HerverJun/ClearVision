@@ -1,18 +1,18 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Operators;
-using Acme.Product.Core.Services;
-using Acme.Product.Infrastructure.Operators;
-using Acme.Product.Infrastructure.Services;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenCvSharp;
 
 var options = MemoryLeakOptions.Parse(args);
 var repoRoot = ResolveRepoRoot();
-var imagePath = options.ImagePath ?? Path.Combine(repoRoot, "Acme.Product", "tests", "TestData", "shapes_composite.png");
+var imagePath = options.ImagePath ?? Path.Combine(repoRoot, "ClearVision.Product", "tests", "TestData", "shapes_composite.png");
 
 if (!File.Exists(imagePath))
 {

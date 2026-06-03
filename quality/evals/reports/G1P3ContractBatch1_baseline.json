@@ -480,7 +480,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -740,7 +740,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -1000,7 +1000,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -1260,7 +1260,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -1520,7 +1520,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -1780,7 +1780,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -2040,7 +2040,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -2300,7 +2300,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -2560,7 +2560,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -2820,7 +2820,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -3080,7 +3080,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -3340,7 +3340,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -3600,7 +3600,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -3860,7 +3860,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -4120,7 +4120,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -4380,7 +4380,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -4640,7 +4640,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -4900,7 +4900,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -5160,7 +5160,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -5420,7 +5420,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -5680,7 +5680,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -5940,7 +5940,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -6200,7 +6200,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -6460,7 +6460,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -6720,7 +6720,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -6980,7 +6980,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -7240,7 +7240,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -7500,7 +7500,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -7760,7 +7760,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -8020,7 +8020,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -8280,7 +8280,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -8540,7 +8540,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -8800,7 +8800,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -9060,7 +9060,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -9320,7 +9320,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -9580,7 +9580,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -9840,7 +9840,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -10100,7 +10100,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -10360,7 +10360,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {
@@ -10620,7 +10620,7 @@
       "MemoryAllocationBytes": 392,
       "ErrorMessage": null,
       "Observed": {
-        "Namespace": "Acme.Product.Infrastructure.Operators"
+        "Namespace": "ClearVision.Product.Infrastructure.Operators"
       }
     },
     {

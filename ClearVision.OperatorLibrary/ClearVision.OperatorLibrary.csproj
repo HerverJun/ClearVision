@@ -1,0 +1,114 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>$(DefineConstants);CLEARVISION_OPERATORLIB_PACKAGE</DefineConstants>
+
+    <PackageId>ClearVision.OperatorLibrary</PackageId>
+    <VersionPrefix>1.0.2</VersionPrefix>
+    <Version Condition="'$(PackageVersion)' == ''">$(VersionPrefix)</Version>
+    <Authors>蘅芜君</Authors>
+    <Description>工业视觉算子库 - 包含 100+ 图像处理、测量、标定、通信算子 / Industrial Vision Operator Library</Description>
+    <PackageTags>opencv;machine-vision;operator;image-processing;measurement;calibration</PackageTags>
+    <PackageProjectUrl>https://github.com/HerverJun/ClearVision</PackageProjectUrl>
+    <PackageReleaseNotes>Packaged operator library with host-agnostic contracts, module namespace indexes, SBOM, and representative smoke tests.</PackageReleaseNotes>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/HerverJun/ClearVision</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(ContinuousIntegrationBuild)' == '' and '$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RepositoryBranch Condition="'$(RepositoryBranch)' == '' and '$(GITHUB_REF_NAME)' != ''">$(GITHUB_REF_NAME)</RepositoryBranch>
+    <RepositoryBranch Condition="'$(RepositoryBranch)' == '' and '$(BUILD_SOURCEBRANCHNAME)' != ''">$(BUILD_SOURCEBRANCHNAME)</RepositoryBranch>
+    <RepositoryCommit Condition="'$(RepositoryCommit)' == '' and '$(GITHUB_SHA)' != ''">$(GITHUB_SHA)</RepositoryCommit>
+    <RepositoryCommit Condition="'$(RepositoryCommit)' == '' and '$(BUILD_SOURCEVERSION)' != ''">$(BUILD_SOURCEVERSION)</RepositoryCommit>
+    <SourceRevisionId Condition="'$(SourceRevisionId)' == '' and '$(RepositoryCommit)' != ''">$(RepositoryCommit)</SourceRevisionId>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+    <None Include="SBOM.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs"
+             Exclude="src\**\bin\**;src\**\obj\**"
+             Link="ClearVision.OperatorLibrary\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Contracts\**\*.cs"
+             Exclude="..\ClearVision.Product\src\ClearVision.Product.Contracts\bin\**;..\ClearVision.Product\src\ClearVision.Product.Contracts\obj\**;..\ClearVision.Product\src\ClearVision.Product.Contracts\artifacts\**"
+             Link="ClearVision.Product.Contracts\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Core\**\*.cs"
+             Exclude="..\ClearVision.Product\src\ClearVision.Product.Core\bin\**;..\ClearVision.Product\src\ClearVision.Product.Core\obj\**;..\ClearVision.Product\src\ClearVision.Product.Core\artifacts\**"
+             Link="ClearVision.Product.Core\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.PlcComm\**\*.cs"
+             Exclude="..\ClearVision.Product\src\ClearVision.PlcComm\bin\**;..\ClearVision.Product\src\ClearVision.PlcComm\obj\**;..\ClearVision.Product\src\ClearVision.PlcComm\artifacts\**"
+             Link="ClearVision.PlcComm\%(RecursiveDir)%(Filename)%(Extension)" />
+
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\**\*.cs"
+             Exclude="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\bin\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\obj\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Operators\artifacts\**"
+             Link="Operators\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ImageProcessing\**\*.cs"
+             Exclude="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ImageProcessing\bin\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ImageProcessing\obj\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ImageProcessing\artifacts\**"
+             Link="ImageProcessing\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\PointCloud\**\*.cs"
+             Exclude="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\PointCloud\bin\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\PointCloud\obj\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\PointCloud\artifacts\**"
+             Link="PointCloud\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Calibration\**\*.cs"
+             Exclude="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Calibration\bin\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Calibration\obj\**;..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Calibration\artifacts\**"
+             Link="Calibration\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Cameras\NoOpCameraFrameStreamCoordinator.cs"
+             Link="Cameras\NoOpCameraFrameStreamCoordinator.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Cameras\NoOpTriggerInputService.cs"
+             Link="Cameras\NoOpTriggerInputService.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\AI\Anomaly\SimplePatchCoreDetector.cs"
+             Link="AI\Anomaly\SimplePatchCoreDetector.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\AI\Anomaly\OnnxPatchEmbeddingExtractor.cs"
+             Link="AI\Anomaly\OnnxPatchEmbeddingExtractor.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\AI\Runtime\ModelCatalog.cs"
+             Link="AI\Runtime\ModelCatalog.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Memory\MatPool.cs"
+             Link="Memory\MatPool.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\DetectionOutputInspector.cs"
+             Link="Services\DetectionOutputInspector.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\DeepLearningLabelResolver.cs"
+             Link="Services\DeepLearningLabelResolver.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\OcrEngineProvider.cs"
+             Link="Services\OcrEngineProvider.cs" />
+    <Compile Include="..\ClearVision.Product\src\ClearVision.Product.Infrastructure\Services\GpuAvailabilityChecker.cs"
+             Link="Services\GpuAvailabilityChecker.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" />
+    <PackageReference Include="HslCommunication" />
+    <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="NModbus" />
+    <PackageReference Include="OpenCvSharp4" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" />
+    <PackageReference Include="PaddleOCRSharp" />
+    <PackageReference Include="S7NetPlus" />
+    <PackageReference Include="System.Drawing.Common" />
+    <PackageReference Include="System.IO.Ports" />
+    <PackageReference Include="ZXing.Net" />
+  </ItemGroup>
+
+</Project>

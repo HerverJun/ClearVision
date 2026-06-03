@@ -1,0 +1,88 @@
+using ClearVision.Product.Core.Attributes;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Infrastructure.PointCloud.Filters;
+using Microsoft.Extensions.Logging;
+using PointCloudModel = ClearVision.Product.Infrastructure.PointCloud.PointCloud;
+
+namespace ClearVision.Product.Infrastructure.Operators;
+
+[OperatorMeta(
+    DisplayName = "体素下采样",
+    Description = "Voxel grid downsampling for point clouds (centroid per voxel).",
+    Category = "3D",
+    IconName = "voxel",
+    Keywords = new[] { "PointCloud", "Voxel", "Downsample", "3D" },
+    Version = "1.0.1"
+)]
+[AlgorithmInfo(
+    Name = "Voxel grid centroid downsampling",
+    CoreApi = "VoxelGridFilter.Downsample -> VoxelKey dictionary -> centroid/color/normal accumulation",
+    ImplementationStrategy = "Bins each point into a leaf-size voxel, accumulates point coordinates and optional color/normal channels per voxel, then emits one centroid representative for every occupied voxel.",
+    TimeComplexity = "O(N)",
+    TypicalLatency = "No dedicated golden benchmark yet; covered by point-cloud unit and flow tests",
+    SpaceComplexity = "O(V)",
+    SuitableUseCases = new[] { "Reducing dense point clouds before registration, clustering, or surface inspection.", "Keeping approximate geometry while preserving averaged colors and normalized normals per voxel." },
+    UnsuitableUseCases = new[] { "Applications that require preserving every raw point or organized point-cloud topology.", "Very small leaf sizes that produce nearly one voxel per input point and little reduction." },
+    KnownLimitations = new[] { "Output is always unorganized even when the input cloud is organized.", "Voxel representatives are centroids rather than nearest original samples, so exact raw-point identity is not preserved." },
+    Dependencies = new[] { "OpenCvSharp", "ClearVision.Product.Infrastructure.PointCloud" }
+)]
+[InputPort("PointCloud", "Point Cloud", PortDataType.Any, IsRequired = true)]
+[OutputPort("PointCloud", "Point Cloud", PortDataType.Any)]
+[OutputPort("PointCount", "Point Count", PortDataType.Integer)]
+[OperatorParam("LeafSize", "Leaf Size", "double", DefaultValue = 0.01, Min = 1e-6)]
+public sealed class VoxelDownsampleOperator : OperatorBase
+{
+    public override OperatorType OperatorType => OperatorType.VoxelDownsample;
+
+    public VoxelDownsampleOperator(ILogger<VoxelDownsampleOperator> logger) : base(logger)
+    {
+    }
+
+    protected override async Task<OperatorExecutionOutput> ExecuteCoreAsync(
+        Operator @operator,
+        Dictionary<string, object>? inputs,
+        CancellationToken cancellationToken)
+    {
+        if (inputs == null || !inputs.TryGetValue("PointCloud", out var cloudObj) || cloudObj is null)
+        {
+            return OperatorExecutionOutput.Failure("PointCloud input is required.");
+        }
+
+        if (cloudObj is not PointCloudModel cloud)
+        {
+            return OperatorExecutionOutput.Failure($"PointCloud input must be {nameof(PointCloudModel)}.");
+        }
+
+        var leafSize = (float)GetDoubleParam(@operator, "LeafSize", 0.01, min: 1e-6, max: 10_000);
+
+        var filter = new VoxelGridFilter();
+        PointCloudModel downsampled;
+
+        try
+        {
+            downsampled = await RunCpuBoundWork(
+                () => filter.Downsample(cloud, leafSize),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Voxel downsample failed.");
+            return OperatorExecutionOutput.Failure($"Voxel downsample failed: {ex.Message}");
+        }
+
+        return OperatorExecutionOutput.Success(new Dictionary<string, object>
+        {
+            ["PointCloud"] = downsampled,
+            ["PointCount"] = downsampled.Count,
+            ["LeafSize"] = leafSize
+        });
+    }
+
+    public override ValidationResult ValidateParameters(Operator @operator)
+    {
+        _ = GetDoubleParam(@operator, "LeafSize", 0.01, min: 1e-6, max: 10_000);
+        return ValidationResult.Valid();
+    }
+}

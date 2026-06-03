@@ -1,0 +1,100 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <LangVersion>12.0</LangVersion>
+    <RootNamespace>ClearVision.Product.Desktop</RootNamespace>
+    <ApplicationIcon />
+    <StartupObject>ClearVision.Product.Desktop.Program</StartupObject>
+    
+    <!-- 发布配置 -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <RuntimeFrameworkVersion>8.0.26</RuntimeFrameworkVersion>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    
+    <!-- 应用信息 -->
+    <AssemblyTitle>ClearVision</AssemblyTitle>
+    <AssemblyDescription>工业视觉检测软件</AssemblyDescription>
+    <AssemblyCompany>ClearVision</AssemblyCompany>
+    <AssemblyProduct>ClearVision</AssemblyProduct>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+  </PropertyGroup>
+
+  <!-- Release 配置优化 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <Optimize>true</Optimize>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <UseWindowsForms>true</UseWindowsForms>
+    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
+  </PropertyGroup>
+
+  <!-- 发布输出配置 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishDir>$(SolutionDir)..\publish\ClearVision-$(AssemblyVersion)</PublishDir>
+  </PropertyGroup>
+
+
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Web.WebView2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="OpenTelemetry" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="Paddle.Runtime.win_x64" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClearVision.Product.Application\ClearVision.Product.Application.csproj" />
+    <ProjectReference Include="..\ClearVision.Product.Contracts\ClearVision.Product.Contracts.csproj" />
+    <ProjectReference Include="..\ClearVision.Product.Infrastructure\ClearVision.Product.Infrastructure.csproj" />
+    <ProjectReference Include="..\ClearVision.Product.Runtime\ClearVision.Product.Runtime.csproj" />
+  </ItemGroup>
+
+  <!-- 配置文件 -->
+  <ItemGroup>
+    <Content Include="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- 复制 wwwroot 前端文件到输出目录 -->
+  <ItemGroup>
+    <Content Include="wwwroot\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <HuaraySdkPath>$(MSBuildThisFileDirectory)..\..\lib\HuaraySDK\x64\</HuaraySdkPath>
+  </PropertyGroup>
+
+  <Target Name="CopyHuarayManagedSdkToPublish"
+          AfterTargets="Publish"
+          Condition="'$(PublishDir)' != '' and Exists('$(HuaraySdkPath)MVSDK_Net.dll')">
+    <Copy SourceFiles="$(HuaraySdkPath)MVSDK_Net.dll"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS0067;CS0162;CS8602;CS8604;CS8625</WarningsNotAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="PaddleOCRSharp" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    
+    <!-- Mock妗嗘灦 -->
+    <PackageReference Include="NSubstitute" />
+
+    
+    <!-- 鏂█搴?-->
+    <PackageReference Include="FluentAssertions" />
+    
+    <!-- E2E 娴嬭瘯 (Playwright) -->
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="Microsoft.Playwright.NUnit" />
+    <PackageReference Include="DotNet.Testcontainers" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="MySqlConnector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ClearVision.Product.Core\ClearVision.Product.Core.csproj" />
+    <ProjectReference Include="..\..\src\ClearVision.Product.Application\ClearVision.Product.Application.csproj" />
+    <ProjectReference Include="..\..\src\ClearVision.Product.Infrastructure\ClearVision.Product.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\ClearVision.Product.Runtime.Abstractions\ClearVision.Product.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\ClearVision.Product.Runtime\ClearVision.Product.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\ClearVision.Product.Station\StationSiteProfileStore.cs" Link="Station\StationSiteProfileStore.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

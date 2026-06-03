@@ -1,23 +1,23 @@
 using System.Diagnostics;
 using System.Text.Json;
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Operators;
-using Acme.Product.Core.Services;
-using Acme.Product.Core.ValueObjects;
-using Acme.Product.Infrastructure.Operators;
-using Acme.Product.Infrastructure.Services;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.Services;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Infrastructure.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenCvSharp;
 using CvPoint = OpenCvSharp.Point;
 using CvRect = OpenCvSharp.Rect;
 using CvSize = OpenCvSharp.Size;
-using DetectionList = Acme.Product.Core.ValueObjects.DetectionList;
-using DetectionResult = Acme.Product.Core.ValueObjects.DetectionResult;
+using DetectionList = ClearVision.Product.Core.ValueObjects.DetectionList;
+using DetectionResult = ClearVision.Product.Core.ValueObjects.DetectionResult;
 
 var options = BaselineOptions.Parse(args);
 var repoRoot = ResolveRepoRoot();
-var dataDirectory = options.DataDirectory ?? Path.Combine(repoRoot, "Acme.Product", "tests", "TestData");
+var dataDirectory = options.DataDirectory ?? Path.Combine(repoRoot, "ClearVision.Product", "tests", "TestData");
 var outputPath = options.OutputPath ?? Path.Combine(repoRoot, "docs", "reports", "baseline_performance.json");
 
 if (!Directory.Exists(dataDirectory))

@@ -1,15 +1,15 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Services;
-using Acme.Product.Core.ValueObjects;
-using Acme.Product.Infrastructure.Services;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Services;
 
 var repoRoot = args.Length > 0 ? args[0] : Directory.GetCurrentDirectory();
 var apply = args.Length > 1 && string.Equals(args[1], "--apply", StringComparison.OrdinalIgnoreCase);
 
-var operatorsRoot = Path.Combine(repoRoot, "Acme.Product", "src", "Acme.Product.Infrastructure", "Operators");
+var operatorsRoot = Path.Combine(repoRoot, "ClearVision.Product", "src", "ClearVision.Product.Infrastructure", "Operators");
 if (!Directory.Exists(operatorsRoot))
 {
     Console.Error.WriteLine($"Operators root not found: {operatorsRoot}");
@@ -71,9 +71,9 @@ foreach (var file in files)
     var newline = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
     var newText = text;
 
-    if (!newText.Contains("using Acme.Product.Core.Attributes;", StringComparison.Ordinal))
+    if (!newText.Contains("using ClearVision.Product.Core.Attributes;", StringComparison.Ordinal))
     {
-        newText = InsertUsing(newText, "using Acme.Product.Core.Attributes;", newline);
+        newText = InsertUsing(newText, "using ClearVision.Product.Core.Attributes;", newline);
     }
 
     var classMatch = classRegex.Match(newText);

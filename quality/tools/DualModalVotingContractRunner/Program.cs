@@ -1,13 +1,13 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Services;
-using Acme.Product.Core.ValueObjects;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging.Abstractions;
-using ServiceDetectionResult = Acme.Product.Core.Services.DetectionResult;
+using ServiceDetectionResult = ClearVision.Product.Core.Services.DetectionResult;
 
 var options = RunnerOptions.Parse(args);
 if (options.ShowHelp)
@@ -448,7 +448,7 @@ internal static class ContractRunner
         return Task.CompletedTask;
     }
 
-    private static async Task<Acme.Product.Core.Operators.OperatorExecutionOutput> ExecuteAsync(Operator op, object? dlResult, object? traditionalResult)
+    private static async Task<ClearVision.Product.Core.Operators.OperatorExecutionOutput> ExecuteAsync(Operator op, object? dlResult, object? traditionalResult)
     {
         var inputs = new Dictionary<string, object>();
         if (dlResult is not null)
@@ -464,7 +464,7 @@ internal static class ContractRunner
         return await ExecuteRawAsync(op, inputs);
     }
 
-    private static async Task<Acme.Product.Core.Operators.OperatorExecutionOutput> ExecuteRawAsync(Operator op, Dictionary<string, object> inputs)
+    private static async Task<ClearVision.Product.Core.Operators.OperatorExecutionOutput> ExecuteRawAsync(Operator op, Dictionary<string, object> inputs)
     {
         return await Operator.ExecuteAsync(op, inputs);
     }
@@ -493,7 +493,7 @@ internal static class ContractRunner
     }
 
     private static void AssertOutput(
-        Acme.Product.Core.Operators.OperatorExecutionOutput result,
+        ClearVision.Product.Core.Operators.OperatorExecutionOutput result,
         bool expectedIsOk,
         double expectedConfidence,
         string expectedJudgmentValue)
@@ -533,7 +533,7 @@ internal static class ContractRunner
         }
     }
 
-    private static string? ValidationErrors(Acme.Product.Core.Operators.ValidationResult validation)
+    private static string? ValidationErrors(ClearVision.Product.Core.Operators.ValidationResult validation)
     {
         return validation.Errors.Count == 0 ? null : string.Join("; ", validation.Errors);
     }

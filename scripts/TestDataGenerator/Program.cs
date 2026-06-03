@@ -1,4 +1,4 @@
-using Acme.Product.Infrastructure.TestData;
+using ClearVision.Product.Infrastructure.TestData;
 
 var repoRoot = ResolveRepoRoot();
 var outputDirectory = ResolveOutputDirectory(args, repoRoot);
@@ -39,7 +39,7 @@ static string ResolveOutputDirectory(string[] args, string repoRoot)
         return Path.GetFullPath(outputArg);
     }
 
-    return Path.Combine(repoRoot, "Acme.Product", "tests", "TestData");
+    return Path.Combine(repoRoot, "ClearVision.Product", "tests", "TestData");
 }
 
 static string ResolveRepoRoot()

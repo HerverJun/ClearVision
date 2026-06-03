@@ -70,7 +70,7 @@ $env:CLEARVISION_VIRTUAL_MODBUS_HOST = "127.0.0.1"
 $env:CLEARVISION_VIRTUAL_MODBUS_PORT = "1502"
 $env:CLEARVISION_VIRTUAL_MODBUS_UNIT_ID = "1"
 & ".\scripts\run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName ModbusCommunicationOperatorVirtualPlcTests `
   -NoBuild `
   -NoRestore

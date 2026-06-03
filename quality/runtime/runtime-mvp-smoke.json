@@ -6,17 +6,17 @@
     {
       "id": "build-solution",
       "status": "passed",
-      "command": "dotnet build Acme.Product/Acme.Product.sln --configuration Debug --no-restore"
+      "command": "dotnet build ClearVision.Product/ClearVision.Product.sln --configuration Debug --no-restore"
     },
     {
       "id": "runtime-tests",
       "status": "passed",
-      "command": "./scripts/run-dotnet-test-serial.ps1 -Project Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj -FullyQualifiedName RuntimeMvpTests -NoRestore -Verbosity minimal"
+      "command": "./scripts/run-dotnet-test-serial.ps1 -Project ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj -FullyQualifiedName RuntimeMvpTests -NoRestore -Verbosity minimal"
     },
     {
       "id": "build-station",
       "status": "passed",
-      "command": "dotnet build Acme.Product/src/Acme.Product.Station/Acme.Product.Station.csproj --configuration Debug --no-restore"
+      "command": "dotnet build ClearVision.Product/src/ClearVision.Product.Station/ClearVision.Product.Station.csproj --configuration Debug --no-restore"
     },
     {
       "id": "dependency-scan",

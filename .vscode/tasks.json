@@ -13,7 +13,7 @@
                 "${workspaceFolder}/scripts/dotnet.ps1",
                 "-InstallIfMissing",
                 "restore",
-                "${workspaceFolder}/Acme.Product/Acme.Product.sln",
+                "${workspaceFolder}/ClearVision.Product/ClearVision.Product.sln",
                 "--locked-mode"
             ],
             "problemMatcher": "$msCompile"
@@ -48,7 +48,7 @@
                 "${workspaceFolder}/scripts/dotnet.ps1",
                 "-InstallIfMissing",
                 "build",
-                "${workspaceFolder}/Acme.Product/src/Acme.Product.Desktop/Acme.Product.Desktop.csproj",
+                "${workspaceFolder}/ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj",
                 "--configuration",
                 "Debug",
                 "--no-restore",
@@ -71,7 +71,7 @@
                 "${workspaceFolder}/scripts/dotnet.ps1",
                 "-InstallIfMissing",
                 "build",
-                "${workspaceFolder}/Acme.Product/src/Acme.Product.Station/Acme.Product.Station.csproj",
+                "${workspaceFolder}/ClearVision.Product/src/ClearVision.Product.Station/ClearVision.Product.Station.csproj",
                 "--configuration",
                 "Debug",
                 "--no-restore",

@@ -84,7 +84,7 @@ $env:CLEARVISION_VIRTUAL_MC_PORT = "5002"
 $env:CLEARVISION_VIRTUAL_FINS_HOST = "127.0.0.1"
 $env:CLEARVISION_VIRTUAL_FINS_PORT = "9600"
 & ".\scripts\run-dotnet-test-serial.ps1" `
-  -Project "Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj" `
   -FullyQualifiedName VirtualMcFinsPlcConnectionTests `
   -NoBuild `
   -NoRestore

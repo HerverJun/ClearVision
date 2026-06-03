@@ -1,0 +1,53 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <UseWindowsForms>false</UseWindowsForms>
+    <UseWPF>false</UseWPF>
+    <UseWinUI>false</UseWinUI>
+    
+    <!-- MSIX packaging -->
+    <PublishProfile>Properties\PublishProfiles\MSIX.pubxml</PublishProfile>
+    <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <AppxBundle>Never</AppxBundle>
+    <AppxBundlePlatforms>x64</AppxBundlePlatforms>
+    <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+    
+    <!-- Application metadata -->
+    <ApplicationTitle>ClearVision</ApplicationTitle>
+    <ApplicationDescription>Industrial vision inspection software based on .NET 8 and WebView2.</ApplicationDescription>
+    <ApplicationDisplayVersion>1.0.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    
+    <!-- Publish configuration -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClearVision.Product.Desktop\ClearVision.Product.Desktop.csproj" />
+  </ItemGroup>
+
+  <!-- MSIX manifest -->
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+  <!-- Asset files -->
+  <ItemGroup>
+    <Content Include="Images\*.png" />
+    <Content Include="Images\*.jpg" />
+    <Content Include="Images\*.ico" />
+  </ItemGroup>
+
+</Project>

@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.ValueObjects;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging.Abstractions;
 
 var options = RunnerOptions.Parse(args);
@@ -375,7 +375,7 @@ internal static class OpenCvCalibrationDatasetRunner
     private static CaseResult CreateCaseResult(
         string id,
         string scenario,
-        Acme.Product.Core.Operators.OperatorExecutionOutput execution,
+        ClearVision.Product.Core.Operators.OperatorExecutionOutput execution,
         double elapsedMs,
         long allocatedBytes,
         int minDetectedImages,
@@ -390,7 +390,7 @@ internal static class OpenCvCalibrationDatasetRunner
     private static CaseResult CreateCameraCaseResult(
         string id,
         string scenario,
-        Acme.Product.Core.Operators.OperatorExecutionOutput execution,
+        ClearVision.Product.Core.Operators.OperatorExecutionOutput execution,
         double elapsedMs,
         long allocatedBytes,
         int minDetectedImages,
@@ -470,7 +470,7 @@ internal static class OpenCvCalibrationDatasetRunner
     private static CaseResult CreateStereoCaseResult(
         string id,
         string scenario,
-        Acme.Product.Core.Operators.OperatorExecutionOutput execution,
+        ClearVision.Product.Core.Operators.OperatorExecutionOutput execution,
         double elapsedMs,
         long allocatedBytes,
         int expectedPairCount,

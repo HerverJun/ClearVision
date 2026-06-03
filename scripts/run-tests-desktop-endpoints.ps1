@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
-$project = Join-Path $repoRoot "Acme.Product\tests\Acme.Product.Desktop.Tests\Acme.Product.Desktop.Tests.csproj"
+$project = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Desktop.Tests\ClearVision.Product.Desktop.Tests.csproj"
 
 $parameters = @{
     Project = $project

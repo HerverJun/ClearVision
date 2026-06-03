@@ -2,8 +2,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Acme.Product.Infrastructure.AI.Anomaly;
-using Acme.Product.Infrastructure.AI.Runtime;
+using ClearVision.Product.Infrastructure.AI.Anomaly;
+using ClearVision.Product.Infrastructure.AI.Runtime;
 using OpenCvSharp;
 
 var options = RunnerOptions.Parse(args);

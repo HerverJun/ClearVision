@@ -25,7 +25,7 @@ if ([string]::IsNullOrWhiteSpace($dotnetPath)) {
     throw "Resolved dotnet path is empty."
 }
 
-& $dotnetPath run --project (Join-Path $repoRoot "Acme.Product/src/Acme.Product.Station.Simulator/Acme.Product.Station.Simulator.csproj") -- `
+& $dotnetPath run --project (Join-Path $repoRoot "ClearVision.Product/src/ClearVision.Product.Station.Simulator/ClearVision.Product.Station.Simulator.csproj") -- `
     --studio $Studio `
     --token $Token `
     --stations $Stations `

@@ -12,7 +12,7 @@ updates:
           - "Microsoft.EntityFrameworkCore*"
           - "Microsoft.Data.*"
   - package-ecosystem: "npm"
-    directory: "/Acme.Product/tests/Acme.Product.UI.Tests"
+    directory: "/ClearVision.Product/tests/ClearVision.Product.UI.Tests"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

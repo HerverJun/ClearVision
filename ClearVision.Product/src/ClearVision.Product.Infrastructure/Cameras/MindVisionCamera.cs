@@ -1,0 +1,933 @@
+// MindVisionCamera.cs
+// 华睿 (Huaray) 工业相机实现 — 直接引用 MVSDK_Net
+// 作者：蘅芜君
+
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using ClearVision.Product.Core.Cameras;
+
+#if HUARAY_SDK
+using MVSDK_Net;
+#endif
+
+namespace ClearVision.Product.Infrastructure.Cameras;
+
+#if HUARAY_SDK
+/// <summary>
+/// 华睿 (Huaray) 工业相机实现
+/// 注意：类名保留 MindVisionCamera 以兼容历史代码
+/// </summary>
+public class MindVisionCamera : ICameraProvider
+{
+    private const uint PixelType_Gvsp_Mono8 = 0x01080001;
+    private const uint PixelType_Gvsp_RGB8 = 0x02180014;
+    private const uint PixelType_Gvsp_BGR8 = 0x02180015;
+    private const uint PixelType_Gvsp_BayerGR8 = 0x01080008;
+    private const uint PixelType_Gvsp_BayerRG8 = 0x01080009;
+    private const uint PixelType_Gvsp_BayerGB8 = 0x0108000A;
+    private const uint PixelType_Gvsp_BayerBG8 = 0x0108000B;
+
+    private MyCamera? _cam;
+    private bool _disposed = false;
+    private bool _isConnected = false;
+    private bool _isGrabbing = false;
+    private CameraDeviceInfo? _currentDevice;
+    private List<CameraDeviceInfo> _cachedDevices = new();
+
+    // 最近一帧引用（用于释放）
+    private IMVDefine.IMV_Frame _lastFrame;
+    private bool _hasUnreleasedFrame = false;
+    private byte[]? _convertedFrameBuffer;
+    private GCHandle _convertedFrameHandle;
+    private byte[]? _rawFrameBuffer;
+    private GCHandle _rawFrameHandle;
+
+    // 原生 DLL 搜索路径设置
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SetDllDirectory(string lpPathName);
+
+    // 静态标记：确保 DLL 路径只设置一次
+    private static bool _nativePathConfigured = false;
+
+    public string ProviderName => "Huaray";
+    public bool IsConnected => _isConnected;
+    public bool IsGrabbing => _isGrabbing;
+    public CameraDeviceInfo? CurrentDevice => _currentDevice;
+
+    // 兼容性属性 —— 供 SettingsEndpoints 诊断接口使用
+    public static bool IsSdkLoaded => true;
+    public static string? LastSdkLoadError => null;
+    public static string? LastEnumerateError { get; private set; }
+    public static string? SdkAssemblyLocation => AppContext.BaseDirectory;
+
+    public MindVisionCamera()
+    {
+        EnsureNativeDllPath();
+    }
+
+    /// <summary>
+    /// 确保原生 SDK DLL（MVSDKmd.dll 等）的搜索路径已设置。
+    /// 必须在任何 MVSDK_Net 类型被使用之前调用。
+    /// </summary>
+    private static void EnsureNativeDllPath()
+    {
+        if (_nativePathConfigured)
+            return;
+
+        try
+        {
+            var baseDir = AppContext.BaseDirectory;
+
+            // 当入口项目设置了 <RuntimeIdentifier>win-x64</RuntimeIdentifier> 时，
+            // .NET 会将原生 DLL 复制到 win-x64 子目录，而非输出根目录。
+            // MVSDK_Net 内部通过 LoadLibrary 加载 MVSDKmd.dll，只搜索 SetDllDirectory 指定的单一路径。
+            var ridSubDir = Path.Combine(baseDir, "win-x64");
+            var nativeDir = Directory.Exists(ridSubDir) && File.Exists(Path.Combine(ridSubDir, "MVSDKmd.dll"))
+                ? ridSubDir
+                : baseDir;
+
+            SetDllDirectory(nativeDir);
+            Debug.WriteLine($"[MindVisionCamera] SetDllDirectory: {nativeDir}");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] SetDllDirectory failed: {ex.Message}");
+        }
+
+        _nativePathConfigured = true;
+    }
+
+    public List<CameraDeviceInfo> EnumerateDevices()
+    {
+        _cachedDevices.Clear();
+        LastEnumerateError = null;
+
+        try
+        {
+            var deviceList = new IMVDefine.IMV_DeviceList();
+            int res = MyCamera.IMV_EnumDevices(ref deviceList, (uint)IMVDefine.IMV_EInterfaceType.interfaceTypeAll);
+
+            if (res != IMVDefine.IMV_OK)
+            {
+                LastEnumerateError = $"IMV_EnumDevices failed: {res}";
+                Debug.WriteLine($"[MindVisionCamera] IMV_EnumDevices failed: {res}");
+                return _cachedDevices;
+            }
+
+            if (deviceList.nDevNum == 0)
+            {
+                LastEnumerateError = "IMV_EnumDevices succeeded, but nDevNum is 0.";
+                Debug.WriteLine("[MindVisionCamera] IMV_EnumDevices: 0 devices");
+                return _cachedDevices;
+            }
+
+            int structSize = Marshal.SizeOf(typeof(IMVDefine.IMV_DeviceInfo));
+
+            for (int i = 0; i < (int)deviceList.nDevNum; i++)
+            {
+                var devInfoPtr = deviceList.pDevInfo + structSize * i;
+                if (devInfoPtr == IntPtr.Zero)
+                    continue;
+
+                var devInfo = (IMVDefine.IMV_DeviceInfo)Marshal.PtrToStructure(
+                    devInfoPtr, typeof(IMVDefine.IMV_DeviceInfo))!;
+
+                var sn = (devInfo.serialNumber ?? $"CAM_{i}").Trim();
+                var vendor = (devInfo.vendorName ?? string.Empty).Trim();
+                var model = (devInfo.modelName ?? string.Empty).Trim();
+                var cameraName = (devInfo.cameraName ?? string.Empty).Trim();
+                var interfaceName = (devInfo.interfaceName ?? string.Empty).Trim();
+
+                _cachedDevices.Add(new CameraDeviceInfo
+                {
+                    SerialNumber = sn,
+                    Manufacturer = string.IsNullOrWhiteSpace(vendor) ? "Huaray" : vendor,
+                    Model = string.IsNullOrWhiteSpace(model) ? "Huaray Camera" : model,
+                    UserDefinedName = string.IsNullOrWhiteSpace(cameraName) ? sn : cameraName,
+                    IpAddress = TryReadIpAddress(devInfo),
+                    InterfaceType = string.IsNullOrWhiteSpace(interfaceName) ? "Unknown" : interfaceName
+                });
+            }
+
+            Debug.WriteLine($"[MindVisionCamera] Found {_cachedDevices.Count} devices");
+        }
+        catch (Exception ex)
+        {
+            LastEnumerateError = ex.Message;
+            Debug.WriteLine($"[MindVisionCamera] EnumerateDevices error: {ex.Message}");
+        }
+
+        return _cachedDevices;
+    }
+
+    private static string? TryReadIpAddress(IMVDefine.IMV_DeviceInfo devInfo)
+    {
+        foreach (var memberName in new[] { "ipAddress", "IpAddress", "cameraIp", "CameraIp", "deviceIp", "DeviceIp", "currentIp", "CurrentIp" })
+        {
+            var value = TryReadMemberValue(devInfo, memberName);
+            var normalized = NormalizeIpString(value);
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                return normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private static object? TryReadMemberValue<T>(T target, string memberName)
+    {
+        var type = target?.GetType();
+        if (type == null)
+        {
+            return null;
+        }
+
+        var field = type.GetField(memberName);
+        if (field != null)
+        {
+            return field.GetValue(target);
+        }
+
+        var property = type.GetProperty(memberName);
+        return property?.GetValue(target);
+    }
+
+    private static string? NormalizeIpString(object? rawValue)
+    {
+        if (rawValue == null)
+        {
+            return null;
+        }
+
+        var text = rawValue.ToString()?.Trim();
+        if (string.IsNullOrWhiteSpace(text) ||
+            text == "0.0.0.0" ||
+            text == "255.255.255.255")
+        {
+            return null;
+        }
+
+        return text;
+    }
+
+    public bool Open(string serialNumber)
+    {
+        // 打开前无条件执行完整资源释放，避免残留句柄导致失败
+        ForceRelease();
+
+        try
+        {
+            // 每次 Open 前强制重新枚举，确保 SDK 全局设备列表与物理状态一致
+            EnumerateDevices();
+
+            // 按序列号找设备索引
+            string target = (serialNumber ?? string.Empty).Trim();
+            int deviceIndex = -1;
+            for (int i = 0; i < _cachedDevices.Count; i++)
+            {
+                if (string.Equals(_cachedDevices[i].SerialNumber?.Trim(), target, StringComparison.OrdinalIgnoreCase))
+                {
+                    deviceIndex = i;
+                    break;
+                }
+            }
+
+            if (deviceIndex < 0)
+            {
+                var knownSerials = string.Join(", ", _cachedDevices.Select(d => d.SerialNumber));
+                throw new InvalidOperationException(
+                    $"SDK 枚举到 {_cachedDevices.Count} 台设备 [{knownSerials}]，但未找到序列号 '{target}'。" +
+                    "请检查相机供电、网线连接及网段配置。");
+            }
+
+            // 创建实例
+            _cam = new MyCamera();
+
+            // 建句柄
+            int res = _cam.IMV_CreateHandle(IMVDefine.IMV_ECreateHandleMode.modeByIndex, deviceIndex);
+            if (res != IMVDefine.IMV_OK)
+            {
+                _cam = null;
+                throw new InvalidOperationException(
+                    $"IMV_CreateHandle 失败 (错误码={res}, deviceIndex={deviceIndex}, SN={target})。" +
+                    "可能原因：设备已被其他进程占用，或 SDK 内部状态异常。");
+            }
+
+            // 打开设备
+            res = _cam.IMV_Open();
+            if (res != IMVDefine.IMV_OK)
+            {
+                _cam.IMV_DestroyHandle();
+                _cam = null;
+                throw new InvalidOperationException(
+                    $"IMV_Open 失败 (错误码={res}, SN={target})。" +
+                    "可能原因：相机已被其他软件占用、网络不可达、或 IP 子网不匹配。");
+            }
+
+            _isConnected = true;
+            _currentDevice = _cachedDevices[deviceIndex];
+            Debug.WriteLine($"[MindVisionCamera] Opened: {serialNumber}");
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] Open error: {ex.Message}");
+            throw new InvalidOperationException($"打开相机时异常: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 无条件释放所有 SDK 资源（StopGrabbing → Close → DestroyHandle）
+    /// </summary>
+    private void ForceRelease()
+    {
+        try
+        {
+            ReleaseLastFrame();
+
+            if (_cam != null)
+            {
+                if (_isGrabbing)
+                {
+                    try
+                    { _cam.IMV_StopGrabbing(); }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[MindVisionCamera] StopGrabbing cleanup failed: {ex.Message}");
+                    }
+                    _isGrabbing = false;
+                }
+
+                try
+                { _cam.IMV_Close(); }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MindVisionCamera] Close cleanup failed: {ex.Message}");
+                }
+                try
+                { _cam.IMV_DestroyHandle(); }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MindVisionCamera] DestroyHandle cleanup failed: {ex.Message}");
+                }
+                _cam = null;
+            }
+
+            _isConnected = false;
+            _currentDevice = null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] ForceRelease error: {ex.Message}");
+        }
+    }
+
+    public bool Close()
+    {
+        if (!_isConnected)
+            return true;
+
+        try
+        {
+            ReleaseLastFrame();
+
+            if (_isGrabbing)
+                StopGrabbing();
+
+            if (_cam != null)
+            {
+                _cam.IMV_Close();
+                _cam.IMV_DestroyHandle();
+                _cam = null;
+            }
+
+            _isConnected = false;
+            _currentDevice = null;
+            Debug.WriteLine("[MindVisionCamera] Closed");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] Close error: {ex.Message}");
+            return false;
+        }
+    }
+
+    public bool StartGrabbing()
+    {
+        if (!_isConnected)
+            return false;
+        if (_isGrabbing)
+            return true;
+        if (_cam == null)
+            return false;
+
+        try
+        {
+            int res = _cam.IMV_StartGrabbing();
+            _isGrabbing = res == IMVDefine.IMV_OK;
+
+            Debug.WriteLine($"[MindVisionCamera] StartGrabbing: {(_isGrabbing ? "OK" : $"Failed({res})")}");
+            return _isGrabbing;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] StartGrabbing error: {ex.Message}");
+            return false;
+        }
+    }
+
+    public bool StopGrabbing()
+    {
+        if (!_isConnected)
+            return true;
+        if (!_isGrabbing)
+            return true;
+        if (_cam == null)
+            return true;
+
+        try
+        {
+            _cam.IMV_StopGrabbing();
+            _isGrabbing = false;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] StopGrabbing error: {ex.Message}");
+            return false;
+        }
+    }
+
+    public CameraFrame? GetFrame(int timeoutMs = 1000)
+    {
+        if (!_isConnected || !_isGrabbing || _cam == null)
+            return null;
+
+        try
+        {
+            // 释放上一帧
+            ReleaseLastFrame();
+
+            var frame = new IMVDefine.IMV_Frame();
+            int res = _cam.IMV_GetFrame(ref frame, (uint)timeoutMs);
+            if (res != IMVDefine.IMV_OK)
+                return null;
+
+            // 保存帧引用以供后续释放
+            _lastFrame = frame;
+            _hasUnreleasedFrame = true;
+
+            try
+            {
+                var width = frame.frameInfo.width;
+                var height = frame.frameInfo.height;
+                var size = frame.frameInfo.size;
+                var pixelFormat = frame.frameInfo.pixelFormat;
+                var mappedPixelFormat = ConvertPixelFormat((uint)pixelFormat);
+
+                if (TryConvertFrameToBgr8(frame, mappedPixelFormat, out var convertedFrame))
+                {
+                    return convertedFrame;
+                }
+
+                var frameSize = checked((int)size);
+                if (frameSize <= 0)
+                {
+                    return null;
+                }
+
+                EnsureRawFrameBuffer(frameSize);
+                Marshal.Copy(frame.pData, _rawFrameBuffer!, 0, frameSize);
+
+                return new CameraFrame
+                {
+                    DataPtr = _rawFrameHandle.AddrOfPinnedObject(),
+                    Width = (int)width,
+                    Height = (int)height,
+                    Size = frameSize,
+                    PixelFormat = mappedPixelFormat,
+                    FrameNumber = 0,
+                    Timestamp = 0,
+                    NeedsNativeRelease = false
+                };
+            }
+            finally
+            {
+                ReleaseLastFrame();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] GetFrame error: {ex.Message}");
+            return null;
+        }
+    }
+
+    private bool TryConvertFrameToBgr8(
+        IMVDefine.IMV_Frame frame,
+        CameraPixelFormat mappedPixelFormat,
+        out CameraFrame convertedFrame)
+    {
+        convertedFrame = null!;
+
+        if (_cam == null || !IsColorPixelFormat(mappedPixelFormat))
+        {
+            return false;
+        }
+
+        if (frame.frameInfo.width == 0 || frame.frameInfo.height == 0)
+        {
+            return false;
+        }
+
+        var destinationSize = checked((int)frame.frameInfo.width * (int)frame.frameInfo.height * 3);
+        EnsureConvertedFrameBuffer(destinationSize);
+
+        var convertParam = new IMVDefine.IMV_PixelConvertParam
+        {
+            nWidth = frame.frameInfo.width,
+            nHeight = frame.frameInfo.height,
+            ePixelFormat = frame.frameInfo.pixelFormat,
+            pSrcData = frame.pData,
+            nSrcDataLen = frame.frameInfo.size,
+            nPaddingX = frame.frameInfo.paddingX,
+            nPaddingY = frame.frameInfo.paddingY,
+            eBayerDemosaic = IMVDefine.IMV_EBayerDemosaic.demosaicEdgeSensing,
+            eDstPixelFormat = IMVDefine.IMV_EPixelType.gvspPixelBGR8,
+            pDstBuf = _convertedFrameHandle.AddrOfPinnedObject(),
+            nDstBufSize = (uint)destinationSize
+        };
+
+        var res = _cam.IMV_PixelConvert(ref convertParam);
+        if (res != IMVDefine.IMV_OK || convertParam.nDstDataLen == 0)
+        {
+            Debug.WriteLine($"[MindVisionCamera] PixelConvert to BGR8 failed: {res}, pixelFormat={frame.frameInfo.pixelFormat}");
+            return false;
+        }
+
+        convertedFrame = new CameraFrame
+        {
+            DataPtr = _convertedFrameHandle.AddrOfPinnedObject(),
+            Width = (int)frame.frameInfo.width,
+            Height = (int)frame.frameInfo.height,
+            Size = (int)convertParam.nDstDataLen,
+            PixelFormat = CameraPixelFormat.BGR8,
+            FrameNumber = 0,
+            Timestamp = 0,
+            NeedsNativeRelease = false
+        };
+
+        return true;
+    }
+
+    private void EnsureConvertedFrameBuffer(int size)
+    {
+        if (_convertedFrameBuffer != null && _convertedFrameBuffer.Length >= size && _convertedFrameHandle.IsAllocated)
+        {
+            return;
+        }
+
+        ReleaseConvertedFrameBuffer();
+        _convertedFrameBuffer = new byte[size];
+        _convertedFrameHandle = GCHandle.Alloc(_convertedFrameBuffer, GCHandleType.Pinned);
+    }
+
+    private void ReleaseConvertedFrameBuffer()
+    {
+        if (_convertedFrameHandle.IsAllocated)
+        {
+            _convertedFrameHandle.Free();
+        }
+
+        _convertedFrameBuffer = null;
+    }
+
+    private void EnsureRawFrameBuffer(int size)
+    {
+        if (_rawFrameBuffer != null && _rawFrameBuffer.Length >= size && _rawFrameHandle.IsAllocated)
+        {
+            return;
+        }
+
+        ReleaseRawFrameBuffer();
+        _rawFrameBuffer = new byte[size];
+        _rawFrameHandle = GCHandle.Alloc(_rawFrameBuffer, GCHandleType.Pinned);
+    }
+
+    private void ReleaseRawFrameBuffer()
+    {
+        if (_rawFrameHandle.IsAllocated)
+        {
+            _rawFrameHandle.Free();
+        }
+
+        _rawFrameBuffer = null;
+    }
+
+    private static bool IsColorPixelFormat(CameraPixelFormat pixelFormat)
+    {
+        return pixelFormat is CameraPixelFormat.RGB8
+            or CameraPixelFormat.BGR8
+            or CameraPixelFormat.BayerRG8
+            or CameraPixelFormat.BayerGB8
+            or CameraPixelFormat.BayerGR8
+            or CameraPixelFormat.BayerBG8;
+    }
+
+    /// <summary>
+    /// 释放上一次 GetFrame 获取的帧资源
+    /// </summary>
+    private void ReleaseLastFrame()
+    {
+        if (!_hasUnreleasedFrame || _cam == null)
+            return;
+
+        try
+        {
+            _cam.IMV_ReleaseFrame(ref _lastFrame);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] ReleaseFrame error: {ex.Message}");
+        }
+        finally
+        {
+            _hasUnreleasedFrame = false;
+        }
+    }
+
+    private static CameraPixelFormat ConvertPixelFormat(uint pixelType)
+    {
+        return pixelType switch
+        {
+            PixelType_Gvsp_Mono8 => CameraPixelFormat.Mono8,
+            PixelType_Gvsp_RGB8 => CameraPixelFormat.RGB8,
+            PixelType_Gvsp_BGR8 => CameraPixelFormat.BGR8,
+            PixelType_Gvsp_BayerRG8 => CameraPixelFormat.BayerRG8,
+            PixelType_Gvsp_BayerGB8 => CameraPixelFormat.BayerGB8,
+            PixelType_Gvsp_BayerGR8 => CameraPixelFormat.BayerGR8,
+            PixelType_Gvsp_BayerBG8 => CameraPixelFormat.BayerBG8,
+            _ => CameraPixelFormat.Unknown
+        };
+    }
+
+    public bool SetExposure(double microseconds)
+    {
+        if (!_isConnected || _cam == null)
+            return false;
+
+        try
+        {
+            int res = _cam.IMV_SetDoubleFeatureValue("ExposureTime", microseconds);
+            if (res == IMVDefine.IMV_OK)
+            {
+                return true;
+            }
+
+            Debug.WriteLine($"[MindVisionCamera] Set ExposureTime failed: {DescribeSdkResult(res)}. Preparing manual exposure state and retrying.");
+            PrepareManualExposureWrite();
+
+            res = _cam.IMV_SetDoubleFeatureValue("ExposureTime", microseconds);
+            if (res == IMVDefine.IMV_OK)
+            {
+                return true;
+            }
+
+            Debug.WriteLine($"[MindVisionCamera] Retry Set ExposureTime failed: {DescribeSdkResult(res)}.");
+            if (TrySetRawExposure(microseconds, out var rawRes))
+            {
+                return true;
+            }
+
+            Debug.WriteLine($"[MindVisionCamera] Set ExposureTimeRaw failed: {DescribeSdkResult(rawRes)}.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] SetExposure failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    public bool SetGain(double value)
+    {
+        if (!_isConnected || _cam == null)
+            return false;
+
+        try
+        {
+            TrySetEnumFeatureIfWriteable("GainSelector", "All");
+
+            int res = _cam.IMV_SetDoubleFeatureValue("GainRaw", value);
+            if (res == IMVDefine.IMV_OK)
+            {
+                return true;
+            }
+
+            Debug.WriteLine($"[MindVisionCamera] Set GainRaw failed: {DescribeSdkResult(res)}. Trying Gain.");
+            res = _cam.IMV_SetDoubleFeatureValue("Gain", value);
+            if (res != IMVDefine.IMV_OK)
+            {
+                Debug.WriteLine($"[MindVisionCamera] Set Gain failed: {DescribeSdkResult(res)}.");
+            }
+
+            return res == IMVDefine.IMV_OK;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] SetGain failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    public bool SetPixelFormat(CameraPixelFormat pixelFormat)
+    {
+        if (!_isConnected || _cam == null)
+            return false;
+
+        try
+        {
+            var symbol = CameraPixelFormatExtensions.Normalize(pixelFormat.ToConfigValue()).ToConfigValue();
+            return TrySetEnumFeatureIfWriteable("PixelFormat", symbol);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] SetPixelFormat failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    public bool SetTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null)
+    {
+        if (!_isConnected || _cam == null)
+            return false;
+
+        try
+        {
+            if (mode == CameraTriggerMode.Software)
+            {
+                int modeRes = _cam.IMV_SetEnumFeatureSymbol("TriggerMode", "On");
+                int sourceRes = _cam.IMV_SetEnumFeatureSymbol("TriggerSource", "Software");
+                return modeRes == IMVDefine.IMV_OK && sourceRes == IMVDefine.IMV_OK;
+            }
+
+            if (mode == CameraTriggerMode.External)
+            {
+                var source = CameraHardwareTriggerSourceExtensions.Normalize(hardwareTriggerSource);
+                int modeRes = _cam.IMV_SetEnumFeatureSymbol("TriggerMode", "On");
+                int sourceRes = _cam.IMV_SetEnumFeatureSymbol("TriggerSource", source);
+                return modeRes == IMVDefine.IMV_OK && sourceRes == IMVDefine.IMV_OK;
+            }
+
+            int continuousRes = _cam.IMV_SetEnumFeatureSymbol("TriggerMode", "Off");
+            return continuousRes == IMVDefine.IMV_OK;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] SetTriggerMode failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private void PrepareManualExposureWrite()
+    {
+        if (_cam == null)
+        {
+            return;
+        }
+
+        TrySetEnumFeatureIfWriteable("ExposureAuto", "Off");
+        TrySetEnumFeatureIfWriteable("ExposureMode", "Timed");
+        TrySetEnumFeatureIfWriteable("AcquisitionMode", "Continuous");
+
+        // Some Huaray GigE models report ExposureTime as read-only until trigger mode
+        // is normalized after a third-party viewer has touched the camera.
+        if (!_isGrabbing)
+        {
+            TrySetEnumFeatureIfWriteable("TriggerMode", "Off");
+        }
+    }
+
+    private bool TrySetRawExposure(double microseconds, out int result)
+    {
+        result = IMVDefine.IMV_ERROR;
+        if (_cam == null ||
+            !_cam.IMV_FeatureIsValid("ExposureTimeRaw") ||
+            !_cam.IMV_FeatureIsAvailable("ExposureTimeRaw"))
+        {
+            return false;
+        }
+
+        var rawValue = checked((long)Math.Round(microseconds * 10.0, MidpointRounding.AwayFromZero));
+        result = _cam.IMV_SetIntFeatureValue("ExposureTimeRaw", rawValue);
+        return result == IMVDefine.IMV_OK;
+    }
+
+    private bool TrySetEnumFeatureIfWriteable(string featureName, string symbol)
+    {
+        if (_cam == null ||
+            !_cam.IMV_FeatureIsValid(featureName) ||
+            !_cam.IMV_FeatureIsAvailable(featureName) ||
+            !_cam.IMV_FeatureIsWriteable(featureName))
+        {
+            return false;
+        }
+
+        var result = _cam.IMV_SetEnumFeatureSymbol(featureName, symbol);
+        if (result != IMVDefine.IMV_OK)
+        {
+            Debug.WriteLine($"[MindVisionCamera] Set {featureName}={symbol} failed: {DescribeSdkResult(result)}.");
+        }
+
+        return result == IMVDefine.IMV_OK;
+    }
+
+    private static string DescribeSdkResult(int result)
+    {
+        return result switch
+        {
+            IMVDefine.IMV_OK => "0 (OK)",
+            IMVDefine.IMV_ERROR => "-101 (Error)",
+            IMVDefine.IMV_INVALID_HANDLE => "-102 (Invalid handle)",
+            IMVDefine.IMV_INVALID_PARAM => "-103 (Invalid parameter)",
+            IMVDefine.IMV_INVALID_FRAME_HANDLE => "-104 (Invalid frame handle)",
+            IMVDefine.IMV_INVALID_FRAME => "-105 (Invalid frame)",
+            IMVDefine.IMV_INVALID_RESOURCE => "-106 (Invalid resource)",
+            IMVDefine.IMV_INVALID_IP => "-107 (Invalid IP)",
+            IMVDefine.IMV_NO_MEMORY => "-108 (No memory)",
+            IMVDefine.IMV_INSUFFICIENT_MEMORY => "-109 (Insufficient memory)",
+            IMVDefine.IMV_ERROR_PROPERTY_TYPE => "-110 (Invalid feature type)",
+            IMVDefine.IMV_INVALID_ACCESS => "-111 (Invalid access)",
+            IMVDefine.IMV_INVALID_RANGE => "-112 (Invalid range)",
+            IMVDefine.IMV_NOT_SUPPORT => "-113 (Not supported)",
+            _ => result.ToString()
+        };
+    }
+
+    public bool ExecuteSoftwareTrigger()
+    {
+        if (!_isConnected || _cam == null)
+            return false;
+
+        try
+        {
+            if (_isGrabbing)
+            {
+                var clearRes = _cam.IMV_ClearFrameBuffer();
+                if (clearRes != IMVDefine.IMV_OK)
+                {
+                    Debug.WriteLine($"[MindVisionCamera] ClearFrameBuffer before software trigger failed: {DescribeSdkResult(clearRes)}.");
+                }
+            }
+
+            int res = _cam.IMV_ExecuteCommandFeature("TriggerSoftware");
+            if (res != IMVDefine.IMV_OK)
+            {
+                Debug.WriteLine($"[MindVisionCamera] Execute TriggerSoftware failed: {DescribeSdkResult(res)}.");
+            }
+
+            return res == IMVDefine.IMV_OK;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] ExecuteSoftwareTrigger failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed)
+            return;
+
+        try
+        {
+            ForceRelease();
+            ReleaseConvertedFrameBuffer();
+            ReleaseRawFrameBuffer();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MindVisionCamera] Dispose error: {ex.Message}");
+        }
+        finally
+        {
+            _disposed = true;
+        }
+    }
+
+    ~MindVisionCamera() => Dispose(false);
+}
+#else
+/// <summary>
+/// CI-safe fallback used when the proprietary Huaray SDK is not present.
+/// </summary>
+public class MindVisionCamera : ICameraProvider
+{
+    private const uint PixelType_Gvsp_Mono8 = 0x01080001;
+    private const uint PixelType_Gvsp_RGB8 = 0x02180014;
+    private const uint PixelType_Gvsp_BGR8 = 0x02180015;
+    private const uint PixelType_Gvsp_BayerGR8 = 0x01080008;
+    private const uint PixelType_Gvsp_BayerRG8 = 0x01080009;
+    private const uint PixelType_Gvsp_BayerGB8 = 0x0108000A;
+    private const uint PixelType_Gvsp_BayerBG8 = 0x0108000B;
+
+    private const string MissingSdkMessage =
+        "MVSDK_Net.dll was not found. Install the Huaray SDK under ClearVision.Product/lib/HuaraySDK/x64 or build with EnableHuaraySdk=true.";
+
+    public string ProviderName => "Huaray";
+    public bool IsConnected => false;
+    public bool IsGrabbing => false;
+    public CameraDeviceInfo? CurrentDevice => null;
+
+    public static bool IsSdkLoaded => false;
+    public static string? LastSdkLoadError => MissingSdkMessage;
+    public static string? LastEnumerateError { get; private set; }
+    public static string? SdkAssemblyLocation => null;
+
+    public List<CameraDeviceInfo> EnumerateDevices()
+    {
+        LastEnumerateError = MissingSdkMessage;
+        return new List<CameraDeviceInfo>();
+    }
+
+    public bool Open(string serialNumber) => throw new InvalidOperationException(MissingSdkMessage);
+    public bool Close() => true;
+    public bool StartGrabbing() => false;
+    public bool StopGrabbing() => true;
+    public CameraFrame? GetFrame(int timeoutMs = 1000) => null;
+    public bool SetExposure(double microseconds) => false;
+    public bool SetGain(double value) => false;
+    public bool SetPixelFormat(CameraPixelFormat pixelFormat) => false;
+    public bool SetTriggerMode(CameraTriggerMode mode, string? hardwareTriggerSource = null) => false;
+    public bool ExecuteSoftwareTrigger() => false;
+    public void Dispose() { }
+
+    private static CameraPixelFormat ConvertPixelFormat(uint pixelType)
+    {
+        return pixelType switch
+        {
+            PixelType_Gvsp_Mono8 => CameraPixelFormat.Mono8,
+            PixelType_Gvsp_RGB8 => CameraPixelFormat.RGB8,
+            PixelType_Gvsp_BGR8 => CameraPixelFormat.BGR8,
+            PixelType_Gvsp_BayerRG8 => CameraPixelFormat.BayerRG8,
+            PixelType_Gvsp_BayerGB8 => CameraPixelFormat.BayerGB8,
+            PixelType_Gvsp_BayerGR8 => CameraPixelFormat.BayerGR8,
+            PixelType_Gvsp_BayerBG8 => CameraPixelFormat.BayerBG8,
+            _ => CameraPixelFormat.Unknown
+        };
+    }
+}
+#endif

@@ -29,7 +29,7 @@ $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path -Parent $scriptRoot
 $runner = Join-Path $scriptRoot "run-dotnet-test-serial.ps1"
-$project = Join-Path $repoRoot "Acme.Product\tests\Acme.Product.Tests\Acme.Product.Tests.csproj"
+$project = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
 
 function Resolve-DetectionPerfGateProfile {
     param(
@@ -119,7 +119,7 @@ if ([string]::IsNullOrWhiteSpace($env:CV_DETECTION_PERF_FAILURE_ARCHIVE_DIR)) {
         Join-Path $ReportDirectory "archive\detection_performance_failures"
     }
     else {
-        Join-Path $repoRoot "Acme.Product\test_results\archive\detection_performance_failures"
+        Join-Path $repoRoot "ClearVision.Product\test_results\archive\detection_performance_failures"
     }
 }
 

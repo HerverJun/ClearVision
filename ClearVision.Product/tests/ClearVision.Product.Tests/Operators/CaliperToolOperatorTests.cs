@@ -1,0 +1,281 @@
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Operators;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+using OpenCvSharp;
+using Xunit;
+
+namespace ClearVision.Product.Tests.Operators;
+
+public class CaliperToolOperatorTests
+{
+    private readonly CaliperToolOperator _operator;
+
+    public CaliperToolOperatorTests()
+    {
+        _operator = new CaliperToolOperator(Substitute.For<ILogger<CaliperToolOperator>>());
+    }
+
+    [Fact]
+    public void OperatorType_ShouldBeCaliperTool()
+    {
+        Assert.Equal(OperatorType.CaliperTool, _operator.OperatorType);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithSimpleEdgeImage_ShouldReturnSuccess()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Direction", "Horizontal" },
+            { "Polarity", "Both" },
+            { "EdgeThreshold", 10.0 },
+            { "ExpectedCount", 1 },
+            { "SubpixelAccuracy", false }
+        });
+
+        using var image = CreateCaliperImage();
+        var inputs = TestHelpers.CreateImageInputs(image);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.OutputData);
+        Assert.True(result.OutputData!.ContainsKey("Width"));
+        Assert.True(result.OutputData.ContainsKey("PairCount"));
+        Assert.True(result.OutputData.ContainsKey("StatusCode"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithSubpixelEnabled_ShouldReturnSuccess()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Direction", "Horizontal" },
+            { "Polarity", "Both" },
+            { "EdgeThreshold", 10.0 },
+            { "ExpectedCount", 1 },
+            { "SubpixelAccuracy", true }
+        });
+
+        using var image = CreateCaliperImage();
+        var inputs = TestHelpers.CreateImageInputs(image);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.OutputData);
+        Assert.True(result.OutputData!.ContainsKey("Width"));
+        Assert.True(result.OutputData.ContainsKey("PairCount"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithSubpixelGradientMoment_ShouldReturnSuccess()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Direction", "Horizontal" },
+            { "Polarity", "Both" },
+            { "EdgeThreshold", 10.0 },
+            { "ExpectedCount", 1 },
+            { "SubpixelAccuracy", true },
+            { "SubPixelMode", "gradient_moment" }
+        });
+
+        using var image = CreateCaliperImage();
+        var inputs = TestHelpers.CreateImageInputs(image);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Assert.NotNull(result.OutputData);
+        Assert.True(result.OutputData!.ContainsKey("Width"));
+        Assert.Equal("gradient_moment", result.OutputData["RequestedSubPixelMode"]);
+        Assert.Equal("gradient_moment", result.OutputData["SubPixelMode"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithSubpixelZernike_ShouldReturnSuccess()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Direction", "Horizontal" },
+            { "Polarity", "Both" },
+            { "EdgeThreshold", 10.0 },
+            { "ExpectedCount", 1 },
+            { "SubpixelAccuracy", true },
+            { "SubPixelMode", "zernike" }
+        });
+
+        using var image = CreateCaliperImage();
+        var inputs = TestHelpers.CreateImageInputs(image);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.OutputData);
+        Assert.True(result.OutputData!.ContainsKey("Width"));
+        Assert.True(result.OutputData.ContainsKey("PairCount"));
+        Assert.Equal("zernike", result.OutputData["RequestedSubPixelMode"]);
+        Assert.Equal("gradient_moment", result.OutputData["SubPixelMode"]);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithEdgePairsMode_ShouldEmitPairStatistics()
+    {
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Direction", "Horizontal" },
+            { "Polarity", "Both" },
+            { "EdgeThreshold", 10.0 },
+            { "ExpectedCount", 1 },
+            { "MeasureMode", "edge_pairs" },
+            { "PairDirection", "any" },
+            { "SubpixelAccuracy", false }
+        });
+
+        using var image = CreateCaliperImage();
+        var inputs = TestHelpers.CreateImageInputs(image);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.OutputData);
+        Assert.True(result.OutputData!.ContainsKey("PairDistances"));
+        Assert.True(result.OutputData.ContainsKey("AverageDistance"));
+        Assert.True(result.OutputData.ContainsKey("DistanceStdDev"));
+
+        var distances = Assert.IsType<List<double>>(result.OutputData["PairDistances"]);
+        Assert.Single(distances);
+        Assert.InRange(distances[0], 35.0, 45.0);
+
+        var avg = Convert.ToDouble(result.OutputData["AverageDistance"]);
+        Assert.InRange(avg, 35.0, 45.0);
+
+        var stdDev = Convert.ToDouble(result.OutputData["DistanceStdDev"]);
+        Assert.InRange(stdDev, 0.0, 1e-6);
+    }
+
+    [Fact]
+    public void ValidateParameters_WithInvalidDirection_ShouldReturnInvalid()
+    {
+        var op = CreateOperator(new Dictionary<string, object> { { "Direction", "Diagonal" } });
+
+        var validation = _operator.ValidateParameters(op);
+
+        Assert.False(validation.IsValid);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithIndustrialSubpixelStripe_ShouldMeetIndustrialTolerance()
+    {
+        const double expectedWidth = 40.0;
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Direction", "Horizontal" },
+            { "Polarity", "Both" },
+            { "PairDirection", "positive_to_negative" },
+            { "EdgeThreshold", 6.0 },
+            { "ExpectedCount", 1 },
+            { "SubpixelAccuracy", true }
+        });
+
+        using var image = IndustrialMeasurementSceneFactory.CreateFilledVerticalStripeImage(
+            width: 240,
+            height: 120,
+            leftX: 90.0,
+            rightX: 130.0,
+            topY: 12,
+            bottomY: 108);
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["SearchRegion"] = new Rect(60, 8, 120, 104);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        var width = Convert.ToDouble(result.OutputData!["Width"]);
+        var uncertainty = Convert.ToDouble(result.OutputData["UncertaintyPx"]);
+        var distances = Assert.IsType<List<double>>(result.OutputData["PairDistances"]);
+        var pairUncertainties = Assert.IsType<List<double>>(result.OutputData["PairUncertainties"]);
+
+        width.Should().BeApproximately(expectedWidth, 0.15);
+        distances.Should().ContainSingle();
+        distances[0].Should().BeApproximately(expectedWidth, 0.15);
+        pairUncertainties.Should().ContainSingle();
+        pairUncertainties[0].Should().BeLessThan(0.15);
+        uncertainty.Should().BeLessThan(0.15);
+        Convert.ToDouble(result.OutputData["SamplePitchPx"]).Should().BeLessThan(0.2);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithLowContrastNoisyStripe_ShouldMeasureWidthWithinRelaxedTolerance()
+    {
+        const double expectedWidth = 40.0;
+        var op = CreateOperator(new Dictionary<string, object>
+        {
+            { "Direction", "Horizontal" },
+            { "Polarity", "Both" },
+            { "PairDirection", "positive_to_negative" },
+            { "EdgeThreshold", 3.0 },
+            { "ExpectedCount", 1 },
+            { "SubpixelAccuracy", true }
+        });
+
+        using var image = CreateLowContrastNoisyStripeImage();
+        var inputs = TestHelpers.CreateImageInputs(image);
+        inputs["SearchRegion"] = new Rect(52, 16, 120, 88);
+
+        var result = await _operator.ExecuteAsync(op, inputs);
+
+        Assert.True(result.IsSuccess, result.ErrorMessage);
+        Convert.ToInt32(result.OutputData!["PairCount"]).Should().Be(1);
+        Convert.ToDouble(result.OutputData["Width"]).Should().BeApproximately(expectedWidth, 0.75);
+        Convert.ToDouble(result.OutputData["UncertaintyPx"]).Should().BeLessThan(1.0);
+    }
+
+    private static Operator CreateOperator(Dictionary<string, object>? parameters = null)
+    {
+        var op = new Operator("Caliper", OperatorType.CaliperTool, 0, 0);
+
+        if (parameters != null)
+        {
+            foreach (var (name, value) in parameters)
+            {
+                op.AddParameter(new Parameter(Guid.NewGuid(), name, name, string.Empty, "string", value));
+            }
+        }
+
+        return op;
+    }
+
+    private static ImageWrapper CreateCaliperImage()
+    {
+        var mat = new Mat(120, 220, MatType.CV_8UC3, Scalar.Black);
+        Cv2.Rectangle(mat, new Rect(90, 10, 40, 100), Scalar.White, -1);
+        return new ImageWrapper(mat);
+    }
+
+    private static ImageWrapper CreateLowContrastNoisyStripeImage()
+    {
+        var mat = new Mat(120, 220, MatType.CV_8UC1, Scalar.All(92));
+        Cv2.Rectangle(mat, new Rect(90, 18, 40, 84), Scalar.All(112), -1);
+
+        var rng = new Random(407);
+        for (var y = 0; y < mat.Rows; y++)
+        {
+            for (var x = 0; x < mat.Cols; x++)
+            {
+                var noise = rng.Next(-2, 3);
+                var value = Math.Clamp(mat.At<byte>(y, x) + noise, 0, 255);
+                mat.Set(y, x, (byte)value);
+            }
+        }
+
+        using var color = new Mat();
+        Cv2.CvtColor(mat, color, ColorConversionCodes.GRAY2BGR);
+        return new ImageWrapper(color.Clone());
+    }
+}

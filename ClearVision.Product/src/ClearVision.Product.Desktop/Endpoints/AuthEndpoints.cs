@@ -1,0 +1,200 @@
+using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Interfaces;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+
+namespace ClearVision.Product.Desktop.Endpoints;
+
+/// <summary>
+/// Authentication endpoints.
+/// </summary>
+public static class AuthEndpoints
+{
+    public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/auth/setup-status", async (IAuthService authService) =>
+        {
+            var status = await authService.GetInitialAdminSetupStatusAsync();
+            return Results.Ok(status);
+        })
+        .AllowAnonymous();
+
+        app.MapPost("/api/auth/setup-admin", async (InitialAdminSetupRequest request, IAuthService authService) =>
+        {
+            var result = await authService.SetupInitialAdminAsync(request);
+            if (!result.Success)
+            {
+                if (string.Equals(result.ErrorMessage, AuthService.InitialAdminSetupAlreadyCompletedMessage, StringComparison.Ordinal))
+                {
+                    return Results.Conflict(new { Error = result.ErrorMessage });
+                }
+
+                return Results.BadRequest(new { Error = result.ErrorMessage ?? "管理员初始化失败" });
+            }
+
+            return Results.Ok(new
+            {
+                Token = result.Token,
+                User = result.User
+            });
+        })
+        .AllowAnonymous();
+
+        app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authService) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return Results.BadRequest(new { Error = "用户名和密码不能为空" });
+            }
+
+            var result = await authService.LoginAsync(request.Username, request.Password);
+            if (!result.Success)
+            {
+                return Results.Json(
+                    new { Error = result.ErrorMessage ?? "用户名或密码错误" },
+                    statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            return Results.Ok(new
+            {
+                Token = result.Token,
+                User = result.User
+            });
+        })
+        .AllowAnonymous();
+
+        app.MapPost("/api/auth/logout", async (HttpContext context, IAuthService authService) =>
+        {
+            var token = GetTokenFromHeader(context);
+            if (!string.IsNullOrEmpty(token))
+            {
+                await authService.LogoutAsync(token);
+            }
+
+            return Results.Ok(new { Message = "已登出", Audit = "server-session-cleared" });
+        });
+
+        app.MapGet("/api/auth/me", async (HttpContext context, IAuthService authService) =>
+        {
+            var token = GetTokenFromHeader(context);
+            if (string.IsNullOrEmpty(token))
+            {
+                return Results.Unauthorized();
+            }
+
+            var session = await authService.GetSessionAsync(token);
+            if (session == null)
+            {
+                return Results.Unauthorized();
+            }
+
+            return Results.Ok(new
+            {
+                session.UserId,
+                session.Username,
+                session.Role
+            });
+        });
+
+        app.MapPost("/api/auth/change-password", async (
+            HttpContext context,
+            ChangePasswordRequest request,
+            IAuthService authService,
+            IConfigurationService configService) =>
+        {
+            var token = GetTokenFromHeader(context);
+            if (string.IsNullOrEmpty(token))
+            {
+                return Results.Unauthorized();
+            }
+
+            var session = await authService.GetSessionAsync(token);
+            if (session == null)
+            {
+                return Results.Unauthorized();
+            }
+
+            if (string.IsNullOrWhiteSpace(request.OldPassword) || string.IsNullOrWhiteSpace(request.NewPassword))
+            {
+                return Results.BadRequest(new { ErrorCode = "EMPTY_PASSWORD", Error = "密码不能为空" });
+            }
+
+            var minPasswordLength = Math.Max(6, configService.GetCurrent()?.Security?.PasswordMinLength ?? 6);
+            if (request.NewPassword.Trim().Length < minPasswordLength)
+            {
+                return Results.BadRequest(new { ErrorCode = "WEAK_PASSWORD", Error = $"新密码长度不能少于 {minPasswordLength} 位" });
+            }
+
+            var result = await authService.ChangePasswordAsync(
+                session.UserId,
+                request.OldPassword,
+                request.NewPassword);
+
+            if (!result.Success)
+            {
+                return Results.BadRequest(new
+                {
+                    ErrorCode = ResolveChangePasswordErrorCode(result.ErrorMessage),
+                    Error = result.ErrorMessage
+                });
+            }
+
+            return Results.Ok(new { Message = "密码修改成功" });
+        });
+
+        return app;
+    }
+
+    private static string? GetTokenFromHeader(HttpContext context)
+    {
+        var authHeader = context.Request.Headers.Authorization.FirstOrDefault();
+        if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return authHeader.Substring("Bearer ".Length).Trim();
+        }
+
+        if (context.Request.Headers.TryGetValue("X-Auth-Token", out var customToken))
+        {
+            return customToken.FirstOrDefault();
+        }
+
+        return null;
+    }
+
+    private static string ResolveChangePasswordErrorCode(string? errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(errorMessage))
+        {
+            return "CHANGE_PASSWORD_FAILED";
+        }
+
+        if (errorMessage.Contains("当前密码错误", StringComparison.Ordinal))
+        {
+            return "INVALID_OLD_PASSWORD";
+        }
+
+        if (errorMessage.Contains("不能与当前密码相同", StringComparison.Ordinal))
+        {
+            return "PASSWORD_REUSE";
+        }
+
+        if (errorMessage.Contains("长度不能少于", StringComparison.Ordinal))
+        {
+            return "WEAK_PASSWORD";
+        }
+
+        if (errorMessage.Contains("用户不存在", StringComparison.Ordinal))
+        {
+            return "USER_NOT_FOUND";
+        }
+
+        if (errorMessage.Contains("密码不能为空", StringComparison.Ordinal))
+        {
+            return "EMPTY_PASSWORD";
+        }
+
+        return "CHANGE_PASSWORD_FAILED";
+    }
+}

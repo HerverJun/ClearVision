@@ -81,18 +81,14 @@ function Test-DotnetHasRequiredSdk {
         [string]$DotnetPath
     )
 
-    $sdkLines = & $DotnetPath --list-sdks 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        return $false
+    Push-Location -LiteralPath $repoRoot
+    try {
+        $null = & $DotnetPath --version 2>$null
+        return $LASTEXITCODE -eq 0
     }
-
-    foreach ($line in $sdkLines) {
-        if ($line -match "^\s*$([regex]::Escape($requiredSdk))\s+\[") {
-            return $true
-        }
+    finally {
+        Pop-Location
     }
-
-    return $false
 }
 
 function Get-DotnetInstallScript {
@@ -152,7 +148,7 @@ function Install-RequiredSdk {
     if (-not $InstallIfMissing) {
         $candidateList = (Get-DotnetCandidates) -join [Environment]::NewLine
         throw @"
-Required .NET SDK $requiredSdk was not found by any usable dotnet host.
+A .NET SDK compatible with global.json baseline $requiredSdk was not found by any usable dotnet host.
 
 Candidates checked:
 $candidateList
@@ -249,7 +245,7 @@ foreach ($candidate in (Get-DotnetCandidates)) {
 if ([string]::IsNullOrWhiteSpace($dotnetPath)) {
     $dotnetPath = Install-RequiredSdk
     if (-not (Test-DotnetHasRequiredSdk -DotnetPath $dotnetPath)) {
-        throw "Installed dotnet host does not report required SDK ${requiredSdk}: $dotnetPath"
+        throw "Installed dotnet host cannot resolve a compatible SDK for ${requiredSdk}: $dotnetPath"
     }
 }
 

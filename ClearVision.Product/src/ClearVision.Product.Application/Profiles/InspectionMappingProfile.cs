@@ -1,0 +1,31 @@
+// InspectionMappingProfile.cs
+// AutoMapper 映射配置
+// 作者：蘅芜君
+
+using ClearVision.Product.Application.Analysis;
+using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.Entities;
+using AutoMapper;
+
+namespace ClearVision.Product.Application.Profiles;
+
+/// <summary>
+/// AutoMapper 映射配置
+/// </summary>
+public class InspectionMappingProfile : Profile
+{
+    public InspectionMappingProfile()
+    {
+        // InspectionResult -> InspectionResultDto
+        CreateMap<InspectionResult, InspectionResultDto>()
+            .ForMember(dest => dest.OutputImage, opt => opt.MapFrom(src =>
+                src.OutputImage != null ? Convert.ToBase64String(src.OutputImage) : null))
+            .ForMember(dest => dest.OutputData, opt => opt.MapFrom(src =>
+                AnalysisPayloadSerialization.DeserializeJsonDictionary(src.OutputDataJson)))
+            .ForMember(dest => dest.AnalysisData, opt => opt.MapFrom(src =>
+                AnalysisPayloadSerialization.DeserializeAnalysisData(src.AnalysisDataJson)));
+
+        // Defect -> DefectDto
+        CreateMap<Defect, DefectDto>();
+    }
+}

@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.ValueObjects;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using OpenCvSharp;
@@ -478,7 +478,7 @@ internal static class ContractRunner
         return Task.CompletedTask;
     }
 
-    private static async Task<Acme.Product.Core.Operators.OperatorExecutionOutput> ExecuteIdentityAsync(Operator op)
+    private static async Task<ClearVision.Product.Core.Operators.OperatorExecutionOutput> ExecuteIdentityAsync(Operator op)
     {
         var mat = Cv2.ImRead(IdentityInputPath(), ImreadModes.Color);
         if (mat.Empty())
@@ -623,7 +623,7 @@ internal static class ContractRunner
         return method.Invoke(null, args);
     }
 
-    private static void RequireSuccess(Acme.Product.Core.Operators.OperatorExecutionOutput result)
+    private static void RequireSuccess(ClearVision.Product.Core.Operators.OperatorExecutionOutput result)
     {
         Require(result.IsSuccess, result.ErrorMessage ?? "Expected operator execution success.");
         Require(result.OutputData is not null, "Expected output data.");
@@ -642,7 +642,7 @@ internal static class ContractRunner
         Require(value?.Contains(expected, StringComparison.OrdinalIgnoreCase) == true, $"Expected '{value}' to contain '{expected}'.");
     }
 
-    private static string? ValidationErrors(Acme.Product.Core.Operators.ValidationResult validation)
+    private static string? ValidationErrors(ClearVision.Product.Core.Operators.ValidationResult validation)
     {
         return validation.Errors.Count == 0 ? null : string.Join("; ", validation.Errors);
     }
@@ -698,12 +698,12 @@ internal static class ContractRunner
 
     private static string IdentityModelPath()
     {
-        return RepoPath("Acme.Product/tests/TestData/model_test_suite/identity_2x2/identity_2x2.onnx");
+        return RepoPath("ClearVision.Product/tests/TestData/model_test_suite/identity_2x2/identity_2x2.onnx");
     }
 
     private static string IdentityInputPath()
     {
-        return RepoPath("Acme.Product/tests/TestData/model_test_suite/identity_2x2/input.png");
+        return RepoPath("ClearVision.Product/tests/TestData/model_test_suite/identity_2x2/input.png");
     }
 
     private static string RepoPath(string relativePath)

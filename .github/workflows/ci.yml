@@ -22,14 +22,14 @@ on:
         default: ""
 
 env:
-  SOLUTION_PATH: Acme.Product/Acme.Product.sln
-  DESKTOP_PROJECT: Acme.Product/src/Acme.Product.Desktop/Acme.Product.Desktop.csproj
-  PRODUCT_TEST_PROJECT: Acme.Product/tests/Acme.Product.Tests/Acme.Product.Tests.csproj
-  DESKTOP_TEST_PROJECT: Acme.Product/tests/Acme.Product.Desktop.Tests/Acme.Product.Desktop.Tests.csproj
-  OPERATOR_PROJECT: Acme.OperatorLibrary/Acme.OperatorLibrary.csproj
-  OPERATOR_SMOKE_TEST_PROJECT: Acme.OperatorLibrary/tests/Acme.OperatorLibrary.SmokeTests/Acme.OperatorLibrary.SmokeTests.csproj
+  SOLUTION_PATH: ClearVision.Product/ClearVision.Product.sln
+  DESKTOP_PROJECT: ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj
+  PRODUCT_TEST_PROJECT: ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj
+  DESKTOP_TEST_PROJECT: ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj
+  OPERATOR_PROJECT: ClearVision.OperatorLibrary/ClearVision.OperatorLibrary.csproj
+  OPERATOR_SMOKE_TEST_PROJECT: ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests/ClearVision.OperatorLibrary.SmokeTests.csproj
   OPERATOR_BENCHMARK_PROJECT: quality/tools/OperatorPerformanceBenchmarkRunner/OperatorPerformanceBenchmarkRunner.csproj
-  OPERATOR_PACKAGE_DIR: Acme.OperatorLibrary/nupkg
+  OPERATOR_PACKAGE_DIR: ClearVision.OperatorLibrary/nupkg
   PUBLISH_DIR: ./publish
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
@@ -208,9 +208,9 @@ jobs:
         with:
           name: detection-performance-report
           path: |
-            Acme.Product/test_results/detection_performance_budget_report.md
-            Acme.Product/test_results/detection_performance_budget_report.json
-            Acme.Product/test_results/archive/detection_performance_failures/**
+            ClearVision.Product/test_results/detection_performance_budget_report.md
+            ClearVision.Product/test_results/detection_performance_budget_report.json
+            ClearVision.Product/test_results/archive/detection_performance_failures/**
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
@@ -248,9 +248,9 @@ jobs:
         run: |
           $smokeLockPath = Join-Path $env:RUNNER_TEMP "operator-library-smoke.packages.lock.json"
           dotnet restore ${{ env.OPERATOR_SMOKE_TEST_PROJECT }} `
-            --configfile Acme.OperatorLibrary/nuget.config `
+            --configfile ClearVision.OperatorLibrary/nuget.config `
             -p:NuGetLockFilePath=$smokeLockPath `
-            -p:AcmeOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION
+            -p:ClearVisionOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION
           & "./scripts/run-dotnet-test-serial.ps1" `
             -Project $env:OPERATOR_SMOKE_TEST_PROJECT `
             -Configuration Release `
@@ -261,7 +261,7 @@ jobs:
             -MinimumTotalTests 1 `
             -MinimumPassedTests 1 `
             -Collect "Code Coverage" `
-            -DotNetTestArguments "-p:AcmeOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION"
+            -DotNetTestArguments "-p:ClearVisionOperatorLibraryPackageVersion=$env:OPERATOR_PACKAGE_VERSION"
 
       - name: Upload OperatorLibrary Package Artifacts
         uses: actions/upload-artifact@v4
@@ -269,13 +269,13 @@ jobs:
         with:
           name: operator-library-package
           path: |
-            ${{ env.OPERATOR_PACKAGE_DIR }}/Acme.OperatorLibrary.*.nupkg
-            ${{ env.OPERATOR_PACKAGE_DIR }}/Acme.OperatorLibrary.*.snupkg
+            ${{ env.OPERATOR_PACKAGE_DIR }}/ClearVision.OperatorLibrary.*.nupkg
+            ${{ env.OPERATOR_PACKAGE_DIR }}/ClearVision.OperatorLibrary.*.snupkg
             TestResults/operator-library/**/*.trx
             TestResults/operator-library/**/*.coverage
-            Acme.OperatorLibrary/SBOM.md
-            Acme.OperatorLibrary/SBOM.spdx.json
-            Acme.OperatorLibrary/THIRD-PARTY-NOTICES.md
+            ClearVision.OperatorLibrary/SBOM.md
+            ClearVision.OperatorLibrary/SBOM.spdx.json
+            ClearVision.OperatorLibrary/THIRD-PARTY-NOTICES.md
 
       - name: Run Operator Performance Benchmark Smoke
         run: >
@@ -298,16 +298,16 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: Acme.Product/tests/Acme.Product.UI.Tests/package-lock.json
+          cache-dependency-path: ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
 
       - name: Install UI Test Dependencies
-        working-directory: Acme.Product/tests/Acme.Product.UI.Tests
+        working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
           npm ci
           npx playwright install --with-deps chromium
 
       - name: Run UI Tests
-        working-directory: Acme.Product/tests/Acme.Product.UI.Tests
+        working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
           npm run test:unit
           npx playwright test
@@ -318,8 +318,8 @@ jobs:
         with:
           name: ui-test-results
           path: |
-            Acme.Product/tests/Acme.Product.UI.Tests/playwright-report/
-            Acme.Product/tests/Acme.Product.UI.Tests/test-results/
+            ClearVision.Product/tests/ClearVision.Product.UI.Tests/playwright-report/
+            ClearVision.Product/tests/ClearVision.Product.UI.Tests/test-results/
 
   industrial-gate:
     name: Operator Industrial Gate
@@ -367,12 +367,12 @@ jobs:
             -p:PackageVersion=$packageVersion
           $smokeLockPath = Join-Path $env:RUNNER_TEMP "operator-library-industrial-smoke.packages.lock.json"
           dotnet restore $env:OPERATOR_SMOKE_TEST_PROJECT `
-            --configfile Acme.OperatorLibrary/nuget.config `
+            --configfile ClearVision.OperatorLibrary/nuget.config `
             -p:NuGetLockFilePath=$smokeLockPath `
-            -p:AcmeOperatorLibraryPackageVersion=$packageVersion
+            -p:ClearVisionOperatorLibraryPackageVersion=$packageVersion
           dotnet build $env:OPERATOR_SMOKE_TEST_PROJECT `
             --no-restore `
-            -p:AcmeOperatorLibraryPackageVersion=$packageVersion
+            -p:ClearVisionOperatorLibraryPackageVersion=$packageVersion
 
       - name: Run Quick Industrial Gate
         shell: pwsh
@@ -450,7 +450,7 @@ jobs:
       - name: Create Launcher Script
         shell: pwsh
         run: |
-          $content = "@echo off`nchcp 65001 >nul`necho Starting ClearVision...`nstart `"`" `"%~dp0Acme.Product.Desktop.exe`""
+          $content = "@echo off`nchcp 65001 >nul`necho Starting ClearVision...`nstart `"`" `"%~dp0ClearVision.Product.Desktop.exe`""
           $content | Out-File -FilePath "${{ env.PUBLISH_DIR }}/ClearVision-${{ steps.version.outputs.VERSION }}/Start-ClearVision.bat" -Encoding UTF8
 
       - name: Create ZIP Archive

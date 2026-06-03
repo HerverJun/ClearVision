@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptDir "..")
 $runner = Join-Path $scriptDir "run-dotnet-test-serial.ps1"
-$testProject = Join-Path $repoRoot "Acme.Product\tests\Acme.Product.Tests\Acme.Product.Tests.csproj"
+$testProject = Join-Path $repoRoot "ClearVision.Product\tests\ClearVision.Product.Tests\ClearVision.Product.Tests.csproj"
 
 if (-not (Test-Path $testProject)) {
     throw "Test project not found: $testProject"

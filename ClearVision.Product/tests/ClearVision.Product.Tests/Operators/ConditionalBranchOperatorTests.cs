@@ -1,0 +1,53 @@
+// ConditionalBranchOperatorTests.cs
+// ConditionalBranchOperatorTests测试
+// 作者：蘅芜君
+
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Infrastructure.Operators;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
+
+namespace ClearVision.Product.Tests.Operators;
+
+public class ConditionalBranchOperatorTests
+{
+    private readonly ConditionalBranchOperator _operator;
+
+    public ConditionalBranchOperatorTests()
+    {
+        _operator = new ConditionalBranchOperator(Substitute.For<ILogger<ConditionalBranchOperator>>());
+    }
+
+    [Fact]
+    public void OperatorType_ShouldBeConditionalBranch()
+    {
+        _operator.OperatorType.Should().Be(OperatorType.ConditionalBranch);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithNullInputs_ShouldReturnFailure()
+    {
+        var op = new Operator("测试", OperatorType.ConditionalBranch, 0, 0);
+        var result = await _operator.ExecuteAsync(op, null);
+        result.IsSuccess.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithValidValue_ShouldReturnSuccess()
+    {
+        var op = new Operator("测试", OperatorType.ConditionalBranch, 0, 0);
+        var inputs = new Dictionary<string, object> { { "Value", 42.0 } };
+        var result = await _operator.ExecuteAsync(op, inputs);
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData.Should().ContainKey("Result");
+    }
+
+    [Fact]
+    public void ValidateParameters_Default_ShouldBeValid()
+    {
+        var op = new Operator("测试", OperatorType.ConditionalBranch, 0, 0);
+        _operator.ValidateParameters(op).IsValid.Should().BeTrue();
+    }
+}

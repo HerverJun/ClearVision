@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <RootNamespace>ClearVision.Product.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClearVision.Product.Core\ClearVision.Product.Core.csproj" />
+    <ProjectReference Include="..\ClearVision.Product.Contracts\ClearVision.Product.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CQRS 支持 -->
+    <PackageReference Include="MediatR" />
+    
+    <!-- 验证 -->
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    
+    <!-- 对象映射 -->
+    <PackageReference Include="AutoMapper" />
+    
+    <!-- 依赖注入 -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    
+    <!-- 日志 -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    
+    <!-- 缓存 -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+    <PackageReference Include="TypeGen" />
+  </ItemGroup>
+
+</Project>

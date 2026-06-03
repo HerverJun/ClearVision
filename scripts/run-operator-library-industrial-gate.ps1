@@ -279,7 +279,7 @@ if ($NoRestore) {
 }
 
 $smokeArguments = [ordered]@{
-    Project = (Join-Path $repoRoot "Acme.OperatorLibrary\tests\Acme.OperatorLibrary.SmokeTests\Acme.OperatorLibrary.SmokeTests.csproj")
+    Project = (Join-Path $repoRoot "ClearVision.OperatorLibrary\tests\ClearVision.OperatorLibrary.SmokeTests\ClearVision.OperatorLibrary.SmokeTests.csproj")
     Verbosity = $Verbosity
     ResultsDirectory = $trxDirectory
     LogFileName = "operator-library-smoke-$timestamp.trx"

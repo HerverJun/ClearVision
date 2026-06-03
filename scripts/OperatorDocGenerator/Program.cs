@@ -6,9 +6,9 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
-using Acme.Product.Core.Attributes;
-using Acme.Product.Core.Enums;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Core.Attributes;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Infrastructure.Operators;
 
 var repoRoot = ResolveRepoRoot(args);
 var overwrite = args.Any(arg => string.Equals(arg, "--overwrite", StringComparison.OrdinalIgnoreCase));
@@ -1121,7 +1121,7 @@ static IEnumerable<string> BuildEvidenceAndFailureContracts(
     var hasGolden = qualityContext.GoldenEvidenceIndex.Contains(operatorId);
 
     yield return hasTests
-        ? "- 单元/契约测试：已在 `Acme.Product/tests/Acme.Product.Tests/Operators` 中发现对应测试入口。"
+        ? "- 单元/契约测试：已在 `ClearVision.Product/tests/ClearVision.Product.Tests/Operators` 中发现对应测试入口。"
         : "- 单元/契约测试：未发现同名算子测试入口，建议补充关键路径和边界输入验证。";
 
     if (hasGolden)
@@ -1822,7 +1822,7 @@ static QualityContext BuildQualityContext(string repoRoot, string docsRoot)
 
 static (Dictionary<string, string> SourcePathByTypeName, Dictionary<string, string> SourceTextByTypeName) BuildOperatorSourceIndex(string repoRoot)
 {
-    var operatorsRoot = Path.Combine(repoRoot, "Acme.Product", "src", "Acme.Product.Infrastructure", "Operators");
+    var operatorsRoot = Path.Combine(repoRoot, "ClearVision.Product", "src", "ClearVision.Product.Infrastructure", "Operators");
     var pathByType = new Dictionary<string, string>(StringComparer.Ordinal);
     var textByType = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -1856,7 +1856,7 @@ static (Dictionary<string, string> SourcePathByTypeName, Dictionary<string, stri
 
 static HashSet<string> BuildOperatorTestIndex(string repoRoot)
 {
-    var testsRoot = Path.Combine(repoRoot, "Acme.Product", "tests", "Acme.Product.Tests", "Operators");
+    var testsRoot = Path.Combine(repoRoot, "ClearVision.Product", "tests", "ClearVision.Product.Tests", "Operators");
     var index = new HashSet<string>(StringComparer.Ordinal);
 
     if (!Directory.Exists(testsRoot))

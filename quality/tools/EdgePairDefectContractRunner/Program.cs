@@ -2,10 +2,10 @@ using System.Collections;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
-using Acme.Product.Core.Entities;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.ValueObjects;
-using Acme.Product.Infrastructure.Operators;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ValueObjects;
+using ClearVision.Product.Infrastructure.Operators;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenCvSharp;
 
@@ -518,7 +518,7 @@ internal static class ContractRunner
         }
     }
 
-    private static async Task<Acme.Product.Core.Operators.OperatorExecutionOutput> ExecuteAsync(
+    private static async Task<ClearVision.Product.Core.Operators.OperatorExecutionOutput> ExecuteAsync(
         Operator op,
         ImageWrapper image,
         object? line1 = null,
@@ -572,7 +572,7 @@ internal static class ContractRunner
     }
 
     private static void AssertSuccess(
-        Acme.Product.Core.Operators.OperatorExecutionOutput result,
+        ClearVision.Product.Core.Operators.OperatorExecutionOutput result,
         int expectedDefects,
         double expectedMaxDeviation,
         int expectedDeviationCount,
@@ -584,13 +584,13 @@ internal static class ContractRunner
         Require(DeviationArray(result).Length == expectedDeviationCount, $"Expected {expectedDeviationCount} deviations.");
     }
 
-    private static void RequireSuccess(Acme.Product.Core.Operators.OperatorExecutionOutput result)
+    private static void RequireSuccess(ClearVision.Product.Core.Operators.OperatorExecutionOutput result)
     {
         Require(result.IsSuccess, result.ErrorMessage ?? "Expected operator execution success.");
         Require(result.OutputData is not null, "Expected output data.");
     }
 
-    private static double[] DeviationArray(Acme.Product.Core.Operators.OperatorExecutionOutput result)
+    private static double[] DeviationArray(ClearVision.Product.Core.Operators.OperatorExecutionOutput result)
     {
         var raw = GetOutput<object>(result.OutputData!, "Deviations");
         if (raw is IEnumerable<double> typed)
@@ -606,7 +606,7 @@ internal static class ContractRunner
         throw new InvalidOperationException($"Unexpected Deviations type: {raw.GetType().Name}.");
     }
 
-    private static void RequireAllDeviations(Acme.Product.Core.Operators.OperatorExecutionOutput result, double expected)
+    private static void RequireAllDeviations(ClearVision.Product.Core.Operators.OperatorExecutionOutput result, double expected)
     {
         foreach (var deviation in DeviationArray(result))
         {
@@ -670,7 +670,7 @@ internal static class ContractRunner
         }
     }
 
-    private static string? ValidationErrors(Acme.Product.Core.Operators.ValidationResult validation)
+    private static string? ValidationErrors(ClearVision.Product.Core.Operators.ValidationResult validation)
     {
         return validation.Errors.Count == 0 ? null : string.Join("; ", validation.Errors);
     }

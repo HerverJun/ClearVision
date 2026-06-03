@@ -236,7 +236,7 @@ if not exist "%ProgramFiles(x86)%\Microsoft\EdgeWebView\Application" (
 )
 
 set "PATH=%~dp0HikvisionRuntime;%~dp0HikvisionRuntime\ThirdParty;%PATH%"
-start "" "%~dp0Acme.Product.Desktop.exe"
+start "" "%~dp0ClearVision.Product.Desktop.exe"
 '@
 
     Set-Content -LiteralPath $TargetPath -Value $content -Encoding ASCII
@@ -352,15 +352,15 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repoRoot ".tmp\publish-check\portable-deployment"
 }
 
-$desktopProject = Join-Path $repoRoot "Acme.Product\src\Acme.Product.Desktop\Acme.Product.Desktop.csproj"
+$desktopProject = Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\ClearVision.Product.Desktop.csproj"
 $runtimeStateDir = Resolve-FirstExistingPath @(
-    (Join-Path $repoRoot "Acme.Product\src\Acme.Product.Desktop\bin\Debug\net8.0-windows\win-x64"),
+    (Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64"),
     (Join-Path $repoRoot ".tmp\single-desktop-out")
 )
 $localDbSource = Resolve-FirstExistingPath @(
     (Join-Path $env:LOCALAPPDATA "ClearVision\vision.db"),
     (Join-Path $repoRoot "vision.db"),
-    (Join-Path $repoRoot "Acme.Product\src\Acme.Product.Desktop\vision.db")
+    (Join-Path $repoRoot "ClearVision.Product\src\ClearVision.Product.Desktop\vision.db")
 )
 $scenarioPackageSource = $null
 $scenarioPackageDirectory = Get-ChildItem -Path $repoRoot -Directory -ErrorAction SilentlyContinue |

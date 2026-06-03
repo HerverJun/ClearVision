@@ -1,0 +1,103 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <RootNamespace>ClearVision.Product.Infrastructure</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <HuaraySdkPath>$(MSBuildThisFileDirectory)..\..\lib\HuaraySDK\x64\</HuaraySdkPath>
+    <EnableHuaraySdk Condition="'$(EnableHuaraySdk)' == '' and Exists('$(HuaraySdkPath)MVSDK_Net.dll')">true</EnableHuaraySdk>
+    <EnableHuaraySdk Condition="'$(EnableHuaraySdk)' == ''">false</EnableHuaraySdk>
+    <DefineConstants Condition="'$(EnableHuaraySdk)' == 'true'">$(DefineConstants);HUARAY_SDK</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Database -->
+    <PackageReference Include="CsvHelper" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="NModbus" />
+    
+    <!-- Image processing -->
+    <PackageReference Include="OpenCvSharp4" />
+    <!-- P3-O3.1 GPU acceleration: choose runtime package by target platform. -->
+    <!-- CPU runtime (default): OpenCvSharp4.runtime.win -->
+    <!-- GPU runtime (requires NVIDIA GPU + CUDA): OpenCvSharp4.runtime.win_gpu -->
+    <PackageReference Include="OpenCvSharp4.runtime.win" />
+    <PackageReference Include="PaddleOCRSharp" />
+    <!-- <PackageReference Include="OpenCvSharp4.runtime.win_gpu" /> -->
+    
+    <!-- Barcode recognition -->
+    <PackageReference Include="ZXing.Net" />
+    
+    <!-- Modbus communication -->
+    <PackageReference Include="System.IO.Ports" />
+    
+    <!-- Password hashing -->
+    <PackageReference Include="BCrypt.Net-Next" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    
+    <!-- SQLite / SQL Server / MySQL -->
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="MySqlConnector" />
+    
+    <!-- ONNX Runtime -->
+    <!-- P3-O3.1 GPU acceleration: CPU package (default). -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" />
+    <!-- P3-O3.1 GPU acceleration: replace the CPU package when enabling GPU runtime. -->
+    <!-- CUDA support: Microsoft.ML.OnnxRuntime.Gpu -->
+    <!-- TensorRT support: Microsoft.ML.OnnxRuntime.TensorRT -->
+    <!-- DirectML support: Microsoft.ML.OnnxRuntime.DirectML -->
+    
+    <!-- File processing -->
+    <PackageReference Include="System.Drawing.Common" />
+    
+    <!-- Logging -->
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Logging" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Exceptions" />
+    
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClearVision.Product.Core\ClearVision.Product.Core.csproj" />
+    <ProjectReference Include="..\ClearVision.Product.Application\ClearVision.Product.Application.csproj" />
+    <ProjectReference Include="..\ClearVision.Product.Contracts\ClearVision.Product.Contracts.csproj" />
+    <ProjectReference Include="..\ClearVision.PlcComm\ClearVision.PlcComm.csproj" />
+  </ItemGroup>
+
+  <!-- Huaray camera SDK -->
+  <ItemGroup Condition="'$(EnableHuaraySdk)' == 'true'">
+    <Reference Include="MVSDK_Net">
+      <HintPath>..\..\lib\HuaraySDK\x64\MVSDK_Net.dll</HintPath>
+      <Private>true</Private>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Huaray SDK native runtime dependencies: use Content + CopyToPublishDirectory
+       so dotnet publish copies them alongside the single-file exe.
+       ExcludeFromSingleFile keeps them as loose files instead of embedding. -->
+  <ItemGroup Condition="'$(EnableHuaraySdk)' == 'true'">
+    <Content Include="..\..\lib\HuaraySDK\x64\**\*.*"
+             Exclude="..\..\lib\HuaraySDK\x64\MVSDK_Net.dll;..\..\lib\HuaraySDK\x64\MVSDK_Net.XML">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+</Project>
