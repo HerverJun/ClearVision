@@ -545,7 +545,7 @@ this.canvas.handleMouseDown = (e) => {
 - [ ] 撤销功能可恢复断开的连接（2026-03-07 复核：交互层 `undo()` 与脚本派发按键可恢复，但真实浏览器 `Ctrl+Z` 自动化证据仍未稳定）
 - [x] 保存/加载工程正常（已验证断开后的状态可正确保存并重新加载）
 - [ ] 不影响其他画布功能（拖拽、缩放、框选等）（2026-03-07 复核：官方 UI smoke `4/4` 通过；框选证据仍缺，暂不归档）
-- [x] 代码通过现有测试（2026-03-07 在 `Acme.Product/tests/Acme.Product.UI.Tests` 运行 Playwright smoke，`editor.spec.ts` + `project.spec.ts` 共 `4/4` 通过）
+- [x] 代码通过现有测试（2026-03-07 在 `ClearVision.Product/tests/ClearVision.Product.UI.Tests` 运行 Playwright smoke，`editor.spec.ts` + `project.spec.ts` 共 `4/4` 通过）
 
 ---
 

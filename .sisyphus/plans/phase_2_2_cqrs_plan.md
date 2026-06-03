@@ -10,8 +10,8 @@ Migrate Inspection execution and history logic to CQRS handlers.
 ## Execution Steps
 
 ### Step 1: Create Directory Structure
-- `Acme.Product.Application/Commands/Inspections`
-- `Acme.Product.Application/Queries/Inspections`
+- `ClearVision.Product.Application/Commands/Inspections`
+- `ClearVision.Product.Application/Queries/Inspections`
 
 ### Step 2: Implement Execute Inspection
 - **Command**: `ExecuteInspectionCommand` (IRequest<InspectionResultDto>)

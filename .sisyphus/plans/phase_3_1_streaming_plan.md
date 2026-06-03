@@ -10,7 +10,7 @@ Implement high-performance, zero-copy image streaming from the C# backend to the
 ## Execution Steps
 
 ### Step 1: Update WebView2Host (Backend)
-- **File**: `Acme.Product.Desktop/WebView2Host.cs`
+- **File**: `ClearVision.Product.Desktop/WebView2Host.cs`
 - **Logic**:
   1.  Create `CoreWebView2SharedBuffer` using `Environment.CreateSharedBuffer`.
   2.  Copy `Mat.Data` (OpenCvSharp) to the shared buffer stream.

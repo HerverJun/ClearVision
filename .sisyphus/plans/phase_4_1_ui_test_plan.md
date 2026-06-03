@@ -10,7 +10,7 @@ Establish an End-to-End (E2E) testing suite using Playwright to verify the criti
 ## Execution Steps
 
 ### Step 1: Initialize Playwright Project
-- **Command**: `npm init playwright@latest` (in `Acme.Product/tests/Acme.Product.UI.Tests`)
+- **Command**: `npm init playwright@latest` (in `ClearVision.Product/tests/ClearVision.Product.UI.Tests`)
 - **Config**: Configure for Chromium (WebView2 engine) and set base URL.
 
 ### Step 2: Create Test Project Structure

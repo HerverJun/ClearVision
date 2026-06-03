@@ -61,7 +61,7 @@ const toggleHandler = (e) => {
 - [x] 展开/收起状态正确更新
 
 **Location**: 
-File: `Acme.Product/src/Acme.Product.Desktop/wwwroot/src/features/operator-library/operatorLibrary.js`
+File: `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/operator-library/operatorLibrary.js`
 Line: 180-182 (在 renderNode 方法中)
 
 **Commit**: YES

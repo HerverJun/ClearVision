@@ -10,8 +10,8 @@ Migrate Project management logic from `ProjectService` to MediatR Command/Query 
 ## Execution Steps
 
 ### Step 1: Create Directory Structure
-- `Acme.Product.Application/Commands/Projects`
-- `Acme.Product.Application/Queries/Projects`
+- `ClearVision.Product.Application/Commands/Projects`
+- `ClearVision.Product.Application/Queries/Projects`
 
 ### Step 2: Implement Create Project
 - **Command**: `CreateProjectCommand` (IRequest<Guid>)

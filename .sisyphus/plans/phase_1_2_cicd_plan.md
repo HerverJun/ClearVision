@@ -46,16 +46,16 @@ Establish a robust Continuous Integration (CI) pipeline using GitHub Actions to 
           dotnet-version: 8.0.x
 
       - name: Restore Dependencies
-        run: dotnet restore Acme.Product.sln
+        run: dotnet restore ClearVision.Product.sln
 
       - name: Build (Debug)
-        run: dotnet build Acme.Product.sln --configuration Debug --no-restore
+        run: dotnet build ClearVision.Product.sln --configuration Debug --no-restore
 
       - name: Test
-        run: dotnet test Acme.Product.sln --configuration Debug --no-build --verbosity normal
+        run: dotnet test ClearVision.Product.sln --configuration Debug --no-build --verbosity normal
 
       - name: Publish (Release)
-        run: dotnet publish Acme.Product/src/Acme.Product.Desktop/Acme.Product.Desktop.csproj -c Release -r win-x64 --self-contained true -o ./publish
+        run: dotnet publish ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj -c Release -r win-x64 --self-contained true -o ./publish
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -67,9 +67,9 @@ Establish a robust Continuous Integration (CI) pipeline using GitHub Actions to 
 ### Step 3: Verify Locally (Dry Run)
 - Since we cannot run GitHub Actions locally without specific tools (like `act`), we will rely on the `dotnet` commands being valid.
 - **Verification**: Run the individual `dotnet` commands locally to ensure they pass before pushing.
-  - `dotnet restore Acme.Product.sln`
-  - `dotnet build Acme.Product.sln`
-  - `dotnet test Acme.Product.sln`
+  - `dotnet restore ClearVision.Product.sln`
+  - `dotnet build ClearVision.Product.sln`
+  - `dotnet test ClearVision.Product.sln`
   - `dotnet publish ...`
 
 ## Outcome

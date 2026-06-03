@@ -16,11 +16,11 @@ icon = "tool"
 command = '''
 $env:ASPNETCORE_ENVIRONMENT = "Development"
 
-dotnet build ".\Acme.Product\src\Acme.Product.Desktop\Acme.Product.Desktop.csproj" /property:GenerateFullPaths=true "/consoleloggerparameters:NoSummary;ForceNoAlign"
+dotnet build ".\ClearVision.Product\src\ClearVision.Product.Desktop\ClearVision.Product.Desktop.csproj" /property:GenerateFullPaths=true "/consoleloggerparameters:NoSummary;ForceNoAlign"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Push-Location ".\Acme.Product\src\Acme.Product.Desktop\bin\Debug\net8.0-windows\win-x64"
-dotnet ".\Acme.Product.Desktop.dll"
+Push-Location ".\ClearVision.Product\src\ClearVision.Product.Desktop\bin\Debug\net8.0-windows\win-x64"
+dotnet ".\ClearVision.Product.Desktop.dll"
 $exitCode = $LASTEXITCODE
 Pop-Location
 exit $exitCode

@@ -10,7 +10,7 @@ Implement functionality to save/load projects from disk (JSON format) and export
 ## Execution Steps
 
 ### Step 1: Add Dependencies
-- **Project**: `Acme.Product.Infrastructure`
+- **Project**: `ClearVision.Product.Infrastructure`
 - **Package**: `CsvHelper` (latest version)
 
 ### Step 2: Implement Project Serialization

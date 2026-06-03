@@ -1,12 +1,12 @@
 ﻿// AiFlowValidator.cs
-// AI 娴佺▼鏍￠獙鍣?// 瀵?AI 鐢熸垚娴佺▼杩涜缁撴瀯涓庤鍒欐牎楠?// 浣滆€咃細铇呰姕鍚?using Acme.Product.Core.DTOs;
-using Acme.Product.Core.Enums;
-using Acme.Product.Core.Services;
+// AI 娴佺▼鏍￠獙鍣?// 瀵?AI 鐢熸垚娴佺▼杩涜缁撴瀯涓庤鍒欐牎楠?// 浣滆€咃細铇呰姕鍚?using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Services;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace Acme.Product.Infrastructure.AI;
+namespace ClearVision.Product.Infrastructure.AI;
 
 /// <summary>
 /// 鏍￠獙 AI 鐢熸垚鐨勫伐浣滄祦鏄惁婊¤冻鎵€鏈夌害鏉?

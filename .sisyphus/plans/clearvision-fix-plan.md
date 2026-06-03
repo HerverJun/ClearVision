@@ -55,7 +55,7 @@
 ## Tasks
 
 ### Task 1: Create TaskExtensions.cs
-**Description**: Create a new file `Acme.Product/src/Acme.Product.Core/Extensions/TaskExtensions.cs` to handle safe fire-and-forget execution for async void scenarios.
+**Description**: Create a new file `ClearVision.Product/src/ClearVision.Product.Core/Extensions/TaskExtensions.cs` to handle safe fire-and-forget execution for async void scenarios.
 **Delegation Recommendation**:
 - Category: `unspecified-low` - Standard utility implementation.
 - Skills: [`typescript-programmer`] - *Correction: Using general coding capability as specific C# skill is not listed, but this is simple.*
@@ -69,7 +69,7 @@
 - [x] Exception handling logs error if `ILogger` provided.
 
 ### Task 2: Fix WebMessageHandler Async Void
-**Description**: Modify `Acme.Product/src/Acme.Product.Desktop/Handlers/WebMessageHandler.cs` line 40. Change `async void OnWebMessageReceived` to `void` and use `Task.Run(...).SafeFireAndForget()`.
+**Description**: Modify `ClearVision.Product/src/ClearVision.Product.Desktop/Handlers/WebMessageHandler.cs` line 40. Change `async void OnWebMessageReceived` to `void` and use `Task.Run(...).SafeFireAndForget()`.
 **Delegation Recommendation**:
 - Category: `unspecified-high` - High risk of crashing process if done wrong.
 - Skills: [`dev-browser`] - Context of WebView handling.
@@ -99,7 +99,7 @@
 - [x] `cancelAnimationFrame` called for animation loops.
 
 ### Task 4: Implement OperatorService CRUD
-**Description**: Implement `UpdateAsync` (line 322) and `DeleteAsync` (line 327) in `Acme.Product/src/Acme.Product.Application/Services/OperatorService.cs`.
+**Description**: Implement `UpdateAsync` (line 322) and `DeleteAsync` (line 327) in `ClearVision.Product/src/ClearVision.Product.Application/Services/OperatorService.cs`.
 **Delegation Recommendation**:
 - Category: `unspecified-high` - Business logic implementation.
 - Skills: [`typescript-programmer`] - Proxy for typed language logic.

@@ -45,7 +45,7 @@
 Complete all missing `TODO.md` items to reach "Feature Complete" (Beta) status.
 
 ### Concrete Deliverables
-- [ ] `Acme.Product.Application` populated with 10+ Command/Query Handlers.
+- [ ] `ClearVision.Product.Application` populated with 10+ Command/Query Handlers.
 - [ ] `webMessageBridge.js` upgraded to handle binary image streams.
 - [ ] `scripts/generate-types.sh` for DTO sync.
 - [ ] `Playwright` test suite for UI verification.
