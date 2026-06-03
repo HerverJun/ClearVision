@@ -15,6 +15,8 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.DryRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
+using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Core.AI.Tools;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
@@ -39,6 +41,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly DryRunService _dryRunService;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly IPromptVersionManager _promptVersionManager;
+    private readonly VisionAgentLoop _visionAgentLoop;
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -66,6 +69,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         DryRunService dryRunService,
         IHostEnvironment hostEnvironment,
         IPromptVersionManager promptVersionManager,
+        VisionAgentLoop visionAgentLoop,
         Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
     {
         _aiOrchestrator = aiOrchestrator;
@@ -83,6 +87,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _dryRunService = dryRunService;
         _hostEnvironment = hostEnvironment;
         _promptVersionManager = promptVersionManager;
+        _visionAgentLoop = visionAgentLoop;
         _logger = logger;
     }
 
@@ -315,6 +320,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         List<AiAttemptDiagnostic> lastAttemptDiagnostics = new();
         string? lastRawResponse = null;
         int retryCount = 0;
+        List<VisionAgentToolTrace>? toolTrace = null;
 
         for (int attempt = 0; attempt <= options.MaxRetries; attempt++)
         {
@@ -332,14 +338,56 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 // 调用 API（使用流式接口）
                 var llmStopwatch = Stopwatch.StartNew();
                 AiCompletionResult completionResult;
+                toolTrace = null;
                 try
                 {
-                    completionResult = await _aiOrchestrator.StreamCompleteAsync(
-                        systemPrompt,
-                        messages,
-                        chunk => onStreamChunk?.Invoke(chunk),
-                        activeModel,
-                        cancellationToken);
+                    if (options.EnableVisionAgentTools)
+                    {
+                        var loopResult = await _visionAgentLoop.RunAsync(
+                            systemPrompt,
+                            messages,
+                            conversationContext.SessionId,
+                            conversationContext.ExistingFlowJson,
+                            request.TargetStationId,
+                            options,
+                            activeModel,
+                            onStreamChunk,
+                            cancellationToken);
+
+                        toolTrace = loopResult.ToolTrace;
+
+                        if (!loopResult.Success)
+                        {
+                            pipeline.AddStage("llm_agent_loop", "failed", loopResult.ErrorMessage, llmStopwatch.Elapsed);
+                            return new AiFlowGenerationResult
+                            {
+                                Success = false,
+                                CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+                                FailureType = AiFlowGenerationResult.FailureTypeManualRetryRequired,
+                                ErrorMessage = loopResult.ErrorMessage,
+                                PromptTrace = promptTrace,
+                                ToolTrace = toolTrace
+                            };
+                        }
+
+                        generatedFlow = loopResult.Flow;
+                        completionResult = new AiCompletionResult
+                        {
+                            Content = JsonSerializer.Serialize(generatedFlow, _jsonOptions),
+                            Reasoning = loopResult.Reasoning
+                        };
+
+                        pipeline.AddStage("llm_agent_loop", "completed", $"rounds={loopResult.RetryCount}", llmStopwatch.Elapsed);
+                    }
+                    else
+                    {
+                        completionResult = await _aiOrchestrator.StreamCompleteAsync(
+                            systemPrompt,
+                            messages,
+                            chunk => onStreamChunk?.Invoke(chunk),
+                            activeModel,
+                            cancellationToken);
+                    }
                 }
                 catch (Exception llmEx)
                 {
@@ -455,13 +503,25 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 // 推送：解析结果
                 ReportProgress("收到 AI 响应，正在解析 JSON 数据...");
                 // 解析 AI 输出的 JSON
-                var parseResult = pipeline.Measure(
-                    "parse",
-                    () => _responseParser.Parse(rawResponse ?? string.Empty),
-                    result => result.Success
-                        ? $"operators={result.Flow!.Operators?.Count ?? 0}, connections={result.Flow.Connections?.Count ?? 0}, candidates={result.CandidateCount}"
-                        : $"parse failed: {result.Code}, candidates={result.CandidateCount}");
-                generatedFlow = parseResult.Flow;
+                AiFlowParseResult parseResult;
+                if (options.EnableVisionAgentTools)
+                {
+                    parseResult = new AiFlowParseResult
+                    {
+                        Flow = generatedFlow,
+                        CandidateCount = 1
+                    };
+                }
+                else
+                {
+                    parseResult = pipeline.Measure(
+                        "parse",
+                        () => _responseParser.Parse(rawResponse ?? string.Empty),
+                        result => result.Success
+                            ? $"operators={result.Flow!.Operators?.Count ?? 0}, connections={result.Flow.Connections?.Count ?? 0}, candidates={result.CandidateCount}"
+                            : $"parse failed: {result.Code}, candidates={result.CandidateCount}");
+                    generatedFlow = parseResult.Flow;
+                }
                 if (generatedFlow == null)
                 {
                     lastValidation = BuildParseValidationResult(parseResult);
@@ -495,7 +555,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         templatePriority.GenerationMode,
                         templatePriority.TemplateLockLevel,
                         BuildTemplateCandidates(templatePriority),
-                        pipeline.Timeline.ToList());
+                        pipeline.Timeline.ToList(),
+                        toolTrace);
                 }
 
                 ApplyTemplateMetadata(generatedFlow, templatePriority);
@@ -624,7 +685,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
                         RouterConfidence = turnRoute.Confidence,
                         BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-                        NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+                        NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
+                        ToolTrace = toolTrace
                     };
                 }
 
@@ -725,7 +787,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     InteractionState = AiInteractionStates.Failed,
                     RouterConfidence = turnRoute.Confidence,
                     BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-                    NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+                    NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
+                    ToolTrace = toolTrace
                 };
             }
             catch (Exception ex)
@@ -802,7 +865,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     InteractionState = AiInteractionStates.Failed,
                     RouterConfidence = turnRoute.Confidence,
                     BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-                    NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+                    NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
+                    ToolTrace = toolTrace
                 };
             }
         }
@@ -847,7 +911,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             InteractionState = AiInteractionStates.Failed,
             RouterConfidence = turnRoute.Confidence,
             BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
+            ToolTrace = toolTrace
         };
     }
 
@@ -3256,7 +3321,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         string generationMode,
         string templateLockLevel,
         List<AiTemplateCandidateInfo> templateCandidates,
-        IReadOnlyList<AiGenerationStageDiagnostic> stageTimeline)
+        IReadOnlyList<AiGenerationStageDiagnostic> stageTimeline,
+        List<VisionAgentToolTrace>? toolTrace = null)
     {
         var failureSummary = BuildFailureSummary(
             validation,
@@ -3311,7 +3377,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             InteractionState = AiInteractionStates.ManualRetry,
             RouterConfidence = turnRoute.Confidence,
             BlockingClarificationFields = requirementBrief?.BlockingClarificationFields.ToList() ?? new List<string>(),
-            NonBlockingMissingFields = requirementBrief?.NonBlockingMissingFields.ToList() ?? new List<string>()
+            NonBlockingMissingFields = requirementBrief?.NonBlockingMissingFields.ToList() ?? new List<string>(),
+            ToolTrace = toolTrace
         };
     }
 

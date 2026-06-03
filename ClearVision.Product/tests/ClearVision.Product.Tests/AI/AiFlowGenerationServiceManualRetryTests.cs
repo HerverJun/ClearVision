@@ -1685,6 +1685,13 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             Content = "test prompt"
         }));
 
+        var scopeFactory = Substitute.For<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>();
+        var visionAgentLoop = new ClearVision.Product.Infrastructure.AI.Agent.VisionAgentLoop(
+            scopeFactory,
+            new AiGenerationOrchestrator(modelSelector, connectorFactory),
+            new ClearVision.Product.Infrastructure.AI.Agent.VisionAgentProtocolParser(),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<ClearVision.Product.Infrastructure.AI.Agent.VisionAgentLoop>>());
+
         return new AiFlowGenerationService(
             new AiGenerationOrchestrator(modelSelector, connectorFactory),
             new PromptBuilder(operatorFactory),
@@ -1701,6 +1708,7 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             new DryRunService(flowExecutionService),
             hostEnvironment,
             promptVersionManager,
+            visionAgentLoop,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>());
     }
 

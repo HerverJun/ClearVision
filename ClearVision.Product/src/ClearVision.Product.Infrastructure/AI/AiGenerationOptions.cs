@@ -77,4 +77,18 @@ public class AiGenerationOptions
     public string ReasoningMode { get; set; } = AiReasoningModes.Auto;
 
     public string ReasoningEffort { get; set; } = AiReasoningEfforts.Medium;
+
+    public bool EnableVisionAgentTools { get; set; } = false;
+
+    public string PromptMode { get; set; } = "hybrid";
+
+    public int MaxToolRoundsDefault { get; set; } = 3;
+
+    public int MaxToolRoundsHardLimit { get; set; } = 5;
+
+    public int MaxToolCallsPerRound { get; set; } = 5;
+
+    public int MaxToolResultChars { get; set; } = 12000;
+
+    public bool EnableParallelReadOnlyToolCalls { get; set; } = true;
 }

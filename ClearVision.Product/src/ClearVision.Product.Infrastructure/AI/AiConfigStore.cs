@@ -418,7 +418,14 @@ public class AiConfigStore
             Priority = 100,
             Capabilities = AiModelCapabilities.Infer(fallback.Provider, fallback.Model),
             Reasoning = new AiReasoningSettings(),
-            IsActive = true
+            IsActive = true,
+            EnableVisionAgentTools = fallback.EnableVisionAgentTools,
+            PromptMode = fallback.PromptMode,
+            MaxToolRoundsDefault = fallback.MaxToolRoundsDefault,
+            MaxToolRoundsHardLimit = fallback.MaxToolRoundsHardLimit,
+            MaxToolCallsPerRound = fallback.MaxToolCallsPerRound,
+            MaxToolResultChars = fallback.MaxToolResultChars,
+            EnableParallelReadOnlyToolCalls = fallback.EnableParallelReadOnlyToolCalls
         };
         defaultModel.NormalizeAdvancedFields();
 
@@ -452,7 +459,14 @@ public class AiConfigStore
         Priority = model.Priority,
         Capabilities = model.Capabilities?.Clone(),
         Reasoning = model.Reasoning?.Clone(),
-        IsActive = model.IsActive
+        IsActive = model.IsActive,
+        EnableVisionAgentTools = model.EnableVisionAgentTools,
+        PromptMode = model.PromptMode,
+        MaxToolRoundsDefault = model.MaxToolRoundsDefault,
+        MaxToolRoundsHardLimit = model.MaxToolRoundsHardLimit,
+        MaxToolCallsPerRound = model.MaxToolCallsPerRound,
+        MaxToolResultChars = model.MaxToolResultChars,
+        EnableParallelReadOnlyToolCalls = model.EnableParallelReadOnlyToolCalls
     };
 
     private static void ApplyUpdatedValues(AiModelConfig candidate, AiModelConfig updated)
@@ -471,6 +485,13 @@ public class AiConfigStore
         candidate.AuthHeaderName = updated.AuthHeaderName ??
             (providerChanged || updated.Protocol != null || updated.AuthMode != null ? null : candidate.AuthHeaderName);
         candidate.Priority = updated.Priority ?? candidate.Priority;
+        candidate.EnableVisionAgentTools = updated.EnableVisionAgentTools;
+        candidate.PromptMode = updated.PromptMode ?? candidate.PromptMode;
+        candidate.MaxToolRoundsDefault = updated.MaxToolRoundsDefault > 0 ? updated.MaxToolRoundsDefault : candidate.MaxToolRoundsDefault;
+        candidate.MaxToolRoundsHardLimit = updated.MaxToolRoundsHardLimit > 0 ? updated.MaxToolRoundsHardLimit : candidate.MaxToolRoundsHardLimit;
+        candidate.MaxToolCallsPerRound = updated.MaxToolCallsPerRound > 0 ? updated.MaxToolCallsPerRound : candidate.MaxToolCallsPerRound;
+        candidate.MaxToolResultChars = updated.MaxToolResultChars > 0 ? updated.MaxToolResultChars : candidate.MaxToolResultChars;
+        candidate.EnableParallelReadOnlyToolCalls = updated.EnableParallelReadOnlyToolCalls;
 
         if (updated.ExtraHeaders != null)
             candidate.ExtraHeaders = CloneStringDictionary(updated.ExtraHeaders);
@@ -541,6 +562,13 @@ public class AiConfigStore
         ExtraBody = CloneJsonDictionary(options.ExtraBody),
         Capabilities = options.Capabilities?.Clone(),
         ReasoningMode = options.ReasoningMode,
-        ReasoningEffort = options.ReasoningEffort
+        ReasoningEffort = options.ReasoningEffort,
+        EnableVisionAgentTools = options.EnableVisionAgentTools,
+        PromptMode = options.PromptMode,
+        MaxToolRoundsDefault = options.MaxToolRoundsDefault,
+        MaxToolRoundsHardLimit = options.MaxToolRoundsHardLimit,
+        MaxToolCallsPerRound = options.MaxToolCallsPerRound,
+        MaxToolResultChars = options.MaxToolResultChars,
+        EnableParallelReadOnlyToolCalls = options.EnableParallelReadOnlyToolCalls
     };
 }

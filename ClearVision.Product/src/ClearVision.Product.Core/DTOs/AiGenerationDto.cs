@@ -17,7 +17,8 @@ public record AiFlowGenerationRequest(
     IReadOnlyList<string>? Attachments = null,
     GenerateFlowMode Mode = GenerateFlowMode.Auto,
     bool DebugPrompt = false,
-    AiTemplateSelectionInfo? TemplateSelection = null
+    AiTemplateSelectionInfo? TemplateSelection = null,
+    string? TargetStationId = null
 )
 {
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
@@ -145,6 +146,11 @@ public class AiFlowGenerationResult
     /// 沙盒空跑验证的结果（覆盖率等信息）
     /// </summary>
     public object? DryRunResult { get; set; }
+
+    /// <summary>
+    /// 工具执行的 Trace 记录
+    /// </summary>
+    public List<ClearVision.Product.Core.AI.Tools.VisionAgentToolTrace>? ToolTrace { get; set; }
 
     /// <summary>
     /// 模板优先命中时的推荐模板信息

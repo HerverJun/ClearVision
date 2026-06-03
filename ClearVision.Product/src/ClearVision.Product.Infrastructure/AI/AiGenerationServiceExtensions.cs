@@ -3,6 +3,9 @@
 // 提供 AI 相关服务的依赖注入扩展方法
 // 作者：蘅芜君
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Infrastructure.AI.Tools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -47,6 +50,31 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<AutoLayoutService>();
         services.AddScoped<IAiFlowGenerationService, AiFlowGenerationService>();
         services.AddScoped<GenerateFlowMessageHandler>();
+
+        // Vision Agent Tools & Engine
+        services.AddSingleton<VisionAgentProtocolParser>();
+        services.AddScoped<VisionAgentLoop>();
+
+        // Register IVisionAgentTool implementations
+        services.AddScoped<IVisionAgentTool, OperatorCatalogTool>();
+        services.AddScoped<IVisionAgentTool, OperatorSchemaTool>();
+        services.AddScoped<IVisionAgentTool, OperatorKnowledgeTool>();
+        services.AddScoped<IVisionAgentTool, FlowTemplateMatchTool>();
+        services.AddScoped<IVisionAgentTool, FlowTemplateSkeletonTool>();
+        services.AddScoped<IVisionAgentTool, CurrentFlowInspectTool>();
+        services.AddScoped<IVisionAgentTool, FlowValidationTool>();
+        services.AddScoped<IVisionAgentTool, DryRunFlowTool>();
+        services.AddScoped<IVisionAgentTool, ReplayFlowWithFrameTool>();
+        services.AddScoped<IVisionAgentTool, CameraBindingsTool>();
+        services.AddScoped<IVisionAgentTool, CameraDiscoveryTool>();
+        services.AddScoped<IVisionAgentTool, CameraTestFrameTool>();
+        services.AddScoped<IVisionAgentTool, CameraBindingDraftTool>();
+        services.AddScoped<IVisionAgentTool, StationStatusTool>();
+        services.AddScoped<IVisionAgentTool, RuntimePackagePrecheckTool>();
+        services.AddScoped<IVisionAgentTool, RuntimePackageManifestDraftTool>();
+
+        // Register registry
+        services.AddScoped<IVisionAgentToolRegistry, VisionAgentToolRegistry>();
 
         // Stage A: unified AI runtime pipeline
         services.AddScoped<IAiModelRegistry, AiModelRegistry>();

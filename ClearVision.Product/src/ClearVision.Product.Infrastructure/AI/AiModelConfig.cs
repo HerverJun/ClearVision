@@ -80,6 +80,20 @@ public class AiModelConfig
     /// <summary>Priority used by fallback ordering. Smaller number = higher priority.</summary>
     public int? Priority { get; set; }
 
+    public bool EnableVisionAgentTools { get; set; } = false;
+
+    public string PromptMode { get; set; } = "hybrid";
+
+    public int MaxToolRoundsDefault { get; set; } = 3;
+
+    public int MaxToolRoundsHardLimit { get; set; } = 5;
+
+    public int MaxToolCallsPerRound { get; set; } = 5;
+
+    public int MaxToolResultChars { get; set; } = 12000;
+
+    public bool EnableParallelReadOnlyToolCalls { get; set; } = true;
+
     public AiModelCapabilities GetEffectiveCapabilities()
     {
         return (Capabilities?.Clone() ?? AiModelCapabilities.Infer(Provider, Model)).Normalize();
@@ -111,6 +125,17 @@ public class AiModelConfig
         var reasoningSupport = GetReasoningSupport();
         Reasoning.Mode = reasoningSupport.NormalizeMode(Reasoning.Mode);
         Reasoning.Effort = reasoningSupport.NormalizeEffort(Reasoning.Effort);
+
+        if (string.IsNullOrWhiteSpace(PromptMode))
+            PromptMode = "hybrid";
+        if (MaxToolRoundsDefault <= 0)
+            MaxToolRoundsDefault = 3;
+        if (MaxToolRoundsHardLimit <= 0)
+            MaxToolRoundsHardLimit = 5;
+        if (MaxToolCallsPerRound <= 0)
+            MaxToolCallsPerRound = 5;
+        if (MaxToolResultChars <= 0)
+            MaxToolResultChars = 12000;
     }
 
     public void ValidateReasoningConfiguration()
@@ -310,7 +335,14 @@ public class AiModelConfig
             TimeoutSeconds = TimeoutMs / 1000,
             MaxRetries = 2,
             MaxTokens = 4096,
-            Temperature = 0.7
+            Temperature = 0.7,
+            EnableVisionAgentTools = EnableVisionAgentTools,
+            PromptMode = PromptMode,
+            MaxToolRoundsDefault = MaxToolRoundsDefault,
+            MaxToolRoundsHardLimit = MaxToolRoundsHardLimit,
+            MaxToolCallsPerRound = MaxToolCallsPerRound,
+            MaxToolResultChars = MaxToolResultChars,
+            EnableParallelReadOnlyToolCalls = EnableParallelReadOnlyToolCalls
         };
     }
 

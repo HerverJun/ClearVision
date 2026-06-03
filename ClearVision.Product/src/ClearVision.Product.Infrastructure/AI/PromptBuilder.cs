@@ -34,8 +34,24 @@ public class PromptBuilder
     /// <summary>
     /// Builds the full system prompt.
     /// </summary>
-    public string BuildSystemPrompt(string? userDescription = null, bool supportsJsonMode = true)
+    public string BuildSystemPrompt(string? userDescription = null, bool supportsJsonMode = true, string promptMode = "legacy_full_prompt")
     {
+        if (string.Equals(promptMode, "agent_tools", StringComparison.OrdinalIgnoreCase))
+        {
+            return new AgentPromptBuilder().BuildSystemPrompt(supportsJsonMode);
+        }
+        if (string.Equals(promptMode, "hybrid", StringComparison.OrdinalIgnoreCase))
+        {
+            var agentPrompt = new AgentPromptBuilder().BuildSystemPrompt(supportsJsonMode);
+            var sbAgent = new StringBuilder(agentPrompt);
+            sbAgent.AppendLine();
+            sbAgent.AppendLine("## Section 4 - Core Operators Catalog");
+            sbAgent.AppendLine("The following are core operators always available for inspection workflows:");
+            var coreMetadata = GetCoreOperators(_operatorFactory.GetAllMetadata());
+            sbAgent.AppendLine(SerializeOperatorCatalog(coreMetadata, includeFullDetails: false));
+            return sbAgent.ToString();
+        }
+
         var sb = new StringBuilder();
 
         AppendSection(sb, "Section 1 - Role And Hard Rules", GetRoleDefinition());

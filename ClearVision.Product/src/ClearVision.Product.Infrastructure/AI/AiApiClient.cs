@@ -1164,6 +1164,9 @@ public class AiApiClient
         var sawSsePayload = false;
         AiTokenUsage? tokenUsage = null;
 
+
+        var accumulatedToolCalls = new Dictionary<int, StreamToolCallState>();
+
         while (!reader.EndOfStream && !cts.Token.IsCancellationRequested)
         {
             var line = await reader.ReadLineAsync(cts.Token);
@@ -1188,6 +1191,49 @@ public class AiApiClient
             try
             {
                 using var doc = JsonDocument.Parse(dataStr);
+
+                // Accumulate tool calls delta
+                if (doc.RootElement.TryGetProperty("choices", out var choicesEl) &&
+                    choicesEl.ValueKind == JsonValueKind.Array &&
+                    choicesEl.GetArrayLength() > 0)
+                {
+                    var choiceEl = choicesEl[0];
+                    if (choiceEl.TryGetProperty("delta", out var deltaEl) &&
+                        deltaEl.ValueKind == JsonValueKind.Object &&
+                        deltaEl.TryGetProperty("tool_calls", out var toolCallsEl) &&
+                        toolCallsEl.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var tc in toolCallsEl.EnumerateArray())
+                        {
+                            if (tc.TryGetProperty("index", out var idxEl) && idxEl.TryGetInt32(out var idx))
+                            {
+                                if (!accumulatedToolCalls.TryGetValue(idx, out var state))
+                                {
+                                    state = new StreamToolCallState();
+                                    accumulatedToolCalls[idx] = state;
+                                }
+
+                                if (tc.TryGetProperty("id", out var idEl))
+                                {
+                                    state.Id = idEl.GetString() ?? string.Empty;
+                                }
+
+                                if (tc.TryGetProperty("function", out var fnEl) && fnEl.ValueKind == JsonValueKind.Object)
+                                {
+                                    if (fnEl.TryGetProperty("name", out var nameEl))
+                                    {
+                                        state.Name = nameEl.GetString() ?? string.Empty;
+                                    }
+                                    if (fnEl.TryGetProperty("arguments", out var argsEl))
+                                    {
+                                        state.Arguments.Append(argsEl.GetString() ?? string.Empty);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (TryExtractReasoningChunk(doc.RootElement, out var reasoningChunk) &&
                     !string.IsNullOrEmpty(reasoningChunk))
                 {
@@ -1259,6 +1305,18 @@ public class AiApiClient
                     // Keep legacy behavior if fallback request also fails: return empty content and let caller retry.
                 }
             }
+        }
+
+        if (accumulatedToolCalls.Count > 0)
+        {
+            var items = accumulatedToolCalls.OrderBy(kv => kv.Key).Select(kv => new
+            {
+                id = kv.Value.Id,
+                name = kv.Value.Name,
+                arguments = JsonSerializer.Deserialize<JsonElement>(kv.Value.Arguments.ToString())
+            }).ToList();
+            fullContent.Clear();
+            fullContent.Append(JsonSerializer.Serialize(new { kind = "tool_call", toolCalls = items }));
         }
 
         onChunk(new AiStreamChunk(AiStreamChunkType.Done, string.Empty));
@@ -2184,6 +2242,13 @@ public class AiApiClient
             new List<ChatMessage> { new ChatMessage("user", userMessage) },
             null,
             cancellationToken);
+    }
+
+    private sealed class StreamToolCallState
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public StringBuilder Arguments { get; } = new StringBuilder();
     }
 }
 
