@@ -1,6 +1,6 @@
-# ClearVision Vision Engineering Agent TODO
+# ClearVision Vision Engineering Agent TODO（最终评审加强版）
 
-> 目标：将当前 ClearVision AI 流程生成能力升级为 **Vision Engineering Agent**。
+> 目标：将当前 ClearVision AI 流程生成能力升级为 **Vision Engineering Agent**。  
 > 该 Agent 不开放系统级 CMD / PowerShell / Shell 权限，只调用 ClearVision 内部已有能力，辅助工程师完成视觉工程配置、流程生成、验证、调试和部署准备。
 
 ---
@@ -101,6 +101,21 @@ Agent 调用 dryrun_flow
 
 所有可能影响现场配置、运行包、Station 部署的动作，必须先生成草稿或预检查结果，由工程师确认后再应用。
 
+### 0.4 最终评审加强约束（Implementation Guardrails）
+
+在交给 Codex 或其他编码 Agent 执行前，必须把以下约束视为硬门禁：
+
+```text
+[ ] 实施前先读取当前 .sln、.csproj、目录结构和现有 namespace，按仓库当前真实命名创建文件；当前目标命名为 ClearVision.Product.*，不得重新创建 Acme.Product.* 路径。
+[ ] 不引入 CMD / PowerShell / shell / 任意系统命令执行能力。
+[ ] Agent Tool Loop 首选 OpenAI / Anthropic 原生 tools / tool_calls；自定义 JSON tool_call/final_flow 仅作为不支持 tools 的 fallback。
+[ ] ToolDescriptor 可缓存；ToolExecutor / ToolRegistry / Tool 实例必须使用 Scoped 或 Transient，严禁 Singleton 捕获硬件、配置、运行时等 Scoped 服务。
+[ ] 只允许 ReadOnly 工具并行；相机采图、DryRun、真实帧回放、配置草稿、部署预检查等工具默认串行。
+[ ] MaxToolRounds 默认 3，硬上限 5；超过上限必须返回 ManualRetry / FailedWithToolLimit，不得继续静默循环。
+[ ] 区分 dryrun_flow（结构/Stub 仿真）与 replay_flow_with_frame（使用 temporaryFrameId 的真实样本帧回放），不要把真实视觉效果验证偷换成空桩 DryRun。
+[ ] 前端跨 AI 面板、Settings、Station 的动作分发必须经 agentActionBridge.js，禁止继续把跨模块表单填充和路由跳转逻辑塞进 aiPanel.js。
+```
+
 ---
 
 ## 1. 当前 Prompt 问题与改造方向
@@ -162,6 +177,7 @@ ToolRegistry:
   - inspect_current_flow
   - validate_flow
   - dryrun_flow
+  - replay_flow_with_frame
   - list_camera_bindings
   - discover_cameras
   - capture_test_frame
@@ -223,6 +239,7 @@ ClearVision.Product.Infrastructure
       ├── CurrentFlowInspectTool.cs
       ├── FlowValidationTool.cs
       ├── DryRunFlowTool.cs
+      ├── ReplayFlowWithFrameTool.cs
       ├── CameraBindingsTool.cs
       ├── CameraDiscoveryTool.cs
       ├── CameraTestFrameTool.cs
@@ -234,7 +251,7 @@ ClearVision.Product.Infrastructure
 
 ## 3. P0：工具系统骨架
 
-### TODO 3.1 新增工具抽象接口与依赖注入防线
+### TODO 3.1 新增工具抽象接口
 
 新增：
 
@@ -274,7 +291,7 @@ public interface IVisionAgentToolRegistry
 验收：
 
 ```text
-[ ] DI 可注册工具，必须将所有 IVisionAgentTool 实例注册为 Transient 或 Scoped 生命周期，严禁 Singleton，防范生命周期捕获风险（Captive Dependency）
+[ ] DI 可注册工具
 [ ] 可列出所有 Agent Tools
 [ ] 可按名称执行工具
 [ ] 工具执行异常被包装为结构化 ToolResult
@@ -566,15 +583,40 @@ Config write and deployment actions must be returned as drafts requiring user co
 
 ### TODO 5.2 定义工具调用协议与原生 Function Calling 适配
 
-协议与 API 调用机制：
+协议优先级：
 
-1. **API 原生 Function Calling（首选）**：
-   - 在 `AiApiClient` 中扩展请求体构建逻辑，将 `IVisionAgentToolRegistry` 注册的工具 schema 格式化为 API 标准的 `tools` 参数传入。
-   - 对接原生 `tool_calls` 响应并自动回调对应工具，规避大模型以纯文本输出 JSON 导致的格式解析不可靠问题。
-2. **自定义 JSON 协议（不支持 tools 时的备用 Fallback）**：
-   - 模型输出支持两类 JSON 格式（工具调用 `tool_call` 和最终结果 `final_flow`）：
+```text
+Native Provider Tools（首选）
+  ↓ 不支持 / 网关不兼容 / 解析失败
+JSON Tool Protocol（fallback）
+  ↓ 仍失败
+legacy_full_prompt 旧链路 fallback
+```
 
-#### 工具调用
+#### A. API 原生 Function Calling（首选）
+
+在 `AiApiClient` 中扩展 OpenAI / Anthropic 请求体构建逻辑：
+
+```text
+[ ] OpenAI Chat Completions / Responses：将工具 schema 映射为标准 tools 参数，并处理 tool_calls / tool result 回填。
+[ ] Anthropic Messages：将工具 schema 映射为 tools 参数，并处理 tool_use / tool_result。
+[ ] 不完整 OpenAI-compatible 网关或 Ollama native 暂不强行启用原生 tools，自动降级到 JSON fallback。
+[ ] 保持现有 streaming 文本输出体验；工具调用事件进入 ToolTrace，不把工具调用 JSON 当普通正文展示。
+```
+
+设计目的：
+
+```text
+[ ] 避免完全依赖模型输出 {"kind":"tool_call"} 文本 JSON。
+[ ] 降低 Markdown 包裹、截断、非法 JSON 对 Tool Loop 的影响。
+[ ] 让模型供应商的 API 帮助约束工具调用格式。
+```
+
+#### B. 自定义 JSON 协议（备用 Fallback）
+
+当模型或中转网关不可靠支持原生 tools 时，模型输出支持两类 JSON：
+
+##### 工具调用
 
 ```json
 {
@@ -592,7 +634,7 @@ Config write and deployment actions must be returned as drafts requiring user co
 }
 ```
 
-#### 最终结果
+##### 最终结果
 
 ```json
 {
@@ -609,11 +651,12 @@ Config write and deployment actions must be returned as drafts requiring user co
 验收：
 
 ```text
-[ ] 优先走 API 原生 Function Calling 链路，支持并发调用多个工具
-[ ] 在 fallback 模式下能正确解析自定义 `tool_call` JSON 和 `final_flow` JSON
-[ ] 协议解析/提取失败时进入 retry 纠错，而不是直接崩溃
-[ ] tool_call 名称必须存在于 ToolRegistry
-[ ] 不存在的工具返回 UnknownTool
+[ ] 优先走 API 原生 Function Calling 链路。
+[ ] fallback 模式能正确解析 tool_call / final_flow。
+[ ] 协议解析/提取失败时进入 retry 纠错，而不是直接崩溃。
+[ ] tool_call 名称必须存在于 ToolRegistry。
+[ ] 不存在的工具返回 UnknownTool。
+[ ] 只允许 ReadOnly 工具并行；其他工具默认串行。
 ```
 
 ---
@@ -629,37 +672,49 @@ ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent/VisionAgentL
 职责：
 
 ```text
-1. 构造轻量 system prompt，并注入工具列表 descriptor（或原生 tools 接口参数）
-2. 调用 LLM
-3. 解析 tool_call / final_flow（或直接读取 API 的 tool_calls 并执行）
-4. 执行 ClearVision 内部工具
-5. 将 tool_result 以 Role=Tool（原生）或 Role=User（自定义协议）追加进上下文
-6. 再次调用 LLM
-7. 循环直到 final_flow 或超出最大轮次
+1. 构造轻量 system prompt。
+2. 注入工具列表 descriptor，或通过 API 原生 tools 参数传入工具 schema。
+3. 调用 LLM。
+4. 读取原生 tool_calls / tool_use，或解析 fallback JSON tool_call / final_flow。
+5. 执行 ClearVision 内部工具。
+6. 将 tool_result 以 Role=Tool（原生）或结构化 User 消息（fallback）追加进上下文。
+7. 再次调用 LLM。
+8. 循环直到 final_flow 或超出最大轮次。
 ```
 
-建议配置（允许更多循环轮次以跑通完整闭环）：
+建议配置：
 
 ```json
 {
   "Ai": {
     "EnableVisionAgentTools": true,
     "PromptMode": "hybrid",
-    "MaxToolRounds": 5,
+    "MaxToolRoundsDefault": 3,
+    "MaxToolRoundsHardLimit": 5,
     "MaxToolCallsPerRound": 5,
-    "MaxToolResultChars": 12000
+    "MaxToolResultChars": 12000,
+    "EnableParallelReadOnlyToolCalls": true
   }
 }
+```
+
+并行规则：
+
+```text
+[ ] ReadOnly 工具可并行：list_operator_catalog / get_operator_schema / inspect_current_flow / list_camera_bindings / retrieve_operator_knowledge。
+[ ] Simulation / RuntimePreview / ConfigDraft / DeploymentPrepare 默认串行。
+[ ] capture_test_frame / dryrun_flow / replay_flow_with_frame / runtime_package_precheck 必须串行，除非工具声明 IsConcurrencySafe=true。
 ```
 
 验收：
 
 ```text
-[ ] 单轮工具调用可完成
-[ ] 多轮工具调用可完成，在 MaxToolRounds 限制下能支持并行工具请求以节省往返延迟
-[ ] 达到 MaxToolRounds 后返回 ManualRetry / FailedWithToolLimit
-[ ] ToolTrace 完整记录调用链
-[ ] 可通过 feature flag 回退旧链路
+[ ] 单轮工具调用可完成。
+[ ] 多轮工具调用可完成。
+[ ] 只读工具可并行，非只读工具默认串行。
+[ ] 达到 MaxToolRoundsHardLimit 后返回 ManualRetry / FailedWithToolLimit。
+[ ] ToolTrace 完整记录调用链。
+[ ] 可通过 feature flag 回退旧链路。
 ```
 
 ---
@@ -911,19 +966,25 @@ ITemplateConstraintValidator.Validate(...)
 
 ### TODO 7.2 `dryrun_flow`
 
+定位：
+
+```text
+dryrun_flow = 结构级仿真 / StubRegistry / 分支覆盖 / 运行链路预演。
+它不直接连接真实硬件，不宣称能验证真实图像效果。
+```
+
 封装：
 
 ```text
 DryRunService.RunAsync(...)
 ```
 
-输入（支持闭环帧注入）：
+输入：
 
 ```json
 {
   "flow": {},
-  "testInputsMode": "empty_stub",
-  "temporaryFrameId": "optional string (从之前 capture_test_frame 采图获取，将临时图片馈送给采集算子，避免仿真时缺失输入图片)"
+  "testInputsMode": "empty_stub"
 }
 ```
 
@@ -943,10 +1004,72 @@ DryRunService.RunAsync(...)
 验收：
 
 ```text
-[ ] validate_flow 通过后调用 dryrun_flow
-[ ] DryRun 异常返回结构化错误摘要
-[ ] Agent 根据 DryRun 结果修复或标记 pendingParameters
-[ ] DryRun 不接真实硬件，但可通过 `temporaryFrameId` 将之前物理相机抓到的图作为输入数据管道馈送给仿真环境下的采集算子，使得深度学习或模板匹配算子能进行闭环真实阈值校验，而非仅用 empty_stub 空值预演
+[ ] validate_flow 通过后调用 dryrun_flow。
+[ ] DryRun 异常返回结构化错误摘要。
+[ ] Agent 根据 DryRun 结果修复结构错误或标记 pendingParameters。
+[ ] DryRun 只证明流程结构/端口/基础运行链路，不把 empty_stub 结果误写成真实视觉效果验证。
+```
+
+---
+
+### TODO 7.3 `replay_flow_with_frame`
+
+定位：
+
+```text
+replay_flow_with_frame = 使用 capture_test_frame 生成的 temporaryFrameId，把真实图片喂给仿真环境下的采集算子，验证 downstream 算子的真实输入表现。
+```
+
+输入：
+
+```json
+{
+  "flow": {},
+  "temporaryFrameId": "agent-frame-xxx",
+  "entryOperatorTempId": "optional image acquisition operator tempId",
+  "expectedOutputs": {
+    "optional": "OK/NG, score range, match count, class labels, etc."
+  }
+}
+```
+
+输出：
+
+```json
+{
+  "isSuccess": true,
+  "durationMs": 42,
+  "frameWidth": 2448,
+  "frameHeight": 2048,
+  "operatorResults": [
+    {
+      "operatorTempId": "op_template",
+      "operatorType": "TemplateMatching",
+      "score": 0.86,
+      "status": "passed"
+    }
+  ],
+  "warnings": []
+}
+```
+
+实现要求：
+
+```text
+[ ] capture_test_frame 只返回 temporaryFrameId，不把图片二进制塞给 LLM。
+[ ] temporaryFrameId 对应的临时图片保存在受控缓存中，设置 TTL 和最大缓存容量。
+[ ] replay_flow_with_frame 从缓存读取图片，并把图片作为 testInputs 注入采集算子或指定入口节点。
+[ ] 临时帧缓存要能清理，不能长期占用磁盘/内存。
+[ ] 真实图片回放失败时返回结构化诊断，不得假装 DryRun 通过。
+```
+
+验收：
+
+```text
+[ ] 已绑定相机采图后，Agent 能拿 temporaryFrameId 调用 replay_flow_with_frame。
+[ ] TemplateMatching / DeepLearning / Thresholding 等算子能基于真实图片返回关键分数或结果摘要。
+[ ] Agent 可以根据真实回放结果提出参数建议或标记待确认，但不直接自动改生产配置。
+[ ] 无 temporaryFrameId 时，Agent 只能走 dryrun_flow，不得宣称完成真实视觉效果验证。
 ```
 
 ---
@@ -1322,16 +1445,33 @@ IP：192.168.1.88
 ```
 
 前端架构隔离要求：
-由于 `aiPanel.js` (296KB) 文件已经过于庞大且为 Vanilla JS 原生开发，为了防范代码失控，严禁将跨组件的表单填充与路由跳转逻辑直接塞入 `aiPanel.js`。
-- 新增 `wwwroot/src/features/ai/agentActionBridge.js` 专门负责拦截 ActionCard 事件。
-- 桥接器处理跨组件（如与 Settings 相机设置页、Stations 部署页）的数据分发，并支持行内修改（Inline Edit）草稿后再应用。
+
+```text
+[ ] `aiPanel.js` 已经体积过大，禁止继续把跨 Settings / Station / Camera 的表单填充、路由跳转和保存逻辑塞进 aiPanel.js。
+[ ] 新增 `wwwroot/src/features/ai/agentActionBridge.js` 专门负责 ActionCard 事件分发。
+[ ] agentActionBridge.js 不直接操作 Settings 内部 DOM；它只分发标准事件或调用统一 API/store。
+[ ] Settings / Station 页面各自监听标准事件并负责刷新自己的表单状态。
+```
+
+建议事件协议：
+
+```js
+window.dispatchEvent(new CustomEvent('clearvision:agent-action', {
+  detail: {
+    actionType: 'cameraBindingDraft.apply',
+    payload: draftBinding
+  }
+}));
+```
 
 验收：
 
 ```text
-[ ] Agent 不能静默写配置
-[ ] 所有 ConfigDraft / DeploymentPrepare 动作都展示卡片，且卡片支持用户在应用前行内微调（Inline Edit）参数
-[ ] 用户确认后才通过 `agentActionBridge.js` 调用现有保存/导出链路，且设置页的表单数据能够同步刷写更新
+[ ] Agent 不能静默写配置。
+[ ] 所有 ConfigDraft / DeploymentPrepare 动作都展示卡片。
+[ ] 卡片支持用户在应用前行内微调（Inline Edit）参数。
+[ ] 用户确认后才通过 agentActionBridge.js 调用现有保存/导出链路。
+[ ] 设置页/Station 页能同步刷新 UI 状态，不要求用户手动刷新页面。
 ```
 
 ---
@@ -1357,6 +1497,7 @@ FlowTemplateToolTests.cs
 CurrentFlowInspectToolTests.cs
 FlowValidationToolTests.cs
 DryRunFlowToolTests.cs
+ReplayFlowWithFrameToolTests.cs
 CameraAgentToolTests.cs
 RuntimePackagePrecheckToolTests.cs
 ```
@@ -1364,7 +1505,7 @@ RuntimePackagePrecheckToolTests.cs
 验收：
 
 ```text
-[ ] 工具注册表测试通过，需包含 Transient / Scoped 生命周期装载与避免 Captive Dependency 的依赖注入测试
+[ ] 工具注册表测试通过
 [ ] 每个工具正常结果 / 异常结果均覆盖
 [ ] 工具参数 schema 快照测试
 [ ] 未知工具 / 权限不足 / 参数错误有测试
@@ -1389,6 +1530,7 @@ GenerateFlowMessageHandlerToolTraceTests.cs
 [ ] 模型请求 get_operator_schema 后生成正确参数名
 [ ] validate_flow 第一次失败，Agent 第二轮修复成功
 [ ] dryrun_flow 失败后 Agent 标记 pendingParameters
+[ ] replay_flow_with_frame 能消费 temporaryFrameId 并返回真实图片回放摘要
 [ ] 无相机绑定时 Agent 返回 MissingResources
 [ ] 发现相机后 Agent 生成 draft_camera_binding，而不保存配置
 [ ] runtime_package_precheck 返回部署阻断项，不执行部署
@@ -1499,7 +1641,8 @@ PromptModeCompatibilityTests.cs
 [ ] agent_tools 模式不再默认注入 Operator Knowledge Slice
 [ ] agent_tools 模式不再默认注入 templateSkeletonJson
 [ ] 实现 dryrun_flow
-[ ] DryRun 结果结构化返回给模型
+[ ] 实现 replay_flow_with_frame
+[ ] DryRun / Replay 结果结构化返回给模型
 [ ] DryRun 失败后 Agent 修复或标记 pendingParameters
 [ ] few-shot 瘦身为 0~1 个最小示例
 [ ] 补 Prompt 瘦身测试
@@ -1514,6 +1657,7 @@ PromptModeCompatibilityTests.cs
 [ ] 再 retrieve_operator_knowledge
 [ ] 生成流程后 validate_flow
 [ ] 通过后 dryrun_flow
+[ ] 有 temporaryFrameId 时再 replay_flow_with_frame
 [ ] prompt 中不再直接塞 templateSkeletonJson
 ```
 
@@ -1573,8 +1717,12 @@ Scope:
 - Do NOT add CMD, PowerShell, shell, arbitrary filesystem, or OS-level permissions.
 - Only expose ClearVision internal capabilities as Agent Tools.
 - Preserve existing GenerateFlow behavior behind fallback / feature flags.
+- Use current repository naming exactly as it exists now under ClearVision.Product.*. Do not recreate Acme.Product paths.
 - Add PromptMode: legacy_full_prompt, hybrid, agent_tools.
+- Prefer native provider tool calling for OpenAI / Anthropic; keep JSON tool_call/final_flow only as fallback.
 - Reduce long prompt injection by moving operator catalog, operator knowledge slices, template skeletons, current flow inspection, validation, DryRun, camera bindings, and deployment precheck into tools.
+- Allow parallel tool calls only for ReadOnly tools; serialize camera capture, dryrun, replay, config draft, and deployment precheck tools.
+- Split structure-only dryrun_flow from real-image replay_flow_with_frame.
 
 Implement:
 1. Core tool abstractions:
@@ -1590,7 +1738,8 @@ Implement:
    - AgentPromptBuilder
    - VisionAgentLoop
    - VisionAgentProtocolParser
-   - tool_call / final_flow protocol
+   - native tools adapter for OpenAI / Anthropic
+   - JSON tool_call / final_flow fallback protocol
    - MaxToolRounds / MaxToolCallsPerRound / MaxToolResultChars
    - ToolTrace returned in GenerateFlowResponse
 
@@ -1603,6 +1752,7 @@ Implement:
    - inspect_current_flow
    - validate_flow
    - dryrun_flow
+   - replay_flow_with_frame
    - list_camera_bindings
    - discover_cameras
    - capture_test_frame
@@ -1633,6 +1783,7 @@ Implement:
    - PromptMode compatibility tests.
    - validate_flow repair test.
    - dryrun_flow failure handling test.
+   - replay_flow_with_frame temporaryFrameId test.
    - camera tool no-device / discovered-device / existing-binding tests.
    - deployment precheck blocking issue tests.
 
@@ -1657,13 +1808,14 @@ Acceptance:
 | A6 | Agent 能按需查询算子目录和 schema | 是 |
 | A7 | Agent 不再依赖 Full Catalog Fallback | 是，agent_tools 模式 |
 | A8 | Agent 能调用 validate_flow 并修复错误 | 是 |
-| A9 | Agent 能调用 dryrun_flow 并处理失败 | 是 |
+| A9 | Agent 能调用 dryrun_flow 并处理结构仿真失败 | 是 |
+| A9.1 | Agent 能调用 replay_flow_with_frame 消费 temporaryFrameId 做真实图片回放 | 是 |
 | A10 | Agent 能读取相机绑定 / 发现相机 | 是 |
 | A11 | Agent 只能生成相机绑定草稿，不直接保存 | 是 |
 | A12 | Agent 能做部署预检查，不直接部署 | 是 |
 | A13 | Prompt 长度较 legacy 明显下降 | 是 |
 | A14 | 现有 GenerateFlow 行为可 fallback | 是 |
-| A15 | 单元测试、集成测试、PromptMode 测试覆盖 | 是 |
+| A15 | 单元测试、集成测试、PromptMode、NativeTools/Fallback、Replay 测试覆盖 | 是 |
 
 ---
 
@@ -1699,6 +1851,23 @@ dryrun_flow 预演
 
 这就是 ClearVision 版的 Codex 工具调用能力：
 
-> 不给它系统命令权限，
-> 而是给它 ClearVision 内部工程工具。
+> 不给它系统命令权限，  
+> 而是给它 ClearVision 内部工程工具。  
 > 让它从“会生成流程的 AI”升级为“会查证、会校验、会预演、会准备部署的视觉工程 Agent”。
+
+
+---
+
+## 16. 最终评审加强版补充结论
+
+本版相对基础 TODO 的关键加强点：
+
+```text
+[ ] 路径/命名空间以当前 ClearVision.Product.* 实况为准。
+[ ] 原生 Function Calling 优先，自定义 JSON 协议只作 fallback。
+[ ] ToolRegistry 生命周期防线明确，避免 Singleton 捕获 Scoped 硬件/运行时服务。
+[ ] MaxToolRounds 默认 3、硬上限 5，避免现场等待时间失控。
+[ ] 只读工具才允许并行，硬件/仿真/配置/部署准备工具默认串行。
+[ ] dryrun_flow 与 replay_flow_with_frame 分工明确，避免把空桩仿真误当真实视觉效果验证。
+[ ] 前端通过 agentActionBridge.js 隔离跨模块动作，避免继续扩大 aiPanel.js。
+```
