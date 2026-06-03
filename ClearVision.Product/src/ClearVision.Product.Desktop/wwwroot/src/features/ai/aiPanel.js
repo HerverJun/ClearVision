@@ -1665,7 +1665,8 @@ export class AiPanel {
                 resultSummary: item?.resultSummary ?? item?.ResultSummary ?? null,
                 errorMessage: String(item?.errorMessage ?? item?.ErrorMessage ?? '').trim(),
                 durationMs: Number.isFinite(duration) ? duration : 0,
-                permission: String(item?.permission ?? item?.Permission ?? '').trim()
+                permission: String(item?.permission ?? item?.Permission ?? '').trim(),
+                toolCallingMode: String(item?.toolCallingMode ?? item?.ToolCallingMode ?? '').trim()
             };
         }).filter(item => item.toolName);
     }
@@ -1722,6 +1723,7 @@ export class AiPanel {
                         const summary = item.success
                             ? this._formatTraceInlineValue(item.resultSummary)
                             : (item.errorMessage || this._formatTraceInlineValue(item.resultSummary));
+                        const modeLabel = item.toolCallingMode ? ` · Tool Calling: ${item.toolCallingMode}` : '';
                         const debugHtml = debugMode
                             ? `
                                 <details class="ai-tool-trace-json">
@@ -1745,7 +1747,7 @@ export class AiPanel {
                                 <div class="ai-tool-trace-body">
                                     <div class="ai-tool-trace-main">
                                         <span class="ai-tool-trace-name">${this._escapeHtml(item.toolName)}</span>
-                                        <span class="ai-tool-trace-meta">${this._escapeHtml(item.permission || '--')} · ${this._formatDuration(item.durationMs)}</span>
+                                        <span class="ai-tool-trace-meta">${this._escapeHtml(item.permission || '--')} · ${this._formatDuration(item.durationMs)}${this._escapeHtml(modeLabel)}</span>
                                     </div>
                                     <div class="ai-tool-trace-summary">${this._escapeHtml(summary)}</div>
                                     ${debugHtml}
@@ -5741,8 +5743,15 @@ export class AiPanel {
         const diagnostics = data?.lastAttemptDiagnostics || data?.LastAttemptDiagnostics || [];
         const manualRetry = data?.manualRetry || data?.ManualRetry || null;
         const dryRun = data?.dryRunResult || data?.DryRunResult || null;
+        const validationPreview = data?.validationPreview || data?.ValidationPreview || null;
         const knowledgeDiags = data?.knowledgeDiagnostics || data?.KnowledgeDiagnostics || [];
-        const hasContent = diagnostics.length > 0 || manualRetry?.required || dryRun || knowledgeDiags.length > 0;
+        const hasPreview = validationPreview && (
+            validationPreview.structuralDryRun || validationPreview.StructuralDryRun ||
+            validationPreview.frameReplay || validationPreview.FrameReplay ||
+            validationPreview.finalDryRun || validationPreview.FinalDryRun ||
+            (validationPreview.toolDryRunTrace || validationPreview.ToolDryRunTrace || []).length > 0
+        );
+        const hasContent = diagnostics.length > 0 || manualRetry?.required || dryRun || hasPreview || knowledgeDiags.length > 0;
 
         if (!hasContent) {
             card.hidden = true;
@@ -5800,6 +5809,36 @@ export class AiPanel {
                     </div>
                 `);
             }
+        }
+
+        if (hasPreview) {
+            const structuralDryRun = validationPreview.structuralDryRun || validationPreview.StructuralDryRun || null;
+            const frameReplay = validationPreview.frameReplay || validationPreview.FrameReplay || null;
+            const finalDryRun = validationPreview.finalDryRun || validationPreview.FinalDryRun || null;
+            const toolDryRunTrace = validationPreview.toolDryRunTrace || validationPreview.ToolDryRunTrace || [];
+            const previewRows = [
+                ['结构预演', structuralDryRun],
+                ['真实帧回放', frameReplay],
+                ['部署预检查 dry-run', finalDryRun]
+            ].filter(([, value]) => value);
+
+            sections.push(`
+                <div class="ai-validation-preview">
+                    <div class="ai-validation-issues-header">Validation Preview</div>
+                    ${previewRows.map(([label, value]) => `
+                        <details class="ai-tool-trace-json">
+                            <summary>${this._escapeHtml(label)} · ${this._escapeHtml(this._formatTraceInlineValue(value, 120))}</summary>
+                            <pre class="ai-prompt-trace-pre">${this._escapeHtml(this._formatPromptTraceJson(value))}</pre>
+                        </details>
+                    `).join('')}
+                    ${toolDryRunTrace.length > 0 ? `
+                        <details class="ai-tool-trace-json">
+                            <summary>工具预演记录 · ${toolDryRunTrace.length}</summary>
+                            <pre class="ai-prompt-trace-pre">${this._escapeHtml(this._formatPromptTraceJson(toolDryRunTrace))}</pre>
+                        </details>
+                    ` : ''}
+                </div>
+            `);
         }
 
         // DryRun result

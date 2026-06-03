@@ -74,6 +74,8 @@ public class AiGenerationOptions
 
     public AiModelCapabilities? Capabilities { get; set; }
 
+    public string ToolCallingMode { get; set; } = AiToolCallingModes.Auto;
+
     public string ReasoningMode { get; set; } = AiReasoningModes.Auto;
 
     public string ReasoningEffort { get; set; } = AiReasoningEfforts.Medium;

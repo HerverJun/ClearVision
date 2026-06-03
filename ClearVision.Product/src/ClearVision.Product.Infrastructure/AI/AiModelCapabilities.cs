@@ -50,6 +50,45 @@ public class AiModelCapabilities
         return this;
     }
 
+    public AiModelCapabilities ApplyToolCallingMode(
+        string mode,
+        string? protocol,
+        string? provider,
+        string? model)
+    {
+        var normalizedMode = AiToolCallingModes.Normalize(mode);
+        if (normalizedMode == AiToolCallingModes.Disabled ||
+            normalizedMode == AiToolCallingModes.JsonFallback)
+        {
+            SupportsToolCall = false;
+            return this;
+        }
+
+        if (normalizedMode == AiToolCallingModes.Native)
+        {
+            SupportsToolCall = true;
+            return this;
+        }
+
+        var normalizedProtocol = AiModelConfig.NormalizeProtocol(protocol, provider);
+        if (normalizedProtocol is AiModelConfig.ProtocolAnthropic or AiModelConfig.ProtocolAzureOpenAi)
+        {
+            SupportsToolCall = true;
+            return this;
+        }
+
+        if (normalizedProtocol == AiModelConfig.ProtocolOpenAiCompatible)
+        {
+            var providerKey = (provider ?? string.Empty).ToLowerInvariant();
+            var isNativeOpenAi = providerKey == "openai" ||
+                providerKey.Contains("openai api") ||
+                (providerKey.Contains("openai") && !providerKey.Contains("compatible"));
+            SupportsToolCall = SupportsToolCall || isNativeOpenAi;
+        }
+
+        return this;
+    }
+
     public static AiModelCapabilities Infer(string? provider, string? model)
     {
         var caps = new AiModelCapabilities();
@@ -81,5 +120,41 @@ public class AiModelCapabilities
         }
 
         return caps.Normalize();
+    }
+}
+
+public static class AiToolCallingModes
+{
+    public const string Auto = "auto";
+    public const string Native = "native";
+    public const string JsonFallback = "json_fallback";
+    public const string Disabled = "disabled";
+
+    public static string Normalize(string? value)
+    {
+        var normalized = (value ?? string.Empty).Trim().ToLowerInvariant().Replace("-", "_");
+        return normalized switch
+        {
+            Native => Native,
+            JsonFallback => JsonFallback,
+            Disabled => Disabled,
+            _ => Auto
+        };
+    }
+
+    public static string ToDisplayLabel(string? value, bool nativeFallbackUsed = false)
+    {
+        if (nativeFallbackUsed)
+        {
+            return "JSON fallback";
+        }
+
+        return Normalize(value) switch
+        {
+            Native => "Native",
+            Disabled => "Disabled",
+            JsonFallback => "JSON fallback",
+            _ => "Auto"
+        };
     }
 }

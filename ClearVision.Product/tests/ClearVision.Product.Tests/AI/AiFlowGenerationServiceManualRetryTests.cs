@@ -1,14 +1,18 @@
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
+using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.DryRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
+using ClearVision.Product.Infrastructure.AI.Tools;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace ClearVision.Product.Tests.AI;
@@ -586,6 +590,152 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             Arg.Any<Action<AiStreamChunk>>(),
             Arg.Any<CancellationToken>());
         validator.Received(2).Validate(Arg.Any<AiGeneratedFlowJson>());
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync agent_tools should feed validator failures back to Agent before manual retry")]
+    public async Task GenerateFlowAsync_AgentFinalFlowValidatorFailureThenRepair_ShouldFeedBackToAgent()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var completeMessages = new List<List<ChatMessage>>();
+        connector.CompleteAsync(
+                Arg.Any<string>(),
+                Arg.Do<List<ChatMessage>>(messages => completeMessages.Add(messages.ToList())),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = "{}"
+                }),
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }));
+
+        var validation = new AiValidationResult();
+        validation.AddError(
+            "ResultOutput is missing required input.",
+            code: "missing_parameter",
+            category: "validation",
+            relatedFields: ["operators[0].parameters.Result"],
+            repairHint: "Connect the result source to ResultOutput.Result.");
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>())
+            .Returns(validation, new AiValidationResult());
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var progress = new List<string>();
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            useRealOperatorFactory: true,
+            useVisionAgentLoop: true);
+
+        var result = await service.GenerateFlowAsync(
+            new AiFlowGenerationRequest(
+                "Generate a basic inspection flow.",
+                SessionId: "agent-validator-repair",
+                DebugPrompt: true)
+            {
+                PromptMode = AiPromptModes.AgentTools
+            },
+            onProgress: progress.Add);
+
+        result.Success.Should().BeTrue();
+        result.ManualRetry.Should().BeNull();
+        result.StageTimeline.Should().Contain(item => item.Stage == "agent_final_repair");
+        progress.Should().Contain(item => item.StartsWith("agent_repair|", StringComparison.Ordinal));
+        await connector.Received(2).CompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<CancellationToken>());
+        completeMessages.Should().HaveCount(2);
+        ChatMessagesContain(
+            completeMessages[1],
+            "backend_final_flow_repair",
+            "validation_result",
+            "missing_parameter",
+            "relatedFields",
+            "repairHint")
+            .Should()
+            .BeTrue();
+        validator.Received(2).Validate(Arg.Any<AiGeneratedFlowJson>());
+    }
+
+    [Fact(DisplayName = "GenerateFlowAsync agent_tools should feed template gate failures back to Agent before manual retry")]
+    public async Task GenerateFlowAsync_AgentFinalFlowTemplateGateFailureThenRepair_ShouldFeedBackToAgent()
+    {
+        var connector = Substitute.For<IAiConnector>();
+        var completeMessages = new List<List<ChatMessage>>();
+        connector.CompleteAsync(
+                Arg.Any<string>(),
+                Arg.Do<List<ChatMessage>>(messages => completeMessages.Add(messages.ToList())),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }),
+                Task.FromResult(new AiCompletionResult
+                {
+                    Content = BuildSuccessfulFlowJson()
+                }));
+
+        var validator = Substitute.For<IAiFlowValidator>();
+        validator.Validate(Arg.Any<AiGeneratedFlowJson>())
+            .Returns(new AiValidationResult(), new AiValidationResult());
+
+        var templateGateFailure = new AiValidationResult();
+        templateGateFailure.AddError(
+            "Template requires a camera entry operator.",
+            code: "template_camera_entry_required",
+            category: "template_gate",
+            relatedFields: ["operators[0].operatorType"],
+            repairHint: "Keep the ImageAcquisition operator from the selected template.");
+
+        var conversationService = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(
+            connector,
+            validator,
+            conversationService,
+            scenarioMatches: [BuildPackagingScenarioMatch(0.95)],
+            useRealOperatorFactory: true,
+            useVisionAgentLoop: true,
+            templateConstraintResults:
+            [
+                templateGateFailure,
+                new AiValidationResult()
+            ]);
+
+        var result = await service.GenerateFlowAsync(
+            new AiFlowGenerationRequest(
+                "Generate packaging inspection flow.",
+                SessionId: "agent-template-gate-repair",
+                DebugPrompt: true)
+            {
+                PromptMode = AiPromptModes.AgentTools,
+                RequirementMode = AiRequirementModes.Draft
+            });
+
+        result.Success.Should().BeTrue(result.ErrorMessage ?? result.FailureType ?? "agent template gate repair should succeed");
+        result.ManualRetry.Should().BeNull();
+        result.StageTimeline.Should().Contain(item => item.Stage == "template_gate");
+        result.StageTimeline.Should().Contain(item => item.Stage == "agent_final_repair");
+        await connector.Received(2).CompleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<List<ChatMessage>>(),
+            Arg.Any<CancellationToken>());
+        completeMessages.Should().HaveCount(2);
+        ChatMessagesContain(
+            completeMessages[1],
+            "backend_final_flow_repair",
+            "template_gate_result",
+            "template_camera_entry_required",
+            "operators[0].operatorType",
+            "repairHint")
+            .Should()
+            .BeTrue();
     }
 
     [Fact]
@@ -1620,7 +1770,9 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         AiRequirementBrief? requirementBrief = null,
         IReadOnlyList<ScenarioMatchResult>? scenarioMatches = null,
         IRequirementBriefExtractor? requirementBriefExtractor = null,
-        bool useRealOperatorFactory = false)
+        bool useRealOperatorFactory = false,
+        bool useVisionAgentLoop = false,
+        IReadOnlyList<AiValidationResult>? templateConstraintResults = null)
     {
         var modelSelector = Substitute.For<IAiModelSelector>();
         modelSelector.SelectGenerationModel().Returns(new AiModelConfig
@@ -1666,11 +1818,24 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
         }
 
         var templateConstraintValidator = Substitute.For<ITemplateConstraintValidator>();
-        templateConstraintValidator.Validate(
-                Arg.Any<AiGeneratedFlowJson>(),
-                Arg.Any<FlowTemplate?>(),
-                Arg.Any<bool>())
-            .Returns(new AiValidationResult());
+        if (templateConstraintResults is { Count: > 0 })
+        {
+            templateConstraintValidator.Validate(
+                    Arg.Any<AiGeneratedFlowJson>(),
+                    Arg.Any<FlowTemplate?>(),
+                    Arg.Any<bool>())
+                .Returns(
+                    templateConstraintResults[0],
+                    templateConstraintResults.Skip(1).ToArray());
+        }
+        else
+        {
+            templateConstraintValidator.Validate(
+                    Arg.Any<AiGeneratedFlowJson>(),
+                    Arg.Any<FlowTemplate?>(),
+                    Arg.Any<bool>())
+                .Returns(new AiValidationResult());
+        }
 
         var flowExecutionService = Substitute.For<IFlowExecutionService>();
         var hostEnvironment = Substitute.For<IHostEnvironment>();
@@ -1684,6 +1849,22 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             Description = "Test",
             Content = "test prompt"
         }));
+
+        var visionAgentLoop = useVisionAgentLoop
+            ? new VisionAgentLoop(
+                new AiGenerationOrchestrator(modelSelector, connectorFactory),
+                new AgentPromptBuilder(),
+                new VisionAgentToolRegistry(
+                    Array.Empty<IVisionAgentTool>(),
+                    Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentToolRegistry>>()),
+                new VisionAgentProtocolParser(),
+                Options.Create(new VisionAgentLoopOptions
+                {
+                    MaxToolRounds = 2,
+                    MaxToolCallsPerRound = 2,
+                    MaxToolResultChars = 2_000
+                }))
+            : null;
 
         return new AiFlowGenerationService(
             new AiGenerationOrchestrator(modelSelector, connectorFactory),
@@ -1699,9 +1880,18 @@ public class AiFlowGenerationServiceManualRetryTests : IDisposable
             templateConstraintValidator,
             new AiFlowResponseParser(),
             new DryRunService(flowExecutionService),
+            visionAgentLoop,
             hostEnvironment,
             promptVersionManager,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>());
+    }
+
+    private static bool ChatMessagesContain(IReadOnlyList<ChatMessage> messages, params string[] tokens)
+    {
+        var text = string.Join(
+            "\n",
+            messages.Select(message => message.Content ?? string.Empty));
+        return tokens.All(token => text.Contains(token, StringComparison.Ordinal));
     }
 
     private static ScenarioMatchResult BuildPackagingScenarioMatch(double confidence)

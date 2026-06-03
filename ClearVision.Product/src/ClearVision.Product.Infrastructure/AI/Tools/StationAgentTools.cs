@@ -4,6 +4,7 @@ using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 
@@ -103,7 +104,11 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
           "type": "object",
           "properties": {
             "flow": { "type": "object" },
-            "targetStationId": { "type": "string" }
+            "targetStationId": { "type": "string" },
+            "validationSummary": { "type": "object" },
+            "dryRunSummary": { "type": "object" },
+            "replaySummary": { "type": "object" },
+            "requireReplayForCameraFlow": { "type": "boolean" }
           }
         }
         """);
@@ -115,11 +120,13 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
     {
         var blocking = new List<string>();
         var warnings = new List<string>();
+        var requiredUserActions = new List<string>();
         AiGeneratedFlowJson? flow = TryReadFlow(arguments);
 
         if (flow == null)
         {
             blocking.Add("Flow payload is missing or cannot be parsed.");
+            requiredUserActions.Add("Provide a valid final_flow payload before deployment precheck.");
         }
         else
         {
@@ -127,10 +134,10 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             if (!validation.IsValid)
             {
                 blocking.AddRange(validation.Errors.Select(error => $"validate_flow: {error}"));
+                requiredUserActions.Add("Repair validation errors before preparing runtime package.");
             }
 
-            AddResourceIssues(flow, blocking, warnings);
-            AddCameraBindingIssues(flow, blocking, warnings);
+            AddResourceIssues(flow, blocking, warnings, requiredUserActions);
         }
 
         var config = _configurationService.GetCurrent();
@@ -145,6 +152,14 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             warnings.Add("No camera bindings are configured.");
         }
 
+        if (flow != null)
+        {
+            AddCameraBindingIssues(flow, bindings, blocking, warnings, requiredUserActions);
+            AddReplayRequirementIssues(flow, arguments, blocking, warnings, requiredUserActions);
+        }
+
+        AddProvidedValidationStateIssues(arguments, blocking, warnings, requiredUserActions);
+
         var targetStationId = ReadString(arguments, "targetStationId");
         if (!string.IsNullOrWhiteSpace(targetStationId))
         {
@@ -154,15 +169,18 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             if (station == null)
             {
                 blocking.Add($"Target Station '{targetStationId}' is not registered.");
+                requiredUserActions.Add("Register or select an existing target Station.");
             }
             else if (!station.Online)
             {
                 blocking.Add($"Target Station '{targetStationId}' is offline.");
+                requiredUserActions.Add("Bring the target Station online before deployment.");
             }
         }
         else
         {
             warnings.Add("Target Station was not specified.");
+            requiredUserActions.Add("Select targetStationId before package export or deploy.");
         }
 
         var action = new VisionAgentPendingAction
@@ -172,7 +190,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             Summary = blocking.Count == 0
                 ? "Runtime package precheck has no blocking issues."
                 : $"Runtime package precheck found {blocking.Count} blocking issue(s).",
-            Payload = new { ready = blocking.Count == 0, blockingIssues = blocking, warnings },
+            Payload = new { ready = blocking.Count == 0, blockingIssues = blocking, warnings, requiredUserActions },
             RequiresUserConfirmation = true
         };
 
@@ -180,7 +198,8 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         {
             ready = blocking.Count == 0,
             blockingIssues = blocking,
-            warnings
+            warnings,
+            requiredUserActions
         }, requiresUserConfirmation: true, pendingActions: [action]);
     }
 
@@ -197,7 +216,11 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         }
     }
 
-    private static void AddResourceIssues(AiGeneratedFlowJson flow, List<string> blocking, List<string> warnings)
+    private static void AddResourceIssues(
+        AiGeneratedFlowJson flow,
+        List<string> blocking,
+        List<string> warnings,
+        List<string> requiredUserActions)
     {
         foreach (var op in flow.Operators)
         {
@@ -209,6 +232,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
                     string.IsNullOrWhiteSpace(value))
                 {
                     blocking.Add($"{op.TempId}.{key} is missing.");
+                    requiredUserActions.Add($"Provide model path for {op.TempId}.{key}.");
                 }
 
                 if ((key.Contains("Path", StringComparison.OrdinalIgnoreCase) ||
@@ -221,15 +245,31 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         }
     }
 
-    private static void AddCameraBindingIssues(AiGeneratedFlowJson flow, List<string> blocking, List<string> warnings)
+    private static void AddCameraBindingIssues(
+        AiGeneratedFlowJson flow,
+        IReadOnlyList<CameraBindingConfig> bindings,
+        List<string> blocking,
+        List<string> warnings,
+        List<string> requiredUserActions)
     {
         foreach (var acquisition in flow.Operators.Where(op =>
                      string.Equals(op.OperatorType, "ImageAcquisition", StringComparison.OrdinalIgnoreCase)))
         {
-            if (!acquisition.Parameters.TryGetValue("CameraBindingId", out var bindingId) ||
+            if ((!acquisition.Parameters.TryGetValue("CameraBindingId", out var bindingId) &&
+                 !acquisition.Parameters.TryGetValue("CameraId", out bindingId)) ||
                 string.IsNullOrWhiteSpace(bindingId))
             {
                 blocking.Add($"{acquisition.TempId} ImageAcquisition is missing CameraBindingId.");
+                requiredUserActions.Add($"Bind a camera for ImageAcquisition {acquisition.TempId}.");
+                continue;
+            }
+
+            if (!bindings.Any(binding =>
+                    string.Equals(binding.Id, bindingId, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(binding.SerialNumber, bindingId, StringComparison.OrdinalIgnoreCase)))
+            {
+                blocking.Add($"{acquisition.TempId} CameraBindingId '{bindingId}' is not configured.");
+                requiredUserActions.Add($"Create or select camera binding '{bindingId}'.");
             }
         }
 
@@ -237,6 +277,146 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         {
             warnings.Add("Flow has no ImageAcquisition operator.");
         }
+    }
+
+    private static void AddReplayRequirementIssues(
+        AiGeneratedFlowJson flow,
+        JsonElement arguments,
+        List<string> blocking,
+        List<string> warnings,
+        List<string> requiredUserActions)
+    {
+        if (!flow.Operators.Any(op => string.Equals(op.OperatorType, "ImageAcquisition", StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        var requireReplay = ReadBool(arguments, "requireReplayForCameraFlow");
+        var replaySummary = TryGetObject(arguments, "replaySummary");
+        var replaySuccess = replaySummary.HasValue &&
+            (ReadBool(replaySummary.Value, "replaySucceeded") ||
+             ReadBool(replaySummary.Value, "isSuccess") ||
+             ReadBool(replaySummary.Value, "IsSuccess"));
+
+        if (replaySuccess)
+        {
+            return;
+        }
+
+        if (requireReplay)
+        {
+            blocking.Add("Camera flow requires a successful replay_flow_with_frame result before deployment precheck can pass.");
+            requiredUserActions.Add("Run capture_test_frame and replay_flow_with_frame successfully for the selected camera entry.");
+        }
+        else
+        {
+            warnings.Add("Camera flow has no successful replay_flow_with_frame result.");
+        }
+    }
+
+    private static void AddProvidedValidationStateIssues(
+        JsonElement arguments,
+        List<string> blocking,
+        List<string> warnings,
+        List<string> requiredUserActions)
+    {
+        AddSummaryIssues(arguments, "validationSummary", "validation", blocking, warnings, requiredUserActions);
+        AddSummaryIssues(arguments, "dryRunSummary", "dryrun", blocking, warnings, requiredUserActions);
+        AddSummaryIssues(arguments, "replaySummary", "replay", blocking, warnings, requiredUserActions);
+    }
+
+    private static void AddSummaryIssues(
+        JsonElement arguments,
+        string propertyName,
+        string label,
+        List<string> blocking,
+        List<string> warnings,
+        List<string> requiredUserActions)
+    {
+        var summary = TryGetObject(arguments, propertyName);
+        if (!summary.HasValue)
+        {
+            return;
+        }
+
+        var valid = !TryReadBool(summary.Value, "isValid", out var isValid) &&
+                    !TryReadBool(summary.Value, "valid", out isValid)
+            ? (bool?)null
+            : isValid;
+        var success = !TryReadBool(summary.Value, "isSuccess", out var isSuccess) &&
+                      !TryReadBool(summary.Value, "dryRunSucceeded", out isSuccess) &&
+                      !TryReadBool(summary.Value, "replaySucceeded", out isSuccess)
+            ? (bool?)null
+            : isSuccess;
+
+        if (valid == false || success == false)
+        {
+            blocking.Add($"{label} summary reports failure.");
+            requiredUserActions.Add($"Resolve {label} failures before runtime package preparation.");
+        }
+
+        foreach (var issue in ReadStringArray(summary.Value, "errors").Concat(ReadStringArray(summary.Value, "blockingIssues")))
+        {
+            blocking.Add($"{label}: {issue}");
+        }
+
+        foreach (var warning in ReadStringArray(summary.Value, "warnings"))
+        {
+            warnings.Add($"{label}: {warning}");
+        }
+    }
+
+    private static JsonElement? TryGetObject(JsonElement arguments, string propertyName)
+    {
+        if (arguments.ValueKind == JsonValueKind.Object &&
+            arguments.TryGetProperty(propertyName, out var value) &&
+            value.ValueKind == JsonValueKind.Object)
+        {
+            return value;
+        }
+
+        return null;
+    }
+
+    private static bool TryReadBool(JsonElement arguments, string propertyName, out bool value)
+    {
+        value = false;
+        if (arguments.ValueKind != JsonValueKind.Object ||
+            !arguments.TryGetProperty(propertyName, out var element))
+        {
+            return false;
+        }
+
+        if (element.ValueKind is JsonValueKind.True or JsonValueKind.False)
+        {
+            value = element.GetBoolean();
+            return true;
+        }
+
+        if (element.ValueKind == JsonValueKind.String &&
+            bool.TryParse(element.GetString(), out var parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static IReadOnlyList<string> ReadStringArray(JsonElement arguments, string propertyName)
+    {
+        if (arguments.ValueKind != JsonValueKind.Object ||
+            !arguments.TryGetProperty(propertyName, out var value) ||
+            value.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<string>();
+        }
+
+        return value.EnumerateArray()
+            .Select(item => item.ValueKind == JsonValueKind.String ? item.GetString() : item.GetRawText())
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item!)
+            .ToList();
     }
 }
 
@@ -246,7 +426,7 @@ public sealed class RuntimePackageManifestDraftTool : VisionAgentToolBase
     public override string DisplayName => "Draft runtime package manifest";
     public override string Description => "Creates a runtime package manifest draft only. It does not write to package directories or deploy.";
     public override string Category => "deployment";
-    public override VisionAgentToolPermission Permission => VisionAgentToolPermission.DeploymentPrepare;
+    public override VisionAgentToolPermission Permission => VisionAgentToolPermission.ConfigDraft;
     public override JsonElement ParametersSchema { get; } = Schema("""
         {
           "type": "object",

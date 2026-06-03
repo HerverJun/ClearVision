@@ -13,6 +13,7 @@ public sealed class AiPromptTrace
     public string UserPrompt { get; set; } = string.Empty;
     public object? AttachmentReport { get; set; }
     public string UsedReferenceFlowSummary { get; set; } = string.Empty;
+    public string ToolCallingMode { get; set; } = string.Empty;
 
     /// <summary>Active prompt template version ID at generation time.</summary>
     public string? PromptVersionId { get; set; }
@@ -46,6 +47,7 @@ public sealed class AiPromptTrace
             UserPrompt = MaskSensitivePatterns(UserPrompt),
             AttachmentReport = AttachmentReport,
             UsedReferenceFlowSummary = MaskSensitivePatterns(UsedReferenceFlowSummary),
+            ToolCallingMode = ToolCallingMode,
             PromptVersionId = PromptVersionId,
             PromptVersionName = PromptVersionName,
             EstimatedInputTokens = EstimatedInputTokens,

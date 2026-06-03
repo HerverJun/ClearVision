@@ -81,7 +81,14 @@ public sealed class CameraDiscoveryTool : VisionAgentToolBase
     public override string Description => "Discovers available physical cameras using ClearVision camera providers.";
     public override string Category => "camera";
     public override VisionAgentToolPermission Permission => VisionAgentToolPermission.ReadOnly;
-    public override JsonElement ParametersSchema { get; } = Schema("""{"type":"object","properties":{}}""");
+    public override JsonElement ParametersSchema { get; } = Schema("""
+        {
+          "type": "object",
+          "properties": {
+            "manufacturer": { "type": "string", "enum": ["Huaray", "Hikvision", "Any"] }
+          }
+        }
+        """);
 
     public override async Task<VisionAgentToolResult> ExecuteAsync(
         VisionAgentToolContext context,
@@ -90,9 +97,19 @@ public sealed class CameraDiscoveryTool : VisionAgentToolBase
     {
         var cameras = await _cameraManager.EnumerateCamerasAsync();
         cancellationToken.ThrowIfCancellationRequested();
+        var all = cameras.ToList();
+        var manufacturer = ReadString(arguments, "manufacturer") ?? "Any";
+        var filtered = FilterByManufacturer(all, manufacturer).ToList();
         return VisionAgentToolResult.Ok(new
         {
-            cameras = cameras.Select(camera => new
+            manufacturer = NormalizeManufacturerFilter(manufacturer),
+            diagnostics = new
+            {
+                totalDiscovered = all.Count,
+                returned = filtered.Count,
+                unknownManufacturer = all.Count(camera => string.IsNullOrWhiteSpace(camera.Manufacturer))
+            },
+            cameras = filtered.Select(camera => new
             {
                 camera.CameraId,
                 camera.Name,
@@ -103,6 +120,34 @@ public sealed class CameraDiscoveryTool : VisionAgentToolBase
                 camera.IsConnected
             }).ToList()
         });
+    }
+
+    private static IEnumerable<CameraInfo> FilterByManufacturer(IEnumerable<CameraInfo> cameras, string manufacturer)
+    {
+        var normalized = NormalizeManufacturerFilter(manufacturer);
+        if (normalized == "Any")
+        {
+            return cameras;
+        }
+
+        return cameras.Where(camera =>
+            string.Equals(camera.Manufacturer, normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeManufacturerFilter(string? manufacturer)
+    {
+        var normalized = (manufacturer ?? string.Empty).Trim();
+        if (normalized.Equals("Huaray", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Huaray";
+        }
+
+        if (normalized.Equals("Hikvision", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Hikvision";
+        }
+
+        return "Any";
     }
 }
 
@@ -127,7 +172,8 @@ public sealed class CameraTestFrameTool : VisionAgentToolBase
           "type": "object",
           "required": ["cameraBindingId"],
           "properties": {
-            "cameraBindingId": { "type": "string" }
+            "cameraBindingId": { "type": "string" },
+            "timeoutMs": { "type": "integer", "minimum": 500, "maximum": 60000 }
           }
         }
         """);
@@ -143,31 +189,103 @@ public sealed class CameraTestFrameTool : VisionAgentToolBase
             return VisionAgentToolResult.Fail("camera_binding_required", "cameraBindingId is required.");
         }
 
-        var camera = await _cameraManager.GetOrCreateByBindingAsync(bindingId);
-        var bytes = await camera.AcquireSingleFrameAsync();
+        var binding = _cameraManager.FindBinding(bindingId);
+        if (binding == null)
+        {
+            return VisionAgentToolResult.Fail(
+                "camera_binding_not_found",
+                $"Camera binding '{bindingId}' was not found.");
+        }
+
+        binding.Normalize();
+        var triggerMode = CameraTriggerModeExtensions.Normalize(binding.TriggerMode);
+        var softwareTriggerSource = CameraSoftwareTriggerSourceExtensions.Normalize(binding.SoftwareTriggerSource);
+        if (triggerMode != CameraTriggerMode.Software ||
+            softwareTriggerSource != CameraSoftwareTriggerSource.Manual)
+        {
+            return VisionAgentToolResult.Fail(
+                "unsupported_trigger_mode_for_test_frame",
+                "capture_test_frame only supports Software/Manual trigger bindings by default.",
+                new
+                {
+                    cameraBindingId = binding.Id,
+                    binding.DisplayName,
+                    triggerMode = binding.TriggerMode,
+                    softwareTriggerSource = binding.SoftwareTriggerSource
+                });
+        }
+
+        var camera = await _cameraManager.GetOrCreateByBindingAsync(binding.Id);
+        var timeoutMs = Math.Clamp(ReadInt(arguments, "timeoutMs") ?? 5000, 500, 60000);
+        byte[] bytes;
+        try
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var acquireTask = camera.AcquireSingleFrameAsync();
+            var completed = await Task.WhenAny(acquireTask, Task.Delay(timeoutMs, timeoutCts.Token));
+            if (completed != acquireTask)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return VisionAgentToolResult.Fail(
+                    "capture_test_frame_timeout",
+                    $"AcquireSingleFrameAsync timed out after {timeoutMs} ms.",
+                    new { cameraBindingId = binding.Id, timeoutMs });
+            }
+
+            timeoutCts.Cancel();
+            bytes = await acquireTask;
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            return VisionAgentToolResult.Fail(
+                "capture_test_frame_cancelled",
+                ex.Message,
+                new { cameraBindingId = binding.Id });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return VisionAgentToolResult.Fail(
+                "capture_test_frame_failed",
+                ex.Message,
+                new { cameraBindingId = binding.Id });
+        }
         cancellationToken.ThrowIfCancellationRequested();
         var parameters = camera.GetParameters();
-        var temporaryFrameId = _frameStore.Store(bytes, new VisionAgentTemporaryFrameMetadata
+        string temporaryFrameId;
+        try
         {
-            CameraBindingId = bindingId,
-            CameraId = camera.CameraId,
-            CameraName = camera.Name,
-            Width = parameters.Width,
-            Height = parameters.Height,
-            PixelFormat = parameters.PixelFormat,
-            CapturedAtUtc = DateTimeOffset.UtcNow
-        });
+            temporaryFrameId = _frameStore.Store(bytes, new VisionAgentTemporaryFrameMetadata
+            {
+                CameraBindingId = binding.Id,
+                CameraId = camera.CameraId,
+                CameraName = camera.Name,
+                Width = parameters.Width,
+                Height = parameters.Height,
+                PixelFormat = parameters.PixelFormat,
+                CapturedAtUtc = DateTimeOffset.UtcNow
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return VisionAgentToolResult.Fail(
+                "temporary_frame_store_limit_exceeded",
+                ex.Message,
+                new { byteLength = bytes.Length, stats = _frameStore.GetStats() });
+        }
 
         return VisionAgentToolResult.Ok(new
         {
             temporaryFrameId,
-            cameraBindingId = bindingId,
+            cameraBindingId = binding.Id,
             camera.CameraId,
             camera.Name,
             byteLength = bytes.Length,
             parameters.Width,
             parameters.Height,
-            parameters.PixelFormat
+            parameters.PixelFormat,
+            triggerMode = binding.TriggerMode,
+            softwareTriggerSource = binding.SoftwareTriggerSource,
+            frameStore = _frameStore.GetStats()
         });
     }
 }

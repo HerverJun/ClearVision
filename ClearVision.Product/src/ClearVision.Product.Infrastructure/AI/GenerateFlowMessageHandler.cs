@@ -55,6 +55,7 @@ public class GenerateFlowMessageHandler
                 {
                     message = "正在连接 AI 服务...",
                     phase = "connecting",
+                    stage = "connecting",
                     requestId
                 }, _jsonOptions));
 
@@ -74,12 +75,7 @@ public class GenerateFlowMessageHandler
                 },
                 progressMsg => onMessage?.Invoke(
                     "GenerateFlowProgress",
-                    JsonSerializer.Serialize(new
-                    {
-                        message = progressMsg,
-                        phase = InferProgressPhase(progressMsg),
-                        requestId
-                    }, _jsonOptions)),
+                    JsonSerializer.Serialize(BuildProgressPayload(progressMsg, requestId), _jsonOptions)),
                 chunk => onMessage?.Invoke(
                     "GenerateFlowStreamChunk",
                     JsonSerializer.Serialize(new GenerateFlowStreamChunk
@@ -130,6 +126,7 @@ public class GenerateFlowMessageHandler
                 NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
                 ToolTrace = MapToolTrace(result.ToolTrace),
                 PendingActions = MapPendingActions(result.PendingActions),
+                ValidationPreview = MapValidationPreview(result.ValidationPreview),
                 PromptVersionId = result.PromptTrace is AiPromptTrace pt ? pt.PromptVersionId : null,
                 PromptVersionName = result.PromptTrace is AiPromptTrace pt2 ? pt2.PromptVersionName : null
             };
@@ -232,10 +229,39 @@ public class GenerateFlowMessageHandler
             response.NonBlockingMissingFields,
             response.ToolTrace,
             response.PendingActions,
+            response.ValidationPreview,
             response.PromptVersionId,
             response.PromptVersionName,
             FailureType = failureType
         }, _jsonOptions);
+    }
+
+    private static object BuildProgressPayload(string? rawMessage, string? requestId)
+    {
+        var (stage, message) = ParseProgressMessage(rawMessage);
+        return new
+        {
+            message,
+            phase = stage,
+            stage,
+            requestId
+        };
+    }
+
+    private static (string Stage, string Message) ParseProgressMessage(string? rawMessage)
+    {
+        var text = rawMessage ?? string.Empty;
+        var separatorIndex = text.IndexOf('|', StringComparison.Ordinal);
+        if (separatorIndex > 0)
+        {
+            var prefix = text[..separatorIndex].Trim();
+            if (prefix is "tool_start" or "tool_end" or "tool_failed" or "agent_repair")
+            {
+                return (prefix, text[(separatorIndex + 1)..].Trim());
+            }
+        }
+
+        return (InferProgressPhase(text), text);
     }
 
     private static string NormalizeStatus(string? completionStatus, bool success)
@@ -283,6 +309,9 @@ public class GenerateFlowMessageHandler
             return "dryrun";
         if (ContainsAny(message, ["布局", "layout"]))
             return "layouting";
+
+        if (ContainsAny(message, ["tool_start", "tool_end", "tool_failed", "正在调用"]))
+            return "tool";
 
         return string.Empty;
     }
@@ -522,8 +551,25 @@ public class GenerateFlowMessageHandler
             ResultSummary = item.ResultSummary,
             ErrorMessage = item.ErrorMessage,
             DurationMs = item.DurationMs,
-            Permission = item.Permission
+            Permission = item.Permission,
+            ToolCallingMode = item.ToolCallingMode
         }).ToList();
+    }
+
+    private static GenerateFlowValidationPreview? MapValidationPreview(AiValidationPreview? preview)
+    {
+        if (preview == null)
+        {
+            return null;
+        }
+
+        return new GenerateFlowValidationPreview
+        {
+            StructuralDryRun = preview.StructuralDryRun,
+            FrameReplay = preview.FrameReplay,
+            FinalDryRun = preview.FinalDryRun,
+            ToolDryRunTrace = preview.ToolDryRunTrace?.ToList() ?? new List<object>()
+        };
     }
 
     private static List<GenerateFlowPendingAction> MapPendingActions(

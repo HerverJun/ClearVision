@@ -9,15 +9,13 @@ public sealed record VisionAgentToolContext
     public string PromptMode { get; init; } = AiPromptModes.LegacyFullPrompt;
     public bool DebugPrompt { get; init; }
     public int MaxToolResultChars { get; init; } = 12_000;
+    public string ToolCallingMode { get; init; } = "JSON fallback";
 
     public IReadOnlySet<VisionAgentToolPermission> AllowedPermissions { get; init; } =
         new HashSet<VisionAgentToolPermission>
         {
             VisionAgentToolPermission.ReadOnly,
-            VisionAgentToolPermission.Simulation,
-            VisionAgentToolPermission.RuntimePreview,
-            VisionAgentToolPermission.ConfigDraft,
-            VisionAgentToolPermission.DeploymentPrepare
+            VisionAgentToolPermission.Simulation
         };
 }
 

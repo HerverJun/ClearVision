@@ -71,6 +71,7 @@ public sealed class DryRunFlowTool : VisionAgentToolBase
             {
                 dryRunExecuted = false,
                 valid = false,
+                isValid = false,
                 blockingIssues = validation.Errors,
                 warnings = validation.Warnings,
                 diagnostics = validation.Diagnostics
@@ -89,7 +90,10 @@ public sealed class DryRunFlowTool : VisionAgentToolBase
             return VisionAgentToolResult.Ok(new
             {
                 dryRunExecuted = true,
+                valid = true,
+                isValid = true,
                 result.IsSuccess,
+                dryRunSucceeded = result.IsSuccess,
                 result.CoveragePercentage,
                 result.CoveredBranches,
                 result.TotalBranches,

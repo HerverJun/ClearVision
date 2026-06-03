@@ -17,7 +17,8 @@ public sealed class AgentPromptBuilder
         string promptMode,
         IReadOnlyList<VisionAgentToolDescriptor> tools,
         bool supportsJsonMode,
-        bool supportsNativeToolCalls = false)
+        bool supportsNativeToolCalls = false,
+        string toolCallingMode = "Auto")
     {
         var normalizedMode = AiPromptModes.Normalize(promptMode);
         var sb = new StringBuilder();
@@ -35,6 +36,7 @@ public sealed class AgentPromptBuilder
         sb.AppendLine($"PromptMode: {normalizedMode}");
         sb.AppendLine($"JsonModeSupportedByModel: {supportsJsonMode}");
         sb.AppendLine($"NativeToolCallSupportedByModel: {supportsNativeToolCalls}");
+        sb.AppendLine($"ToolCallingMode: {toolCallingMode}");
         sb.AppendLine();
         sb.AppendLine("Tool calling protocol:");
         sb.AppendLine("If native tool calls are available, call tools through the provider tool-calling API.");

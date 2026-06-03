@@ -55,6 +55,21 @@ public sealed class VisionAgentToolRegistry : IVisionAgentToolRegistry
                 $"Vision agent tool '{name}' is not registered.");
         }
 
+        if (tool.Permission == VisionAgentToolPermission.ConfigWrite)
+        {
+            return VisionAgentToolResult.Fail(
+                "permission_denied",
+                $"Tool '{tool.Name}' requires ConfigWrite, which is never allowed for Vision Agent v1.");
+        }
+
+        if (tool.Permission == VisionAgentToolPermission.DeploymentPrepare &&
+            !string.Equals(tool.Name, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase))
+        {
+            return VisionAgentToolResult.Fail(
+                "permission_denied",
+                $"Tool '{tool.Name}' requests DeploymentPrepare, but Vision Agent v1 only allows deployment precheck.");
+        }
+
         if (!context.AllowedPermissions.Contains(tool.Permission))
         {
             return VisionAgentToolResult.Fail(

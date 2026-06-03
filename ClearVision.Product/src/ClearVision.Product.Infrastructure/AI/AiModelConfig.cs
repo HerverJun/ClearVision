@@ -80,9 +80,18 @@ public class AiModelConfig
     /// <summary>Priority used by fallback ordering. Smaller number = higher priority.</summary>
     public int? Priority { get; set; }
 
+    /// <summary>Tool calling mode: auto | native | json_fallback | disabled.</summary>
+    public string? ToolCallingMode { get; set; }
+
     public AiModelCapabilities GetEffectiveCapabilities()
     {
-        return (Capabilities?.Clone() ?? AiModelCapabilities.Infer(Provider, Model)).Normalize();
+        var capabilities = Capabilities?.Clone() ?? AiModelCapabilities.Infer(Provider, Model);
+        capabilities.ApplyToolCallingMode(
+            AiToolCallingModes.Normalize(ToolCallingMode),
+            NormalizeProtocol(Protocol, Provider),
+            Provider,
+            Model);
+        return capabilities.Normalize();
     }
 
     public AiReasoningSupportInfo GetReasoningSupport()
@@ -103,6 +112,7 @@ public class AiModelConfig
         AuthHeaderName = NormalizeAuthHeaderName(AuthHeaderName, AuthMode!, protocol);
         RoleBindings = NormalizeRoleBindings(RoleBindings);
         Priority ??= 100;
+        ToolCallingMode = AiToolCallingModes.Normalize(ToolCallingMode);
 
         ExtraHeaders = NormalizeStringMap(ExtraHeaders);
         ExtraQuery = NormalizeStringMap(ExtraQuery);
@@ -305,6 +315,7 @@ public class AiModelConfig
             ExtraQuery = CloneStringMap(ExtraQuery),
             ExtraBody = CloneJsonMap(ExtraBody),
             Capabilities = GetEffectiveCapabilities(),
+            ToolCallingMode = AiToolCallingModes.Normalize(ToolCallingMode),
             ReasoningMode = Reasoning?.Mode ?? AiReasoningModes.Auto,
             ReasoningEffort = Reasoning?.Effort ?? AiReasoningEfforts.Medium,
             TimeoutSeconds = TimeoutMs / 1000,

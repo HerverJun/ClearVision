@@ -459,7 +459,13 @@ public class AiApiClient
 
     private static AiModelCapabilities ResolveCapabilities(AiGenerationOptions options)
     {
-        return (options.Capabilities?.Clone() ?? AiModelCapabilities.Infer(options.Provider, options.Model)).Normalize();
+        var capabilities = options.Capabilities?.Clone() ?? AiModelCapabilities.Infer(options.Provider, options.Model);
+        capabilities.ApplyToolCallingMode(
+            options.ToolCallingMode,
+            ResolveProtocol(options),
+            options.Provider,
+            options.Model);
+        return capabilities.Normalize();
     }
 
     private static bool UrlPathEndsWith(string url, string suffix)
@@ -903,7 +909,7 @@ public class AiApiClient
         var toolCalls = ExtractAnthropicToolCalls(contentArray);
         if (content.Length == 0 && toolCalls.Count == 0)
         {
-            throw new InvalidOperationException("AI 杩斿洖浜嗙┖鍝嶅簲");
+            throw new InvalidOperationException("AI 返回了空响应");
         }
 
         return new AiCompletionResult
@@ -1076,7 +1082,7 @@ public class AiApiClient
         var toolCalls = ExtractOpenAiResponsesToolCalls(doc.RootElement);
         if (string.IsNullOrWhiteSpace(content) && toolCalls.Count == 0)
         {
-            throw new InvalidOperationException("AI 杩斿洖浜嗙┖鍝嶅簲");
+            throw new InvalidOperationException("AI 返回了空响应");
         }
 
         return new AiCompletionResult
@@ -1393,7 +1399,7 @@ public class AiApiClient
 
         if (string.IsNullOrWhiteSpace(content) && toolCalls.Count == 0)
         {
-            throw new InvalidOperationException("AI 杩斿洖浜嗙┖鍝嶅簲");
+            throw new InvalidOperationException("AI 返回了空响应");
         }
 
         return new AiCompletionResult

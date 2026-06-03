@@ -145,7 +145,8 @@ public class GenerateFlowMessageHandlerTests
                         Success = true,
                         ResultSummary = new { draft = "cam_SN1" },
                         DurationMs = 7,
-                        Permission = VisionAgentToolPermission.ConfigDraft.ToString()
+                        Permission = VisionAgentToolPermission.ConfigDraft.ToString(),
+                        ToolCallingMode = "JSON fallback"
                     }
                 ],
                 PendingActions =
@@ -158,7 +159,12 @@ public class GenerateFlowMessageHandlerTests
                         Payload = new { id = "cam_SN1", serialNumber = "SN-1" },
                         RequiresUserConfirmation = true
                     }
-                ]
+                ],
+                ValidationPreview = new AiValidationPreview
+                {
+                    FrameReplay = new { replaySucceeded = true, usedEntryOperatorTempId = "cam_entry" },
+                    ToolDryRunTrace = [new { toolName = "replay_flow_with_frame" }]
+                }
             }));
 
         var resultJson = await handler.HandleAsync(
@@ -170,12 +176,18 @@ public class GenerateFlowMessageHandlerTests
         trace.GetArrayLength().Should().Be(1);
         trace[0].GetProperty("toolName").GetString().Should().Be("draft_camera_binding");
         trace[0].GetProperty("permission").GetString().Should().Be("ConfigDraft");
+        trace[0].GetProperty("toolCallingMode").GetString().Should().Be("JSON fallback");
 
         var actions = doc.RootElement.GetProperty("pendingActions");
         actions.GetArrayLength().Should().Be(1);
         actions[0].GetProperty("actionType").GetString().Should().Be("cameraBindingDraft.apply");
         actions[0].GetProperty("requiresUserConfirmation").GetBoolean().Should().BeTrue();
         actions[0].GetProperty("payload").GetProperty("serialNumber").GetString().Should().Be("SN-1");
+        doc.RootElement.GetProperty("validationPreview")
+            .GetProperty("frameReplay")
+            .GetProperty("usedEntryOperatorTempId")
+            .GetString()
+            .Should().Be("cam_entry");
     }
 
     [Fact(DisplayName = "GenerateFlowMessageHandler should forward attachment report message")]

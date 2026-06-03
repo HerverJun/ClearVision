@@ -140,6 +140,7 @@ public sealed class VisionAgentLoopTests
                 MaxToolCallsPerRound = 2,
                 MaxToolResultChars = 2_000
             }));
+        var progress = new List<VisionAgentToolProgress>();
 
         var result = await loop.RunAsync(new VisionAgentLoopRequest
         {
@@ -156,7 +157,8 @@ public sealed class VisionAgentLoopTests
                     VisionAgentToolPermission.ReadOnly,
                     VisionAgentToolPermission.ConfigDraft
                 }
-            }
+            },
+            Progress = progress.Add
         }, CancellationToken.None);
 
         result.Success.Should().BeTrue();
@@ -165,12 +167,64 @@ public sealed class VisionAgentLoopTests
         result.ToolTrace.Should().ContainSingle();
         result.ToolTrace[0].ToolName.Should().Be("draft_camera_binding");
         result.ToolTrace[0].Success.Should().BeTrue();
+        result.ToolTrace[0].ToolCallingMode.Should().Be("JSON fallback");
+        result.ToolCallingMode.Should().Be("JSON fallback");
         result.PendingActions.Should().ContainSingle();
         result.PendingActions[0].ActionType.Should().Be("cameraBindingDraft.apply");
+        progress.Should().Contain(item =>
+            item.Stage == "tool_start" &&
+            item.ToolName == "draft_camera_binding" &&
+            item.Message.Contains("正在调用"));
+        progress.Should().Contain(item =>
+            item.Stage == "tool_end" &&
+            item.ToolName == "draft_camera_binding");
         tool.ExecuteCount.Should().Be(1);
         connector.Calls.Should().HaveCount(2);
         connector.Calls[1].Messages.Last().Content.Should().Contain("tool_result");
         connector.Calls[1].Messages.Last().Content.Should().Contain("cameraBindingDraft.apply");
+    }
+
+    [Fact(DisplayName = "AiModelConfig should keep OpenAI-compatible tool calling conservative unless explicitly enabled")]
+    public void AiModelConfig_ShouldApplyOpenAiCompatibleToolCallingMode()
+    {
+        var defaultCompatible = new AiModelConfig
+        {
+            Provider = "OpenAI Compatible",
+            Protocol = AiModelConfig.ProtocolOpenAiCompatible,
+            Model = "vendor-chat",
+            ToolCallingMode = AiToolCallingModes.Auto
+        };
+
+        var explicitSupport = new AiModelConfig
+        {
+            Provider = "OpenAI Compatible",
+            Protocol = AiModelConfig.ProtocolOpenAiCompatible,
+            Model = "vendor-chat",
+            ToolCallingMode = AiToolCallingModes.Auto,
+            Capabilities = new AiModelCapabilities { SupportsToolCall = true }
+        };
+
+        var forcedNative = new AiModelConfig
+        {
+            Provider = "OpenAI Compatible",
+            Protocol = AiModelConfig.ProtocolOpenAiCompatible,
+            Model = "vendor-chat",
+            ToolCallingMode = AiToolCallingModes.Native
+        };
+
+        var jsonFallback = new AiModelConfig
+        {
+            Provider = "OpenAI",
+            Protocol = AiModelConfig.ProtocolOpenAiCompatible,
+            Model = "gpt-native",
+            ToolCallingMode = AiToolCallingModes.JsonFallback,
+            Capabilities = new AiModelCapabilities { SupportsToolCall = true }
+        };
+
+        defaultCompatible.GetEffectiveCapabilities().SupportsToolCall.Should().BeFalse();
+        explicitSupport.GetEffectiveCapabilities().SupportsToolCall.Should().BeTrue();
+        forcedNative.GetEffectiveCapabilities().SupportsToolCall.Should().BeTrue();
+        jsonFallback.GetEffectiveCapabilities().SupportsToolCall.Should().BeFalse();
     }
 
     [Fact(DisplayName = "VisionAgentLoop should use native provider tool calls when capability is enabled")]
@@ -248,6 +302,89 @@ public sealed class VisionAgentLoopTests
         connector.NativeCalls[1].Messages.Should().Contain(message => message.HasToolCalls);
         connector.NativeCalls[1].Messages.Should().Contain(message => message.HasToolResults);
         connector.CompleteCalls.Should().Be(0);
+    }
+
+    [Fact(DisplayName = "VisionAgentLoop should fall back to JSON tool calls when native provider tool calls fail")]
+    public async Task VisionAgentLoop_ShouldFallbackToJsonWhenNativeToolCallsFail()
+    {
+        var tool = new FakeVisionAgentTool(
+            "get_operator_schema",
+            VisionAgentToolPermission.ReadOnly,
+            VisionAgentToolResult.Ok(new { operatorType = "ImageAcquisition", ports = new[] { "Image" } }));
+        var registry = new VisionAgentToolRegistry(
+            [tool],
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentToolRegistry>>());
+        var connector = new NativeFailThenJsonConnector(
+            """
+            {
+              "kind": "tool_call",
+              "toolCalls": [
+                {
+                  "id": "call_json_1",
+                  "name": "get_operator_schema",
+                  "arguments": { "operatorType": "ImageAcquisition" }
+                }
+              ]
+            }
+            """,
+            """{"kind":"final_flow","operators":[],"connections":[]}""");
+        var model = new AiModelConfig
+        {
+            Id = "native-fallback-model",
+            Name = "Native Fallback Model",
+            Provider = "OpenAI Compatible",
+            Protocol = AiModelConfig.ProtocolOpenAiCompatible,
+            Model = "vendor-native",
+            ToolCallingMode = AiToolCallingModes.Native
+        };
+        var orchestrator = new AiGenerationOrchestrator(
+            new FixedModelSelector(model),
+            new FixedConnectorFactory(connector));
+        var loop = new VisionAgentLoop(
+            orchestrator,
+            new AgentPromptBuilder(),
+            registry,
+            new VisionAgentProtocolParser(),
+            Options.Create(new VisionAgentLoopOptions
+            {
+                MaxToolRounds = 2,
+                MaxToolCallsPerRound = 2,
+                MaxToolResultChars = 2_000
+            }));
+        var progress = new List<VisionAgentToolProgress>();
+
+        var result = await loop.RunAsync(new VisionAgentLoopRequest
+        {
+            UserPrompt = "build acquisition flow",
+            Model = model,
+            Capabilities = model.GetEffectiveCapabilities(),
+            ToolContext = new VisionAgentToolContext
+            {
+                PromptMode = AiPromptModes.AgentTools,
+                UserDescription = "build acquisition flow",
+                AllowedPermissions = new HashSet<VisionAgentToolPermission>
+                {
+                    VisionAgentToolPermission.ReadOnly
+                }
+            },
+            Progress = progress.Add
+        }, CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.ToolCallingMode.Should().Be("JSON fallback");
+        result.ToolTrace.Should().ContainSingle();
+        result.ToolTrace[0].ToolCallingMode.Should().Be("JSON fallback");
+        connector.NativeCalls.Should().HaveCount(1);
+        connector.CompleteCalls.Should().HaveCount(2);
+        connector.CompleteCalls[0].SystemPrompt.Should().Contain("ToolCallingMode: JSON fallback");
+        progress.Should().Contain(item =>
+            item.Stage == "tool_failed" &&
+            item.ToolName == "native_tool_call" &&
+            item.Message.Contains("JSON fallback"));
+        progress.Should().Contain(item =>
+            item.Stage == "tool_start" &&
+            item.ToolName == "get_operator_schema");
+        tool.ExecuteCount.Should().Be(1);
     }
 
     private sealed class FakeVisionAgentTool : IVisionAgentTool
@@ -348,6 +485,50 @@ public sealed class VisionAgentLoopTests
         {
             NativeCalls.Add((systemPrompt, messages.ToList(), tools.ToList()));
             return Task.FromResult(_responses.Dequeue());
+        }
+
+        public Task<AiCompletionResult> StreamCompleteAsync(
+            string systemPrompt,
+            List<ChatMessage> messages,
+            Action<ClearVision.Product.Contracts.Messages.AiStreamChunk> onChunk,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class NativeFailThenJsonConnector : IAiConnector, IAiToolCallingConnector
+    {
+        private readonly Queue<string> _jsonResponses;
+
+        public NativeFailThenJsonConnector(params string[] jsonResponses)
+        {
+            _jsonResponses = new Queue<string>(jsonResponses);
+        }
+
+        public List<(string SystemPrompt, List<ChatMessage> Messages, IReadOnlyList<AiNativeToolDefinition> Tools)> NativeCalls { get; } = new();
+        public List<(string SystemPrompt, List<ChatMessage> Messages)> CompleteCalls { get; } = new();
+
+        public Task<AiCompletionResult> CompleteAsync(
+            string systemPrompt,
+            List<ChatMessage> messages,
+            CancellationToken cancellationToken = default)
+        {
+            CompleteCalls.Add((systemPrompt, messages.ToList()));
+            return Task.FromResult(new AiCompletionResult
+            {
+                Content = _jsonResponses.Dequeue()
+            });
+        }
+
+        public Task<AiCompletionResult> CompleteWithToolsAsync(
+            string systemPrompt,
+            List<ChatMessage> messages,
+            IReadOnlyList<AiNativeToolDefinition> tools,
+            CancellationToken cancellationToken = default)
+        {
+            NativeCalls.Add((systemPrompt, messages.ToList(), tools.ToList()));
+            throw new InvalidOperationException("native tools unavailable");
         }
 
         public Task<AiCompletionResult> StreamCompleteAsync(

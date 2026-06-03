@@ -42,14 +42,23 @@ public sealed class VisionAgentLoop
         VisionAgentLoopRequest request,
         CancellationToken cancellationToken)
     {
-        var tools = _toolRegistry.ListTools();
+        var allTools = _toolRegistry.ListTools();
+        var requestedToolCallingMode = AiToolCallingModes.Normalize(request.Model.ToolCallingMode);
+        var nativeToolCallsEnabled = ShouldUseNativeToolCalls(requestedToolCallingMode, request.Capabilities, allTools.Count);
+        var tools = requestedToolCallingMode == AiToolCallingModes.Disabled
+            ? Array.Empty<VisionAgentToolDescriptor>()
+            : allTools;
+        var toolCallingModeLabel = ResolveToolCallingModeLabel(
+            requestedToolCallingMode,
+            nativeToolCallsEnabled,
+            tools.Count);
         var systemPrompt = _promptBuilder.BuildSystemPrompt(
             request.ToolContext.PromptMode,
             tools,
             request.Capabilities.SupportsJsonMode,
-            request.Capabilities.SupportsToolCall);
-        var useNativeToolCalls = request.Capabilities.SupportsToolCall && tools.Count > 0;
-        var nativeToolDefinitions = useNativeToolCalls
+            nativeToolCallsEnabled,
+            toolCallingModeLabel);
+        var nativeToolDefinitions = nativeToolCallsEnabled
             ? BuildNativeToolDefinitions(tools)
             : Array.Empty<AiNativeToolDefinition>();
         var messages = new List<ChatMessage>
@@ -63,18 +72,42 @@ public sealed class VisionAgentLoop
         for (var round = 0; round <= _options.MaxToolRounds; round++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lastCompletion = useNativeToolCalls
-                ? await _orchestrator.CompleteWithToolsAsync(
-                    systemPrompt,
-                    messages,
-                    nativeToolDefinitions,
-                    request.Model,
-                    cancellationToken)
-                : await _orchestrator.CompleteAsync(
+            try
+            {
+                lastCompletion = nativeToolCallsEnabled
+                    ? await _orchestrator.CompleteWithToolsAsync(
+                        systemPrompt,
+                        messages,
+                        nativeToolDefinitions,
+                        request.Model,
+                        cancellationToken)
+                    : await _orchestrator.CompleteAsync(
+                        systemPrompt,
+                        messages,
+                        request.Model,
+                        cancellationToken);
+            }
+            catch (Exception ex) when (nativeToolCallsEnabled)
+            {
+                request.Progress?.Invoke(new VisionAgentToolProgress(
+                    "tool_failed",
+                    "native_tool_call",
+                    $"原生工具调用失败，已切换 JSON fallback：{ex.Message}",
+                    null));
+                nativeToolCallsEnabled = false;
+                toolCallingModeLabel = AiToolCallingModes.ToDisplayLabel(AiToolCallingModes.JsonFallback);
+                systemPrompt = _promptBuilder.BuildSystemPrompt(
+                    request.ToolContext.PromptMode,
+                    tools,
+                    request.Capabilities.SupportsJsonMode,
+                    supportsNativeToolCalls: false,
+                    toolCallingMode: toolCallingModeLabel);
+                lastCompletion = await _orchestrator.CompleteAsync(
                     systemPrompt,
                     messages,
                     request.Model,
                     cancellationToken);
+            }
 
             var usedNativeToolCallsThisRound = lastCompletion.ToolCalls.Count > 0;
             var parsed = usedNativeToolCallsThisRound
@@ -92,7 +125,8 @@ public sealed class VisionAgentLoop
                     SystemPrompt = systemPrompt,
                     UserPrompt = request.UserPrompt,
                     TokenUsage = lastCompletion.TokenUsage,
-                    ToolRounds = round
+                    ToolRounds = round,
+                    ToolCallingMode = toolCallingModeLabel
                 };
             }
 
@@ -110,14 +144,20 @@ public sealed class VisionAgentLoop
                     SystemPrompt = systemPrompt,
                     UserPrompt = request.UserPrompt,
                     TokenUsage = lastCompletion.TokenUsage,
-                    ToolRounds = round
+                    ToolRounds = round,
+                    ToolCallingMode = toolCallingModeLabel
                 };
             }
 
             var toolCalls = parsed.ToolCalls.Take(_options.MaxToolCallsPerRound).ToList();
             var roundResults = await ExecuteToolRoundAsync(
                 toolCalls,
-                request.ToolContext with { MaxToolResultChars = _options.MaxToolResultChars },
+                request.ToolContext with
+                {
+                    MaxToolResultChars = _options.MaxToolResultChars,
+                    ToolCallingMode = toolCallingModeLabel
+                },
+                request.Progress,
                 traces,
                 pendingActions,
                 cancellationToken);
@@ -155,13 +195,15 @@ public sealed class VisionAgentLoop
             SystemPrompt = systemPrompt,
             UserPrompt = request.UserPrompt,
             TokenUsage = lastCompletion?.TokenUsage,
-            ToolRounds = _options.MaxToolRounds
+            ToolRounds = _options.MaxToolRounds,
+            ToolCallingMode = toolCallingModeLabel
         };
     }
 
     private async Task<List<ToolRoundExecutionResult>> ExecuteToolRoundAsync(
         IReadOnlyList<VisionAgentToolCall> toolCalls,
         VisionAgentToolContext context,
+        Action<VisionAgentToolProgress>? progress,
         List<VisionAgentToolTrace> traces,
         List<VisionAgentPendingAction> pendingActions,
         CancellationToken cancellationToken)
@@ -172,14 +214,14 @@ public sealed class VisionAgentLoop
         if (allReadOnly)
         {
             var parallel = await Task.WhenAll(toolCalls.Select(call =>
-                ExecuteOneToolAsync(call, context, traces, pendingActions, cancellationToken)));
+                ExecuteOneToolAsync(call, context, progress, traces, pendingActions, cancellationToken)));
             return parallel.ToList();
         }
 
         var results = new List<ToolRoundExecutionResult>();
         foreach (var call in toolCalls)
         {
-            results.Add(await ExecuteOneToolAsync(call, context, traces, pendingActions, cancellationToken));
+            results.Add(await ExecuteOneToolAsync(call, context, progress, traces, pendingActions, cancellationToken));
         }
 
         return results;
@@ -188,6 +230,7 @@ public sealed class VisionAgentLoop
     private async Task<ToolRoundExecutionResult> ExecuteOneToolAsync(
         VisionAgentToolCall call,
         VisionAgentToolContext context,
+        Action<VisionAgentToolProgress>? progress,
         List<VisionAgentToolTrace> traces,
         List<VisionAgentPendingAction> pendingActions,
         CancellationToken cancellationToken)
@@ -196,8 +239,23 @@ public sealed class VisionAgentLoop
         var permission = _toolRegistry.TryGet(call.Name, out var tool)
             ? tool.Permission.ToString()
             : string.Empty;
+        progress?.Invoke(new VisionAgentToolProgress(
+            "tool_start",
+            call.Name,
+            $"正在调用 {call.Name}...",
+            null));
         var result = await _toolRegistry.ExecuteAsync(call.Name, context, call.Arguments, cancellationToken);
         stopwatch.Stop();
+        var issueCount = CountToolIssues(result.Data);
+        progress?.Invoke(new VisionAgentToolProgress(
+            result.Success ? "tool_end" : "tool_failed",
+            call.Name,
+            result.Success
+                ? issueCount > 0
+                    ? $"{call.Name} 返回 {issueCount} 个问题，正在修复..."
+                    : $"{call.Name} 调用完成。"
+                : $"{call.Name} 调用失败：{result.ErrorCode ?? "tool_failed"} {result.ErrorMessage}",
+            issueCount));
 
         lock (traces)
         {
@@ -209,7 +267,8 @@ public sealed class VisionAgentLoop
                 ResultSummary = SummarizeResult(result),
                 ErrorMessage = result.ErrorMessage,
                 DurationMs = stopwatch.ElapsedMilliseconds,
-                Permission = permission
+                Permission = permission,
+                ToolCallingMode = context.ToolCallingMode
             });
         }
 
@@ -279,6 +338,74 @@ public sealed class VisionAgentLoop
         };
     }
 
+    private static int CountToolIssues(object? data)
+    {
+        if (data == null)
+        {
+            return 0;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(data, JsonOptions));
+            return CountArrayProperty(doc.RootElement, "errors") +
+                   CountArrayProperty(doc.RootElement, "blockingIssues");
+        }
+        catch (JsonException)
+        {
+            return 0;
+        }
+    }
+
+    private static int CountArrayProperty(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out var value) ||
+            value.ValueKind != JsonValueKind.Array)
+        {
+            return 0;
+        }
+
+        return value.GetArrayLength();
+    }
+
+    private static bool ShouldUseNativeToolCalls(
+        string requestedMode,
+        AiModelCapabilities capabilities,
+        int toolCount)
+    {
+        if (toolCount == 0 ||
+            requestedMode is AiToolCallingModes.Disabled or AiToolCallingModes.JsonFallback)
+        {
+            return false;
+        }
+
+        if (requestedMode == AiToolCallingModes.Native)
+        {
+            return true;
+        }
+
+        return capabilities.SupportsToolCall;
+    }
+
+    private static string ResolveToolCallingModeLabel(
+        string requestedMode,
+        bool nativeToolCallsEnabled,
+        int toolCount)
+    {
+        if (toolCount == 0 || requestedMode == AiToolCallingModes.Disabled)
+        {
+            return "Disabled";
+        }
+
+        if (nativeToolCallsEnabled)
+        {
+            return "Native";
+        }
+
+        return "JSON fallback";
+    }
+
     private static object? TruncateForModel(object? data, int maxChars)
     {
         if (data == null)
@@ -331,7 +458,14 @@ public sealed record VisionAgentLoopRequest
     public AiModelConfig Model { get; init; } = new();
     public AiModelCapabilities Capabilities { get; init; } = new();
     public VisionAgentToolContext ToolContext { get; init; } = new();
+    public Action<VisionAgentToolProgress>? Progress { get; init; }
 }
+
+public sealed record VisionAgentToolProgress(
+    string Stage,
+    string ToolName,
+    string Message,
+    int? IssueCount);
 
 public sealed record VisionAgentLoopResult
 {
@@ -346,4 +480,5 @@ public sealed record VisionAgentLoopResult
     public string UserPrompt { get; init; } = string.Empty;
     public AiTokenUsage? TokenUsage { get; init; }
     public int ToolRounds { get; init; }
+    public string ToolCallingMode { get; init; } = string.Empty;
 }

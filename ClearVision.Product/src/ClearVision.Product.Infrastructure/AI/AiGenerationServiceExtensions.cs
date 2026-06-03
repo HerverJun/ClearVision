@@ -50,6 +50,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IAiFlowResponseParser, AiFlowResponseParser>();
         services.AddScoped<AutoLayoutService>();
         services.Configure<VisionAgentLoopOptions>(configuration.GetSection($"{AiGenerationOptions.SectionName}:AgentLoop"));
+        services.Configure<VisionAgentTemporaryFrameStoreOptions>(configuration.GetSection($"{AiGenerationOptions.SectionName}:TemporaryFrameStore"));
         services.AddScoped<AgentPromptBuilder>();
         services.AddScoped<VisionAgentProtocolParser>();
         services.AddScoped<VisionAgentLoop>();

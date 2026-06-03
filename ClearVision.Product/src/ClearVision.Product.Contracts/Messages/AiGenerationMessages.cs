@@ -109,6 +109,7 @@ public record GenerateFlowResponse
     public List<string> NonBlockingMissingFields { get; init; } = new();
     public List<GenerateFlowToolTrace> ToolTrace { get; init; } = new();
     public List<GenerateFlowPendingAction> PendingActions { get; init; } = new();
+    public GenerateFlowValidationPreview? ValidationPreview { get; init; }
 
     /// <summary>Active prompt template version ID at generation time.</summary>
     public string? PromptVersionId { get; init; }
@@ -287,6 +288,15 @@ public record GenerateFlowToolTrace
     public string? ErrorMessage { get; init; }
     public long DurationMs { get; init; }
     public string Permission { get; init; } = string.Empty;
+    public string ToolCallingMode { get; init; } = string.Empty;
+}
+
+public record GenerateFlowValidationPreview
+{
+    public object? StructuralDryRun { get; init; }
+    public object? FrameReplay { get; init; }
+    public object? FinalDryRun { get; init; }
+    public List<object> ToolDryRunTrace { get; init; } = new();
 }
 
 public record GenerateFlowPendingAction

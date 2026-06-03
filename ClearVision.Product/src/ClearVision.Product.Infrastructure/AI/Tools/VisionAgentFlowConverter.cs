@@ -10,8 +10,17 @@ internal static class VisionAgentFlowConverter
 {
     public static OperatorFlow ToEntity(AiGeneratedFlowJson generatedFlow, IOperatorFactory operatorFactory)
     {
+        return ToEntity(generatedFlow, operatorFactory, out _);
+    }
+
+    public static OperatorFlow ToEntity(
+        AiGeneratedFlowJson generatedFlow,
+        IOperatorFactory operatorFactory,
+        out Dictionary<string, Guid> operatorIdByTempId)
+    {
         var flow = new OperatorFlow("Vision Agent DryRun Flow");
         var operatorByTempId = new Dictionary<string, Operator>(StringComparer.OrdinalIgnoreCase);
+        operatorIdByTempId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         var inputPorts = new Dictionary<(string TempId, string PortName), Guid>();
         var outputPorts = new Dictionary<(string TempId, string PortName), Guid>();
 
@@ -68,6 +77,7 @@ internal static class VisionAgentFlowConverter
 
             flow.AddOperator(op);
             operatorByTempId[item.TempId] = op;
+            operatorIdByTempId[item.TempId] = op.Id;
         }
 
         foreach (var connection in generatedFlow.Connections)

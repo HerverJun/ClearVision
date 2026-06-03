@@ -53,6 +53,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
     };
     private const int DefaultMaxMultimodalAttachmentCount = 4;
+    private const int AgentFinalRepairAttempts = 2;
     public AiFlowGenerationService(
         AiGenerationOrchestrator aiOrchestrator,
         PromptBuilder promptBuilder,
@@ -683,6 +684,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         SessionId = conversationContext.SessionId,
                         DetectedIntent = detectedIntent,
                         DryRunResult = dryRunReport,
+                        ValidationPreview = new AiValidationPreview
+                        {
+                            FinalDryRun = dryRunReport
+                        },
                         RecommendedTemplate = recommendedTemplate,
                         GenerationMode = templatePriority.GenerationMode,
                         TemplateLockLevel = templatePriority.TemplateLockLevel,
@@ -1065,8 +1070,10 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 SessionId = conversationContext.SessionId,
                 ExistingFlowJson = conversationContext.ExistingFlowJson,
                 PromptMode = AiPromptModes.Normalize(request.PromptMode),
-                DebugPrompt = request.DebugPrompt
-            }
+                DebugPrompt = request.DebugPrompt,
+                AllowedPermissions = BuildAgentAllowedPermissions()
+            },
+            Progress = progress => reportProgress($"{progress.Stage}|{progress.Message}")
         }, cancellationToken);
         stopwatch.Stop();
 
@@ -1108,7 +1115,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 SelectionReason = selectionReason,
                 AttachmentReport = attachmentReport,
                 EstimatedInputTokens = estimatedInputTokens,
-                EstimatedOutputTokens = estimatedOutputTokens
+                EstimatedOutputTokens = estimatedOutputTokens,
+                ToolCallingMode = agentResult.ToolCallingMode
             }
             : null;
 
@@ -1147,76 +1155,132 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 ? $"operators={result.Flow!.Operators?.Count ?? 0}, connections={result.Flow.Connections?.Count ?? 0}, candidates={result.CandidateCount}"
                 : $"parse failed: {result.Code}, candidates={result.CandidateCount}");
         var generatedFlow = parseResult.Flow;
+        AiValidationResult? lastValidation = null;
         if (generatedFlow == null)
         {
             var validation = BuildParseValidationResult(parseResult);
             var diagnostics = BuildAttemptDiagnostics(1, "parse", validation, agentResult.FinalContent);
-            var manualRetry = CreateManualRetryResult(
-                stage: "agent_parse",
-                conversationContext.SessionId,
-                request.Description,
+            var repair = await TryRepairAgentFinalFlowAsync(
+                request,
+                conversationContext,
+                activeModel,
+                capabilities,
+                agentResult,
                 validation,
                 diagnostics,
-                retryCount: 0,
-                lastRawResponse: agentResult.FinalContent,
-                promptTrace,
-                progressMessages,
-                requirementBrief,
-                turnRoute,
-                templatePriority.GenerationMode,
-                templatePriority.TemplateLockLevel,
-                BuildTemplateCandidates(templatePriority),
-                pipeline.Timeline.ToList());
-            manualRetry.ToolTrace = agentResult.ToolTrace;
-            manualRetry.PendingActions = agentResult.PendingActions;
-            return manualRetry;
+                "parse",
+                templatePriority,
+                pipeline,
+                reportProgress,
+                cancellationToken);
+            if (!repair.Success)
+            {
+                var manualRetry = CreateManualRetryResult(
+                    stage: "agent_parse",
+                    conversationContext.SessionId,
+                    request.Description,
+                    repair.Validation ?? validation,
+                    repair.Diagnostics.Count > 0 ? repair.Diagnostics : diagnostics,
+                    retryCount: repair.RepairAttempts,
+                    lastRawResponse: repair.AgentResult?.FinalContent ?? agentResult.FinalContent,
+                    promptTrace,
+                    progressMessages,
+                    requirementBrief,
+                    turnRoute,
+                    templatePriority.GenerationMode,
+                    templatePriority.TemplateLockLevel,
+                    BuildTemplateCandidates(templatePriority),
+                    pipeline.Timeline.ToList());
+                manualRetry.ToolTrace = repair.ToolTrace.Count > 0 ? repair.ToolTrace : agentResult.ToolTrace;
+                manualRetry.PendingActions = repair.PendingActions.Count > 0 ? repair.PendingActions : agentResult.PendingActions;
+                return manualRetry;
+            }
+
+            agentResult = repair.AgentResult!;
+            generatedFlow = repair.GeneratedFlow!;
+            lastValidation = repair.Validation!;
+            if (promptTrace != null)
+            {
+                promptTrace.SystemPrompt = agentResult.SystemPrompt;
+                promptTrace.UserPrompt = agentResult.UserPrompt;
+                promptTrace.ToolCallingMode = agentResult.ToolCallingMode;
+            }
         }
 
         ApplyTemplateMetadata(generatedFlow, templatePriority);
         ApplyModelEmbeddedNmsDefaults(generatedFlow);
 
-        var lastValidation = pipeline.Measure(
-            "validator",
-            () => _validator.Validate(generatedFlow),
-            validation => validation.IsValid
-                ? $"valid with warnings={validation.Warnings.Count}"
-                : $"errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
-        if (lastValidation.IsValid && templatePriority.IsTemplateFirst)
+        if (lastValidation == null)
         {
-            var templateGate = pipeline.Measure(
-                "template_gate",
-                () => _templateConstraintValidator.Validate(
-                    generatedFlow,
-                    templatePriority.Template,
-                    string.Equals(templatePriority.TemplateLockLevel, "strict", StringComparison.OrdinalIgnoreCase)),
+            lastValidation = pipeline.Measure(
+                "validator",
+                () => _validator.Validate(generatedFlow),
                 validation => validation.IsValid
-                    ? $"template gate passed with warnings={validation.Warnings.Count}"
-                    : $"template gate errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
-            MergeValidationResult(lastValidation, templateGate);
+                    ? $"valid with warnings={validation.Warnings.Count}"
+                    : $"errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
+            if (lastValidation.IsValid && templatePriority.IsTemplateFirst)
+            {
+                var templateGate = pipeline.Measure(
+                    "template_gate",
+                    () => _templateConstraintValidator.Validate(
+                        generatedFlow,
+                        templatePriority.Template,
+                        string.Equals(templatePriority.TemplateLockLevel, "strict", StringComparison.OrdinalIgnoreCase)),
+                    validation => validation.IsValid
+                        ? $"template gate passed with warnings={validation.Warnings.Count}"
+                        : $"template gate errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
+                MergeValidationResult(lastValidation, templateGate);
+            }
         }
 
         if (!lastValidation.IsValid)
         {
             var diagnostics = BuildAttemptDiagnostics(1, "validation", lastValidation, agentResult.FinalContent);
-            var manualRetry = CreateManualRetryResult(
-                stage: "agent_validation",
-                conversationContext.SessionId,
-                request.Description,
+            var repair = await TryRepairAgentFinalFlowAsync(
+                request,
+                conversationContext,
+                activeModel,
+                capabilities,
+                agentResult,
                 lastValidation,
                 diagnostics,
-                retryCount: 0,
-                lastRawResponse: agentResult.FinalContent,
-                promptTrace,
-                progressMessages,
-                requirementBrief,
-                turnRoute,
-                templatePriority.GenerationMode,
-                templatePriority.TemplateLockLevel,
-                BuildTemplateCandidates(templatePriority),
-                pipeline.Timeline.ToList());
-            manualRetry.ToolTrace = agentResult.ToolTrace;
-            manualRetry.PendingActions = agentResult.PendingActions;
-            return manualRetry;
+                "validation",
+                templatePriority,
+                pipeline,
+                reportProgress,
+                cancellationToken);
+            if (!repair.Success)
+            {
+                var manualRetry = CreateManualRetryResult(
+                    stage: "agent_validation",
+                    conversationContext.SessionId,
+                    request.Description,
+                    repair.Validation ?? lastValidation,
+                    repair.Diagnostics.Count > 0 ? repair.Diagnostics : diagnostics,
+                    retryCount: repair.RepairAttempts,
+                    lastRawResponse: repair.AgentResult?.FinalContent ?? agentResult.FinalContent,
+                    promptTrace,
+                    progressMessages,
+                    requirementBrief,
+                    turnRoute,
+                    templatePriority.GenerationMode,
+                    templatePriority.TemplateLockLevel,
+                    BuildTemplateCandidates(templatePriority),
+                    pipeline.Timeline.ToList());
+                manualRetry.ToolTrace = repair.ToolTrace.Count > 0 ? repair.ToolTrace : agentResult.ToolTrace;
+                manualRetry.PendingActions = repair.PendingActions.Count > 0 ? repair.PendingActions : agentResult.PendingActions;
+                return manualRetry;
+            }
+
+            agentResult = repair.AgentResult!;
+            generatedFlow = repair.GeneratedFlow!;
+            lastValidation = repair.Validation!;
+            if (promptTrace != null)
+            {
+                promptTrace.SystemPrompt = agentResult.SystemPrompt;
+                promptTrace.UserPrompt = agentResult.UserPrompt;
+                promptTrace.ToolCallingMode = agentResult.ToolCallingMode;
+            }
         }
 
         var (flowDto, actualOperatorIdMap) = ConvertToFlowDto(generatedFlow, request.Description);
@@ -1305,6 +1369,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             MissingResources = missingResources,
             PendingActions = pendingActions,
             ToolTrace = agentResult.ToolTrace,
+            ValidationPreview = BuildValidationPreview(dryRunReport, agentResult.ToolTrace),
             PromptTrace = promptTrace,
             RequirementBrief = requirementBrief,
             TemplateCandidates = BuildTemplateCandidates(templatePriority),
@@ -1316,6 +1381,277 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
             NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
         };
+    }
+
+    private async Task<AgentFinalRepairResult> TryRepairAgentFinalFlowAsync(
+        AiFlowGenerationRequest request,
+        ConversationContext conversationContext,
+        AiModelConfig activeModel,
+        AiModelCapabilities capabilities,
+        VisionAgentLoopResult initialAgentResult,
+        AiValidationResult initialValidation,
+        List<AiAttemptDiagnostic> initialDiagnostics,
+        string failureStage,
+        TemplatePriorityContext templatePriority,
+        AiGenerationPipelineContext pipeline,
+        Action<string> reportProgress,
+        CancellationToken cancellationToken)
+    {
+        var diagnostics = initialDiagnostics.Select(CloneAttemptDiagnostic).ToList();
+        var toolTrace = initialAgentResult.ToolTrace.ToList();
+        var pendingActions = initialAgentResult.PendingActions.ToList();
+        var lastValidation = initialValidation;
+        var lastAgentResult = initialAgentResult;
+        AiGeneratedFlowJson? generatedFlow = null;
+
+        for (var attempt = 1; attempt <= AgentFinalRepairAttempts; attempt++)
+        {
+            var errorCount = Math.Max(1, lastValidation.Diagnostics.Count(item => item.Severity == AiValidationSeverity.Error));
+            reportProgress($"agent_repair|发现 {errorCount} 个错误，正在回灌 Agent 修复（第 {attempt}/{AgentFinalRepairAttempts} 轮）...");
+            var repairPrompt = BuildAgentFinalRepairPrompt(
+                request.Description,
+                lastAgentResult.FinalContent,
+                lastValidation,
+                failureStage,
+                attempt);
+
+            var stopwatch = Stopwatch.StartNew();
+            var repairResult = await _visionAgentLoop!.RunAsync(new VisionAgentLoopRequest
+            {
+                UserPrompt = repairPrompt,
+                Model = activeModel,
+                Capabilities = capabilities,
+                ToolContext = new VisionAgentToolContext
+                {
+                    UserDescription = request.Description,
+                    AdditionalContext = request.AdditionalContext,
+                    SessionId = conversationContext.SessionId,
+                    ExistingFlowJson = conversationContext.ExistingFlowJson,
+                    PromptMode = AiPromptModes.Normalize(request.PromptMode),
+                    DebugPrompt = request.DebugPrompt,
+                    AllowedPermissions = BuildAgentAllowedPermissions()
+                },
+                Progress = progress => reportProgress($"{progress.Stage}|{progress.Message}")
+            }, cancellationToken);
+            stopwatch.Stop();
+
+            toolTrace.AddRange(repairResult.ToolTrace);
+            pendingActions.AddRange(repairResult.PendingActions);
+            pipeline.AddStage(
+                "agent_final_repair",
+                repairResult.Success ? "completed" : "failed",
+                repairResult.Success
+                    ? $"attempt={attempt}, toolRounds={repairResult.ToolRounds}, responseChars={repairResult.FinalContent.Length}"
+                    : repairResult.ErrorMessage ?? "agent final repair failed",
+                stopwatch.Elapsed,
+                new Dictionary<string, string>
+                {
+                    ["attempt"] = attempt.ToString(CultureInfo.InvariantCulture),
+                    ["failureStage"] = failureStage,
+                    ["toolCallingMode"] = repairResult.ToolCallingMode
+                });
+
+            lastAgentResult = repairResult with
+            {
+                ToolTrace = toolTrace.ToList(),
+                PendingActions = pendingActions.ToList()
+            };
+
+            if (!repairResult.Success)
+            {
+                return AgentFinalRepairResult.Failed(
+                    lastAgentResult,
+                    lastValidation,
+                    diagnostics,
+                    toolTrace,
+                    pendingActions,
+                    attempt);
+            }
+
+            var parseResult = pipeline.Measure(
+                "parse",
+                () => _responseParser.Parse(repairResult.FinalContent),
+                result => result.Success
+                    ? $"operators={result.Flow!.Operators?.Count ?? 0}, connections={result.Flow.Connections?.Count ?? 0}, candidates={result.CandidateCount}"
+                    : $"parse failed: {result.Code}, candidates={result.CandidateCount}");
+            generatedFlow = parseResult.Flow;
+            if (generatedFlow == null)
+            {
+                lastValidation = BuildParseValidationResult(parseResult);
+                diagnostics.AddRange(BuildAttemptDiagnostics(
+                    attempt + 1,
+                    "parse",
+                    lastValidation,
+                    repairResult.FinalContent));
+                continue;
+            }
+
+            ApplyTemplateMetadata(generatedFlow, templatePriority);
+            ApplyModelEmbeddedNmsDefaults(generatedFlow);
+            lastValidation = pipeline.Measure(
+                "validator",
+                () => _validator.Validate(generatedFlow),
+                validation => validation.IsValid
+                    ? $"valid with warnings={validation.Warnings.Count}"
+                    : $"errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
+
+            if (lastValidation.IsValid && templatePriority.IsTemplateFirst)
+            {
+                var templateGate = pipeline.Measure(
+                    "template_gate",
+                    () => _templateConstraintValidator.Validate(
+                        generatedFlow,
+                        templatePriority.Template,
+                        string.Equals(templatePriority.TemplateLockLevel, "strict", StringComparison.OrdinalIgnoreCase)),
+                    validation => validation.IsValid
+                        ? $"template gate passed with warnings={validation.Warnings.Count}"
+                        : $"template gate errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
+                MergeValidationResult(lastValidation, templateGate);
+            }
+
+            diagnostics.AddRange(BuildAttemptDiagnostics(
+                attempt + 1,
+                "validation",
+                lastValidation,
+                repairResult.FinalContent));
+
+            if (lastValidation.IsValid)
+            {
+                return AgentFinalRepairResult.Repaired(
+                    lastAgentResult,
+                    generatedFlow,
+                    lastValidation,
+                    diagnostics,
+                    toolTrace,
+                    pendingActions,
+                    attempt);
+            }
+        }
+
+        return AgentFinalRepairResult.Failed(
+            lastAgentResult,
+            lastValidation,
+            diagnostics,
+            toolTrace,
+            pendingActions,
+            AgentFinalRepairAttempts);
+    }
+
+    private static HashSet<VisionAgentToolPermission> BuildAgentAllowedPermissions() =>
+    [
+        VisionAgentToolPermission.ReadOnly,
+        VisionAgentToolPermission.Simulation,
+        VisionAgentToolPermission.RuntimePreview,
+        VisionAgentToolPermission.ConfigDraft,
+        VisionAgentToolPermission.DeploymentPrepare
+    ];
+
+    private static string BuildAgentFinalRepairPrompt(
+        string originalDescription,
+        string previousFinalContent,
+        AiValidationResult validation,
+        string failureStage,
+        int repairAttempt)
+    {
+        var payload = new
+        {
+            kind = "backend_final_flow_repair",
+            repairAttempt,
+            failureStage,
+            originalDescription,
+            validation_result = BuildStructuredValidationPayload(
+                validation,
+                includeTemplateDiagnostics: false),
+            template_gate_result = BuildStructuredValidationPayload(
+                validation,
+                includeTemplateDiagnostics: true),
+            previous_final_flow = TrimRetryOutput(previousFinalContent)
+        };
+
+        return "Backend parse/validator/template_gate rejected the previous final_flow. " +
+               "Use the structured result below to repair only the failing fields and return one final_flow JSON object.\n" +
+               JsonSerializer.Serialize(payload, _jsonOptions);
+    }
+
+    private static object BuildStructuredValidationPayload(
+        AiValidationResult validation,
+        bool includeTemplateDiagnostics)
+    {
+        var diagnostics = validation.Diagnostics
+            .Where(issue => includeTemplateDiagnostics == IsTemplateGateDiagnostic(issue))
+            .ToList();
+        var issues = diagnostics.Select(issue => new
+        {
+            severity = issue.Severity,
+            code = issue.Code,
+            category = issue.Category,
+            message = issue.Message,
+            relatedFields = issue.RelatedFields,
+            operatorId = issue.OperatorId,
+            parameterName = issue.ParameterName,
+            portName = issue.TargetPortName ?? issue.SourcePortName,
+            sourcePortName = issue.SourcePortName,
+            targetPortName = issue.TargetPortName,
+            repairHint = issue.RepairHint
+        }).ToList();
+
+        return new
+        {
+            isValid = includeTemplateDiagnostics
+                ? diagnostics.All(issue => issue.Severity != AiValidationSeverity.Error)
+                : validation.IsValid,
+            errors = issues
+                .Where(issue => issue.severity == AiValidationSeverity.Error)
+                .ToList(),
+            warnings = issues
+                .Where(issue => issue.severity == AiValidationSeverity.Warning)
+                .ToList(),
+            issues
+        };
+    }
+
+    private static bool IsTemplateGateDiagnostic(AiValidationDiagnostic issue)
+    {
+        return string.Equals(issue.Category, "template", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(issue.Category, "template_gate", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static AiValidationPreview BuildValidationPreview(
+        object? finalDryRun,
+        IReadOnlyList<VisionAgentToolTrace> toolTrace)
+    {
+        var toolDryRunTrace = toolTrace
+            .Where(item =>
+                string.Equals(item.ToolName, "dryrun_flow", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(item.ToolName, "replay_flow_with_frame", StringComparison.OrdinalIgnoreCase))
+            .Select(item => new
+            {
+                item.ToolName,
+                item.Success,
+                item.ResultSummary,
+                item.ErrorMessage,
+                item.DurationMs,
+                item.ToolCallingMode
+            })
+            .Cast<object>()
+            .ToList();
+
+        return new AiValidationPreview
+        {
+            StructuralDryRun = FindLastToolResult(toolTrace, "dryrun_flow"),
+            FrameReplay = FindLastToolResult(toolTrace, "replay_flow_with_frame"),
+            FinalDryRun = finalDryRun,
+            ToolDryRunTrace = toolDryRunTrace
+        };
+    }
+
+    private static object? FindLastToolResult(
+        IReadOnlyList<VisionAgentToolTrace> toolTrace,
+        string toolName)
+    {
+        return toolTrace
+            .LastOrDefault(item => string.Equals(item.ToolName, toolName, StringComparison.OrdinalIgnoreCase))
+            ?.ResultSummary;
     }
 
     private static string BuildTurnRoutePromptSection(AiTurnRoute route)
@@ -3405,6 +3741,36 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 Array.Empty<string>(),
                 null,
                 Array.Empty<ScenarioMatchResult>());
+    }
+
+    private sealed record AgentFinalRepairResult(
+        bool Success,
+        VisionAgentLoopResult? AgentResult,
+        AiGeneratedFlowJson? GeneratedFlow,
+        AiValidationResult? Validation,
+        List<AiAttemptDiagnostic> Diagnostics,
+        List<VisionAgentToolTrace> ToolTrace,
+        List<VisionAgentPendingAction> PendingActions,
+        int RepairAttempts)
+    {
+        public static AgentFinalRepairResult Repaired(
+            VisionAgentLoopResult agentResult,
+            AiGeneratedFlowJson generatedFlow,
+            AiValidationResult validation,
+            List<AiAttemptDiagnostic> diagnostics,
+            List<VisionAgentToolTrace> toolTrace,
+            List<VisionAgentPendingAction> pendingActions,
+            int repairAttempts) =>
+            new(true, agentResult, generatedFlow, validation, diagnostics, toolTrace, pendingActions, repairAttempts);
+
+        public static AgentFinalRepairResult Failed(
+            VisionAgentLoopResult agentResult,
+            AiValidationResult validation,
+            List<AiAttemptDiagnostic> diagnostics,
+            List<VisionAgentToolTrace> toolTrace,
+            List<VisionAgentPendingAction> pendingActions,
+            int repairAttempts) =>
+            new(false, agentResult, null, validation, diagnostics, toolTrace, pendingActions, repairAttempts);
     }
 
     private sealed record ClarificationHistoryContext(

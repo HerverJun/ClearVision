@@ -224,6 +224,16 @@ public class AiFlowGenerationResult
     public List<VisionAgentToolTrace> ToolTrace { get; set; } = new();
 
     public List<VisionAgentPendingAction> PendingActions { get; set; } = new();
+
+    public AiValidationPreview? ValidationPreview { get; set; }
+}
+
+public class AiValidationPreview
+{
+    public object? StructuralDryRun { get; set; }
+    public object? FrameReplay { get; set; }
+    public object? FinalDryRun { get; set; }
+    public List<object> ToolDryRunTrace { get; set; } = new();
 }
 
 public static class AiTurnIntents
