@@ -128,7 +128,7 @@ public sealed class FlowTemplateSkeletonTool : VisionAgentToolBase
                 targetTempId = connection.TargetTempId,
                 targetPortName = connection.TargetPortName
             }).ToList(),
-            resourcePolicy = "No camera capture, frame replay, model loading, template file loading, or Station access is performed."
+            resourcePolicy = "No camera capture, frame replay, model loading, template file loading, or external service access is performed."
         }));
     }
 

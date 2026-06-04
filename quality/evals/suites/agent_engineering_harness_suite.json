@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2026-04-27.quality-suite.v1",
   "suiteId": "agent_engineering_harness_suite",
-  "description": "Evaluation Harness v0.1 for Vision Engineering Agent engineering behavior. Uses fixed mock cases only; no images, cameras, models, stations, network, or OS command tools.",
+  "description": "Evaluation Harness and Vision Engineering Agent guard suite. Uses fixed mock/scripted cases only; no images, cameras, models, stations, network, or OS command tools.",
   "ciBudgetMinutes": 3,
   "execution": {
     "mode": "serial",
@@ -12,7 +12,7 @@
       "id": "agent-engineering-harness-v0.1",
       "entries": [
         {
-          "id": "vision_agent_engineering_harness_tests",
+          "id": "vision_agent_engineering_harness_and_tool_guard_tests",
           "status": "active",
           "evidenceKind": "agent_engineering_harness",
           "operators": [
@@ -30,7 +30,7 @@
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            "& './scripts/run-dotnet-test-serial.ps1' -Project 'ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj' -FullyQualifiedName 'ClearVision.Product.Tests.AI.AgentEvaluation.AgentEngineeringEvaluationHarnessTests' -Verbosity minimal -ResultsDirectory 'test_results/agent_engineering_harness' -LogFileName 'agent_engineering_harness.trx' -MinimumTotalTests 16 -MinimumPassedTests 16"
+            "& './scripts/run-dotnet-test-serial.ps1' -Project 'ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj' -FullyQualifiedName 'ClearVision.Product.Tests.AI.AgentEvaluation.AgentEngineeringEvaluationHarnessTests,ClearVision.Product.Tests.AI.VisionAgentSkeleton.VisionAgentSkeletonTests,ClearVision.Product.Tests.AI.VisionAgentReadOnlyTools.VisionAgentReadOnlyToolsTests,ClearVision.Product.Tests.AI.VisionAgentSimulationTools.VisionAgentSimulationToolsTests' -Verbosity minimal -ResultsDirectory 'test_results/agent_engineering_harness' -LogFileName 'agent_engineering_harness.trx' -MinimumTotalTests 62 -MinimumPassedTests 62"
           ],
           "estimatedSeconds": 45
         }
