@@ -268,7 +268,7 @@ public sealed class VisionAgentGenerateFlowTests
             !source.Contains(fragment, StringComparison.OrdinalIgnoreCase));
     }
 
-    [Fact(DisplayName = "Mainline guard should keep Agent loop out of default GenerateFlow and frontend")]
+    [Fact(DisplayName = "Mainline guard should keep Agent loop out of default GenerateFlow and keep frontend Agent entry hidden")]
     public void MainlineGuard_ShouldKeepAgentLoopOutOfDefaultGenerateFlowAndFrontend()
     {
         var productRoot = GetProductRoot();
@@ -278,17 +278,22 @@ public sealed class VisionAgentGenerateFlowTests
             "ClearVision.Product.Infrastructure",
             "AI",
             "AiFlowGenerationService.cs"));
-        var frontendSource = ReadSourceUnder(Path.Combine(
+        var frontendSource = File.ReadAllText(Path.Combine(
             productRoot,
             "src",
             "ClearVision.Product.Desktop",
             "wwwroot",
-            "src"));
+            "src",
+            "features",
+            "ai",
+            "aiPanel.js"));
 
         generateFlowService.Should().NotContain("VisionAgentLoop");
         generateFlowService.Should().Contain("ShouldRunAgentGenerateFlow");
         generateFlowService.Should().Contain("request.UseVisionAgentGenerateFlow");
-        frontendSource.Should().NotContain("useVisionAgentGenerateFlow");
+        frontendSource.Should().Contain("_isAgentDeveloperControlsEnabled");
+        frontendSource.Should().Contain("_buildAgentGenerateFlowRequestPayload");
+        frontendSource.Should().Contain("useVisionAgentGenerateFlow: true");
         frontendSource.Should().NotContain("capture_test_frame");
         frontendSource.Should().NotContain("replay_flow_with_frame");
         frontendSource.Should().NotContain("runtime_package_precheck");

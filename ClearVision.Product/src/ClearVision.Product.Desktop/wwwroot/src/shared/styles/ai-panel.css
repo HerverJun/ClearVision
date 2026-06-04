@@ -958,6 +958,43 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     white-space: nowrap;
 }
 
+.ai-agent-dev-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.ai-agent-dev-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--paper-white);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.ai-agent-dev-toggle input {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--cinnabar);
+}
+
+.ai-agent-dev-mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 36, 53, 0.36);
+}
+
+.ai-agent-dev-mode-toggle .ai-mode-chip:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .ai-input-box {
     display: flex;
     align-items: flex-end;
@@ -2423,6 +2460,13 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     gap: 6px;
 }
 
+.ai-parameter-field.is-placeholder {
+    padding: 8px;
+    border-left: 3px solid rgba(251, 191, 36, 0.68);
+    border-radius: 6px;
+    background: rgba(251, 191, 36, 0.07);
+}
+
 .ai-parameter-field-label {
     display: flex;
     align-items: center;
@@ -2539,6 +2583,12 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 
 .ai-parameter-field-status.is-unconfirmed {
     color: var(--ink-gray);
+}
+
+.ai-parameter-field-placeholder {
+    color: #fbbf24;
+    font-size: 11px;
+    line-height: 1.4;
 }
 
 .ai-parameter-editor-actions {
@@ -3378,6 +3428,112 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 }
 .ai-validation-retry-summary { font-size: 12px; color: var(--text-secondary, #aaa); }
 .ai-validation-retry-stage { font-size: 11px; color: var(--text-muted, #888); margin-top: 2px; }
+
+.ai-agent-validation-artifacts {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.ai-agent-deployment-state {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(15, 36, 53, 0.36);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--ink-gray);
+    font-size: 11px;
+}
+
+.ai-agent-preview-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(15, 36, 53, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ai-agent-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--paper-white);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.ai-agent-preview-header small {
+    color: var(--ink-gray);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.ai-agent-preview-summary,
+.ai-agent-preview-state-row,
+.ai-agent-artifact-row {
+    color: var(--ink-gray);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.ai-agent-preview-state-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.ai-agent-artifact-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.ai-agent-artifact-row span,
+.ai-agent-artifact-row small {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.ai-agent-tool-trace {
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 36, 53, 0.28);
+    color: var(--ink-gray);
+    font-size: 11px;
+}
+
+.ai-agent-tool-trace summary {
+    cursor: pointer;
+    padding: 10px 12px;
+    color: var(--paper-white);
+    overflow-wrap: anywhere;
+}
+
+.ai-agent-tool-trace-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 12px 10px;
+}
+
+.ai-agent-tool-trace-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 5px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ai-agent-tool-trace-row span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
 
 .ai-validation-issues { display: flex; flex-direction: column; gap: 4px; }
 .ai-validation-issues-header { font-size: 12px; font-weight: 600; color: var(--text-secondary, #aaa); margin-bottom: 4px; }

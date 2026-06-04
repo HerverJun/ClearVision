@@ -101,6 +101,9 @@ export class AiPanel {
         this._lastAgentRuntime = null;
         this._clarificationSelectionDraft = {};
         this._lastClarificationDraftText = '';
+        this.isVisionAgentDeveloperUiEnabled = this._isAgentDeveloperControlsEnabled();
+        this.useVisionAgentGenerateFlow = this._loadAgentGenerateFlowEnabled();
+        this.agentGenerateFlowMode = this._loadAgentGenerateFlowMode();
 
         // 应用预览与撤销
         this._preApplySnapshot = null;
@@ -332,6 +335,7 @@ export class AiPanel {
                             </div>
                             <div class="ai-requirement-mode-tip" id="ai-requirement-mode-tip"></div>
                         </div>
+                        ${this._renderAgentDeveloperControls()}
                         <div class="ai-input-box">
                             <button class="icon-btn" id="ai-btn-attach" type="button" title="添加附件" aria-label="添加附件">
                                 <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 005 0V5c0-1.38-1.12-2.5-2.5-2.5S8 3.62 8 5v11.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
@@ -463,6 +467,7 @@ export class AiPanel {
                 this._setRequirementMode(button.dataset.requirementMode || 'strict');
             });
         });
+        this._bindAgentDeveloperControls();
         
         this.container.querySelectorAll('.ai-tag').forEach(tag => {
             tag.addEventListener('click', () => {
@@ -595,6 +600,7 @@ export class AiPanel {
             : null;
         const flowPayload = shouldIncludeFlowPayload ? currentFlowPayload : null;
         const normalizedTemplateSelection = this._normalizeTemplateSelection(templateSelection);
+        const agentGenerateFlowPayload = this._buildAgentGenerateFlowRequestPayload();
         this._renderAgentRuntime(this._buildOutgoingRuntimePayload(resolvedMode));
 
         if (this.currentResult?.flow) {
@@ -615,7 +621,8 @@ export class AiPanel {
                     requestId,
                     sessionId: this.sessionId,
                     existingFlowJson: flowPayload,
-                    attachments: attachmentPaths
+                    attachments: attachmentPaths,
+                    ...agentGenerateFlowPayload
                 }
             });
             this.nextHintDraft = '';
@@ -805,6 +812,156 @@ export class AiPanel {
         }
     }
 
+    _isAgentDeveloperControlsEnabled() {
+        if (this.options?.enableVisionAgentGenerateFlowDevUi === true ||
+            this.options?.visionAgentGenerateFlowDeveloperUi === true) {
+            return true;
+        }
+
+        try {
+            if (window?.__CLEARVISION_AGENT_DEV_UI__ === true) {
+                return true;
+            }
+
+            const search = new URLSearchParams(window?.location?.search || '');
+            const queryValue = search.get('visionAgentDev') || search.get('agentDev') || search.get('cvAgentDev');
+            if (this._parseBooleanPreference(queryValue)) {
+                return true;
+            }
+        } catch {
+            // ignore browser context failures
+        }
+
+        try {
+            return this._parseBooleanPreference(localStorage.getItem('cv_ai_agent_dev_ui'));
+        } catch {
+            return false;
+        }
+    }
+
+    _parseBooleanPreference(value) {
+        const normalized = String(value ?? '').trim().toLowerCase();
+        return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+    }
+
+    _normalizeAgentGenerateFlowMode(mode) {
+        return String(mode || '').trim().toLowerCase() === 'planner' ? 'planner' : 'scripted';
+    }
+
+    _loadAgentGenerateFlowEnabled() {
+        if (!this.isVisionAgentDeveloperUiEnabled) {
+            return false;
+        }
+
+        if (this.options?.useVisionAgentGenerateFlow === true) {
+            return true;
+        }
+
+        try {
+            return this._parseBooleanPreference(localStorage.getItem('cv_ai_use_vision_agent_generate_flow'));
+        } catch {
+            return false;
+        }
+    }
+
+    _loadAgentGenerateFlowMode() {
+        const optionMode = this.options?.agentGenerateFlowMode;
+        if (optionMode) {
+            return this._normalizeAgentGenerateFlowMode(optionMode);
+        }
+
+        try {
+            return this._normalizeAgentGenerateFlowMode(localStorage.getItem('cv_ai_agent_generate_flow_mode'));
+        } catch {
+            return 'scripted';
+        }
+    }
+
+    _saveAgentGenerateFlowPreference() {
+        if (!this.isVisionAgentDeveloperUiEnabled) {
+            return;
+        }
+
+        try {
+            localStorage.setItem('cv_ai_use_vision_agent_generate_flow', this.useVisionAgentGenerateFlow ? 'true' : 'false');
+            localStorage.setItem('cv_ai_agent_generate_flow_mode', this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode));
+        } catch {
+            // ignore localStorage failures
+        }
+    }
+
+    _renderAgentDeveloperControls() {
+        if (!this.isVisionAgentDeveloperUiEnabled) {
+            return '';
+        }
+
+        const enabled = Boolean(this.useVisionAgentGenerateFlow);
+        const mode = this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode);
+        return `
+            <div class="ai-agent-dev-controls" id="ai-agent-dev-controls">
+                <label class="ai-agent-dev-toggle">
+                    <input id="ai-agent-generate-toggle" type="checkbox" ${enabled ? 'checked' : ''} />
+                    <span>Agent GenerateFlow</span>
+                </label>
+                <div class="ai-agent-dev-mode-toggle" id="ai-agent-generate-mode-toggle" role="group" aria-label="Agent GenerateFlow 模式">
+                    <button class="ai-mode-chip ${mode === 'scripted' ? 'is-active' : ''}" type="button" data-agent-generate-mode="scripted" ${enabled ? '' : 'disabled'}>scripted</button>
+                    <button class="ai-mode-chip ${mode === 'planner' ? 'is-active' : ''}" type="button" data-agent-generate-mode="planner" ${enabled ? '' : 'disabled'}>planner</button>
+                </div>
+            </div>
+        `;
+    }
+
+    _bindAgentDeveloperControls() {
+        if (!this.isVisionAgentDeveloperUiEnabled) {
+            return;
+        }
+
+        const toggle = this.container?.querySelector('#ai-agent-generate-toggle');
+        const modeButtons = Array.from(this.container?.querySelectorAll('[data-agent-generate-mode]') || []);
+        const refresh = () => {
+            const mode = this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode);
+            modeButtons.forEach(button => {
+                const isActive = String(button.dataset.agentGenerateMode || '').toLowerCase() === mode;
+                button.classList.toggle('is-active', isActive);
+                button.disabled = !this.useVisionAgentGenerateFlow;
+            });
+        };
+
+        if (toggle) {
+            toggle.checked = Boolean(this.useVisionAgentGenerateFlow);
+            toggle.addEventListener('change', () => {
+                this.useVisionAgentGenerateFlow = Boolean(toggle.checked);
+                this._saveAgentGenerateFlowPreference();
+                refresh();
+            });
+        }
+
+        modeButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                if (!this.useVisionAgentGenerateFlow) {
+                    return;
+                }
+
+                this.agentGenerateFlowMode = this._normalizeAgentGenerateFlowMode(button.dataset.agentGenerateMode);
+                this._saveAgentGenerateFlowPreference();
+                refresh();
+            });
+        });
+
+        refresh();
+    }
+
+    _buildAgentGenerateFlowRequestPayload() {
+        if (!this.isVisionAgentDeveloperUiEnabled || !this.useVisionAgentGenerateFlow) {
+            return {};
+        }
+
+        return {
+            useVisionAgentGenerateFlow: true,
+            agentGenerateFlowMode: this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode)
+        };
+    }
+
     _normalizeRequirementMode(mode) {
         return String(mode || '').trim().toLowerCase() === 'draft' ? 'draft' : 'strict';
     }
@@ -888,9 +1045,7 @@ export class AiPanel {
             return;
         }
 
-        const pending = this._normalizePendingParameters(
-            this.currentResult?.pendingParameters ?? this.currentResult?.PendingParameters
-        );
+        const pending = this._resolvePendingParametersForDraft(this.currentResult);
         if (pending.length === 0) {
             this._addMessage('system', '当前没有待确认参数，无需提交 AI 审核。');
             return;
@@ -928,7 +1083,7 @@ export class AiPanel {
             return;
         }
 
-        const pending = this._normalizePendingParameters(data?.pendingParameters ?? data?.PendingParameters);
+        const pending = this._resolvePendingParametersForDraft(data);
         if (pending.length === 0) {
             this._addMessage('system', '当前没有待确认参数，无需执行确认。');
             return;
@@ -1206,7 +1361,7 @@ export class AiPanel {
         this.pendingManualRetry = null;
         this._renderManualRetryBanner();
         this._rebuildPendingOperatorBindings({
-            pending: payload?.pendingParameters ?? payload?.PendingParameters,
+            pending: this._resolvePendingParametersForDraft(payload),
             flow: payload?.flow ?? payload?.Flow ?? null,
             preferIndexFallback: true
         });
@@ -1356,13 +1511,16 @@ export class AiPanel {
         const opsContainer = this.container.querySelector('#ai-result-ops');
         opsContainer.innerHTML = '';
         const pendingSet = new Set(
-            (data?.pendingParameters || data?.PendingParameters || [])
-                .map(p => p.operatorId || p.OperatorId || p.actualOperatorId || p.ActualOperatorId || '')
+            this._resolvePendingParametersForDraft(data)
+                .flatMap(p => [p.operatorId, p.actualOperatorId])
                 .filter(Boolean)
         );
+        const normalizedMissingResources = this._normalizeMissingResources(data?.missingResources || data?.MissingResources || []);
         const missingResourceOps = new Set(
-            (data?.missingResources || data?.MissingResources || [])
-                .map(r => (r.description || r.Description || '').toLowerCase())
+            normalizedMissingResources
+                .flatMap(r => [r.operatorId, r.actualOperatorId, r.description])
+                .map(value => String(value || '').toLowerCase())
+                .filter(Boolean)
         );
         if (clarificationRequired && !flow) {
             opsContainer.innerHTML = '<div class="ai-followup-empty">当前尚未进入生成阶段，请先完成需求澄清。</div>';
@@ -1372,7 +1530,9 @@ export class AiPanel {
                 const opType = op?.operatorType || op?.OperatorType || '';
                 const opId = op?.tempId || op?.TempId || op?.id || op?.Id || '';
                 const hasPending = pendingSet.has(opId);
-                const hasMissing = (op.parameters || op.Parameters || {})['ModelPath'] === '' || missingResourceOps.has(opName.toLowerCase());
+                const hasMissing = (op.parameters || op.Parameters || {})['ModelPath'] === ''
+                    || missingResourceOps.has(opId.toLowerCase())
+                    || missingResourceOps.has(opName.toLowerCase());
                 const statusBadges = [];
                 if (hasPending) statusBadges.push('<span class="op-badge op-badge-pending">待确认</span>');
                 if (hasMissing) statusBadges.push('<span class="op-badge op-badge-missing">缺资源</span>');
@@ -1567,7 +1727,7 @@ export class AiPanel {
         const container = this.container?.querySelector('#ai-result-followups');
         if (!container) return;
 
-        const pending = this._normalizePendingParameters(data?.pendingParameters ?? data?.PendingParameters);
+        const pending = this._resolvePendingParametersForDraft(data);
         const missing = this._normalizeMissingResources(data?.missingResources ?? data?.MissingResources);
         const recommended = this._normalizeRecommendedTemplate(data?.recommendedTemplate ?? data?.RecommendedTemplate);
         const candidates = this._normalizeTemplateCandidates(data?.templateCandidates ?? data?.TemplateCandidates);
@@ -1781,7 +1941,7 @@ export class AiPanel {
         const container = this.container?.querySelector('#ai-result-parameter-editor');
         if (!container) return;
 
-        const pending = this._normalizePendingParameters(data?.pendingParameters ?? data?.PendingParameters);
+        const pending = this._resolvePendingParametersForDraft(data);
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
         this._syncPendingParameterDrafts(data, flow);
 
@@ -1963,6 +2123,9 @@ export class AiPanel {
         const sourceHint = field.source === 'canvas_override'
             ? '<div class="ai-parameter-field-desc">当前值已从画布同步。</div>'
             : '';
+        const placeholderHint = field.isPendingPlaceholder
+            ? '<div class="ai-parameter-field-placeholder">当前为待补占位符，需由工程师补齐后才能部署。</div>'
+            : '';
 
         let controlHtml = '';
         if (field.dataType === 'boolean' || field.dataType === 'bool') {
@@ -2063,7 +2226,7 @@ export class AiPanel {
         }
 
         return `
-            <div class="ai-parameter-field">
+            <div class="ai-parameter-field ${field.isPendingPlaceholder ? 'is-placeholder' : ''}" data-pending-placeholder="${field.isPendingPlaceholder ? 'true' : 'false'}">
                 <label class="ai-parameter-field-label" for="${this._escapeHtml(inputId)}">
                     ${label}
                     <span class="ai-parameter-field-key">${this._escapeHtml(field.parameterName)}</span>
@@ -2072,6 +2235,7 @@ export class AiPanel {
                 ${suggestionHtml}
                 ${isBatchConfirmed ? `<div class="ai-parameter-field-status">当前状态：已确认</div>` : '<div class="ai-parameter-field-status is-unconfirmed">当前状态：待确认</div>'}
                 ${sourceHint}
+                ${placeholderHint}
                 ${description}
             </div>
         `;
@@ -2152,9 +2316,7 @@ export class AiPanel {
         const container = this.container?.querySelector('#ai-result-parameter-editor');
         if (!container || container.classList.contains('is-empty')) return;
 
-        const pending = this._normalizePendingParameters(
-            data?.pendingParameters ?? data?.PendingParameters
-        );
+        const pending = this._resolvePendingParametersForDraft(data);
         if (pending.length === 0) return;
 
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
@@ -2193,7 +2355,7 @@ export class AiPanel {
 
     _syncPendingParameterDrafts(data, flow = null, options = {}) {
         const force = Boolean(options?.force);
-        const pending = this._normalizePendingParameters(data?.pendingParameters ?? data?.PendingParameters);
+        const pending = this._resolvePendingParametersForDraft(data);
         const operators = this._extractOperators(flow || data?.flow || data?.Flow || null);
         const signature = `${this.currentResultVersion || 0}::${this._computePendingDraftSignature(pending, operators)}`;
         const canvasOperators = this._isCurrentResultAppliedToCanvas()
@@ -2750,6 +2912,8 @@ export class AiPanel {
             ? (metadata?.options ?? metadata?.Options)
             : [];
         const dataType = this._normalizePendingFieldType(metadata);
+        const confirmedValue = entry?.confirmedValue ?? null;
+        const suggestedValue = entry?.suggestedValue ?? null;
 
         return {
             operatorId,
@@ -2762,11 +2926,20 @@ export class AiPanel {
             step: metadata?.step ?? metadata?.Step,
             options,
             defaultValue: metadata?.defaultValue ?? metadata?.DefaultValue ?? null,
-            confirmedValue: entry?.confirmedValue ?? null,
-            suggestedValue: entry?.suggestedValue ?? null,
+            confirmedValue,
+            suggestedValue,
             status: entry?.status ?? 'unconfirmed',
-            source: entry?.source ?? 'ai_suggestion'
+            source: entry?.source ?? 'ai_suggestion',
+            isPendingPlaceholder: this._isPendingPlaceholderValue(confirmedValue) || this._isPendingPlaceholderValue(suggestedValue)
         };
+    }
+
+    _isPendingPlaceholderValue(value) {
+        const normalized = String(value ?? '').trim().toLowerCase();
+        return normalized === '<pending-camera-binding>' ||
+            normalized === '<pending-model-path>' ||
+            normalized === '<pending-template-path>' ||
+            normalized === '<pending-output-channel>';
     }
 
     _buildEnumOptions(options, currentValue) {
@@ -2846,9 +3019,7 @@ export class AiPanel {
             ? structuredClone(flow)
             : JSON.parse(JSON.stringify(flow));
         const operators = this._extractOperators(clonedFlow);
-        const pending = this._normalizePendingParameters(
-            this.currentResult?.pendingParameters ?? this.currentResult?.PendingParameters
-        );
+        const pending = this._resolvePendingParametersForDraft(this.currentResult);
 
         pending.forEach(item => {
             const context = this._resolvePendingOperatorContext(item.operatorId, operators);
@@ -2955,9 +3126,7 @@ export class AiPanel {
 
     _buildPendingParameterReviewRequest() {
         const flow = this._getCurrentFlowJson();
-        const pending = this._normalizePendingParameters(
-            this.currentResult?.pendingParameters ?? this.currentResult?.PendingParameters
-        );
+        const pending = this._resolvePendingParametersForDraft(this.currentResult);
         const operators = this._getPendingOperatorSourceOperators(flow || null);
         const input = this.container?.querySelector('#ai-input');
         const extraNote = String(input?.value || '').trim();
@@ -3050,6 +3219,68 @@ export class AiPanel {
         return String(value ?? '');
     }
 
+    _resolvePendingParametersForDraft(data) {
+        if (Array.isArray(data)) {
+            return this._normalizePendingParameters(data);
+        }
+
+        const explicitPending = this._normalizePendingParameters(
+            data?.pendingParameters ?? data?.PendingParameters
+        );
+        const missingResourcePending = this._buildPendingParametersFromMissingResources(
+            data?.missingResources ?? data?.MissingResources
+        );
+        return this._mergePendingParameterGroups([...explicitPending, ...missingResourcePending]);
+    }
+
+    _buildPendingParametersFromMissingResources(items) {
+        const resources = this._normalizeMissingResources(items);
+        return resources
+            .map(resource => {
+                const parameterName = resource.parameterName || this._inferPendingParameterNameFromMissingResource(resource);
+                const operatorId = resource.operatorId || this._inferPendingOperatorIdFromResourceKey(resource.resourceKey);
+                if (!operatorId || !parameterName) {
+                    return null;
+                }
+
+                return {
+                    operatorId,
+                    actualOperatorId: resource.actualOperatorId,
+                    parameterNames: [parameterName]
+                };
+            })
+            .filter(Boolean);
+    }
+
+    _mergePendingParameterGroups(items) {
+        const merged = new Map();
+        this._normalizePendingParameters(items).forEach(item => {
+            const key = (item.operatorId || item.actualOperatorId || item.parameterNames.join('|')).toLowerCase();
+            if (!key) return;
+
+            const existing = merged.get(key) || {
+                operatorId: item.operatorId,
+                actualOperatorId: item.actualOperatorId,
+                parameterNames: []
+            };
+            if (!existing.operatorId && item.operatorId) {
+                existing.operatorId = item.operatorId;
+            }
+            if (!existing.actualOperatorId && item.actualOperatorId) {
+                existing.actualOperatorId = item.actualOperatorId;
+            }
+
+            item.parameterNames.forEach(name => {
+                if (!existing.parameterNames.some(current => current.toLowerCase() === name.toLowerCase())) {
+                    existing.parameterNames.push(name);
+                }
+            });
+            merged.set(key, existing);
+        });
+
+        return Array.from(merged.values());
+    }
+
     _normalizePendingParameters(items) {
         if (!Array.isArray(items)) return [];
 
@@ -3073,12 +3304,95 @@ export class AiPanel {
         if (!Array.isArray(items)) return [];
 
         return items
-            .map(item => ({
-                resourceType: String(item?.resourceType ?? item?.ResourceType ?? '').trim(),
-                resourceKey: String(item?.resourceKey ?? item?.ResourceKey ?? '').trim(),
-                description: String(item?.description ?? item?.Description ?? '').trim()
-            }))
+            .map(item => {
+                const resourceKey = String(item?.resourceKey ?? item?.ResourceKey ?? '').trim();
+                const parameterName = String(
+                    item?.parameterName ??
+                    item?.ParameterName ??
+                    this._inferPendingParameterNameFromResourceKey(resourceKey) ??
+                    ''
+                ).trim();
+                return {
+                    resourceType: String(item?.resourceType ?? item?.ResourceType ?? '').trim(),
+                    resourceKey,
+                    description: String(item?.description ?? item?.Description ?? '').trim(),
+                    operatorId: String(
+                        item?.operatorId ??
+                        item?.OperatorId ??
+                        item?.tempId ??
+                        item?.TempId ??
+                        this._inferPendingOperatorIdFromResourceKey(resourceKey) ??
+                        ''
+                    ).trim(),
+                    actualOperatorId: String(item?.actualOperatorId ?? item?.ActualOperatorId ?? '').trim(),
+                    parameterName
+                };
+            })
             .filter(item => item.resourceType || item.resourceKey || item.description);
+    }
+
+    _inferPendingOperatorIdFromResourceKey(resourceKey) {
+        const normalized = String(resourceKey || '').trim();
+        if (!this._inferPendingParameterNameFromResourceKey(normalized)) {
+            return '';
+        }
+
+        const dotIndex = normalized.indexOf('.');
+        return dotIndex > 0 ? normalized.slice(0, dotIndex).trim() : '';
+    }
+
+    _inferPendingParameterNameFromResourceKey(resourceKey) {
+        const normalized = String(resourceKey || '').trim();
+        const dotIndex = normalized.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex >= normalized.length - 1) {
+            return '';
+        }
+
+        const candidate = normalized.slice(dotIndex + 1).trim();
+        return this._isKnownPendingResourceParameter(candidate) ? candidate : '';
+    }
+
+    _isKnownPendingResourceParameter(parameterName) {
+        const normalized = String(parameterName || '').trim().toLowerCase();
+        return normalized === 'camerabindingid' ||
+            normalized === 'modelpath' ||
+            normalized === 'templatepath' ||
+            normalized === 'outputchannel' ||
+            normalized === 'outputchannelid' ||
+            normalized === 'plcparameters' ||
+            normalized === 'plcaddress' ||
+            normalized === 'plcaddressparameters';
+    }
+
+    _inferPendingParameterNameFromMissingResource(resource) {
+        const directName = String(resource?.parameterName || '').trim();
+        if (directName) {
+            return directName;
+        }
+
+        const fromKey = this._inferPendingParameterNameFromResourceKey(resource?.resourceKey);
+        if (fromKey) {
+            return fromKey;
+        }
+
+        const type = String(resource?.resourceType || '').trim().toLowerCase();
+        if (type.includes('camera')) {
+            return 'CameraBindingId';
+        }
+        if (type.includes('model')) {
+            return 'ModelPath';
+        }
+        if (type.includes('template')) {
+            return 'TemplatePath';
+        }
+        if (type.includes('output')) {
+            return 'OutputChannel';
+        }
+        if (type.includes('plc')) {
+            return 'PlcParameters';
+        }
+
+        return '';
     }
 
     _normalizeTemplateSelection(selection) {
@@ -4680,7 +4994,7 @@ export class AiPanel {
         const effectiveBlockingFields = blockingFields.length > 0 ? blockingFields : (brief?.blockingClarificationFields || []);
         const effectiveNonBlockingFields = nonBlockingFields.length > 0 ? nonBlockingFields : (brief?.nonBlockingMissingFields || []);
         const questionCount = brief?.clarificationQuestions?.length || 0;
-        const pendingParameters = this._normalizePendingParameters(source.pendingParameters ?? source.PendingParameters);
+        const pendingParameters = this._resolvePendingParametersForDraft(source);
         const missingResources = this._normalizeMissingResources(source.missingResources ?? source.MissingResources);
         const flow = source.flow ?? source.Flow ?? this.currentResult?.flow ?? this.currentResult?.Flow ?? null;
         const manualRetry = source.manualRetry ?? source.ManualRetry ?? null;
@@ -5093,7 +5407,7 @@ export class AiPanel {
         if (canvasFlow) {
             this._setCurrentResult(restoredResult);
             this._rebuildPendingOperatorBindings({
-                pending: restoredResult?.pendingParameters,
+                pending: this._resolvePendingParametersForDraft(restoredResult),
                 flow: restoredResult?.flow,
                 sourceFlow: followupSource,
                 preferIndexFallback: true
@@ -5367,6 +5681,263 @@ export class AiPanel {
 
     // ── 校验与 DryRun 控制台 ──────────────────────────────────
 
+    _getObjectValue(source, names) {
+        if (!source || typeof source !== 'object') {
+            return undefined;
+        }
+
+        for (const name of names) {
+            if (Object.prototype.hasOwnProperty.call(source, name)) {
+                return source[name];
+            }
+        }
+
+        const keys = Object.keys(source);
+        const matched = keys.find(key => names.some(name => key.toLowerCase() === String(name).toLowerCase()));
+        return matched ? source[matched] : undefined;
+    }
+
+    _getArrayValue(source, names) {
+        const value = this._getObjectValue(source, names);
+        return Array.isArray(value) ? value : [];
+    }
+
+    _getBooleanValue(source, names) {
+        const value = this._getObjectValue(source, names);
+        if (typeof value === 'boolean') {
+            return value;
+        }
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase();
+            if (normalized === 'true') return true;
+            if (normalized === 'false') return false;
+        }
+        return null;
+    }
+
+    _normalizeAgentValidationPreview(data) {
+        const preview = data?.validationPreview ?? data?.ValidationPreview ?? null;
+        if (!preview || typeof preview !== 'object') {
+            return null;
+        }
+
+        return {
+            structuralValidation: this._getObjectValue(preview, ['structuralValidation', 'StructuralValidation']),
+            dryRun: this._getObjectValue(preview, ['dryRun', 'DryRun']),
+            deploymentPrecheck: this._getObjectValue(preview, ['deploymentPrecheck', 'DeploymentPrecheck'])
+        };
+    }
+
+    _deriveAgentDeploymentUiState(data) {
+        const preview = data?.validationPreview ?? data?.ValidationPreview ?? data ?? null;
+        const precheck = this._getObjectValue(preview, ['deploymentPrecheck', 'DeploymentPrecheck']) || preview;
+        const readyValue = this._getBooleanValue(precheck, ['readyForDeployment', 'ReadyForDeployment']);
+        const draftAllowedValue = this._getBooleanValue(precheck, ['workflowDraftAllowed', 'WorkflowDraftAllowed']);
+        const deploymentBlockedValue = this._getBooleanValue(precheck, ['deploymentBlocked', 'DeploymentBlocked']);
+        const deploymentActionsDisabled = readyValue === false || deploymentBlockedValue === true;
+        const workflowEditingAllowed = draftAllowedValue !== false;
+
+        return {
+            readyForDeployment: readyValue === true,
+            workflowDraftAllowed: workflowEditingAllowed,
+            deploymentBlocked: deploymentActionsDisabled,
+            deploymentActionsDisabled,
+            workflowEditingAllowed
+        };
+    }
+
+    _normalizeAgentPendingActions(items) {
+        if (!Array.isArray(items)) return [];
+
+        return items
+            .map(item => {
+                if (typeof item === 'string') {
+                    return { actionType: 'pending', summary: item, resourceKey: '', operatorId: '', parameterName: '' };
+                }
+
+                return {
+                    actionType: String(item?.actionType ?? item?.ActionType ?? item?.type ?? item?.Type ?? 'pending').trim(),
+                    summary: String(item?.summary ?? item?.Summary ?? item?.message ?? item?.Message ?? item?.description ?? item?.Description ?? '').trim(),
+                    resourceKey: String(item?.resourceKey ?? item?.ResourceKey ?? '').trim(),
+                    operatorId: String(item?.operatorId ?? item?.OperatorId ?? item?.tempId ?? item?.TempId ?? '').trim(),
+                    parameterName: String(item?.parameterName ?? item?.ParameterName ?? '').trim()
+                };
+            })
+            .filter(item => item.actionType || item.summary || item.resourceKey || item.operatorId || item.parameterName);
+    }
+
+    _normalizeAgentToolTrace(items) {
+        if (!Array.isArray(items)) return [];
+
+        return items
+            .map(item => {
+                const duration = Number(item?.durationMs ?? item?.DurationMs ?? 0);
+                const successValue = item?.success ?? item?.Success;
+                return {
+                    toolName: String(item?.toolName ?? item?.ToolName ?? item?.name ?? item?.Name ?? '').trim(),
+                    permission: String(item?.permission ?? item?.Permission ?? '').trim(),
+                    success: typeof successValue === 'boolean' ? successValue : String(successValue ?? '').toLowerCase() === 'true',
+                    errorCode: String(item?.errorCode ?? item?.ErrorCode ?? '').trim(),
+                    durationMs: Number.isFinite(duration) ? Math.max(0, Math.round(duration)) : 0
+                };
+            })
+            .filter(item => item.toolName);
+    }
+
+    _renderAgentPreviewIssueList(items, type) {
+        const normalized = (Array.isArray(items) ? items : [])
+            .slice(0, 4)
+            .map(item => {
+                if (typeof item === 'string') {
+                    return { message: item, code: '', operatorId: '' };
+                }
+                return {
+                    message: String(item?.message ?? item?.Message ?? item?.summary ?? item?.Summary ?? item?.description ?? item?.Description ?? item?.resourceKey ?? item?.ResourceKey ?? '').trim(),
+                    code: String(item?.code ?? item?.Code ?? item?.resourceType ?? item?.ResourceType ?? '').trim(),
+                    operatorId: String(item?.operatorId ?? item?.OperatorId ?? item?.tempId ?? item?.TempId ?? '').trim()
+                };
+            })
+            .filter(item => item.message || item.code || item.operatorId);
+
+        if (normalized.length === 0) {
+            return '';
+        }
+
+        const cls = type === 'blocking' ? 'is-error' : 'is-warning';
+        const icon = type === 'blocking' ? '&#10007;' : '&#9888;';
+        return normalized.map(item => `
+            <div class="ai-validation-issue ${cls}">
+                <span class="ai-validation-issue-icon">${icon}</span>
+                <div class="ai-validation-issue-body">
+                    <div class="ai-validation-issue-msg">${this._escapeHtml(item.message || item.code || '待处理项')}</div>
+                    ${(item.code || item.operatorId) ? `<div class="ai-validation-issue-meta">${this._escapeHtml([item.code, item.operatorId].filter(Boolean).join(' · '))}</div>` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    _renderAgentValidationPreviewSection(sectionKey, title, section) {
+        if (!section || typeof section !== 'object') {
+            return '';
+        }
+
+        const blocking = this._getArrayValue(section, ['blockingIssues', 'BlockingIssues']);
+        const warnings = this._getArrayValue(section, ['warnings', 'Warnings']);
+        const missing = this._getArrayValue(section, ['missingResources', 'MissingResources']);
+        const executed = this._getArrayValue(section, ['executedOperators', 'ExecutedOperators']);
+        const skipped = this._getArrayValue(section, ['skippedOperators', 'SkippedOperators']);
+        const summary = String(this._getObjectValue(section, ['summary', 'Summary', 'precheckSummary', 'PrecheckSummary', 'dryRunSummary', 'DryRunSummary']) ?? '').trim();
+        const readyForDeployment = this._getBooleanValue(section, ['readyForDeployment', 'ReadyForDeployment']);
+        const workflowDraftAllowed = this._getBooleanValue(section, ['workflowDraftAllowed', 'WorkflowDraftAllowed']);
+        const deployed = this._getBooleanValue(section, ['deployed', 'Deployed']);
+        const packageCreated = this._getBooleanValue(section, ['packageCreated', 'PackageCreated']);
+        const stationTouched = this._getBooleanValue(section, ['stationTouched', 'StationTouched']);
+        const countLabel = [
+            blocking.length ? `${blocking.length} blocking` : '',
+            warnings.length ? `${warnings.length} warning` : '',
+            missing.length ? `${missing.length} missing` : '',
+            executed.length ? `${executed.length} executed` : '',
+            skipped.length ? `${skipped.length} skipped` : ''
+        ].filter(Boolean).join(' · ') || 'no issues';
+
+        return `
+            <div class="ai-agent-preview-section" data-validation-preview-section="${this._escapeHtml(sectionKey)}">
+                <div class="ai-agent-preview-header">
+                    <span>${this._escapeHtml(title)}</span>
+                    <small>${this._escapeHtml(countLabel)}</small>
+                </div>
+                ${summary ? `<div class="ai-agent-preview-summary">${this._escapeHtml(summary)}</div>` : ''}
+                ${(readyForDeployment !== null || workflowDraftAllowed !== null) ? `
+                    <div class="ai-agent-preview-state-row">
+                        ${readyForDeployment !== null ? `<span>readyForDeployment=${readyForDeployment ? 'true' : 'false'}</span>` : ''}
+                        ${workflowDraftAllowed !== null ? `<span>workflowDraftAllowed=${workflowDraftAllowed ? 'true' : 'false'}</span>` : ''}
+                    </div>
+                ` : ''}
+                ${(deployed !== null || packageCreated !== null || stationTouched !== null) ? `
+                    <div class="ai-agent-preview-state-row">
+                        ${deployed !== null ? `<span>deployed=${deployed ? 'true' : 'false'}</span>` : ''}
+                        ${packageCreated !== null ? `<span>packageCreated=${packageCreated ? 'true' : 'false'}</span>` : ''}
+                        ${stationTouched !== null ? `<span>stationTouched=${stationTouched ? 'true' : 'false'}</span>` : ''}
+                    </div>
+                ` : ''}
+                ${this._renderAgentPreviewIssueList(blocking, 'blocking')}
+                ${this._renderAgentPreviewIssueList(warnings, 'warning')}
+                ${this._renderAgentPreviewIssueList(missing, 'warning')}
+            </div>
+        `;
+    }
+
+    _renderAgentValidationArtifacts(data) {
+        const preview = this._normalizeAgentValidationPreview(data);
+        const pendingActions = this._normalizeAgentPendingActions(data?.pendingActions ?? data?.PendingActions);
+        const missingResources = this._normalizeMissingResources(data?.missingResources ?? data?.MissingResources);
+        const toolTrace = this._normalizeAgentToolTrace(data?.toolTrace ?? data?.ToolTrace);
+        const hasPreview = Boolean(preview?.structuralValidation || preview?.dryRun || preview?.deploymentPrecheck);
+        const hasContent = hasPreview || pendingActions.length > 0 || missingResources.length > 0 || toolTrace.length > 0;
+        if (!hasContent) {
+            return '';
+        }
+
+        const deploymentState = this._deriveAgentDeploymentUiState(data);
+        const toolSummary = toolTrace
+            .map(item => `${item.toolName}:${item.permission || '--'}:${item.success ? 'ok' : 'failed'}:${item.durationMs}ms${item.errorCode ? `:${item.errorCode}` : ''}`)
+            .join(' | ');
+
+        return `
+            <div class="ai-agent-validation-artifacts">
+                <div
+                    class="ai-agent-deployment-state"
+                    data-agent-deployment-disabled="${deploymentState.deploymentActionsDisabled ? 'true' : 'false'}"
+                    data-agent-workflow-edit-enabled="${deploymentState.workflowEditingAllowed ? 'true' : 'false'}"
+                >
+                    <span>deploymentActions=${deploymentState.deploymentActionsDisabled ? 'disabled' : 'enabled'}</span>
+                    <span>workflowEditing=${deploymentState.workflowEditingAllowed ? 'enabled' : 'disabled'}</span>
+                </div>
+                ${this._renderAgentValidationPreviewSection('structuralValidation', 'structuralValidation', preview?.structuralValidation)}
+                ${this._renderAgentValidationPreviewSection('dryRun', 'dryRun', preview?.dryRun)}
+                ${this._renderAgentValidationPreviewSection('deploymentPrecheck', 'deploymentPrecheck', preview?.deploymentPrecheck)}
+                ${missingResources.length > 0 ? `
+                    <div class="ai-agent-preview-section" data-agent-artifact="missingResources">
+                        <div class="ai-agent-preview-header"><span>missingResources</span><small>${missingResources.length}</small></div>
+                        ${missingResources.slice(0, 6).map(item => `
+                            <div class="ai-agent-artifact-row">
+                                <span>${this._escapeHtml(item.resourceKey || item.parameterName || item.resourceType || 'missing')}</span>
+                                <small>${this._escapeHtml(item.description || item.operatorId || '')}</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                ${pendingActions.length > 0 ? `
+                    <div class="ai-agent-preview-section" data-agent-artifact="pendingActions">
+                        <div class="ai-agent-preview-header"><span>pendingActions</span><small>${pendingActions.length}</small></div>
+                        ${pendingActions.slice(0, 6).map(item => `
+                            <div class="ai-agent-artifact-row">
+                                <span>${this._escapeHtml(item.actionType || 'pending')}</span>
+                                <small>${this._escapeHtml(item.summary || item.resourceKey || [item.operatorId, item.parameterName].filter(Boolean).join('.'))}</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                ${toolTrace.length > 0 ? `
+                    <details class="ai-agent-tool-trace" data-agent-artifact="toolTrace">
+                        <summary>toolTrace (${toolTrace.length}) ${this._escapeHtml(toolSummary)}</summary>
+                        <div class="ai-agent-tool-trace-list">
+                            ${toolTrace.map(item => `
+                                <div class="ai-agent-tool-trace-row">
+                                    <span>${this._escapeHtml(item.toolName)}</span>
+                                    <span>${this._escapeHtml(item.permission || '--')}</span>
+                                    <span>${item.success ? 'success' : 'failed'}</span>
+                                    <span>${this._escapeHtml(String(item.durationMs))}ms</span>
+                                    <span>${this._escapeHtml(item.errorCode || '--')}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </details>
+                ` : ''}
+            </div>
+        `;
+    }
+
     _renderValidationConsole(data) {
         const card = this.container?.querySelector('#ai-result-validation-card');
         const container = this.container?.querySelector('#ai-result-validation');
@@ -5376,7 +5947,8 @@ export class AiPanel {
         const manualRetry = data?.manualRetry || data?.ManualRetry || null;
         const dryRun = data?.dryRunResult || data?.DryRunResult || null;
         const knowledgeDiags = data?.knowledgeDiagnostics || data?.KnowledgeDiagnostics || [];
-        const hasContent = diagnostics.length > 0 || manualRetry?.required || dryRun || knowledgeDiags.length > 0;
+        const agentArtifactsHtml = this._renderAgentValidationArtifacts(data);
+        const hasContent = diagnostics.length > 0 || manualRetry?.required || dryRun || knowledgeDiags.length > 0 || agentArtifactsHtml;
 
         if (!hasContent) {
             card.hidden = true;
@@ -5386,6 +5958,9 @@ export class AiPanel {
 
         card.hidden = false;
         const sections = [];
+        if (agentArtifactsHtml) {
+            sections.push(agentArtifactsHtml);
+        }
 
         // ManualRetry banner
         if (manualRetry?.required) {
@@ -5691,7 +6266,7 @@ export class AiPanel {
     }
 
     _buildApplyRiskSummary(result = this.currentResult) {
-        const pending = this._normalizePendingParameters(result?.pendingParameters ?? result?.PendingParameters);
+        const pending = this._resolvePendingParametersForDraft(result);
         const missing = this._normalizeMissingResources(result?.missingResources ?? result?.MissingResources);
         const brief = this._normalizeRequirementBrief(result?.requirementBrief ?? result?.RequirementBrief ?? null);
         const nonBlockingFields = this._normalizeRuntimeFieldList(
