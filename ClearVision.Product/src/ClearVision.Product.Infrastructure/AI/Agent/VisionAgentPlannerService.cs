@@ -40,11 +40,13 @@ public sealed class VisionAgentPlannerService : IVisionAgentPlannerService
         AgentPlannerCompletionRequest request,
         CancellationToken cancellationToken)
     {
+        var allowedToolNames = _toolCallPolicy.ListAllowedToolNames();
         var enriched = request with
         {
             PlannerPrompt = _promptBuilder.Build(
                 request.GenerationRequest,
-                _toolCallPolicy.ListAllowedToolNames())
+                allowedToolNames),
+            AllowedToolNames = allowedToolNames
         };
         var completion = await _completionSource.CompleteAsync(enriched, cancellationToken);
         var parsed = _protocolParser.Parse(completion);
@@ -76,6 +78,7 @@ public sealed record AgentPlannerCompletionRequest
     public AiFlowGenerationRequest GenerationRequest { get; init; } = new(string.Empty);
     public IReadOnlyList<VisionAgentLoopMessage> Messages { get; init; } = Array.Empty<VisionAgentLoopMessage>();
     public string PlannerPrompt { get; init; } = string.Empty;
+    public IReadOnlyList<string> AllowedToolNames { get; init; } = Array.Empty<string>();
     public JsonElement FlowDraft { get; init; }
     public JsonElement ValidationSummary { get; init; }
     public JsonElement DryRunSummary { get; init; }

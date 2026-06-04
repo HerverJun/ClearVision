@@ -256,10 +256,13 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
 
     private bool ShouldUsePlanner(AiFlowGenerationRequest request)
     {
+        if (!request.UseVisionAgentGenerateFlow)
+        {
+            return false;
+        }
+
         var requestMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode);
-        var optionMode = AiAgentGenerateFlowModes.Normalize(_agentOptions.Mode);
-        return string.Equals(requestMode, AiAgentGenerateFlowModes.Planner, StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(optionMode, AiAgentGenerateFlowModes.Planner, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(requestMode, AiAgentGenerateFlowModes.Planner, StringComparison.OrdinalIgnoreCase);
     }
 
     private static AiFlowGenerationResult ControlledFailure(

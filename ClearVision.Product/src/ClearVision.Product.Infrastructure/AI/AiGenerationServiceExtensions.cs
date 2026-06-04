@@ -27,6 +27,8 @@ public static class AiGenerationServiceExtensions
             configuration.GetSection(AgentGenerateFlowOptions.SectionName));
         services.Configure<VisionAgentLoopOptions>(
             configuration.GetSection("AI:VisionAgent:Loop"));
+        services.Configure<AgentPlannerCompletionOptions>(
+            configuration.GetSection(AgentPlannerCompletionOptions.SectionName));
 
         // 注册运行时配置管理器（单例：启动时从 ai_models.json 加载，必要时从 ai_config.json 迁移）
         services.AddSingleton<AiConfigStore>();
@@ -54,11 +56,13 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<AutoLayoutService>();
         services.AddScoped<AgentPromptBuilder>();
         services.AddScoped<AgentPlannerPromptBuilder>();
+        services.AddScoped<AgentPlannerPromptComposer>();
+        services.AddScoped<JsonToolCallRepair>();
         services.AddScoped<AgentToolCallPolicy>();
         services.AddScoped<AgentWorkflowDraftEditor>();
         services.AddScoped<VisionAgentProtocolParser>();
         services.AddScoped<VisionAgentLoop>();
-        services.AddScoped<IVisionAgentPlannerCompletionSource, NoOpVisionAgentPlannerCompletionSource>();
+        services.AddScoped<IVisionAgentPlannerCompletionSource, LlmVisionAgentPlannerCompletionSource>();
         services.AddScoped<IVisionAgentPlannerService, VisionAgentPlannerService>();
         services.AddScoped<IVisionAgentStationStatusReader, NoOpVisionAgentStationStatusReader>();
         services.AddScoped<IVisionAgentTool, OperatorCatalogTool>();
