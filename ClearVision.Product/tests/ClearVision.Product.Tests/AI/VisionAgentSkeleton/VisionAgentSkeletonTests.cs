@@ -270,7 +270,6 @@ public sealed class VisionAgentSkeletonTests
         {
             "CameraTestFrameTool",
             "ReplayFlowWithFrameTool",
-            "RuntimePackagePrecheckTool",
             "AcquireSingleFrameAsync",
             "GetOrCreateByBindingAsync",
             "EnumerateCamerasAsync",

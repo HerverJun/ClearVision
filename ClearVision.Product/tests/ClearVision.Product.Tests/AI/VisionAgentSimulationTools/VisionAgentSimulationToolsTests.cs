@@ -263,7 +263,6 @@ public sealed class VisionAgentSimulationToolsTests
         {
             "CameraTestFrameTool",
             "ReplayFlowWithFrameTool",
-            "RuntimePackagePrecheckTool",
             "AcquireSingleFrameAsync",
             "EnumerateCamerasAsync",
             "GetOrCreateByBindingAsync",

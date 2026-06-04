@@ -57,11 +57,12 @@ public sealed class VisionAgentToolRegistry : IVisionAgentToolRegistry
                 $"Tool '{tool.Name}' requires ConfigWrite, which is always denied.");
         }
 
-        if (tool.Permission == VisionAgentToolPermission.DeploymentPrepare)
+        if (tool.Permission == VisionAgentToolPermission.DeploymentPrepare &&
+            !CanRunDeploymentPrepareTool(tool, context))
         {
             return VisionAgentToolResult.Fail(
                 "tool_permission_denied",
-                $"Tool '{tool.Name}' requires DeploymentPrepare, which is not enabled for ReadOnly Tools v0.1.");
+                $"Tool '{tool.Name}' requires DeploymentPrepare and is not allowed in this session.");
         }
 
         if (!context.AllowedPermissions.Contains(tool.Permission))
@@ -83,5 +84,13 @@ public sealed class VisionAgentToolRegistry : IVisionAgentToolRegistry
         {
             return VisionAgentToolResult.Fail("tool_exception", ex.Message);
         }
+    }
+
+    private static bool CanRunDeploymentPrepareTool(
+        IVisionAgentTool tool,
+        VisionAgentToolContext context)
+    {
+        return string.Equals(tool.Name, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase) &&
+               context.AllowedPermissions.Contains(VisionAgentToolPermission.DeploymentPrepare);
     }
 }

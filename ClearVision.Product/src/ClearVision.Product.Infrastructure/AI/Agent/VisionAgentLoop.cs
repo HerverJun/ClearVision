@@ -158,11 +158,12 @@ public sealed class VisionAgentLoop
                 "tool_permission_denied",
                 $"Tool '{tool.Name}' requires ConfigWrite, which is always denied in Vision Agent skeleton v0.1.");
         }
-        else if (tool.Permission == VisionAgentToolPermission.DeploymentPrepare)
+        else if (tool.Permission == VisionAgentToolPermission.DeploymentPrepare &&
+                 !CanRunDeploymentPrepareTool(tool, context))
         {
             result = VisionAgentToolResult.Fail(
                 "tool_permission_denied",
-                $"Tool '{tool.Name}' requires DeploymentPrepare, which is not enabled in Vision Agent skeleton v0.1.");
+                $"Tool '{tool.Name}' requires DeploymentPrepare and is not allowed in this session.");
         }
         else if (!context.AllowedPermissions.Contains(tool.Permission))
         {
@@ -313,6 +314,14 @@ public sealed class VisionAgentLoop
     private static object? CloneJsonCompatible(JsonElement value)
     {
         return JsonSerializer.Deserialize<object>(value.GetRawText(), JsonOptions);
+    }
+
+    private static bool CanRunDeploymentPrepareTool(
+        IVisionAgentTool tool,
+        VisionAgentToolContext context)
+    {
+        return string.Equals(tool.Name, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase) &&
+               context.AllowedPermissions.Contains(VisionAgentToolPermission.DeploymentPrepare);
     }
 }
 
