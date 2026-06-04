@@ -23,12 +23,27 @@ public record AiFlowGenerationRequest(
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
 
     public bool UseVisionAgentGenerateFlow { get; init; }
+
+    public string AgentGenerateFlowMode { get; init; } = AiAgentGenerateFlowModes.Scripted;
 }
 
 public static class AiRequirementModes
 {
     public const string Draft = "draft";
     public const string Strict = "strict";
+}
+
+public static class AiAgentGenerateFlowModes
+{
+    public const string Scripted = "scripted";
+    public const string Planner = "planner";
+
+    public static string Normalize(string? value)
+    {
+        return string.Equals(value, Planner, StringComparison.OrdinalIgnoreCase)
+            ? Planner
+            : Scripted;
+    }
 }
 
 public enum GenerateFlowMode

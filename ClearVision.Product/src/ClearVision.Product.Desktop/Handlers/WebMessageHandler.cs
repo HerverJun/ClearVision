@@ -346,6 +346,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 ?? TryGetMessageString(doc.RootElement, "requirementMode");
             var templateSelection = TryGetTemplateSelection(payload);
             var useVisionAgentGenerateFlow = TryGetBoolean(payload, "useVisionAgentGenerateFlow") ?? false;
+            var agentGenerateFlowMode = TryGetMessageString(payload, "agentGenerateFlowMode")
+                ?? TryGetMessageString(doc.RootElement, "agentGenerateFlowMode");
             var existingFlowJson = TryGetExistingFlowJson(payload);
             var attachments = payload.TryGetProperty("attachments", out var attachmentElement) &&
                               attachmentElement.ValueKind == JsonValueKind.Array
@@ -374,6 +376,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 requirementMode,
                 templateSelection,
                 useVisionAgentGenerateFlow,
+                agentGenerateFlowMode,
                 onMessage: (type, payload) =>
                 {
                     // payload 已是 JSON 字符串，直接拼接外层 envelope，避免反序列化再序列化的额外开销。

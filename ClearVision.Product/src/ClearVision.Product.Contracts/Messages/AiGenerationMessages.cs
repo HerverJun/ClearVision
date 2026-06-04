@@ -62,6 +62,8 @@ public record GenerateFlowRequestPayload
 
     public bool? UseVisionAgentGenerateFlow { get; init; }
 
+    public string? AgentGenerateFlowMode { get; init; }
+
     public List<string>? Attachments { get; init; }
 }
 

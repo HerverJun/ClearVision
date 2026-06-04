@@ -21,6 +21,10 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
     private readonly VisionAgentLoop _loop;
     private readonly Microsoft.Extensions.Logging.ILogger<VisionAgentGenerateFlowService> _logger;
     private readonly VisionAgentLoopOptions _loopOptions;
+    private readonly AgentGenerateFlowOptions _agentOptions;
+    private readonly IVisionAgentPlannerService? _plannerService;
+    private readonly VisionAgentProtocolParser _protocolParser;
+    private readonly AgentWorkflowDraftEditor _draftEditor;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -31,38 +35,144 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
     public VisionAgentGenerateFlowService(
         VisionAgentLoop loop,
         IOptions<VisionAgentLoopOptions> loopOptions,
-        Microsoft.Extensions.Logging.ILogger<VisionAgentGenerateFlowService> logger)
+        Microsoft.Extensions.Logging.ILogger<VisionAgentGenerateFlowService> logger,
+        IOptions<AgentGenerateFlowOptions>? agentOptions = null,
+        IVisionAgentPlannerService? plannerService = null,
+        VisionAgentProtocolParser? protocolParser = null,
+        AgentWorkflowDraftEditor? draftEditor = null)
     {
         _loop = loop;
         _logger = logger;
         _loopOptions = loopOptions.Value;
         _loopOptions.Normalize();
+        _agentOptions = agentOptions?.Value ?? new AgentGenerateFlowOptions();
+        _agentOptions.Mode = AiAgentGenerateFlowModes.Normalize(_agentOptions.Mode);
+        _plannerService = plannerService;
+        _protocolParser = protocolParser ?? new VisionAgentProtocolParser();
+        _draftEditor = draftEditor ?? new AgentWorkflowDraftEditor();
     }
 
     public async Task<AiFlowGenerationResult> GenerateFlowAsync(
         AiFlowGenerationRequest request,
         CancellationToken cancellationToken)
     {
+        if (ShouldUsePlanner(request))
+        {
+            var plannerResult = await RunPlannerAsync(request, cancellationToken);
+            if (plannerResult.Success || !_agentOptions.FallbackToScriptedOnPlannerFailure)
+            {
+                return plannerResult;
+            }
+
+            _logger.LogWarning(
+                "Vision Agent planner failed and will fall back to scripted mode. Error={Error}",
+                plannerResult.ErrorMessage);
+            return await RunScriptedAsync(
+                request,
+                "agent_planner_scripted_fallback",
+                "Vision Agent planner failed; scripted safe fallback generated a workflow draft.",
+                cancellationToken);
+        }
+
+        return await RunScriptedAsync(
+            request,
+            "agent_controlled_scripted",
+            "Controlled Vision Agent generated a workflow draft from static engineering tools.",
+            cancellationToken);
+    }
+
+    private Task<AiFlowGenerationResult> RunScriptedAsync(
+        AiFlowGenerationRequest request,
+        string generationMode,
+        string explanation,
+        CancellationToken cancellationToken)
+    {
         var capture = new AgentToolResultCapture();
         var completion = new AgentGenerateFlowScript(request, capture);
-        var loopResult = await _loop.RunAsync(new VisionAgentLoopRequest
+        return RunWithCompletionAsync(
+            request,
+            capture,
+            completion.CompleteAsync,
+            generationMode,
+            explanation,
+            cancellationToken);
+    }
+
+    private Task<AiFlowGenerationResult> RunPlannerAsync(
+        AiFlowGenerationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (_plannerService == null)
         {
-            UserPrompt = request.Description,
-            ToolContext = new VisionAgentToolContext
+            return Task.FromResult(ControlledFailure(
+                "Vision Agent planner service is not registered.",
+                []));
+        }
+
+        var capture = new AgentToolResultCapture();
+        if (!string.IsNullOrWhiteSpace(request.ExistingFlowJson))
+        {
+            using var doc = JsonDocument.Parse(request.ExistingFlowJson);
+            capture.FlowDraft = doc.RootElement.Clone();
+        }
+
+        var completion = new AgentGenerateFlowPlanner(
+            request,
+            capture,
+            _plannerService,
+            _protocolParser,
+            _draftEditor);
+        return RunWithCompletionAsync(
+            request,
+            capture,
+            completion.CompleteAsync,
+            "agent_planner",
+            "Vision Agent planner generated or edited a workflow draft with static engineering tools.",
+            cancellationToken);
+    }
+
+    private async Task<AiFlowGenerationResult> RunWithCompletionAsync(
+        AiFlowGenerationRequest request,
+        AgentToolResultCapture capture,
+        Func<IReadOnlyList<VisionAgentLoopMessage>, CancellationToken, Task<string>> completeAsync,
+        string generationMode,
+        string explanation,
+        CancellationToken cancellationToken)
+    {
+        VisionAgentLoopResult loopResult;
+        try
+        {
+            loopResult = await _loop.RunAsync(new VisionAgentLoopRequest
             {
-                UserDescription = request.Description,
-                AdditionalContext = request.AdditionalContext,
-                ExistingFlowJson = request.ExistingFlowJson,
-                MaxToolResultChars = _loopOptions.MaxToolResultChars,
-                AllowedPermissions = new HashSet<VisionAgentToolPermission>
+                UserPrompt = request.Description,
+                ToolContext = new VisionAgentToolContext
                 {
-                    VisionAgentToolPermission.ReadOnly,
-                    VisionAgentToolPermission.Simulation,
-                    VisionAgentToolPermission.DeploymentPrepare
-                }
-            },
-            CompleteAsync = completion.CompleteAsync
-        }, cancellationToken);
+                    UserDescription = request.Description,
+                    AdditionalContext = request.AdditionalContext,
+                    ExistingFlowJson = request.ExistingFlowJson,
+                    MaxToolResultChars = _loopOptions.MaxToolResultChars,
+                    AllowedPermissions = new HashSet<VisionAgentToolPermission>
+                    {
+                        VisionAgentToolPermission.ReadOnly,
+                        VisionAgentToolPermission.Simulation,
+                        VisionAgentToolPermission.DeploymentPrepare
+                    }
+                },
+                CompleteAsync = completeAsync
+            }, cancellationToken);
+        }
+        catch (AgentToolCallPolicyViolationException ex)
+        {
+            return ControlledFailure(
+                $"Vision Agent planner tool policy denied the request: {ex.Message}",
+                []);
+        }
+        catch (Exception ex)
+        {
+            return ControlledFailure(
+                $"Vision Agent GenerateFlow failed: {ex.Message}",
+                []);
+        }
 
         if (!loopResult.Success)
         {
@@ -100,14 +210,16 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                 Success = true,
                 CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
                 Flow = flow,
-                AiExplanation = "Controlled Vision Agent generated a workflow draft from static engineering tools.",
+                AiExplanation = explanation,
                 ParametersNeedingReview = BuildParametersNeedingReview(pendingParameters),
                 RetryCount = 0,
                 SessionId = request.SessionId,
                 DetectedIntent = AiTurnIntents.NewFlow,
                 DryRunResult = CloneJsonCompatible(capture.DryRunSummary),
-                GenerationMode = "agent_controlled",
-                TemplateLockLevel = "agent_template_skeleton",
+                GenerationMode = generationMode,
+                TemplateLockLevel = generationMode.Contains("planner", StringComparison.OrdinalIgnoreCase)
+                    ? "agent_planner_draft"
+                    : "agent_template_skeleton",
                 PendingParameters = pendingParameters,
                 MissingResources = missingResources,
                 PendingActions = pendingActions,
@@ -117,13 +229,13 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                 [
                     new AiGenerationStageDiagnostic
                     {
-                        Stage = "vision_agent_generate_flow",
+                        Stage = generationMode,
                         Status = "completed",
                         Summary = $"toolCalls={loopResult.ToolTrace.Count}, rounds={loopResult.ToolRounds}",
                         DurationMs = 0,
                         Metadata = new Dictionary<string, string>
                         {
-                            ["agentMode"] = "controlled",
+                            ["agentMode"] = generationMode,
                             ["toolCalls"] = loopResult.ToolTrace.Count.ToString()
                         }
                     }
@@ -140,6 +252,14 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                 $"Controlled Vision Agent GenerateFlow mapping failed: {ex.Message}",
                 loopResult.ToolTrace);
         }
+    }
+
+    private bool ShouldUsePlanner(AiFlowGenerationRequest request)
+    {
+        var requestMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode);
+        var optionMode = AiAgentGenerateFlowModes.Normalize(_agentOptions.Mode);
+        return string.Equals(requestMode, AiAgentGenerateFlowModes.Planner, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(optionMode, AiAgentGenerateFlowModes.Planner, StringComparison.OrdinalIgnoreCase);
     }
 
     private static AiFlowGenerationResult ControlledFailure(
@@ -567,6 +687,194 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         public JsonElement ValidationSummary { get; set; }
         public JsonElement DryRunSummary { get; set; }
         public JsonElement DeploymentPrecheck { get; set; }
+    }
+
+    private sealed class AgentGenerateFlowPlanner
+    {
+        private readonly AiFlowGenerationRequest _request;
+        private readonly AgentToolResultCapture _capture;
+        private readonly IVisionAgentPlannerService _plannerService;
+        private readonly VisionAgentProtocolParser _protocolParser;
+        private readonly AgentWorkflowDraftEditor _draftEditor;
+
+        public AgentGenerateFlowPlanner(
+            AiFlowGenerationRequest request,
+            AgentToolResultCapture capture,
+            IVisionAgentPlannerService plannerService,
+            VisionAgentProtocolParser protocolParser,
+            AgentWorkflowDraftEditor draftEditor)
+        {
+            _request = request;
+            _capture = capture;
+            _plannerService = plannerService;
+            _protocolParser = protocolParser;
+            _draftEditor = draftEditor;
+        }
+
+        public async Task<string> CompleteAsync(
+            IReadOnlyList<VisionAgentLoopMessage> messages,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CaptureLatestToolResults(messages);
+            var completion = await _plannerService.CompleteAsync(new AgentPlannerCompletionRequest
+            {
+                GenerationRequest = _request,
+                Messages = messages,
+                FlowDraft = _capture.FlowDraft,
+                ValidationSummary = _capture.ValidationSummary,
+                DryRunSummary = _capture.DryRunSummary,
+                DeploymentPrecheck = _capture.DeploymentPrecheck
+            }, cancellationToken);
+
+            CaptureOutgoingFlowDraft(completion);
+            CaptureFinalDraft(completion);
+            return completion;
+        }
+
+        private void CaptureLatestToolResults(IReadOnlyList<VisionAgentLoopMessage> messages)
+        {
+            var latest = messages.LastOrDefault(message =>
+                string.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase) &&
+                message.Content.Contains("\"tool_result\"", StringComparison.OrdinalIgnoreCase));
+            if (latest == null)
+            {
+                return;
+            }
+
+            using var doc = JsonDocument.Parse(latest.Content);
+            if (!TryGetProperty(doc.RootElement, "toolResults", out var results) ||
+                results.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (var result in results.EnumerateArray())
+            {
+                var name = ReadString(result, "name");
+                if (string.IsNullOrWhiteSpace(name) ||
+                    !TryGetProperty(result, "data", out var data))
+                {
+                    continue;
+                }
+
+                switch (name)
+                {
+                    case "get_flow_template_skeleton":
+                        CaptureFlowDraft(data);
+                        break;
+                    case "validate_flow":
+                        _capture.ValidationSummary = data.Clone();
+                        break;
+                    case "dryrun_flow":
+                        _capture.DryRunSummary = data.Clone();
+                        break;
+                    case "runtime_package_precheck":
+                        _capture.DeploymentPrecheck = data.Clone();
+                        break;
+                }
+            }
+        }
+
+        private void CaptureOutgoingFlowDraft(string completion)
+        {
+            var parsed = _protocolParser.Parse(completion);
+            if (!parsed.IsToolCall)
+            {
+                return;
+            }
+
+            foreach (var call in parsed.ToolCalls)
+            {
+                if (!string.Equals(call.Name, "validate_flow", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(call.Name, "dryrun_flow", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(call.Name, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (TryReadFlowArgument(call.Arguments, out var flow))
+                {
+                    _capture.FlowDraft = flow;
+                }
+            }
+        }
+
+        private void CaptureFinalDraft(string completion)
+        {
+            if (_draftEditor.TryApplyFinalContent(completion, _capture.FlowDraft, out var editedDraft))
+            {
+                _capture.FlowDraft = editedDraft;
+            }
+        }
+
+        private void CaptureFlowDraft(JsonElement data)
+        {
+            if (data.ValueKind == JsonValueKind.Object &&
+                TryGetProperty(data, "truncated", out var truncated) &&
+                truncated.ValueKind == JsonValueKind.True)
+            {
+                return;
+            }
+
+            if (data.ValueKind == JsonValueKind.Object)
+            {
+                _capture.FlowDraft = data.Clone();
+            }
+        }
+
+        private static bool TryReadFlowArgument(JsonElement arguments, out JsonElement flow)
+        {
+            flow = default;
+            if (TryGetProperty(arguments, "flow", out var flowElement))
+            {
+                if (flowElement.ValueKind == JsonValueKind.Object)
+                {
+                    flow = flowElement.Clone();
+                    return true;
+                }
+
+                if (flowElement.ValueKind == JsonValueKind.String &&
+                    TryParseFlowJson(flowElement.GetString(), out flow))
+                {
+                    return true;
+                }
+            }
+
+            if (TryGetProperty(arguments, "flowJson", out var flowJson) &&
+                flowJson.ValueKind == JsonValueKind.String &&
+                TryParseFlowJson(flowJson.GetString(), out flow))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryParseFlowJson(string? value, out JsonElement flow)
+        {
+            flow = default;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(value);
+                if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                {
+                    return false;
+                }
+
+                flow = doc.RootElement.Clone();
+                return true;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
     }
 
     private sealed class AgentGenerateFlowScript

@@ -53,8 +53,13 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IAiFlowResponseParser, AiFlowResponseParser>();
         services.AddScoped<AutoLayoutService>();
         services.AddScoped<AgentPromptBuilder>();
+        services.AddScoped<AgentPlannerPromptBuilder>();
+        services.AddScoped<AgentToolCallPolicy>();
+        services.AddScoped<AgentWorkflowDraftEditor>();
         services.AddScoped<VisionAgentProtocolParser>();
         services.AddScoped<VisionAgentLoop>();
+        services.AddScoped<IVisionAgentPlannerCompletionSource, NoOpVisionAgentPlannerCompletionSource>();
+        services.AddScoped<IVisionAgentPlannerService, VisionAgentPlannerService>();
         services.AddScoped<IVisionAgentStationStatusReader, NoOpVisionAgentStationStatusReader>();
         services.AddScoped<IVisionAgentTool, OperatorCatalogTool>();
         services.AddScoped<IVisionAgentTool, OperatorSchemaTool>();
