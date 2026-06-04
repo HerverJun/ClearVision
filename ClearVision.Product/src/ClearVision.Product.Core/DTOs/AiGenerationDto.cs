@@ -21,6 +21,8 @@ public record AiFlowGenerationRequest(
 )
 {
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
+
+    public bool UseVisionAgentGenerateFlow { get; init; }
 }
 
 public static class AiRequirementModes
@@ -180,6 +182,12 @@ public class AiFlowGenerationResult
     /// 模板落地所缺资源（模型/地址/标定等）
     /// </summary>
     public List<AiMissingResourceInfo> MissingResources { get; set; } = new();
+
+    public List<object> PendingActions { get; set; } = new();
+
+    public object? ValidationPreview { get; set; }
+
+    public List<object> ToolTrace { get; set; } = new();
 
     /// <summary>
     /// 本次失败的结构化摘要（成功时为空）

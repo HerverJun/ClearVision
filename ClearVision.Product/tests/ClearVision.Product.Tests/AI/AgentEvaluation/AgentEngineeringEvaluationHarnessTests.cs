@@ -163,8 +163,8 @@ public sealed class AgentEngineeringEvaluationHarnessTests
         serializedCases.Should().Contain("mock://templates");
     }
 
-    [Fact(DisplayName = "Production AI mainline should not wire real AgentLoop or RuntimePreview tools")]
-    public void ProductionAiMainline_ShouldNotWireRealAgentLoopOrRuntimePreviewTools()
+    [Fact(DisplayName = "Production AI mainline should keep Agent controlled and RuntimePreview tools absent")]
+    public void ProductionAiMainline_ShouldKeepAgentControlledAndRuntimePreviewToolsAbsent()
     {
         var productRoot = GetProductRoot();
         var aiFlowGenerationService = File.ReadAllText(Path.Combine(
@@ -187,7 +187,11 @@ public sealed class AgentEngineeringEvaluationHarnessTests
 
         aiFlowGenerationService.Should().NotContain("VisionAgentLoop");
         aiFlowGenerationService.Should().NotContain("BuildAgentAllowedPermissions");
-        serviceExtensions.Should().NotContain("IVisionAgentTool");
+        aiFlowGenerationService.Should().Contain("ShouldRunAgentGenerateFlow");
+        aiFlowGenerationService.Should().Contain("request.UseVisionAgentGenerateFlow");
+        serviceExtensions.Should().Contain("AgentGenerateFlowOptions");
+        serviceExtensions.Should().Contain("IVisionAgentToolRegistry");
+        serviceExtensions.Should().Contain("NoOpVisionAgentStationStatusReader");
         serviceExtensions.Should().NotContain("ReplayFlowWithFrameTool");
         serviceExtensions.Should().NotContain("CameraTestFrameTool");
         serviceExtensions.Should().NotContain("RuntimePreview");

@@ -2,6 +2,7 @@
 // AI 服务注入扩展
 // 提供 AI 相关服务的依赖注入扩展方法
 // 作者：蘅芜君
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,7 +10,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace ClearVision.Product.Infrastructure.AI;
 
 using ClearVision.Product.Infrastructure.AI.Connectors;
+using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.Runtime;
+using ClearVision.Product.Infrastructure.AI.Tools;
 
 public static class AiGenerationServiceExtensions
 {
@@ -20,6 +23,10 @@ public static class AiGenerationServiceExtensions
         // 注册 IOptions<AiGenerationOptions>（供 AiConfigStore 初始化时读取 appsettings.json 默认值）
         services.Configure<AiGenerationOptions>(
             configuration.GetSection(AiGenerationOptions.SectionName));
+        services.Configure<AgentGenerateFlowOptions>(
+            configuration.GetSection(AgentGenerateFlowOptions.SectionName));
+        services.Configure<VisionAgentLoopOptions>(
+            configuration.GetSection("AI:VisionAgent:Loop"));
 
         // 注册运行时配置管理器（单例：启动时从 ai_models.json 加载，必要时从 ai_config.json 迁移）
         services.AddSingleton<AiConfigStore>();
@@ -45,6 +52,21 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IAiFlowValidator, AiFlowValidator>();
         services.AddScoped<IAiFlowResponseParser, AiFlowResponseParser>();
         services.AddScoped<AutoLayoutService>();
+        services.AddScoped<AgentPromptBuilder>();
+        services.AddScoped<VisionAgentProtocolParser>();
+        services.AddScoped<VisionAgentLoop>();
+        services.AddScoped<IVisionAgentStationStatusReader, NoOpVisionAgentStationStatusReader>();
+        services.AddScoped<IVisionAgentTool, OperatorCatalogTool>();
+        services.AddScoped<IVisionAgentTool, OperatorSchemaTool>();
+        services.AddScoped<IVisionAgentTool, OperatorKnowledgeTool>();
+        services.AddScoped<IVisionAgentTool, FlowTemplateMatchTool>();
+        services.AddScoped<IVisionAgentTool, FlowTemplateSkeletonTool>();
+        services.AddScoped<IVisionAgentTool, CurrentFlowInspectTool>();
+        services.AddScoped<IVisionAgentTool, FlowValidationTool>();
+        services.AddScoped<IVisionAgentTool, DryRunFlowTool>();
+        services.AddScoped<IVisionAgentTool, RuntimePackagePrecheckTool>();
+        services.AddScoped<IVisionAgentToolRegistry, VisionAgentToolRegistry>();
+        services.AddScoped<IVisionAgentGenerateFlowService, VisionAgentGenerateFlowService>();
         services.AddScoped<IAiFlowGenerationService, AiFlowGenerationService>();
         services.AddScoped<GenerateFlowMessageHandler>();
 

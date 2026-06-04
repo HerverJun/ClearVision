@@ -13,10 +13,12 @@ using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.DryRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OpenCvSharp;
 
 namespace ClearVision.Product.Infrastructure.AI;
@@ -40,6 +42,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly IHostEnvironment _hostEnvironment;
     private readonly IPromptVersionManager _promptVersionManager;
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
+    private readonly AgentGenerateFlowOptions _agentGenerateFlowOptions;
+    private readonly IVisionAgentGenerateFlowService? _agentGenerateFlowService;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -66,7 +70,9 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         DryRunService dryRunService,
         IHostEnvironment hostEnvironment,
         IPromptVersionManager promptVersionManager,
-        Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
+        Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger,
+        IOptions<AgentGenerateFlowOptions>? agentGenerateFlowOptions = null,
+        IVisionAgentGenerateFlowService? agentGenerateFlowService = null)
     {
         _aiOrchestrator = aiOrchestrator;
         _promptBuilder = promptBuilder;
@@ -84,6 +90,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _hostEnvironment = hostEnvironment;
         _promptVersionManager = promptVersionManager;
         _logger = logger;
+        _agentGenerateFlowOptions = agentGenerateFlowOptions?.Value ?? new AgentGenerateFlowOptions();
+        _agentGenerateFlowService = agentGenerateFlowService;
     }
 
     public async Task<AiFlowGenerationResult> GenerateFlowAsync(
@@ -101,6 +109,55 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
             progressMessages.Add(message);
             onProgress?.Invoke(message);
+        }
+
+        if (ShouldRunAgentGenerateFlow(request))
+        {
+            try
+            {
+                ReportProgress("Vision Agent controlled GenerateFlow mode is enabled.");
+                if (_agentGenerateFlowService == null)
+                {
+                    throw new InvalidOperationException("Vision Agent GenerateFlow service is not registered.");
+                }
+
+                var agentResult = await _agentGenerateFlowService.GenerateFlowAsync(request, cancellationToken);
+                if (agentResult.Success || !_agentGenerateFlowOptions.FallbackToLegacyOnFailure)
+                {
+                    return agentResult;
+                }
+
+                _logger.LogWarning(
+                    "Vision Agent GenerateFlow failed and will fall back to legacy GenerateFlow. Error={Error}",
+                    agentResult.ErrorMessage);
+                ReportProgress("Vision Agent controlled mode failed; falling back to legacy GenerateFlow.");
+            }
+            catch (Exception ex) when (_agentGenerateFlowOptions.FallbackToLegacyOnFailure)
+            {
+                _logger.LogWarning(ex, "Vision Agent GenerateFlow failed and will fall back to legacy GenerateFlow.");
+                ReportProgress("Vision Agent controlled mode failed; falling back to legacy GenerateFlow.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Vision Agent GenerateFlow failed with controlled error mode.");
+                return new AiFlowGenerationResult
+                {
+                    Success = false,
+                    CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+                    FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+                    ErrorMessage = $"Vision Agent GenerateFlow failed: {ex.Message}",
+                    FailureSummary = new AiFailureSummary
+                    {
+                        Category = "vision_agent",
+                        Code = "controlled_agent_generate_flow_failed",
+                        Message = $"Vision Agent GenerateFlow failed: {ex.Message}",
+                        RepairTarget = "Disable Agent mode or retry with legacy GenerateFlow."
+                    },
+                    InteractionState = AiInteractionStates.Failed,
+                    TurnIntent = AiTurnIntents.NewFlow,
+                    RouterConfidence = AiRouterConfidence.Low
+                };
+            }
         }
 
         var pipeline = new AiGenerationPipelineContext();
@@ -854,6 +911,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private static bool ShouldIncludeReferenceFlowSummary(GenerateFlowMode mode)
     {
         return mode is GenerateFlowMode.Modify or GenerateFlowMode.Explain or GenerateFlowMode.ReviewPendingParameters;
+    }
+
+    private bool ShouldRunAgentGenerateFlow(AiFlowGenerationRequest request)
+    {
+        return _agentGenerateFlowOptions.Enabled &&
+               request.UseVisionAgentGenerateFlow;
     }
 
     private static GenerateFlowMode ResolveEffectiveMode(

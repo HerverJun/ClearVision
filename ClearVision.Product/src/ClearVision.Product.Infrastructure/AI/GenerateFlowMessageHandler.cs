@@ -41,6 +41,7 @@ public class GenerateFlowMessageHandler
         IReadOnlyList<string>? attachments = null,
         string? requirementMode = null,
         AiTemplateSelectionInfo? templateSelection = null,
+        bool useVisionAgentGenerateFlow = false,
         Action<string, string>? onMessage = null,
         CancellationToken cancellationToken = default)
     {
@@ -68,7 +69,8 @@ public class GenerateFlowMessageHandler
                     DebugPrompt: debugPrompt,
                     TemplateSelection: templateSelection)
                 {
-                    RequirementMode = requirementMode ?? AiRequirementModes.Strict
+                    RequirementMode = requirementMode ?? AiRequirementModes.Strict,
+                    UseVisionAgentGenerateFlow = useVisionAgentGenerateFlow
                 },
                 progressMsg => onMessage?.Invoke(
                     "GenerateFlowProgress",
@@ -114,6 +116,9 @@ public class GenerateFlowMessageHandler
                 TemplateCandidates = MapTemplateCandidates(result.TemplateCandidates),
                 PendingParameters = MapPendingParameters(result.PendingParameters),
                 MissingResources = MapMissingResources(result.MissingResources),
+                PendingActions = result.PendingActions,
+                ValidationPreview = result.ValidationPreview,
+                ToolTrace = result.ToolTrace,
                 ManualRetry = MapManualRetry(result.ManualRetry),
                 PromptTrace = result.PromptTrace is AiPromptTrace trace ? trace.Desensitize() : result.PromptTrace,
                 StageTimeline = MapStageTimeline(result.StageTimeline),
@@ -214,6 +219,9 @@ public class GenerateFlowMessageHandler
             response.TemplateCandidates,
             response.PendingParameters,
             response.MissingResources,
+            response.PendingActions,
+            response.ValidationPreview,
+            response.ToolTrace,
             response.ManualRetry,
             response.PromptTrace,
             response.StageTimeline,
