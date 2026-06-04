@@ -1,8 +1,4 @@
 using System.Text.Json;
-using ClearVision.Product.Core.AI.Tools;
-using ClearVision.Product.Infrastructure.AI.Tools;
-using Microsoft.Extensions.Logging;
-using NSubstitute;
 
 namespace ClearVision.Product.Tests.AI.AgentEvaluation;
 
@@ -20,21 +16,16 @@ internal sealed class AgentEvaluationHarness
         AgentEngineeringEvaluationCase evaluationCase,
         CancellationToken cancellationToken = default)
     {
-        var tools = BuildMockTools(evaluationCase.MockToolResponses);
-        var registry = new VisionAgentToolRegistry(
-            tools,
-            Substitute.For<ILogger<VisionAgentToolRegistry>>());
+        var registry = new MockAgentToolRegistry(BuildMockTools(evaluationCase.MockToolResponses));
         var allowedPermissions = BuildAllowedPermissions(evaluationCase.AllowRuntimePreview);
-        var context = new VisionAgentToolContext
+        var context = new MockAgentToolContext
         {
             UserDescription = evaluationCase.UserRequest,
-            PromptMode = AiPromptModes.AgentTools,
-            AllowedPermissions = allowedPermissions,
-            ToolCallingMode = "agent evaluation harness"
+            AllowedPermissions = allowedPermissions
         };
         var state = new EvaluationRunState();
         var callResults = new List<AgentEvaluationToolCallResult>();
-        var rawToolResults = new List<(string ToolName, string Permission, VisionAgentToolResult Result)>();
+        var rawToolResults = new List<(string ToolName, AgentEvaluationToolPermission? Permission, AgentEvaluationToolResult Result)>();
         var pendingActions = new List<string>();
         var blockingIssues = new List<string>();
 
@@ -42,22 +33,21 @@ internal sealed class AgentEvaluationHarness
         {
             cancellationToken.ThrowIfCancellationRequested();
             var permission = registry.TryGet(call.ToolName, out var tool)
-                ? tool.Permission.ToString()
-                : string.Empty;
-            var fakeTool = tool as ScriptedMockVisionAgentTool;
-            var executeCountBefore = fakeTool?.ExecuteCount ?? 0;
+                ? tool.Permission
+                : (AgentEvaluationToolPermission?)null;
+            var executeCountBefore = tool?.ExecuteCount ?? 0;
             var arguments = BuildArguments(call, evaluationCase, state);
             var result = await registry.ExecuteAsync(
                 call.ToolName,
                 context,
                 arguments,
                 cancellationToken);
-            var executedByMock = fakeTool != null && fakeTool.ExecuteCount > executeCountBefore;
+            var executedByMock = tool != null && tool.ExecuteCount > executeCountBefore;
 
             callResults.Add(new AgentEvaluationToolCallResult
             {
                 ToolName = call.ToolName,
-                Permission = permission,
+                Permission = permission?.ToString() ?? string.Empty,
                 Success = result.Success,
                 ErrorCode = result.ErrorCode,
                 ErrorMessage = result.ErrorMessage,
@@ -96,7 +86,7 @@ internal sealed class AgentEvaluationHarness
         };
     }
 
-    private static IReadOnlyList<IVisionAgentTool> BuildMockTools(IReadOnlyList<MockToolResponse> responses)
+    private static IReadOnlyList<ScriptedMockAgentTool> BuildMockTools(IReadOnlyList<MockToolResponse> responses)
     {
         return responses
             .GroupBy(response => response.ToolName, StringComparer.OrdinalIgnoreCase)
@@ -112,27 +102,24 @@ internal sealed class AgentEvaluationHarness
                         $"Mock tool '{group.Key}' has inconsistent permissions.");
                 }
 
-                return (IVisionAgentTool)new ScriptedMockVisionAgentTool(
-                    group.Key,
-                    permissions[0],
-                    group.ToList());
+                return new ScriptedMockAgentTool(group.Key, permissions[0], group.ToList());
             })
             .ToList();
     }
 
-    private static HashSet<VisionAgentToolPermission> BuildAllowedPermissions(bool allowRuntimePreview)
+    private static HashSet<AgentEvaluationToolPermission> BuildAllowedPermissions(bool allowRuntimePreview)
     {
-        var permissions = new HashSet<VisionAgentToolPermission>
+        var permissions = new HashSet<AgentEvaluationToolPermission>
         {
-            VisionAgentToolPermission.ReadOnly,
-            VisionAgentToolPermission.Simulation,
-            VisionAgentToolPermission.ConfigDraft,
-            VisionAgentToolPermission.DeploymentPrepare
+            AgentEvaluationToolPermission.ReadOnly,
+            AgentEvaluationToolPermission.Simulation,
+            AgentEvaluationToolPermission.ConfigDraft,
+            AgentEvaluationToolPermission.DeploymentPrepare
         };
 
         if (allowRuntimePreview)
         {
-            permissions.Add(VisionAgentToolPermission.RuntimePreview);
+            permissions.Add(AgentEvaluationToolPermission.RuntimePreview);
         }
 
         return permissions;
@@ -173,7 +160,7 @@ internal sealed class AgentEvaluationHarness
 
     private static void UpdateState(
         string toolName,
-        VisionAgentToolResult result,
+        AgentEvaluationToolResult result,
         EvaluationRunState state)
     {
         var data = ToNullableJsonElement(result.Data);
@@ -202,7 +189,7 @@ internal sealed class AgentEvaluationHarness
     }
 
     private static AgentEvaluationValidationPreview BuildValidationPreview(
-        IReadOnlyList<(string ToolName, string Permission, VisionAgentToolResult Result)> toolResults)
+        IReadOnlyList<(string ToolName, AgentEvaluationToolPermission? Permission, AgentEvaluationToolResult Result)> toolResults)
     {
         return new AgentEvaluationValidationPreview
         {
@@ -217,7 +204,7 @@ internal sealed class AgentEvaluationHarness
     }
 
     private static string ResolveDryRunStatus(
-        IReadOnlyList<(string ToolName, string Permission, VisionAgentToolResult Result)> toolResults)
+        IReadOnlyList<(string ToolName, AgentEvaluationToolPermission? Permission, AgentEvaluationToolResult Result)> toolResults)
     {
         var result = LastToolResult(toolResults, "dryrun_flow");
         if (result == null)
@@ -243,7 +230,7 @@ internal sealed class AgentEvaluationHarness
     }
 
     private static string ResolveReplayStatus(
-        IReadOnlyList<(string ToolName, string Permission, VisionAgentToolResult Result)> toolResults)
+        IReadOnlyList<(string ToolName, AgentEvaluationToolPermission? Permission, AgentEvaluationToolResult Result)> toolResults)
     {
         var result = LastToolResult(toolResults, "replay_flow_with_frame");
         if (result == null)
@@ -274,7 +261,7 @@ internal sealed class AgentEvaluationHarness
     }
 
     private static string ResolvePrecheckStatus(
-        IReadOnlyList<(string ToolName, string Permission, VisionAgentToolResult Result)> toolResults)
+        IReadOnlyList<(string ToolName, AgentEvaluationToolPermission? Permission, AgentEvaluationToolResult Result)> toolResults)
     {
         var result = LastToolResult(toolResults, "runtime_package_precheck");
         if (result == null)
@@ -311,20 +298,20 @@ internal sealed class AgentEvaluationHarness
                 .ToList(),
             RuntimePreviewExecutedToolNames = callResults
                 .Where(item => item.ExecutedByMock &&
-                               string.Equals(item.Permission, VisionAgentToolPermission.RuntimePreview.ToString(),
+                               string.Equals(item.Permission, AgentEvaluationToolPermission.RuntimePreview.ToString(),
                                    StringComparison.OrdinalIgnoreCase))
                 .Select(item => item.ToolName)
                 .ToList(),
             DeploymentPrepareExecutedToolNames = callResults
                 .Where(item => item.ExecutedByMock &&
-                               string.Equals(item.Permission, VisionAgentToolPermission.DeploymentPrepare.ToString(),
+                               string.Equals(item.Permission, AgentEvaluationToolPermission.DeploymentPrepare.ToString(),
                                    StringComparison.OrdinalIgnoreCase))
                 .Select(item => item.ToolName)
                 .ToList()
         };
     }
 
-    private static IReadOnlyList<string> ExtractBlockingIssues(string toolName, VisionAgentToolResult result)
+    private static IReadOnlyList<string> ExtractBlockingIssues(string toolName, AgentEvaluationToolResult result)
     {
         var issues = new List<string>();
         var data = ToNullableJsonElement(result.Data);
@@ -398,8 +385,8 @@ internal sealed class AgentEvaluationHarness
         }
     }
 
-    private static VisionAgentToolResult? LastToolResult(
-        IReadOnlyList<(string ToolName, string Permission, VisionAgentToolResult Result)> toolResults,
+    private static AgentEvaluationToolResult? LastToolResult(
+        IReadOnlyList<(string ToolName, AgentEvaluationToolPermission? Permission, AgentEvaluationToolResult Result)> toolResults,
         string toolName)
     {
         return toolResults
@@ -487,31 +474,86 @@ internal sealed class AgentEvaluationHarness
         public JsonElement? RuntimePackagePrecheck { get; set; }
     }
 
-    private sealed class ScriptedMockVisionAgentTool : IVisionAgentTool
+    private sealed record MockAgentToolContext
+    {
+        public string UserDescription { get; init; } = string.Empty;
+        public IReadOnlySet<AgentEvaluationToolPermission> AllowedPermissions { get; init; } =
+            new HashSet<AgentEvaluationToolPermission>();
+    }
+
+    private sealed class MockAgentToolRegistry
+    {
+        private readonly IReadOnlyDictionary<string, ScriptedMockAgentTool> _tools;
+
+        public MockAgentToolRegistry(IReadOnlyList<ScriptedMockAgentTool> tools)
+        {
+            _tools = tools.ToDictionary(tool => tool.Name, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public bool TryGet(string name, out ScriptedMockAgentTool tool)
+        {
+            return _tools.TryGetValue(name.Trim(), out tool!);
+        }
+
+        public Task<AgentEvaluationToolResult> ExecuteAsync(
+            string name,
+            MockAgentToolContext context,
+            JsonElement arguments,
+            CancellationToken cancellationToken)
+        {
+            if (!TryGet(name, out var tool))
+            {
+                return Task.FromResult(AgentEvaluationToolResult.Fail(
+                    "unknown_tool",
+                    $"Mock agent tool '{name}' is not registered."));
+            }
+
+            if (tool.Permission == AgentEvaluationToolPermission.ConfigWrite)
+            {
+                return Task.FromResult(AgentEvaluationToolResult.Fail(
+                    "tool_permission_denied",
+                    $"Tool '{tool.Name}' requires ConfigWrite, which is not allowed in Evaluation Harness v0.1."));
+            }
+
+            if (tool.Permission == AgentEvaluationToolPermission.DeploymentPrepare &&
+                !string.Equals(tool.Name, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult(AgentEvaluationToolResult.Fail(
+                    "tool_permission_denied",
+                    $"Tool '{tool.Name}' requests DeploymentPrepare, but only runtime_package_precheck is allowed."));
+            }
+
+            if (!context.AllowedPermissions.Contains(tool.Permission))
+            {
+                return Task.FromResult(AgentEvaluationToolResult.Fail(
+                    "tool_permission_denied",
+                    $"Tool '{tool.Name}' requires permission '{tool.Permission}', which is not allowed in this mock session."));
+            }
+
+            return tool.ExecuteAsync(context, arguments, cancellationToken);
+        }
+    }
+
+    private sealed class ScriptedMockAgentTool
     {
         private readonly Queue<MockToolResponse> _responses;
 
-        public ScriptedMockVisionAgentTool(
+        public ScriptedMockAgentTool(
             string name,
-            VisionAgentToolPermission permission,
+            AgentEvaluationToolPermission permission,
             IReadOnlyList<MockToolResponse> responses)
         {
             Name = name;
             Permission = permission;
             _responses = new Queue<MockToolResponse>(responses);
-            ParametersSchema = ToJsonElement(new { type = "object", properties = new { } });
         }
 
         public string Name { get; }
-        public string DisplayName => $"Mock {Name}";
-        public string Description => "Evaluation harness mock tool. It never touches hardware, files, models, stations, or OS commands.";
-        public string Category => "agent-evaluation-mock";
-        public VisionAgentToolPermission Permission { get; }
-        public JsonElement ParametersSchema { get; }
+        public AgentEvaluationToolPermission Permission { get; }
         public int ExecuteCount { get; private set; }
 
-        public Task<VisionAgentToolResult> ExecuteAsync(
-            VisionAgentToolContext context,
+        public Task<AgentEvaluationToolResult> ExecuteAsync(
+            MockAgentToolContext context,
             JsonElement arguments,
             CancellationToken cancellationToken)
         {
@@ -519,13 +561,13 @@ internal sealed class AgentEvaluationHarness
             ExecuteCount++;
             if (_responses.Count == 0)
             {
-                return Task.FromResult(VisionAgentToolResult.Fail(
+                return Task.FromResult(AgentEvaluationToolResult.Fail(
                     "mock_response_missing",
                     $"No scripted mock response remains for tool '{Name}'."));
             }
 
             var response = _responses.Dequeue();
-            return Task.FromResult(new VisionAgentToolResult
+            return Task.FromResult(new AgentEvaluationToolResult
             {
                 Success = response.Success,
                 Data = response.Data,

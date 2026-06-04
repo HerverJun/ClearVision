@@ -9,12 +9,10 @@ using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Contracts.Messages;
-using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
-using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.DryRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using Microsoft.Extensions.Hosting;
@@ -39,7 +37,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly ITemplateConstraintValidator _templateConstraintValidator;
     private readonly IAiFlowResponseParser _responseParser;
     private readonly DryRunService _dryRunService;
-    private readonly VisionAgentLoop? _visionAgentLoop;
     private readonly IHostEnvironment _hostEnvironment;
     private readonly IPromptVersionManager _promptVersionManager;
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
@@ -53,7 +50,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
     };
     private const int DefaultMaxMultimodalAttachmentCount = 4;
-    private const int AgentFinalRepairAttempts = 2;
     public AiFlowGenerationService(
         AiGenerationOrchestrator aiOrchestrator,
         PromptBuilder promptBuilder,
@@ -68,45 +64,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         ITemplateConstraintValidator templateConstraintValidator,
         IAiFlowResponseParser responseParser,
         DryRunService dryRunService,
-        IHostEnvironment hostEnvironment,
-        IPromptVersionManager promptVersionManager,
-        Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
-        : this(
-            aiOrchestrator,
-            promptBuilder,
-            conversationalFlowService,
-            validator,
-            layoutService,
-            operatorFactory,
-            templateService,
-            scenarioMatcher,
-            requirementBriefExtractor,
-            turnRouter,
-            templateConstraintValidator,
-            responseParser,
-            dryRunService,
-            null,
-            hostEnvironment,
-            promptVersionManager,
-            logger)
-    {
-    }
-
-    public AiFlowGenerationService(
-        AiGenerationOrchestrator aiOrchestrator,
-        PromptBuilder promptBuilder,
-        IConversationalFlowService conversationalFlowService,
-        IAiFlowValidator validator,
-        AutoLayoutService layoutService,
-        IOperatorFactory operatorFactory,
-        IFlowTemplateService templateService,
-        IScenarioMatcher scenarioMatcher,
-        IRequirementBriefExtractor requirementBriefExtractor,
-        IAiTurnRouter turnRouter,
-        ITemplateConstraintValidator templateConstraintValidator,
-        IAiFlowResponseParser responseParser,
-        DryRunService dryRunService,
-        VisionAgentLoop? visionAgentLoop,
         IHostEnvironment hostEnvironment,
         IPromptVersionManager promptVersionManager,
         Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger)
@@ -124,7 +81,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _templateConstraintValidator = templateConstraintValidator;
         _responseParser = responseParser;
         _dryRunService = dryRunService;
-        _visionAgentLoop = visionAgentLoop;
         _hostEnvironment = hostEnvironment;
         _promptVersionManager = promptVersionManager;
         _logger = logger;
@@ -289,16 +245,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         var selectionReason = _aiOrchestrator.ResolveSelectionReason();
         var options = activeModel.ToGenerationOptions();
         var capabilities = _aiOrchestrator.ResolveCapabilities(activeModel);
-        var promptMode = AiPromptModes.Normalize(request.PromptMode);
-        var useAgentTools = AiPromptModes.UsesAgentTools(promptMode) && _visionAgentLoop != null;
 
-        var systemPrompt = useAgentTools
-            ? string.Empty
-            : pipeline.Measure(
-                "prompt_context",
-                () => _promptBuilder.BuildSystemPrompt(request.Description, capabilities.SupportsJsonMode),
-                prompt => $"system prompt chars={prompt.Length}");
-        var referenceFlowSummary = !useAgentTools && ShouldIncludeReferenceFlowSummary(effectiveMode)
+        var systemPrompt = pipeline.Measure(
+            "prompt_context",
+            () => _promptBuilder.BuildSystemPrompt(request.Description, capabilities.SupportsJsonMode),
+            prompt => $"system prompt chars={prompt.Length}");
+        var referenceFlowSummary = ShouldIncludeReferenceFlowSummary(effectiveMode)
             ? AiPromptComposer.BuildReferenceFlowSummary(conversationContext.ExistingFlowJson)
             : string.Empty;
         var userMessage = AiPromptComposer.BuildUserPrompt(new AiPromptRequest(
@@ -306,15 +258,13 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             Mode: effectiveMode,
             AdditionalContext: request.AdditionalContext,
             InteractionInstructions: BuildTurnRoutePromptSection(turnRoute),
-            TemplatePriority: useAgentTools
-                ? BuildAgentTemplatePriorityPromptSection(templatePriority)
-                : BuildTemplatePriorityPromptSection(templatePriority),
+            TemplatePriority: BuildTemplatePriorityPromptSection(templatePriority),
             AttachmentContext: attachmentContext,
             SessionSummary: conversationContext.SessionSummary,
             ReferenceFlowSummary: referenceFlowSummary,
             RequirementBriefSection: BuildRequirementBriefPromptSection(requirementBrief)));
         GenerateFlowAttachmentReport promptTraceAttachmentReport = new();
-        var promptTrace = !useAgentTools && ShouldIncludePromptTrace(request.DebugPrompt)
+        var promptTrace = ShouldIncludePromptTrace(request.DebugPrompt)
             ? new AiPromptTrace
             {
                 Mode = effectiveMode.ToWireValue(),
@@ -358,31 +308,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
         if (promptTrace != null)
             promptTrace.AttachmentReport = promptTraceAttachmentReport;
-        var currentUserMessage = useAgentTools
-            ? new ChatMessage("user", userMessage)
-            : BuildUserChatMessage(userMessage, activeSendablePaths);
-
-        if (useAgentTools)
-        {
-            return await RunAgentToolsFlowAsync(
-                request,
-                conversationContext,
-                detectedIntent,
-                turnRoute,
-                templatePriority,
-                requirementBrief,
-                progressMessages,
-                pipeline,
-                activePromptVersion,
-                activeModel,
-                capabilities,
-                options,
-                selectionReason,
-                userMessage,
-                promptTraceAttachmentReport,
-                ReportProgress,
-                cancellationToken);
-        }
+        var currentUserMessage = BuildUserChatMessage(userMessage, activeSendablePaths);
 
         AiGeneratedFlowJson? generatedFlow = null;
         AiValidationResult? lastValidation = null;
@@ -684,10 +610,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         SessionId = conversationContext.SessionId,
                         DetectedIntent = detectedIntent,
                         DryRunResult = dryRunReport,
-                        ValidationPreview = new AiValidationPreview
-                        {
-                            FinalDryRun = dryRunReport
-                        },
                         RecommendedTemplate = recommendedTemplate,
                         GenerationMode = templatePriority.GenerationMode,
                         TemplateLockLevel = templatePriority.TemplateLockLevel,
@@ -1037,644 +959,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return debugPrompt || _hostEnvironment.IsDevelopment() || System.Diagnostics.Debugger.IsAttached;
     }
 
-    private async Task<AiFlowGenerationResult> RunAgentToolsFlowAsync(
-        AiFlowGenerationRequest request,
-        ConversationContext conversationContext,
-        string detectedIntent,
-        AiTurnRoute turnRoute,
-        TemplatePriorityContext templatePriority,
-        AiRequirementBrief requirementBrief,
-        IReadOnlyList<string> progressMessages,
-        AiGenerationPipelineContext pipeline,
-        PromptVersion activePromptVersion,
-        AiModelConfig activeModel,
-        AiModelCapabilities capabilities,
-        AiGenerationOptions options,
-        string selectionReason,
-        string userMessage,
-        GenerateFlowAttachmentReport attachmentReport,
-        Action<string> reportProgress,
-        CancellationToken cancellationToken)
-    {
-        reportProgress("Vision Agent 正在按需调用 ClearVision 内部工具...");
-        var stopwatch = Stopwatch.StartNew();
-        var allowRuntimePreviewTools = request.AllowRuntimePreviewTools || options.EnableRuntimePreviewTools;
-        var agentAllowedPermissions = BuildAgentAllowedPermissions(allowRuntimePreviewTools);
-        var agentResult = await _visionAgentLoop!.RunAsync(new VisionAgentLoopRequest
-        {
-            UserPrompt = userMessage,
-            Model = activeModel,
-            Capabilities = capabilities,
-            ToolContext = new VisionAgentToolContext
-            {
-                UserDescription = request.Description,
-                AdditionalContext = request.AdditionalContext,
-                SessionId = conversationContext.SessionId,
-                ExistingFlowJson = conversationContext.ExistingFlowJson,
-                PromptMode = AiPromptModes.Normalize(request.PromptMode),
-                DebugPrompt = request.DebugPrompt,
-                AllowedPermissions = agentAllowedPermissions
-            },
-            Progress = progress => reportProgress($"{progress.Stage}|{progress.Message}")
-        }, cancellationToken);
-        stopwatch.Stop();
-
-        var estimatedInputTokens = agentResult.TokenUsage?.InputTokens
-            ?? EstimateTokens(agentResult.SystemPrompt) + EstimateTokens(agentResult.UserPrompt);
-        var estimatedOutputTokens = agentResult.TokenUsage?.OutputTokens
-            ?? EstimateTokens(agentResult.FinalContent);
-        pipeline.EstimatedInputTokens = estimatedInputTokens;
-        pipeline.EstimatedOutputTokens = estimatedOutputTokens;
-        pipeline.AddStage(
-            "agent_loop",
-            agentResult.Success ? "completed" : "failed",
-            agentResult.Success
-                ? $"toolRounds={agentResult.ToolRounds}, toolCalls={agentResult.ToolTrace.Count}, responseChars={agentResult.FinalContent.Length}"
-                : agentResult.ErrorMessage ?? "agent loop failed",
-            stopwatch.Elapsed,
-            new Dictionary<string, string>
-            {
-                ["provider"] = options.Provider,
-                ["model"] = options.Model,
-                ["promptMode"] = AiPromptModes.Normalize(request.PromptMode),
-                ["estimatedInputTokens"] = estimatedInputTokens.ToString(CultureInfo.InvariantCulture),
-                ["estimatedOutputTokens"] = estimatedOutputTokens.ToString(CultureInfo.InvariantCulture)
-            });
-
-        var promptTrace = ShouldIncludePromptTrace(request.DebugPrompt)
-            ? new AiPromptTrace
-            {
-                Mode = AiPromptModes.Normalize(request.PromptMode),
-                Provider = options.Provider,
-                Model = options.Model,
-                BaseUrl = options.BaseUrl,
-                Capabilities = capabilities.Clone(),
-                SystemPrompt = agentResult.SystemPrompt,
-                UserPrompt = agentResult.UserPrompt,
-                UsedReferenceFlowSummary = string.Empty,
-                PromptVersionId = activePromptVersion.Id.ToString(),
-                PromptVersionName = activePromptVersion.Name,
-                SelectionReason = selectionReason,
-                AttachmentReport = attachmentReport,
-                EstimatedInputTokens = estimatedInputTokens,
-                EstimatedOutputTokens = estimatedOutputTokens,
-                ToolCallingMode = agentResult.ToolCallingMode
-            }
-            : null;
-
-        if (!agentResult.Success)
-        {
-            return new AiFlowGenerationResult
-            {
-                Success = false,
-                ErrorMessage = agentResult.ErrorMessage,
-                CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
-                FailureType = AiFlowGenerationResult.FailureTypeManualRetryRequired,
-                RetryCount = 0,
-                SessionId = conversationContext.SessionId,
-                DetectedIntent = detectedIntent,
-                PromptTrace = promptTrace,
-                RequirementBrief = requirementBrief,
-                GenerationMode = templatePriority.GenerationMode,
-                TemplateLockLevel = templatePriority.TemplateLockLevel,
-                TemplateCandidates = BuildTemplateCandidates(templatePriority),
-                StageTimeline = pipeline.Timeline.ToList(),
-                ToolTrace = agentResult.ToolTrace,
-                PendingActions = agentResult.PendingActions,
-                TurnIntent = turnRoute.TurnIntent,
-                InteractionState = AiInteractionStates.ManualRetry,
-                RouterConfidence = turnRoute.Confidence,
-                BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-                NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
-            };
-        }
-
-        reportProgress("Vision Agent 已返回 final_flow，正在解析和复用现有校验链...");
-        var parseResult = pipeline.Measure(
-            "parse",
-            () => _responseParser.Parse(agentResult.FinalContent),
-            result => result.Success
-                ? $"operators={result.Flow!.Operators?.Count ?? 0}, connections={result.Flow.Connections?.Count ?? 0}, candidates={result.CandidateCount}"
-                : $"parse failed: {result.Code}, candidates={result.CandidateCount}");
-        var generatedFlow = parseResult.Flow;
-        AiValidationResult? lastValidation = null;
-        var repairAttempts = 0;
-        if (generatedFlow == null)
-        {
-            var validation = BuildParseValidationResult(parseResult);
-            var diagnostics = BuildAttemptDiagnostics(1, "parse", validation, agentResult.FinalContent);
-            var repair = await TryRepairAgentFinalFlowAsync(
-                request,
-                conversationContext,
-                activeModel,
-                capabilities,
-                agentResult,
-                validation,
-                diagnostics,
-                "parse",
-                templatePriority,
-                pipeline,
-                allowRuntimePreviewTools,
-                reportProgress,
-                cancellationToken);
-            if (!repair.Success)
-            {
-                var manualRetry = CreateManualRetryResult(
-                    stage: "agent_parse",
-                    conversationContext.SessionId,
-                    request.Description,
-                    repair.Validation ?? validation,
-                    repair.Diagnostics.Count > 0 ? repair.Diagnostics : diagnostics,
-                    retryCount: repair.RepairAttempts,
-                    lastRawResponse: repair.AgentResult?.FinalContent ?? agentResult.FinalContent,
-                    promptTrace,
-                    progressMessages,
-                    requirementBrief,
-                    turnRoute,
-                    templatePriority.GenerationMode,
-                    templatePriority.TemplateLockLevel,
-                    BuildTemplateCandidates(templatePriority),
-                    pipeline.Timeline.ToList());
-                manualRetry.ToolTrace = repair.ToolTrace.Count > 0 ? repair.ToolTrace : agentResult.ToolTrace;
-                manualRetry.PendingActions = repair.PendingActions.Count > 0 ? repair.PendingActions : agentResult.PendingActions;
-                return manualRetry;
-            }
-
-            agentResult = repair.AgentResult!;
-            generatedFlow = repair.GeneratedFlow!;
-            lastValidation = repair.Validation!;
-            repairAttempts += repair.RepairAttempts;
-            if (promptTrace != null)
-            {
-                promptTrace.SystemPrompt = agentResult.SystemPrompt;
-                promptTrace.UserPrompt = agentResult.UserPrompt;
-                promptTrace.ToolCallingMode = agentResult.ToolCallingMode;
-            }
-        }
-
-        ApplyTemplateMetadata(generatedFlow, templatePriority);
-        ApplyModelEmbeddedNmsDefaults(generatedFlow);
-
-        if (lastValidation == null)
-        {
-            lastValidation = pipeline.Measure(
-                "validator",
-                () => _validator.Validate(generatedFlow),
-                validation => validation.IsValid
-                    ? $"valid with warnings={validation.Warnings.Count}"
-                    : $"errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
-            if (lastValidation.IsValid && templatePriority.IsTemplateFirst)
-            {
-                var templateGate = pipeline.Measure(
-                    "template_gate",
-                    () => _templateConstraintValidator.Validate(
-                        generatedFlow,
-                        templatePriority.Template,
-                        string.Equals(templatePriority.TemplateLockLevel, "strict", StringComparison.OrdinalIgnoreCase)),
-                    validation => validation.IsValid
-                        ? $"template gate passed with warnings={validation.Warnings.Count}"
-                        : $"template gate errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
-                MergeValidationResult(lastValidation, templateGate);
-            }
-        }
-
-        if (!lastValidation.IsValid)
-        {
-            var diagnostics = BuildAttemptDiagnostics(1, "validation", lastValidation, agentResult.FinalContent);
-            var repair = await TryRepairAgentFinalFlowAsync(
-                request,
-                conversationContext,
-                activeModel,
-                capabilities,
-                agentResult,
-                lastValidation,
-                diagnostics,
-                "validation",
-                templatePriority,
-                pipeline,
-                allowRuntimePreviewTools,
-                reportProgress,
-                cancellationToken);
-            if (!repair.Success)
-            {
-                var manualRetry = CreateManualRetryResult(
-                    stage: "agent_validation",
-                    conversationContext.SessionId,
-                    request.Description,
-                    repair.Validation ?? lastValidation,
-                    repair.Diagnostics.Count > 0 ? repair.Diagnostics : diagnostics,
-                    retryCount: repair.RepairAttempts,
-                    lastRawResponse: repair.AgentResult?.FinalContent ?? agentResult.FinalContent,
-                    promptTrace,
-                    progressMessages,
-                    requirementBrief,
-                    turnRoute,
-                    templatePriority.GenerationMode,
-                    templatePriority.TemplateLockLevel,
-                    BuildTemplateCandidates(templatePriority),
-                    pipeline.Timeline.ToList());
-                manualRetry.ToolTrace = repair.ToolTrace.Count > 0 ? repair.ToolTrace : agentResult.ToolTrace;
-                manualRetry.PendingActions = repair.PendingActions.Count > 0 ? repair.PendingActions : agentResult.PendingActions;
-                return manualRetry;
-            }
-
-            agentResult = repair.AgentResult!;
-            generatedFlow = repair.GeneratedFlow!;
-            lastValidation = repair.Validation!;
-            repairAttempts += repair.RepairAttempts;
-            if (promptTrace != null)
-            {
-                promptTrace.SystemPrompt = agentResult.SystemPrompt;
-                promptTrace.UserPrompt = agentResult.UserPrompt;
-                promptTrace.ToolCallingMode = agentResult.ToolCallingMode;
-            }
-        }
-
-        var (flowDto, actualOperatorIdMap) = ConvertToFlowDto(generatedFlow, request.Description);
-        pipeline.Measure(
-            "layout",
-            () => { _layoutService.ApplyLayout(flowDto); return true; },
-            _ => $"applied layout to {flowDto.Operators?.Count ?? 0} operators");
-
-        object? dryRunReport = null;
-        try
-        {
-            var dryRunStopwatch = Stopwatch.StartNew();
-            var flowEntity = ConvertDtoToEntity(flowDto);
-            var drResult = await _dryRunService.RunAsync(
-                flowEntity,
-                new Dictionary<string, object>(),
-                new DryRunStubRegistry(),
-                cancellationToken);
-            pipeline.AddStage(
-                "dryrun",
-                "completed",
-                $"success={drResult.IsSuccess}, coverage={drResult.CoveragePercentage:F1}%",
-                dryRunStopwatch.Elapsed);
-            dryRunReport = new
-            {
-                drResult.CoveragePercentage,
-                drResult.CoveredBranches,
-                drResult.TotalBranches,
-                drResult.IsSuccess
-            };
-        }
-        catch (Exception ex)
-        {
-            pipeline.AddStage("dryrun", "warning", ex.Message, TimeSpan.Zero);
-            _logger.LogWarning(ex, "Agent DryRun preview failed.");
-        }
-
-        var recommendedTemplate = ResolveRecommendedTemplate(generatedFlow, templatePriority);
-        var pendingParameters = BuildPendingParameters(generatedFlow, actualOperatorIdMap);
-        var missingResources = BuildMissingResources(generatedFlow, templatePriority);
-        var pendingActions = agentResult.PendingActions
-            .Concat(generatedFlow.PendingActions ?? new List<VisionAgentPendingAction>())
-            .ToList();
-        generatedFlow.PendingParameters = pendingParameters;
-
-        var assistantReply = BuildAssistantReply(generatedFlow, flowDto, recommendedTemplate);
-        var assistantPayload = new ConversationTurnPayload
-        {
-            Kind = "assistant_result",
-            Status = AiFlowGenerationResult.CompletionStatusCompleted,
-            InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
-            TurnIntent = turnRoute.TurnIntent,
-            RouterConfidence = turnRoute.Confidence,
-            BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
-            Reply = assistantReply,
-            Reasoning = ShouldIncludePromptTrace(request.DebugPrompt) ? agentResult.Reasoning : null,
-            Progress = progressMessages.ToList(),
-            RequirementBrief = requirementBrief,
-            ClarificationRequired = requirementBrief.ClarificationRequired
-        };
-
-        _conversationalFlowService.RecordAssistantResponse(
-            conversationContext.SessionId,
-            assistantReply,
-            JsonSerializer.Serialize(generatedFlow, _jsonOptions),
-            JsonSerializer.Serialize(flowDto, _jsonOptions),
-            assistantPayload);
-
-        return new AiFlowGenerationResult
-        {
-            Success = true,
-            CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
-            Flow = flowDto,
-            AiExplanation = generatedFlow.Explanation,
-            Reasoning = ShouldIncludePromptTrace(request.DebugPrompt) ? agentResult.Reasoning : null,
-            ParametersNeedingReview = generatedFlow.ParametersNeedingReview,
-            RetryCount = repairAttempts,
-            SessionId = conversationContext.SessionId,
-            DetectedIntent = detectedIntent,
-            DryRunResult = dryRunReport,
-            RecommendedTemplate = recommendedTemplate,
-            GenerationMode = templatePriority.GenerationMode,
-            TemplateLockLevel = templatePriority.TemplateLockLevel,
-            PendingParameters = pendingParameters,
-            MissingResources = missingResources,
-            PendingActions = pendingActions,
-            ToolTrace = agentResult.ToolTrace,
-            ValidationPreview = BuildValidationPreview(dryRunReport, agentResult.ToolTrace),
-            PromptTrace = promptTrace,
-            RequirementBrief = requirementBrief,
-            TemplateCandidates = BuildTemplateCandidates(templatePriority),
-            StageTimeline = pipeline.Timeline.ToList(),
-            KnowledgeDiagnostics = ExtractKnowledgeDiagnostics(lastValidation),
-            TurnIntent = turnRoute.TurnIntent,
-            InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
-            RouterConfidence = turnRoute.Confidence,
-            BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
-        };
-    }
-
-    private async Task<AgentFinalRepairResult> TryRepairAgentFinalFlowAsync(
-        AiFlowGenerationRequest request,
-        ConversationContext conversationContext,
-        AiModelConfig activeModel,
-        AiModelCapabilities capabilities,
-        VisionAgentLoopResult initialAgentResult,
-        AiValidationResult initialValidation,
-        List<AiAttemptDiagnostic> initialDiagnostics,
-        string failureStage,
-        TemplatePriorityContext templatePriority,
-        AiGenerationPipelineContext pipeline,
-        bool allowRuntimePreviewTools,
-        Action<string> reportProgress,
-        CancellationToken cancellationToken)
-    {
-        var diagnostics = initialDiagnostics.Select(CloneAttemptDiagnostic).ToList();
-        var toolTrace = initialAgentResult.ToolTrace.ToList();
-        var pendingActions = initialAgentResult.PendingActions.ToList();
-        var lastValidation = initialValidation;
-        var lastAgentResult = initialAgentResult;
-        AiGeneratedFlowJson? generatedFlow = null;
-
-        for (var attempt = 1; attempt <= AgentFinalRepairAttempts; attempt++)
-        {
-            var errorCount = Math.Max(1, lastValidation.Diagnostics.Count(item => item.Severity == AiValidationSeverity.Error));
-            reportProgress($"agent_repair|发现 {errorCount} 个错误，正在回灌 Agent 修复（第 {attempt}/{AgentFinalRepairAttempts} 轮）...");
-            var repairPrompt = BuildAgentFinalRepairPrompt(
-                request.Description,
-                lastAgentResult.FinalContent,
-                lastValidation,
-                failureStage,
-                attempt);
-
-            var stopwatch = Stopwatch.StartNew();
-            var repairResult = await _visionAgentLoop!.RunAsync(new VisionAgentLoopRequest
-            {
-                UserPrompt = repairPrompt,
-                Model = activeModel,
-                Capabilities = capabilities,
-                ToolContext = new VisionAgentToolContext
-                {
-                    UserDescription = request.Description,
-                    AdditionalContext = request.AdditionalContext,
-                    SessionId = conversationContext.SessionId,
-                    ExistingFlowJson = conversationContext.ExistingFlowJson,
-                    PromptMode = AiPromptModes.Normalize(request.PromptMode),
-                    DebugPrompt = request.DebugPrompt,
-                    AllowedPermissions = BuildAgentAllowedPermissions(allowRuntimePreviewTools)
-                },
-                Progress = progress => reportProgress($"{progress.Stage}|{progress.Message}")
-            }, cancellationToken);
-            stopwatch.Stop();
-
-            toolTrace.AddRange(repairResult.ToolTrace);
-            pendingActions.AddRange(repairResult.PendingActions);
-            pipeline.AddStage(
-                "agent_final_repair",
-                repairResult.Success ? "completed" : "failed",
-                repairResult.Success
-                    ? $"attempt={attempt}, toolRounds={repairResult.ToolRounds}, responseChars={repairResult.FinalContent.Length}"
-                    : repairResult.ErrorMessage ?? "agent final repair failed",
-                stopwatch.Elapsed,
-                new Dictionary<string, string>
-                {
-                    ["attempt"] = attempt.ToString(CultureInfo.InvariantCulture),
-                    ["failureStage"] = failureStage,
-                    ["toolCallingMode"] = repairResult.ToolCallingMode
-                });
-
-            lastAgentResult = repairResult with
-            {
-                ToolTrace = toolTrace.ToList(),
-                PendingActions = pendingActions.ToList()
-            };
-
-            if (!repairResult.Success)
-            {
-                return AgentFinalRepairResult.Failed(
-                    lastAgentResult,
-                    lastValidation,
-                    diagnostics,
-                    toolTrace,
-                    pendingActions,
-                    attempt);
-            }
-
-            var parseResult = pipeline.Measure(
-                "parse",
-                () => _responseParser.Parse(repairResult.FinalContent),
-                result => result.Success
-                    ? $"operators={result.Flow!.Operators?.Count ?? 0}, connections={result.Flow.Connections?.Count ?? 0}, candidates={result.CandidateCount}"
-                    : $"parse failed: {result.Code}, candidates={result.CandidateCount}");
-            generatedFlow = parseResult.Flow;
-            if (generatedFlow == null)
-            {
-                lastValidation = BuildParseValidationResult(parseResult);
-                diagnostics.AddRange(BuildAttemptDiagnostics(
-                    attempt + 1,
-                    "parse",
-                    lastValidation,
-                    repairResult.FinalContent));
-                continue;
-            }
-
-            ApplyTemplateMetadata(generatedFlow, templatePriority);
-            ApplyModelEmbeddedNmsDefaults(generatedFlow);
-            lastValidation = pipeline.Measure(
-                "validator",
-                () => _validator.Validate(generatedFlow),
-                validation => validation.IsValid
-                    ? $"valid with warnings={validation.Warnings.Count}"
-                    : $"errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
-
-            if (lastValidation.IsValid && templatePriority.IsTemplateFirst)
-            {
-                var templateGate = pipeline.Measure(
-                    "template_gate",
-                    () => _templateConstraintValidator.Validate(
-                        generatedFlow,
-                        templatePriority.Template,
-                        string.Equals(templatePriority.TemplateLockLevel, "strict", StringComparison.OrdinalIgnoreCase)),
-                    validation => validation.IsValid
-                        ? $"template gate passed with warnings={validation.Warnings.Count}"
-                        : $"template gate errors={validation.Errors.Count}, warnings={validation.Warnings.Count}");
-                MergeValidationResult(lastValidation, templateGate);
-            }
-
-            diagnostics.AddRange(BuildAttemptDiagnostics(
-                attempt + 1,
-                "validation",
-                lastValidation,
-                repairResult.FinalContent));
-
-            if (lastValidation.IsValid)
-            {
-                return AgentFinalRepairResult.Repaired(
-                    lastAgentResult,
-                    generatedFlow,
-                    lastValidation,
-                    diagnostics,
-                    toolTrace,
-                    pendingActions,
-                    attempt);
-            }
-        }
-
-        return AgentFinalRepairResult.Failed(
-            lastAgentResult,
-            lastValidation,
-            diagnostics,
-            toolTrace,
-            pendingActions,
-            AgentFinalRepairAttempts);
-    }
-
-    private static HashSet<VisionAgentToolPermission> BuildAgentAllowedPermissions(bool allowRuntimePreviewTools)
-    {
-        var permissions = new HashSet<VisionAgentToolPermission>
-        {
-            VisionAgentToolPermission.ReadOnly,
-            VisionAgentToolPermission.Simulation,
-            VisionAgentToolPermission.ConfigDraft,
-            VisionAgentToolPermission.DeploymentPrepare
-        };
-
-        if (allowRuntimePreviewTools)
-        {
-            permissions.Add(VisionAgentToolPermission.RuntimePreview);
-        }
-
-        return permissions;
-    }
-
-    private static string BuildAgentFinalRepairPrompt(
-        string originalDescription,
-        string previousFinalContent,
-        AiValidationResult validation,
-        string failureStage,
-        int repairAttempt)
-    {
-        var payload = new
-        {
-            kind = "backend_final_flow_repair",
-            repairAttempt,
-            failureStage,
-            originalDescription,
-            validation_result = BuildStructuredValidationPayload(
-                validation,
-                includeTemplateDiagnostics: false),
-            template_gate_result = BuildStructuredValidationPayload(
-                validation,
-                includeTemplateDiagnostics: true),
-            previous_final_flow = TrimRetryOutput(previousFinalContent)
-        };
-
-        return "Backend parse/validator/template_gate rejected the previous final_flow. " +
-               "Use the structured result below to repair only the failing fields and return one final_flow JSON object.\n" +
-               JsonSerializer.Serialize(payload, _jsonOptions);
-    }
-
-    private static object BuildStructuredValidationPayload(
-        AiValidationResult validation,
-        bool includeTemplateDiagnostics)
-    {
-        var diagnostics = validation.Diagnostics
-            .Where(issue => includeTemplateDiagnostics == IsTemplateGateDiagnostic(issue))
-            .ToList();
-        var issues = diagnostics.Select(issue => new
-        {
-            severity = issue.Severity,
-            code = issue.Code,
-            category = issue.Category,
-            message = issue.Message,
-            relatedFields = issue.RelatedFields,
-            operatorId = issue.OperatorId,
-            parameterName = issue.ParameterName,
-            portName = issue.TargetPortName ?? issue.SourcePortName,
-            sourcePortName = issue.SourcePortName,
-            targetPortName = issue.TargetPortName,
-            repairHint = issue.RepairHint
-        }).ToList();
-
-        return new
-        {
-            isValid = includeTemplateDiagnostics
-                ? diagnostics.All(issue => issue.Severity != AiValidationSeverity.Error)
-                : validation.IsValid,
-            errors = issues
-                .Where(issue => issue.severity == AiValidationSeverity.Error)
-                .ToList(),
-            warnings = issues
-                .Where(issue => issue.severity == AiValidationSeverity.Warning)
-                .ToList(),
-            issues
-        };
-    }
-
-    private static bool IsTemplateGateDiagnostic(AiValidationDiagnostic issue)
-    {
-        return string.Equals(issue.Category, "template", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(issue.Category, "template_gate", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static AiValidationPreview BuildValidationPreview(
-        object? finalDryRun,
-        IReadOnlyList<VisionAgentToolTrace> toolTrace)
-    {
-        var toolDryRunTrace = toolTrace
-            .Where(item =>
-                string.Equals(item.ToolName, "dryrun_flow", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(item.ToolName, "replay_flow_with_frame", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(item.ToolName, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase))
-            .Select(item => new
-            {
-                item.ToolName,
-                item.Success,
-                ResultSummary = item.ValidationPreviewSummary ?? item.ResultSummary,
-                item.ErrorMessage,
-                item.DurationMs,
-                item.ToolCallingMode
-            })
-            .Cast<object>()
-            .ToList();
-
-        return new AiValidationPreview
-        {
-            StructuralDryRun = FindLastToolResult(toolTrace, "dryrun_flow"),
-            FrameReplay = FindLastToolResult(toolTrace, "replay_flow_with_frame"),
-            FinalDryRun = finalDryRun,
-            RuntimePackagePrecheck = FindLastToolResult(toolTrace, "runtime_package_precheck"),
-            ToolDryRunTrace = toolDryRunTrace
-        };
-    }
-
-    private static object? FindLastToolResult(
-        IReadOnlyList<VisionAgentToolTrace> toolTrace,
-        string toolName)
-    {
-        return toolTrace
-            .LastOrDefault(item => string.Equals(item.ToolName, toolName, StringComparison.OrdinalIgnoreCase))
-            is { } trace
-                ? trace.ValidationPreviewSummary ?? trace.ResultSummary
-                : null;
-    }
-
     private static string BuildTurnRoutePromptSection(AiTurnRoute route)
     {
         var sb = new StringBuilder();
@@ -1752,32 +1036,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         }
 
         sb.AppendLine("Include recommendedTemplate, pendingParameters, and missingResources in the JSON output.");
-        return sb.ToString().Trim();
-    }
-
-    private static string BuildAgentTemplatePriorityPromptSection(TemplatePriorityContext templatePriority)
-    {
-        if (!templatePriority.IsTemplateFirst)
-            return string.Empty;
-
-        var sb = new StringBuilder();
-        sb.AppendLine("templateFirst=true");
-        sb.AppendLine($"matchMode={templatePriority.MatchMode}");
-        sb.AppendLine($"generationMode={templatePriority.GenerationMode}");
-        sb.AppendLine($"templateLockLevel={templatePriority.TemplateLockLevel}");
-        if (!string.IsNullOrWhiteSpace(templatePriority.ScenarioKey))
-            sb.AppendLine($"scenarioKey={templatePriority.ScenarioKey}");
-        if (templatePriority.Template != null)
-        {
-            sb.AppendLine($"templateId={templatePriority.Template.Id}");
-            sb.AppendLine($"templateName={templatePriority.Template.Name}");
-            sb.AppendLine("Call get_flow_template_skeleton if the template backbone is needed.");
-        }
-        else
-        {
-            sb.AppendLine("Call match_flow_template to find a reusable template if needed.");
-        }
-
         return sb.ToString().Trim();
     }
 
@@ -3762,36 +3020,6 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 Array.Empty<string>(),
                 null,
                 Array.Empty<ScenarioMatchResult>());
-    }
-
-    private sealed record AgentFinalRepairResult(
-        bool Success,
-        VisionAgentLoopResult? AgentResult,
-        AiGeneratedFlowJson? GeneratedFlow,
-        AiValidationResult? Validation,
-        List<AiAttemptDiagnostic> Diagnostics,
-        List<VisionAgentToolTrace> ToolTrace,
-        List<VisionAgentPendingAction> PendingActions,
-        int RepairAttempts)
-    {
-        public static AgentFinalRepairResult Repaired(
-            VisionAgentLoopResult agentResult,
-            AiGeneratedFlowJson generatedFlow,
-            AiValidationResult validation,
-            List<AiAttemptDiagnostic> diagnostics,
-            List<VisionAgentToolTrace> toolTrace,
-            List<VisionAgentPendingAction> pendingActions,
-            int repairAttempts) =>
-            new(true, agentResult, generatedFlow, validation, diagnostics, toolTrace, pendingActions, repairAttempts);
-
-        public static AgentFinalRepairResult Failed(
-            VisionAgentLoopResult agentResult,
-            AiValidationResult validation,
-            List<AiAttemptDiagnostic> diagnostics,
-            List<VisionAgentToolTrace> toolTrace,
-            List<VisionAgentPendingAction> pendingActions,
-            int repairAttempts) =>
-            new(false, agentResult, null, validation, diagnostics, toolTrace, pendingActions, repairAttempts);
     }
 
     private sealed record ClarificationHistoryContext(

@@ -1,5 +1,4 @@
-using ClearVision.Product.Core.AI.Tools;
-
+﻿
 namespace ClearVision.Product.Tests.AI.AgentEvaluation;
 
 internal static class AgentEngineeringEvaluationCases
@@ -505,7 +504,7 @@ internal static class AgentEngineeringEvaluationCases
                     "multiple_image_acquisition_requires_entry_operator_temp_id",
                     missingEntry,
                     ReplayBlocked(missingEntry),
-                    VisionAgentToolPermission.RuntimePreview,
+                    AgentEvaluationToolPermission.RuntimePreview,
                     [Pending("entryOperatorTempId.required", "Select replay entry ImageAcquisition")])
             ],
             ToolCalls =
@@ -704,19 +703,19 @@ internal static class AgentEngineeringEvaluationCases
     }
 
     private static MockToolResponse ReadOnly(string toolName, object data) =>
-        MockToolResponse.Ok(toolName, data, VisionAgentToolPermission.ReadOnly);
+        MockToolResponse.Ok(toolName, data, AgentEvaluationToolPermission.ReadOnly);
 
     private static MockToolResponse Simulation(string toolName, object data) =>
-        MockToolResponse.Ok(toolName, data, VisionAgentToolPermission.Simulation);
+        MockToolResponse.Ok(toolName, data, AgentEvaluationToolPermission.Simulation);
 
     private static MockToolResponse Runtime(string toolName, object data) =>
-        MockToolResponse.Ok(toolName, data, VisionAgentToolPermission.RuntimePreview);
+        MockToolResponse.Ok(toolName, data, AgentEvaluationToolPermission.RuntimePreview);
 
-    private static MockToolResponse Precheck(object data, IReadOnlyList<VisionAgentPendingAction> pendingActions) =>
+    private static MockToolResponse Precheck(object data, IReadOnlyList<AgentEvaluationPendingAction> pendingActions) =>
         MockToolResponse.Ok(
             "runtime_package_precheck",
             data,
-            VisionAgentToolPermission.DeploymentPrepare,
+            AgentEvaluationToolPermission.DeploymentPrepare,
             requiresUserConfirmation: true,
             pendingActions: pendingActions);
 
@@ -836,7 +835,7 @@ internal static class AgentEngineeringEvaluationCases
         blockingIssues = new[] { issue }
     };
 
-    private static VisionAgentPendingAction Pending(string actionType, string title) => new()
+    private static AgentEvaluationPendingAction Pending(string actionType, string title) => new()
     {
         ActionType = actionType,
         Title = title,

@@ -41,8 +41,6 @@ public class GenerateFlowMessageHandler
         IReadOnlyList<string>? attachments = null,
         string? requirementMode = null,
         AiTemplateSelectionInfo? templateSelection = null,
-        string? promptMode = null,
-        bool allowRuntimePreviewTools = false,
         Action<string, string>? onMessage = null,
         CancellationToken cancellationToken = default)
     {
@@ -56,7 +54,6 @@ public class GenerateFlowMessageHandler
                 {
                     message = "正在连接 AI 服务...",
                     phase = "connecting",
-                    stage = "connecting",
                     requestId
                 }, _jsonOptions));
 
@@ -71,13 +68,16 @@ public class GenerateFlowMessageHandler
                     DebugPrompt: debugPrompt,
                     TemplateSelection: templateSelection)
                 {
-                    RequirementMode = requirementMode ?? AiRequirementModes.Strict,
-                    PromptMode = ClearVision.Product.Core.AI.Tools.AiPromptModes.Normalize(promptMode),
-                    AllowRuntimePreviewTools = allowRuntimePreviewTools
+                    RequirementMode = requirementMode ?? AiRequirementModes.Strict
                 },
                 progressMsg => onMessage?.Invoke(
                     "GenerateFlowProgress",
-                    JsonSerializer.Serialize(BuildProgressPayload(progressMsg, requestId), _jsonOptions)),
+                    JsonSerializer.Serialize(new
+                    {
+                        message = progressMsg,
+                        phase = InferProgressPhase(progressMsg),
+                        requestId
+                    }, _jsonOptions)),
                 chunk => onMessage?.Invoke(
                     "GenerateFlowStreamChunk",
                     JsonSerializer.Serialize(new GenerateFlowStreamChunk
@@ -126,9 +126,6 @@ public class GenerateFlowMessageHandler
                 RouterConfidence = result.RouterConfidence,
                 BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
                 NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
-                ToolTrace = MapToolTrace(result.ToolTrace),
-                PendingActions = MapPendingActions(result.PendingActions),
-                ValidationPreview = MapValidationPreview(result.ValidationPreview),
                 PromptVersionId = result.PromptTrace is AiPromptTrace pt ? pt.PromptVersionId : null,
                 PromptVersionName = result.PromptTrace is AiPromptTrace pt2 ? pt2.PromptVersionName : null
             };
@@ -229,41 +226,10 @@ public class GenerateFlowMessageHandler
             response.RouterConfidence,
             response.BlockingClarificationFields,
             response.NonBlockingMissingFields,
-            response.ToolTrace,
-            response.PendingActions,
-            response.ValidationPreview,
             response.PromptVersionId,
             response.PromptVersionName,
             FailureType = failureType
         }, _jsonOptions);
-    }
-
-    private static object BuildProgressPayload(string? rawMessage, string? requestId)
-    {
-        var (stage, message) = ParseProgressMessage(rawMessage);
-        return new
-        {
-            message,
-            phase = stage,
-            stage,
-            requestId
-        };
-    }
-
-    private static (string Stage, string Message) ParseProgressMessage(string? rawMessage)
-    {
-        var text = rawMessage ?? string.Empty;
-        var separatorIndex = text.IndexOf('|', StringComparison.Ordinal);
-        if (separatorIndex > 0)
-        {
-            var prefix = text[..separatorIndex].Trim();
-            if (prefix is "tool_start" or "tool_end" or "tool_failed" or "agent_repair")
-            {
-                return (prefix, text[(separatorIndex + 1)..].Trim());
-            }
-        }
-
-        return (InferProgressPhase(text), text);
     }
 
     private static string NormalizeStatus(string? completionStatus, bool success)
@@ -311,9 +277,6 @@ public class GenerateFlowMessageHandler
             return "dryrun";
         if (ContainsAny(message, ["布局", "layout"]))
             return "layouting";
-
-        if (ContainsAny(message, ["tool_start", "tool_end", "tool_failed", "正在调用"]))
-            return "tool";
 
         return string.Empty;
     }
@@ -534,64 +497,6 @@ public class GenerateFlowMessageHandler
             RelatedFields = d.RelatedFields?.ToList() ?? new List<string>(),
             OperatorId = d.OperatorId,
             RepairHint = d.RepairHint
-        }).ToList();
-    }
-
-    private static List<GenerateFlowToolTrace> MapToolTrace(
-        IReadOnlyCollection<ClearVision.Product.Core.AI.Tools.VisionAgentToolTrace>? trace)
-    {
-        if (trace == null || trace.Count == 0)
-        {
-            return new List<GenerateFlowToolTrace>();
-        }
-
-        return trace.Select(item => new GenerateFlowToolTrace
-        {
-            ToolName = item.ToolName,
-            Arguments = item.Arguments,
-            Success = item.Success,
-            ResultSummary = item.ResultSummary,
-            ValidationPreviewSummary = item.ValidationPreviewSummary,
-            ErrorCode = item.ErrorCode,
-            ErrorMessage = item.ErrorMessage,
-            DurationMs = item.DurationMs,
-            Permission = item.Permission,
-            ToolCallingMode = item.ToolCallingMode
-        }).ToList();
-    }
-
-    private static GenerateFlowValidationPreview? MapValidationPreview(AiValidationPreview? preview)
-    {
-        if (preview == null)
-        {
-            return null;
-        }
-
-        return new GenerateFlowValidationPreview
-        {
-            StructuralDryRun = preview.StructuralDryRun,
-            FrameReplay = preview.FrameReplay,
-            FinalDryRun = preview.FinalDryRun,
-            RuntimePackagePrecheck = preview.RuntimePackagePrecheck,
-            ToolDryRunTrace = preview.ToolDryRunTrace?.ToList() ?? new List<object>()
-        };
-    }
-
-    private static List<GenerateFlowPendingAction> MapPendingActions(
-        IReadOnlyCollection<ClearVision.Product.Core.AI.Tools.VisionAgentPendingAction>? actions)
-    {
-        if (actions == null || actions.Count == 0)
-        {
-            return new List<GenerateFlowPendingAction>();
-        }
-
-        return actions.Select(item => new GenerateFlowPendingAction
-        {
-            ActionType = item.ActionType,
-            Title = item.Title,
-            Summary = item.Summary,
-            Payload = item.Payload,
-            RequiresUserConfirmation = item.RequiresUserConfirmation
         }).ToList();
     }
 

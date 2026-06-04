@@ -8,7 +8,6 @@ import { installCameraTab } from './tabs/cameraTab.js';
 import { installPlcTab } from './tabs/plcTab.js';
 import { installStationTab } from './tabs/stationTab.js';
 import { installSystemTabs } from './tabs/systemTabs.js';
-import { onAgentAction } from '../ai/agentActionBridge.js';
 
 class SettingsView {
     constructor(containerId) {
@@ -63,9 +62,6 @@ class SettingsView {
         this._stationTokenHideTimer = null;
         this._diskUsageRequestId = 0;
         this._refreshRequestId = 0;
-        this._unsubscribeAgentAction = onAgentAction((detail) => {
-            void this.handleAgentAction(detail);
-        });
     }
 
     createTrackedModal(options = {}) {
@@ -148,108 +144,9 @@ class SettingsView {
 
     destroy() {
         this.deactivate();
-        this._unsubscribeAgentAction?.();
-        this._unsubscribeAgentAction = null;
         if (this.container) {
             this.container.innerHTML = '';
         }
-    }
-
-    async handleAgentAction(detail) {
-        const actionType = String(detail?.actionType || '').trim();
-        if (actionType !== 'cameraBindingDraft.apply') {
-            return false;
-        }
-
-        try {
-            return await this.applyCameraBindingAgentDraft(detail?.payload ?? null);
-        } catch (error) {
-            console.error('[SettingsView] Failed to apply AI camera binding draft:', error);
-            showToast(`应用 AI 相机绑定草稿失败: ${error.message}`, 'error');
-            return false;
-        }
-    }
-
-    async ensureConfigLoadedForAgentAction() {
-        if (this.config) {
-            return;
-        }
-
-        this.config = this.normalizeAppConfig(await settingsApi.loadSettings());
-        this.cameraBindings = this.config.cameras || [];
-    }
-
-    async applyCameraBindingAgentDraft(rawPayload) {
-        const draft = rawPayload?.draftBinding ?? rawPayload;
-        if (!draft || typeof draft !== 'object') {
-            showToast('AI 相机绑定草稿缺少 Payload', 'warning');
-            return false;
-        }
-
-        await this.ensureConfigLoadedForAgentAction();
-        const binding = this.normalizeAgentCameraBindingDraft(draft);
-        const existingIndex = this.cameraBindings.findIndex(item =>
-            String(item.id || '').toLowerCase() === binding.id.toLowerCase() ||
-            (binding.serialNumber && String(item.serialNumber || '').toLowerCase() === binding.serialNumber.toLowerCase()) ||
-            (binding.cameraId && String(item.cameraId || '').toLowerCase() === binding.cameraId.toLowerCase()));
-        if (existingIndex >= 0) {
-            this.cameraBindings[existingIndex] = {
-                ...this.cameraBindings[existingIndex],
-                ...binding
-            };
-        } else {
-            this.cameraBindings.push(binding);
-        }
-
-        this.selectedCameraBindingId = binding.id;
-        const saved = await this.saveCameraBindings({ silent: true });
-        if (!saved) {
-            showToast(this.lastCameraBindingSaveError || '保存 AI 相机绑定草稿失败', 'error');
-            return false;
-        }
-
-        this.refreshCameraTable?.();
-        showToast(`已应用 AI 相机绑定草稿: ${binding.displayName || binding.serialNumber || binding.id}`, 'success');
-        return true;
-    }
-
-    normalizeAgentCameraBindingDraft(draft) {
-        const serialNumber = String(draft.serialNumber ?? draft.SerialNumber ?? draft.cameraId ?? draft.CameraId ?? '').trim();
-        const id = String(draft.id ?? draft.Id ?? '').trim() || this.createAgentCameraBindingId(serialNumber);
-        return {
-            id,
-            cameraId: String(draft.cameraId ?? draft.CameraId ?? id).trim() || id,
-            displayName: String(draft.displayName ?? draft.DisplayName ?? draft.name ?? draft.Name ?? 'AI Camera').trim() || 'AI Camera',
-            serialNumber,
-            ipAddress: String(draft.ipAddress ?? draft.IpAddress ?? '').trim(),
-            manufacturer: String(draft.manufacturer ?? draft.Manufacturer ?? '').trim(),
-            modelName: String(draft.modelName ?? draft.ModelName ?? '').trim(),
-            interfaceType: String(draft.interfaceType ?? draft.InterfaceType ?? '').trim(),
-            isEnabled: draft.isEnabled ?? draft.IsEnabled ?? true,
-            exposureTimeUs: Number(draft.exposureTimeUs ?? draft.ExposureTimeUs ?? 5000),
-            gainDb: Number(draft.gainDb ?? draft.GainDb ?? 1),
-            pixelFormat: this.normalizeCameraPixelFormat?.(draft.pixelFormat ?? draft.PixelFormat ?? 'Mono8') ?? 'Mono8',
-            triggerMode: this.normalizeCameraTriggerMode?.(draft.triggerMode ?? draft.TriggerMode ?? 'Software') ?? 'Software',
-            hardwareTriggerSource: this.normalizeHardwareTriggerSource?.(draft.hardwareTriggerSource ?? draft.HardwareTriggerSource ?? 'Line0') ?? 'Line0',
-            softwareTriggerSource: this.normalizeSoftwareTriggerSource?.(draft.softwareTriggerSource ?? draft.SoftwareTriggerSource ?? 'Manual') ?? 'Manual',
-            enterPhotoelectricDebounceMs: Number.parseInt(String(draft.enterPhotoelectricDebounceMs ?? draft.EnterPhotoelectricDebounceMs ?? 200), 10),
-            enterPhotoelectricTimeoutMs: Number.parseInt(String(draft.enterPhotoelectricTimeoutMs ?? draft.EnterPhotoelectricTimeoutMs ?? 30000), 10),
-            enterPhotoelectricDeviceId: String(draft.enterPhotoelectricDeviceId ?? draft.EnterPhotoelectricDeviceId ?? '').trim(),
-            ignoreEnterTriggerWhileBusy: draft.ignoreEnterTriggerWhileBusy ?? draft.IgnoreEnterTriggerWhileBusy ?? true,
-            serialPhotoelectricPortName: String(draft.serialPhotoelectricPortName ?? draft.SerialPhotoelectricPortName ?? '').trim(),
-            serialPhotoelectricBaudRate: Number.parseInt(String(draft.serialPhotoelectricBaudRate ?? draft.SerialPhotoelectricBaudRate ?? 9600), 10),
-            serialPhotoelectricDebounceMs: Number.parseInt(String(draft.serialPhotoelectricDebounceMs ?? draft.SerialPhotoelectricDebounceMs ?? 200), 10),
-            serialPhotoelectricTimeoutMs: Number.parseInt(String(draft.serialPhotoelectricTimeoutMs ?? draft.SerialPhotoelectricTimeoutMs ?? 30000), 10),
-            ignoreSerialPhotoelectricTriggerWhileBusy: draft.ignoreSerialPhotoelectricTriggerWhileBusy ?? draft.IgnoreSerialPhotoelectricTriggerWhileBusy ?? true,
-            targetFrameRateFps: this.normalizeCameraTargetFrameRate?.(draft.targetFrameRateFps ?? draft.TargetFrameRateFps ?? 30) ?? 30
-        };
-    }
-
-    createAgentCameraBindingId(seed) {
-        const normalized = String(seed || '')
-            .replace(/[^a-z0-9]/gi, '')
-            .slice(0, 16);
-        return normalized ? `cam_${normalized}` : `cam_ai_${Date.now().toString(36)}`;
     }
 
     async refresh() {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI.AgentEvaluation;
@@ -111,6 +112,88 @@ public sealed class AgentEngineeringEvaluationHarnessTests
                 !string.IsNullOrWhiteSpace(response.ErrorCode));
     }
 
+    [Fact(DisplayName = "AgentEvaluation harness should be self-contained and decoupled from production Agent types")]
+    public void AgentEngineeringHarness_ShouldBeSelfContainedAndDecoupledFromProductionAgentTypes()
+    {
+        var source = ReadAgentEvaluationSource();
+
+        source.Should().NotContain("ClearVision.Product.Core.AI.Tools");
+        source.Should().NotContain("ClearVision.Product.Infrastructure.AI.Tools");
+        source.Should().NotContain("IVisionAgentTool");
+        source.Should().NotContain("VisionAgentToolRegistry");
+        source.Should().NotContain("VisionAgentLoop");
+    }
+
+    [Fact(DisplayName = "AgentEvaluation cases should not use real images, hardware, models, stations, or network")]
+    public void AgentEngineeringHarness_ShouldAvoidRealRuntimeResources()
+    {
+        var serializedCases = JsonSerializer.Serialize(AgentEngineeringEvaluationCases.All);
+        var source = ReadAgentEvaluationSource();
+        var forbiddenImagePathFragments = new[]
+        {
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".bmp",
+            ".tif",
+            ".tiff",
+            "C:\\",
+            "file://"
+        };
+        var forbiddenRuntimeAccessApis = new[]
+        {
+            "AcquireSingleFrameAsync",
+            "GetOrCreateByBindingAsync",
+            "EnumerateCamerasAsync",
+            "HttpClient",
+            "Socket",
+            "TcpClient",
+            "File.ReadAllBytes",
+            "Image.FromFile",
+            "Cv2.ImRead",
+            "ProcessStartInfo",
+            "Process.Start"
+        };
+
+        forbiddenImagePathFragments.Should().OnlyContain(fragment =>
+            !serializedCases.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+        forbiddenRuntimeAccessApis.Should().OnlyContain(fragment =>
+            !source.Contains(fragment, StringComparison.OrdinalIgnoreCase));
+        serializedCases.Should().Contain("mock://models");
+        serializedCases.Should().Contain("mock://templates");
+    }
+
+    [Fact(DisplayName = "Production AI mainline should not wire real AgentLoop or RuntimePreview tools")]
+    public void ProductionAiMainline_ShouldNotWireRealAgentLoopOrRuntimePreviewTools()
+    {
+        var productRoot = GetProductRoot();
+        var aiFlowGenerationService = File.ReadAllText(Path.Combine(
+            productRoot,
+            "src",
+            "ClearVision.Product.Infrastructure",
+            "AI",
+            "AiFlowGenerationService.cs"));
+        var serviceExtensions = File.ReadAllText(Path.Combine(
+            productRoot,
+            "src",
+            "ClearVision.Product.Infrastructure",
+            "AI",
+            "AiGenerationServiceExtensions.cs"));
+        var program = File.ReadAllText(Path.Combine(
+            productRoot,
+            "src",
+            "ClearVision.Product.Desktop",
+            "Program.cs"));
+
+        aiFlowGenerationService.Should().NotContain("VisionAgentLoop");
+        aiFlowGenerationService.Should().NotContain("BuildAgentAllowedPermissions");
+        serviceExtensions.Should().NotContain("IVisionAgentTool");
+        serviceExtensions.Should().NotContain("ReplayFlowWithFrameTool");
+        serviceExtensions.Should().NotContain("CameraTestFrameTool");
+        serviceExtensions.Should().NotContain("RuntimePreview");
+        program.Should().NotContain("VisionAgentStationStatusReader");
+    }
+
     [Fact(DisplayName = "RuntimePreview default deny and explicit replay authorization should be distinguishable")]
     public async Task RuntimePreviewPermission_ShouldDefaultDenyCaptureAndAllowAuthorizedReplay()
     {
@@ -136,5 +219,27 @@ public sealed class AgentEngineeringEvaluationHarnessTests
             .Should()
             .Equal("capture_test_frame", "replay_flow_with_frame");
         allowed.ActualValidationPreview.FrameReplayStatus.Should().Be("ok");
+    }
+
+    private static string ReadAgentEvaluationSource()
+    {
+        var agentEvaluationDirectory = Path.Combine(
+            GetProductRoot(),
+            "tests",
+            "ClearVision.Product.Tests",
+            "AI",
+            "AgentEvaluation");
+
+        return string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(agentEvaluationDirectory, "*.cs")
+                .Where(path => !Path.GetFileName(path).EndsWith("Tests.cs", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .Select(File.ReadAllText));
+    }
+
+    private static string GetProductRoot()
+    {
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
     }
 }

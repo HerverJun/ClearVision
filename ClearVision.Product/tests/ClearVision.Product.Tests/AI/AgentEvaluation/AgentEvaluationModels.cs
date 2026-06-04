@@ -1,6 +1,47 @@
-using ClearVision.Product.Core.AI.Tools;
-
 namespace ClearVision.Product.Tests.AI.AgentEvaluation;
+
+public enum AgentEvaluationToolPermission
+{
+    ReadOnly,
+    Simulation,
+    RuntimePreview,
+    ConfigDraft,
+    ConfigWrite,
+    DeploymentPrepare
+}
+
+public sealed record AgentEvaluationPendingAction
+{
+    public string ActionType { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string Summary { get; init; } = string.Empty;
+    public object? Payload { get; init; }
+    public bool RequiresUserConfirmation { get; init; } = true;
+}
+
+public sealed record AgentEvaluationToolResult
+{
+    public bool Success { get; init; }
+    public object? Data { get; init; }
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+    public bool RequiresUserConfirmation { get; init; }
+    public List<AgentEvaluationPendingAction> PendingActions { get; init; } = new();
+
+    public static AgentEvaluationToolResult Fail(
+        string errorCode,
+        string errorMessage,
+        object? data = null)
+    {
+        return new AgentEvaluationToolResult
+        {
+            Success = false,
+            ErrorCode = errorCode,
+            ErrorMessage = errorMessage,
+            Data = data
+        };
+    }
+}
 
 public sealed record AgentEngineeringEvaluationCase
 {
@@ -25,20 +66,20 @@ public sealed record AgentEngineeringEvaluationCase
 public sealed record MockToolResponse
 {
     public string ToolName { get; init; } = string.Empty;
-    public VisionAgentToolPermission Permission { get; init; } = VisionAgentToolPermission.ReadOnly;
+    public AgentEvaluationToolPermission Permission { get; init; } = AgentEvaluationToolPermission.ReadOnly;
     public bool Success { get; init; } = true;
     public object? Data { get; init; }
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
     public bool RequiresUserConfirmation { get; init; }
-    public IReadOnlyList<VisionAgentPendingAction> PendingActions { get; init; } = [];
+    public IReadOnlyList<AgentEvaluationPendingAction> PendingActions { get; init; } = [];
 
     public static MockToolResponse Ok(
         string toolName,
         object? data,
-        VisionAgentToolPermission permission = VisionAgentToolPermission.ReadOnly,
+        AgentEvaluationToolPermission permission = AgentEvaluationToolPermission.ReadOnly,
         bool requiresUserConfirmation = false,
-        IReadOnlyList<VisionAgentPendingAction>? pendingActions = null)
+        IReadOnlyList<AgentEvaluationPendingAction>? pendingActions = null)
     {
         return new MockToolResponse
         {
@@ -56,8 +97,8 @@ public sealed record MockToolResponse
         string errorCode,
         string errorMessage,
         object? data,
-        VisionAgentToolPermission permission,
-        IReadOnlyList<VisionAgentPendingAction>? pendingActions = null)
+        AgentEvaluationToolPermission permission,
+        IReadOnlyList<AgentEvaluationPendingAction>? pendingActions = null)
     {
         return new MockToolResponse
         {

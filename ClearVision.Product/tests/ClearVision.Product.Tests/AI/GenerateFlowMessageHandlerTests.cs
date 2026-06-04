@@ -1,6 +1,5 @@
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
-using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
@@ -101,17 +100,13 @@ public class GenerateFlowMessageHandlerTests
             mode: GenerateFlowMode.ReviewPendingParameters,
             debugPrompt: true,
             requirementMode: "draft",
-            templateSelection: templateSelection,
-            promptMode: AiPromptModes.AgentTools,
-            allowRuntimePreviewTools: true);
+            templateSelection: templateSelection);
 
         await generationService.Received(1).GenerateFlowAsync(
             Arg.Is<AiFlowGenerationRequest>(request =>
                 request.Mode == GenerateFlowMode.ReviewPendingParameters &&
                 request.DebugPrompt &&
                 request.RequirementMode == "draft" &&
-                request.PromptMode == AiPromptModes.AgentTools &&
-                request.AllowRuntimePreviewTools &&
                 request.TemplateSelection != null &&
                 request.TemplateSelection.Mode == "template_adapt" &&
                 request.TemplateSelection.ScenarioKey == "carton-appearance-inspection"),
@@ -119,97 +114,6 @@ public class GenerateFlowMessageHandlerTests
             Arg.Any<Action<ClearVision.Product.Contracts.Messages.AiStreamChunk>>(),
             Arg.Any<CancellationToken>(),
             Arg.Any<Action<ClearVision.Product.Contracts.Messages.GenerateFlowAttachmentReport>>());
-    }
-
-    [Fact(DisplayName = "GenerateFlowMessageHandler should serialize tool trace and pending agent actions")]
-    public async Task HandleAsync_ShouldSerializeToolTraceAndPendingActions()
-    {
-        var generationService = Substitute.For<IAiFlowGenerationService>();
-        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
-        var handler = new GenerateFlowMessageHandler(generationService, logger);
-
-        generationService.GenerateFlowAsync(
-                Arg.Any<AiFlowGenerationRequest>(),
-                Arg.Any<Action<string>>(),
-                Arg.Any<Action<ClearVision.Product.Contracts.Messages.AiStreamChunk>>(),
-                Arg.Any<CancellationToken>(),
-                Arg.Any<Action<ClearVision.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
-            .Returns(Task.FromResult(new AiFlowGenerationResult
-            {
-                Success = true,
-                Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() },
-                ToolTrace =
-                [
-                    new VisionAgentToolTrace
-                    {
-                        ToolName = "draft_camera_binding",
-                        Arguments = new { serialNumber = "SN-1" },
-                        Success = true,
-                        ResultSummary = new { draft = "cam_SN1" },
-                        DurationMs = 7,
-                        Permission = VisionAgentToolPermission.ConfigDraft.ToString(),
-                        ToolCallingMode = "JSON fallback"
-                    },
-                    new VisionAgentToolTrace
-                    {
-                        ToolName = "capture_test_frame",
-                        Arguments = new { cameraBindingId = "cam-1" },
-                        Success = false,
-                        ResultSummary = new { success = false, errorCode = "tool_permission_denied" },
-                        ErrorCode = "tool_permission_denied",
-                        ErrorMessage = "RuntimePreview tools are not enabled.",
-                        DurationMs = 1,
-                        Permission = VisionAgentToolPermission.RuntimePreview.ToString(),
-                        ToolCallingMode = "Native"
-                    }
-                ],
-                PendingActions =
-                [
-                    new VisionAgentPendingAction
-                    {
-                        ActionType = "cameraBindingDraft.apply",
-                        Title = "Apply camera binding draft",
-                        Summary = "Draft camera binding for SN-1.",
-                        Payload = new { id = "cam_SN1", serialNumber = "SN-1" },
-                        RequiresUserConfirmation = true
-                    }
-                ],
-                ValidationPreview = new AiValidationPreview
-                {
-                    FrameReplay = new { replaySucceeded = true, usedEntryOperatorTempId = "cam_entry" },
-                    RuntimePackagePrecheck = new { ready = false, blockingIssues = new[] { "station offline" } },
-                    ToolDryRunTrace = [new { toolName = "replay_flow_with_frame" }]
-                }
-            }));
-
-        var resultJson = await handler.HandleAsync(
-            description: "draft camera binding",
-            promptMode: AiPromptModes.AgentTools);
-
-        using var doc = JsonDocument.Parse(resultJson);
-        var trace = doc.RootElement.GetProperty("toolTrace");
-        trace.GetArrayLength().Should().Be(2);
-        trace[0].GetProperty("toolName").GetString().Should().Be("draft_camera_binding");
-        trace[0].GetProperty("permission").GetString().Should().Be("ConfigDraft");
-        trace[0].GetProperty("toolCallingMode").GetString().Should().Be("JSON fallback");
-        trace[1].GetProperty("errorCode").GetString().Should().Be("tool_permission_denied");
-        trace[1].GetProperty("errorMessage").GetString().Should().Be("RuntimePreview tools are not enabled.");
-
-        var actions = doc.RootElement.GetProperty("pendingActions");
-        actions.GetArrayLength().Should().Be(1);
-        actions[0].GetProperty("actionType").GetString().Should().Be("cameraBindingDraft.apply");
-        actions[0].GetProperty("requiresUserConfirmation").GetBoolean().Should().BeTrue();
-        actions[0].GetProperty("payload").GetProperty("serialNumber").GetString().Should().Be("SN-1");
-        doc.RootElement.GetProperty("validationPreview")
-            .GetProperty("frameReplay")
-            .GetProperty("usedEntryOperatorTempId")
-            .GetString()
-            .Should().Be("cam_entry");
-        doc.RootElement.GetProperty("validationPreview")
-            .GetProperty("runtimePackagePrecheck")
-            .GetProperty("blockingIssues")[0]
-            .GetString()
-            .Should().Be("station offline");
     }
 
     [Fact(DisplayName = "GenerateFlowMessageHandler should forward attachment report message")]

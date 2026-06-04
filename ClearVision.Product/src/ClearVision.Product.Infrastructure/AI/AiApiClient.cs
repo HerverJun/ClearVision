@@ -459,13 +459,7 @@ public class AiApiClient
 
     private static AiModelCapabilities ResolveCapabilities(AiGenerationOptions options)
     {
-        var capabilities = options.Capabilities?.Clone() ?? AiModelCapabilities.Infer(options.Provider, options.Model);
-        capabilities.ApplyToolCallingMode(
-            options.ToolCallingMode,
-            ResolveProtocol(options),
-            options.Provider,
-            options.Model);
-        return capabilities.Normalize();
+        return (options.Capabilities?.Clone() ?? AiModelCapabilities.Infer(options.Provider, options.Model)).Normalize();
     }
 
     private static bool UrlPathEndsWith(string url, string suffix)
@@ -587,48 +581,6 @@ public class AiApiClient
         return map;
     }
 
-    private static object[] BuildOpenAiToolDefinitions(IReadOnlyList<AiNativeToolDefinition> tools)
-    {
-        return tools.Select(tool => new
-        {
-            type = "function",
-            function = new
-            {
-                name = tool.Name,
-                description = tool.Description,
-                parameters = ConvertJsonElement(tool.ParametersSchema)
-            }
-        }).Cast<object>().ToArray();
-    }
-
-    private static object[] BuildOpenAiResponsesToolDefinitions(IReadOnlyList<AiNativeToolDefinition> tools)
-    {
-        return tools.Select(tool => new
-        {
-            type = "function",
-            name = tool.Name,
-            description = tool.Description,
-            parameters = ConvertJsonElement(tool.ParametersSchema)
-        }).Cast<object>().ToArray();
-    }
-
-    private static object[] BuildAnthropicToolDefinitions(IReadOnlyList<AiNativeToolDefinition> tools)
-    {
-        return tools.Select(tool => new
-        {
-            name = tool.Name,
-            description = tool.Description,
-            input_schema = ConvertJsonElement(tool.ParametersSchema)
-        }).Cast<object>().ToArray();
-    }
-
-    private static string SerializeToolArguments(JsonElement arguments)
-    {
-        return arguments.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
-            ? "{}"
-            : arguments.GetRawText();
-    }
-
     private static string FormatModeLabel(string mode)
     {
         return AiReasoningModes.Normalize(mode) switch
@@ -695,39 +647,6 @@ public class AiApiClient
     /// <summary>
     /// 流式调用 AI API 获取结果（支持思维链和正文的逐块推送）
     /// </summary>
-    public async Task<AiCompletionResult> CompleteWithToolsAsync(
-        string systemPrompt,
-        List<ChatMessage> messages,
-        IReadOnlyList<AiNativeToolDefinition> tools,
-        AiGenerationOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        var currentOptions = options ?? _configStore.Get();
-        var capabilities = ResolveCapabilities(currentOptions);
-        if (!capabilities.SupportsToolCall || tools.Count == 0)
-        {
-            return await CompleteAsync(systemPrompt, messages, currentOptions, cancellationToken);
-        }
-
-        var protocol = ResolveProtocol(currentOptions);
-        if (protocol == AiModelConfig.ProtocolAnthropic)
-        {
-            return await CallAnthropicWithToolsAsync(systemPrompt, messages, tools, currentOptions, cancellationToken);
-        }
-
-        if (protocol == AiModelConfig.ProtocolOpenAiCompatible && UsesOpenAiResponsesApi(currentOptions))
-        {
-            return await CallOpenAiResponsesWithToolsAsync(systemPrompt, messages, tools, currentOptions, cancellationToken);
-        }
-
-        if (protocol is AiModelConfig.ProtocolOpenAiCompatible or AiModelConfig.ProtocolAzureOpenAi)
-        {
-            return await CallOpenAiWithToolsAsync(systemPrompt, messages, tools, currentOptions, cancellationToken);
-        }
-
-        return await CompleteAsync(systemPrompt, messages, currentOptions, cancellationToken);
-    }
-
     public async Task<AiCompletionResult> StreamCompleteAsync(
         string systemPrompt,
         List<ChatMessage> messages,
@@ -845,79 +764,6 @@ public class AiApiClient
             Content = content ?? throw new InvalidOperationException("AI 返回了空响应"),
             Reasoning = reasoning,
             TokenUsage = tokenUsage
-        };
-    }
-
-    private async Task<AiCompletionResult> CallAnthropicWithToolsAsync(
-        string systemPrompt,
-        List<ChatMessage> messages,
-        IReadOnlyList<AiNativeToolDefinition> tools,
-        AiGenerationOptions options,
-        CancellationToken cancellationToken)
-    {
-        var support = AiReasoningModelFamilyCatalog.Resolve(options.Provider, options.Model, options.BaseUrl, options.Protocol);
-        var requestBody = BuildAnthropicRequestBody(systemPrompt, messages, options, stream: false, support);
-        requestBody["tools"] = BuildAnthropicToolDefinitions(tools);
-
-        var apiUrl = AppendQueryParameters(options.BaseUrl ?? "https://api.anthropic.com/v1/messages", options.ExtraQuery);
-        var request = new HttpRequestMessage(HttpMethod.Post, apiUrl);
-        ApplyAuthHeaders(request, options, AiModelConfig.AuthModeHeaderKey, "x-api-key");
-        request.Headers.Remove("anthropic-version");
-        request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(requestBody, _jsonOptions),
-            Encoding.UTF8,
-            "application/json");
-        ApplyExtraHeaders(request, options.ExtraHeaders);
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(TimeSpan.FromSeconds(options.TimeoutSeconds));
-
-        using var response = await _httpClient.SendAsync(request, cts.Token);
-        await EnsureSuccessStatusCodeWithDetailsAsync(response, cts.Token);
-
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var doc = JsonDocument.Parse(responseJson);
-
-        string? reasoning = null;
-        var content = new StringBuilder();
-        var contentArray = doc.RootElement.GetProperty("content");
-        foreach (var block in contentArray.EnumerateArray())
-        {
-            var blockType = block.GetProperty("type").GetString();
-            if (blockType == "thinking" && block.TryGetProperty("thinking", out var thinkingEl))
-            {
-                reasoning = thinkingEl.GetString();
-            }
-            else if (blockType == "text" && block.TryGetProperty("text", out var textEl))
-            {
-                content.Append(textEl.GetString());
-            }
-        }
-
-        AiTokenUsage? tokenUsage = null;
-        if (doc.RootElement.TryGetProperty("usage", out var anthropicUsage) &&
-            anthropicUsage.ValueKind == JsonValueKind.Object)
-        {
-            tokenUsage = new AiTokenUsage
-            {
-                InputTokens = ReadIntPropertyOrZero(anthropicUsage, "input_tokens"),
-                OutputTokens = ReadIntPropertyOrZero(anthropicUsage, "output_tokens")
-            };
-        }
-
-        var toolCalls = ExtractAnthropicToolCalls(contentArray);
-        if (content.Length == 0 && toolCalls.Count == 0)
-        {
-            throw new InvalidOperationException("AI 返回了空响应");
-        }
-
-        return new AiCompletionResult
-        {
-            Content = content.ToString(),
-            Reasoning = reasoning,
-            TokenUsage = tokenUsage,
-            ToolCalls = toolCalls
         };
     }
 
@@ -1041,56 +887,6 @@ public class AiApiClient
             Content = content,
             Reasoning = reasoning,
             TokenUsage = tokenUsage
-        };
-    }
-
-    private async Task<AiCompletionResult> CallOpenAiResponsesWithToolsAsync(
-        string systemPrompt,
-        List<ChatMessage> messages,
-        IReadOnlyList<AiNativeToolDefinition> tools,
-        AiGenerationOptions options,
-        CancellationToken cancellationToken)
-    {
-        var support = AiReasoningModelFamilyCatalog.Resolve(options.Provider, options.Model, options.BaseUrl, options.Protocol);
-        var requestBody = BuildOpenAiResponsesRequestBody(systemPrompt, messages, options, stream: false, support: support);
-        requestBody["tools"] = BuildOpenAiResponsesToolDefinitions(tools);
-        requestBody["tool_choice"] = "auto";
-
-        var request = new HttpRequestMessage(HttpMethod.Post, BuildOpenAiResponsesApiUrl(options));
-        ApplyAuthHeaders(request, options, AiModelConfig.AuthModeBearer, "Authorization");
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(requestBody, _jsonOptions),
-            Encoding.UTF8,
-            "application/json");
-        ApplyExtraHeaders(request, options.ExtraHeaders);
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(TimeSpan.FromSeconds(Math.Max(options.TimeoutSeconds, 1)));
-
-        using var response = await _httpClient.SendAsync(request, cts.Token);
-        await EnsureSuccessStatusCodeWithDetailsAsync(response, cts.Token);
-
-        var responseJson = await response.Content.ReadAsStringAsync(cts.Token);
-        if (!TryParseOpenAiResponsesPayload(responseJson, out var content, out var reasoning, out var tokenUsage))
-        {
-            content = string.Empty;
-            reasoning = string.Empty;
-            tokenUsage = null;
-        }
-
-        using var doc = JsonDocument.Parse(responseJson);
-        var toolCalls = ExtractOpenAiResponsesToolCalls(doc.RootElement);
-        if (string.IsNullOrWhiteSpace(content) && toolCalls.Count == 0)
-        {
-            throw new InvalidOperationException("AI 返回了空响应");
-        }
-
-        return new AiCompletionResult
-        {
-            Content = content,
-            Reasoning = reasoning,
-            TokenUsage = tokenUsage,
-            ToolCalls = toolCalls
         };
     }
 
@@ -1234,7 +1030,7 @@ public class AiApiClient
         {
             new { role = "system", content = systemPrompt }
         };
-        apiMessages.AddRange(BuildOpenAiMessages(messages));
+        apiMessages.AddRange(messages.Select(BuildOpenAiMessage));
 
         // 判断是否为推理模型（如 deepseek-reasoner）
         var support = AiReasoningModelFamilyCatalog.Resolve(options.Provider, options.Model, options.BaseUrl, options.Protocol);
@@ -1318,99 +1114,6 @@ public class AiApiClient
         };
     }
 
-    private async Task<AiCompletionResult> CallOpenAiWithToolsAsync(
-        string systemPrompt,
-        List<ChatMessage> messages,
-        IReadOnlyList<AiNativeToolDefinition> tools,
-        AiGenerationOptions options,
-        CancellationToken cancellationToken)
-    {
-        var apiMessages = new List<object>
-        {
-            new { role = "system", content = systemPrompt }
-        };
-        apiMessages.AddRange(BuildOpenAiMessages(messages));
-
-        var support = AiReasoningModelFamilyCatalog.Resolve(options.Provider, options.Model, options.BaseUrl, options.Protocol);
-        var isReasonerModel = support.FamilyId == AiReasoningModelFamilyCatalog.FamilyDeepSeekReasonerLocked;
-        var protocol = ResolveProtocol(options);
-        var capabilities = ResolveCapabilities(options);
-        var requestBody = BuildOpenAiRequestBody(
-            apiMessages,
-            options,
-            stream: false,
-            support,
-            capabilities,
-            includeModel: protocol != AiModelConfig.ProtocolAzureOpenAi);
-        requestBody["tools"] = BuildOpenAiToolDefinitions(tools);
-        requestBody["tool_choice"] = "auto";
-
-        var apiUrl = protocol == AiModelConfig.ProtocolAzureOpenAi
-            ? BuildAzureOpenAiApiUrl(options)
-            : BuildOpenAiApiUrl(options);
-        var request = new HttpRequestMessage(HttpMethod.Post, apiUrl);
-        ApplyAuthHeaders(
-            request,
-            options,
-            protocol == AiModelConfig.ProtocolAzureOpenAi ? AiModelConfig.AuthModeHeaderKey : AiModelConfig.AuthModeBearer,
-            protocol == AiModelConfig.ProtocolAzureOpenAi ? "api-key" : "Authorization");
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(requestBody, _jsonOptions),
-            Encoding.UTF8,
-            "application/json");
-        ApplyExtraHeaders(request, options.ExtraHeaders);
-
-        var timeoutSeconds = isReasonerModel
-            ? Math.Max(options.TimeoutSeconds, 300)
-            : options.TimeoutSeconds;
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
-
-        using var response = await _httpClient.SendAsync(request, cts.Token);
-        await EnsureSuccessStatusCodeWithDetailsAsync(response, cts.Token);
-
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var doc = JsonDocument.Parse(responseJson);
-
-        var message = doc.RootElement
-            .GetProperty("choices")[0]
-            .GetProperty("message");
-
-        var content = ExtractOpenAiMessageContent(message) ?? string.Empty;
-        var toolCalls = ExtractOpenAiToolCalls(message);
-
-        string? reasoning = null;
-        if (message.TryGetProperty("reasoning_content", out var reasoningEl))
-        {
-            reasoning = reasoningEl.GetString();
-        }
-
-        AiTokenUsage? tokenUsage = null;
-        if (doc.RootElement.TryGetProperty("usage", out var openAiUsage) &&
-            openAiUsage.ValueKind == JsonValueKind.Object)
-        {
-            tokenUsage = new AiTokenUsage
-            {
-                InputTokens = ReadIntPropertyOrZero(openAiUsage, "prompt_tokens"),
-                OutputTokens = ReadIntPropertyOrZero(openAiUsage, "completion_tokens")
-            };
-        }
-
-        if (string.IsNullOrWhiteSpace(content) && toolCalls.Count == 0)
-        {
-            throw new InvalidOperationException("AI 返回了空响应");
-        }
-
-        return new AiCompletionResult
-        {
-            Content = content,
-            Reasoning = reasoning,
-            TokenUsage = tokenUsage,
-            ToolCalls = toolCalls
-        };
-    }
-
     private async Task<AiCompletionResult> StreamOpenAiAsync(
         string systemPrompt,
         List<ChatMessage> messages,
@@ -1419,7 +1122,7 @@ public class AiApiClient
         CancellationToken cancellationToken)
     {
         var apiMessages = new List<object> { new { role = "system", content = systemPrompt } };
-        apiMessages.AddRange(BuildOpenAiMessages(messages));
+        apiMessages.AddRange(messages.Select(BuildOpenAiMessage));
 
         var support = AiReasoningModelFamilyCatalog.Resolve(options.Provider, options.Model, options.BaseUrl, options.Protocol);
         var isReasonerModel = support.FamilyId == AiReasoningModelFamilyCatalog.FamilyDeepSeekReasonerLocked;
@@ -1717,27 +1420,6 @@ public class AiApiClient
     // 保留旧方法以兼容
     private static object BuildAnthropicMessage(ChatMessage message)
     {
-        if (message.HasToolCalls)
-        {
-            var blocks = new List<object>();
-            if (!string.IsNullOrWhiteSpace(message.Content))
-            {
-                blocks.Add(new { type = "text", text = message.Content });
-            }
-
-            blocks.AddRange(message.ToolCalls.Select(BuildAnthropicToolUseBlock));
-            return new { role = "assistant", content = blocks };
-        }
-
-        if (message.HasToolResults)
-        {
-            return new
-            {
-                role = "user",
-                content = message.ToolResults.Select(BuildAnthropicToolResultBlock).ToArray()
-            };
-        }
-
         if (!message.HasRichContent)
         {
             return new { role = message.Role, content = message.Content };
@@ -1796,34 +1478,8 @@ public class AiApiClient
         return parts;
     }
 
-    private static IEnumerable<object> BuildOpenAiMessages(IEnumerable<ChatMessage> messages)
-    {
-        foreach (var message in messages)
-        {
-            if (message.HasToolResults)
-            {
-                foreach (var result in message.ToolResults)
-                {
-                    yield return BuildOpenAiToolResultMessage(result);
-                }
-
-                continue;
-            }
-
-            yield return BuildOpenAiMessage(message);
-        }
-    }
-
     private static object BuildOpenAiMessage(ChatMessage message)
     {
-        if (message.HasToolCalls)
-        {
-            return CreateObjectMap(
-                ("role", "assistant"),
-                ("content", string.IsNullOrWhiteSpace(message.Content) ? null : message.Content),
-                ("tool_calls", message.ToolCalls.Select(BuildOpenAiToolCallMessage).ToArray()));
-        }
-
         if (!message.HasRichContent)
         {
             return new { role = message.Role, content = message.Content };
@@ -1838,88 +1494,9 @@ public class AiApiClient
         return new { role = message.Role, content = contentParts };
     }
 
-    private static object BuildOpenAiToolCallMessage(AiNativeToolCall call)
-    {
-        return new
-        {
-            id = string.IsNullOrWhiteSpace(call.Id) ? $"call_{Guid.NewGuid():N}" : call.Id,
-            type = "function",
-            function = new
-            {
-                name = call.Name,
-                arguments = SerializeToolArguments(call.Arguments)
-            }
-        };
-    }
-
-    private static object BuildOpenAiToolResultMessage(AiNativeToolResult result)
-    {
-        return new
-        {
-            role = "tool",
-            tool_call_id = result.ToolCallId,
-            content = result.Content
-        };
-    }
-
-    private static object BuildOpenAiResponsesFunctionCallItem(AiNativeToolCall call)
-    {
-        var item = CreateObjectMap(
-            ("type", "function_call"),
-            ("call_id", call.Id),
-            ("name", call.Name),
-            ("arguments", SerializeToolArguments(call.Arguments)));
-        if (!string.IsNullOrWhiteSpace(call.ResponseItemId))
-        {
-            item["id"] = call.ResponseItemId;
-        }
-
-        return item;
-    }
-
-    private static object BuildOpenAiResponsesToolResultItem(AiNativeToolResult result)
-    {
-        return new
-        {
-            type = "function_call_output",
-            call_id = result.ToolCallId,
-            output = result.Content
-        };
-    }
-
     private static List<object> BuildOpenAiResponsesInput(List<ChatMessage> messages)
     {
-        return messages.SelectMany(BuildOpenAiResponsesInputItems).ToList();
-    }
-
-    private static IEnumerable<object> BuildOpenAiResponsesInputItems(ChatMessage message)
-    {
-        if (message.HasToolCalls)
-        {
-            if (!string.IsNullOrWhiteSpace(message.Content))
-            {
-                yield return new { role = "assistant", content = message.Content };
-            }
-
-            foreach (var call in message.ToolCalls)
-            {
-                yield return BuildOpenAiResponsesFunctionCallItem(call);
-            }
-
-            yield break;
-        }
-
-        if (message.HasToolResults)
-        {
-            foreach (var result in message.ToolResults)
-            {
-                yield return BuildOpenAiResponsesToolResultItem(result);
-            }
-
-            yield break;
-        }
-
-        yield return BuildOpenAiResponsesMessage(message);
+        return messages.Select(BuildOpenAiResponsesMessage).ToList();
     }
 
     private static object BuildOpenAiResponsesMessage(ChatMessage message)
@@ -1976,38 +1553,6 @@ public class AiApiClient
         }
 
         return parts;
-    }
-
-    private static object BuildAnthropicToolUseBlock(AiNativeToolCall call)
-    {
-        return new
-        {
-            type = "tool_use",
-            id = call.Id,
-            name = call.Name,
-            input = ConvertJsonElement(call.Arguments)
-        };
-    }
-
-    private static object BuildAnthropicToolResultBlock(AiNativeToolResult result)
-    {
-        if (result.IsError)
-        {
-            return new
-            {
-                type = "tool_result",
-                tool_use_id = result.ToolCallId,
-                content = result.Content,
-                is_error = true
-            };
-        }
-
-        return new
-            {
-                type = "tool_result",
-                tool_use_id = result.ToolCallId,
-                content = result.Content
-            };
     }
 
     private static List<object> BuildOpenAiContentParts(ChatMessage message)
@@ -2139,156 +1684,6 @@ public class AiApiClient
         }
 
         return sb.Length > 0 ? sb.ToString() : null;
-    }
-
-    private static List<AiNativeToolCall> ExtractOpenAiToolCalls(JsonElement message)
-    {
-        var calls = new List<AiNativeToolCall>();
-        if (!message.TryGetProperty("tool_calls", out var toolCalls) ||
-            toolCalls.ValueKind != JsonValueKind.Array)
-        {
-            return calls;
-        }
-
-        var index = 0;
-        foreach (var item in toolCalls.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object ||
-                !item.TryGetProperty("function", out var function) ||
-                function.ValueKind != JsonValueKind.Object ||
-                !TryExtractTextProperty(function, "name", out var name) ||
-                string.IsNullOrWhiteSpace(name))
-            {
-                continue;
-            }
-
-            var id = TryExtractTextProperty(item, "id", out var itemId) && !string.IsNullOrWhiteSpace(itemId)
-                ? itemId
-                : $"call_{++index}";
-            var arguments = TryExtractTextProperty(function, "arguments", out var rawArguments)
-                ? ParseToolArguments(rawArguments)
-                : EmptyJsonObject();
-            calls.Add(new AiNativeToolCall
-            {
-                Id = id,
-                Name = name,
-                Arguments = arguments
-            });
-        }
-
-        return calls;
-    }
-
-    private static List<AiNativeToolCall> ExtractAnthropicToolCalls(JsonElement contentArray)
-    {
-        var calls = new List<AiNativeToolCall>();
-        if (contentArray.ValueKind != JsonValueKind.Array)
-        {
-            return calls;
-        }
-
-        var index = 0;
-        foreach (var block in contentArray.EnumerateArray())
-        {
-            if (block.ValueKind != JsonValueKind.Object ||
-                !TryExtractTextProperty(block, "type", out var type) ||
-                !string.Equals(type, "tool_use", StringComparison.OrdinalIgnoreCase) ||
-                !TryExtractTextProperty(block, "name", out var name) ||
-                string.IsNullOrWhiteSpace(name))
-            {
-                continue;
-            }
-
-            var id = TryExtractTextProperty(block, "id", out var blockId) && !string.IsNullOrWhiteSpace(blockId)
-                ? blockId
-                : $"toolu_{++index}";
-            var arguments = block.TryGetProperty("input", out var input) && input.ValueKind == JsonValueKind.Object
-                ? input.Clone()
-                : EmptyJsonObject();
-            calls.Add(new AiNativeToolCall
-            {
-                Id = id,
-                Name = name,
-                Arguments = arguments
-            });
-        }
-
-        return calls;
-    }
-
-    private static List<AiNativeToolCall> ExtractOpenAiResponsesToolCalls(JsonElement root)
-    {
-        var calls = new List<AiNativeToolCall>();
-        if (root.TryGetProperty("response", out var response) &&
-            response.ValueKind == JsonValueKind.Object)
-        {
-            calls.AddRange(ExtractOpenAiResponsesToolCalls(response));
-        }
-
-        if (!root.TryGetProperty("output", out var output) ||
-            output.ValueKind != JsonValueKind.Array)
-        {
-            return calls;
-        }
-
-        var index = 0;
-        foreach (var item in output.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object ||
-                !TryExtractTextProperty(item, "type", out var type) ||
-                !string.Equals(type, "function_call", StringComparison.OrdinalIgnoreCase) ||
-                !TryExtractTextProperty(item, "name", out var name) ||
-                string.IsNullOrWhiteSpace(name))
-            {
-                continue;
-            }
-
-            var callId = TryExtractTextProperty(item, "call_id", out var rawCallId) && !string.IsNullOrWhiteSpace(rawCallId)
-                ? rawCallId
-                : $"call_{++index}";
-            var responseItemId = TryExtractTextProperty(item, "id", out var rawItemId) &&
-                                 !string.IsNullOrWhiteSpace(rawItemId)
-                ? rawItemId
-                : null;
-            var arguments = TryExtractTextProperty(item, "arguments", out var rawArguments)
-                ? ParseToolArguments(rawArguments)
-                : EmptyJsonObject();
-            calls.Add(new AiNativeToolCall
-            {
-                Id = callId,
-                Name = name,
-                Arguments = arguments,
-                ResponseItemId = responseItemId
-            });
-        }
-
-        return calls;
-    }
-
-    private static JsonElement ParseToolArguments(string? rawArguments)
-    {
-        if (string.IsNullOrWhiteSpace(rawArguments))
-        {
-            return EmptyJsonObject();
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(rawArguments);
-            return doc.RootElement.ValueKind == JsonValueKind.Object
-                ? doc.RootElement.Clone()
-                : EmptyJsonObject();
-        }
-        catch (JsonException)
-        {
-            return EmptyJsonObject();
-        }
-    }
-
-    private static JsonElement EmptyJsonObject()
-    {
-        using var doc = JsonDocument.Parse("{}");
-        return doc.RootElement.Clone();
     }
 
     private static bool TryExtractDeltaContent(JsonElement delta, out string chunk)
@@ -2800,20 +2195,14 @@ public sealed class ChatMessage
     public string Role { get; }
     public string Content { get; }
     public IReadOnlyList<ChatMessageContentPart>? Parts { get; }
-    public IReadOnlyList<AiNativeToolCall> ToolCalls { get; }
-    public IReadOnlyList<AiNativeToolResult> ToolResults { get; }
 
     public bool HasRichContent => Parts != null && Parts.Count > 0;
-    public bool HasToolCalls => ToolCalls.Count > 0;
-    public bool HasToolResults => ToolResults.Count > 0;
 
     public ChatMessage(string role, string content)
     {
         Role = role;
         Content = content;
         Parts = null;
-        ToolCalls = Array.Empty<AiNativeToolCall>();
-        ToolResults = Array.Empty<AiNativeToolResult>();
     }
 
     public ChatMessage(string role, IReadOnlyList<ChatMessageContentPart> parts)
@@ -2821,28 +2210,7 @@ public sealed class ChatMessage
         Role = role;
         Content = string.Empty;
         Parts = parts;
-        ToolCalls = Array.Empty<AiNativeToolCall>();
-        ToolResults = Array.Empty<AiNativeToolResult>();
     }
-
-    private ChatMessage(
-        string role,
-        string content,
-        IReadOnlyList<AiNativeToolCall> toolCalls,
-        IReadOnlyList<AiNativeToolResult> toolResults)
-    {
-        Role = role;
-        Content = content;
-        Parts = null;
-        ToolCalls = toolCalls;
-        ToolResults = toolResults;
-    }
-
-    public static ChatMessage AssistantToolCalls(string? content, IReadOnlyList<AiNativeToolCall> toolCalls) =>
-        new("assistant", content ?? string.Empty, toolCalls, Array.Empty<AiNativeToolResult>());
-
-    public static ChatMessage ToolResultsMessage(IReadOnlyList<AiNativeToolResult> toolResults) =>
-        new("tool", string.Empty, Array.Empty<AiNativeToolCall>(), toolResults);
 }
 
 public static class ChatContentPartType

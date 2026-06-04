@@ -9,7 +9,6 @@ using ClearVision.Product.Desktop.Hubs;
 using ClearVision.Product.Desktop.Middleware;
 using ClearVision.Product.Desktop.Station;
 using ClearVision.Product.Desktop.Triggers;
-using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.Logging;
 using ClearVision.Product.Infrastructure.Metrics;
@@ -162,7 +161,6 @@ static class Program
             builder.Services.AddSingleton<StationRegistryService>();
             builder.Services.AddSingleton<StationCentralStore>();
             builder.Services.AddSingleton<StationPackageStore>();
-            builder.Services.AddSingleton<IVisionAgentStationStatusReader, VisionAgentStationStatusReader>();
             builder.Services.AddSingleton<VisionDatabaseMaintenanceService>();
             builder.Services.AddSignalR();
             builder.Services.ConfigureHttpJsonOptions(options =>

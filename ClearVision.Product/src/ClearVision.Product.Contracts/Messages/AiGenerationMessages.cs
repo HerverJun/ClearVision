@@ -56,16 +56,6 @@ public record GenerateFlowRequestPayload
     public string? RequirementMode { get; init; }
 
     /// <summary>
-    /// Optional prompt mode: legacy_full_prompt / hybrid / agent_tools.
-    /// </summary>
-    public string? PromptMode { get; init; }
-
-    /// <summary>
-    /// Explicitly allows runtime-preview tools such as capture_test_frame / replay_flow_with_frame for this request.
-    /// </summary>
-    public bool? AllowRuntimePreviewTools { get; init; }
-
-    /// <summary>
     /// 可选：用户在工作台中选择的模板策略。
     /// </summary>
     public GenerateFlowTemplateSelection? TemplateSelection { get; init; }
@@ -112,9 +102,6 @@ public record GenerateFlowResponse
     public string? RouterConfidence { get; init; }
     public List<string> BlockingClarificationFields { get; init; } = new();
     public List<string> NonBlockingMissingFields { get; init; } = new();
-    public List<GenerateFlowToolTrace> ToolTrace { get; init; } = new();
-    public List<GenerateFlowPendingAction> PendingActions { get; init; } = new();
-    public GenerateFlowValidationPreview? ValidationPreview { get; init; }
 
     /// <summary>Active prompt template version ID at generation time.</summary>
     public string? PromptVersionId { get; init; }
@@ -282,38 +269,6 @@ public record GenerateFlowKnowledgeDiagnostic
     public List<string> RelatedFields { get; init; } = new();
     public string? OperatorId { get; init; }
     public string? RepairHint { get; init; }
-}
-
-public record GenerateFlowToolTrace
-{
-    public string ToolName { get; init; } = string.Empty;
-    public object? Arguments { get; init; }
-    public bool Success { get; init; }
-    public object? ResultSummary { get; init; }
-    public object? ValidationPreviewSummary { get; init; }
-    public string? ErrorCode { get; init; }
-    public string? ErrorMessage { get; init; }
-    public long DurationMs { get; init; }
-    public string Permission { get; init; } = string.Empty;
-    public string ToolCallingMode { get; init; } = string.Empty;
-}
-
-public record GenerateFlowValidationPreview
-{
-    public object? StructuralDryRun { get; init; }
-    public object? FrameReplay { get; init; }
-    public object? FinalDryRun { get; init; }
-    public object? RuntimePackagePrecheck { get; init; }
-    public List<object> ToolDryRunTrace { get; init; } = new();
-}
-
-public record GenerateFlowPendingAction
-{
-    public string ActionType { get; init; } = string.Empty;
-    public string Title { get; init; } = string.Empty;
-    public string Summary { get; init; } = string.Empty;
-    public object? Payload { get; init; }
-    public bool RequiresUserConfirmation { get; init; } = true;
 }
 
 

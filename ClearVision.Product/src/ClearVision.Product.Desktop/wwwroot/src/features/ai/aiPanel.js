@@ -2,7 +2,6 @@
 import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
 import { buildWireSequenceFollowupHint } from '../flow-editor/wireSequenceAssist.js';
-import { dispatchAgentAction } from './agentActionBridge.js';
 
 const AiWorkbenchStates = Object.freeze({
     IDLE: 'idle',
@@ -37,7 +36,6 @@ const STAGE_DIAGNOSTIC_LABELS = {
     requirement_brief: '需求提炼',
     clarification: '需求澄清',
     prompt_context: 'Prompt 构建',
-    agent_loop: 'Agent 工具循环',
     llm: '模型调用',
     parse: '结果解析',
     validator: '流程校验',
@@ -45,24 +43,6 @@ const STAGE_DIAGNOSTIC_LABELS = {
     dryrun: 'DryRun 预演',
     layout: '自动布局'
 };
-
-const PROMPT_MODE_OPTIONS = [
-    {
-        value: 'legacy_full_prompt',
-        label: 'Legacy',
-        tip: '完整上下文 Prompt，保持旧链路。'
-    },
-    {
-        value: 'hybrid',
-        label: 'Hybrid',
-        tip: '保留旧链路，并允许内部工具补充上下文。'
-    },
-    {
-        value: 'agent_tools',
-        label: 'Tools',
-        tip: '短 Prompt，由 Agent 主动调用内部工具。'
-    }
-];
 
 /**
  * AI 智能助手面板
@@ -113,8 +93,6 @@ export class AiPanel {
         this.activeAssistantTurn = null;
         this.pendingManualRetry = null;
         this.requirementMode = this._loadRequirementMode();
-        this.promptMode = this._loadPromptMode();
-        this.allowRuntimePreviewTools = Boolean(options.allowRuntimePreviewTools);
 
         // 工作台状态机
         this.workbenchState = AiWorkbenchStates.IDLE;
@@ -354,15 +332,6 @@ export class AiPanel {
                             </div>
                             <div class="ai-requirement-mode-tip" id="ai-requirement-mode-tip"></div>
                         </div>
-                        <div class="ai-prompt-mode-bar">
-                            <div class="ai-prompt-mode-label">Agent 模式</div>
-                            <div class="ai-prompt-mode-toggle" id="ai-prompt-mode-toggle" role="group" aria-label="Agent 模式">
-                                <button class="ai-mode-chip" type="button" data-prompt-mode="legacy_full_prompt">Legacy</button>
-                                <button class="ai-mode-chip" type="button" data-prompt-mode="hybrid">Hybrid</button>
-                                <button class="ai-mode-chip" type="button" data-prompt-mode="agent_tools">Tools</button>
-                            </div>
-                            <div class="ai-prompt-mode-tip" id="ai-prompt-mode-tip"></div>
-                        </div>
                         <div class="ai-input-box">
                             <button class="icon-btn" id="ai-btn-attach" type="button" title="添加附件" aria-label="添加附件">
                                 <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 005 0V5c0-1.38-1.12-2.5-2.5-2.5S8 3.62 8 5v11.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/></svg>
@@ -431,24 +400,11 @@ export class AiPanel {
                             <div class="ai-validation-panel" id="ai-result-validation"></div>
                         </div>
 
-                        <div class="result-card tool-trace-card" id="ai-result-tool-trace-card" hidden>
-                            <div class="card-title tool-trace-titlebar">
-                                <span>工具调用</span>
-                                <span class="card-badge" id="ai-tool-trace-summary"></span>
-                            </div>
-                            <div class="ai-tool-trace-panel" id="ai-result-tool-trace"></div>
-                        </div>
-
                         <div class="result-card followup-card">
                             <div class="card-title">待补信息</div>
                             <div class="ai-followup-panel is-empty" id="ai-result-followups">
                                 <div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>
                             </div>
-                        </div>
-
-                        <div class="result-card pending-actions-card" id="ai-result-pending-actions-card" hidden>
-                            <div class="card-title">Agent 待办</div>
-                            <div class="ai-pending-actions-panel" id="ai-result-pending-actions"></div>
                         </div>
 
                         <div class="result-card parameter-editor-card">
@@ -507,11 +463,6 @@ export class AiPanel {
                 this._setRequirementMode(button.dataset.requirementMode || 'strict');
             });
         });
-        this.container.querySelectorAll('[data-prompt-mode]').forEach(button => {
-            button.addEventListener('click', () => {
-                this._setPromptMode(button.dataset.promptMode || 'legacy_full_prompt');
-            });
-        });
         
         this.container.querySelectorAll('.ai-tag').forEach(tag => {
             tag.addEventListener('click', () => {
@@ -540,7 +491,6 @@ export class AiPanel {
 
         this._renderAttachments();
         this._updateRequirementModeUI();
-        this._updatePromptModeUI();
         this._renderQueuedHintBanner();
         this._renderRequirementBrief(null);
         this._renderFollowupChecklist(null);
@@ -660,8 +610,6 @@ export class AiPanel {
                     hint: normalizedHint || null,
                     mode: resolvedMode,
                     requirementMode: this.requirementMode,
-                    promptMode: this.promptMode,
-                    allowRuntimePreviewTools: Boolean(this.allowRuntimePreviewTools),
                     templateSelection: normalizedTemplateSelection,
                     debugPrompt: this._shouldRequestPromptTrace(),
                     requestId,
@@ -912,77 +860,6 @@ export class AiPanel {
         }
     }
 
-    _normalizePromptMode(mode) {
-        const value = String(mode || '').trim().toLowerCase();
-        return PROMPT_MODE_OPTIONS.some(option => option.value === value)
-            ? value
-            : 'legacy_full_prompt';
-    }
-
-    _loadPromptMode() {
-        try {
-            const search = new URLSearchParams(window.location.search || '');
-            const modeFromQuery = search.get('promptMode');
-            if (modeFromQuery) {
-                return this._normalizePromptMode(modeFromQuery);
-            }
-
-            return this._normalizePromptMode(localStorage.getItem('cv_ai_prompt_mode'));
-        } catch {
-            return 'legacy_full_prompt';
-        }
-    }
-
-    _savePromptMode(mode) {
-        try {
-            localStorage.setItem('cv_ai_prompt_mode', this._normalizePromptMode(mode));
-        } catch {
-            // ignore localStorage failures
-        }
-    }
-
-    _getPromptModeOption(mode) {
-        const normalized = this._normalizePromptMode(mode);
-        return PROMPT_MODE_OPTIONS.find(option => option.value === normalized) || PROMPT_MODE_OPTIONS[0];
-    }
-
-    _getPromptModeLabel(mode) {
-        return this._getPromptModeOption(mode).label;
-    }
-
-    _setPromptMode(mode, { silent = false } = {}) {
-        const normalized = this._normalizePromptMode(mode);
-        if (normalized === this.promptMode) {
-            this._updatePromptModeUI();
-            return;
-        }
-
-        this.promptMode = normalized;
-        this._savePromptMode(normalized);
-        this._updatePromptModeUI();
-
-        if (!silent) {
-            this._addMessage('system', `Agent 模式已切换为「${this._getPromptModeLabel(normalized)}」。`);
-        }
-    }
-
-    _updatePromptModeUI() {
-        const normalized = this._normalizePromptMode(this.promptMode);
-        const tip = this.container?.querySelector('#ai-prompt-mode-tip');
-        const buttons = this.container?.querySelectorAll('[data-prompt-mode]');
-        const option = this._getPromptModeOption(normalized);
-
-        buttons?.forEach(button => {
-            const buttonMode = this._normalizePromptMode(button.dataset.promptMode);
-            button.classList.toggle('is-active', buttonMode === normalized);
-            button.setAttribute('aria-pressed', buttonMode === normalized ? 'true' : 'false');
-        });
-
-        if (tip) {
-            tip.textContent = option.tip;
-        }
-    }
-
     async _handleGenerate() {
         const input = this.container.querySelector('#ai-input');
         const description = input.value.trim();
@@ -1214,8 +1091,6 @@ export class AiPanel {
         const isClarification = this._isClarificationResult(payload);
         const isInteractionOnly = this._isInteractionOnlyResult(payload);
         this._renderAgentRuntime(payload);
-        this._renderToolTrace(payload);
-        this._renderPendingActions(payload);
 
         if (isCancelled) {
             this._clearActiveRequestState();
@@ -1529,8 +1404,6 @@ export class AiPanel {
         this._renderParameterDraftEditor(data, flow);
         this._renderStageTimeline(data?.stageTimeline || data?.StageTimeline || this._workbenchStageTimeline || []);
         this._renderValidationConsole(data);
-        this._renderToolTrace(data);
-        this._renderPendingActions(data);
         this._renderAttachmentPanel();
         this._renderPromptTrace(data?.promptTrace ?? data?.PromptTrace ?? null);
         if (appendChatMessage) {
@@ -1550,7 +1423,8 @@ export class AiPanel {
             return;
         }
 
-        const isDebugMode = this._isPromptTraceDebugMode();
+        const isDebugMode = new URLSearchParams(window.location.search).has('debugPrompt')
+            || localStorage.getItem('cv_ai_debug_prompt') === '1';
 
         // Store trace for toggle
         this._currentPromptTrace = trace;
@@ -1639,231 +1513,6 @@ export class AiPanel {
                 </div>
             </details>
         `;
-    }
-
-    _isPromptTraceDebugMode() {
-        try {
-            const search = new URLSearchParams(window.location.search || '');
-            if (search.has('debugPrompt')) {
-                return search.get('debugPrompt') !== '0';
-            }
-
-            const saved = String(localStorage.getItem('cv_ai_debug_prompt') || '').trim().toLowerCase();
-            return saved === '1' || saved === 'true';
-        } catch {
-            return false;
-        }
-    }
-
-    _normalizeToolTraceItems(items) {
-        if (!Array.isArray(items)) return [];
-
-        return items.map(item => {
-            const duration = Number(item?.durationMs ?? item?.DurationMs ?? 0);
-            return {
-                toolName: String(item?.toolName ?? item?.ToolName ?? '').trim(),
-                arguments: item?.arguments ?? item?.Arguments ?? null,
-                success: Boolean(item?.success ?? item?.Success),
-                resultSummary: item?.resultSummary ?? item?.ResultSummary ?? null,
-                validationPreviewSummary: item?.validationPreviewSummary ?? item?.ValidationPreviewSummary ?? null,
-                errorCode: String(item?.errorCode ?? item?.ErrorCode ?? '').trim(),
-                errorMessage: String(item?.errorMessage ?? item?.ErrorMessage ?? '').trim(),
-                durationMs: Number.isFinite(duration) ? duration : 0,
-                permission: String(item?.permission ?? item?.Permission ?? '').trim(),
-                toolCallingMode: String(item?.toolCallingMode ?? item?.ToolCallingMode ?? '').trim()
-            };
-        }).filter(item => item.toolName);
-    }
-
-    _formatTraceInlineValue(value, maxLength = 180) {
-        if (value === null || value === undefined || value === '') return '--';
-
-        let text = '';
-        if (typeof value === 'string') {
-            text = value;
-        } else {
-            try {
-                text = JSON.stringify(value);
-            } catch {
-                text = String(value);
-            }
-        }
-
-        const normalized = text.replace(/\s+/g, ' ').trim();
-        return normalized.length > maxLength
-            ? `${normalized.slice(0, maxLength - 3)}...`
-            : normalized;
-    }
-
-    _renderToolTrace(source) {
-        const card = this.container?.querySelector('#ai-result-tool-trace-card');
-        const container = this.container?.querySelector('#ai-result-tool-trace');
-        const summaryBadge = this.container?.querySelector('#ai-tool-trace-summary');
-        if (!card || !container) return;
-
-        const trace = this._normalizeToolTraceItems(source?.toolTrace ?? source?.ToolTrace);
-        if (trace.length === 0) {
-            card.hidden = true;
-            container.innerHTML = '';
-            if (summaryBadge) summaryBadge.textContent = '';
-            return;
-        }
-
-        const debugMode = this._isPromptTraceDebugMode();
-        const failedCount = trace.filter(item => !item.success).length;
-        const totalMs = trace.reduce((sum, item) => sum + item.durationMs, 0);
-        card.hidden = false;
-        if (summaryBadge) {
-            summaryBadge.textContent = `${trace.length} 次 · ${this._formatDuration(totalMs)}`;
-        }
-
-        container.innerHTML = `
-            <details class="ai-tool-trace-details" open>
-                <summary>${failedCount > 0 ? `${failedCount} 次失败` : '全部工具调用完成'}</summary>
-                <div class="ai-tool-trace-list">
-                    ${trace.map((item, index) => {
-                        const statusClass = item.success ? 'is-ok' : 'is-failed';
-                        const statusIcon = item.success ? '&#10003;' : '&#10007;';
-                        const summary = item.success
-                            ? this._formatTraceInlineValue(item.resultSummary)
-                            : ([item.errorCode, item.errorMessage || this._formatTraceInlineValue(item.resultSummary)]
-                                .filter(Boolean)
-                                .join(': '));
-                        const modeLabel = item.toolCallingMode ? ` · Tool Calling: ${item.toolCallingMode}` : '';
-                        const debugHtml = debugMode
-                            ? `
-                                <details class="ai-tool-trace-json">
-                                    <summary>JSON</summary>
-                                    <div class="ai-prompt-trace-grid">
-                                        <div class="ai-prompt-trace-block">
-                                            <div class="ai-prompt-trace-label">Arguments</div>
-                                            <pre class="ai-prompt-trace-pre">${this._escapeHtml(this._formatPromptTraceJson(item.arguments))}</pre>
-                                        </div>
-                                        <div class="ai-prompt-trace-block">
-                                            <div class="ai-prompt-trace-label">Result</div>
-                                            <pre class="ai-prompt-trace-pre">${this._escapeHtml(this._formatPromptTraceJson(item.resultSummary))}</pre>
-                                        </div>
-                                    </div>
-                                </details>
-                            `
-                            : '';
-                        return `
-                            <div class="ai-tool-trace-item ${statusClass}" data-tool-trace-index="${index}">
-                                <span class="ai-tool-trace-icon">${statusIcon}</span>
-                                <div class="ai-tool-trace-body">
-                                    <div class="ai-tool-trace-main">
-                                        <span class="ai-tool-trace-name">${this._escapeHtml(item.toolName)}</span>
-                                        <span class="ai-tool-trace-meta">${this._escapeHtml(item.permission || '--')} · ${this._formatDuration(item.durationMs)}${this._escapeHtml(modeLabel)}</span>
-                                    </div>
-                                    <div class="ai-tool-trace-summary">${this._escapeHtml(summary)}</div>
-                                    ${debugHtml}
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </details>
-        `;
-    }
-
-    _normalizePendingActions(items) {
-        if (!Array.isArray(items)) return [];
-
-        return items.map((item, index) => ({
-            index,
-            actionType: String(item?.actionType ?? item?.ActionType ?? '').trim(),
-            title: String(item?.title ?? item?.Title ?? '').trim(),
-            summary: String(item?.summary ?? item?.Summary ?? '').trim(),
-            payload: item?.payload ?? item?.Payload ?? null,
-            requiresUserConfirmation: Boolean(item?.requiresUserConfirmation ?? item?.RequiresUserConfirmation ?? true)
-        })).filter(item => item.actionType);
-    }
-
-    _getPendingActionTypeLabel(actionType) {
-        const normalized = String(actionType || '').trim();
-        const labels = {
-            'cameraBindingDraft.apply': '相机绑定草稿',
-            'runtimePackagePrecheck.review': '运行包预检',
-            'runtimePackageManifestDraft.review': '运行包 Manifest'
-        };
-        return labels[normalized] || normalized || 'Agent 待办';
-    }
-
-    _renderPendingActions(source) {
-        const card = this.container?.querySelector('#ai-result-pending-actions-card');
-        const container = this.container?.querySelector('#ai-result-pending-actions');
-        if (!card || !container) return;
-
-        const actions = this._normalizePendingActions(source?.pendingActions ?? source?.PendingActions);
-        if (actions.length === 0) {
-            card.hidden = true;
-            container.innerHTML = '';
-            return;
-        }
-
-        card.hidden = false;
-        container.innerHTML = `
-            <div class="ai-pending-action-list">
-                ${actions.map(action => {
-                    const payloadPreview = this._formatTraceInlineValue(action.payload, 260);
-                    const title = action.title || this._getPendingActionTypeLabel(action.actionType);
-                    const summary = action.summary || payloadPreview;
-                    return `
-                        <section class="ai-pending-action" data-agent-action-index="${action.index}">
-                            <div class="ai-pending-action-header">
-                                <div>
-                                    <div class="ai-pending-action-title">${this._escapeHtml(title)}</div>
-                                    <div class="ai-pending-action-type">${this._escapeHtml(this._getPendingActionTypeLabel(action.actionType))}</div>
-                                </div>
-                                ${action.requiresUserConfirmation ? '<span class="ai-pending-action-badge">需确认</span>' : ''}
-                            </div>
-                            <div class="ai-pending-action-summary">${this._escapeHtml(summary)}</div>
-                            <details class="ai-pending-action-payload">
-                                <summary>Payload</summary>
-                                <pre class="ai-prompt-trace-pre">${this._escapeHtml(this._formatPromptTraceJson(action.payload))}</pre>
-                            </details>
-                            <div class="ai-pending-action-row">
-                                <button class="ai-pending-action-btn is-primary" type="button" data-agent-action="${action.index}">发送到工作台</button>
-                                <button class="ai-pending-action-btn" type="button" data-agent-action-copy="${action.index}">复制 Payload</button>
-                            </div>
-                        </section>
-                    `;
-                }).join('')}
-            </div>
-        `;
-
-        container.querySelectorAll('[data-agent-action]').forEach(button => {
-            button.disabled = this.isGenerating;
-            button.addEventListener('click', () => {
-                const index = Number(button.dataset.agentAction);
-                const action = actions.find(item => item.index === index);
-                if (!action) return;
-
-                dispatchAgentAction(action.actionType, action.payload, {
-                    source: 'aiPanel',
-                    title: action.title,
-                    summary: action.summary,
-                    requiresUserConfirmation: action.requiresUserConfirmation
-                });
-                this._addMessage('system', `已发送 Agent 待办事件：${action.actionType}`);
-            });
-        });
-
-        container.querySelectorAll('[data-agent-action-copy]').forEach(button => {
-            button.disabled = this.isGenerating;
-            button.addEventListener('click', async () => {
-                const index = Number(button.dataset.agentActionCopy);
-                const action = actions.find(item => item.index === index);
-                if (!action) return;
-
-                try {
-                    await navigator.clipboard.writeText(this._formatPromptTraceJson(action.payload));
-                    this._addMessage('system', '已复制 Agent 待办 Payload。');
-                } catch {
-                    this._addMessage('system', '复制失败，请展开 Payload 手动查看。');
-                }
-            });
-        });
     }
 
     _formatPromptTraceJson(value) {
@@ -4318,9 +3967,6 @@ export class AiPanel {
         this.container.querySelectorAll('[data-requirement-mode]').forEach(btnEl => {
             btnEl.disabled = busy;
         });
-        this.container.querySelectorAll('[data-prompt-mode]').forEach(btnEl => {
-            btnEl.disabled = busy;
-        });
         this.container.querySelectorAll('.ai-attachment-remove').forEach(btnEl => {
             btnEl.disabled = busy;
         });
@@ -4331,9 +3977,6 @@ export class AiPanel {
             btnEl.disabled = busy;
         });
         this.container.querySelectorAll('[data-draft-input="true"], [data-draft-file-pick], [data-followup-nav], [data-draft-adopt]').forEach(el => {
-            el.disabled = busy;
-        });
-        this.container.querySelectorAll('[data-agent-action], [data-agent-action-copy]').forEach(el => {
             el.disabled = busy;
         });
         const clearHintBtn = this.container.querySelector('#ai-btn-clear-followup-hint');
@@ -4899,7 +4542,6 @@ export class AiPanel {
         return {
             turnIntent,
             interactionState,
-            promptMode: this.promptMode,
             routerConfidence: '',
             blockingClarificationFields: [],
             nonBlockingMissingFields: []
@@ -5043,13 +4685,6 @@ export class AiPanel {
         const flow = source.flow ?? source.Flow ?? this.currentResult?.flow ?? this.currentResult?.Flow ?? null;
         const manualRetry = source.manualRetry ?? source.ManualRetry ?? null;
         const performanceBudget = this._normalizePerformanceBudget(source.performanceBudget ?? source.PerformanceBudget);
-        const promptMode = this._normalizePromptMode(
-            source.promptMode
-            ?? source.PromptMode
-            ?? source.promptTrace?.mode
-            ?? source.PromptTrace?.Mode
-            ?? this.promptMode
-        );
 
         const intentLabels = {
             manual_retry_repair: '修复草稿',
@@ -5105,7 +4740,6 @@ export class AiPanel {
             ? `性能提示：${performanceBudget.warnings.slice(0, 2).join('、')}`
             : '';
         const runtimeMetrics = [
-            { label: '模式', value: this._getPromptModeLabel(promptMode) },
             { label: '意图', value: intentLabels[turnIntent] || turnIntent },
             { label: '置信度', value: confidenceLabels[routerConfidence] || routerConfidence || '--' },
             { label: '阻断', value: blockingCount },
@@ -5186,14 +4820,6 @@ export class AiPanel {
             editor.classList.add('is-empty');
             editor.innerHTML = '<div class="ai-followup-empty">当前没有待确认参数，暂无需补录。</div>';
         }
-        const toolTraceCard = this.container.querySelector('#ai-result-tool-trace-card');
-        const toolTrace = this.container.querySelector('#ai-result-tool-trace');
-        if (toolTraceCard) toolTraceCard.hidden = true;
-        if (toolTrace) toolTrace.innerHTML = '';
-        const pendingActionsCard = this.container.querySelector('#ai-result-pending-actions-card');
-        const pendingActions = this.container.querySelector('#ai-result-pending-actions');
-        if (pendingActionsCard) pendingActionsCard.hidden = true;
-        if (pendingActions) pendingActions.innerHTML = '';
         const promptTraceCard = this.container.querySelector('#ai-result-prompt-trace-card');
         const promptTrace = this.container.querySelector('#ai-result-prompt-trace');
         if (promptTraceCard) promptTraceCard.hidden = true;
@@ -5749,16 +5375,8 @@ export class AiPanel {
         const diagnostics = data?.lastAttemptDiagnostics || data?.LastAttemptDiagnostics || [];
         const manualRetry = data?.manualRetry || data?.ManualRetry || null;
         const dryRun = data?.dryRunResult || data?.DryRunResult || null;
-        const validationPreview = data?.validationPreview || data?.ValidationPreview || null;
         const knowledgeDiags = data?.knowledgeDiagnostics || data?.KnowledgeDiagnostics || [];
-        const hasPreview = validationPreview && (
-            validationPreview.structuralDryRun || validationPreview.StructuralDryRun ||
-            validationPreview.frameReplay || validationPreview.FrameReplay ||
-            validationPreview.finalDryRun || validationPreview.FinalDryRun ||
-            validationPreview.runtimePackagePrecheck || validationPreview.RuntimePackagePrecheck ||
-            (validationPreview.toolDryRunTrace || validationPreview.ToolDryRunTrace || []).length > 0
-        );
-        const hasContent = diagnostics.length > 0 || manualRetry?.required || dryRun || hasPreview || knowledgeDiags.length > 0;
+        const hasContent = diagnostics.length > 0 || manualRetry?.required || dryRun || knowledgeDiags.length > 0;
 
         if (!hasContent) {
             card.hidden = true;
@@ -5816,38 +5434,6 @@ export class AiPanel {
                     </div>
                 `);
             }
-        }
-
-        if (hasPreview) {
-            const structuralDryRun = validationPreview.structuralDryRun || validationPreview.StructuralDryRun || null;
-            const frameReplay = validationPreview.frameReplay || validationPreview.FrameReplay || null;
-            const finalDryRun = validationPreview.finalDryRun || validationPreview.FinalDryRun || null;
-            const runtimePackagePrecheck = validationPreview.runtimePackagePrecheck || validationPreview.RuntimePackagePrecheck || null;
-            const toolDryRunTrace = validationPreview.toolDryRunTrace || validationPreview.ToolDryRunTrace || [];
-            const previewRows = [
-                ['结构预演', structuralDryRun],
-                ['真实帧回放', frameReplay],
-                ['最终 DryRun', finalDryRun],
-                ['部署预检查', runtimePackagePrecheck]
-            ].filter(([, value]) => value);
-
-            sections.push(`
-                <div class="ai-validation-preview">
-                    <div class="ai-validation-issues-header">Validation Preview</div>
-                    ${previewRows.map(([label, value]) => `
-                        <details class="ai-tool-trace-json">
-                            <summary>${this._escapeHtml(label)} · ${this._escapeHtml(this._formatTraceInlineValue(value, 120))}</summary>
-                            <pre class="ai-prompt-trace-pre">${this._escapeHtml(this._formatPromptTraceJson(value))}</pre>
-                        </details>
-                    `).join('')}
-                    ${toolDryRunTrace.length > 0 ? `
-                        <details class="ai-tool-trace-json">
-                            <summary>工具预演记录 · ${toolDryRunTrace.length}</summary>
-                            <pre class="ai-prompt-trace-pre">${this._escapeHtml(this._formatPromptTraceJson(toolDryRunTrace))}</pre>
-                        </details>
-                    ` : ''}
-                </div>
-            `);
         }
 
         // DryRun result

@@ -72,7 +72,7 @@ public class ImageAcquisitionOperator : OperatorBase
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
-        if (TryGetProvidedFrameEnvelope(@operator, inputs, out var envelope) && envelope != null)
+        if (TryGetProvidedFrameEnvelope(inputs, out var envelope) && envelope != null)
         {
             return CreateOutputFromEnvelope(envelope);
         }
@@ -343,10 +343,7 @@ public class ImageAcquisitionOperator : OperatorBase
         }
     }
 
-    private static bool TryGetProvidedFrameEnvelope(
-        Operator @operator,
-        Dictionary<string, object>? inputs,
-        out FrameEnvelope? envelope)
+    private static bool TryGetProvidedFrameEnvelope(Dictionary<string, object>? inputs, out FrameEnvelope? envelope)
     {
         envelope = null;
         if (inputs == null)
@@ -354,11 +351,7 @@ public class ImageAcquisitionOperator : OperatorBase
             return false;
         }
 
-        if (!inputs.TryGetValue($"ProvidedFrameEnvelope:{@operator.Id}", out var value) &&
-            !inputs.TryGetValue($"providedFrameEnvelope:{@operator.Id}", out value) &&
-            !inputs.TryGetValue($"ProvidedFrameEnvelope.{@operator.Id}", out value) &&
-            !inputs.TryGetValue($"providedFrameEnvelope.{@operator.Id}", out value) &&
-            !inputs.TryGetValue("ProvidedFrameEnvelope", out value) &&
+        if (!inputs.TryGetValue("ProvidedFrameEnvelope", out var value) &&
             !inputs.TryGetValue("providedFrameEnvelope", out value))
         {
             return false;
