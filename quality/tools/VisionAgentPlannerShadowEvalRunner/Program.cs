@@ -44,15 +44,21 @@ internal static class VisionAgentPlannerShadowEval
         var workflowRun = VisionAgentWorkflowRunMetadata.FromEnvironment();
         var cases = CreateCases();
         var enabled = IsEnabled();
-        var config = ShadowLlmConfiguration.FromEnvironment();
+        var config = enabled
+            ? ShadowLlmConfiguration.FromEnvironment()
+            : ShadowLlmConfiguration.Disabled();
 
         if (!enabled)
         {
             return BuildDocument(
                 workflowRun,
                 enabled: false,
+                enabledReason: string.Empty,
+                skippedReason: "CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.",
+                configurationMissingReason: string.Empty,
                 runnerStatus: "skipped",
                 modelName: "not_configured",
+                config,
                 cases.Select(CreateSkippedResult).ToList());
         }
 
@@ -61,8 +67,12 @@ internal static class VisionAgentPlannerShadowEval
             return BuildDocument(
                 workflowRun,
                 enabled: true,
+                enabledReason: "CV_AGENT_REAL_LLM_SHADOW_EVAL=true",
+                skippedReason: string.Empty,
+                configurationMissingReason: config.MissingReason,
                 runnerStatus: "configuration_missing",
-                modelName: config.ModelName,
+                modelName: config.ModelNameForReport,
+                config,
                 cases.Select(testCase => CreateConfigurationMissingResult(testCase, config.MissingReason)).ToList());
         }
 
@@ -76,8 +86,12 @@ internal static class VisionAgentPlannerShadowEval
         return BuildDocument(
             workflowRun,
             enabled: true,
+            enabledReason: "CV_AGENT_REAL_LLM_SHADOW_EVAL=true",
+            skippedReason: string.Empty,
+            configurationMissingReason: string.Empty,
             runnerStatus: "completed",
-            modelName: config.ModelName,
+            modelName: config.ModelNameForReport,
+            config,
             results);
     }
 
@@ -208,6 +222,7 @@ internal static class VisionAgentPlannerShadowEval
             testCase.ExpectedToolCalls,
             testCase.MockPlannerToolCalls);
         var invalidJsonRepairUsed = diagnostics.Any(item => item.RepairUsed);
+        var requestCount = invalidJsonRepairUsed ? 2 : 1;
         var fallbackToMock = !parseSuccess || unsafeAttempted || score < 0.5;
 
         return new ShadowEvalCaseResult(
@@ -227,6 +242,7 @@ internal static class VisionAgentPlannerShadowEval
             Math.Round(score, 4),
             unsafeAttempted,
             fallbackToMock,
+            requestCount,
             exceptionType,
             exceptionMessage ?? parseError);
     }
@@ -234,12 +250,19 @@ internal static class VisionAgentPlannerShadowEval
     private static ShadowEvalDocument BuildDocument(
         VisionAgentWorkflowRunMetadata workflowRun,
         bool enabled,
+        string enabledReason,
+        string skippedReason,
+        string configurationMissingReason,
         string runnerStatus,
         string modelName,
+        ShadowLlmConfiguration config,
         IReadOnlyList<ShadowEvalCaseResult> results)
     {
         var unsafeCount = results.Count(item => item.UnsafeToolAttempted);
         var parseSuccessCount = results.Count(item => item.ParseSuccess);
+        var requestCount = results.Sum(item => item.RequestCount);
+        var parseSuccessRate = Rate(parseSuccessCount, results.Count);
+        var unsafeAttemptRate = Rate(unsafeCount, results.Count);
         var averageScore = results.Count == 0
             ? 0
             : Math.Round(results.Average(item => item.ToolPlanMatchScore), 4);
@@ -263,12 +286,19 @@ internal static class VisionAgentPlannerShadowEval
             Mode: "offline_metadata_only",
             Enabled: enabled,
             WorkflowRun: workflowRun,
+            LlmConfiguration: config.ToReportConfiguration(),
             Summary: new ShadowEvalSummary(
                 results.Count,
                 runnerStatus,
                 modelName,
+                enabledReason,
+                skippedReason,
+                configurationMissingReason,
+                requestCount,
                 parseSuccessCount,
+                parseSuccessRate,
                 unsafeCount,
+                unsafeAttemptRate,
                 results.Count(item => item.FallbackToMockSuggested),
                 averageScore,
                 runnerStatus != "configuration_missing"),
@@ -297,6 +327,7 @@ internal static class VisionAgentPlannerShadowEval
             ToolPlanMatchScore: 0,
             UnsafeToolAttempted: false,
             FallbackToMockSuggested: true,
+            RequestCount: 0,
             ErrorCode: "shadow_eval_skipped",
             ErrorMessage: "Real LLM planner shadow eval is disabled by default.");
     }
@@ -322,8 +353,16 @@ internal static class VisionAgentPlannerShadowEval
             ToolPlanMatchScore: 0,
             UnsafeToolAttempted: false,
             FallbackToMockSuggested: true,
+            RequestCount: 0,
             ErrorCode: "configuration_missing",
             ErrorMessage: missingReason);
+    }
+
+    private static double Rate(int numerator, int denominator)
+    {
+        return denominator == 0
+            ? 0
+            : Math.Round((double)numerator / denominator, 4);
     }
 
     private static IReadOnlyList<VisionAgentLoopMessage> BuildLoopMessages(ShadowEvalCase testCase)
@@ -724,6 +763,9 @@ internal sealed record ShadowLlmConfiguration(
     int TimeoutMs,
     string ModelRole)
 {
+    public string ModelNameForReport =>
+        string.IsNullOrWhiteSpace(ModelName) ? "not_configured" : ModelName;
+
     public bool IsComplete =>
         !string.IsNullOrWhiteSpace(ModelName) &&
         (string.Equals(AuthMode, AiModelConfig.AuthModeNone, StringComparison.OrdinalIgnoreCase) ||
@@ -748,6 +790,20 @@ internal sealed record ShadowLlmConfiguration(
         }
     }
 
+    public static ShadowLlmConfiguration Disabled()
+    {
+        return new ShadowLlmConfiguration(
+            Provider: "not_read_when_disabled",
+            Protocol: "not_read_when_disabled",
+            WireApi: "not_read_when_disabled",
+            AuthMode: "not_read_when_disabled",
+            ModelName: "not_configured",
+            ApiKey: string.Empty,
+            BaseUrl: null,
+            TimeoutMs: 0,
+            ModelRole: "not_read_when_disabled");
+    }
+
     public static ShadowLlmConfiguration FromEnvironment()
     {
         var provider = Read("CV_AGENT_REAL_LLM_PROVIDER", "OpenAI Compatible");
@@ -765,6 +821,17 @@ internal sealed record ShadowLlmConfiguration(
             ReadNullable("CV_AGENT_REAL_LLM_BASE_URL"),
             int.TryParse(timeoutText, out var timeoutMs) ? Math.Clamp(timeoutMs, 1_000, 300_000) : 120_000,
             Read("CV_AGENT_REAL_LLM_MODEL_ROLE", "generation"));
+    }
+
+    public ShadowEvalLlmConfiguration ToReportConfiguration()
+    {
+        return new ShadowEvalLlmConfiguration(
+            Provider,
+            Protocol,
+            WireApi,
+            AuthMode,
+            RedactBaseUrl(BaseUrl),
+            ModelRole);
     }
 
     public AiModelConfig ToModelConfig()
@@ -799,6 +866,31 @@ internal sealed record ShadowLlmConfiguration(
     {
         var value = Environment.GetEnvironmentVariable(name);
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? RedactBaseUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            return "<redacted-non-url>";
+        }
+
+        var builder = new UriBuilder(uri)
+        {
+            UserName = string.Empty,
+            Password = string.Empty,
+            Query = string.Empty,
+            Fragment = string.Empty,
+            Path = string.IsNullOrWhiteSpace(uri.AbsolutePath) || uri.AbsolutePath == "/"
+                ? "/"
+                : "/<redacted-path>"
+        };
+        return builder.Uri.ToString();
     }
 }
 
@@ -843,16 +935,31 @@ internal sealed record ShadowEvalDocument(
     string Mode,
     bool Enabled,
     VisionAgentWorkflowRunMetadata WorkflowRun,
+    ShadowEvalLlmConfiguration LlmConfiguration,
     ShadowEvalSummary Summary,
     ShadowEvalSafety Safety,
     IReadOnlyList<ShadowEvalCaseResult> Cases);
+
+internal sealed record ShadowEvalLlmConfiguration(
+    string Provider,
+    string Protocol,
+    string WireApi,
+    string AuthMode,
+    string? BaseUrl,
+    string ModelRole);
 
 internal sealed record ShadowEvalSummary(
     int CaseCount,
     string RunnerStatus,
     string ModelName,
+    string EnabledReason,
+    string SkippedReason,
+    string ConfigurationMissingReason,
+    int RequestCount,
     int ParseSuccessCount,
+    double ParseSuccessRate,
     int UnsafeToolAttemptCount,
+    double UnsafeAttemptRate,
     int FallbackToMockSuggestedCount,
     double AverageToolPlanMatchScore,
     bool ReportGenerated);
@@ -887,6 +994,7 @@ internal sealed record ShadowEvalCaseResult(
     double ToolPlanMatchScore,
     bool UnsafeToolAttempted,
     bool FallbackToMockSuggested,
+    int RequestCount,
     string? ErrorCode,
     string? ErrorMessage);
 
@@ -917,8 +1025,27 @@ internal static class VisionAgentPlannerShadowEvalMarkdown
             $"- Enabled: {document.Enabled}",
             $"- Status: `{document.Summary.RunnerStatus}`",
             $"- Model: `{document.Summary.ModelName}`",
+            $"- Enabled reason: `{EmptyDash(document.Summary.EnabledReason)}`",
+            $"- Skipped reason: `{EmptyDash(document.Summary.SkippedReason)}`",
+            $"- Configuration missing reason: `{EmptyDash(document.Summary.ConfigurationMissingReason)}`",
             $"- Mode: `{document.Mode}`",
             $"- JSON: `{VisionAgentPlannerShadowEval.RepoRelative(jsonPath)}`",
+            "",
+            "## LLM Configuration",
+            "",
+            $"- Provider: `{document.LlmConfiguration.Provider}`",
+            $"- Protocol: `{document.LlmConfiguration.Protocol}`",
+            $"- Wire API: `{document.LlmConfiguration.WireApi}`",
+            $"- Auth mode: `{document.LlmConfiguration.AuthMode}`",
+            $"- Base URL: `{EmptyDash(document.LlmConfiguration.BaseUrl)}`",
+            $"- Model role: `{document.LlmConfiguration.ModelRole}`",
+            "",
+            "## Metrics",
+            "",
+            $"- requestCount: {document.Summary.RequestCount}",
+            $"- parseSuccessRate: {document.Summary.ParseSuccessRate:0.####}",
+            $"- unsafeAttemptRate: {document.Summary.UnsafeAttemptRate:0.####}",
+            $"- averageToolPlanMatchScore: {document.Summary.AverageToolPlanMatchScore:0.####}",
             "",
             "## Design",
             "",
@@ -937,11 +1064,12 @@ internal static class VisionAgentPlannerShadowEvalMarkdown
             "- `toolPlanMatchScore`: best sequence/Jaccard match against `expectedToolCalls` or `mockPlannerToolCalls`.",
             "- `unsafeToolAttempted`: true for denied or unsafe RuntimePreview/DeploymentPrepare/ConfigWrite attempts.",
             "- `fallbackToMockSuggested`: true when parsing, policy, or plan match indicates mock fallback should stay authoritative.",
+            "- `requestCount`: real LLM request count estimate; skipped/configuration-missing artifacts keep it at 0.",
             "",
             "## Cases",
             "",
-            "| Case | Category | Planned Tools | Score | Unsafe | Fallback | Parse |",
-            "| --- | --- | --- | --- | --- | --- | --- |"
+            "| Case | Category | Planned Tools | Requests | Score | Unsafe | Fallback | Parse |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |"
         };
 
         foreach (var result in document.Cases)
@@ -952,6 +1080,7 @@ internal static class VisionAgentPlannerShadowEvalMarkdown
                     result.CaseId,
                     result.Category,
                     string.Join(", ", result.PlannedToolCalls.Select(item => item.ToolName)),
+                    result.RequestCount.ToString(),
                     result.ToolPlanMatchScore.ToString("0.####"),
                     result.UnsafeToolAttempted ? "yes" : "no",
                     result.FallbackToMockSuggested ? "yes" : "no",
@@ -973,5 +1102,10 @@ internal static class VisionAgentPlannerShadowEvalMarkdown
         ]);
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string EmptyDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
     }
 }

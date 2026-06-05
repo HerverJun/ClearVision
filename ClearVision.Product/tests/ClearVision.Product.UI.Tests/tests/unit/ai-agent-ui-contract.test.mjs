@@ -994,6 +994,18 @@ test('real LLM planner shadow eval report remains default-off and policy-only', 
   assert.equal(report.summary.runnerStatus, 'skipped');
   assert.equal(report.summary.caseCount, 12);
   assert.equal(report.summary.reportGenerated, true);
+  assert.equal(report.summary.enabledReason, '');
+  assert.match(report.summary.skippedReason, /CV_AGENT_REAL_LLM_SHADOW_EVAL/);
+  assert.equal(report.summary.configurationMissingReason, '');
+  assert.equal(report.summary.requestCount, 0);
+  assert.equal(report.summary.parseSuccessRate, 0);
+  assert.equal(report.summary.unsafeAttemptRate, 0);
+  assert.equal(report.summary.averageToolPlanMatchScore, 0);
+  assert.equal(report.llmConfiguration.provider, 'not_read_when_disabled');
+  assert.equal(report.llmConfiguration.protocol, 'not_read_when_disabled');
+  assert.equal(report.llmConfiguration.wireApi, 'not_read_when_disabled');
+  assert.equal(report.llmConfiguration.authMode, 'not_read_when_disabled');
+  assert.equal(report.llmConfiguration.modelRole, 'not_read_when_disabled');
   assertWorkflowRunMetadata(report.workflowRun);
   assert.equal(report.safety.workflowExecutionAttempted, false);
   assert.equal(report.safety.deploymentPrepareExecuted, false);
@@ -1008,7 +1020,71 @@ test('real LLM planner shadow eval report remains default-off and policy-only', 
     assert.ok(Array.isArray(item.mockPlannerToolCalls), item.caseId);
     assert.ok(Array.isArray(item.plannedToolCalls), item.caseId);
     assert.ok(Array.isArray(item.policyDecision), item.caseId);
+    assert.equal(item.requestCount, 0, item.caseId);
     assert.equal(item.fallbackToMockSuggested, true, item.caseId);
+  }
+});
+
+test('real LLM shadow eval report does not expose API keys and keeps BaseUrl redacted', () => {
+  const reportPath = path.resolve(
+    getRepoRoot(),
+    'quality',
+    'evals',
+    'reports',
+    'real_llm_planner_shadow_eval.json'
+  );
+  const reportText = fs.readFileSync(reportPath, 'utf8');
+  const report = JSON.parse(reportText);
+
+  assert.doesNotMatch(reportText, /apiKey|ApiKey|CV_AGENT_REAL_LLM_API_KEY|Bearer\s+|x-api-key|Authorization/);
+  assert.ok(report.llmConfiguration);
+  assert.equal(Object.prototype.hasOwnProperty.call(report.llmConfiguration, 'apiKey'), false);
+  if (typeof report.llmConfiguration.baseUrl === 'string') {
+    assert.doesNotMatch(report.llmConfiguration.baseUrl, /\?|@/);
+  }
+});
+
+test('CI artifact assertion enforces non-local workflow metadata before upload', () => {
+  const repoRoot = getRepoRoot();
+  const scriptPath = path.resolve(repoRoot, 'quality', 'tools', 'assert_vision_agent_report_artifacts.py');
+  const dedicatedWorkflow = fs.readFileSync(path.resolve(repoRoot, '.github', 'workflows', 'vision-agent-quality.yml'), 'utf8');
+  const ciWorkflow = fs.readFileSync(path.resolve(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
+  const script = fs.readFileSync(scriptPath, 'utf8');
+
+  assert.match(script, /--require-non-local-workflow-run/);
+  assert.match(script, /workflowRun\.commitSha.*must not be local|workflowRun\.\{field\} must not be local/s);
+  for (const workflow of [dedicatedWorkflow, ciWorkflow]) {
+    assert.match(workflow, /Assert Vision Agent Artifact Reports/);
+    assert.match(workflow, /assert_vision_agent_report_artifacts\.py --require-non-local-workflow-run/);
+    assert.match(workflow, /vision_agent_quality_artifact_manifest\.json/);
+    assert.match(workflow, /VisionAgent_business_benchmark_baseline\.json/);
+    assert.match(workflow, /planner_autonomy_benchmark\.json/);
+    assert.match(workflow, /real_llm_planner_shadow_eval\.json/);
+    assert.match(workflow, /agent_ui_contract_output\.txt/);
+    assert.match(workflow, /\*\*\/\*\.trx/);
+  }
+});
+
+test('shadow eval source guard confines HttpClient to shadow runner only', () => {
+  const repoRoot = getRepoRoot();
+  const shadowRunner = fs.readFileSync(
+    path.resolve(repoRoot, 'quality', 'tools', 'VisionAgentPlannerShadowEvalRunner', 'Program.cs'),
+    'utf8'
+  );
+  assert.match(shadowRunner, /new HttpClient/);
+
+  const guardedRoots = [
+    path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Agent'),
+    path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools'),
+    path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai')
+  ];
+  for (const root of guardedRoots) {
+    for (const sourcePath of fs.readdirSync(root, { recursive: true })
+      .filter(fileName => String(fileName).endsWith('.cs') || String(fileName).endsWith('.js'))
+      .map(fileName => path.resolve(root, fileName))) {
+      const source = fs.readFileSync(sourcePath, 'utf8');
+      assert.doesNotMatch(source, /new\s+HttpClient|HttpClient\s*\(/, sourcePath);
+    }
   }
 });
 
@@ -1020,7 +1096,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 36);
+  assert.equal(uiEntry.minimumTests, 39);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)

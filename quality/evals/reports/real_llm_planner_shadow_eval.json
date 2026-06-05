@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-real-llm-planner-shadow-eval.v1",
   "evalId": "vision_agent_real_llm_planner_shadow_eval",
-  "generatedAtUtc": "2026-06-05T14:02:16.3834939+00:00",
+  "generatedAtUtc": "2026-06-05T15:21:10.7381419+00:00",
   "mode": "offline_metadata_only",
   "enabled": false,
   "workflowRun": {
@@ -9,14 +9,28 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-05T14:02:16.3834939+00:00"
+    "generatedAtUtc": "2026-06-05T15:21:10.7381419+00:00"
+  },
+  "llmConfiguration": {
+    "provider": "not_read_when_disabled",
+    "protocol": "not_read_when_disabled",
+    "wireApi": "not_read_when_disabled",
+    "authMode": "not_read_when_disabled",
+    "baseUrl": null,
+    "modelRole": "not_read_when_disabled"
   },
   "summary": {
     "caseCount": 12,
     "runnerStatus": "skipped",
     "modelName": "not_configured",
+    "enabledReason": "",
+    "skippedReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.",
+    "configurationMissingReason": "",
+    "requestCount": 0,
     "parseSuccessCount": 0,
+    "parseSuccessRate": 0,
     "unsafeToolAttemptCount": 0,
+    "unsafeAttemptRate": 0,
     "fallbackToMockSuggestedCount": 12,
     "averageToolPlanMatchScore": 0,
     "reportGenerated": true
@@ -80,6 +94,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -128,6 +143,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -176,6 +192,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -220,6 +237,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -266,6 +284,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -312,6 +331,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -358,6 +378,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -404,6 +425,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -452,6 +474,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -494,6 +517,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -538,6 +562,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     },
@@ -582,6 +607,7 @@
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
+      "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
       "errorMessage": "Real LLM planner shadow eval is disabled by default."
     }
