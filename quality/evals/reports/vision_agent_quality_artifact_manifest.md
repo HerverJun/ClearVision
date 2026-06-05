@@ -1,6 +1,6 @@
 # Vision Agent Quality Artifact Manifest
 
-- Generated UTC: `2026-06-05T18:32:17.407049+00:00`
+- Generated UTC: `2026-06-05T18:36:57.550038+00:00`
 - Artifact: `vision-agent-quality-suite`
 
 | File | Size bytes |
@@ -11,7 +11,7 @@
 | quality/evals/reports/VisionAgent_business_benchmark_baseline.md | 10516 |
 | quality/evals/reports/planner_autonomy_benchmark.md | 5482 |
 | quality/evals/reports/real_llm_planner_shadow_eval.md | 3620 |
-| test_results/agent_engineering_harness/agent_ui_contract_output.txt | 8360 |
+| test_results/agent_engineering_harness/agent_ui_contract_output.txt | 8362 |
 | test_results/agent_engineering_harness/agent_contracts_skeleton.trx | 35964 |
 | test_results/agent_engineering_harness/agent_engineering_harness.trx | 263369 |
 | test_results/agent_engineering_harness/agent_planner_parity_subset.trx | 16369 |

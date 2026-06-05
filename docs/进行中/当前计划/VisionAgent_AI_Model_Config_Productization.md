@@ -6,6 +6,16 @@
 
 The fallback only selects a provider whose provider key, `name`, or `provider` value contains `cpa`. It uses the provider `env_key` to read the key from the process environment and never prints the key or full BaseUrl. A non-CPA default Codex provider is ignored and results in a redacted `configuration_missing` report.
 
+The bridge also supports an inspect-only mode for validating CPA config without calling the shadow eval runner or any network endpoint:
+
+```powershell
+& quality/tools/run_real_llm_shadow_eval_from_codex_config.ps1 `
+  -InspectConfigOnly `
+  -InspectOutput quality/evals/reports/real_llm_planner_shadow_eval.inspect.json
+```
+
+Inspect output is sanitized and includes only booleans for key/model/BaseUrl presence plus a redacted BaseUrl marker.
+
 日期：2026-06-06
 
 ## 现状审计

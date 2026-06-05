@@ -3,7 +3,9 @@ param(
     [string]$Report = "quality/evals/reports/real_llm_planner_shadow_eval.manual.md",
     [string]$ModelConfigId = "",
     [string]$ModelConfigRole = "",
-    [string]$ModelConfigDir = ""
+    [string]$ModelConfigDir = "",
+    [switch]$InspectConfigOnly,
+    [string]$InspectOutput = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,6 +25,26 @@ function Set-ShadowEnv {
     param([string]$Name, [string]$Value)
     if (-not [string]::IsNullOrWhiteSpace($Value)) {
         [Environment]::SetEnvironmentVariable($Name, $Value, "Process")
+    }
+}
+
+function Redact-BaseUrlForReport {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $null
+    }
+
+    try {
+        $uri = [Uri]$Value
+        $pathMarker = ""
+        if (-not [string]::IsNullOrWhiteSpace($uri.AbsolutePath) -and $uri.AbsolutePath -ne "/") {
+            $pathMarker = "/<redacted-path>"
+        }
+        return "$($uri.Scheme)://<redacted-host>$pathMarker"
+    }
+    catch {
+        return "<redacted-url>"
     }
 }
 
@@ -191,6 +213,9 @@ $authMode = Read-FirstEnv @("CV_AGENT_CPA_AUTH_MODE", "CPA_AUTH_MODE", "CODEX_CP
 $wireApi = Read-FirstEnv @("CV_AGENT_CPA_WIRE_API", "CPA_WIRE_API", "CODEX_CPA_WIRE_API", "CV_AGENT_REAL_LLM_WIRE_API") "chat_completions"
 $protocol = Read-FirstEnv @("CV_AGENT_CPA_PROTOCOL", "CPA_PROTOCOL", "CODEX_CPA_PROTOCOL", "CV_AGENT_REAL_LLM_PROTOCOL") "openai_compatible"
 $timeoutMs = Read-FirstEnv @("CV_AGENT_CPA_TIMEOUT_MS", "CPA_TIMEOUT_MS", "CODEX_CPA_TIMEOUT_MS", "CV_AGENT_REAL_LLM_TIMEOUT_MS") "120000"
+$explicitCpaConfigured = -not [string]::IsNullOrWhiteSpace($model) -or
+    -not [string]::IsNullOrWhiteSpace($baseUrl) -or
+    -not [string]::IsNullOrWhiteSpace($apiKey)
 
 if (-not [string]::IsNullOrWhiteSpace($codexCpa.Provider)) {
     if ([string]::IsNullOrWhiteSpace($provider) -or $provider -eq "CPA OpenAI Compatible") { $provider = $codexCpa.Provider }
@@ -220,6 +245,49 @@ if ([string]::IsNullOrWhiteSpace($baseUrl)) {
 }
 if ($missingReasons.Count -gt 0) {
     Set-ShadowEnv "CV_AGENT_REAL_LLM_CONFIGURATION_MISSING_REASON" ($missingReasons -join " ")
+}
+
+if ($InspectConfigOnly) {
+    $configSource = "none"
+    if ($explicitCpaConfigured) {
+        $configSource = "explicit-env"
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($codexCpa.Provider)) {
+        $configSource = "codex-config"
+    }
+
+    $inspect = [ordered]@{
+        schemaVersion = "2026-06-06.cpa-shadow-bridge-inspect.v1"
+        mode = "inspect_config_only"
+        configSource = $configSource
+        provider = $provider
+        protocol = $protocol
+        wireApi = $wireApi
+        authMode = $authMode
+        modelConfigured = -not [string]::IsNullOrWhiteSpace($model)
+        baseUrlConfigured = -not [string]::IsNullOrWhiteSpace($baseUrl)
+        baseUrl = Redact-BaseUrlForReport $baseUrl
+        apiKeyConfigured = -not [string]::IsNullOrWhiteSpace($apiKey)
+        missingReasons = $missingReasons
+        shadowEvalWouldRun = $missingReasons.Count -eq 0
+        workflowExecutionAttempted = $false
+        deploymentPrepareExecuted = $false
+        realCameraSdkTouched = $false
+        realStationTouched = $false
+        realImageFilesRead = $false
+        realModelFilesLoaded = $false
+        plcWriteAttempted = $false
+    }
+    $json = $inspect | ConvertTo-Json -Depth 4
+    if (-not [string]::IsNullOrWhiteSpace($InspectOutput)) {
+        $directory = Split-Path -Parent $InspectOutput
+        if (-not [string]::IsNullOrWhiteSpace($directory)) {
+            New-Item -ItemType Directory -Force -Path $directory | Out-Null
+        }
+        Set-Content -LiteralPath $InspectOutput -Value $json -Encoding UTF8
+    }
+    Write-Output $json
+    exit 0
 }
 
 [Environment]::SetEnvironmentVariable("CV_AGENT_REAL_LLM_SHADOW_EVAL", "true", "Process")

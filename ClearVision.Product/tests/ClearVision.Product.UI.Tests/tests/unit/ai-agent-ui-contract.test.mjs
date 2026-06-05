@@ -1103,6 +1103,8 @@ test('CPA shadow bridge reads only explicit CPA or Codex CPA provider config', (
   assert.match(bridge, /CV_AGENT_CPA_MODEL/);
   assert.match(bridge, /CV_AGENT_CPA_BASE_URL/);
   assert.match(bridge, /CV_AGENT_CPA_API_KEY/);
+  assert.match(bridge, /InspectConfigOnly/);
+  assert.match(bridge, /shadowEvalWouldRun/);
   assert.doesNotMatch(bridge, /model_provider.*ccswitch/i);
 });
 
@@ -1121,6 +1123,9 @@ test('CPA shadow bridge reports missing config without printing secrets', () => 
   assert.match(bridge, /CV_AGENT_REAL_LLM_CONFIGURATION_MISSING_REASON/);
   assert.match(bridge, /No CPA provider was found/);
   assert.match(bridge, /Secrets and full BaseUrl are not printed/);
+  assert.match(bridge, /mode = "inspect_config_only"/);
+  assert.match(bridge, /apiKeyConfigured/);
+  assert.match(bridge, /Redact-BaseUrlForReport/);
   assert.equal(manualReport.summary.runnerStatus, 'configuration_missing');
   assert.match(manualReport.summary.configurationMissingReason, /CPA model is missing/);
   assert.equal(manualReport.summary.requestCount, 0);

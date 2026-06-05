@@ -6,6 +6,16 @@
 
 The Codex config fallback only accepts a provider whose provider key, `name`, or `provider` value contains `cpa`. This prevents the manual CPA bridge from accidentally using a normal OpenAI/Codex provider. If the CPA provider declares `env_key`, the bridge reads that environment variable for the key without printing it.
 
+Use inspect mode before a manual trial when you need to verify that CPA config will be selected. Inspect mode does not call the shadow eval runner and does not make network requests:
+
+```powershell
+& quality/tools/run_real_llm_shadow_eval_from_codex_config.ps1 `
+  -InspectConfigOnly `
+  -InspectOutput quality/evals/reports/real_llm_planner_shadow_eval.inspect.json
+```
+
+The inspect JSON reports `configSource`, `modelConfigured`, `baseUrlConfigured`, `apiKeyConfigured`, `missingReasons`, and `shadowEvalWouldRun`. It redacts BaseUrl and never includes the API key.
+
 ## 默认行为
 
 - 稳定 CI 默认保持 `CV_AGENT_REAL_LLM_SHADOW_EVAL=false`。
