@@ -1088,6 +1088,47 @@ test('shadow eval source guard confines HttpClient to shadow runner only', () =>
   }
 });
 
+test('CPA shadow bridge reads only explicit CPA or Codex CPA provider config', () => {
+  const repoRoot = getRepoRoot();
+  const bridgePath = path.resolve(repoRoot, 'quality', 'tools', 'run_real_llm_shadow_eval_from_codex_config.ps1');
+  const bridge = fs.readFileSync(bridgePath, 'utf8');
+
+  assert.match(bridge, /CODEX_CONFIG_PATH/);
+  assert.match(bridge, /CODEX_HOME/);
+  assert.match(bridge, /\$HOME.*\.codex\/config\.toml/s);
+  assert.match(bridge, /\[model_providers\\\./);
+  assert.match(bridge, /function Test-IsCpaProvider/);
+  assert.match(bridge, /ProviderKey -match 'cpa'/);
+  assert.match(bridge, /env_key/);
+  assert.match(bridge, /CV_AGENT_CPA_MODEL/);
+  assert.match(bridge, /CV_AGENT_CPA_BASE_URL/);
+  assert.match(bridge, /CV_AGENT_CPA_API_KEY/);
+  assert.doesNotMatch(bridge, /model_provider.*ccswitch/i);
+});
+
+test('CPA shadow bridge reports missing config without printing secrets', () => {
+  const repoRoot = getRepoRoot();
+  const bridge = fs.readFileSync(
+    path.resolve(repoRoot, 'quality', 'tools', 'run_real_llm_shadow_eval_from_codex_config.ps1'),
+    'utf8'
+  );
+  const manualReport = JSON.parse(fs.readFileSync(
+    path.resolve(repoRoot, 'quality', 'evals', 'reports', 'real_llm_planner_shadow_eval.manual.json'),
+    'utf8'
+  ));
+  const manualText = JSON.stringify(manualReport);
+
+  assert.match(bridge, /CV_AGENT_REAL_LLM_CONFIGURATION_MISSING_REASON/);
+  assert.match(bridge, /No CPA provider was found/);
+  assert.match(bridge, /Secrets and full BaseUrl are not printed/);
+  assert.equal(manualReport.summary.runnerStatus, 'configuration_missing');
+  assert.match(manualReport.summary.configurationMissingReason, /CPA model is missing/);
+  assert.equal(manualReport.summary.requestCount, 0);
+  assert.equal(manualReport.safety.workflowExecutionAttempted, false);
+  assert.equal(manualReport.safety.deploymentPrepareExecuted, false);
+  assert.doesNotMatch(manualText, /Bearer\s+|Authorization|x-api-key|sk-[A-Za-z0-9_-]{8,}/);
+});
+
 test('quality suite tracks raised UI contract minimum', () => {
   const suitePath = path.resolve(getRepoRoot(), 'quality', 'evals', 'suites', 'agent_engineering_harness_suite.json');
   const suite = JSON.parse(fs.readFileSync(suitePath, 'utf8'));
@@ -1096,7 +1137,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 46);
+  assert.equal(uiEntry.minimumTests, 48);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)
