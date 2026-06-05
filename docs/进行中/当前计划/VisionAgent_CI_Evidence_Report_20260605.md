@@ -1,18 +1,23 @@
 # Vision Agent CI Evidence Report 20260605
 
-本报告记录 Vision Agent Quality Suite 的 CI artifact 证据闭环。当前文档先记录本地准备和 artifact 契约，推送后以 GitHub Actions 实际 runId 更新。
+本报告记录 Vision Agent Quality Suite 的 CI artifact 证据闭环。2026-06-05T16:18:46Z 触发的 push run 已成功完成并上传 artifact。
 
 ## CI Run
 
 | 字段 | 值 |
 | --- | --- |
-| commitSha | pending after push |
+| commitSha | c48d2cf9caac88198ddf0e8e40b86223a45fe959 |
 | branchName | codex初稿 |
-| runId | pending after push |
-| runAttempt | pending after push |
+| runId | 27026501955 |
+| runAttempt | 1 |
 | artifact name | vision-agent-quality-suite |
+| artifact id | 7441437925 |
+| artifact size | 103589 bytes |
+| artifact expired | false |
 | workflow | `.github/workflows/vision-agent-quality.yml` |
 | trigger | push on `codex*` branch |
+| run URL | `https://github.com/HerverJun/ClearVision/actions/runs/27026501955` |
+| job URL | `https://github.com/HerverJun/ClearVision/actions/runs/27026501955/job/79767769568` |
 
 ## Artifact Manifest
 
@@ -28,6 +33,8 @@ CI artifact `vision-agent-quality-suite` 必须包含：
 - `vision_agent_quality_artifact_manifest.md`
 - `agent_engineering_harness.trx`
 - `agent_ui_contract_output.txt`
+
+GitHub artifact API returned `vision-agent-quality-suite` with id `7441437925`, size `103589` bytes, created at `2026-06-05T16:20:58Z`.
 
 上传 artifact 前必须执行：
 
@@ -48,6 +55,13 @@ CI artifact 内三个 JSON 报告必须满足：
 - `workflowRun.runAttempt != local`
 
 本地运行允许 `local`，但 CI artifact assertion 不允许 `local` 并会在上传前失败。
+
+本次 CI job step 结果：
+
+- `Run Vision Agent Quality Suite`：success。
+- `Generate Real LLM Shadow Eval Sample`：success。
+- `Assert Vision Agent Artifact Reports`：success，workflow 使用 `--require-non-local-workflow-run`。
+- `Upload Vision Agent Quality Reports`：success。
 
 ## Benchmark Summary
 
