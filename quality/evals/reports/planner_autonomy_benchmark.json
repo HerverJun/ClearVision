@@ -845,7 +845,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 9,
+          "durationMs": 0,
           "permission": "ReadOnly",
           "permissionDecision": {
             "allowed": true,
@@ -866,7 +866,7 @@
           },
           "errorCode": "template_not_found",
           "errorMessage": "templateId or scenarioKey does not match a read-only template.",
-          "durationMs": 1,
+          "durationMs": 0,
           "permission": "ReadOnly",
           "permissionDecision": {
             "allowed": false,
@@ -969,7 +969,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 8,
+          "durationMs": 0,
           "permission": "Simulation",
           "permissionDecision": {
             "allowed": true,
@@ -1057,7 +1057,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 4,
+          "durationMs": 0,
           "permission": "Simulation",
           "permissionDecision": {
             "allowed": true,
@@ -1222,7 +1222,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 6,
+          "durationMs": 0,
           "permission": "DeploymentPrepare",
           "permissionDecision": {
             "allowed": true,
@@ -4444,7 +4444,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 3,
+          "durationMs": 0,
           "permission": "ReadOnly",
           "permissionDecision": {
             "allowed": true,
@@ -5571,7 +5571,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 1,
+          "durationMs": 0,
           "permission": "Simulation",
           "permissionDecision": {
             "allowed": true,
@@ -5851,7 +5851,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 1,
+          "durationMs": 0,
           "permission": "DeploymentPrepare",
           "permissionDecision": {
             "allowed": true,
@@ -9646,7 +9646,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 11,
+          "durationMs": 0,
           "permission": "RuntimePreview",
           "permissionDecision": {
             "allowed": true,
@@ -9724,7 +9724,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 5,
+          "durationMs": 0,
           "permission": "RuntimePreview",
           "permissionDecision": {
             "allowed": true,
@@ -10533,7 +10533,7 @@
           },
           "errorCode": null,
           "errorMessage": null,
-          "durationMs": 2,
+          "durationMs": 0,
           "permission": "ReadOnly",
           "permissionDecision": {
             "allowed": true,

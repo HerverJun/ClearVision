@@ -13,7 +13,7 @@ function flowDebugEnabled() {
 const PORT_TYPE_COLORS = {
     'Image':           '#52c41a',  // 缂佽儻澹?- 閸ユ儳鍎?
     'String':          '#1890ff',  // 閽冩繆澹?- 鐎涙顑佹稉?
-    'Integer':         '#fa8c16',  // 濮楁瑨澹?- 閺佸瓨鏆?
+    'Integer':         '#fa8c16',  // Encoding cleanup: previous comment text was unreadable.
     'Float':           '#fa8c16',  // 濮楁瑨澹?- 濞搭喚鍋?
     'Boolean':         '#f5222d',  // 缁俱垼澹?- 鐢啫鐨甸崐?
     'Point':           '#eb2f96',  // 缁澹?- 閸ф劖鐖?
@@ -22,7 +22,7 @@ const PORT_TYPE_COLORS = {
     'PointList':       '#eb2f96',  // 缁澹?- 閻愮懓鍨悰?(Sprint 1.2)
     'DetectionResult': '#13c2c2',  // 闂堟帟澹?- 濡偓濞村绮ㄩ弸?(Sprint 1.2)
     'DetectionList':   '#13c2c2',  // 闂堟帟澹?- 濡偓濞村鍨悰?(Sprint 1.2)
-    'CircleData':      '#2f54eb',  // 闂堟稖鎽?- 閸﹀棙鏆熼幑?(Sprint 1.2)
+    'CircleData':      '#2f54eb',  // Encoding cleanup: previous comment text was unreadable.
     'LineData':        '#2f54eb',  // 闂堟稖鎽?- 閻╁鍤庨弫鐗堝祦 (Sprint 1.2)
     'Any':             '#bfbfbf',  // 閻忔媽澹?- 娴犵粯鍓?
     // 鍏煎鏋氫妇鏁板瓧鍊?
@@ -50,7 +50,7 @@ const LEGACY_OPERATOR_TYPE_ALIASES = {
 };
 
 const PORT_HIT_RADIUS_PX = 12;       // 绔彛灞忓箷鍛戒腑鍗婂緞
-const CONNECTION_HIT_RADIUS_PX = 10; // 杩炵嚎灞忓箷鍛戒腑鍗婂緞
+const CONNECTION_HIT_RADIUS_PX = 10; // Encoding cleanup: previous comment text was unreadable.
 const CONNECTION_HIT_SAMPLES = 16;   // 鐠愭繂顢ｇ亸鏃€娲哥痪鍧楀櫚閺嶉鍋ｉ弫?
 const NODE_DEFAULT_WIDTH = 140;
 const NODE_MIN_HEIGHT = 60;
@@ -80,7 +80,7 @@ class FlowCanvas {
         this.viewStateListeners = new Set();
         this.structureStateListeners = new Set();
 
-        // 閫昏緫灏哄锛圕SS 鍍忕礌锛変笌 DPR锛氭墍鏈夌粯鍒跺潗鏍囧湪閫昏緫鍍忕礌绌洪棿锛岄€氳繃 setTransform 缂╂斁鍒?backing store
+        // Encoding cleanup: previous comment text was unreadable.
         this._dpr = 1;
         this._logicalWidth = 0;
         this._logicalHeight = 0;
@@ -128,7 +128,7 @@ class FlowCanvas {
         // 闁鑵戦惃鍕箾閹?
         this.selectedConnection = null;
 
-        // 鏉╃偞甯寸槐銏犵穿閿涙氨鏁ゆ禍?O(1) 閺屻儲澹橀敍宀勪缉閸忓秵鐦＄敮?mousemove 娑撳﹦娈?.find/.filter 閸忋劏銆冮幍顐ｅ伎
+        // Encoding cleanup: previous comment text was unreadable.
         this._connectionById = new Map();
         this._connectionsByOutputPort = new Map();  // key=portKey -> Set<connection>
         this._connectionByInputPort = new Map();    // key=portKey -> connection閿涘牐绶崗銉ь伂閸欙絼绮庨崗浣筋啅 1 閺夆槄绱?
@@ -202,7 +202,7 @@ class FlowCanvas {
     }
 
     /**
-     * 澶勭悊椤甸潰鍙鎬у彉鍖栵細鍚庡彴鏆傚仠 RAF锛屽洖鍓嶅彴绔嬪嵆璋冨害涓€娆￠噸缁?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     handleVisibilityChange() {
         if (document.hidden) {
@@ -280,7 +280,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鐠嬪啯鏆ｉ悽璇茬婢堆冪毈閿涘本鏁幐?devicePixelRatio閵?
+     * Encoding cleanup: previous comment text was unreadable.
      * - canvas.width/height閿涘潌acking store閿涘濞囬悽?dpr 閺€鎯с亣
      * - canvas.style.width/height 娣囨繃瀵?CSS 閸嶅繒绀?
      * - ctx.setTransform(dpr,0,0,dpr,0,0) 鐠佲晜澧嶉張澶岀帛閸掕泛娼楅弽鍥﹀▏閻劑鈧槒绶崓蹇曠
@@ -363,7 +363,7 @@ class FlowCanvas {
     }
 
     /**
-     * 閸掔娀娅庨懞鍌滃仯閿涘牆鎮撻弮鑸电閻炲棛娴夐崗瀹犵箾閹恒儰绗岀槐銏犵穿閿涘鈧?
+     * Encoding cleanup: previous comment text was unreadable.
      * 缁崵绮洪懞鍌滃仯 (_systemNode) 閸欐ぞ绻氶幎銈忕礉娑撳秴褰查崚鐘绘珟閵?
      */
     removeNode(nodeId) {
@@ -376,7 +376,7 @@ class FlowCanvas {
             return false;
         }
 
-        // 娓呯悊涓庢湰鑺傜偣鐩稿叧鐨勮繛鎺ワ紙鍚屾椂鍚屾绱㈠紩锛?
+        // Encoding cleanup: previous comment text was unreadable.
         const remaining = [];
         for (const conn of this.connections) {
             if (conn.source === nodeId || conn.target === nodeId) {
@@ -628,7 +628,7 @@ class FlowCanvas {
         });
 
         this.notifyViewStateChanged();
-        // 缁撴瀯鍙樺寲鏃舵竻闄?SubGraph 瑙ｆ瀽缂撳瓨锛圵eakMap 鏃犳硶鎵归噺娓咃紝浣嗛噸璧嬪紩鐢ㄥ彲閲婃斁鏃ч敭锛?
+        // Encoding cleanup: previous comment text was unreadable.
         this._subGraphNodeCountCache = new WeakMap();
     }
 
@@ -742,14 +742,14 @@ class FlowCanvas {
             borderWidth = 2;
             glowColor = 'rgba(245, 34, 45, 0.3)';
         } else if (hasFileParam) {
-            // 閸?file 閸欏倹鏆熼惃鍕暬鐎涙劧绱板娆掑閹绘劗銇氭潏瑙勵攱
+            // Encoding cleanup: previous comment text was unreadable.
             borderColor = '#fa8c16';
             borderWidth = 2;
         } else if (isSelected) {
             glowColor = `${node.color}80`; // 50% opacity
         }
 
-        // 閻樿埖鈧礁褰傞崗澶嬫櫏閺嬫粣绱檚ave/restore 閸栧懓锛欓柆鍨帳闂冩潙濂栧▔鍕础閸掓澘鎮楃紒顓犵帛閸掕绱?
+        // Encoding cleanup: previous comment text was unreadable.
         this.ctx.save();
         if (glowColor) {
             this.ctx.shadowColor = glowColor;
@@ -805,7 +805,7 @@ class FlowCanvas {
             this.ctx.save();
             this.ctx.translate(x + 8 * this.scale, y + 4 * this.scale);
             this.ctx.scale(scaleFactor, scaleFactor);
-            this.ctx.fillStyle = '#ffffff'; // 閸ョ偓鐖ｅ姝岀箼閻у€熷
+            this.ctx.fillStyle = '#ffffff'; // Encoding cleanup: previous comment text was unreadable.
             const path = new Path2D(node.iconPath);
             this.ctx.fill(path);
             this.ctx.restore();
@@ -879,7 +879,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鐠嬪啯鏆ｆ０婊嗗娴滎喖瀹?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     adjustColor(color, amount) {
         const hex = color.replace('#', '');
@@ -1014,11 +1014,11 @@ class FlowCanvas {
     }
 
     /**
-     * 鑾峰彇绔彛鍦ㄥ睆骞曚笂鐨勫潗鏍?
-     * @param {string} nodeId - 閼哄倻鍋D
-     * @param {number} portIndex - 缁旑垰褰涚槐銏犵穿
-     * @param {boolean} isOutput - 鏄惁鏄緭鍑虹鍙?
-     * @returns {{x: number, y: number}} 缁旑垰褰涢崸鎰垼
+     * Get the absolute position of a node port on the canvas.
+     * @param {string} nodeId - Node id
+     * @param {number} portIndex - Port index
+     * @param {boolean} isOutput - Whether the port is an output port
+     * @returns {{x: number, y: number}} Port position
      */
     getPortPosition(nodeId, portIndex, isOutput) {
         const node = this.nodes.get(nodeId);
@@ -1041,8 +1041,8 @@ class FlowCanvas {
 
     /**
      * 濡偓濞村绱堕弽鍥︾秴缂冾喗妲搁崥锕€婀粩顖氬經娑?
-     * @param {number} x - 榧犳爣X鍧愭爣锛堜笘鐣屽潗鏍囷級
-     * @param {number} y - 榧犳爣Y鍧愭爣锛堜笘鐣屽潗鏍囷級
+     * Encoding cleanup: previous comment text was unreadable.
+     * Encoding cleanup: previous comment text was unreadable.
      * @returns {{nodeId: string, portIndex: number, isOutput: boolean}|null}
      */
     getPortAt(x, y) {
@@ -1081,17 +1081,17 @@ class FlowCanvas {
     }
 
     /**
-     * 閼惧嘲褰囬幐鍥х暰缁旑垰褰涙稉濠勬畱鏉╃偞甯撮敍鍦?1) 閺屻儲澹橀敍?
-     * @param {string} nodeId - 閼哄倻鍋D
-     * @param {number} portIndex - 缁旑垰褰涚槐銏犵穿
-     * @param {boolean} isOutput - 鏄惁鏄緭鍑虹鍙?
-     * @returns {Object|null} 鏉╃偞甯寸€电钖勯幋鏉梪ll
+     * Find port metadata for a node port.
+     * @param {string} nodeId - Node id
+     * @param {number} portIndex - Port index
+     * @param {boolean} isOutput - Whether the port is an output port
+     * @returns {Object|null} Port metadata
      */
     getConnectionAtPort(nodeId, portIndex, isOutput) {
         if (isOutput) {
             const set = this._connectionsByOutputPort.get(portKey(nodeId, portIndex));
             if (!set || set.size === 0) return null;
-            // 杈撳嚭绔彛鍙兘鏈夊鏉¤繛鎺ワ紝杩斿洖绗竴鏉?
+            // Encoding cleanup: previous comment text was unreadable.
             return set.values().next().value;
         }
         return this._connectionByInputPort.get(portKey(nodeId, portIndex)) || null;
@@ -1247,7 +1247,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鏉╃偟鍤庨弮鍫曠彯娴滎喖鍚嬬€瑰湱娈戠粩顖氬經
+     * Encoding cleanup: previous comment text was unreadable.
      */
     highlightCompatiblePorts() {
         if (!this.isConnecting || !this.connectingFrom) return;
@@ -1284,7 +1284,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鍒犻櫎杩炴帴
+     * Encoding cleanup: previous comment text was unreadable.
      * @param {string} connectionId - 鏉╃偞甯碔D
      */
     removeConnection(connectionId) {
@@ -1316,7 +1316,7 @@ class FlowCanvas {
 
         if (!startPos) return;
 
-        // 銆愭柊澧炪€戣繛绾挎椂楂樹寒鍏煎绔彛
+        // Encoding cleanup: previous comment text was unreadable.
         this.highlightCompatiblePorts();
 
         const endX = (this.mousePosition.x - this.offset.x) * this.scale;
@@ -1504,7 +1504,7 @@ class FlowCanvas {
 
     /**
      * 鐠囬攱鐪伴柌宥囩帛閿涙碍鐖ｇ拋鎵暰鐢啩璐熼懘蹇ョ礉楠炴儼鐨熸惔锔跨濞?RAF閵?
-     * 鏉╂瑦妲搁弬棰佸敩閻焦甯归懡鎰▏閻劎娈戦崗銉ュ經閿涙硜ender() 娣囨繄鏆€娑撳搫鍚嬬€圭懓鍩嗛崥宥冣偓?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     invalidate() {
         this._dirty = true;
@@ -1513,7 +1513,7 @@ class FlowCanvas {
 
     /**
      * 閸忕厧顔愰崗銉ュ經閿涙氨鐡戞禒铚傜艾 invalidate()閵?
-     * 鍘嗗彶璋冪敤澶ч噺 `this.render()`锛屼繚鐣欒涔変笉鍙橈紙璇锋眰涓€娆￠噸缁橈級锛?
+     * Encoding cleanup: previous comment text was unreadable.
      * 娴ｅ棔绗夐崘宥呭灡瀵ょ儤妫ら梽鎰儕閻滎垬鈧?
      */
     render() {
@@ -1531,7 +1531,7 @@ class FlowCanvas {
     }
 
     /**
-     * 褰撳墠甯ф槸鍚﹂渶瑕佹寔缁姩鐢伙紙杩炵嚎鎷栨嫿銆佹椿璺冩暟鎹祦绮掑瓙銆佽繍琛屼腑鑺傜偣绛夛級銆?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     _hasAnimation() {
         if (this.isConnecting) return true;
@@ -1563,7 +1563,7 @@ class FlowCanvas {
     }
 
     /**
-     * 瑙嗗彛瑁佸壀锛氬垽鏂繛鎺ユ槸鍚﹁嚦灏戞湁涓€涓鐐瑰湪鍙鍖哄煙鍐呫€?
+     * Encoding cleanup: previous comment text was unreadable.
      * @private
      */
     _isConnectionVisible(conn) {
@@ -1621,7 +1621,7 @@ class FlowCanvas {
 
         this._dirty = false;
 
-        // 濡傛灉鏈夋椿鍔ㄥ姩鐢伙紝缁х画 RAF锛涘惁鍒欑瓑寰呬笅涓€娆?invalidate()
+        // Encoding cleanup: previous comment text was unreadable.
         if (this._hasAnimation()) {
             this._scheduleFrame();
         } else {
@@ -1630,7 +1630,7 @@ class FlowCanvas {
     }
 
     /**
-     * 瑙勮寖鍖栫鍙ｇ被鍨嬶紝纭繚鍏剁鍚堝悗绔灇涓惧悕绉?(PascalCase)
+     * Encoding cleanup: previous comment text was unreadable.
      */
     normalizePortType(type) {
         if (!type) return 'Any';
@@ -1658,7 +1658,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鎼村繐鍨崠鏍ㄧウ缁嬪鏆熼幑?- 闁倿鍘ら崥搴ｎ伂 DTO (camelCase)
+     * Encoding cleanup: previous comment text was unreadable.
      * 閸氬海顏?Program.cs 闁板秶鐤?JsonNamingPolicy.CamelCase閿涘本澧嶆禒銉ョ箑妞よ濞囬悽銊ョ毈妞圭厧鍢?
      */
     serialize() {
@@ -1681,7 +1681,7 @@ class FlowCanvas {
             }
         }
 
-        // 閺嬪嫬缂?Operators 閸掓銆?(camelCase)
+        // Encoding cleanup: previous comment text was unreadable.
         const operators = Array.from(this.nodes.values()).map(node => ({
             id: node.id,
             name: node.title,
@@ -1718,7 +1718,7 @@ class FlowCanvas {
             isEnabled: node.disabled !== true
         }));
 
-        // 閺嬪嫬缂?Connections 閸掓銆?(camelCase)
+        // Encoding cleanup: previous comment text was unreadable.
         const debug = flowDebugEnabled();
         if (debug) {
             console.log('[FlowCanvas serialize] === START ===');
@@ -1766,7 +1766,7 @@ class FlowCanvas {
                     console.warn(`[FlowCanvas serialize] Invalid target port index ${conn.targetPort}, input count ${targetNode?.inputs?.length || 0}`);
                 }
 
-                // 銆愪慨澶嶃€戝鏋滄棤娉曡幏鍙栫鍙D锛岃烦杩囨杩炴帴鑰屼笉鏄敓鎴愰敊璇殑UUID
+                // Encoding cleanup: previous comment text was unreadable.
                 if (!sourcePortId || !targetPortId) {
                     if (debug) {
                         console.warn(`[FlowCanvas serialize] Skipping connection with missing port ids: sourcePortId=${sourcePortId}, targetPortId=${targetPortId}`);
@@ -2154,7 +2154,7 @@ class FlowCanvas {
         e.preventDefault();
         
         const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        // 鐠嬪啯鏆ｇ紓鈺傛杹閼煎啫娲块敍?.2 (20%) - 2.0 (200%) - 閻劍鍩涢崣宥夘洯缂傗晜鏂佹潻鍥х毈娑撳秵鏌熸笟鍨暰娴?
+        // Encoding cleanup: previous comment text was unreadable.
         const newScale = Math.max(0.2, Math.min(2.0, this.scale * delta));
         
         if (newScale !== this.scale) {
@@ -2176,8 +2176,8 @@ class FlowCanvas {
      */
     /**
      * 濡偓濞村绱堕弽鍥︾秴缂冾喗妲搁崥锕€婀潻鐐村复缁惧じ绗?
-     * @param {number} x - 榧犳爣X鍧愭爣锛堜笘鐣屽潗鏍囷級
-     * @param {number} y - 榧犳爣Y鍧愭爣锛堜笘鐣屽潗鏍囷級
+     * Encoding cleanup: previous comment text was unreadable.
+     * Encoding cleanup: previous comment text was unreadable.
      * @param {Object} connection - 鏉╃偞甯寸痪鍨嚠鐠?
      * @returns {boolean}
      */
@@ -2221,9 +2221,9 @@ class FlowCanvas {
     }
 
     /**
-     * 鑾峰彇榧犳爣浣嶇疆涓嬬殑杩炴帴绾?
-     * @param {number} x - 榧犳爣X鍧愭爣锛堜笘鐣屽潗鏍囷級
-     * @param {number} y - 榧犳爣Y鍧愭爣锛堜笘鐣屽潗鏍囷級
+     * Encoding cleanup: previous comment text was unreadable.
+     * Encoding cleanup: previous comment text was unreadable.
+     * Encoding cleanup: previous comment text was unreadable.
      * @returns {Object|null}
      */
     getConnectionAt(x, y) {
@@ -2271,7 +2271,7 @@ class FlowCanvas {
     }
 
     /**
-     * 閲嶇疆鎵€鏈夎妭鐐圭姸鎬?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     resetAllStatus() {
         let changed = false;
@@ -2591,7 +2591,7 @@ class FlowCanvas {
     }
 
     // ==========================================================================
-    // 闃舵鍥涘寮猴細灏忓湴鍥惧姛鑳?
+    // Encoding cleanup: previous comment text was unreadable.
     // ==========================================================================
 
     /**
@@ -2702,7 +2702,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鏇存柊娓叉煋寰幆浠ュ寘鍚皬鍦板浘
+     * Resize the minimap canvas to match current bounds.
      */
     resizeMinimapCanvas() {
         if (!this.minimapCanvas) {

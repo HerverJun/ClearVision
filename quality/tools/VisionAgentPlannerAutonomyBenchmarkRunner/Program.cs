@@ -250,7 +250,9 @@ internal static class VisionAgentPlannerAutonomyBenchmark
     {
         if (loopResult != null)
         {
-            return loopResult.ToolTrace;
+            return loopResult.ToolTrace
+                .Select(NormalizeTrace)
+                .ToList();
         }
 
         return source.PlannedToolCalls
@@ -269,6 +271,14 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 }
             })
             .ToList();
+    }
+
+    private static VisionAgentToolTrace NormalizeTrace(VisionAgentToolTrace trace)
+    {
+        return trace with
+        {
+            DurationMs = 0
+        };
     }
 
     private static IReadOnlyList<VisionAgentPendingAction> BuildPendingActions(

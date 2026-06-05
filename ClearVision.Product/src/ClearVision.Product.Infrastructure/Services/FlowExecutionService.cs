@@ -1,6 +1,6 @@
 // FlowExecutionService.cs
 // 流程执行服务实现
-// 浣滆€咃細铇呰姕鍚?
+// Encoding cleanup: previous comment text was unreadable.
 
 using System.Collections;
 using System.Collections.Concurrent;
@@ -76,7 +76,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _executionCancellations = new();
     private readonly IVariableContext _variableContext;
 
-    // 璋冭瘯妯″紡锛氱紦瀛樹腑闂寸粨鏋?- Key: (DebugSessionId, OperatorId)
+    // Encoding cleanup: previous comment text was unreadable.
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), Dictionary<string, object>> _debugCache = new();
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), string> _debugCacheFingerprints = new();
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), long> _debugCacheEntrySizes = new();
@@ -497,7 +497,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             Guid.NewGuid(),
             enableParallel ? "parallel-flow-run" : "sequential-flow-run"));
 
-        // 銆愮涓変紭鍏堢骇銆戦€掑寰幆璁℃暟鍣?
+        // Encoding cleanup: previous comment text was unreadable.
         _variableContext.IncrementCycleCount();
         _logger.LogDebug("[FlowExecution] 寰幆璁℃暟: {CycleCount}", _variableContext.CycleCount);
 
@@ -512,7 +512,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         try
         {
-            // Sprint 1 Task 1.1: 棰勫垎鏋愭墖鍑哄害锛屼负 ImageWrapper 寮曠敤璁℃暟鍋氬噯澶?
+            // Encoding cleanup: previous comment text was unreadable.
             var plan = GetFlowExecutionPlan(flow);
 
             // 获取执行顺序（拓扑排序）
@@ -553,7 +553,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             stopwatch.Stop();
             result.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
 
-            // 妫€鏌ユ槸鍚﹀洜涓哄彇娑堣€屼腑鏂?
+            // Check whether execution was canceled.
             if (cts.Token.IsCancellationRequested)
             {
                 result.IsSuccess = false;
@@ -639,7 +639,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         int completedCount = 0;
         foreach (var op in executionOrder)
         {
-            // 妫€鏌ュ彇娑?
+            // Check cancellation before the next operator.
             if (cancellationToken.IsCancellationRequested)
             {
                 break;
@@ -732,7 +732,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             using var layerCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             OperatorExecutionResult? primaryLayerFailure = null;
 
-            // 骞惰鎵ц褰撳墠灞傜殑鎵€鏈夌畻瀛?
+            // Encoding cleanup: previous comment text was unreadable.
             var layerTasks = layer.Select(op => ExecuteParallelLayerOperatorAsync(
                 plan,
                 op,
@@ -746,7 +746,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             var layerResults = await Task.WhenAll(layerTasks);
             result.OperatorResults.AddRange(layerResults);
 
-            // 妫€鏌ユ槸鍚︽湁澶辫触鐨勭畻瀛?
+            // Stop parallel execution when any operator failed.
             if (layerResults.Any(r => !r.IsSuccess))
             {
                 failed = true;
@@ -916,11 +916,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         return layers;
     }
 
-    // 榛樿绠楀瓙鎵ц瓒呮椂鏃堕棿锛?0绉掞級
+    // Encoding cleanup: previous comment text was unreadable.
     private const int DefaultOperatorTimeoutMs = 30000;
 
     /// <summary>
-    /// 鍐呴儴鎵ц鍗曚釜绠楀瓙锛堝甫瓒呮椂淇濇姢锛?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     private async Task<OperatorExecutionResult> ExecuteOperatorInternalAsync(
         Operator op,
@@ -937,7 +937,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(DefaultOperatorTimeoutMs));
 
-            // O1.3: 浼犻€?CancellationToken 缁欑畻瀛愭墽琛屽櫒锛屾敮鎸佸彇娑堟搷浣?
+            // Encoding cleanup: previous comment text was unreadable.
             var opResult = await executor.ExecuteAsync(op, inputs, timeoutCts.Token);
             opStopwatch.Stop();
 
@@ -1049,10 +1049,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     {
         var result = new FlowValidationResult();
 
-        // 妫€鏌ユ槸鍚︽湁绠楀瓙
+        // Validate that the flow contains operators.
         if (flow.Operators.Count == 0)
         {
-            result.Errors.Add("流程中没有任何算子");
+            result.Errors.Add("Flow does not contain any operators.");
             return result;
         }
 
@@ -1125,7 +1125,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
             catch (ObjectDisposedException)
             {
-                // 蹇界暐宸查噴鏀剧殑瀵硅薄寮傚父
+                // Encoding cleanup: previous comment text was unreadable.
             }
         }
 
@@ -1139,8 +1139,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    /// 瑙勮寖鍖栨祦绋嬭緭鍑猴紝閬垮厤灏?OpenCvSharp.Mat 绛夐潪 JSON 瀹夊叏瀵硅薄鐩存帴鏆撮湶鍒颁笂灞傘€?
-    /// 鍥惧儚绫诲瀷浼氳蹇収鍖栦负 byte[]锛屽洜姝や笂灞備笉鑳藉亣璁剧粨鏋滀粛鐒舵槸 live Mat銆?
+    // Encoding cleanup: previous comment text was unreadable.
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     private Dictionary<string, object> ConvertImageWrappersToBytes(Dictionary<string, object>? outputData)
     {
@@ -1379,7 +1379,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     #region Sprint 1 Task 1.1: 扇出预分析与引用计数管理
 
     /// <summary>
-    /// 棰勫垎鏋?DAG 涓瘡涓緭鍑虹鍙ｇ殑鎵囧嚭搴︼紙涓嬫父杩炴帴鏁帮級銆?
+    // Encoding cleanup: previous comment text was unreadable.
     /// 鐢ㄤ簬鍐冲畾 ImageWrapper 鐨勫紩鐢ㄨ鏁板垵濮嬪€笺€?
     /// </summary>
     private static Dictionary<(Guid OperatorId, Guid PortId), int> AnalyzeFanOutDegrees(
@@ -1404,8 +1404,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    /// 鏍规嵁鎵囧嚭搴︿负绠楀瓙杈撳嚭鐨?ImageWrapper 璁剧疆寮曠敤璁℃暟銆?
-    /// 鎵囧嚭搴︿负 N 鏃讹紝AddRef (N-1) 娆★紝浣挎€诲紩鐢ㄨ鏁颁负 N銆?
+    // Encoding cleanup: previous comment text was unreadable.
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     private void ApplyFanOutRefCounts(
         Operator op,
@@ -1429,7 +1429,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 ? fanOutDegrees.GetValueOrDefault((op.Id, port.Id), 1)
                 : 1;
 
-            // 寮曠敤璁℃暟鍒濆涓?1锛屾瘡澶氫竴涓笅娓告秷璐硅€?AddRef 涓€娆?
+            // Encoding cleanup: previous comment text was unreadable.
             for (int i = 1; i < fanOut; i++)
             {
                 img.AddRef();
@@ -1506,8 +1506,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         var inputs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         inputPreparationIndex ??= BuildFlowInputPreparationIndex(flow);
 
-        // 1. 銆愬熀纭€娉ㄥ叆銆戦鍏堝皢绠楀瓙鑷韩鐨勫弬鏁板悎骞跺埌杈撳叆涓綔涓洪粯璁ゅ€笺€?
-        // 杩欑‘淇濅簡濡傛灉娌℃湁澶栭儴杩炵嚎锛岀畻瀛愪緷鐒惰兘鎷垮埌 UI 灞炴€ч潰鏉胯缃殑鍙傛暟锛堜緥濡?filePath锛夈€?
+        // Encoding cleanup: previous comment text was unreadable.
+        // Encoding cleanup: previous comment text was unreadable.
         foreach (var param in op.Parameters)
         {
             if (param.Value != null)
@@ -1516,7 +1516,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
         }
 
-        // 鏌ユ壘杩炴帴鍒拌绠楀瓙鐨勬墍鏈夎繛绾?
+        // Encoding cleanup: previous comment text was unreadable.
         var incomingConnections = inputPreparationIndex.GetIncomingConnections(op.Id);
 
         // 如果没有输入连接，尝试从初始输入数据获取 (Guid.Empty)
@@ -1540,19 +1540,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             {
                 if (operatorOutputs.TryGetValue(connection.SourceOperatorId, out var sourceOutputs))
                 {
-                    // 銆愭潯浠跺垎鏀矾鐢变慨澶嶃€戞鏌ユ簮绠楀瓙鏄惁涓烘潯浠跺垎鏀畻瀛?
+                    // Encoding cleanup: previous comment text was unreadable.
                     var sourceOperator = inputPreparationIndex.GetSourceOperator(connection.SourceOperatorId);
 
                     if (sourceOperator?.Type == OperatorType.ConditionalBranch)
                     {
-                        // 瀵逛簬鏉′欢鍒嗘敮绠楀瓙锛屽彧浼犻€掍笌杩炴帴绔彛鍚嶇О鍖归厤鐨勬暟鎹?
-                        // 鑾峰彇婧愮鍙ｅ悕绉帮紙True / False锛?
+                        // Encoding cleanup: previous comment text was unreadable.
+                        // Encoding cleanup: previous comment text was unreadable.
                         var sourcePort = inputPreparationIndex.GetSourcePort(connection.SourceOperatorId, connection.SourcePortId);
                         if (sourcePort != null)
                         {
                             var portName = sourcePort.Name;
                             var targetPort = inputPreparationIndex.GetTargetPort(op.Id, connection.TargetPortId);
-                            // 妫€鏌ヨ緭鍑烘暟鎹腑鏄惁鏈夊搴旂鍙ｇ殑鏁版嵁涓斾笉涓簄ull
+                            // Forward source output data only when the source port produced a non-null value.
                             if (sourceOutputs.TryGetValue(portName, out var portData) && portData != null)
                             {
                                 if (targetPort != null)
@@ -1564,7 +1564,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 {
                                     inputs[portName] = portData;
                                 }
-                                // 鍚屾椂浼犻€掑垽鏂粨鏋滅瓑閫氱敤淇℃伅
+                                // Encoding cleanup: previous comment text was unreadable.
                                 if (sourceOutputs.TryGetValue("Result", out var result))
                                     inputs["ConditionResult"] = result;
                                 if (sourceOutputs.TryGetValue("Condition", out var condition))
@@ -1572,15 +1572,15 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 if (sourceOutputs.TryGetValue("ActualValue", out var actualValue))
                                     inputs["ActualValue"] = actualValue;
                             }
-                            // 濡傛灉绔彛鏁版嵁涓?null锛岃鏄庢潯浠跺垎鏀蛋鐨勬槸鍙︿竴鍒嗘敮锛屼笉浼犻€掍换浣曟暟鎹?
+                            // Encoding cleanup: previous comment text was unreadable.
                         }
                     }
                     else
                     {
-                        // 鏅€氱畻瀛愶細鎵ц澧炲己鐨勭鍙ｆ槧灏勯€昏緫
+                        // Encoding cleanup: previous comment text was unreadable.
 
-                        // 灏濊瘯鑾峰彇杩炵嚎涓ょ鐨勭鍙ｅ畾涔?
-                        // 娉ㄦ剰锛歋ourceOperator 鍙兘涓嶅湪褰撳墠涓婁笅鏂囷紙铏界劧涓嶅お鍙兘锛夛紝浣嗘垜浠闃插尽鎬х紪绋?
+                        // Encoding cleanup: previous comment text was unreadable.
+                        // Encoding cleanup: previous comment text was unreadable.
                         Port? sourcePort = null;
                         Port? targetPort = null;
                         if (sourceOperator != null)
@@ -1591,19 +1591,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                             // 【Bug 4 修复】基于端口名称的精确映射
                             if (sourcePort != null && targetPort != null)
                             {
-                                // 灏濊瘯浠庢簮杈撳嚭涓幏鍙栦笌婧愮鍙ｅ悕鍖归厤鐨勬暟鎹?
+                                // Encoding cleanup: previous comment text was unreadable.
                                 if (sourceOutputs.TryGetValue(sourcePort.Name, out var data))
                                 {
-                                    // 灏嗘暟鎹槧灏勫埌鐩爣绔彛
+                                    // Encoding cleanup: previous comment text was unreadable.
                                     // 例如：源输出 "Image" -> 目标输入 "Background"
                                     inputs[targetPort.Name] = data;
                                 }
                             }
                         }
 
-                        // 銆愬吋瀹规€у厹搴曘€?
-                        // 濡傛灉娌℃湁閫氳繃绔彛鎴愬姛鏄犲皠锛堝彲鑳芥槸鏃х増鏁版嵁銆佺鍙ｅ悕鏈畾涔夈€佹垨鏃ㄥ湪浼犻€掗殣寮忔暟鎹級
-                        // 鎴栬€呬负浜嗗悜鍚庡吋瀹癸紙闃叉鏌愪簺鏈蛋绔彛瀹氫箟鐨勯殣寮忔暟鎹涪澶憋紝閬垮厤 ResultOutput 鎵€闇€鐨勯澶栦俊鎭己澶憋級
+                        // Encoding cleanup: previous comment text was unreadable.
+                        // Encoding cleanup: previous comment text was unreadable.
+                        // Encoding cleanup: previous comment text was unreadable.
                         // 我们依然执行全量合并，但跳过已存在的键（避免覆盖精确映射的结果）
                         foreach (var kvp in sourceOutputs)
                         {
@@ -1721,7 +1721,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     #region 调试功能实现
 
     /// <summary>
-    /// 璋冭瘯鎵ц娴佺▼ - 鏀寔鏂偣鍜屽崟姝ユ墽琛?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     public async Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(
         OperatorFlow flow,
@@ -1772,19 +1772,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 operatorOutputs[Guid.Empty] = inputData;
             }
 
-            // 椤哄簭鎵ц锛堣皟璇曟ā寮忎笉鏀寔骞惰锛?
+            // Encoding cleanup: previous comment text was unreadable.
             int completedCount = 0;
             Guid? pausedOperatorId = null;
 
             foreach (var op in executionOrder)
             {
-                // 妫€鏌ュ彇娑?
+                // Check cancellation before the next operator.
                 if (cts.Token.IsCancellationRequested)
                 {
                     break;
                 }
 
-                // 妫€鏌ユ槸鍚﹀懡涓柇鐐?
+                // Check whether this operator is a breakpoint.
                 if (options.Breakpoints.Contains(op.Id))
                 {
                     pausedOperatorId = op.Id;
@@ -1794,7 +1794,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
                     if (options.StepMode)
                     {
-                        // 鍗曟妯″紡锛氭殏鍋滄墽琛?
+                        // Encoding cleanup: previous comment text was unreadable.
                         break;
                     }
                 }
@@ -1883,7 +1883,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     {
                         pausedOperatorId = op.Id;
                         result.PausedOperatorId = pausedOperatorId;
-                        _logger.LogInformation("[璋冭瘯] 澶嶇敤缂撳瓨骞跺仠鍦ㄦ柇鐐圭畻瀛? {OperatorName} ({OperatorId})", op.Name, op.Id);
+                        _logger.LogInformation("[Debug] Reused cached output and paused at breakpoint operator {OperatorName} ({OperatorId})", op.Name, op.Id);
                         break;
                     }
 
@@ -1927,7 +1927,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 operatorOutputs[op.Id] = outputs;
                 ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
 
-                // 璋冭瘯妯″紡锛氱紦瀛樹腑闂寸粨鏋?
+                // Encoding cleanup: previous comment text was unreadable.
                 if (options.EnableIntermediateCache && normalizedOutputData.Count > 0)
                 {
                     SetDebugCacheEntry(cacheKey, normalizedOutputData, cacheFingerprint!);
@@ -1956,7 +1956,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             stopwatch.Stop();
             result.ExecutionTimeMs = stopwatch.ElapsedMilliseconds;
 
-            // 妫€鏌ユ槸鍚﹀洜涓哄彇娑堣€屼腑鏂?
+            // Check whether execution was canceled.
             if (cts.Token.IsCancellationRequested)
             {
                 result.IsSuccess = false;
@@ -2040,7 +2040,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     /// </summary>
     public Task ClearDebugCacheAsync(Guid debugSessionId)
     {
-        // 娓呴櫎璇ヤ細璇濈殑鎵€鏈夌紦瀛?
+        // Encoding cleanup: previous comment text was unreadable.
         lock (_debugCacheEvictionGate)
         {
             var keysToRemove = _debugCache.Keys.Where(k => k.DebugSessionId == debugSessionId).ToList();

@@ -60,7 +60,7 @@ window.addEventListener('unhandledrejection', function(event) {
 debugLogger.debug(`[App] ${t('app.startingImports', 'Starting module imports')}...`);
 
 // ============================================
-// 璁よ瘉妫€鏌?- 鏈櫥褰曞垯璺宠浆
+// Auth session bootstrap
 // ============================================
 import { bootstrapAuthSession, logout } from './features/auth/auth.js';
 
@@ -106,7 +106,7 @@ function trackedSubscribe(subscribeFn, callback) {
     return unsubscribe;
 }
 
-// 缁勪欢瀹炰緥
+// Encoding cleanup: previous comment text was unreadable.
 let imageViewer = null;
 let operatorLibraryPanel = null;
 let flowCanvas = null;
@@ -177,7 +177,7 @@ function isInspectionActiveForBackgroundWork() {
 }
 let aiPanelModulePromise = null;
 
-// 鏈満鑽夌澶囦唤瀹氭椂鍣?
+// Encoding cleanup: previous comment text was unreadable.
 let autoSaveInterval = null;
 const AUTO_SAVE_DELAY = 5 * 60 * 1000;
 const LOCAL_DRAFT_BACKUP_KEY = 'cv_autosave_backup';
@@ -1778,18 +1778,18 @@ function startAutoSave() {
 }
 
 /**
- * 銆愰樁娈礏-B4銆戝仠姝㈡湰鏈鸿崏绋垮浠?
+ * Encoding cleanup: previous comment text was unreadable.
  */
 function stopAutoSave() {
     if (autoSaveInterval) {
         clearInterval(autoSaveInterval);
         autoSaveInterval = null;
-        debugLogger.debug('[LocalDraftBackup] 鏈満鑽夌澶囦唤宸插仠姝?');
+        debugLogger.debug('[LocalDraftBackup] Local draft backup event.');
     }
 }
 
 /**
- * 銆愰樁娈礏-B4銆戠珛鍗虫墽琛屾湰鏈鸿崏绋垮浠?
+ * Encoding cleanup: previous comment text was unreadable.
  */
 async function triggerAutoSave() {
     const project = getCurrentProject();
@@ -2078,7 +2078,7 @@ function showProjectExportDialog() {
 }
 
 /**
- * 銆愪慨澶嶃€戞牴鎹畻瀛愮被鍨嬫煡鎵剧畻瀛愬簱涓殑瀹氫箟鏁版嵁
+ * Encoding cleanup: previous comment text was unreadable.
  * @param {string} type - 算子类型
  * @returns {Object|null} 算子定义数据
  */
@@ -2089,16 +2089,16 @@ function findOperatorDefinition(type) {
 }
 
 /**
- * 銆愪慨澶嶃€戝悎骞跺弬鏁板畾涔変笌鍙傛暟鍊?
- * @param {Array} defParams - 绠楀瓙搴撲腑鐨勫弬鏁板畾涔夛紙鍩哄噯锛?
+ * Encoding cleanup: previous comment text was unreadable.
+ * Encoding cleanup: previous comment text was unreadable.
  * @param {Array} nodeParams - 鐢诲竷鑺傜偣淇濆瓨鐨勫弬鏁板€?
- * @returns {Array} 鍚堝苟鍚庣殑鍙傛暟鍒楄〃
+ * Encoding cleanup: previous comment text was unreadable.
  */
 function mergeParameters(defParams, nodeParams) {
     if (!defParams || defParams.length === 0) return nodeParams || [];
     
     return defParams.map(defP => {
-        // [淇] 涓嶅尯鍒嗗ぇ灏忓啓鍖归厤锛岃В鍐冲墠绔?(camelCase) 涓庡悗绔?(PascalCase) 鐨勫樊寮?
+        // Encoding cleanup: previous comment text was unreadable.
         const nodeP = (nodeParams || []).find(np => 
             (np.name && defP.name && np.name.toLowerCase() === defP.name.toLowerCase()) ||
             (np.Name && defP.name && np.Name.toLowerCase() === defP.name.toLowerCase())
@@ -2116,7 +2116,7 @@ function mergeParameters(defParams, nodeParams) {
 
 /**
  * 【阶段B-B5】从JSON文件导入工程
- * @param {File} file - 鐢ㄦ埛閫夋嫨鐨勬枃浠?
+ * Encoding cleanup: previous comment text was unreadable.
  */
 async function importProjectFromJson(file) {
     if (!file) return;
@@ -2134,7 +2134,7 @@ async function importProjectFromJson(file) {
         const confirmed = confirm(`确定要导入工程 "${importData.project.name || '未命名'}" 吗？\n如果当前工程有未保存的更改，系统会先询问是否保存。`);
         if (!confirmed) return;
         
-        // 閫氳繃 projectManager 鍒涘缓鏂板伐绋嬶紙鐢卞悗绔敓鎴?ID锛?
+        // Encoding cleanup: previous comment text was unreadable.
         const importName = (importData.project.name || '未命名') + ' (导入)';
         const importDesc = importData.project.description || '';
         const project = await projectManager.createProject(importName, importDesc);
@@ -2142,15 +2142,15 @@ async function importProjectFromJson(file) {
         // 鍔犺浇娴佺▼鍒扮敾甯?
         if (flowCanvas && importData.project.flow) {
             withProjectFlowSyncSuppressed(() => flowCanvas.deserialize(importData.project.flow));
-            // 灏嗘祦绋嬫暟鎹繚瀛樺埌鍚庣
+            // Refresh project flow after import.
             projectManager.updateFlow(flowCanvas.serialize());
             await projectManager.saveProject(projectManager.getCurrentProject?.() || project);
         }
         
-        // 璁剧疆妫€娴嬫帶鍒跺櫒鐨勫伐绋?
+        // Bind the inspection controller to the current project.
         inspectionController.setProject(project.id);
         
-        // 鍒囨崲鍒版祦绋嬭鍥?
+        // Switch back to the flow editor.
         switchView('flow');
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.classList.remove('active');
@@ -2160,7 +2160,7 @@ async function importProjectFromJson(file) {
         showToast('工程导入成功', 'success');
         debugLogger.debug('[Import] 工程已导入', project.name);
         
-        // 鍒锋柊宸ョ▼鍒楄〃
+        // Encoding cleanup: previous comment text was unreadable.
         if (projectView) {
             projectView.refresh();
         }
@@ -2264,7 +2264,7 @@ function updateFPS() {
     }
 }
 
-// 鍚姩鐘舵€佹爮鏇存柊
+// Encoding cleanup: previous comment text was unreadable.
 function startStatusBarUpdates() {
     if (statusBarStarted) {
         return;
@@ -2289,11 +2289,11 @@ function startStatusBarUpdates() {
 }
 
 // ==========================================================================
-// 闃舵浜旓細瑙嗗浘鍒囨崲杩囨浮鍔ㄧ敾
+// Encoding cleanup: previous comment text was unreadable.
 // ==========================================================================
 
 /**
- * 鍒囨崲瑙嗗浘锛堝甫杩囨浮鍔ㄧ敾锛?
+ * Encoding cleanup: previous comment text was unreadable.
  */
 function switchViewWithTransition(view) {
     const views = ['flow', 'inspection', 'results', 'project'];
@@ -2307,7 +2307,7 @@ function switchViewWithTransition(view) {
                             document.getElementById('flow-editor');
     
     if (currentContainer) {
-        // 娣诲姞閫€鍑哄姩鐢?
+        // Encoding cleanup: previous comment text was unreadable.
         currentContainer.classList.add('view-exit');
         
         setTimeout(() => {

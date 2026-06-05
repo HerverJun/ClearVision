@@ -1,6 +1,6 @@
 // OperatorBase.cs
 // 绠楀瓙鎵ц鍣ㄦ娊璞″熀绫?- 鎻愪緵缁熶竴鐨勫弬鏁拌幏鍙栥€佽緭鍏ユ鏌ャ€佹棩蹇楄褰曞拰鎵ц璁℃椂鍔熻兘
-// 浣滆€咃細铇呰姕鍚?
+// Encoding cleanup: previous comment text was unreadable.
 
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -42,7 +42,7 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 鎵ц绠楀瓙锛堝寘瑁呮柟娉曪紝鎻愪緵缁熶竴鐨勮鏃跺拰鏃ュ織锛?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     /// <param name="operator">算子实体</param>
     /// <param name="inputs">杈撳叆鏁版嵁</param>
@@ -53,28 +53,28 @@ public abstract class OperatorBase : IOperatorExecutor
         Dictionary<string, object>? inputs = null,
         CancellationToken cancellationToken = default)
     {
-        // Sprint 1 Task 1.1: 浣跨敤甯︾敓鍛藉懆鏈熺鐞嗙殑鏂规硶
+        // Encoding cleanup: previous comment text was unreadable.
         return await ExecuteWithLifecycleAsync(@operator, inputs, cancellationToken);
     }
 
     /// <summary>
-    /// 鎵ц绠楀瓙锛堝甫鐢熷懡鍛ㄦ湡绠＄悊 - Sprint 1 Task 1.1锛夈€?
+    // Encoding cleanup: previous comment text was unreadable.
     /// 
-    /// 自动管理 ImageWrapper 的引用计数：
-    /// 1. 执行前：输入中的 ImageWrapper 引用计数已由上游 AddRef
-    /// 2. 鎵ц鍚庯細鑷姩 Release 鎵€鏈夎緭鍏ヤ腑鐨?ImageWrapper
+    /// Manages ImageWrapper reference counts automatically:
+    /// 1. Before execution, upstream inputs have already called AddRef.
+    /// 2. After execution, input references are released for ImageWrapper values.
     /// 
-    /// 绠楀瓙寮€鍙戠害瀹氾紙妗嗘灦灞傞€氳繃 Code Review 寮哄埗妫€鏌ワ級锛?
+    /// Operator development contract: framework-level code review enforces lifecycle rules.
     ///
-    /// 璇绘搷浣滐細image.MatReadOnly  鈥?涓嶈Е鍙?Clone/Pool锛屽骞跺彂瀹夊叏
+    /// Read-only example: use image.MatReadOnly; clone or pool only when mutation is needed.
     ///
-    /// 鍐欐搷浣滐細var dst = image.GetWritableMat(); // 鍙兘浠?Pool 鍙栵紙CoW锛?
-    ///          Cv2.SomeFilter(dst, dst, ...);    // 灏卞湴淇敼
-    ///          return new ImageWrapper(dst);     // 输出，引用计数重置为 1
-    ///          // 若不作为输出，需归还：MatPool.Shared.Return(dst)
+    /// Writable example: var dst = image.GetWritableMat(); // copy-on-write pool buffer.
+    ///          Cv2.SomeFilter(dst, dst, ...);    // Write into dst.
+    ///          return new ImageWrapper(dst);     // Output with reference count reset to 1.
+    ///          // If not returned as output, return dst to MatPool.Shared.
     ///
-    /// 绂佹鍦ㄧ畻瀛愬唴閮ㄦ墜鍔ㄨ皟鐢?AddRef() / Release()銆?
-    /// 绂佹鍦ㄧ畻瀛愬唴閮ㄧ洿鎺ヨ皟鐢?mat.Dispose()銆?
+    /// Do not call AddRef() / Release() manually inside operators.
+    /// Do not call mat.Dispose() directly inside operators.
     /// </summary>
     public async Task<OperatorExecutionOutput> ExecuteWithLifecycleAsync(
         Operator @operator,
@@ -87,7 +87,7 @@ public abstract class OperatorBase : IOperatorExecutor
 
         try
         {
-            // 妫€鏌ュ彇娑堣姹?
+            // Check cancellation before executing core logic.
             cancellationToken.ThrowIfCancellationRequested();
 
             // 执行核心逻辑
@@ -134,7 +134,7 @@ public abstract class OperatorBase : IOperatorExecutor
             // Sprint 1 Task 1.1: 閲婃斁杈撳叆涓殑 ImageWrapper 寮曠敤
             if (inputs != null)
             {
-                // 鍚屼竴涓?ImageWrapper 鍙兘浠ュ涓敭閫忎紶鍒颁笅娓革紱鎸夊紩鐢ㄥ幓閲嶅悗鍐?Release锛岄伩鍏嶅弻閲嶉噴鏀?
+                // Encoding cleanup: previous comment text was unreadable.
                 var releasedImages = new HashSet<ImageWrapper>(ReferenceEqualityComparer.Instance);
                 foreach (var value in inputs.Values)
                 {
@@ -169,11 +169,11 @@ public abstract class OperatorBase : IOperatorExecutor
     #region 鍙傛暟鑾峰彇鏂规硶
 
     /// <summary>
-    /// 鑾峰彇鍙傛暟鍊硷紙鏀寔绫诲瀷杞崲锛?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     /// <typeparam name="T">鐩爣绫诲瀷</typeparam>
     /// <param name="operator">算子实体</param>
-    /// <param name="paramName">鍙傛暟鍚嶇О</param>
+    // Encoding cleanup: previous comment text was unreadable.
     /// <param name="defaultValue">榛樿鍊?/param>
     /// <returns>鍙傛暟鍊?/returns>
     protected T GetParam<T>(Operator @operator, string paramName, T defaultValue)
@@ -206,12 +206,12 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 鑾峰彇鍙€夊弬鏁板€硷紙鍙兘涓?null锛?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
-    /// <typeparam name="T">鐩爣绫诲瀷</typeparam>
-    /// <param name="operator">算子实体</param>
-    /// <param name="paramName">鍙傛暟鍚嶇О</param>
-    /// <returns>鍙傛暟鍊硷紝涓嶅瓨鍦ㄦ椂杩斿洖 null</returns>
+    /// <typeparam name="T">Parameter value type</typeparam>
+    /// <param name="operator">Operator instance</param>
+    /// <param name="paramName">Parameter name</param>
+    /// <returns>Parameter value, or null when the parameter is absent.</returns>
     protected T? GetParamOrNull<T>(Operator @operator, string paramName) where T : struct
     {
         var param = FindParameter(@operator, paramName);
@@ -240,7 +240,7 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 鑾峰彇瀛楃涓插弬鏁?
     /// </summary>
     /// <param name="operator">算子实体</param>
-    /// <param name="paramName">鍙傛暟鍚嶇О</param>
+    // Encoding cleanup: previous comment text was unreadable.
     /// <param name="defaultValue">榛樿鍊?/param>
     /// <returns>鍙傛暟鍊?/returns>
     protected string GetStringParam(Operator @operator, string paramName, string defaultValue = "")
@@ -252,10 +252,10 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 鑾峰彇鏁村瀷鍙傛暟
     /// </summary>
     /// <param name="operator">算子实体</param>
-    /// <param name="paramName">鍙傛暟鍚嶇О</param>
+    // Encoding cleanup: previous comment text was unreadable.
     /// <param name="defaultValue">榛樿鍊?/param>
-    /// <param name="min">鏈€灏忓€?/param>
-    /// <param name="max">鏈€澶у€?/param>
+    // Encoding cleanup: previous comment text was unreadable.
+    // Encoding cleanup: previous comment text was unreadable.
     /// <returns>鍙傛暟鍊?/returns>
     protected int GetIntParam(Operator @operator, string paramName, int defaultValue, int? min = null, int? max = null)
     {
@@ -273,10 +273,10 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 鑾峰彇鍙岀簿搴︽诞鐐瑰弬鏁?
     /// </summary>
     /// <param name="operator">算子实体</param>
-    /// <param name="paramName">鍙傛暟鍚嶇О</param>
+    // Encoding cleanup: previous comment text was unreadable.
     /// <param name="defaultValue">榛樿鍊?/param>
-    /// <param name="min">鏈€灏忓€?/param>
-    /// <param name="max">鏈€澶у€?/param>
+    // Encoding cleanup: previous comment text was unreadable.
+    // Encoding cleanup: previous comment text was unreadable.
     /// <returns>鍙傛暟鍊?/returns>
     protected double GetDoubleParam(Operator @operator, string paramName, double defaultValue, double? min = null, double? max = null)
     {
@@ -294,10 +294,10 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 鑾峰彇鍗曠簿搴︽诞鐐瑰弬鏁?
     /// </summary>
     /// <param name="operator">算子实体</param>
-    /// <param name="paramName">鍙傛暟鍚嶇О</param>
+    // Encoding cleanup: previous comment text was unreadable.
     /// <param name="defaultValue">榛樿鍊?/param>
-    /// <param name="min">鏈€灏忓€?/param>
-    /// <param name="max">鏈€澶у€?/param>
+    // Encoding cleanup: previous comment text was unreadable.
+    // Encoding cleanup: previous comment text was unreadable.
     /// <returns>鍙傛暟鍊?/returns>
     protected float GetFloatParam(Operator @operator, string paramName, float defaultValue, float? min = null, float? max = null)
     {
@@ -315,7 +315,7 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 鑾峰彇甯冨皵鍙傛暟
     /// </summary>
     /// <param name="operator">算子实体</param>
-    /// <param name="paramName">鍙傛暟鍚嶇О</param>
+    // Encoding cleanup: previous comment text was unreadable.
     /// <param name="defaultValue">榛樿鍊?/param>
     /// <returns>鍙傛暟鍊?/returns>
     protected bool GetBoolParam(Operator @operator, string paramName, bool defaultValue)
@@ -328,8 +328,8 @@ public abstract class OperatorBase : IOperatorExecutor
     #region 杈撳叆澶勭悊鏂规硶
 
     /// <summary>
-    /// 灏濊瘯浠庤緭鍏ヤ腑鑾峰彇鍥惧儚鏁版嵁
-    /// 鏀寔 ImageWrapper銆乥yte[] 鎴?Mat 绫诲瀷
+    // Encoding cleanup: previous comment text was unreadable.
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     /// <param name="inputs">杈撳叆瀛楀吀</param>
     /// <param name="key">图像键名，默认为 "Image"</param>
@@ -369,7 +369,7 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 灏濊瘯浠庤緭鍏ヤ腑鑾峰彇鍥惧儚鏁版嵁锛堥粯璁ら敭鍚?"Image"锛?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     /// <param name="inputs">杈撳叆瀛楀吀</param>
     /// <param name="image">杈撳嚭鍥惧儚鍖呰鍣?/param>
@@ -418,7 +418,7 @@ public abstract class OperatorBase : IOperatorExecutor
     #region 杈撳嚭澶勭悊鏂规硶 (P0: ImageWrapper闆舵嫹璐濊緭鍑?
 
     /// <summary>
-    /// 鍒涘缓鍥惧儚杈撳嚭瀛楀吀 - 浣跨敤ImageWrapper瀹炵幇闆舵嫹璐濅紶閫?(P0浼樺厛绾?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     /// <param name="mat">杈撳嚭鍥惧儚Mat</param>
     /// <param name="additionalData">闄勫姞鏁版嵁</param>
@@ -478,10 +478,10 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 鍒涘缓鍥惧儚杈撳嚭瀛楀吀锛堝吋瀹规ā寮忥級- 鏀寔ImageWrapper鎴朾yte[] (P0浼樺厛绾?
+    // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     /// <param name="mat">杈撳嚭鍥惧儚Mat</param>
-    /// <param name="useZeroCopy">鏄惁浣跨敤闆舵嫹璐濓紙ImageWrapper锛?/param>
+    // Encoding cleanup: previous comment text was unreadable.
     /// <param name="additionalData">闄勫姞鏁版嵁</param>
     /// <returns>杈撳嚭瀛楀吀</returns>
     protected Dictionary<string, object> CreateImageOutput(Mat mat, bool useZeroCopy, Dictionary<string, object>? additionalData = null)
@@ -632,7 +632,7 @@ public abstract class OperatorBase : IOperatorExecutor
             if (targetType == typeof(long) || targetType == typeof(long?))
                 return (T?)(object)element.GetInt64();
 
-            // 鍏朵粬绫诲瀷灏濊瘯瀛楃涓茶浆鎹?
+            // Encoding cleanup: previous comment text was unreadable.
             return (T?)Convert.ChangeType(element.ToString(), targetType);
         }
         catch
@@ -642,12 +642,12 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 鍦ㄥ悗鍙扮嚎绋嬫墽琛?CPU 瀵嗛泦鍨嬫搷浣?
+    /// Runs CPU-bound work on a background thread.
     /// </summary>
-    /// <typeparam name="T">杩斿洖绫诲瀷</typeparam>
-    /// <param name="action">瑕佹墽琛岀殑鎿嶄綔</param>
-    /// <param name="cancellationToken">鍙栨秷浠ょ墝</param>
-    /// <returns>鎿嶄綔缁撴灉</returns>
+    /// <typeparam name="T">Return value type</typeparam>
+    /// <param name="action">CPU-bound action</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Action result</returns>
     protected Task<T> RunCpuBoundWork<T>(Func<T> action, CancellationToken cancellationToken)
     {
         return Task.Run(() =>
@@ -658,10 +658,10 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 鍦ㄥ悗鍙扮嚎绋嬫墽琛?CPU 瀵嗛泦鍨嬫搷浣滐紙鏃犺繑鍥炲€硷級
+    /// Runs CPU-bound work on a background thread without a return value.
     /// </summary>
-    /// <param name="action">瑕佹墽琛岀殑鎿嶄綔</param>
-    /// <param name="cancellationToken">鍙栨秷浠ょ墝</param>
+    /// <param name="action">CPU-bound action</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     protected Task RunCpuBoundWork(Action action, CancellationToken cancellationToken)
     {
         return Task.Run(() =>
