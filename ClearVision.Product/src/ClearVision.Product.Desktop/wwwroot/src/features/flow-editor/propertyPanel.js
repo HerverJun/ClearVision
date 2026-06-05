@@ -10,6 +10,12 @@ import RoiEditorPanel from './roiEditorPanel.js';
 import { resolvePreviewInputImageBase64 } from './previewCoordinator.js';
 import { buildWireSequenceFollowupHint, createWireSequenceParameterPatch } from './wireSequenceAssist.js';
 import { getOperatorRoiConfig } from './roiEditorSupport.mjs';
+import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
+import {
+    collectEffectiveRequiredParameterErrors,
+    getParameterEffectiveState,
+    normalizeAcquisitionSourceType
+} from '../../shared/parameterDependencyRules.js';
 
 function normalizeParameterName(name) {
     return String(name || '').trim().toLowerCase();
@@ -200,6 +206,7 @@ class PropertyPanel {
         // 兼容 title (画布节点) 和 displayName (算子库)
         const title = this.currentOperator.title || this.currentOperator.displayName || this.currentOperator.type;
         const { type, parameters = [], iconPath, icon } = this.currentOperator;
+        const typeDisplay = getOperatorTypeDisplayName(type, { includeType: true });
         const roiEditorConfig = getOperatorRoiConfig(this.currentOperator);
         const parametersForRender = type === 'ImageAcquisition'
             ? parameters.filter(param => !['exposuretime', 'gain', 'triggermode'].includes(String(param?.name || '').toLowerCase()))
@@ -215,7 +222,7 @@ class PropertyPanel {
                 ${iconHtml}
                 <div class="header-text">
                     <h4>${title}</h4>
-                    <span class="property-type">${type}</span>
+                    <span class="property-type">${this.escapeHtml(typeDisplay || type)}</span>
                 </div>
                 <div class="property-header-actions">
                     ${canRecommend ? `<button type="button" class="btn btn-secondary btn-recommend" id="btn-recommend">智能推荐</button>` : ''}
@@ -302,6 +309,7 @@ class PropertyPanel {
         const operator = this.currentOperator || {};
         const title = this.getOperatorText(operator, ['title', 'displayName', 'DisplayName', 'name', 'Name', 'type', 'Type'], '未命名算子');
         const type = this.getOperatorText(operator, ['type', 'Type'], '');
+        const typeDisplay = getOperatorTypeDisplayName(type, { includeType: true });
         const category = this.getOperatorText(operator, ['category', 'Category'], '其他');
         const description = this.getOperatorText(operator, ['description', 'Description'], '暂无说明');
         const usage = this.getOperatorText(operator, ['usage', 'Usage', 'purpose', 'Purpose'], '');
@@ -329,7 +337,7 @@ class PropertyPanel {
                 ${iconHtml}
                 <div class="header-text">
                     <h4>${this.escapeHtml(title)}</h4>
-                    <span class="property-type">${this.escapeHtml(type)}</span>
+                    <span class="property-type">${this.escapeHtml(typeDisplay || type)}</span>
                 </div>
             </div>
             <div class="property-content property-library-summary">
@@ -478,7 +486,11 @@ class PropertyPanel {
         const { name, displayName, description, dataType, value, defaultValue, min, max, isRequired } = param;
         
         let inputHtml = '';
-        const requiredMark = isRequired ? '<span class="required">*</span>' : '';
+        const effectiveState = this.getParameterRuleState(param);
+        const requiredMark = effectiveState.effectiveRequired ? '<span class="required">*</span>' : '';
+        const disabledHint = effectiveState.effectiveDisabled && effectiveState.disabledReason
+            ? `<p class="form-description parameter-rule-hint">${this.escapeHtml(effectiveState.disabledReason)}</p>`
+            : '';
         const currentValue = value !== undefined ? value : defaultValue;
         
         switch (dataType) {
@@ -604,12 +616,13 @@ class PropertyPanel {
         }
 
         return `
-            <div class="form-group">
+            <div class="form-group ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''}" data-effective-required="${effectiveState.effectiveRequired ? 'true' : 'false'}" data-effective-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}">
                 <label for="param-${name}" class="form-label">
                     ${displayName || name} ${requiredMark}
                 </label>
                 ${inputHtml}
                 ${description ? `<p class="form-description">${description}</p>` : ''}
+                ${disabledHint}
             </div>
         `;
     }
@@ -620,7 +633,11 @@ class PropertyPanel {
     renderParameterEnhanced(param) {
         const { name, displayName, description, dataType, value, defaultValue, min, max, isRequired, step } = param;
         
-        const requiredMark = isRequired ? '<span class="required">*</span>' : '';
+        const effectiveState = this.getParameterRuleState(param);
+        const requiredMark = effectiveState.effectiveRequired ? '<span class="required">*</span>' : '';
+        const disabledHint = effectiveState.effectiveDisabled && effectiveState.disabledReason
+            ? `<p class="form-description parameter-rule-hint">${this.escapeHtml(effectiveState.disabledReason)}</p>`
+            : '';
         const currentValue = value !== undefined ? value : defaultValue;
         let inputHtml = '';
         
@@ -679,12 +696,13 @@ class PropertyPanel {
         }
         
         return `
-            <div class="form-group param-enhanced">
+            <div class="form-group param-enhanced ${effectiveState.effectiveDisabled ? 'is-rule-disabled' : ''}" data-effective-required="${effectiveState.effectiveRequired ? 'true' : 'false'}" data-effective-disabled="${effectiveState.effectiveDisabled ? 'true' : 'false'}">
                 <label for="param-${name}" class="form-label">
                     ${displayName || name} ${requiredMark}
                 </label>
                 ${inputHtml}
                 ${description ? `<p class="form-description">${description}</p>` : ''}
+                ${disabledHint}
             </div>
         `;
     }
@@ -869,9 +887,26 @@ class PropertyPanel {
      * @param {Object} values - 从 getValues() 获取的键值对
      */
     normalizeSourceTypeValue(value) {
-        const raw = String(value || 'File').trim();
-        const separatorIndex = raw.indexOf('|');
-        return (separatorIndex >= 0 ? raw.substring(0, separatorIndex) : raw).trim().toLowerCase();
+        return normalizeAcquisitionSourceType(value);
+    }
+
+    getParameterRuleState(paramOrName, operator = this.currentOperator, values = null) {
+        return getParameterEffectiveState(operator, paramOrName, { values });
+    }
+
+    collectFormRuleValues(form = document.getElementById('property-form')) {
+        if (!form) {
+            return {};
+        }
+
+        const values = {};
+        Array.from(form.querySelectorAll('input[name], select[name]')).forEach(input => {
+            if (!input.name || input.type === 'range') {
+                return;
+            }
+            values[input.name] = input.type === 'checkbox' ? input.checked : input.value;
+        });
+        return values;
     }
 
     getParameterByName(name, operator = this.currentOperator) {
@@ -895,25 +930,52 @@ class PropertyPanel {
         }
 
         const sourceTypeInput = this.findParamInput('SourceType', 'sourceType');
-        const filePathInput = this.findParamInput('FilePath', 'filePath');
-        if (!sourceTypeInput || !filePathInput) {
+        if (!sourceTypeInput) {
             return;
         }
 
+        const values = this.collectFormRuleValues();
         const isCameraMode = this.normalizeSourceTypeValue(sourceTypeInput.value) === 'camera';
-        const fileGroup = filePathInput.closest('.form-group');
-        const pickerButton = fileGroup?.querySelector('.btn-pick-file');
+        const controlledInputs = ['FilePath', 'CameraId', 'CameraBindingId']
+            .map(name => this.findParamInput(name))
+            .filter(Boolean)
+            .filter((input, index, all) => all.indexOf(input) === index);
 
-        if (isCameraMode && options.clearFilePathWhenCamera !== false && filePathInput.value) {
-            filePathInput.value = '';
-        }
+        controlledInputs.forEach(input => {
+            const param = this.getParameterByName(input.name);
+            const state = this.getParameterRuleState(param || input.name, this.currentOperator, values);
+            const group = input.closest('.form-group');
+            const pickerButton = group?.querySelector('.btn-pick-file');
+            const label = group?.querySelector('.form-label');
+            const requiredMark = label?.querySelector('.required');
 
-        filePathInput.disabled = isCameraMode;
-        if (pickerButton) {
-            pickerButton.disabled = isCameraMode;
-        }
+            if (
+                isCameraMode &&
+                state.effectiveDisabled &&
+                input.name.toLowerCase() === 'filepath' &&
+                options.clearFilePathWhenCamera !== false &&
+                input.value
+            ) {
+                input.value = '';
+            }
 
-        fileGroup?.classList.toggle('hidden', isCameraMode);
+            input.disabled = state.effectiveDisabled;
+            input.setAttribute('aria-disabled', state.effectiveDisabled ? 'true' : 'false');
+            if (pickerButton) {
+                pickerButton.disabled = state.effectiveDisabled;
+            }
+
+            group?.classList.toggle('hidden', state.effectiveDisabled);
+            group?.classList.toggle('is-rule-disabled', state.effectiveDisabled);
+            group?.setAttribute('data-effective-disabled', state.effectiveDisabled ? 'true' : 'false');
+            group?.setAttribute('data-effective-required', state.effectiveRequired ? 'true' : 'false');
+
+            if (label && state.effectiveRequired && !requiredMark) {
+                label.insertAdjacentHTML('beforeend', ' <span class="required">*</span>');
+            } else if (!state.effectiveRequired && requiredMark) {
+                requiredMark.remove();
+            }
+        });
     }
 
     normalizeImageAcquisitionValues(values) {
@@ -1037,19 +1099,28 @@ class PropertyPanel {
         }
 
         const errors = [];
+        const ruleValues = this.collectFormRuleValues(form);
+        const requiredErrors = collectEffectiveRequiredParameterErrors(this.currentOperator, this.currentOperator.parameters || [], {
+            values: ruleValues,
+            getLabel: (param, fallbackName) => getParameterLabel(param, fallbackName)
+        });
+        requiredErrors.forEach(error => {
+            errors.push({ name: error.name, message: error.message });
+        });
+
         const inputs = Array.from(form.querySelectorAll('input[name], select[name]'))
             .filter(input => input.type !== 'range');
 
         inputs.forEach(input => {
             const param = this.getParameterByName(input.name);
+            const state = this.getParameterRuleState(param || input.name, this.currentOperator, ruleValues);
+            if (state.effectiveDisabled) {
+                return;
+            }
+
             const dataType = String(input.dataset.type || getParameterDataType(param)).toLowerCase();
             const label = getParameterLabel(param, input.name);
             const rawValue = input.type === 'checkbox' ? input.checked : input.value;
-
-            if (isParameterRequired(param) && isEmptyValue(rawValue)) {
-                errors.push({ name: input.name, message: `${label} 为必填项` });
-                return;
-            }
 
             if (['int', 'integer', 'double', 'float', 'number'].includes(dataType) && !isEmptyValue(rawValue)) {
                 const parsed = parseNumericValue(rawValue);
@@ -1075,7 +1146,6 @@ class PropertyPanel {
             }
         });
 
-        this.collectImageAcquisitionValidationErrors(this.currentOperator, errors);
         return errors;
     }
 
@@ -1084,37 +1154,15 @@ class PropertyPanel {
             return;
         }
 
-        const params = operator.parameters || [];
-        const readParamValue = (...names) => {
-            for (const name of names) {
-                const input = this.currentOperator?.id === operator.id ? this.findParamInput(name) : null;
-                if (input) {
-                    return input.value;
-                }
-
-                const param = params.find(item => normalizeParameterName(item?.name || item?.Name) === normalizeParameterName(name));
-                if (param) {
-                    return getParameterEffectiveValue(param);
-                }
-            }
-
-            return null;
-        };
-
-        const sourceType = this.normalizeSourceTypeValue(readParamValue('SourceType', 'sourceType'));
-        const filePath = String(readParamValue('FilePath', 'filePath') || '').trim();
-        const cameraId = String(readParamValue('CameraId', 'cameraId') || '').trim();
-
-        if (sourceType === 'camera') {
-            if (!cameraId) {
-                errors.push({ name: 'CameraId', message: '相机采集模式必须选择相机' });
-            }
-            return;
-        }
-
-        if (!filePath) {
-            errors.push({ name: 'FilePath', message: '文件采集模式必须选择图像文件' });
-        }
+        const values = this.currentOperator?.id === operator.id
+            ? this.collectFormRuleValues()
+            : null;
+        collectEffectiveRequiredParameterErrors(operator, operator.parameters || [], {
+            values,
+            getLabel: (param, fallbackName) => getParameterLabel(param, fallbackName)
+        }).forEach(error => {
+            errors.push({ name: error.name, message: error.message });
+        });
     }
 
     renderValidationErrors(errors, options = {}) {
@@ -1151,14 +1199,21 @@ class PropertyPanel {
         }
 
         const nodeTitle = operator.title || operator.name || operator.Name || operator.type || '算子';
+        const requiredErrors = collectEffectiveRequiredParameterErrors(operator, operator.parameters || [], {
+            getLabel: (param, fallbackName) => getParameterLabel(param, fallbackName)
+        });
+        requiredErrors.forEach(error => {
+            errors.push({ nodeId: operator.id, name: error.name, message: `${nodeTitle}：${error.message}` });
+        });
+
         (operator.parameters || []).forEach(param => {
             const name = param?.name || param?.Name;
             const label = getParameterLabel(param, name);
             const dataType = getParameterDataType(param).toLowerCase();
             const value = getParameterEffectiveValue(param);
+            const state = this.getParameterRuleState(param, operator);
 
-            if (isParameterRequired(param) && isEmptyValue(value)) {
-                errors.push({ nodeId: operator.id, name, message: `${nodeTitle}：${label} 为必填项` });
+            if (state.effectiveDisabled) {
                 return;
             }
 
@@ -1186,7 +1241,6 @@ class PropertyPanel {
             }
         });
 
-        this.collectImageAcquisitionValidationErrors(operator, errors);
         return errors;
     }
 

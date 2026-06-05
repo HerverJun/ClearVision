@@ -137,6 +137,11 @@ async function loadAiPanel() {
   return import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js');
 }
 
+async function loadPropertyPanel() {
+  installDom();
+  return import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
+}
+
 function createPanel(AiPanel, overrides = {}) {
   const panel = Object.create(AiPanel.prototype);
   panel.options = overrides.options || {};
@@ -147,13 +152,68 @@ function createPanel(AiPanel, overrides = {}) {
   panel.pendingParameterDrafts = {};
   panel.pendingOperatorBindings = {};
   panel.operatorMetadataCache = new Map();
+  panel.operatorMetadataLoading = new Map();
   panel.cameraBindingsCache = [];
+  panel.cameraBindingsLoadingPromise = null;
   panel.currentResultVersion = 1;
   panel.sessionId = 'agent-ui-contract';
   panel.currentResult = overrides.currentResult || null;
   panel.isGenerating = false;
   panel.flowCanvas = null;
   return panel;
+}
+
+function createPropertyPanel(PropertyPanel, operator) {
+  const panel = Object.create(PropertyPanel.prototype);
+  panel.currentOperator = operator;
+  panel.container = createFakeElement();
+  panel.cameraBindingsCache = [];
+  panel.recommendationSupportedOperators = new Set();
+  panel.recommendedFieldNames = new Set();
+  panel.pendingRecommendation = null;
+  panel.bindEvents = () => {};
+  panel.initSliders = () => {};
+  panel.initRoiEditorPanel = () => {};
+  panel.initPreviewPanel = () => {};
+  return panel;
+}
+
+function imageAcquisitionOperator(sourceType, overrides = {}) {
+  return {
+    id: overrides.id || 'op_acq',
+    type: 'ImageAcquisition',
+    title: overrides.title || '采集',
+    displayName: overrides.displayName || '采集',
+    parameters: [
+      { name: 'SourceType', displayName: '采集源', dataType: 'enum', value: sourceType, defaultValue: 'File' },
+      { name: 'FilePath', displayName: '文件路径', dataType: 'file', value: overrides.filePath ?? '', isRequired: true },
+      { name: 'CameraId', displayName: '相机绑定', dataType: 'cameraBinding', value: overrides.cameraId ?? '', isRequired: true }
+    ]
+  };
+}
+
+function createInput({ name, value = '', type = 'text', dataType = 'string' }) {
+  return {
+    name,
+    value,
+    type,
+    checked: Boolean(value),
+    dataset: { type: dataType },
+    closest() { return null; }
+  };
+}
+
+function installPropertyForm(inputs) {
+  const form = {
+    querySelectorAll(selector) {
+      return selector.includes('input') || selector.includes('select') ? inputs : [];
+    },
+    querySelector() {
+      return null;
+    }
+  };
+  global.document.getElementById = id => id === 'property-form' ? form : null;
+  return form;
 }
 
 function attachValidationPanel(panel) {
@@ -436,6 +496,189 @@ test('readyForDeployment=false disables deployment actions but not workflow edit
 
   assert.match(validation.innerHTML, /data-agent-deployment-disabled="true"/);
   assert.match(validation.innerHTML, /data-agent-workflow-edit-enabled="true"/);
+});
+
+test('AI pending draft excludes FilePath when ImageAcquisition SourceType is Camera', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const response = {
+    flow: {
+      operators: [
+        {
+          tempId: 'op_acq',
+          operatorType: 'ImageAcquisition',
+          displayName: '采集',
+          parameters: { SourceType: 'Camera' }
+        }
+      ]
+    },
+    pendingParameters: [
+      { operatorId: 'op_acq', parameterNames: ['SourceType', 'FilePath', 'CameraId', 'CameraBindingId'] }
+    ]
+  };
+
+  const pending = panel._resolvePendingParametersForDraft(response);
+  const groups = panel._collectPendingDraftGroups(pending, response.flow.operators);
+  const names = groups.flatMap(group => group.fields.map(field => field.parameterName));
+
+  assert.deepEqual(names.sort(), ['CameraBindingId', 'CameraId', 'SourceType'].sort());
+  assert.equal(names.includes('FilePath'), false);
+});
+
+test('AI pending draft excludes camera binding fields when ImageAcquisition SourceType is File', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const response = {
+    flow: {
+      operators: [
+        {
+          tempId: 'op_acq',
+          operatorType: 'ImageAcquisition',
+          displayName: '采集',
+          parameters: { SourceType: 'File' }
+        }
+      ]
+    },
+    pendingParameters: [
+      { operatorId: 'op_acq', parameterNames: ['FilePath', 'CameraId', 'CameraBindingId'] }
+    ]
+  };
+
+  const pending = panel._resolvePendingParametersForDraft(response);
+  const groups = panel._collectPendingDraftGroups(pending, response.flow.operators);
+  const names = groups.flatMap(group => group.fields.map(field => field.parameterName));
+
+  assert.deepEqual(names, ['FilePath']);
+});
+
+test('AI pending parameter editor displays Chinese operator type metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    options: {
+      getOperators: () => [
+        {
+          type: 'ImageAcquisition',
+          parameters: [
+            { name: 'FilePath', dataType: 'file', displayName: '文件路径' }
+          ]
+        }
+      ]
+    }
+  });
+  const editor = createFakeElement();
+  panel.container = createContainer({
+    '#ai-result-parameter-editor': editor
+  });
+  const response = {
+    flow: {
+      operators: [
+        {
+          tempId: 'op_acq',
+          operatorType: 'ImageAcquisition',
+          displayName: '采集',
+          parameters: { SourceType: 'File' }
+        }
+      ]
+    },
+    pendingParameters: [
+      { operatorId: 'op_acq', parameterNames: ['FilePath'] }
+    ]
+  };
+
+  panel._renderParameterDraftEditor(response, response.flow);
+
+  assert.match(editor.innerHTML, /图像采集（ImageAcquisition）/);
+});
+
+test('PropertyPanel header displays Chinese operator type first', async () => {
+  const { PropertyPanel } = await loadPropertyPanel();
+  const panel = createPropertyPanel(PropertyPanel, imageAcquisitionOperator('File'));
+
+  panel.render();
+
+  assert.match(panel.container.innerHTML, /图像采集（ImageAcquisition）/);
+});
+
+test('PropertyPanel Camera mode does not mark FilePath required and does not require it', async () => {
+  const { PropertyPanel } = await loadPropertyPanel();
+  const operator = imageAcquisitionOperator('Camera', { filePath: '', cameraId: 'cam-1' });
+  const panel = createPropertyPanel(PropertyPanel, operator);
+  const filePathParam = operator.parameters.find(param => param.name === 'FilePath');
+  const html = panel.renderParameter(filePathParam);
+
+  installPropertyForm([
+    createInput({ name: 'SourceType', value: 'Camera', dataType: 'enum' }),
+    createInput({ name: 'FilePath', value: '', dataType: 'file' }),
+    createInput({ name: 'CameraId', value: 'cam-1', dataType: 'string' })
+  ]);
+
+  assert.doesNotMatch(html, /<span class="required">\*<\/span>/);
+  assert.deepEqual(panel.collectCurrentOperatorValidationErrors(), []);
+});
+
+test('PropertyPanel File mode marks FilePath required and reports empty value', async () => {
+  const { PropertyPanel } = await loadPropertyPanel();
+  const operator = imageAcquisitionOperator('File', { filePath: '', cameraId: '' });
+  const panel = createPropertyPanel(PropertyPanel, operator);
+  const filePathParam = operator.parameters.find(param => param.name === 'FilePath');
+  const html = panel.renderParameter(filePathParam);
+
+  installPropertyForm([
+    createInput({ name: 'SourceType', value: 'File', dataType: 'enum' }),
+    createInput({ name: 'FilePath', value: '', dataType: 'file' }),
+    createInput({ name: 'CameraId', value: '', dataType: 'string' })
+  ]);
+
+  assert.match(html, /<span class="required">\*<\/span>/);
+  const errors = panel.collectCurrentOperatorValidationErrors();
+  assert.equal(errors.some(error => error.name === 'FilePath'), true);
+  assert.equal(errors.some(error => error.name === 'CameraId'), false);
+});
+
+test('validateOperatorModel applies ImageAcquisition mutual exclusion rules off current node', async () => {
+  const { PropertyPanel } = await loadPropertyPanel();
+  const panel = createPropertyPanel(PropertyPanel, null);
+  const cameraOperator = imageAcquisitionOperator('Camera', { filePath: '', cameraId: 'cam-1' });
+  const fileOperator = imageAcquisitionOperator('File', { filePath: '', cameraId: '' });
+
+  assert.deepEqual(panel.validateOperatorModel(cameraOperator), []);
+  const fileErrors = panel.validateOperatorModel(fileOperator);
+  assert.equal(fileErrors.some(error => error.name === 'FilePath'), true);
+  assert.equal(fileErrors.some(error => error.name === 'CameraId'), false);
+});
+
+test('AI layout CSS places Agent workbench left and chat right with mobile fallback', () => {
+  const currentFile = fileURLToPath(import.meta.url);
+  const testProjectRoot = path.resolve(path.dirname(currentFile), '..', '..');
+  const productRoot = path.resolve(testProjectRoot, '..', '..');
+  const sourcePath = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai', 'aiPanel.js');
+  const cssPath = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'shared', 'styles', 'ai-panel.css');
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  const css = fs.readFileSync(cssPath, 'utf8');
+
+  assert.match(source, /data-ai-workbench-pane="true"/);
+  assert.match(source, /data-ai-chat-pane="true"/);
+  assert.match(source, /focus\(\{\s*preventScroll:\s*true\s*\}\)/);
+  assert.match(css, /\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#f3f6fa[^}]*background:\s*var\(--ai-surface-page\)/s);
+  assert.match(css, /\[data-theme="dark"\]\s+\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#14181d/s);
+  assert.match(css, /\.ai-workspace\s*{[^}]*2\.05fr[^}]*clamp\(22rem,\s*26vw,\s*31rem\)/s);
+  assert.match(css, /\.ai-pane-right\s*{[^}]*grid-column:\s*1;/s);
+  assert.match(css, /\.ai-pane-left\s*{[^}]*grid-column:\s*2;/s);
+  assert.match(css, /\.ai-results-scroll\s*{[^}]*grid-template-columns:\s*repeat\(12,\s*minmax\(0,\s*1fr\)\)/s);
+  assert.match(css, /@media \(max-width:\s*1180px\)[\s\S]*\.ai-pane-right\s*{[\s\S]*grid-row:\s*1;[\s\S]*\.ai-pane-left\s*{[\s\S]*grid-row:\s*2;/);
+});
+
+test('quality suite tracks raised UI contract minimum', () => {
+  const currentFile = fileURLToPath(import.meta.url);
+  const repoRoot = path.resolve(path.dirname(currentFile), '..', '..', '..', '..', '..');
+  const suitePath = path.resolve(repoRoot, 'quality', 'evals', 'suites', 'agent_engineering_harness_suite.json');
+  const suite = JSON.parse(fs.readFileSync(suitePath, 'utf8'));
+  const uiEntry = suite.stages
+    .flatMap(stage => stage.entries)
+    .find(entry => entry.id === 'vision_agent_ui_contract_tests');
+
+  assert.ok(uiEntry);
+  assert.equal(uiEntry.minimumTests, 26);
 });
 
 test('source guard: Agent UI has no RuntimePreview hardware network or process tool entry', () => {

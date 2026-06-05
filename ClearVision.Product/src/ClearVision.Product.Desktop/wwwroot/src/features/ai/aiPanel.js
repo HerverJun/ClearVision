@@ -2,6 +2,10 @@
 import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
 import { buildWireSequenceFollowupHint } from '../flow-editor/wireSequenceAssist.js';
+import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
+import {
+    shouldIncludePendingParameter
+} from '../../shared/parameterDependencyRules.js';
 
 const AiWorkbenchStates = Object.freeze({
     IDLE: 'idle',
@@ -155,8 +159,22 @@ export class AiPanel {
     
     activate() {
         this._checkConnection();
+        const mainContent = this.container.closest('.main-content');
+        if (mainContent) {
+            mainContent.scrollTop = 0;
+        }
+
         const textarea = this.container.querySelector('.ai-textarea');
-        if (textarea) textarea.focus();
+        if (textarea) {
+            try {
+                textarea.focus({ preventScroll: true });
+            } catch {
+                textarea.focus();
+                if (mainContent) {
+                    mainContent.scrollTop = 0;
+                }
+            }
+        }
     }
     
     _handleNewConversation() {
@@ -283,7 +301,7 @@ export class AiPanel {
     render() {
         this.container.innerHTML = `
             <div class="ai-workspace">
-                <aside class="ai-pane-left">
+                <aside class="ai-pane-left" data-ai-chat-pane="true">
                     <div class="ai-pane-header">
                         <span class="pane-icon">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
@@ -365,7 +383,7 @@ export class AiPanel {
                     </div>
                 </aside>
 
-                <aside class="ai-pane-right" id="ai-result-pane">
+                <aside class="ai-pane-right" id="ai-result-pane" data-ai-workbench-pane="true">
                     <div class="ai-agent-runtime" id="ai-agent-runtime" hidden></div>
                     <div class="ai-workbench-state-bar" id="ai-workbench-state-bar"></div>
                     <div class="ai-result-status-note" id="ai-result-status-note"></div>
@@ -1080,7 +1098,13 @@ export class AiPanel {
         }
 
         const operators = this._getPendingOperatorSourceOperators(this.currentResult.flow);
-        const confirmationState = this._getPendingParameterConfirmationState(pending, operators);
+        const groups = this._collectPendingDraftGroups(pending, operators);
+        if (groups.length === 0) {
+            this._addMessage('system', '当前模式下没有需要补录的互斥参数，无需提交 AI 审核。');
+            return;
+        }
+
+        const confirmationState = this._getPendingParameterConfirmationState(pending, operators, groups);
         if (!confirmationState.canReview) {
             this._addMessage('system', '请先确认全部参数，再提交审核。');
             return;
@@ -1119,6 +1143,10 @@ export class AiPanel {
 
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
         const groups = this._collectPendingDraftGroups(pending, operators);
+        if (groups.length === 0) {
+            this._addMessage('system', '当前模式下没有需要补录的互斥参数，无需执行确认。');
+            return;
+        }
         const confirmationState = this._getPendingParameterConfirmationState(pending, operators, groups);
         if (confirmationState.isConfirmed) {
             return;
@@ -1555,7 +1583,8 @@ export class AiPanel {
         } else {
             ops.forEach((op, i) => {
                 const opName = op?.displayName || op?.DisplayName || op?.name || op?.Name || '未命名算子';
-                const opType = op?.operatorType || op?.OperatorType || '';
+                const opType = op?.operatorType || op?.OperatorType || op?.type || op?.Type || '';
+                const opTypeDisplay = getOperatorTypeDisplayName(opType);
                 const opId = op?.tempId || op?.TempId || op?.id || op?.Id || '';
                 const hasPending = pendingSet.has(opId);
                 const hasMissing = (op.parameters || op.Parameters || {})['ModelPath'] === ''
@@ -1573,7 +1602,7 @@ export class AiPanel {
                     <div class="op-dot"></div>
                     <div class="op-main">
                         <div class="op-name">${this._escapeHtml(String(opName))}</div>
-                        ${opType ? `<div class="op-type-badge">${this._escapeHtml(opType)}</div>` : ''}
+                        ${opTypeDisplay ? `<div class="op-type-badge">${this._escapeHtml(opTypeDisplay)}</div>` : ''}
                     </div>
                     ${statusBadges.length > 0 ? `<div class="op-badges">${statusBadges.join('')}</div>` : ''}
                 `;
@@ -1764,15 +1793,20 @@ export class AiPanel {
         const generationMode = this._getGenerationMode(data);
         const templateLockLevel = this._getTemplateLockLevel(data);
         const operators = this._getPendingOperatorSourceOperators(flow || data?.flow || data?.Flow || null);
+        const pendingGroups = this._collectPendingDraftGroups(pending, operators);
+        const effectivePending = pendingGroups.map(group => ({
+            operatorId: group.operatorId,
+            parameterNames: group.fields.map(field => field.parameterName)
+        }));
         const hasTemplateStrategy = Boolean(recommended || candidates.length > 0 || generationMode || templateLockLevel);
 
-        if (!hasTemplateStrategy && pending.length === 0 && missing.length === 0 && nonBlockingFields.length === 0) {
+        if (!hasTemplateStrategy && pendingGroups.length === 0 && missing.length === 0 && nonBlockingFields.length === 0) {
             container.classList.add('is-empty');
             container.innerHTML = '<div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>';
             return;
         }
 
-        const followupText = this._buildFollowupHintText({ recommended, pending, missing, operators, nonBlockingFields });
+        const followupText = this._buildFollowupHintText({ recommended, pending: effectivePending, missing, operators, nonBlockingFields });
         const strategyText = this._formatTemplateStrategy(generationMode, templateLockLevel);
         const primaryTemplate = recommended || candidates[0] || null;
         const candidatesHtml = candidates.length > 0
@@ -1828,7 +1862,7 @@ export class AiPanel {
             `
             : '';
 
-        const pendingHtml = pending.length > 0
+        const pendingHtml = pendingGroups.length > 0
             ? `
                 <div class="ai-followup-section">
                     <div class="ai-followup-section-header">
@@ -1836,13 +1870,11 @@ export class AiPanel {
                         <div class="ai-followup-section-tip">点击可跳到下方填写区</div>
                     </div>
                     <div class="ai-followup-list">
-                        ${pending.map(item => {
-                            const context = this._resolvePendingOperatorContext(item.operatorId, operators);
-                            const groupKey = this._getPendingDraftGroupKey(item.operatorId);
+                        ${pendingGroups.map(group => {
                             return `
-                            <button class="ai-followup-item ai-followup-nav" type="button" data-followup-nav="${this._escapeHtml(groupKey)}">
-                                <div class="ai-followup-item-title">${this._escapeHtml(context.label)}</div>
-                                <div class="ai-followup-item-body">需要补充：${this._escapeHtml(item.parameterNames.join('、'))}</div>
+                            <button class="ai-followup-item ai-followup-nav" type="button" data-followup-nav="${this._escapeHtml(group.groupKey)}">
+                                <div class="ai-followup-item-title">${this._escapeHtml(group.label)}</div>
+                                <div class="ai-followup-item-body">需要补充：${this._escapeHtml(group.fields.map(field => field.parameterName).join('、'))}</div>
                             </button>
                         `;
                         }).join('')}
@@ -1980,6 +2012,12 @@ export class AiPanel {
         }
 
         const groups = this._collectPendingDraftGroups(pending, operators);
+        if (groups.length === 0) {
+            container.classList.add('is-empty');
+            container.innerHTML = '<div class="ai-followup-empty">当前采集模式下没有需要补录的互斥参数。</div>';
+            return;
+        }
+
         const confirmationState = this._getPendingParameterConfirmationState(pending, operators, groups);
         const { totals } = confirmationState;
         const signature = this.pendingParameterDraftSignature;
@@ -2002,7 +2040,7 @@ export class AiPanel {
                             <div>
                                 <div class="ai-parameter-group-title">${this._escapeHtml(group.label)}</div>
                                 <div class="ai-parameter-group-meta">
-                                    ${group.operatorType ? this._escapeHtml(group.operatorType) : '未识别算子类型'}
+                                    ${group.operatorType ? this._escapeHtml(getOperatorTypeDisplayName(group.operatorType, { includeType: true })) : '未识别算子类型'}
                                     ${group.operator ? '' : ' · 当前画布快照中未找到精确算子，提交时将按名称提示 AI 继续审核'}
                                 </div>
                             </div>
@@ -2096,16 +2134,19 @@ export class AiPanel {
         return pending.map(item => {
             const context = this._resolvePendingOperatorContext(item.operatorId, operators);
             const metadata = this._getCachedOperatorMetadata(context.operatorType);
-            const fields = item.parameterNames.map(parameterName => {
-                const parameterMetadata = this._findMetadataParameter(metadata, parameterName);
-                const entry = this._getPendingDraftEntry(item.operatorId, parameterName);
-                return this._normalizePendingDraftField({
-                    operatorId: item.operatorId,
-                    parameterName,
-                    entry,
-                    metadata: parameterMetadata
+            const ruleOperator = context.operator || { operatorType: context.operatorType, parameters: {} };
+            const fields = item.parameterNames
+                .filter(parameterName => shouldIncludePendingParameter(ruleOperator, parameterName))
+                .map(parameterName => {
+                    const parameterMetadata = this._findMetadataParameter(metadata, parameterName);
+                    const entry = this._getPendingDraftEntry(item.operatorId, parameterName);
+                    return this._normalizePendingDraftField({
+                        operatorId: item.operatorId,
+                        parameterName,
+                        entry,
+                        metadata: parameterMetadata
+                    });
                 });
-            });
 
             return {
                 operatorId: item.operatorId,
@@ -2115,7 +2156,7 @@ export class AiPanel {
                 groupKey: this._getPendingDraftGroupKey(item.operatorId),
                 fields
             };
-        });
+        }).filter(group => group.fields.length > 0);
     }
 
     _renderPendingDraftField(group, field, confirmationState = null) {
@@ -2301,7 +2342,11 @@ export class AiPanel {
         safePending.forEach(item => {
             const context = this._resolvePendingOperatorContext(item.operatorId, safeOperators);
             const metadata = this._getCachedOperatorMetadata(context.operatorType);
+            const ruleOperator = context.operator || { operatorType: context.operatorType, parameters: {} };
             item.parameterNames.forEach(parameterName => {
+                if (!shouldIncludePendingParameter(ruleOperator, parameterName)) {
+                    return;
+                }
                 const fieldType = this._normalizePendingFieldType(this._findMetadataParameter(metadata, parameterName));
                 const value = this._getPendingDraftConfirmedValue(item.operatorId, parameterName);
                 const valueText = this._hasPendingDraftValue(value, fieldType)
@@ -2403,7 +2448,11 @@ export class AiPanel {
         pending.forEach(item => {
             const context = this._resolvePendingOperatorContext(item.operatorId, operators);
             const metadata = this._getCachedOperatorMetadata(context.operatorType);
+            const ruleOperator = context.operator || { operatorType: context.operatorType, parameters: {} };
             item.parameterNames.forEach(parameterName => {
+                if (!shouldIncludePendingParameter(ruleOperator, parameterName)) {
+                    return;
+                }
                 const parameterMetadata = this._findMetadataParameter(metadata, parameterName);
                 const fieldType = this._normalizePendingFieldType(parameterMetadata);
 
@@ -2479,7 +2528,14 @@ export class AiPanel {
             })
             .join('|');
         const pendingPart = pending
-            .map(item => `${item.operatorId}:${item.parameterNames.join(',')}`)
+            .map(item => {
+                const context = this._resolvePendingOperatorContext(item.operatorId, operators);
+                const ruleOperator = context.operator || { operatorType: context.operatorType, parameters: {} };
+                const names = item.parameterNames.filter(parameterName =>
+                    shouldIncludePendingParameter(ruleOperator, parameterName)
+                );
+                return `${item.operatorId}:${names.join(',')}`;
+            })
             .join('|');
         return `${this.sessionId || 'no-session'}::${operatorPart}::${pendingPart}`;
     }
@@ -3054,6 +3110,9 @@ export class AiPanel {
             if (!context.operator) return;
 
             item.parameterNames.forEach(parameterName => {
+                if (!shouldIncludePendingParameter(context.operator, parameterName)) {
+                    return;
+                }
                 const confirmedValue = this._getPendingDraftConfirmedValue(item.operatorId, parameterName);
                 const fieldType = this._normalizePendingFieldType(
                     this._findMetadataParameter(
@@ -3156,11 +3215,12 @@ export class AiPanel {
         const flow = this._getCurrentFlowJson();
         const pending = this._resolvePendingParametersForDraft(this.currentResult);
         const operators = this._getPendingOperatorSourceOperators(flow || null);
+        const groups = this._collectPendingDraftGroups(pending, operators);
         const input = this.container?.querySelector('#ai-input');
         const extraNote = String(input?.value || '').trim();
         const queuedHint = String(this.nextHintDraft || '').trim();
 
-        if (!flow || pending.length === 0) {
+        if (!flow || groups.length === 0) {
             return null;
         }
 
@@ -3174,16 +3234,17 @@ export class AiPanel {
         let filledCount = 0;
         let totalCount = 0;
 
-        pending.forEach(item => {
-            const context = this._resolvePendingOperatorContext(item.operatorId, operators);
+        groups.forEach(group => {
+            const context = this._resolvePendingOperatorContext(group.operatorId, operators);
             const filledPairs = [];
             const missingNames = [];
             const metadata = this._getCachedOperatorMetadata(context.operatorType);
 
-            item.parameterNames.forEach(parameterName => {
+            group.fields.forEach(field => {
+                const parameterName = field.parameterName;
                 totalCount += 1;
                 const fieldType = this._normalizePendingFieldType(this._findMetadataParameter(metadata, parameterName));
-                const value = this._getPendingDraftConfirmedValue(item.operatorId, parameterName);
+                const value = this._getPendingDraftConfirmedValue(group.operatorId, parameterName);
                 if (this._hasPendingDraftValue(value, fieldType)) {
                     filledCount += 1;
                     filledPairs.push(`${parameterName}=${this._stringifyPendingDraftValue(value, fieldType)}`);
@@ -5876,11 +5937,12 @@ export class AiPanel {
         ].filter(Boolean).join(' · ') || 'no issues';
 
         return `
-            <div class="ai-agent-preview-section" data-validation-preview-section="${this._escapeHtml(sectionKey)}">
-                <div class="ai-agent-preview-header">
+            <details class="ai-agent-preview-section" data-validation-preview-section="${this._escapeHtml(sectionKey)}">
+                <summary class="ai-agent-preview-header">
                     <span>${this._escapeHtml(title)}</span>
                     <small>${this._escapeHtml(countLabel)}</small>
-                </div>
+                </summary>
+                <div class="ai-agent-preview-body">
                 ${summary ? `<div class="ai-agent-preview-summary">${this._escapeHtml(summary)}</div>` : ''}
                 ${(readyForDeployment !== null || workflowDraftAllowed !== null || previewReady !== null || adapterName || previewMode) ? `
                     <div class="ai-agent-preview-state-row">
@@ -5915,7 +5977,8 @@ export class AiPanel {
                         `).join('')}
                     </div>
                 ` : ''}
-            </div>
+                </div>
+            </details>
         `;
     }
 
@@ -6634,7 +6697,10 @@ export class AiPanel {
         return sorted
             .map(tid => opMap.get(tid))
             .filter(Boolean)
-            .map(op => op.operatorType || op.OperatorType || op.displayName || op.DisplayName || '?')
+            .map(op => {
+                const operatorType = op.operatorType || op.OperatorType || op.type || op.Type || '';
+                return getOperatorTypeDisplayName(operatorType) || op.displayName || op.DisplayName || '?';
+            })
             .join(' -> ');
     }
 
