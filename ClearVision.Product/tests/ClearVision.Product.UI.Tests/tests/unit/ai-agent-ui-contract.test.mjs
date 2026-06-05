@@ -147,6 +147,22 @@ async function loadParameterRules() {
   return import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/parameterDependencyRules.js');
 }
 
+function getRepoRoot() {
+  const currentFile = fileURLToPath(import.meta.url);
+  return path.resolve(path.dirname(currentFile), '..', '..', '..', '..', '..');
+}
+
+function loadParameterRuleParitySpec() {
+  const specPath = path.resolve(
+    getRepoRoot(),
+    'quality',
+    'evals',
+    'specs',
+    'vision_agent_parameter_rule_parity_cases.json'
+  );
+  return JSON.parse(fs.readFileSync(specPath, 'utf8'));
+}
+
 function createPanel(AiPanel, overrides = {}) {
   const panel = Object.create(AiPanel.prototype);
   panel.options = overrides.options || {};
@@ -651,13 +667,40 @@ test('parameter rules cover ResultOutput channel file and PLC safety dependencie
 
   assert.equal(getParameterEffectiveState(outputById, 'Channel').effectiveDisabled, true);
   assert.equal(getParameterEffectiveState(outputById, 'FilePath').effectiveDisabled, true);
-  assert.equal(getParameterEffectiveState(outputById, 'PlcAddress').effectiveDisabled, true);
+  assert.equal(getParameterEffectiveState(outputById, 'PlcAddress').effectiveDisabled, false);
   assert.equal(shouldIncludePendingParameter(outputById, 'Channel'), false);
   assert.equal(
     collectEffectiveRequiredParameterErrors(missingChannel, missingChannel.parameters)
       .some(error => error.kind === 'atLeastOneOf' && error.parameterNames.includes('OutputChannelId')),
     true
   );
+});
+
+test('shared parameter rule parity spec matches frontend effective states', async () => {
+  const { getParameterEffectiveState } = await loadParameterRules();
+  const spec = loadParameterRuleParitySpec();
+
+  for (const parityCase of spec.cases) {
+    const operator = {
+      type: parityCase.operatorType,
+      operatorType: parityCase.operatorType,
+      parameters: parityCase.parameters
+    };
+
+    for (const [parameterName, expected] of Object.entries(parityCase.uiStates)) {
+      const actual = getParameterEffectiveState(operator, parameterName);
+      assert.equal(
+        actual.effectiveRequired,
+        expected.effectiveRequired,
+        `${parityCase.caseId}.${parameterName}.effectiveRequired`
+      );
+      assert.equal(
+        actual.effectiveDisabled,
+        expected.effectiveDisabled,
+        `${parityCase.caseId}.${parameterName}.effectiveDisabled`
+      );
+    }
+  }
 });
 
 test('AI pending draft uses effectiveDisabled rules for precheck missing resources', async () => {
@@ -814,7 +857,7 @@ test('AI layout CSS places Agent workbench left and chat right with mobile fallb
   assert.match(source, /aiPanelPendingParametersMixin/);
   assert.match(source, /aiPanelChatMixin/);
   assert.match(source, /aiPanelValidationPreviewMixin/);
-  assert.ok(source.split(/\r?\n/).length < 4500);
+  assert.ok(source.split(/\r?\n/).length < 2500);
   assert.match(source, /focus\(\{\s*preventScroll:\s*true\s*\}\)/);
   assert.match(css, /\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#f3f6fa[^}]*background:\s*var\(--ai-surface-page\)/s);
   assert.match(css, /\[data-theme="dark"\]\s+\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#14181d/s);
@@ -825,17 +868,72 @@ test('AI layout CSS places Agent workbench left and chat right with mobile fallb
   assert.match(css, /@media \(max-width:\s*1180px\)[\s\S]*\.ai-pane-right\s*{[\s\S]*grid-row:\s*1;[\s\S]*\.ai-pane-left\s*{[\s\S]*grid-row:\s*2;/);
 });
 
+test('AI panel productization modules carry remaining workbench responsibilities', () => {
+  const productRoot = path.resolve(getRepoRoot(), 'ClearVision.Product');
+  const aiSourceDir = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai');
+  const mainSource = fs.readFileSync(path.resolve(aiSourceDir, 'aiPanel.js'), 'utf8');
+  const modules = [
+    ['aiPanelGenerateRequest.js', 'aiPanelGenerateRequestMixin'],
+    ['aiPanelRequirementBrief.js', 'aiPanelRequirementBriefMixin'],
+    ['aiPanelAttachments.js', 'aiPanelAttachmentsMixin'],
+    ['aiPanelSessionHistory.js', 'aiPanelSessionHistoryMixin'],
+    ['aiPanelApplyPreview.js', 'aiPanelApplyPreviewMixin'],
+    ['aiPanelTopologySummary.js', 'aiPanelTopologySummaryMixin']
+  ];
+
+  for (const [fileName, exportName] of modules) {
+    const source = fs.readFileSync(path.resolve(aiSourceDir, fileName), 'utf8');
+    assert.match(source, new RegExp(`export const ${exportName}`));
+    assert.match(mainSource, new RegExp(exportName));
+  }
+
+  const runtimePreviewSource = fs.readFileSync(path.resolve(aiSourceDir, 'aiPanelRuntimePreview.js'), 'utf8');
+  assert.match(runtimePreviewSource, /normalizeRuntimePreviewSummary/);
+  assert.match(runtimePreviewSource, /adapterName/);
+  assert.match(runtimePreviewSource, /previewMode/);
+  assert.match(runtimePreviewSource, /previewReady/);
+  assert.match(runtimePreviewSource, /fallback/);
+});
+
+test('executable business benchmark report exposes actual toolchain fields', () => {
+  const reportPath = path.resolve(
+    getRepoRoot(),
+    'quality',
+    'evals',
+    'reports',
+    'VisionAgent_business_benchmark_baseline.json'
+  );
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+  assert.equal(report.benchmarkId, 'vision_agent_executable_business_benchmark');
+  assert.equal(report.mode, 'offline_metadata_only');
+  assert.ok(report.summary.caseCount >= 30 && report.summary.caseCount <= 50);
+  assert.equal(report.summary.accepted, true);
+  for (const item of report.cases) {
+    assert.ok(Array.isArray(item.expectedBusinessActions), item.caseId);
+    assert.ok(Array.isArray(item.expectedToolCalls), item.caseId);
+    assert.ok(Array.isArray(item.actualToolCalls), item.caseId);
+    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualValidationResult'), item.caseId);
+    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualDryRunResult'), item.caseId);
+    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualPrecheckResult'), item.caseId);
+    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualRuntimePreviewResult'), item.caseId);
+  }
+  const expectedTools = report.cases.flatMap(item => item.expectedToolCalls);
+  assert.equal(expectedTools.includes('list_camera_bindings'), false);
+  assert.equal(expectedTools.includes('propose_flow_patch'), false);
+  assert.equal(expectedTools.includes('propose_parameter_patch'), false);
+  assert.equal(expectedTools.includes('runtime_preview_metadata'), false);
+});
+
 test('quality suite tracks raised UI contract minimum', () => {
-  const currentFile = fileURLToPath(import.meta.url);
-  const repoRoot = path.resolve(path.dirname(currentFile), '..', '..', '..', '..', '..');
-  const suitePath = path.resolve(repoRoot, 'quality', 'evals', 'suites', 'agent_engineering_harness_suite.json');
+  const suitePath = path.resolve(getRepoRoot(), 'quality', 'evals', 'suites', 'agent_engineering_harness_suite.json');
   const suite = JSON.parse(fs.readFileSync(suitePath, 'utf8'));
   const uiEntry = suite.stages
     .flatMap(stage => stage.entries)
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 31);
+  assert.equal(uiEntry.minimumTests, 34);
 });
 
 test('source guard: Agent UI has no RuntimePreview hardware network or process tool entry', () => {
@@ -843,18 +941,13 @@ test('source guard: Agent UI has no RuntimePreview hardware network or process t
   const testProjectRoot = path.resolve(path.dirname(currentFile), '..', '..');
   const productRoot = path.resolve(testProjectRoot, '..', '..');
   const aiSourceDir = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai');
-  const sourcePath = path.resolve(aiSourceDir, 'aiPanel.js');
-  const source = fs.readFileSync(sourcePath, 'utf8');
-  const artifactSource = [
+  const guardedSource = [
+    'aiPanel.js',
+    'aiPanelGenerateRequest.js',
     'aiPanelValidationPreview.js',
     'aiPanelRuntimePreview.js',
     'aiPanelToolTrace.js'
   ].map(file => fs.readFileSync(path.resolve(aiSourceDir, file), 'utf8')).join('\n');
-  const developerControlSection = source.slice(
-    source.indexOf('_isAgentDeveloperControlsEnabled'),
-    source.indexOf('_normalizeRequirementMode')
-  );
-  const guardedSource = `${developerControlSection}\n${artifactSource}`;
 
   assert.doesNotMatch(guardedSource, /capture_test_frame|replay_flow_with_frame|runtime_package_precheck/i);
   assert.doesNotMatch(guardedSource, /AcquireSingleFrameAsync|EnumerateCamerasAsync|GetOrCreateByBindingAsync|fetch\(|XMLHttpRequest|child_process|process\.|powershell|cmd\.exe|execute_command/i);

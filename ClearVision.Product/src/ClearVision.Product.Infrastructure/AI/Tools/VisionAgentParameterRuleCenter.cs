@@ -19,11 +19,12 @@ internal static class VisionAgentParameterRuleCenter
             AddImageAcquisitionResources(op, missingResources);
             AddTemplateMatchingResources(op, missingResources);
             AddDeepLearningResources(op, missingResources);
+            AddResultOutputResources(op, missingResources);
+            AddPlcResources(op, missingResources);
 
             if (scope == VisionAgentParameterRuleScope.DeploymentPrecheck)
             {
-                AddResultOutputResources(op, missingResources);
-                AddPlcResources(op, missingResources);
+                AddDeploymentOnlyResources(op, missingResources);
             }
         }
 
@@ -146,6 +147,14 @@ internal static class VisionAgentParameterRuleCenter
             "plc_parameters",
             ["PLCParameters", "PlcAddress"],
             $"{op.OperatorType} PLC parameters are missing or pending.");
+    }
+
+    private static void AddDeploymentOnlyResources(
+        VisionAgentFlowOperator op,
+        List<VisionAgentMissingResource> missingResources)
+    {
+        // Reserved for future static deployment precheck-only rules. Runtime
+        // resources stay metadata-only; no package, Station, PLC, or adapter is touched here.
     }
 
     private static void AddMissingAtLeastOne(

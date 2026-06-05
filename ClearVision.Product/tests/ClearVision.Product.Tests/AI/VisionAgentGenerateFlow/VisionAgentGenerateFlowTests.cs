@@ -285,16 +285,27 @@ public sealed class VisionAgentGenerateFlowTests
             "features",
             "ai",
             "aiPanel.js"));
+        var frontendGenerateRequestSource = File.ReadAllText(Path.Combine(
+            productRoot,
+            "src",
+            "ClearVision.Product.Desktop",
+            "wwwroot",
+            "src",
+            "features",
+            "ai",
+            "aiPanelGenerateRequest.js"));
+        var frontendGuardSource = string.Join(Environment.NewLine, frontendSource, frontendGenerateRequestSource);
 
         generateFlowService.Should().NotContain("VisionAgentLoop");
         generateFlowService.Should().Contain("ShouldRunAgentGenerateFlow");
         generateFlowService.Should().Contain("request.UseVisionAgentGenerateFlow");
-        frontendSource.Should().Contain("_isAgentDeveloperControlsEnabled");
-        frontendSource.Should().Contain("_buildAgentGenerateFlowRequestPayload");
-        frontendSource.Should().Contain("useVisionAgentGenerateFlow: true");
-        frontendSource.Should().NotContain("capture_test_frame");
-        frontendSource.Should().NotContain("replay_flow_with_frame");
-        frontendSource.Should().NotContain("runtime_package_precheck");
+        frontendSource.Should().Contain("aiPanelGenerateRequestMixin");
+        frontendGuardSource.Should().Contain("_isAgentDeveloperControlsEnabled");
+        frontendGuardSource.Should().Contain("_buildAgentGenerateFlowRequestPayload");
+        frontendGuardSource.Should().Contain("useVisionAgentGenerateFlow: true");
+        frontendGuardSource.Should().NotContain("capture_test_frame");
+        frontendGuardSource.Should().NotContain("replay_flow_with_frame");
+        frontendGuardSource.Should().NotContain("runtime_package_precheck");
     }
 
     [Fact(DisplayName = "Controlled agent should not be enabled by default in options")]

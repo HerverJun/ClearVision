@@ -215,22 +215,72 @@ export const OPERATOR_PARAMETER_RULES = Object.freeze({
                 atLeastOneMessage: 'ResultOutput requires Channel, OutputChannel, or OutputChannelId.'
             }),
             FilePath: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'SaveToFile', equals: true }),
-                disabledWhen: Object.freeze({ parameter: 'SaveToFile', equals: false }),
-                disabledReason: 'File path is disabled when SaveToFile is false.'
+                requiredWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', equals: 'file' }),
+                    Object.freeze({ parameter: 'OutputChannel', equals: 'file' })
+                ]),
+                disabledWhenAll: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', notEquals: 'file' }),
+                    Object.freeze({ parameter: 'OutputChannel', notEquals: 'file' })
+                ]),
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'OutputPath', notEmpty: true })
+                ]),
+                disabledReason: 'File path is enabled only for file output.',
+                mutuallyExclusiveGroup: 'file-output',
+                atLeastOneOf: Object.freeze(['FilePath', 'OutputPath']),
+                atLeastOneMessage: 'File output requires FilePath or OutputPath.'
             }),
             OutputPath: Object.freeze({
-                requiredWhen: Object.freeze({ parameter: 'SaveToFile', equals: true }),
-                disabledWhen: Object.freeze({ parameter: 'SaveToFile', equals: false }),
-                disabledReason: 'Output path is disabled when SaveToFile is false.'
+                requiredWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', equals: 'file' }),
+                    Object.freeze({ parameter: 'OutputChannel', equals: 'file' })
+                ]),
+                disabledWhenAll: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', notEquals: 'file' }),
+                    Object.freeze({ parameter: 'OutputChannel', notEquals: 'file' })
+                ]),
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'FilePath', notEmpty: true })
+                ]),
+                disabledReason: 'Output path is enabled only for file output.',
+                mutuallyExclusiveGroup: 'file-output',
+                atLeastOneOf: Object.freeze(['FilePath', 'OutputPath']),
+                atLeastOneMessage: 'File output requires FilePath or OutputPath.'
             }),
             PlcAddress: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'Channel', equals: 'plc' }),
-                disabledReason: 'Agent workbench does not write PLC; keep PLC address disabled in offline review.'
+                requiredWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', equals: 'plc' }),
+                    Object.freeze({ parameter: 'OutputChannel', equals: 'plc' })
+                ]),
+                disabledWhenAll: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', notEquals: 'plc' }),
+                    Object.freeze({ parameter: 'OutputChannel', notEquals: 'plc' })
+                ]),
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'PLCParameters', notEmpty: true })
+                ]),
+                disabledReason: 'PLC metadata is enabled only for PLC output review.',
+                mutuallyExclusiveGroup: 'plc-output',
+                atLeastOneOf: Object.freeze(['PlcAddress', 'PLCParameters']),
+                atLeastOneMessage: 'PLC output requires PlcAddress or PLCParameters.'
             }),
             PLCParameters: Object.freeze({
-                disabledWhen: Object.freeze({ parameter: 'Channel', equals: 'plc' }),
-                disabledReason: 'Agent workbench does not write PLC; keep PLC parameters disabled in offline review.'
+                requiredWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', equals: 'plc' }),
+                    Object.freeze({ parameter: 'OutputChannel', equals: 'plc' })
+                ]),
+                disabledWhenAll: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', notEquals: 'plc' }),
+                    Object.freeze({ parameter: 'OutputChannel', notEquals: 'plc' })
+                ]),
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'PlcAddress', notEmpty: true })
+                ]),
+                disabledReason: 'PLC metadata is enabled only for PLC output review.',
+                mutuallyExclusiveGroup: 'plc-output',
+                atLeastOneOf: Object.freeze(['PlcAddress', 'PLCParameters']),
+                atLeastOneMessage: 'PLC output requires PlcAddress or PLCParameters.'
             })
         })
     })

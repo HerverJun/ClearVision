@@ -306,6 +306,20 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
 
+      - name: Run Vision Agent Quality Suite
+        shell: pwsh
+        run: python quality/tools/run_quality_suite.py --suite agent_engineering_harness_suite --run
+
+      - name: Upload Vision Agent Quality Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vision-agent-quality-suite
+          path: |
+            quality/evals/reports/VisionAgent_business_benchmark_baseline.json
+            quality/evals/reports/VisionAgent_business_benchmark_baseline.md
+            test_results/agent_engineering_harness/**/*.trx
+
       - name: Run UI Tests
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
         run: |
