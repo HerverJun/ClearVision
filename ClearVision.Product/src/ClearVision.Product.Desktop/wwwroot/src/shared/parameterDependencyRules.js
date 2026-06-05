@@ -1,25 +1,236 @@
 export const OPERATOR_PARAMETER_RULES = Object.freeze({
     ImageAcquisition: Object.freeze({
         parameters: Object.freeze({
+            SourceType: Object.freeze({
+                required: true
+            }),
             FilePath: Object.freeze({
                 requiredWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
                 disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'camera' }),
-                disabledReason: '相机模式下不需要文件路径',
+                disabledReason: 'File path is disabled while SourceType is camera.',
                 mutuallyExclusiveGroup: 'image-source'
             }),
             CameraId: Object.freeze({
                 requiredWhen: Object.freeze({ parameter: 'SourceType', equals: 'camera' }),
-                disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
-                disabledReason: '文件模式下不需要相机绑定',
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'SourceType', equals: 'file' }),
+                    Object.freeze({ parameter: 'CameraBindingId', notEmpty: true })
+                ]),
+                disabledReason: 'Camera id is disabled in file mode or when CameraBindingId is set.',
                 mutuallyExclusiveGroup: 'image-source',
-                atLeastOneOf: Object.freeze(['CameraId', 'CameraBindingId'])
+                atLeastOneOf: Object.freeze(['CameraId', 'CameraBindingId']),
+                atLeastOneMessage: 'Camera mode requires CameraId or CameraBindingId.'
             }),
             CameraBindingId: Object.freeze({
                 requiredWhen: Object.freeze({ parameter: 'SourceType', equals: 'camera' }),
-                disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
-                disabledReason: '文件模式下不需要相机绑定',
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'SourceType', equals: 'file' }),
+                    Object.freeze({ parameter: 'CameraId', notEmpty: true })
+                ]),
+                disabledReason: 'Camera binding is disabled in file mode or when CameraId is set.',
                 mutuallyExclusiveGroup: 'image-source',
-                atLeastOneOf: Object.freeze(['CameraId', 'CameraBindingId'])
+                atLeastOneOf: Object.freeze(['CameraId', 'CameraBindingId']),
+                atLeastOneMessage: 'Camera mode requires CameraId or CameraBindingId.'
+            }),
+            ExposureTime: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
+                disabledReason: 'Camera exposure is disabled for file acquisition.'
+            }),
+            Gain: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
+                disabledReason: 'Camera gain is disabled for file acquisition.'
+            }),
+            TriggerMode: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'SourceType', equals: 'file' }),
+                disabledReason: 'Trigger mode is disabled for file acquisition.'
+            })
+        })
+    }),
+    TemplateMatching: Object.freeze({
+        parameters: Object.freeze({
+            TemplatePath: Object.freeze({
+                required: true,
+                disabledWhen: Object.freeze({ parameter: 'TemplateId', notEmpty: true }),
+                disabledReason: 'Template path is disabled when TemplateId is selected.',
+                mutuallyExclusiveGroup: 'template-source',
+                atLeastOneOf: Object.freeze(['TemplatePath', 'TemplateId']),
+                atLeastOneMessage: 'TemplateMatching requires TemplatePath or TemplateId.'
+            }),
+            TemplateId: Object.freeze({
+                required: true,
+                disabledWhen: Object.freeze({ parameter: 'TemplatePath', notEmpty: true }),
+                disabledReason: 'TemplateId is disabled when TemplatePath is selected.',
+                mutuallyExclusiveGroup: 'template-source',
+                atLeastOneOf: Object.freeze(['TemplatePath', 'TemplateId']),
+                atLeastOneMessage: 'TemplateMatching requires TemplatePath or TemplateId.'
+            }),
+            RoiX: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'UseRoi', equals: false }),
+                disabledReason: 'ROI X is disabled when UseRoi is false.'
+            }),
+            RoiY: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'UseRoi', equals: false }),
+                disabledReason: 'ROI Y is disabled when UseRoi is false.'
+            }),
+            RoiWidth: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'UseRoi', equals: true }),
+                disabledWhen: Object.freeze({ parameter: 'UseRoi', equals: false }),
+                disabledReason: 'ROI width is disabled when UseRoi is false.'
+            }),
+            RoiHeight: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'UseRoi', equals: true }),
+                disabledWhen: Object.freeze({ parameter: 'UseRoi', equals: false }),
+                disabledReason: 'ROI height is disabled when UseRoi is false.'
+            }),
+            OriginX: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'OriginMode', equals: 'Custom' }),
+                disabledWhen: Object.freeze({ parameter: 'OriginMode', notEquals: 'Custom' }),
+                disabledReason: 'Origin X is only editable when OriginMode is Custom.'
+            }),
+            OriginY: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'OriginMode', equals: 'Custom' }),
+                disabledWhen: Object.freeze({ parameter: 'OriginMode', notEquals: 'Custom' }),
+                disabledReason: 'Origin Y is only editable when OriginMode is Custom.'
+            }),
+            AngleStart: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
+                disabledReason: 'Angle search is disabled when EnablePoseSearch is false.'
+            }),
+            AngleExtent: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
+                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
+                disabledReason: 'Angle extent is disabled when EnablePoseSearch is false.'
+            }),
+            AngleStep: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
+                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
+                disabledReason: 'Angle step is disabled when EnablePoseSearch is false.'
+            }),
+            ScaleMin: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
+                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
+                disabledReason: 'Scale search is disabled when EnablePoseSearch is false.'
+            }),
+            ScaleMax: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
+                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
+                disabledReason: 'Scale search is disabled when EnablePoseSearch is false.'
+            }),
+            ScaleStep: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: true }),
+                disabledWhen: Object.freeze({ parameter: 'EnablePoseSearch', equals: false }),
+                disabledReason: 'Scale step is disabled when EnablePoseSearch is false.'
+            })
+        })
+    }),
+    DeepLearning: Object.freeze({
+        parameters: Object.freeze({
+            ModelPath: Object.freeze({
+                required: true,
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'ModelId', notEmpty: true }),
+                    Object.freeze({ parameter: 'ModelCatalogPath', notEmpty: true })
+                ]),
+                disabledReason: 'ModelPath is disabled when ModelId or ModelCatalogPath is selected.',
+                mutuallyExclusiveGroup: 'model-source',
+                atLeastOneOf: Object.freeze(['ModelPath', 'ModelId', 'ModelCatalogPath']),
+                atLeastOneMessage: 'DeepLearning requires ModelPath, ModelId, or ModelCatalogPath.'
+            }),
+            ModelId: Object.freeze({
+                required: true,
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'ModelPath', notEmpty: true }),
+                    Object.freeze({ parameter: 'ModelCatalogPath', notEmpty: true })
+                ]),
+                disabledReason: 'ModelId is disabled when ModelPath or ModelCatalogPath is selected.',
+                mutuallyExclusiveGroup: 'model-source',
+                atLeastOneOf: Object.freeze(['ModelPath', 'ModelId', 'ModelCatalogPath']),
+                atLeastOneMessage: 'DeepLearning requires ModelPath, ModelId, or ModelCatalogPath.'
+            }),
+            ModelCatalogPath: Object.freeze({
+                required: true,
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'ModelPath', notEmpty: true }),
+                    Object.freeze({ parameter: 'ModelId', notEmpty: true })
+                ]),
+                disabledReason: 'ModelCatalogPath is disabled when ModelPath or ModelId is selected.',
+                mutuallyExclusiveGroup: 'model-source',
+                atLeastOneOf: Object.freeze(['ModelPath', 'ModelId', 'ModelCatalogPath']),
+                atLeastOneMessage: 'DeepLearning requires ModelPath, ModelId, or ModelCatalogPath.'
+            }),
+            GpuDeviceId: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'UseGpu', equals: false }),
+                disabledReason: 'GPU device id is disabled when UseGpu is false.'
+            }),
+            EnableInternalNms: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'OutputFormat', equals: 'EndToEndNms' }),
+                disabledReason: 'Internal NMS is owned by the exported model when OutputFormat is EndToEndNms.'
+            }),
+            NmsIouThreshold: Object.freeze({
+                requiredWhenAll: Object.freeze([
+                    Object.freeze({ parameter: 'OutputFormat', equals: 'RawYolo' }),
+                    Object.freeze({ parameter: 'EnableInternalNms', equals: true })
+                ]),
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'OutputFormat', equals: 'EndToEndNms' }),
+                    Object.freeze({ parameter: 'EnableInternalNms', equals: false })
+                ]),
+                disabledReason: 'NMS IoU is disabled when model-side NMS is trusted or internal NMS is off.'
+            })
+        })
+    }),
+    ResultOutput: Object.freeze({
+        parameters: Object.freeze({
+            Channel: Object.freeze({
+                required: true,
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'OutputChannel', notEmpty: true }),
+                    Object.freeze({ parameter: 'OutputChannelId', notEmpty: true })
+                ]),
+                disabledReason: 'Channel is disabled when a concrete output channel id is selected.',
+                mutuallyExclusiveGroup: 'output-channel',
+                atLeastOneOf: Object.freeze(['Channel', 'OutputChannel', 'OutputChannelId']),
+                atLeastOneMessage: 'ResultOutput requires Channel, OutputChannel, or OutputChannelId.'
+            }),
+            OutputChannel: Object.freeze({
+                required: true,
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', notEmpty: true }),
+                    Object.freeze({ parameter: 'OutputChannelId', notEmpty: true })
+                ]),
+                disabledReason: 'OutputChannel is disabled when Channel or OutputChannelId is selected.',
+                mutuallyExclusiveGroup: 'output-channel',
+                atLeastOneOf: Object.freeze(['Channel', 'OutputChannel', 'OutputChannelId']),
+                atLeastOneMessage: 'ResultOutput requires Channel, OutputChannel, or OutputChannelId.'
+            }),
+            OutputChannelId: Object.freeze({
+                required: true,
+                disabledWhenAny: Object.freeze([
+                    Object.freeze({ parameter: 'Channel', notEmpty: true }),
+                    Object.freeze({ parameter: 'OutputChannel', notEmpty: true })
+                ]),
+                disabledReason: 'OutputChannelId is disabled when Channel or OutputChannel is selected.',
+                mutuallyExclusiveGroup: 'output-channel',
+                atLeastOneOf: Object.freeze(['Channel', 'OutputChannel', 'OutputChannelId']),
+                atLeastOneMessage: 'ResultOutput requires Channel, OutputChannel, or OutputChannelId.'
+            }),
+            FilePath: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'SaveToFile', equals: true }),
+                disabledWhen: Object.freeze({ parameter: 'SaveToFile', equals: false }),
+                disabledReason: 'File path is disabled when SaveToFile is false.'
+            }),
+            OutputPath: Object.freeze({
+                requiredWhen: Object.freeze({ parameter: 'SaveToFile', equals: true }),
+                disabledWhen: Object.freeze({ parameter: 'SaveToFile', equals: false }),
+                disabledReason: 'Output path is disabled when SaveToFile is false.'
+            }),
+            PlcAddress: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'Channel', equals: 'plc' }),
+                disabledReason: 'Agent workbench does not write PLC; keep PLC address disabled in offline review.'
+            }),
+            PLCParameters: Object.freeze({
+                disabledWhen: Object.freeze({ parameter: 'Channel', equals: 'plc' }),
+                disabledReason: 'Agent workbench does not write PLC; keep PLC parameters disabled in offline review.'
             })
         })
     })
@@ -49,16 +260,28 @@ export function isEmptyParameterValue(value) {
         (typeof value === 'string' && value.trim() === '');
 }
 
+function normalizeConditionComparable(parameterName, value) {
+    if (parameterName && normalizeParameterName(parameterName) === 'sourcetype') {
+        return normalizeAcquisitionSourceType(value);
+    }
+
+    const raw = String(value ?? '').trim();
+    const separatorIndex = raw.indexOf('|');
+    return (separatorIndex >= 0 ? raw.substring(0, separatorIndex) : raw)
+        .trim()
+        .toLowerCase();
+}
+
 export function normalizeAcquisitionSourceType(value) {
     const raw = String(value || 'File').trim();
     const separatorIndex = raw.indexOf('|');
     const token = (separatorIndex >= 0 ? raw.substring(0, separatorIndex) : raw).trim().toLowerCase();
 
-    if (token === 'camera' || token.includes('相机')) {
+    if (token === 'camera' || token.includes('cam')) {
         return 'camera';
     }
 
-    if (token === 'file' || token.includes('文件')) {
+    if (token === 'file' || token.includes('image') || token.includes('path')) {
         return 'file';
     }
 
@@ -119,15 +342,64 @@ function evaluateCondition(condition, operator, values) {
         return false;
     }
 
-    const rawValue = getOperatorParameterValue(operator, condition.parameter, values);
-    const value = condition.parameter === 'SourceType'
-        ? normalizeAcquisitionSourceType(rawValue)
-        : String(rawValue ?? '').trim().toLowerCase();
-    const expected = condition.parameter === 'SourceType'
-        ? normalizeAcquisitionSourceType(condition.equals)
-        : String(condition.equals ?? '').trim().toLowerCase();
+    if (Array.isArray(condition.any)) {
+        return condition.any.some(item => evaluateCondition(item, operator, values));
+    }
 
-    return value === expected;
+    if (Array.isArray(condition.all)) {
+        return condition.all.every(item => evaluateCondition(item, operator, values));
+    }
+
+    const rawValue = getOperatorParameterValue(operator, condition.parameter, values);
+    const normalizedValue = normalizeConditionComparable(condition.parameter, rawValue);
+    const isEmpty = isEmptyParameterValue(rawValue);
+
+    if (Object.prototype.hasOwnProperty.call(condition, 'notEmpty')) {
+        return !isEmpty === Boolean(condition.notEmpty);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(condition, 'empty')) {
+        return isEmpty === Boolean(condition.empty);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(condition, 'equals')) {
+        return normalizedValue === normalizeConditionComparable(condition.parameter, condition.equals);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(condition, 'notEquals')) {
+        return normalizedValue !== normalizeConditionComparable(condition.parameter, condition.notEquals);
+    }
+
+    if (Array.isArray(condition.in)) {
+        return condition.in
+            .map(item => normalizeConditionComparable(condition.parameter, item))
+            .includes(normalizedValue);
+    }
+
+    if (Array.isArray(condition.notIn)) {
+        return !condition.notIn
+            .map(item => normalizeConditionComparable(condition.parameter, item))
+            .includes(normalizedValue);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(condition, 'truthy')) {
+        return Boolean(rawValue) === Boolean(condition.truthy);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(condition, 'falsy')) {
+        return !Boolean(rawValue) === Boolean(condition.falsy);
+    }
+
+    return false;
+}
+
+function evaluateAnyCondition(conditions, operator, values) {
+    return Array.isArray(conditions) && conditions.some(condition => evaluateCondition(condition, operator, values));
+}
+
+function evaluateAllConditions(conditions, operator, values) {
+    return Array.isArray(conditions) && conditions.length > 0 &&
+        conditions.every(condition => evaluateCondition(condition, operator, values));
 }
 
 function hasAnyPeerValue(operator, names, values) {
@@ -141,11 +413,27 @@ export function getParameterEffectiveState(operator, paramOrName, options = {}) 
     const rawRequired = typeof paramOrName === 'string'
         ? false
         : isParameterRawRequired(paramOrName);
-    const effectiveDisabled = Boolean(rule?.disabledWhen && evaluateCondition(rule.disabledWhen, operator, values));
+    const effectiveDisabled = Boolean(
+        (rule?.disabledWhen && evaluateCondition(rule.disabledWhen, operator, values)) ||
+        evaluateAnyCondition(rule?.disabledWhenAny, operator, values) ||
+        evaluateAllConditions(rule?.disabledWhenAll, operator, values)
+    );
     let effectiveRequired = rawRequired;
+
+    if (typeof rule?.required === 'boolean') {
+        effectiveRequired = rule.required;
+    }
 
     if (rule?.requiredWhen) {
         effectiveRequired = evaluateCondition(rule.requiredWhen, operator, values);
+    }
+
+    if (Array.isArray(rule?.requiredWhenAny)) {
+        effectiveRequired = evaluateAnyCondition(rule.requiredWhenAny, operator, values);
+    }
+
+    if (Array.isArray(rule?.requiredWhenAll)) {
+        effectiveRequired = evaluateAllConditions(rule.requiredWhenAll, operator, values);
     }
 
     if (effectiveRequired && Array.isArray(rule?.atLeastOneOf) && rule.atLeastOneOf.length > 1) {
@@ -220,7 +508,7 @@ export function collectEffectiveRequiredParameterErrors(operator, params = null,
                     name,
                     parameterNames: rule.atLeastOneOf,
                     kind: 'atLeastOneOf',
-                    message: '相机采集模式必须选择相机绑定'
+                    message: rule.atLeastOneMessage || `At least one of ${rule.atLeastOneOf.join(', ')} is required.`
                 });
             }
             return;
@@ -232,7 +520,7 @@ export function collectEffectiveRequiredParameterErrors(operator, params = null,
                 name,
                 parameterNames: [name],
                 kind: 'required',
-                message: `${options.getLabel?.(param, name) || name} 为必填项`
+                message: `${options.getLabel?.(param, name) || name} is required.`
             });
         }
     });

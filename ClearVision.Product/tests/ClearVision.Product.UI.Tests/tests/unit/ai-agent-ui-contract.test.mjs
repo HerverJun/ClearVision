@@ -142,6 +142,11 @@ async function loadPropertyPanel() {
   return import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js');
 }
 
+async function loadParameterRules() {
+  installDom();
+  return import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/shared/parameterDependencyRules.js');
+}
+
 function createPanel(AiPanel, overrides = {}) {
   const panel = Object.create(AiPanel.prototype);
   panel.options = overrides.options || {};
@@ -551,6 +556,153 @@ test('AI pending draft excludes camera binding fields when ImageAcquisition Sour
   assert.deepEqual(names, ['FilePath']);
 });
 
+test('parameter rules cover TemplateMatching template and ROI dependencies', async () => {
+  const {
+    collectEffectiveRequiredParameterErrors,
+    getParameterEffectiveState,
+    shouldIncludePendingParameter
+  } = await loadParameterRules();
+  const missingTemplate = {
+    type: 'TemplateMatching',
+    parameters: [
+      { name: 'TemplatePath', value: '' },
+      { name: 'TemplateId', value: '' },
+      { name: 'UseRoi', value: true },
+      { name: 'RoiWidth', value: '' },
+      { name: 'RoiHeight', value: '' }
+    ]
+  };
+  const configuredTemplate = {
+    type: 'TemplateMatching',
+    parameters: {
+      TemplateId: 'tmpl-fixture',
+      UseRoi: false,
+      EnablePoseSearch: false
+    }
+  };
+
+  assert.equal(getParameterEffectiveState(configuredTemplate, 'TemplatePath').effectiveDisabled, true);
+  assert.equal(getParameterEffectiveState(configuredTemplate, 'RoiWidth').effectiveDisabled, true);
+  assert.equal(shouldIncludePendingParameter(configuredTemplate, 'TemplatePath'), false);
+  assert.equal(
+    collectEffectiveRequiredParameterErrors(missingTemplate, missingTemplate.parameters)
+      .some(error => error.kind === 'atLeastOneOf' && error.parameterNames.includes('TemplatePath')),
+    true
+  );
+});
+
+test('parameter rules cover DeepLearning model source and NMS dependencies', async () => {
+  const {
+    collectEffectiveRequiredParameterErrors,
+    getParameterEffectiveState,
+    shouldIncludePendingParameter
+  } = await loadParameterRules();
+  const modelById = {
+    type: 'DeepLearning',
+    parameters: {
+      ModelId: 'wire-sequence-model',
+      UseGpu: false,
+      OutputFormat: 'EndToEndNms',
+      EnableInternalNms: true
+    }
+  };
+  const missingModel = {
+    type: 'DeepLearning',
+    parameters: [
+      { name: 'ModelPath', value: '' },
+      { name: 'ModelId', value: '' },
+      { name: 'ModelCatalogPath', value: '' }
+    ]
+  };
+
+  assert.equal(getParameterEffectiveState(modelById, 'ModelPath').effectiveDisabled, true);
+  assert.equal(getParameterEffectiveState(modelById, 'GpuDeviceId').effectiveDisabled, true);
+  assert.equal(getParameterEffectiveState(modelById, 'NmsIouThreshold').effectiveDisabled, true);
+  assert.equal(shouldIncludePendingParameter(modelById, 'ModelPath'), false);
+  assert.equal(
+    collectEffectiveRequiredParameterErrors(missingModel, missingModel.parameters)
+      .some(error => error.kind === 'atLeastOneOf' && error.parameterNames.includes('ModelPath')),
+    true
+  );
+});
+
+test('parameter rules cover ResultOutput channel file and PLC safety dependencies', async () => {
+  const {
+    collectEffectiveRequiredParameterErrors,
+    getParameterEffectiveState,
+    shouldIncludePendingParameter
+  } = await loadParameterRules();
+  const outputById = {
+    type: 'ResultOutput',
+    parameters: {
+      OutputChannelId: 'qa-board',
+      SaveToFile: false,
+      Channel: 'plc'
+    }
+  };
+  const missingChannel = {
+    type: 'ResultOutput',
+    parameters: [
+      { name: 'Channel', value: '' },
+      { name: 'OutputChannel', value: '' },
+      { name: 'OutputChannelId', value: '' }
+    ]
+  };
+
+  assert.equal(getParameterEffectiveState(outputById, 'Channel').effectiveDisabled, true);
+  assert.equal(getParameterEffectiveState(outputById, 'FilePath').effectiveDisabled, true);
+  assert.equal(getParameterEffectiveState(outputById, 'PlcAddress').effectiveDisabled, true);
+  assert.equal(shouldIncludePendingParameter(outputById, 'Channel'), false);
+  assert.equal(
+    collectEffectiveRequiredParameterErrors(missingChannel, missingChannel.parameters)
+      .some(error => error.kind === 'atLeastOneOf' && error.parameterNames.includes('OutputChannelId')),
+    true
+  );
+});
+
+test('AI pending draft uses effectiveDisabled rules for precheck missing resources', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const response = {
+    flow: {
+      operators: [
+        {
+          tempId: 'op_detect',
+          operatorType: 'DeepLearning',
+          displayName: 'Detector',
+          parameters: { ModelId: 'catalog-model' }
+        }
+      ]
+    },
+    missingResources: [
+      { resourceType: 'model_path', resourceKey: 'op_detect.ModelPath' }
+    ]
+  };
+
+  const pending = panel._resolvePendingParametersForDraft(response);
+  const groups = panel._collectPendingDraftGroups(pending, response.flow.operators);
+
+  assert.deepEqual(groups, []);
+});
+
+test('PropertyPanel model validation uses shared effectiveRequired rules beyond ImageAcquisition', async () => {
+  const { PropertyPanel } = await loadPropertyPanel();
+  const panel = createPropertyPanel(PropertyPanel, null);
+  const operator = {
+    id: 'dl',
+    type: 'DeepLearning',
+    parameters: [
+      { name: 'ModelPath', value: '' },
+      { name: 'ModelId', value: '' },
+      { name: 'ModelCatalogPath', value: '' }
+    ]
+  };
+
+  const errors = panel.validateOperatorModel(operator);
+
+  assert.equal(errors.some(error => String(error.message).includes('ModelPath')), true);
+});
+
 test('AI pending parameter editor displays Chinese operator type metadata', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, {
@@ -658,6 +810,11 @@ test('AI layout CSS places Agent workbench left and chat right with mobile fallb
 
   assert.match(source, /data-ai-workbench-pane="true"/);
   assert.match(source, /data-ai-chat-pane="true"/);
+  assert.match(source, /aiPanelWorkbenchMixin/);
+  assert.match(source, /aiPanelPendingParametersMixin/);
+  assert.match(source, /aiPanelChatMixin/);
+  assert.match(source, /aiPanelValidationPreviewMixin/);
+  assert.ok(source.split(/\r?\n/).length < 4500);
   assert.match(source, /focus\(\{\s*preventScroll:\s*true\s*\}\)/);
   assert.match(css, /\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#f3f6fa[^}]*background:\s*var\(--ai-surface-page\)/s);
   assert.match(css, /\[data-theme="dark"\]\s+\.ai-view-container\s*{[^}]*--ai-surface-page:\s*#14181d/s);
@@ -678,24 +835,26 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 26);
+  assert.equal(uiEntry.minimumTests, 31);
 });
 
 test('source guard: Agent UI has no RuntimePreview hardware network or process tool entry', () => {
   const currentFile = fileURLToPath(import.meta.url);
   const testProjectRoot = path.resolve(path.dirname(currentFile), '..', '..');
   const productRoot = path.resolve(testProjectRoot, '..', '..');
-  const sourcePath = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai', 'aiPanel.js');
+  const aiSourceDir = path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai');
+  const sourcePath = path.resolve(aiSourceDir, 'aiPanel.js');
   const source = fs.readFileSync(sourcePath, 'utf8');
+  const artifactSource = [
+    'aiPanelValidationPreview.js',
+    'aiPanelRuntimePreview.js',
+    'aiPanelToolTrace.js'
+  ].map(file => fs.readFileSync(path.resolve(aiSourceDir, file), 'utf8')).join('\n');
   const developerControlSection = source.slice(
     source.indexOf('_isAgentDeveloperControlsEnabled'),
     source.indexOf('_normalizeRequirementMode')
   );
-  const artifactSection = source.slice(
-    source.indexOf('_renderAgentValidationArtifacts'),
-    source.indexOf('_renderValidationConsole')
-  );
-  const guardedSource = `${developerControlSection}\n${artifactSection}`;
+  const guardedSource = `${developerControlSection}\n${artifactSource}`;
 
   assert.doesNotMatch(guardedSource, /capture_test_frame|replay_flow_with_frame|runtime_package_precheck/i);
   assert.doesNotMatch(guardedSource, /AcquireSingleFrameAsync|EnumerateCamerasAsync|GetOrCreateByBindingAsync|fetch\(|XMLHttpRequest|child_process|process\.|powershell|cmd\.exe|execute_command/i);

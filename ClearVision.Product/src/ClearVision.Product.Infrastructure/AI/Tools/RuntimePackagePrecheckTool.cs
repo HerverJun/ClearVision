@@ -130,33 +130,18 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         List<PrecheckIssue> warnings,
         List<PrecheckMissingResource> missingResources)
     {
-        foreach (var op in flow.Operators)
+        foreach (var resource in VisionAgentParameterRuleCenter.CollectMissingResources(
+                     flow,
+                     VisionAgentParameterRuleScope.DeploymentPrecheck))
         {
-            if (string.Equals(op.OperatorType, "ResultOutput", StringComparison.OrdinalIgnoreCase) &&
-                IsMissingParameter(op.Parameters, "Channel"))
-            {
-                AddMissingResource(
-                    warnings,
-                    missingResources,
-                    "output_channel",
-                    "Channel",
-                    op.TempId,
-                    op.OperatorType,
-                    "ResultOutput.Channel is not configured.");
-            }
-
-            if (op.OperatorType.Contains("Plc", StringComparison.OrdinalIgnoreCase) &&
-                HasMissingPlcParameters(op.Parameters))
-            {
-                AddMissingResource(
-                    warnings,
-                    missingResources,
-                    "plc_parameters",
-                    "PLCParameters",
-                    op.TempId,
-                    op.OperatorType,
-                    $"{op.OperatorType} PLC parameters are missing or pending.");
-            }
+            AddMissingResource(
+                warnings,
+                missingResources,
+                resource.ResourceKind,
+                resource.ParameterName,
+                resource.TempId,
+                resource.OperatorType,
+                resource.Message);
         }
     }
 
@@ -302,23 +287,6 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             message,
             tempId,
             operatorType));
-    }
-
-    private static bool HasMissingPlcParameters(IReadOnlyDictionary<string, string?> parameters)
-    {
-        return parameters.Count == 0 ||
-               parameters.Any(parameter =>
-                   string.IsNullOrWhiteSpace(parameter.Value) ||
-                   parameter.Value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool IsMissingParameter(
-        IReadOnlyDictionary<string, string?> parameters,
-        string parameterName)
-    {
-        return !parameters.TryGetValue(parameterName, out var value) ||
-               string.IsNullOrWhiteSpace(value) ||
-               value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<PrecheckIssue> ReadIssues(JsonElement root, string propertyName)

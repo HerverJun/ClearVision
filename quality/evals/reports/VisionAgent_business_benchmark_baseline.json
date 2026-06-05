@@ -1,0 +1,1196 @@
+{
+  "schemaVersion": "2026-06-05.vision-agent-business-benchmark.v1",
+  "benchmarkId": "vision_agent_business_benchmark",
+  "generatedAtUtc": "2026-06-05T00:00:00Z",
+  "mode": "offline_metadata_only",
+  "summary": {
+    "caseCount": 36,
+    "previewEligibleCount": 7,
+    "accepted": true
+  },
+  "metrics": {
+    "generationSuccessRate": 1.0,
+    "structuralValidationPassRate": 1.0,
+    "dryRunPassRate": 0.7778,
+    "previewReadyRate": 0.7143,
+    "parameterCompletionRate": 0.75,
+    "userApplicableRate": 1.0
+  },
+  "thresholdResults": {
+    "generationSuccessRate": {
+      "actual": 1.0,
+      "minimum": 0.95,
+      "passed": true
+    },
+    "structuralValidationPassRate": {
+      "actual": 1.0,
+      "minimum": 0.95,
+      "passed": true
+    },
+    "dryRunPassRate": {
+      "actual": 0.7778,
+      "minimum": 0.75,
+      "passed": true
+    },
+    "previewReadyRate": {
+      "actual": 0.7143,
+      "minimum": 0.7,
+      "passed": true
+    },
+    "parameterCompletionRate": {
+      "actual": 0.75,
+      "minimum": 0.75,
+      "passed": true
+    },
+    "userApplicableRate": {
+      "actual": 1.0,
+      "minimum": 0.9,
+      "passed": true
+    }
+  },
+  "categoryCounts": {
+    "hole_distance": 5,
+    "missing_resources": 5,
+    "modify_existing_flow": 4,
+    "parameter_completion": 5,
+    "precheck": 3,
+    "runtime_preview": 4,
+    "template_matching": 5,
+    "wire_sequence": 5
+  },
+  "taskTypeCounts": {
+    "generate": 3,
+    "missing_resource": 8,
+    "modify_existing_flow": 6,
+    "parameter_completion": 8,
+    "precheck": 4,
+    "runtime_preview": 7
+  },
+  "safety": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "hotLoadAttempted": false,
+    "runtimePreviewMode": "offline_metadata_only",
+    "violations": []
+  },
+  "cases": [
+    {
+      "caseId": "VA-BM-001",
+      "category": "wire_sequence",
+      "taskType": "generate",
+      "userRequest": "Generate a terminal wire sequence inspection draft.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "RoiManager",
+        "DeepLearning",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "match_flow_template",
+        "get_flow_template_skeleton",
+        "list_camera_bindings",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready_with_warnings"
+    },
+    {
+      "caseId": "VA-BM-002",
+      "category": "wire_sequence",
+      "taskType": "modify_existing_flow",
+      "userRequest": "Update the existing wire sequence rule from red-blue-black to red-black-blue.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "RoiManager",
+        "DeepLearning",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_flow_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-003",
+      "category": "wire_sequence",
+      "taskType": "missing_resource",
+      "userRequest": "Create a wire sequence draft when no camera binding is selected yet.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "RoiManager",
+        "DeepLearning",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "list_camera_bindings",
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "cameraBinding.required",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": false,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "blocked_missing_resource"
+    },
+    {
+      "caseId": "VA-BM-004",
+      "category": "wire_sequence",
+      "taskType": "runtime_preview",
+      "userRequest": "Show offline RuntimePreview metadata for the wire sequence draft.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "RoiManager",
+        "DeepLearning",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "runtime_preview_metadata",
+        "validate_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": true,
+        "previewReady": true,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "offline_metadata_only",
+      "precheckStatus": "not_requested"
+    },
+    {
+      "caseId": "VA-BM-005",
+      "category": "wire_sequence",
+      "taskType": "parameter_completion",
+      "userRequest": "Fill the wire sequence ResultOutput channel from the engineer selection.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "RoiManager",
+        "DeepLearning",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_parameter_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-006",
+      "category": "template_matching",
+      "taskType": "generate",
+      "userRequest": "Generate a bracket alignment flow using template matching.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "PositionCorrection",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "match_flow_template",
+        "get_flow_template_skeleton",
+        "get_operator_schema",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready_with_warnings"
+    },
+    {
+      "caseId": "VA-BM-007",
+      "category": "template_matching",
+      "taskType": "missing_resource",
+      "userRequest": "Prepare a template matching flow before the template has been selected.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "get_operator_schema",
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "templatePath.required",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": false,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "blocked_missing_resource"
+    },
+    {
+      "caseId": "VA-BM-008",
+      "category": "template_matching",
+      "taskType": "parameter_completion",
+      "userRequest": "Review and fill ROI parameters for template matching.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_parameter_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-009",
+      "category": "template_matching",
+      "taskType": "modify_existing_flow",
+      "userRequest": "Raise the template matching minimum score threshold to 0.86.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_flow_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-010",
+      "category": "template_matching",
+      "taskType": "runtime_preview",
+      "userRequest": "Show offline RuntimePreview metadata for bracket template matching.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "runtime_preview_metadata",
+        "validate_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": true,
+        "previewReady": true,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "offline_metadata_only",
+      "precheckStatus": "not_requested"
+    },
+    {
+      "caseId": "VA-BM-011",
+      "category": "hole_distance",
+      "taskType": "generate",
+      "userRequest": "Generate a hole distance measurement flow with two circle measurements.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "CircleMeasurement",
+        "CircleMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "retrieve_operator_knowledge",
+        "get_operator_schema",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready_with_warnings"
+    },
+    {
+      "caseId": "VA-BM-012",
+      "category": "hole_distance",
+      "taskType": "missing_resource",
+      "userRequest": "Flag missing calibration review for a hole distance measurement draft.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "CircleMeasurement",
+        "CircleMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "retrieve_operator_knowledge",
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "calibration.review",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready_with_warnings"
+    },
+    {
+      "caseId": "VA-BM-013",
+      "category": "hole_distance",
+      "taskType": "parameter_completion",
+      "userRequest": "Fill both hole ROI names after the engineer selects them.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "CircleMeasurement",
+        "CircleMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_parameter_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-014",
+      "category": "hole_distance",
+      "taskType": "modify_existing_flow",
+      "userRequest": "Tighten the hole distance tolerance to plus/minus 0.03 mm.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "CircleMeasurement",
+        "CircleMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_flow_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-015",
+      "category": "hole_distance",
+      "taskType": "precheck",
+      "userRequest": "Run static precheck for a hole distance draft and surface deployment warnings.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "CircleMeasurement",
+        "CircleMeasurement",
+        "MeasureDistance",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready_with_warnings"
+    },
+    {
+      "caseId": "VA-BM-016",
+      "category": "missing_resources",
+      "taskType": "missing_resource",
+      "userRequest": "Generate defect detection but leave the DeepLearning model unresolved.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "DeepLearning",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "retrieve_operator_knowledge",
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "modelPath.required",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": false,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "blocked_missing_resource"
+    },
+    {
+      "caseId": "VA-BM-017",
+      "category": "missing_resources",
+      "taskType": "missing_resource",
+      "userRequest": "Generate a flow while CameraBindingId is still pending.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "list_camera_bindings",
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "cameraBinding.required",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": false,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "blocked_missing_resource"
+    },
+    {
+      "caseId": "VA-BM-018",
+      "category": "missing_resources",
+      "taskType": "missing_resource",
+      "userRequest": "Surface missing ResultOutput channel before deployment precheck.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "outputChannel.required",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": false,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "blocked_missing_resource"
+    },
+    {
+      "caseId": "VA-BM-019",
+      "category": "missing_resources",
+      "taskType": "missing_resource",
+      "userRequest": "Surface missing PLC metadata without writing to PLC.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "ResultJudgment",
+        "PlcResultOutput"
+      ],
+      "expectedTools": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "plcParameters.required",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": false,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "blocked_missing_resource"
+    },
+    {
+      "caseId": "VA-BM-020",
+      "category": "missing_resources",
+      "taskType": "missing_resource",
+      "userRequest": "Surface missing template resource and keep the flow as a draft.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "get_operator_schema",
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "templatePath.required",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": false,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "blocked_missing_resource"
+    },
+    {
+      "caseId": "VA-BM-021",
+      "category": "modify_existing_flow",
+      "taskType": "modify_existing_flow",
+      "userRequest": "Add a DeepLearning branch to an existing template matching flow.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "DeepLearning",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "get_operator_schema",
+        "propose_flow_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-022",
+      "category": "modify_existing_flow",
+      "taskType": "modify_existing_flow",
+      "userRequest": "Replace a template matching operator with a catalog template variant.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_flow_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-023",
+      "category": "modify_existing_flow",
+      "taskType": "runtime_preview",
+      "userRequest": "Add RuntimePreview metadata display to the current Agent workbench result.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "runtime_preview_metadata",
+        "validate_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": true,
+        "previewReady": true,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "offline_metadata_only",
+      "precheckStatus": "not_requested"
+    },
+    {
+      "caseId": "VA-BM-024",
+      "category": "modify_existing_flow",
+      "taskType": "modify_existing_flow",
+      "userRequest": "Change ResultJudgment thresholds while preserving existing connections.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_flow_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-025",
+      "category": "parameter_completion",
+      "taskType": "parameter_completion",
+      "userRequest": "Fill ImageAcquisition CameraId from a catalog selection.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_parameter_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-026",
+      "category": "parameter_completion",
+      "taskType": "parameter_completion",
+      "userRequest": "Fill DeepLearning ModelId instead of ModelPath.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "DeepLearning",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_parameter_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-027",
+      "category": "parameter_completion",
+      "taskType": "parameter_completion",
+      "userRequest": "Fill TemplateMatching TemplateId instead of TemplatePath.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_parameter_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-028",
+      "category": "parameter_completion",
+      "taskType": "parameter_completion",
+      "userRequest": "Fill ResultOutput OutputChannelId and suppress conflicting Channel prompts.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_parameter_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-029",
+      "category": "parameter_completion",
+      "taskType": "parameter_completion",
+      "userRequest": "Disable ImageAcquisition FilePath when camera source is selected.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "propose_parameter_patch",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-030",
+      "category": "runtime_preview",
+      "taskType": "runtime_preview",
+      "userRequest": "Render RuntimePreview metadata for a single-camera flow.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "runtime_preview_metadata",
+        "validate_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": true,
+        "previewReady": true,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "offline_metadata_only",
+      "precheckStatus": "not_requested"
+    },
+    {
+      "caseId": "VA-BM-031",
+      "category": "runtime_preview",
+      "taskType": "runtime_preview",
+      "userRequest": "Block RuntimePreview metadata when multiple ImageAcquisition entries need selection.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "ImageAcquisition",
+        "ImageCompose",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "runtime_preview_metadata",
+        "validate_flow"
+      ],
+      "pendingActions": [
+        "entryOperatorTempId.required"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": true,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "offline_metadata_only",
+      "precheckStatus": "not_requested"
+    },
+    {
+      "caseId": "VA-BM-032",
+      "category": "runtime_preview",
+      "taskType": "runtime_preview",
+      "userRequest": "Keep developer hidden RuntimePreview controls disabled by default.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "runtime_preview_metadata",
+        "validate_flow"
+      ],
+      "pendingActions": [
+        "developerHiddenUi.disabled"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "offline_metadata_only",
+      "precheckStatus": "not_requested"
+    },
+    {
+      "caseId": "VA-BM-033",
+      "category": "runtime_preview",
+      "taskType": "runtime_preview",
+      "userRequest": "Show RuntimePreview metadata without frame bytes, image files, or model files.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "inspect_current_flow",
+        "runtime_preview_metadata",
+        "validate_flow"
+      ],
+      "pendingActions": [],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": true,
+        "previewReady": true,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "offline_metadata_only",
+      "precheckStatus": "not_requested"
+    },
+    {
+      "caseId": "VA-BM-034",
+      "category": "precheck",
+      "taskType": "precheck",
+      "userRequest": "Run static runtime package precheck for a ready draft.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "ready"
+    },
+    {
+      "caseId": "VA-BM-035",
+      "category": "precheck",
+      "taskType": "precheck",
+      "userRequest": "Block deployment when mock Station status is offline, without touching a real Station.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "stationStatus.review",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "blocked_station_offline"
+    },
+    {
+      "caseId": "VA-BM-036",
+      "category": "precheck",
+      "taskType": "precheck",
+      "userRequest": "Block deployment when structure-only dryrun summary is missing.",
+      "expectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultJudgment",
+        "ResultOutput"
+      ],
+      "expectedTools": [
+        "validate_flow",
+        "runtime_package_precheck"
+      ],
+      "pendingActions": [
+        "dryrun.required",
+        "runtimePackagePrecheck.review"
+      ],
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": false,
+        "previewEligible": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "runtimePreviewMode": "not_requested",
+      "precheckStatus": "blocked_dryrun_missing"
+    }
+  ]
+}

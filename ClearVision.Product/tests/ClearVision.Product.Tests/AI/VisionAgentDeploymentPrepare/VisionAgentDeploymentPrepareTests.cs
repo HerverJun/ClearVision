@@ -74,6 +74,48 @@ public sealed class VisionAgentDeploymentPrepareTests
         Json(result.Data).GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
     }
 
+    [Fact(DisplayName = "validate_flow should use parameter rule center for model and template alternatives")]
+    public async Task ValidateFlow_ShouldUseParameterRuleCenterForModelAndTemplateAlternatives()
+    {
+        var flow = TemplateAndModelCatalogFlow();
+        var result = await new FlowValidationTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(("flow", flow)),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var missingParameters = Json(result.Data)
+            .GetProperty("missingResources")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("parameterName").GetString())
+            .ToList();
+
+        missingParameters.Should().NotContain("TemplatePath");
+        missingParameters.Should().NotContain("ModelPath");
+    }
+
+    [Fact(DisplayName = "runtime_package_precheck should use parameter rule center for output channel aliases")]
+    public async Task Precheck_ShouldUseParameterRuleCenterForOutputChannelAliases()
+    {
+        var flow = OutputAliasFlow();
+        var result = await new RuntimePackagePrecheckTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(
+                ("flow", flow),
+                ("validationSummary", await ValidateAsync(flow)),
+                ("dryRunSummary", await DryRunAsync(flow))),
+            CancellationToken.None);
+
+        var missingParameters = Json(result.Data)
+            .GetProperty("missingResources")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("parameterName").GetString())
+            .ToList();
+
+        missingParameters.Should().NotContain("Channel");
+        Json(result.Data).GetProperty("readyForDeployment").GetBoolean().Should().BeTrue();
+    }
+
     [Fact(DisplayName = "runtime_package_precheck should block deployment for structural validation issues")]
     public async Task Precheck_ShouldBlockDeploymentForStructuralErrors()
     {
@@ -388,6 +430,44 @@ public sealed class VisionAgentDeploymentPrepareTests
             {
                 Connection("op_cam", "Image", "op_plc", "Input"),
                 Connection("op_plc", "Result", "op_out", "Input")
+            }
+        };
+    }
+
+    private static object TemplateAndModelCatalogFlow()
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
+                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplateId"] = "template_catalog_item" }),
+                Operator("op_detect", "DeepLearning", new Dictionary<string, string> { ["ModelId"] = "model_catalog_item" }),
+                Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["Channel"] = "result_bus" })
+            },
+            connections = new object[]
+            {
+                Connection("op_cam", "Image", "op_match", "Image"),
+                Connection("op_cam", "Image", "op_detect", "Image"),
+                Connection("op_match", "Score", "op_out", "Input")
+            }
+        };
+    }
+
+    private static object OutputAliasFlow()
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
+                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "template://fixture" }),
+                Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["OutputChannelId"] = "result_bus" })
+            },
+            connections = new object[]
+            {
+                Connection("op_cam", "Image", "op_match", "Image"),
+                Connection("op_match", "Score", "op_out", "Input")
             }
         };
     }

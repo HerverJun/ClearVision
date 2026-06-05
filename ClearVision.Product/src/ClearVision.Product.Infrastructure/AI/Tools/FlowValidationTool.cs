@@ -42,13 +42,6 @@ public sealed class FlowValidationTool : VisionAgentToolBase
 
 internal static class VisionAgentFlowDraftValidator
 {
-    private static readonly IReadOnlyList<ResourceRequirement> ResourceRequirements =
-    [
-        new("ImageAcquisition", "CameraBindingId", "camera_binding"),
-        new("DeepLearning", "ModelPath", "model_path"),
-        new("TemplateMatching", "TemplatePath", "template_path")
-    ];
-
     public static VisionAgentFlowValidation Validate(VisionAgentFlowDraft flow)
     {
         var blockingIssues = new List<VisionAgentFlowIssue>();
@@ -143,24 +136,20 @@ internal static class VisionAgentFlowDraftValidator
                     op.OperatorType));
             }
 
-            foreach (var requirement in ResourceRequirements.Where(requirement =>
-                         string.Equals(requirement.OperatorType, op.OperatorType, StringComparison.OrdinalIgnoreCase)))
-            {
-                if (IsMissingResource(op.Parameters, requirement.ParameterName))
-                {
-                    missingResources.Add(new VisionAgentMissingResource(
-                        requirement.ResourceKind,
-                        requirement.ParameterName,
-                        op.TempId,
-                        op.OperatorType,
-                        $"{op.OperatorType}.{requirement.ParameterName} is not configured."));
-                    warnings.Add(new VisionAgentFlowIssue(
-                        "missing_resource",
-                        $"{op.OperatorType}.{requirement.ParameterName} is missing or pending.",
-                        op.TempId,
-                        op.OperatorType));
-                }
-            }
+        }
+
+        missingResources.AddRange(
+            VisionAgentParameterRuleCenter.CollectMissingResources(
+                flow,
+                VisionAgentParameterRuleScope.FlowValidation));
+
+        foreach (var missingResource in missingResources)
+        {
+            warnings.Add(new VisionAgentFlowIssue(
+                "missing_resource",
+                missingResource.Message,
+                missingResource.TempId,
+                missingResource.OperatorType));
         }
 
         return new VisionAgentFlowValidation(flow, blockingIssues, warnings, missingResources);
@@ -200,24 +189,6 @@ internal static class VisionAgentFlowDraftValidator
         }
     }
 
-    private static bool IsMissingResource(
-        IReadOnlyDictionary<string, string?> parameters,
-        string parameterName)
-    {
-        if (!parameters.TryGetValue(parameterName, out var value) ||
-            string.IsNullOrWhiteSpace(value))
-        {
-            return true;
-        }
-
-        return value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
-               value.Contains("todo", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private sealed record ResourceRequirement(
-        string OperatorType,
-        string ParameterName,
-        string ResourceKind);
 }
 
 internal sealed record VisionAgentFlowValidation(

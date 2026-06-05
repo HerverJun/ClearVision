@@ -2,6 +2,7 @@ import {
     buildPreviewSummaryItems,
     isPreviewImageLikePayload
 } from './previewOutputFormatter.mjs';
+import { normalizeAcquisitionSourceType } from '../../shared/parameterDependencyRules.js';
 
 const DEFAULT_DEBOUNCE_MS = 500;
 const DEFAULT_PREVIEW_TIMEOUT_MS = 15000;
@@ -460,12 +461,6 @@ function getParameterValue(parameters, ...names) {
     }
 
     return null;
-}
-
-function normalizeAcquisitionSourceType(value) {
-    const raw = String(value || 'File').trim();
-    const separatorIndex = raw.indexOf('|');
-    return (separatorIndex >= 0 ? raw.substring(0, separatorIndex) : raw).trim().toLowerCase();
 }
 
 function shouldUseExternalInputImage(node) {
