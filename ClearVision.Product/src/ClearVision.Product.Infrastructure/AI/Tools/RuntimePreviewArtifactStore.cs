@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using ClearVision.Product.Core.AI.Tools;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
@@ -89,8 +91,9 @@ public sealed class RuntimePreviewArtifactStore
 
     public static string StableSuffix(params string[] values)
     {
-        var hash = string.Join("|", values).GetHashCode(StringComparison.OrdinalIgnoreCase);
-        return unchecked((uint)hash).ToString("x8");
+        var normalized = string.Join("|", values.Select(value => value.Trim().ToUpperInvariant()));
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(normalized));
+        return Convert.ToHexString(hash, 0, 4).ToLowerInvariant();
     }
 
     private static string SafeToken(string? value)

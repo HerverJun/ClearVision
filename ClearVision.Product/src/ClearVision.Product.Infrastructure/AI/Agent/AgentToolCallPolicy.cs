@@ -78,6 +78,21 @@ public sealed class AgentToolCallPolicy
                 $"Planner tool '{toolName}' requires explicit RuntimePreview consent.");
         }
 
+        if (!string.Equals(toolName, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase) &&
+            LooksLikeDeploymentPrepareTool(toolName))
+        {
+            return AgentToolCallPolicyResult.Deny(
+                "deployment_prepare_tool_denied",
+                "DeploymentPrepare is only allowed for runtime_package_precheck.");
+        }
+
+        if (LooksLikeConfigWriteTool(toolName))
+        {
+            return AgentToolCallPolicyResult.Deny(
+                "config_write_denied",
+                "ConfigWrite tools are always denied for Vision Agent planner calls.");
+        }
+
         if (!AllowedToolNames.Contains(toolName))
         {
             return AgentToolCallPolicyResult.Deny(
@@ -85,15 +100,20 @@ public sealed class AgentToolCallPolicy
                 $"Planner tool '{toolName}' is outside the allowed tool set.");
         }
 
-        if (!string.Equals(toolName, "runtime_package_precheck", StringComparison.OrdinalIgnoreCase) &&
-            toolName.Contains("precheck", StringComparison.OrdinalIgnoreCase))
-        {
-            return AgentToolCallPolicyResult.Deny(
-                "deployment_prepare_tool_denied",
-                "DeploymentPrepare is only allowed for runtime_package_precheck.");
-        }
-
         return AgentToolCallPolicyResult.Allow();
+    }
+
+    private static bool LooksLikeDeploymentPrepareTool(string toolName)
+    {
+        return toolName.Contains("runtime_package", StringComparison.OrdinalIgnoreCase) ||
+               toolName.Contains("station_package", StringComparison.OrdinalIgnoreCase) ||
+               toolName.Contains("deployment", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeConfigWriteTool(string toolName)
+    {
+        return toolName.Contains("config_write", StringComparison.OrdinalIgnoreCase) ||
+               toolName.Contains("write_config", StringComparison.OrdinalIgnoreCase);
     }
 }
 

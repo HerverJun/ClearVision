@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace ClearVision.Product.Tests.AI.ParameterRuleParity;
 
-public sealed class ParameterRuleParityTests
+public sealed class VisionAgentParameterRuleParityTests
 {
     [Fact(DisplayName = "parameter rule parity spec should cover required Vision Agent operator families")]
     public void SharedSpec_ShouldCoverRequiredRuleFamilies()

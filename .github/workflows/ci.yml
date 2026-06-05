@@ -318,7 +318,10 @@ jobs:
           path: |
             quality/evals/reports/VisionAgent_business_benchmark_baseline.json
             quality/evals/reports/VisionAgent_business_benchmark_baseline.md
+            quality/evals/reports/planner_autonomy_benchmark.json
+            quality/evals/reports/planner_autonomy_benchmark.md
             test_results/agent_engineering_harness/**/*.trx
+            test_results/agent_engineering_harness/agent_ui_contract_output.txt
 
       - name: Run UI Tests
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests

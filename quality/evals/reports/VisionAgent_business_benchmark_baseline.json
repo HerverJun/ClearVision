@@ -769,13 +769,13 @@
         "previewReady": true,
         "workflowDraftAllowed": true,
         "frameSource": "offline_fixture_metadata",
-        "frameId": "offline-frame-ed7e814e",
+        "frameId": "offline-frame-9927be31",
         "source": "runtime_preview_offline_adapter",
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
           "previewMode": "offline_fixture",
-          "frameId": "offline-frame-ed7e814e",
+          "frameId": "offline-frame-9927be31",
           "executedOperators": [
             {
               "tempId": "op_cam",
@@ -826,14 +826,14 @@
         "missingResources": [],
         "artifacts": [
           {
-            "artifactId": "operator-result-d4d4c62d",
+            "artifactId": "operator-result-aa8500f2",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_cam",
               "operatorType": "ImageAcquisition",
               "status": "simulated_offline_frame",
@@ -841,14 +841,14 @@
             }
           },
           {
-            "artifactId": "operator-result-20cab5b0",
+            "artifactId": "operator-result-0b2829d0",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_roi",
               "operatorType": "RoiManager",
               "status": "simulated_offline_operator",
@@ -856,14 +856,14 @@
             }
           },
           {
-            "artifactId": "operator-result-10018987",
+            "artifactId": "operator-result-76ed651d",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_detect",
               "operatorType": "DeepLearning",
               "status": "simulated_offline_model_inference",
@@ -871,14 +871,14 @@
             }
           },
           {
-            "artifactId": "operator-result-3ae39cf0",
+            "artifactId": "operator-result-806294f7",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_judge",
               "operatorType": "ResultJudgment",
               "status": "simulated_offline_operator",
@@ -886,14 +886,14 @@
             }
           },
           {
-            "artifactId": "operator-result-8a91d9cc",
+            "artifactId": "operator-result-dee74268",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_out",
               "operatorType": "ResultOutput",
               "status": "simulated_offline_output",
@@ -901,14 +901,14 @@
             }
           },
           {
-            "artifactId": "replay-summary-c2c2492c",
+            "artifactId": "replay-summary-43a0d705",
             "artifactType": "replay_summary_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "executedCount": 5,
               "skippedCount": 0,
               "blockingIssueCount": 0,
@@ -1914,13 +1914,13 @@
         "previewReady": true,
         "workflowDraftAllowed": true,
         "frameSource": "offline_fixture_metadata",
-        "frameId": "offline-frame-ed7e814e",
+        "frameId": "offline-frame-9927be31",
         "source": "runtime_preview_offline_adapter",
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
           "previewMode": "offline_fixture",
-          "frameId": "offline-frame-ed7e814e",
+          "frameId": "offline-frame-9927be31",
           "executedOperators": [
             {
               "tempId": "op_cam",
@@ -1965,14 +1965,14 @@
         "missingResources": [],
         "artifacts": [
           {
-            "artifactId": "operator-result-d4d4c62d",
+            "artifactId": "operator-result-aa8500f2",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_cam",
               "operatorType": "ImageAcquisition",
               "status": "simulated_offline_frame",
@@ -1980,14 +1980,14 @@
             }
           },
           {
-            "artifactId": "operator-result-e097f685",
+            "artifactId": "operator-result-8ec827f7",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_match",
               "operatorType": "TemplateMatching",
               "status": "simulated_offline_template_match",
@@ -1995,14 +1995,14 @@
             }
           },
           {
-            "artifactId": "operator-result-f9874272",
+            "artifactId": "operator-result-10c62b1b",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_judge",
               "operatorType": "ResultJudgment",
               "status": "simulated_offline_operator",
@@ -2010,14 +2010,14 @@
             }
           },
           {
-            "artifactId": "operator-result-d05977ae",
+            "artifactId": "operator-result-8c317233",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_out",
               "operatorType": "ResultOutput",
               "status": "simulated_offline_output",
@@ -2025,14 +2025,14 @@
             }
           },
           {
-            "artifactId": "replay-summary-dd378769",
+            "artifactId": "replay-summary-825d0f84",
             "artifactType": "replay_summary_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "executedCount": 4,
               "skippedCount": 0,
               "blockingIssueCount": 0,
@@ -4445,13 +4445,13 @@
         "previewReady": true,
         "workflowDraftAllowed": true,
         "frameSource": "offline_fixture_metadata",
-        "frameId": "offline-frame-ed7e814e",
+        "frameId": "offline-frame-9927be31",
         "source": "runtime_preview_offline_adapter",
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
           "previewMode": "offline_fixture",
-          "frameId": "offline-frame-ed7e814e",
+          "frameId": "offline-frame-9927be31",
           "executedOperators": [
             {
               "tempId": "op_cam",
@@ -4496,14 +4496,14 @@
         "missingResources": [],
         "artifacts": [
           {
-            "artifactId": "operator-result-d4d4c62d",
+            "artifactId": "operator-result-aa8500f2",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_cam",
               "operatorType": "ImageAcquisition",
               "status": "simulated_offline_frame",
@@ -4511,14 +4511,14 @@
             }
           },
           {
-            "artifactId": "operator-result-e097f685",
+            "artifactId": "operator-result-8ec827f7",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_match",
               "operatorType": "TemplateMatching",
               "status": "simulated_offline_template_match",
@@ -4526,14 +4526,14 @@
             }
           },
           {
-            "artifactId": "operator-result-f9874272",
+            "artifactId": "operator-result-10c62b1b",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_judge",
               "operatorType": "ResultJudgment",
               "status": "simulated_offline_operator",
@@ -4541,14 +4541,14 @@
             }
           },
           {
-            "artifactId": "operator-result-d05977ae",
+            "artifactId": "operator-result-8c317233",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_out",
               "operatorType": "ResultOutput",
               "status": "simulated_offline_output",
@@ -4556,14 +4556,14 @@
             }
           },
           {
-            "artifactId": "replay-summary-dd378769",
+            "artifactId": "replay-summary-825d0f84",
             "artifactType": "replay_summary_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "executedCount": 4,
               "skippedCount": 0,
               "blockingIssueCount": 0,
@@ -5631,13 +5631,13 @@
         "previewReady": true,
         "workflowDraftAllowed": true,
         "frameSource": "offline_fixture_metadata",
-        "frameId": "offline-frame-ed7e814e",
+        "frameId": "offline-frame-9927be31",
         "source": "runtime_preview_offline_adapter",
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
           "previewMode": "offline_fixture",
-          "frameId": "offline-frame-ed7e814e",
+          "frameId": "offline-frame-9927be31",
           "executedOperators": [
             {
               "tempId": "op_cam",
@@ -5682,14 +5682,14 @@
         "missingResources": [],
         "artifacts": [
           {
-            "artifactId": "operator-result-d4d4c62d",
+            "artifactId": "operator-result-aa8500f2",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_cam",
               "operatorType": "ImageAcquisition",
               "status": "simulated_offline_frame",
@@ -5697,14 +5697,14 @@
             }
           },
           {
-            "artifactId": "operator-result-e097f685",
+            "artifactId": "operator-result-8ec827f7",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_match",
               "operatorType": "TemplateMatching",
               "status": "simulated_offline_template_match",
@@ -5712,14 +5712,14 @@
             }
           },
           {
-            "artifactId": "operator-result-f9874272",
+            "artifactId": "operator-result-10c62b1b",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_judge",
               "operatorType": "ResultJudgment",
               "status": "simulated_offline_operator",
@@ -5727,14 +5727,14 @@
             }
           },
           {
-            "artifactId": "operator-result-d05977ae",
+            "artifactId": "operator-result-8c317233",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_out",
               "operatorType": "ResultOutput",
               "status": "simulated_offline_output",
@@ -5742,14 +5742,14 @@
             }
           },
           {
-            "artifactId": "replay-summary-dd378769",
+            "artifactId": "replay-summary-825d0f84",
             "artifactType": "replay_summary_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "executedCount": 4,
               "skippedCount": 0,
               "blockingIssueCount": 0,
@@ -5912,13 +5912,13 @@
         "previewReady": false,
         "workflowDraftAllowed": true,
         "frameSource": "offline_fixture_metadata",
-        "frameId": "offline-frame-ed7e814e",
+        "frameId": "offline-frame-9927be31",
         "source": "runtime_preview_offline_adapter",
         "replaySummary": {
           "replaySucceeded": false,
           "adapterName": "offline_runtime_preview",
           "previewMode": "offline_fixture",
-          "frameId": "offline-frame-ed7e814e",
+          "frameId": "offline-frame-9927be31",
           "executedOperators": [],
           "skippedOperators": [
             {
@@ -5966,14 +5966,14 @@
         "missingResources": [],
         "artifacts": [
           {
-            "artifactId": "replay-summary-f03e9a31",
+            "artifactId": "replay-summary-b3d27fc1",
             "artifactType": "replay_summary_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "executedCount": 0,
               "skippedCount": 4,
               "blockingIssueCount": 1,
@@ -6277,13 +6277,13 @@
         "previewReady": true,
         "workflowDraftAllowed": true,
         "frameSource": "offline_fixture_metadata",
-        "frameId": "offline-frame-ed7e814e",
+        "frameId": "offline-frame-9927be31",
         "source": "runtime_preview_offline_adapter",
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
           "previewMode": "offline_fixture",
-          "frameId": "offline-frame-ed7e814e",
+          "frameId": "offline-frame-9927be31",
           "executedOperators": [
             {
               "tempId": "op_cam",
@@ -6328,14 +6328,14 @@
         "missingResources": [],
         "artifacts": [
           {
-            "artifactId": "operator-result-d4d4c62d",
+            "artifactId": "operator-result-aa8500f2",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_cam",
               "operatorType": "ImageAcquisition",
               "status": "simulated_offline_frame",
@@ -6343,14 +6343,14 @@
             }
           },
           {
-            "artifactId": "operator-result-e097f685",
+            "artifactId": "operator-result-8ec827f7",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_match",
               "operatorType": "TemplateMatching",
               "status": "simulated_offline_template_match",
@@ -6358,14 +6358,14 @@
             }
           },
           {
-            "artifactId": "operator-result-f9874272",
+            "artifactId": "operator-result-10c62b1b",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_judge",
               "operatorType": "ResultJudgment",
               "status": "simulated_offline_operator",
@@ -6373,14 +6373,14 @@
             }
           },
           {
-            "artifactId": "operator-result-d05977ae",
+            "artifactId": "operator-result-8c317233",
             "artifactType": "operator_result_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "tempId": "op_out",
               "operatorType": "ResultOutput",
               "status": "simulated_offline_output",
@@ -6388,14 +6388,14 @@
             }
           },
           {
-            "artifactId": "replay-summary-dd378769",
+            "artifactId": "replay-summary-825d0f84",
             "artifactType": "replay_summary_metadata",
             "sourceTool": "replay_flow_with_frame",
             "metadataOnly": true,
             "binaryIncluded": false,
             "byteLength": 0,
             "metadata": {
-              "frameId": "offline-frame-ed7e814e",
+              "frameId": "offline-frame-9927be31",
               "executedCount": 4,
               "skippedCount": 0,
               "blockingIssueCount": 0,

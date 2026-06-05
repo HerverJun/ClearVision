@@ -925,6 +925,49 @@ test('executable business benchmark report exposes actual toolchain fields', () 
   assert.equal(expectedTools.includes('runtime_preview_metadata'), false);
 });
 
+test('planner autonomy benchmark report exposes planner and permission negative fields', () => {
+  const reportPath = path.resolve(
+    getRepoRoot(),
+    'quality',
+    'evals',
+    'reports',
+    'planner_autonomy_benchmark.json'
+  );
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+  assert.equal(report.benchmarkId, 'vision_agent_planner_autonomy_benchmark');
+  assert.equal(report.mode, 'offline_metadata_only');
+  assert.equal(report.summary.plannerCaseCount, 15);
+  assert.equal(report.summary.permissionNegativeCaseCount, 6);
+  assert.equal(report.summary.accepted, true);
+
+  for (const item of [...report.cases, ...report.permissionNegativeCases]) {
+    assert.ok(Array.isArray(item.expectedBusinessActions), item.caseId);
+    assert.ok(Array.isArray(item.allowedTools), item.caseId);
+    assert.ok(Array.isArray(item.plannerMessages), item.caseId);
+    assert.ok(Array.isArray(item.plannedToolCalls), item.caseId);
+    assert.ok(Array.isArray(item.policyDecisions), item.caseId);
+    assert.ok(Array.isArray(item.actualToolCalls), item.caseId);
+    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualValidationResult'), item.caseId);
+    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualDryRunResult'), item.caseId);
+    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualPrecheckResult'), item.caseId);
+    assert.ok(Object.prototype.hasOwnProperty.call(item, 'actualRuntimePreviewResult'), item.caseId);
+    assert.ok(Object.prototype.hasOwnProperty.call(item, 'finalWorkflowDraftAllowed'), item.caseId);
+    assert.equal(item.passed, true, item.caseId);
+  }
+
+  const permissionErrors = report.permissionNegativeCases
+    .flatMap(item => item.policyDecisions)
+    .filter(item => item.errorCode)
+    .map(item => item.errorCode);
+  assert.ok(permissionErrors.includes('runtime_preview_consent_required'));
+  assert.ok(permissionErrors.includes('runtime_preview_permission_denied'));
+  assert.ok(permissionErrors.includes('tool_permission_denied'));
+  assert.ok(permissionErrors.includes('config_write_denied'));
+  assert.ok(permissionErrors.includes('tool_not_whitelisted'));
+  assert.ok(permissionErrors.includes('deployment_prepare_tool_denied'));
+});
+
 test('quality suite tracks raised UI contract minimum', () => {
   const suitePath = path.resolve(getRepoRoot(), 'quality', 'evals', 'suites', 'agent_engineering_harness_suite.json');
   const suite = JSON.parse(fs.readFileSync(suitePath, 'utf8'));
@@ -933,7 +976,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 34);
+  assert.equal(uiEntry.minimumTests, 35);
 });
 
 test('source guard: Agent UI has no RuntimePreview hardware network or process tool entry', () => {
