@@ -1,6 +1,8 @@
 name: Vision Agent Quality Suite
 
 on:
+  push:
+    branches: ["codex*"]
   workflow_dispatch:
 
 env:
