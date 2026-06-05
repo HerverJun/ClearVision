@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-06-05T18:24:42.138199+00:00",
+  "generatedAtUtc": "2026-06-05T18:29:23.658451+00:00",
   "artifactName": "vision-agent-quality-suite",
   "files": [
     {
@@ -29,7 +29,7 @@
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
-      "sizeBytes": 8036
+      "sizeBytes": 8032
     },
     {
       "path": "test_results/agent_engineering_harness/agent_contracts_skeleton.trx",
@@ -53,7 +53,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-05T18:16:38.5270256+00:00"
+        "generatedAtUtc": "2026-06-05T18:29:13.8461361+00:00"
       },
       "summary": {
         "caseCount": 36,
@@ -70,7 +70,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-05T18:16:40.7296246+00:00"
+        "generatedAtUtc": "2026-06-05T18:29:16.1536459+00:00"
       },
       "summary": {
         "plannerCaseCount": 15,

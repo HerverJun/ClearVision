@@ -765,7 +765,8 @@ internal sealed record ShadowLlmConfiguration(
     string ApiKey,
     string? BaseUrl,
     int TimeoutMs,
-    string ModelRole)
+    string ModelRole,
+    string ConfigurationMissingReasonOverride = "")
 {
     public string ModelNameForReport =>
         string.IsNullOrWhiteSpace(ModelName) ? "not_configured" : ModelName;
@@ -781,6 +782,11 @@ internal sealed record ShadowLlmConfiguration(
         {
             if (string.IsNullOrWhiteSpace(ModelName))
             {
+                if (!string.IsNullOrWhiteSpace(ConfigurationMissingReasonOverride))
+                {
+                    return AiSecretSanitizer.Redact(ConfigurationMissingReasonOverride);
+                }
+
                 if (string.Equals(Provider, "model_config", StringComparison.OrdinalIgnoreCase))
                 {
                     return "Saved AI model config was not found for the requested shadow eval id/role.";
@@ -792,6 +798,11 @@ internal sealed record ShadowLlmConfiguration(
             if (!string.Equals(AuthMode, AiModelConfig.AuthModeNone, StringComparison.OrdinalIgnoreCase) &&
                 string.IsNullOrWhiteSpace(ApiKey))
             {
+                if (!string.IsNullOrWhiteSpace(ConfigurationMissingReasonOverride))
+                {
+                    return AiSecretSanitizer.Redact(ConfigurationMissingReasonOverride);
+                }
+
                 if (string.Equals(Provider, "model_config", StringComparison.OrdinalIgnoreCase))
                 {
                     return "Saved AI model config has no API key for the requested auth mode.";
@@ -845,7 +856,8 @@ internal sealed record ShadowLlmConfiguration(
             Read("CV_AGENT_REAL_LLM_API_KEY", string.Empty),
             ReadNullable("CV_AGENT_REAL_LLM_BASE_URL"),
             int.TryParse(timeoutText, out var timeoutMs) ? Math.Clamp(timeoutMs, 1_000, 300_000) : 120_000,
-            Read("CV_AGENT_REAL_LLM_MODEL_ROLE", AiModelConfig.RoleShadowEval));
+            Read("CV_AGENT_REAL_LLM_MODEL_ROLE", AiModelConfig.RoleShadowEval),
+            Read("CV_AGENT_REAL_LLM_CONFIGURATION_MISSING_REASON", string.Empty));
     }
 
     private static ShadowLlmConfiguration FromModelConfig(ShadowEvalRunnerOptions options)

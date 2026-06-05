@@ -1,7 +1,7 @@
 # Vision Agent Real LLM Planner Shadow Eval
 
 - Eval: `vision_agent_real_llm_planner_shadow_eval`
-- Generated UTC: `2026-06-05T18:24:18.7558953+00:00`
+- Generated UTC: `2026-06-05T18:28:30.4314415+00:00`
 - Commit SHA: `local`
 - Branch: `local`
 - Workflow run: `local` attempt `local`
@@ -10,7 +10,7 @@
 - Model: `not_configured`
 - Enabled reason: `CV_AGENT_REAL_LLM_SHADOW_EVAL=true`
 - Skipped reason: `-`
-- Configuration missing reason: `CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true.`
+- Configuration missing reason: `No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url.`
 - Mode: `offline_metadata_only`
 - JSON: `quality/evals/reports/real_llm_planner_shadow_eval.manual.json`
 

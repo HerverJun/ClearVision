@@ -1,14 +1,14 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-executable-business-benchmark.v1",
   "benchmarkId": "vision_agent_executable_business_benchmark",
-  "generatedAtUtc": "2026-06-05T18:16:38.5270256+00:00",
+  "generatedAtUtc": "2026-06-05T18:29:13.8461361+00:00",
   "mode": "offline_metadata_only",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-05T18:16:38.5270256+00:00"
+    "generatedAtUtc": "2026-06-05T18:29:13.8461361+00:00"
   },
   "summary": {
     "caseCount": 36,

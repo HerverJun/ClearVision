@@ -202,6 +202,26 @@ if (-not [string]::IsNullOrWhiteSpace($codexCpa.Provider)) {
     if ([string]::IsNullOrWhiteSpace($authMode)) { $authMode = $codexCpa.AuthMode }
 }
 
+$missingReasons = @()
+if ([string]::IsNullOrWhiteSpace($codexCpa.Provider) -and
+    [string]::IsNullOrWhiteSpace($model) -and
+    [string]::IsNullOrWhiteSpace($baseUrl) -and
+    [string]::IsNullOrWhiteSpace($apiKey)) {
+    $missingReasons += "No CPA provider was found in explicit CPA environment variables or Codex config.toml."
+}
+if ([string]::IsNullOrWhiteSpace($model)) {
+    $missingReasons += "CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider."
+}
+if ([string]::IsNullOrWhiteSpace($apiKey) -and $authMode -ne "none") {
+    $missingReasons += "CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable."
+}
+if ([string]::IsNullOrWhiteSpace($baseUrl)) {
+    $missingReasons += "CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+}
+if ($missingReasons.Count -gt 0) {
+    Set-ShadowEnv "CV_AGENT_REAL_LLM_CONFIGURATION_MISSING_REASON" ($missingReasons -join " ")
+}
+
 [Environment]::SetEnvironmentVariable("CV_AGENT_REAL_LLM_SHADOW_EVAL", "true", "Process")
 Set-ShadowEnv "CV_AGENT_REAL_LLM_PROVIDER" $provider
 Set-ShadowEnv "CV_AGENT_REAL_LLM_MODEL" $model

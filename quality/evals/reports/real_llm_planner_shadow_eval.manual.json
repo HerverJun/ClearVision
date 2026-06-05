@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-real-llm-planner-shadow-eval.v1",
   "evalId": "vision_agent_real_llm_planner_shadow_eval",
-  "generatedAtUtc": "2026-06-05T18:24:18.7558953+00:00",
+  "generatedAtUtc": "2026-06-05T18:28:30.4314415+00:00",
   "mode": "offline_metadata_only",
   "enabled": true,
   "workflowRun": {
@@ -9,7 +9,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-05T18:24:18.7558953+00:00"
+    "generatedAtUtc": "2026-06-05T18:28:30.4314415+00:00"
   },
   "llmConfiguration": {
     "provider": "CPA OpenAI Compatible",
@@ -25,7 +25,7 @@
     "modelName": "not_configured",
     "enabledReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL=true",
     "skippedReason": "",
-    "configurationMissingReason": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true.",
+    "configurationMissingReason": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url.",
     "requestCount": 0,
     "parseSuccessCount": 0,
     "parseSuccessRate": 0,
@@ -88,7 +88,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -98,7 +98,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-002",
@@ -137,7 +137,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -147,7 +147,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-003",
@@ -186,7 +186,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -196,7 +196,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-004",
@@ -231,7 +231,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -241,7 +241,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-005",
@@ -278,7 +278,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -288,7 +288,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-006",
@@ -325,7 +325,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -335,7 +335,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-007",
@@ -372,7 +372,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -382,7 +382,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-008",
@@ -419,7 +419,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -429,7 +429,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-009",
@@ -468,7 +468,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -478,7 +478,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-010",
@@ -511,7 +511,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -521,7 +521,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-011",
@@ -556,7 +556,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -566,7 +566,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     },
     {
       "caseId": "VA-SHADOW-012",
@@ -601,7 +601,7 @@
           "toolName": null,
           "allowed": false,
           "errorCode": "configuration_missing",
-          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
         }
       ],
       "parseSuccess": false,
@@ -611,7 +611,7 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "configuration_missing",
-      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
+      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
     }
   ]
 }
