@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-06-05T16:16:28.659734+00:00",
+  "generatedAtUtc": "2026-06-05T18:16:51.185138+00:00",
   "artifactName": "vision-agent-quality-suite",
   "files": [
     {
@@ -13,7 +13,7 @@
     },
     {
       "path": "quality/evals/reports/real_llm_planner_shadow_eval.json",
-      "sizeBytes": 20909
+      "sizeBytes": 20973
     },
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.md",
@@ -25,11 +25,11 @@
     },
     {
       "path": "quality/evals/reports/real_llm_planner_shadow_eval.md",
-      "sizeBytes": 3599
+      "sizeBytes": 3620
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
-      "sizeBytes": 6908
+      "sizeBytes": 8036
     },
     {
       "path": "test_results/agent_engineering_harness/agent_contracts_skeleton.trx",
@@ -37,7 +37,7 @@
     },
     {
       "path": "test_results/agent_engineering_harness/agent_engineering_harness.trx",
-      "sizeBytes": 227028
+      "sizeBytes": 263369
     },
     {
       "path": "test_results/agent_engineering_harness/agent_planner_parity_subset.trx",
@@ -53,7 +53,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-05T16:15:36.3652073+00:00"
+        "generatedAtUtc": "2026-06-05T18:16:38.5270256+00:00"
       },
       "summary": {
         "caseCount": 36,
@@ -70,7 +70,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-05T16:15:39.0853877+00:00"
+        "generatedAtUtc": "2026-06-05T18:16:40.7296246+00:00"
       },
       "summary": {
         "plannerCaseCount": 15,
@@ -88,7 +88,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-05T16:15:55.0274847+00:00"
+        "generatedAtUtc": "2026-06-05T18:10:55.6167486+00:00"
       },
       "summary": {
         "caseCount": 12,
@@ -100,6 +100,8 @@
         "requestCount": 0,
         "parseSuccessCount": 0,
         "parseSuccessRate": 0,
+        "invalidJsonRepairUsedCount": 0,
+        "repairUsedRate": 0,
         "unsafeToolAttemptCount": 0,
         "unsafeAttemptRate": 0,
         "fallbackToMockSuggestedCount": 12,

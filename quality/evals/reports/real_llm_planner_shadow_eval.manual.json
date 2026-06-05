@@ -1,31 +1,31 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-real-llm-planner-shadow-eval.v1",
   "evalId": "vision_agent_real_llm_planner_shadow_eval",
-  "generatedAtUtc": "2026-06-05T18:10:55.6167486+00:00",
+  "generatedAtUtc": "2026-06-05T18:11:09.3485771+00:00",
   "mode": "offline_metadata_only",
-  "enabled": false,
+  "enabled": true,
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-05T18:10:55.6167486+00:00"
+    "generatedAtUtc": "2026-06-05T18:11:09.3485771+00:00"
   },
   "llmConfiguration": {
-    "provider": "not_read_when_disabled",
-    "protocol": "not_read_when_disabled",
-    "wireApi": "not_read_when_disabled",
-    "authMode": "not_read_when_disabled",
+    "provider": "CPA OpenAI Compatible",
+    "protocol": "openai_compatible",
+    "wireApi": "chat_completions",
+    "authMode": "bearer",
     "baseUrl": null,
-    "modelRole": "not_read_when_disabled"
+    "modelRole": "vision-agent-shadow-eval"
   },
   "summary": {
     "caseCount": 12,
-    "runnerStatus": "skipped",
+    "runnerStatus": "configuration_missing",
     "modelName": "not_configured",
-    "enabledReason": "",
-    "skippedReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.",
-    "configurationMissingReason": "",
+    "enabledReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL=true",
+    "skippedReason": "",
+    "configurationMissingReason": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true.",
     "requestCount": 0,
     "parseSuccessCount": 0,
     "parseSuccessRate": 0,
@@ -35,7 +35,7 @@
     "unsafeAttemptRate": 0,
     "fallbackToMockSuggestedCount": 12,
     "averageToolPlanMatchScore": 0,
-    "reportGenerated": true
+    "reportGenerated": false
   },
   "safety": {
     "realCameraSdkTouched": false,
@@ -84,11 +84,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -97,8 +97,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-002",
@@ -133,11 +133,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -146,8 +146,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-003",
@@ -182,11 +182,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -195,8 +195,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-004",
@@ -227,11 +227,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -240,8 +240,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-005",
@@ -274,11 +274,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -287,8 +287,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-006",
@@ -321,11 +321,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -334,8 +334,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-007",
@@ -368,11 +368,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -381,8 +381,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-008",
@@ -415,11 +415,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -428,8 +428,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-009",
@@ -464,11 +464,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -477,8 +477,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-010",
@@ -507,11 +507,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -520,8 +520,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-011",
@@ -552,11 +552,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -565,8 +565,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     },
     {
       "caseId": "VA-SHADOW-012",
@@ -597,11 +597,11 @@
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "shadow_eval_disabled",
+          "stage": "configuration",
           "toolName": null,
-          "allowed": true,
-          "errorCode": "shadow_eval_skipped",
-          "errorMessage": "Set CV_AGENT_REAL_LLM_SHADOW_EVAL=true to run real LLM planner shadow eval."
+          "allowed": false,
+          "errorCode": "configuration_missing",
+          "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
         }
       ],
       "parseSuccess": false,
@@ -610,8 +610,8 @@
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
       "requestCount": 0,
-      "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorCode": "configuration_missing",
+      "errorMessage": "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true."
     }
   ]
 }

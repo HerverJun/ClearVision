@@ -521,4 +521,98 @@ public class AiConfigStoreTests : IDisposable
         Assert.DoesNotContain("TestKey", persistedJson);
         Assert.DoesNotContain("custom-key", persistedJson);
     }
+
+    [Fact]
+    public void Update_WithExplicitReplaceAndClearApiKey_ShouldApplyKeyOperation()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "key-model",
+            Name = "Key Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "old-secret"
+        });
+
+        var replaced = store.Update("key-model", new AiModelConfig
+        {
+            Name = "Key Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            ApiKey = "new-secret"
+        }, AiApiKeyUpdateMode.Replace);
+
+        Assert.Equal("new-secret", replaced!.ApiKey);
+
+        var cleared = store.Update("key-model", new AiModelConfig
+        {
+            Name = "Key Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini"
+        }, AiApiKeyUpdateMode.Clear);
+
+        Assert.Equal(string.Empty, cleared!.ApiKey);
+        Assert.DoesNotContain("new-secret", File.ReadAllText(_testModelsFile));
+    }
+
+    [Fact]
+    public void SetDefaultForRole_ShouldBindPlannerRoleAndEnableModel()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "planner-model",
+            Name = "Planner Model",
+            Provider = "OpenAI Compatible",
+            Model = "planner",
+            IsEnabled = false,
+            RoleBindings = new List<string> { AiModelConfig.RoleGeneration },
+            Priority = 50
+        });
+
+        var ok = store.SetDefaultForRole("planner-model", AiModelConfig.RolePlanner);
+
+        Assert.True(ok);
+        var updated = store.GetById("planner-model")!;
+        Assert.True(updated.IsEnabled);
+        Assert.Contains(AiModelConfig.RolePlanner, updated.RoleBindings!);
+        Assert.Equal(AiModelConfig.RolePlanner, updated.ModelRole);
+        Assert.Equal(1, updated.Priority);
+    }
+
+    [Fact]
+    public void Add_ProductizedFields_ShouldPersistAndHydrate()
+    {
+        var store = CreateStore();
+        store.Add(new AiModelConfig
+        {
+            Id = "product-model",
+            Name = "Product Model",
+            DisplayName = "Workbench Planner",
+            Provider = "OpenAI Compatible",
+            Model = "planner",
+            ModelRole = AiModelConfig.RoleShadowEval,
+            RoleBindings = new List<string> { AiModelConfig.RoleShadowEval },
+            Remark = "offline shadow only",
+            Priority = 7,
+            IsEnabled = true,
+            LastTestStatus = "ok",
+            LastTestAt = DateTimeOffset.UtcNow,
+            LastTestLatencyMs = 42
+        });
+
+        var reloaded = CreateStore().GetById("product-model")!;
+
+        Assert.Equal("Workbench Planner", reloaded.DisplayName);
+        Assert.Equal(AiModelConfig.RoleShadowEval, reloaded.ModelRole);
+        Assert.Contains(AiModelConfig.RoleShadowEval, reloaded.RoleBindings!);
+        Assert.Equal("offline shadow only", reloaded.Remark);
+        Assert.Equal(7, reloaded.Priority);
+        Assert.True(reloaded.IsEnabled);
+        Assert.Equal("ok", reloaded.LastTestStatus);
+        Assert.Equal(42, reloaded.LastTestLatencyMs);
+        Assert.NotNull(reloaded.CreatedAt);
+        Assert.NotNull(reloaded.UpdatedAt);
+    }
 }

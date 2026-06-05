@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,25 @@ MARKDOWN_REPORTS = [
 TEXT_OUTPUTS = [
     TEST_RESULTS_DIR / "agent_ui_contract_output.txt",
 ]
+
+FORBIDDEN_SECRET_PATTERNS = [
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in [
+        r"CV_AGENT_REAL_LLM_API_KEY",
+        r"Authorization\s*[:=]",
+        r"Bearer\s+[A-Za-z0-9._~+/=-]{8,}",
+        r"x-api-key\s*[:=]",
+        r"api-key\s*[:=]",
+        r'"apiKey"\s*:\s*"[^"]+"',
+        r"api_key=[^&\s]+",
+        r"access_token=[^&\s]+",
+    ]
+]
+
+UNREDACTED_BASE_URL_PATTERN = re.compile(
+    r"https?://(?:[^/\s@]+@)?(?:\d{1,3}(?:\.\d{1,3}){3}|[A-Za-z0-9.-]+\.[A-Za-z]{2,})(?:/[^\s`\"']*)?(?:\?[^\s`\"']*)?",
+    re.IGNORECASE,
+)
 
 
 def repo_relative(path: Path) -> str:
@@ -72,17 +92,7 @@ def validate_workflow_run(
 
 def validate_shadow_report(path: Path, report: dict[str, Any], errors: list[str]) -> None:
     text = path.read_text(encoding="utf-8")
-    forbidden_fragments = [
-        "apiKey",
-        "ApiKey",
-        "CV_AGENT_REAL_LLM_API_KEY",
-        "Authorization",
-        "Bearer ",
-        "x-api-key",
-    ]
-    for fragment in forbidden_fragments:
-        if fragment in text:
-            errors.append(f"{repo_relative(path)} leaks forbidden secret/auth fragment: {fragment}")
+    validate_no_secret_leaks(path, text, errors)
 
     config = report.get("llmConfiguration")
     if not isinstance(config, dict):
@@ -95,8 +105,13 @@ def validate_shadow_report(path: Path, report: dict[str, Any], errors: list[str]
             errors.append(f"{repo_relative(path)} llmConfiguration.{field} must be a non-empty string.")
 
     base_url = config.get("baseUrl")
-    if isinstance(base_url, str) and ("?" in base_url or "@" in base_url):
+    if isinstance(base_url, str) and ("?" in base_url or "@" in base_url or "<redacted-host>" not in base_url):
         errors.append(f"{repo_relative(path)} llmConfiguration.baseUrl must be redacted.")
+    for match in UNREDACTED_BASE_URL_PATTERN.finditer(text):
+        value = match.group(0)
+        if "<redacted-host>" not in value and not value.startswith("https://github.com"):
+            errors.append(f"{repo_relative(path)} contains an unredacted URL-like BaseUrl: {value[:80]}")
+            break
 
     summary = report.get("summary")
     if not isinstance(summary, dict):
@@ -114,6 +129,12 @@ def validate_shadow_report(path: Path, report: dict[str, Any], errors: list[str]
     ]:
         if field not in summary:
             errors.append(f"{repo_relative(path)} summary missing {field}.")
+
+
+def validate_no_secret_leaks(path: Path, text: str, errors: list[str]) -> None:
+    for pattern in FORBIDDEN_SECRET_PATTERNS:
+        if pattern.search(text):
+            errors.append(f"{repo_relative(path)} leaks forbidden secret/auth fragment: {pattern.pattern}")
 
 
 def build_manifest(json_reports: list[dict[str, Any]], files: list[Path]) -> dict[str, Any]:
@@ -165,6 +186,9 @@ def main() -> int:
     for path in expected_files:
         if not path.exists():
             errors.append(f"Missing artifact file: {repo_relative(path)}")
+            continue
+        if path.suffix.lower() in {".json", ".md", ".txt", ".trx"}:
+            validate_no_secret_leaks(path, path.read_text(encoding="utf-8", errors="ignore"), errors)
 
     report_summaries: list[dict[str, Any]] = []
     for path in JSON_REPORTS:

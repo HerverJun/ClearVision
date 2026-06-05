@@ -4,8 +4,10 @@
 
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.IO.Ports;
 using System.Linq;
+using System.Net.Http;
 using System.Text.Json;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Cameras;
@@ -227,29 +229,7 @@ public static class SettingsEndpoints
         app.MapGet("/api/ai/models", (AiConfigStore configStore) =>
         {
             var models = configStore.GetAll();
-            var result = models.Select(m => new
-            {
-                m.Id,
-                m.Name,
-                m.Provider,
-                hasApiKey = !string.IsNullOrWhiteSpace(m.ApiKey), // 前端用此判断是否已配置密钥
-                m.Model,
-                baseUrl = m.BaseUrl ?? "",
-                m.TimeoutMs,
-                m.IsActive,
-                m.Protocol,
-                m.WireApi,
-                m.AuthMode,
-                m.AuthHeaderName,
-                m.ExtraHeaders,
-                m.ExtraQuery,
-                m.ExtraBody,
-                m.RoleBindings,
-                m.Priority,
-                m.Capabilities,
-                m.Reasoning,
-                ReasoningSupport = m.GetReasoningSupport()
-            });
+            var result = models.Select(ToAiModelResponse);
             return Results.Ok(result);
         });
 
@@ -277,6 +257,7 @@ public static class SettingsEndpoints
                 {
                     Id = $"model_{Guid.NewGuid():N}",
                     Name = request.Name ?? "新建模型",
+                    DisplayName = request.DisplayName,
                     Provider = request.Provider ?? AiModelConfig.GetLegacyProviderByProtocol(request.Protocol),
                     ApiKey = request.ApiKey ?? "",
                     Model = request.Model ?? string.Empty,
@@ -290,8 +271,11 @@ public static class SettingsEndpoints
                     ExtraQuery = CloneStringMap(request.ExtraQuery),
                     ExtraBody = CloneJsonMap(request.ExtraBody),
                     RoleBindings = CloneStringList(request.RoleBindings),
+                    ModelRole = request.ModelRole,
                     Priority = request.Priority,
+                    Remark = request.Remark,
                     IsActive = false,
+                    IsEnabled = request.IsEnabled ?? true,
                     Capabilities = request.Capabilities?.Clone(),
                     Reasoning = request.Reasoning?.Clone()
                 };
@@ -317,6 +301,7 @@ public static class SettingsEndpoints
                 var updated = new AiModelConfig
                 {
                     Name = request.Name!,
+                    DisplayName = request.DisplayName,
                     Provider = request.Provider!,
                     ApiKey = request.ApiKey ?? "", // 空字符串 → 保留原值（由 AiConfigStore.Update 处理）
                     Model = request.Model ?? string.Empty,
@@ -330,11 +315,14 @@ public static class SettingsEndpoints
                     ExtraQuery = CloneStringMap(request.ExtraQuery),
                     ExtraBody = CloneJsonMap(request.ExtraBody),
                     RoleBindings = CloneStringList(request.RoleBindings),
+                    ModelRole = request.ModelRole,
                     Priority = request.Priority,
+                    Remark = request.Remark,
+                    IsEnabled = request.IsEnabled ?? true,
                     Capabilities = request.Capabilities?.Clone(),
                     Reasoning = request.Reasoning?.Clone()
                 };
-                var result = configStore.Update(id, updated);
+                var result = configStore.Update(id, updated, ResolveApiKeyUpdateMode(request.ApiKeyOperation, request.ApiKey));
                 if (result == null)
                     return Results.NotFound(new { Error = $"模型 {id} 不存在" });
 
@@ -382,6 +370,32 @@ public static class SettingsEndpoints
         });
 
         // 测试指定模型的连接（使用该模型的真实 Key，不影响全局 active 状态）
+        app.MapPost("/api/ai/models/{id}/default-planner", (string id, AiConfigStore configStore, HttpContext context) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            var ok = configStore.SetDefaultForRole(id, AiModelConfig.RolePlanner);
+            return ok
+                ? Results.Ok(new { Message = "Default planner model updated.", role = AiModelConfig.RolePlanner })
+                : Results.NotFound(new { Error = $"Model {id} not found." });
+        });
+
+        app.MapPost("/api/ai/models/{id}/default-shadow-eval", (string id, AiConfigStore configStore, HttpContext context) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            var ok = configStore.SetDefaultForRole(id, AiModelConfig.RoleShadowEval);
+            return ok
+                ? Results.Ok(new { Message = "Default shadow eval model updated.", role = AiModelConfig.RoleShadowEval })
+                : Results.NotFound(new { Error = $"Model {id} not found." });
+        });
+
         app.MapPost("/api/ai/models/{id}/test", async (string id, AiConfigStore configStore, AiApiClient apiClient, HttpContext context) =>
         {
             if (!IsAdmin(context))
@@ -389,35 +403,31 @@ public static class SettingsEndpoints
                 return Results.Forbid();
             }
 
-            try
+            var model = configStore.GetById(id);
+            if (model == null)
             {
-                var model = configStore.GetById(id);
-                if (model == null)
-                    return Results.NotFound(new { Success = false, Message = $"模型 {id} 不存在" });
-
-                var authMode = AiModelConfig.NormalizeAuthMode(model.AuthMode, model.Protocol ?? model.Provider);
-                if (authMode != AiModelConfig.AuthModeNone && string.IsNullOrEmpty(model.ApiKey))
-                    return Results.Ok(new { Success = false, Message = "连接失败: 未配置 API Key" });
-
-                var options = model.ToGenerationOptions();
-                var response = await apiClient.StreamCompleteAsync(
-                    "You are a connection health-check assistant. Respond only with valid JSON.",
-                    new List<ChatMessage> { new("user", "Reply with a JSON object exactly: {\"ok\": true}") },
-                    _ => { },
-                    options,
-                    CancellationToken.None);
-
-                if (!IsSuccessfulAiHealthCheck(response.Content))
-                    return Results.Ok(new { Success = false, Message = "连接失败: AI 返回内容不是预期的 JSON health-check 响应" });
-
-                return Results.Ok(new { Success = true, Message = "连接成功" });
+                return Results.NotFound(BuildAiModelConnectionResult(
+                    connectionOk: false,
+                    statusCode: null,
+                    errorCode: "model_config_not_found",
+                    latencyMs: 0,
+                    sanitizedMessage: $"Model config {id} not found.",
+                    provider: string.Empty,
+                    modelName: string.Empty,
+                    protocol: string.Empty,
+                    wireApi: string.Empty));
             }
-            catch (Exception ex)
-            {
-                return Results.Ok(new { Success = false, Message = $"连接失败: {ex.Message}" });
-            }
+
+            var testResult = await TestAiModelConnectionAsync(model, apiClient, context.RequestAborted);
+            configStore.UpdateTestStatus(
+                id,
+                testResult.ConnectionOk ? "ok" : "failed",
+                DateTimeOffset.UtcNow,
+                testResult.LatencyMs);
+            return Results.Ok(testResult);
         });
 
+        // AI model connection tests only call the configured LLM endpoint and do not touch RuntimePreview, Station, camera, PLC, or deployment.
         // ==================== 相机管理 API ====================
 
         // 搜索在线相机设备
@@ -861,16 +871,220 @@ public static class SettingsEndpoints
         }
     }
 
+    private static async Task<AiModelTestConnectionResult> TestAiModelConnectionAsync(
+        AiModelConfig model,
+        AiApiClient apiClient,
+        CancellationToken cancellationToken)
+    {
+        var protocol = AiModelConfig.NormalizeProtocol(model.Protocol, model.Provider);
+        var wireApi = AiModelConfig.NormalizeWireApi(model.WireApi);
+        var authMode = AiModelConfig.NormalizeAuthMode(model.AuthMode, protocol);
+        var timeoutMs = Math.Clamp(model.TimeoutMs <= 0 ? 120_000 : model.TimeoutMs, 1_000, 300_000);
+
+        if (authMode != AiModelConfig.AuthModeNone && string.IsNullOrWhiteSpace(model.ApiKey))
+        {
+            return BuildAiModelConnectionResult(
+                false,
+                null,
+                "missing_api_key",
+                0,
+                "API key is required for this auth mode.",
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.BaseUrl) &&
+            !Uri.TryCreate(model.BaseUrl, UriKind.Absolute, out _))
+        {
+            return BuildAiModelConnectionResult(
+                false,
+                null,
+                "base_url_error",
+                0,
+                "BaseUrl is not a valid absolute URL.",
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
+            var options = model.ToGenerationOptions();
+            options.MaxRetries = 0;
+            options.MaxTokens = 32;
+            options.Temperature = 0;
+
+            var response = await apiClient.StreamCompleteAsync(
+                "You are a connection health-check assistant. Respond only with valid JSON.",
+                new List<ChatMessage> { new("user", "Reply with a JSON object exactly: {\"ok\": true}") },
+                _ => { },
+                options,
+                timeoutCts.Token);
+
+            stopwatch.Stop();
+            if (!IsSuccessfulAiHealthCheck(response.Content))
+            {
+                return BuildAiModelConnectionResult(
+                    false,
+                    null,
+                    "bad_response",
+                    Elapsed(stopwatch),
+                    "AI response did not match the expected JSON health-check shape; 不是预期的 JSON health-check 响应.",
+                    model.Provider,
+                    model.Model,
+                    protocol,
+                    wireApi);
+            }
+
+            return BuildAiModelConnectionResult(
+                true,
+                200,
+                "ok",
+                Elapsed(stopwatch),
+                "Connection succeeded.",
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+        catch (HttpRequestException ex)
+        {
+            stopwatch.Stop();
+            var statusCode = ex.StatusCode.HasValue ? (int?)ex.StatusCode.Value : null;
+            return BuildAiModelConnectionResult(
+                false,
+                statusCode,
+                ClassifyHttpConnectionError(statusCode),
+                Elapsed(stopwatch),
+                AiSecretSanitizer.RedactException(ex),
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+        catch (Exception ex) when (ex is TaskCanceledException or OperationCanceledException)
+        {
+            stopwatch.Stop();
+            return BuildAiModelConnectionResult(
+                false,
+                null,
+                "timeout",
+                Elapsed(stopwatch),
+                "Connection test timed out.",
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            return BuildAiModelConnectionResult(
+                false,
+                null,
+                ClassifyNonHttpConnectionError(ex),
+                Elapsed(stopwatch),
+                AiSecretSanitizer.RedactException(ex),
+                model.Provider,
+                model.Model,
+                protocol,
+                wireApi);
+        }
+    }
+
+    private static AiModelTestConnectionResult BuildAiModelConnectionResult(
+        bool connectionOk,
+        int? statusCode,
+        string errorCode,
+        int latencyMs,
+        string sanitizedMessage,
+        string provider,
+        string modelName,
+        string protocol,
+        string wireApi)
+    {
+        var safeMessage = AiSecretSanitizer.Redact(sanitizedMessage);
+        return new AiModelTestConnectionResult
+        {
+            ConnectionOk = connectionOk,
+            Success = connectionOk,
+            StatusCode = statusCode,
+            ErrorCode = errorCode,
+            LatencyMs = latencyMs,
+            SanitizedMessage = safeMessage,
+            Message = safeMessage,
+            Provider = provider,
+            ModelName = modelName,
+            Protocol = protocol,
+            WireApi = wireApi
+        };
+    }
+
+    private static string ClassifyHttpConnectionError(int? statusCode)
+    {
+        return statusCode switch
+        {
+            401 or 403 => "auth_failed",
+            404 => "model_not_found",
+            >= 500 => "provider_error",
+            _ => "http_error"
+        };
+    }
+
+    private static string ClassifyNonHttpConnectionError(Exception exception)
+    {
+        var message = exception.Message;
+        if (exception is UriFormatException ||
+            message.Contains("url", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("uri", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("baseurl", StringComparison.OrdinalIgnoreCase))
+        {
+            return "base_url_error";
+        }
+
+        return "response_format_error";
+    }
+
+    private static int Elapsed(Stopwatch stopwatch)
+    {
+        return (int)Math.Clamp(stopwatch.ElapsedMilliseconds, 0, int.MaxValue);
+    }
+
+    private static AiApiKeyUpdateMode ResolveApiKeyUpdateMode(string? apiKeyOperation, string? apiKey)
+    {
+        var normalized = string.IsNullOrWhiteSpace(apiKeyOperation)
+            ? (string.IsNullOrWhiteSpace(apiKey) ? "keep" : "replace")
+            : apiKeyOperation.Trim().ToLowerInvariant().Replace("_", "-");
+
+        return normalized switch
+        {
+            "clear" => AiApiKeyUpdateMode.Clear,
+            "replace" => AiApiKeyUpdateMode.Replace,
+            "new" => AiApiKeyUpdateMode.Replace,
+            "keep" => AiApiKeyUpdateMode.Keep,
+            _ => string.IsNullOrWhiteSpace(apiKey) ? AiApiKeyUpdateMode.Keep : AiApiKeyUpdateMode.Replace
+        };
+    }
+
     private static object ToAiModelResponse(AiModelConfig m) => new
     {
         m.Id,
         m.Name,
+        m.DisplayName,
         m.Provider,
         hasApiKey = !string.IsNullOrWhiteSpace(m.ApiKey),
+        apiKeyMasked = AiSecretSanitizer.MaskApiKey(!string.IsNullOrWhiteSpace(m.ApiKey)),
         m.Model,
         baseUrl = m.BaseUrl ?? "",
         m.TimeoutMs,
         m.IsActive,
+        m.IsEnabled,
         m.Protocol,
         m.WireApi,
         m.AuthMode,
@@ -879,7 +1093,14 @@ public static class SettingsEndpoints
         m.ExtraQuery,
         m.ExtraBody,
         m.RoleBindings,
+        m.ModelRole,
         m.Priority,
+        m.Remark,
+        m.CreatedAt,
+        m.UpdatedAt,
+        m.LastTestStatus,
+        m.LastTestAt,
+        m.LastTestLatencyMs,
         m.Capabilities,
         m.Reasoning,
         ReasoningSupport = m.GetReasoningSupport()
@@ -1528,14 +1749,31 @@ public static class SettingsEndpoints
 
         return new List<string>(source);
     }
+
+    private sealed class AiModelTestConnectionResult
+    {
+        public bool ConnectionOk { get; init; }
+        public bool Success { get; init; }
+        public int? StatusCode { get; init; }
+        public string ErrorCode { get; init; } = string.Empty;
+        public int LatencyMs { get; init; }
+        public string SanitizedMessage { get; init; } = string.Empty;
+        public string Message { get; init; } = string.Empty;
+        public string Provider { get; init; } = string.Empty;
+        public string ModelName { get; init; } = string.Empty;
+        public string Protocol { get; init; } = string.Empty;
+        public string WireApi { get; init; } = string.Empty;
+    }
 }
 
 /// <summary>创建模型请求</summary>
 public class AiModelCreateRequest
 {
     public string? Name { get; set; }
+    public string? DisplayName { get; set; }
     public string? Provider { get; set; }
     public string? ApiKey { get; set; }
+    public string? ApiKeyOperation { get; set; }
     public string? Model { get; set; }
     public string? BaseUrl { get; set; }
     public int TimeoutMs { get; set; }
@@ -1548,7 +1786,10 @@ public class AiModelCreateRequest
     public Dictionary<string, JsonElement>? ExtraBody { get; set; }
     public AiReasoningSettings? Reasoning { get; set; }
     public List<string>? RoleBindings { get; set; }
+    public string? ModelRole { get; set; }
     public int? Priority { get; set; }
+    public bool? IsEnabled { get; set; }
+    public string? Remark { get; set; }
     public AiModelCapabilities? Capabilities { get; set; }
 }
 
@@ -1556,8 +1797,10 @@ public class AiModelCreateRequest
 public class AiModelUpdateRequest
 {
     public string? Name { get; set; }
+    public string? DisplayName { get; set; }
     public string? Provider { get; set; }
     public string? ApiKey { get; set; }
+    public string? ApiKeyOperation { get; set; }
     public string? Model { get; set; }
     public string? BaseUrl { get; set; }
     public int TimeoutMs { get; set; }
@@ -1570,7 +1813,10 @@ public class AiModelUpdateRequest
     public Dictionary<string, JsonElement>? ExtraBody { get; set; }
     public AiReasoningSettings? Reasoning { get; set; }
     public List<string>? RoleBindings { get; set; }
+    public string? ModelRole { get; set; }
     public int? Priority { get; set; }
+    public bool? IsEnabled { get; set; }
+    public string? Remark { get; set; }
     public AiModelCapabilities? Capabilities { get; set; }
 }
 

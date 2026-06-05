@@ -1,27 +1,27 @@
 # Vision Agent Real LLM Planner Shadow Eval
 
 - Eval: `vision_agent_real_llm_planner_shadow_eval`
-- Generated UTC: `2026-06-05T18:10:55.6167486+00:00`
+- Generated UTC: `2026-06-05T18:11:09.3485771+00:00`
 - Commit SHA: `local`
 - Branch: `local`
 - Workflow run: `local` attempt `local`
-- Enabled: False
-- Status: `skipped`
+- Enabled: True
+- Status: `configuration_missing`
 - Model: `not_configured`
-- Enabled reason: `-`
-- Skipped reason: `CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.`
-- Configuration missing reason: `-`
+- Enabled reason: `CV_AGENT_REAL_LLM_SHADOW_EVAL=true`
+- Skipped reason: `-`
+- Configuration missing reason: `CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true.`
 - Mode: `offline_metadata_only`
-- JSON: `quality/evals/reports/real_llm_planner_shadow_eval.json`
+- JSON: `quality/evals/reports/real_llm_planner_shadow_eval.manual.json`
 
 ## LLM Configuration
 
-- Provider: `not_read_when_disabled`
-- Protocol: `not_read_when_disabled`
-- Wire API: `not_read_when_disabled`
-- Auth mode: `not_read_when_disabled`
+- Provider: `CPA OpenAI Compatible`
+- Protocol: `openai_compatible`
+- Wire API: `chat_completions`
+- Auth mode: `bearer`
 - Base URL: `-`
-- Model role: `not_read_when_disabled`
+- Model role: `vision-agent-shadow-eval`
 
 ## Metrics
 

@@ -1096,13 +1096,100 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 39);
+  assert.equal(uiEntry.minimumTests, 46);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)
     .find(entry => entry.id === 'vision_agent_real_llm_planner_shadow_eval');
   assert.ok(shadowEntry);
   assert.equal(shadowEntry.status, 'manual');
+});
+
+test('AI settings model config UI exposes productized model fields', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  for (const token of [
+    'cfg-ai-display-name',
+    'cfg-ai-protocol',
+    'cfg-ai-authmode',
+    'cfg-ai-priority',
+    'cfg-ai-enabled',
+    'cfg-ai-remark'
+  ]) {
+    assert.match(source, new RegExp(token));
+  }
+});
+
+test('AI settings key input uses explicit keep replace clear semantics', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /cfg-ai-apikey-clear/);
+  assert.match(source, /apiKeyOperation/);
+  assert.match(source, /"clear"/);
+  assert.match(source, /"replace"/);
+  assert.match(source, /"keep"/);
+  assert.match(source, /apiKeyOperation === "replace" \|\| apiKeyOperation === "new"/);
+});
+
+test('AI settings model roles include planner and shadow eval bindings', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-ai-role="generation"/);
+  assert.match(source, /data-ai-role="planner"/);
+  assert.match(source, /data-ai-role="vision-agent-shadow-eval"/);
+  assert.match(source, /setDefaultPlannerAiModel/);
+  assert.match(source, /setDefaultShadowEvalAiModel/);
+});
+
+test('AI settings Test Connection consumes structured sanitized result fields', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /connectionOk/);
+  assert.match(source, /sanitizedMessage/);
+  assert.match(source, /errorCode/);
+  assert.match(source, /latencyMs/);
+});
+
+test('AI settings keeps shadow eval execution entry developer-hidden by default', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /hidden data-ai-shadow-eval-entry="hidden"/);
+});
+
+test('AI settings API wrapper exposes planner and shadow default endpoints', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsApi.js'),
+    'utf8'
+  );
+
+  assert.match(source, /default-planner/);
+  assert.match(source, /default-shadow-eval/);
+});
+
+test('AI settings source does not log or render full API key values', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.doesNotMatch(source, /console\.(log|debug|info)\([^)]*apiKey/i);
+  assert.match(source, /placeholder="\$\{apiKeyPlaceholderValue\}"/);
+  assert.match(source, /value=""/);
 });
 
 test('source guard: Agent UI has no RuntimePreview hardware network or process tool entry', () => {

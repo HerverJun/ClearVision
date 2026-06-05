@@ -138,6 +138,43 @@ export function validateAiModelDraftPayload(payload) {
         return { ok: false, message: 'AI 请求超时必须是 1000 - 600000 ms 之间的整数。' };
     }
 
+    const protocol = String(payload.protocol || 'openai_compatible').trim().toLowerCase();
+    if (!['openai_compatible', 'anthropic', 'azure_openai', 'ollama_native'].includes(protocol)) {
+        return { ok: false, message: 'AI Protocol must be openai_compatible, anthropic, azure_openai, or ollama_native.' };
+    }
+
+    const wireApi = String(payload.wireApi || 'chat_completions').trim().toLowerCase();
+    if (!['chat_completions', 'responses'].includes(wireApi)) {
+        return { ok: false, message: 'WireApi must be chat_completions or responses.' };
+    }
+
+    const authMode = String(payload.authMode || 'bearer').trim().toLowerCase();
+    if (!['bearer', 'header_key', 'none'].includes(authMode)) {
+        return { ok: false, message: 'AuthMode must be bearer, header_key, or none.' };
+    }
+
+    const apiKeyOperation = String(payload.apiKeyOperation || 'keep').trim().toLowerCase().replace(/_/g, '-');
+    if (!['keep', 'replace', 'clear', 'new'].includes(apiKeyOperation)) {
+        return { ok: false, message: 'ApiKey operation must be keep, replace, clear, or new.' };
+    }
+
+    if ((apiKeyOperation === 'replace' || apiKeyOperation === 'new') && !String(payload.apiKey || '').trim()) {
+        return { ok: false, message: 'A replacement API key is required for this key operation.' };
+    }
+
+    const roles = Array.isArray(payload.roleBindings) ? payload.roleBindings : [];
+    const allowedRoles = ['generation', 'planner', 'vision-agent-shadow-eval', 'reasoning', 'fallback', 'validation', 'vision'];
+    if (roles.some(role => !allowedRoles.includes(String(role || '').trim().toLowerCase().replace(/_/g, '-')))) {
+        return { ok: false, message: 'ModelRole contains an unsupported role binding.' };
+    }
+
+    if (payload.priority !== undefined && payload.priority !== null) {
+        const priority = Number(payload.priority);
+        if (!Number.isInteger(priority) || priority < 1 || priority > 10000) {
+            return { ok: false, message: 'Priority must be an integer from 1 to 10000.' };
+        }
+    }
+
     const baseUrl = String(payload.baseUrl || '').trim();
     if (baseUrl) {
         try {

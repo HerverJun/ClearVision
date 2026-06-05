@@ -246,6 +246,49 @@ export function installSettingsNormalizers(SettingsView) {
             return normalized === 'responses' || normalized === 'response' ? 'responses' : 'chat_completions';
         }
         ,
+        normalizeAiProtocol(protocol, provider = '') {
+            const normalized = `${protocol || ''}`.trim().toLowerCase();
+            if (['anthropic', 'azure_openai', 'ollama_native', 'openai_compatible'].includes(normalized)) {
+                return normalized;
+            }
+            const providerText = `${provider || ''}`.toLowerCase();
+            if (providerText.includes('anthropic')) return 'anthropic';
+            if (providerText.includes('azure')) return 'azure_openai';
+            if (providerText.includes('ollama')) return 'ollama_native';
+            return 'openai_compatible';
+        }
+        ,
+        normalizeAiAuthMode(authMode, protocol = 'openai_compatible') {
+            const normalized = `${authMode || ''}`.trim().toLowerCase();
+            if (['bearer', 'header_key', 'none'].includes(normalized)) {
+                return normalized;
+            }
+            const normalizedProtocol = this.normalizeAiProtocol(protocol);
+            if (normalizedProtocol === 'ollama_native') return 'none';
+            if (normalizedProtocol === 'anthropic' || normalizedProtocol === 'azure_openai') return 'header_key';
+            return 'bearer';
+        }
+        ,
+        normalizeAiRoleName(role) {
+            const normalized = `${role || 'generation'}`.trim().toLowerCase().replace(/_/g, '-');
+            if (normalized === 'planner') return 'planner';
+            if (normalized === 'vision-agent-shadow-eval' || normalized === 'shadow-eval') return 'vision-agent-shadow-eval';
+            if (['generation', 'reasoning', 'fallback', 'validation', 'vision'].includes(normalized)) return normalized;
+            return 'generation';
+        }
+        ,
+        normalizeAiRoleBindings(roles, modelRole = null) {
+            const source = Array.isArray(roles) ? roles : [];
+            if (modelRole) source.push(modelRole);
+            const normalized = [...new Set(source.map(role => this.normalizeAiRoleName(role)))];
+            return normalized.length > 0 ? normalized : ['generation'];
+        }
+        ,
+        getMaskedAiKey(hasApiKey, maskedValue = '') {
+            if (maskedValue) return String(maskedValue);
+            return hasApiKey ? '********' : '';
+        }
+        ,
         getDefaultAiReasoningSupport() {
             return {
                 familyId: 'unknown',

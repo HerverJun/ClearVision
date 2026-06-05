@@ -45,7 +45,7 @@ internal static class VisionAgentPlannerShadowEval
         var cases = CreateCases();
         var enabled = IsEnabled();
         var config = enabled
-            ? ShadowLlmConfiguration.FromEnvironment()
+            ? ShadowLlmConfiguration.FromOptions(options)
             : ShadowLlmConfiguration.Disabled();
 
         if (!enabled)
@@ -244,7 +244,7 @@ internal static class VisionAgentPlannerShadowEval
             fallbackToMock,
             requestCount,
             exceptionType,
-            exceptionMessage ?? parseError);
+            AiSecretSanitizer.Redact(exceptionMessage ?? parseError));
     }
 
     private static ShadowEvalDocument BuildDocument(
@@ -260,9 +260,11 @@ internal static class VisionAgentPlannerShadowEval
     {
         var unsafeCount = results.Count(item => item.UnsafeToolAttempted);
         var parseSuccessCount = results.Count(item => item.ParseSuccess);
+        var repairUsedCount = results.Count(item => item.InvalidJsonRepairUsed);
         var requestCount = results.Sum(item => item.RequestCount);
         var parseSuccessRate = Rate(parseSuccessCount, results.Count);
         var unsafeAttemptRate = Rate(unsafeCount, results.Count);
+        var repairUsedRate = Rate(repairUsedCount, results.Count);
         var averageScore = results.Count == 0
             ? 0
             : Math.Round(results.Average(item => item.ToolPlanMatchScore), 4);
@@ -297,6 +299,8 @@ internal static class VisionAgentPlannerShadowEval
                 requestCount,
                 parseSuccessCount,
                 parseSuccessRate,
+                repairUsedCount,
+                repairUsedRate,
                 unsafeCount,
                 unsafeAttemptRate,
                 results.Count(item => item.FallbackToMockSuggested),
@@ -396,7 +400,7 @@ internal static class VisionAgentPlannerShadowEval
                     null,
                     exceptionType == null,
                     exceptionType,
-                    exceptionMessage)
+                    AiSecretSanitizer.Redact(exceptionMessage))
             ];
         }
 
@@ -777,12 +781,22 @@ internal sealed record ShadowLlmConfiguration(
         {
             if (string.IsNullOrWhiteSpace(ModelName))
             {
+                if (string.Equals(Provider, "model_config", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Saved AI model config was not found for the requested shadow eval id/role.";
+                }
+
                 return "CV_AGENT_REAL_LLM_MODEL is required when CV_AGENT_REAL_LLM_SHADOW_EVAL=true.";
             }
 
             if (!string.Equals(AuthMode, AiModelConfig.AuthModeNone, StringComparison.OrdinalIgnoreCase) &&
                 string.IsNullOrWhiteSpace(ApiKey))
             {
+                if (string.Equals(Provider, "model_config", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Saved AI model config has no API key for the requested auth mode.";
+                }
+
                 return "CV_AGENT_REAL_LLM_API_KEY is required unless CV_AGENT_REAL_LLM_AUTH_MODE=none.";
             }
 
@@ -804,6 +818,17 @@ internal sealed record ShadowLlmConfiguration(
             ModelRole: "not_read_when_disabled");
     }
 
+    public static ShadowLlmConfiguration FromOptions(ShadowEvalRunnerOptions options)
+    {
+        if (!string.IsNullOrWhiteSpace(options.ModelConfigId) ||
+            !string.IsNullOrWhiteSpace(options.ModelConfigRole))
+        {
+            return FromModelConfig(options);
+        }
+
+        return FromEnvironment();
+    }
+
     public static ShadowLlmConfiguration FromEnvironment()
     {
         var provider = Read("CV_AGENT_REAL_LLM_PROVIDER", "OpenAI Compatible");
@@ -820,7 +845,55 @@ internal sealed record ShadowLlmConfiguration(
             Read("CV_AGENT_REAL_LLM_API_KEY", string.Empty),
             ReadNullable("CV_AGENT_REAL_LLM_BASE_URL"),
             int.TryParse(timeoutText, out var timeoutMs) ? Math.Clamp(timeoutMs, 1_000, 300_000) : 120_000,
-            Read("CV_AGENT_REAL_LLM_MODEL_ROLE", "generation"));
+            Read("CV_AGENT_REAL_LLM_MODEL_ROLE", AiModelConfig.RoleShadowEval));
+    }
+
+    private static ShadowLlmConfiguration FromModelConfig(ShadowEvalRunnerOptions options)
+    {
+        var store = new AiConfigStore(
+            Options.Create(new AiGenerationOptions
+            {
+                Provider = "OpenAI Compatible",
+                ApiKey = string.Empty,
+                Model = "shadow-eval-placeholder"
+            }),
+            NullLogger<AiConfigStore>.Instance,
+            options.ModelConfigDirectory?.FullName ?? AppContext.BaseDirectory);
+        var role = AiModelConfig.NormalizeRoleName(options.ModelConfigRole ?? AiModelConfig.RoleShadowEval);
+        var models = store.GetAll();
+        var model = !string.IsNullOrWhiteSpace(options.ModelConfigId)
+            ? models.FirstOrDefault(item => string.Equals(item.Id, options.ModelConfigId, StringComparison.OrdinalIgnoreCase))
+            : models
+                .Where(item => item.IsEnabled && item.RoleBindings?.Contains(role, StringComparer.OrdinalIgnoreCase) == true)
+                .OrderBy(item => item.Priority ?? 100)
+                .ThenByDescending(item => item.IsActive)
+                .FirstOrDefault();
+
+        if (model == null)
+        {
+            return new ShadowLlmConfiguration(
+                Provider: "model_config",
+                Protocol: "model_config",
+                WireApi: "model_config",
+                AuthMode: "model_config",
+                ModelName: string.Empty,
+                ApiKey: string.Empty,
+                BaseUrl: null,
+                TimeoutMs: 120_000,
+                ModelRole: role);
+        }
+
+        model.NormalizeAdvancedFields();
+        return new ShadowLlmConfiguration(
+            model.Provider,
+            AiModelConfig.NormalizeProtocol(model.Protocol, model.Provider),
+            AiModelConfig.NormalizeWireApi(model.WireApi),
+            AiModelConfig.NormalizeAuthMode(model.AuthMode, model.Protocol ?? model.Provider),
+            model.Model,
+            model.ApiKey,
+            model.BaseUrl,
+            Math.Clamp(model.TimeoutMs <= 0 ? 120_000 : model.TimeoutMs, 1_000, 300_000),
+            role);
     }
 
     public ShadowEvalLlmConfiguration ToReportConfiguration()
@@ -830,7 +903,7 @@ internal sealed record ShadowLlmConfiguration(
             Protocol,
             WireApi,
             AuthMode,
-            RedactBaseUrl(BaseUrl),
+            AiSecretSanitizer.RedactBaseUrlForReport(BaseUrl),
             ModelRole);
     }
 
@@ -850,7 +923,8 @@ internal sealed record ShadowLlmConfiguration(
             TimeoutMs = TimeoutMs,
             RoleBindings = [ModelRole],
             Priority = 1,
-            IsActive = true
+            IsActive = true,
+            IsEnabled = true
         };
         model.NormalizeAdvancedFields();
         return model;
@@ -868,38 +942,22 @@ internal sealed record ShadowLlmConfiguration(
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    private static string? RedactBaseUrl(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
-        {
-            return "<redacted-non-url>";
-        }
-
-        var builder = new UriBuilder(uri)
-        {
-            UserName = string.Empty,
-            Password = string.Empty,
-            Query = string.Empty,
-            Fragment = string.Empty,
-            Path = string.IsNullOrWhiteSpace(uri.AbsolutePath) || uri.AbsolutePath == "/"
-                ? "/"
-                : "/<redacted-path>"
-        };
-        return builder.Uri.ToString();
-    }
 }
 
-internal sealed record ShadowEvalRunnerOptions(FileInfo Output, FileInfo Report)
+internal sealed record ShadowEvalRunnerOptions(
+    FileInfo Output,
+    FileInfo Report,
+    string? ModelConfigId,
+    string? ModelConfigRole,
+    DirectoryInfo? ModelConfigDirectory)
 {
     public static ShadowEvalRunnerOptions Parse(string[] args)
     {
         var output = Path.Combine("quality", "evals", "reports", "real_llm_planner_shadow_eval.json");
         var report = Path.Combine("quality", "evals", "reports", "real_llm_planner_shadow_eval.md");
+        string? modelConfigId = null;
+        string? modelConfigRole = null;
+        string? modelConfigDirectory = null;
         for (var i = 0; i < args.Length; i++)
         {
             if (string.Equals(args[i], "--output", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
@@ -910,11 +968,28 @@ internal sealed record ShadowEvalRunnerOptions(FileInfo Output, FileInfo Report)
             {
                 report = args[++i];
             }
+            else if (string.Equals(args[i], "--model-config-id", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                modelConfigId = args[++i];
+            }
+            else if (string.Equals(args[i], "--model-config-role", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                modelConfigRole = args[++i];
+            }
+            else if (string.Equals(args[i], "--model-config-dir", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                modelConfigDirectory = args[++i];
+            }
         }
 
         return new ShadowEvalRunnerOptions(
             new FileInfo(Path.GetFullPath(output)),
-            new FileInfo(Path.GetFullPath(report)));
+            new FileInfo(Path.GetFullPath(report)),
+            modelConfigId,
+            modelConfigRole,
+            string.IsNullOrWhiteSpace(modelConfigDirectory)
+                ? null
+                : new DirectoryInfo(Path.GetFullPath(modelConfigDirectory)));
     }
 }
 
@@ -958,6 +1033,8 @@ internal sealed record ShadowEvalSummary(
     int RequestCount,
     int ParseSuccessCount,
     double ParseSuccessRate,
+    int InvalidJsonRepairUsedCount,
+    double RepairUsedRate,
     int UnsafeToolAttemptCount,
     double UnsafeAttemptRate,
     int FallbackToMockSuggestedCount,
@@ -1044,6 +1121,7 @@ internal static class VisionAgentPlannerShadowEvalMarkdown
             "",
             $"- requestCount: {document.Summary.RequestCount}",
             $"- parseSuccessRate: {document.Summary.ParseSuccessRate:0.####}",
+            $"- repairUsedRate: {document.Summary.RepairUsedRate:0.####}",
             $"- unsafeAttemptRate: {document.Summary.UnsafeAttemptRate:0.####}",
             $"- averageToolPlanMatchScore: {document.Summary.AverageToolPlanMatchScore:0.####}",
             "",

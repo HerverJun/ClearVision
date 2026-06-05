@@ -23,6 +23,8 @@ const settingsApi = {
     updateAiModel: (id, payload) => httpClient.put(`/ai/models/${id}`, payload),
     deleteAiModel: id => httpClient.delete(`/ai/models/${id}`),
     activateAiModel: id => httpClient.post(`/ai/models/${id}/activate`, {}),
+    setDefaultPlannerAiModel: id => httpClient.post(`/ai/models/${id}/default-planner`, {}),
+    setDefaultShadowEvalAiModel: id => httpClient.post(`/ai/models/${id}/default-shadow-eval`, {}),
     testAiModel: id => httpClient.post(`/ai/models/${id}/test`, {}),
     resolveAiReasoningSupport: payload => httpClient.post('/ai/reasoning-support', payload),
 

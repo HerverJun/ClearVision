@@ -1,3 +1,5 @@
+using ClearVision.Product.Infrastructure.AI;
+
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
 public sealed class AgentPlannerCompletionOptions
@@ -6,7 +8,7 @@ public sealed class AgentPlannerCompletionOptions
 
     public bool Enabled { get; set; } = true;
 
-    public string ModelRole { get; set; } = "generation";
+    public string ModelRole { get; set; } = AiModelConfig.RolePlanner;
 
     public bool AllowRepair { get; set; } = true;
 
@@ -22,7 +24,7 @@ public sealed class AgentPlannerCompletionOptions
 
     public AgentPlannerCompletionOptions Normalize()
     {
-        ModelRole = string.IsNullOrWhiteSpace(ModelRole) ? "generation" : ModelRole.Trim();
+        ModelRole = AiModelConfig.NormalizeRoleName(ModelRole);
         MaxRepairAttempts = Math.Clamp(MaxRepairAttempts, 0, 1);
         MaxMessages = Math.Clamp(MaxMessages, 2, 32);
         MaxMessageChars = Math.Clamp(MaxMessageChars, 512, 16_000);

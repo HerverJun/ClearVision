@@ -168,7 +168,15 @@ export function installAiTab(SettingsView) {
                             model: '',
                             baseUrl: '',
                             apiKey: '',
+                            apiKeyOperation: 'new',
+                            protocol: 'openai_compatible',
                             wireApi: 'chat_completions',
+                            authMode: 'bearer',
+                            roleBindings: ['generation'],
+                            modelRole: 'generation',
+                            priority: 100,
+                            isEnabled: true,
+                            remark: '',
                             timeoutMs: 120000
                         });
                         await this.loadAiModels();
@@ -217,6 +225,26 @@ export function installAiTab(SettingsView) {
                     } catch (err) {
                         showToast('切换激活失败: ' + err.message, 'error');
                     }
+                } else if (btn.dataset.action === 'default-planner') {
+                    const id = btn.dataset.id;
+                    try {
+                        await settingsApi.setDefaultPlannerAiModel(id);
+                        await this.loadAiModels({ preserveEditingId: true });
+                        this.refreshAiTableAndForm();
+                        showToast('Default planner model updated.', 'success');
+                    } catch (err) {
+                        showToast('Default planner update failed: ' + err.message, 'error');
+                    }
+                } else if (btn.dataset.action === 'default-shadow-eval') {
+                    const id = btn.dataset.id;
+                    try {
+                        await settingsApi.setDefaultShadowEvalAiModel(id);
+                        await this.loadAiModels({ preserveEditingId: true });
+                        this.refreshAiTableAndForm();
+                        showToast('Shadow eval model updated.', 'success');
+                    } catch (err) {
+                        showToast('Shadow eval model update failed: ' + err.message, 'error');
+                    }
                 } else if (btn.id === 'btn-ai-test') {
                     const modelId = this.editingAiModelId;
                     if (!modelId) return;
@@ -229,12 +257,15 @@ export function installAiTab(SettingsView) {
                         // 先保存当前表单到后端，再测试（确保用的是最新配置）
                         await this._saveCurrentForm();
                         const result = await settingsApi.testAiModel(modelId);
-                        if (result.success) {
-                            if (resultEl) { resultEl.textContent = '✅ ' + result.message; resultEl.style.color = '#4caf50'; }
-                            showToast('AI 测试连接成功', 'success');
+                        const ok = result.connectionOk ?? result.success;
+                        const message = result.sanitizedMessage || result.message || result.errorCode || "";
+                        const latency = Number.isFinite(Number(result.latencyMs)) ? ` (${result.latencyMs} ms)` : "";
+                        if (ok) {
+                            if (resultEl) { resultEl.textContent = "OK " + message + latency; resultEl.style.color = "#4caf50"; }
+                            showToast("AI connection test succeeded", "success");
                         } else {
-                            if (resultEl) { resultEl.textContent = '❌ ' + result.message; resultEl.style.color = 'var(--cinnabar)'; }
-                            showToast('AI 连接失败: ' + result.message, 'error');
+                            if (resultEl) { resultEl.textContent = `${result.errorCode || "failed"}: ${message}${latency}`; resultEl.style.color = "var(--cinnabar)"; }
+                            showToast("AI connection test failed: " + message, "error");
                         }
                     } catch (err) {
                         if (resultEl) { resultEl.textContent = '❌ 请求失败: ' + err.message; resultEl.style.color = 'var(--cinnabar)'; }
@@ -264,19 +295,26 @@ export function installAiTab(SettingsView) {
 
                 const fieldMap = {
                     'cfg-ai-name': 'name',
+                    'cfg-ai-display-name': 'displayName',
                     'cfg-ai-provider': 'provider',
+                    'cfg-ai-protocol': 'protocol',
                     'cfg-ai-wireapi': 'wireApi',
+                    'cfg-ai-authmode': 'authMode',
                     'cfg-ai-model': 'model',
                     'cfg-ai-baseurl': 'baseUrl',
                     'cfg-ai-apikey': 'apiKey',
+                    'cfg-ai-apikey-clear': 'apiKey.clear',
                     'cfg-ai-timeout': 'timeoutMs',
+                    'cfg-ai-priority': 'priority',
+                    'cfg-ai-enabled': 'isEnabled',
+                    'cfg-ai-remark': 'remark',
                     'cfg-ai-reasoning-mode': 'reasoning.mode',
                     'cfg-ai-reasoning-effort': 'reasoning.effort'
                 };
                 const field = fieldMap[el.id];
                 if (!field) return;
 
-                this._pendingFormEdits[field] = el.value;
+                this._pendingFormEdits[field] = el.type === 'checkbox' ? el.checked : el.value;
                 if (el.id === 'cfg-ai-name') {
                     const m = this.aiModels.find(x => x.id === this.editingAiModelId);
                     if (m) {
@@ -285,7 +323,7 @@ export function installAiTab(SettingsView) {
                     }
                 }
 
-                if (['cfg-ai-provider', 'cfg-ai-model', 'cfg-ai-baseurl'].includes(el.id)) {
+                if (['cfg-ai-provider', 'cfg-ai-protocol', 'cfg-ai-model', 'cfg-ai-baseurl'].includes(el.id)) {
                     this.scheduleAiReasoningSupportPreview();
                 }
 
@@ -325,7 +363,14 @@ export function installAiTab(SettingsView) {
 
             const currentTimeout = parseInt(aiTab.querySelector('#cfg-ai-timeout')?.value || '120000', 10);
             const normalizedTimeout = Number.isFinite(currentTimeout) ? currentTimeout : 120000;
+            const currentPriority = parseInt(aiTab.querySelector('#cfg-ai-priority')?.value || '100', 10);
+            const normalizedPriority = Number.isFinite(currentPriority) ? currentPriority : 100;
             const pendingApiKey = aiTab.querySelector('#cfg-ai-apikey')?.value || '';
+            const clearApiKey = aiTab.querySelector('#cfg-ai-apikey-clear')?.checked === true;
+            const currentRoles = this.normalizeAiRoleBindings(model.roleBindings, model.modelRole).join(',');
+            const draftRoles = Array.from(aiTab.querySelectorAll('[data-ai-role]:checked'))
+                .map(item => item.dataset.aiRole)
+                .join(',');
             const currentReasoning = this.normalizeAiReasoning(model.reasoning);
             const draftReasoning = this.normalizeAiReasoning({
                 mode: aiTab.querySelector('#cfg-ai-reasoning-mode')?.value || currentReasoning.mode,
@@ -333,22 +378,34 @@ export function installAiTab(SettingsView) {
             });
 
             return (aiTab.querySelector('#cfg-ai-name')?.value || '') !== (model.name || '')
+                || (aiTab.querySelector('#cfg-ai-display-name')?.value || '') !== (model.displayName || '')
                 || (aiTab.querySelector('#cfg-ai-provider')?.value || 'OpenAI Compatible') !== (model.provider || 'OpenAI Compatible')
+                || this.normalizeAiProtocol(aiTab.querySelector('#cfg-ai-protocol')?.value, model.provider) !== this.normalizeAiProtocol(model.protocol, model.provider)
                 || this.normalizeAiWireApi(aiTab.querySelector('#cfg-ai-wireapi')?.value) !== this.normalizeAiWireApi(model.wireApi)
+                || this.normalizeAiAuthMode(aiTab.querySelector('#cfg-ai-authmode')?.value, model.protocol) !== this.normalizeAiAuthMode(model.authMode, model.protocol)
                 || (aiTab.querySelector('#cfg-ai-model')?.value || '') !== (model.model || '')
                 || (aiTab.querySelector('#cfg-ai-baseurl')?.value || '') !== (model.baseUrl || '')
                 || normalizedTimeout !== (model.timeoutMs ?? 120000)
+                || normalizedPriority !== (model.priority ?? 100)
+                || (aiTab.querySelector('#cfg-ai-enabled')?.checked !== (model.isEnabled !== false))
+                || (aiTab.querySelector('#cfg-ai-remark')?.value || '') !== (model.remark || '')
+                || draftRoles !== currentRoles
                 || draftReasoning.mode !== currentReasoning.mode
                 || draftReasoning.effort !== currentReasoning.effort
+                || clearApiKey
                 || pendingApiKey.trim().length > 0;
         }
         ,
         clearAiSecretInputs() {
             const apiKeyInput = this.container?.querySelector('#cfg-ai-apikey');
+            const clearApiKeyInput = this.container?.querySelector('#cfg-ai-apikey-clear');
             const toggleButton = this.container?.querySelector('#btn-toggle-apikey');
             if (apiKeyInput) {
                 apiKeyInput.value = '';
                 apiKeyInput.type = 'password';
+            }
+            if (clearApiKeyInput) {
+                clearApiKeyInput.checked = false;
             }
             if (toggleButton) {
                 toggleButton.textContent = '👁';
@@ -365,17 +422,37 @@ export function installAiTab(SettingsView) {
             const aiTab = this.container.querySelector('[data-section="ai"]');
             if (!aiTab) return;
 
+            const model = this.aiModels.find(x => x.id === modelId);
+            const apiKeyValue = aiTab.querySelector("#cfg-ai-apikey")?.value || "";
+            const clearApiKey = aiTab.querySelector("#cfg-ai-apikey-clear")?.checked === true;
+            const apiKeyOperation = clearApiKey
+                ? "clear"
+                : (apiKeyValue.trim().length > 0 ? (model?.hasApiKey ? "replace" : "new") : "keep");
+            const provider = aiTab.querySelector("#cfg-ai-provider")?.value || "OpenAI Compatible";
+            const protocol = this.normalizeAiProtocol(aiTab.querySelector("#cfg-ai-protocol")?.value, provider);
+            const roleBindings = this.normalizeAiRoleBindings(
+                Array.from(aiTab.querySelectorAll("[data-ai-role]:checked")).map(item => item.dataset.aiRole));
+
             const payload = {
-                name: aiTab.querySelector('#cfg-ai-name')?.value || '',
-                provider: aiTab.querySelector('#cfg-ai-provider')?.value || 'OpenAI Compatible',
-                wireApi: this.normalizeAiWireApi(aiTab.querySelector('#cfg-ai-wireapi')?.value),
-                model: aiTab.querySelector('#cfg-ai-model')?.value || '',
-                baseUrl: aiTab.querySelector('#cfg-ai-baseurl')?.value || '',
-                apiKey: aiTab.querySelector('#cfg-ai-apikey')?.value || '', // 空 → 后端保留原值
-                timeoutMs: parseInt(aiTab.querySelector('#cfg-ai-timeout')?.value || '120000', 10),
+                name: aiTab.querySelector("#cfg-ai-name")?.value || "",
+                displayName: aiTab.querySelector("#cfg-ai-display-name")?.value || "",
+                provider,
+                protocol,
+                wireApi: this.normalizeAiWireApi(aiTab.querySelector("#cfg-ai-wireapi")?.value),
+                authMode: this.normalizeAiAuthMode(aiTab.querySelector("#cfg-ai-authmode")?.value, protocol),
+                model: aiTab.querySelector("#cfg-ai-model")?.value || "",
+                baseUrl: aiTab.querySelector("#cfg-ai-baseurl")?.value || "",
+                apiKey: apiKeyOperation === "replace" || apiKeyOperation === "new" ? apiKeyValue : "",
+                apiKeyOperation,
+                timeoutMs: parseInt(aiTab.querySelector("#cfg-ai-timeout")?.value || "120000", 10),
+                roleBindings,
+                modelRole: roleBindings[0] || "generation",
+                isEnabled: aiTab.querySelector("#cfg-ai-enabled")?.checked !== false,
+                priority: parseInt(aiTab.querySelector("#cfg-ai-priority")?.value || "100", 10),
+                remark: aiTab.querySelector("#cfg-ai-remark")?.value || "",
                 reasoning: {
-                    mode: aiTab.querySelector('#cfg-ai-reasoning-mode')?.value || 'auto',
-                    effort: aiTab.querySelector('#cfg-ai-reasoning-effort')?.value || 'medium'
+                    mode: aiTab.querySelector("#cfg-ai-reasoning-mode")?.value || "auto",
+                    effort: aiTab.querySelector("#cfg-ai-reasoning-effort")?.value || "medium"
                 }
             };
 
@@ -398,6 +475,11 @@ export function installAiTab(SettingsView) {
                 const provider = String(m.provider || '');
                 const providerHtml = this.escapeHtml(provider || '-');
                 const model = this.escapeHtml(m.model || '-');
+                const roles = this.normalizeAiRoleBindings(m.roleBindings, m.modelRole);
+                const roleHtml = roles.map(role => `<span class="type-badge" style="margin-right:4px;">${this.escapeHtml(role)}</span>`).join('');
+                const enabledHtml = m.isEnabled === false
+                    ? '<span class="type-badge" style="background:#fff7ed;color:#c2410c;">Disabled</span>'
+                    : '<span class="type-badge" style="background:#ecfdf5;color:#047857;">Enabled</span>';
                 const badgeBg = provider.includes('Anthropic') ? '#fce7f3' : (provider.includes('OpenAI API') ? '#e0e7ff' : '#f3f4f6');
                 const badgeColor = provider.includes('Anthropic') ? '#db2777' : (provider.includes('OpenAI API') ? '#4338ca' : '#475569');
 
@@ -406,6 +488,7 @@ export function installAiTab(SettingsView) {
                         <td class="font-bold">${name}</td>
                         <td><span class="type-badge" style="background:${badgeBg}; color:${badgeColor};">${providerHtml}</span></td>
                         <td class="font-mono">${model}</td>
+                        <td>${roleHtml}${enabledHtml}</td>
                         <td>
                             ${m.isActive
                                 ? '<span class="settings-status-badge status-connected" style="background:#ecfdf5; padding:2px 8px;"><span class="status-dot"></span> 已启用</span>'
@@ -415,6 +498,8 @@ export function installAiTab(SettingsView) {
                             <button class="action-icon-btn" data-action="edit" data-id="${id}" title="编辑">
                                 <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/></svg>
                             </button>
+                            <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-planner" data-id="${id}">Planner</button>
+                            <button class="cv-btn settings-btn-light" style="padding:2px 8px; font-size:12px; height:24px;" data-action="default-shadow-eval" data-id="${id}">Shadow</button>
                             <button class="action-icon-btn" data-action="delete" data-id="${id}" title="删除" style="color:var(--cinnabar);">
                                 <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                             </button>
@@ -447,13 +532,26 @@ export function installAiTab(SettingsView) {
             const baseUrlValue = this.escapeHtml(m.baseUrl || '');
             const apiKeyPlaceholderValue = this.escapeHtml(apiKeyPlaceholder);
             const timeoutValue = Number.isFinite(Number(m.timeoutMs)) ? Number(m.timeoutMs) : 120000;
+            const displayNameValue = this.escapeHtml(m.displayName || '');
+            const protocol = this.normalizeAiProtocol(m.protocol, m.provider);
+            const authMode = this.normalizeAiAuthMode(m.authMode, protocol);
+            const roles = this.normalizeAiRoleBindings(m.roleBindings, m.modelRole);
+            const priorityValue = Number.isFinite(Number(m.priority)) ? Number(m.priority) : 100;
+            const remarkValue = this.escapeHtml(m.remark || '');
+            const lastTestStatus = this.escapeHtml(m.lastTestStatus || 'untested');
+            const lastTestAt = this.escapeHtml(m.lastTestAt || '-');
+            const lastTestLatency = Number.isFinite(Number(m.lastTestLatencyMs)) ? `${m.lastTestLatencyMs} ms` : '-';
 
             formContainer.innerHTML = `
                 <div style="display:flex; gap:16px; margin-bottom:16px;">
                      <div class="settings-fieldset" style="flex:1;">
-                         <label>模型昵称</label>
-                         <input type="text" class="cv-input" id="cfg-ai-name" value="${nameValue}" placeholder="本地别名">
-                      </div>
+                         <label>Model Name</label>
+                         <input type="text" class="cv-input" id="cfg-ai-name" value="${nameValue}" placeholder="Local alias">
+                     </div>
+                     <div class="settings-fieldset" style="flex:1;">
+                         <label>Display Name</label>
+                         <input type="text" class="cv-input" id="cfg-ai-display-name" value="${displayNameValue}" placeholder="Workbench label">
+                     </div>
                      <div class="settings-fieldset" style="flex:1;">
                          <label>API 协议</label>
                          <select class="cv-input" id="cfg-ai-provider">
@@ -463,10 +561,27 @@ export function installAiTab(SettingsView) {
                          </select>
                      </div>
                      <div class="settings-fieldset" style="flex:1;">
+                         <label>Protocol</label>
+                         <select class="cv-input" id="cfg-ai-protocol">
+                             <option value="openai_compatible" ${protocol === "openai_compatible" ? "selected" : ""}>OpenAI Compatible</option>
+                             <option value="anthropic" ${protocol === "anthropic" ? "selected" : ""}>Anthropic</option>
+                             <option value="azure_openai" ${protocol === "azure_openai" ? "selected" : ""}>Azure OpenAI</option>
+                             <option value="ollama_native" ${protocol === "ollama_native" ? "selected" : ""}>Ollama Native</option>
+                         </select>
+                     </div>
+                     <div class="settings-fieldset" style="flex:1;">
                          <label>API 接口</label>
                          <select class="cv-input" id="cfg-ai-wireapi">
                              <option value="chat_completions" ${wireApi === 'chat_completions' ? 'selected' : ''}>Chat Completions</option>
                              <option value="responses" ${wireApi === 'responses' ? 'selected' : ''}>Responses</option>
+                         </select>
+                     </div>
+                     <div class="settings-fieldset" style="flex:1;">
+                         <label>Auth Mode</label>
+                         <select class="cv-input" id="cfg-ai-authmode">
+                             <option value="bearer" ${authMode === "bearer" ? "selected" : ""}>Bearer</option>
+                             <option value="header_key" ${authMode === "header_key" ? "selected" : ""}>Header Key</option>
+                             <option value="none" ${authMode === "none" ? "selected" : ""}>None</option>
                          </select>
                      </div>
                      <div class="settings-fieldset" style="flex:1;">
@@ -488,12 +603,43 @@ export function installAiTab(SettingsView) {
                               <input type="password" class="cv-input" id="cfg-ai-apikey" value="" placeholder="${apiKeyPlaceholderValue}" style="padding-right:36px; font-family:monospace;">
                              <button class="icon-action-btn" id="btn-toggle-apikey" style="position:absolute; right:10px; top:50%; transform:translateY(-50%);">👁</button>
                          </div>
+                              <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px; color:#64748b;">
+                                  <input type="checkbox" id="cfg-ai-apikey-clear"> Clear saved key
+                              </label>
                      </div>
                       <div class="settings-fieldset" style="flex:1;">
                           <label>请求超时 (ms)</label>
                           <input type="number" class="cv-input" id="cfg-ai-timeout" value="${timeoutValue}">
                       </div>
                   </div>
+                   <div style="display:flex; gap:16px; margin-top:16px; align-items:flex-start;">
+                       <div class="settings-fieldset" style="flex:2;">
+                           <label>Model Roles</label>
+                           <div style="display:flex; flex-wrap:wrap; gap:8px; padding:8px 0;">
+                               <label><input type="checkbox" data-ai-role="generation" ${roles.includes("generation") ? "checked" : ""}> generation</label>
+                               <label><input type="checkbox" data-ai-role="planner" ${roles.includes("planner") ? "checked" : ""}> planner</label>
+                               <label><input type="checkbox" data-ai-role="vision-agent-shadow-eval" ${roles.includes("vision-agent-shadow-eval") ? "checked" : ""}> shadow eval</label>
+                           </div>
+                           <div hidden data-ai-shadow-eval-entry="hidden">Shadow eval execution entry is developer-hidden by default.</div>
+                       </div>
+                       <div class="settings-fieldset" style="flex:1;">
+                           <label>Priority</label>
+                           <input type="number" class="cv-input" id="cfg-ai-priority" value="${priorityValue}" min="1" max="10000">
+                       </div>
+                       <div class="settings-fieldset" style="flex:1;">
+                           <label>Enabled</label>
+                           <label style="display:flex; align-items:center; gap:8px; height:38px;"><input type="checkbox" id="cfg-ai-enabled" ${m.isEnabled === false ? "" : "checked"}> Enabled</label>
+                       </div>
+                   </div>
+                   <div class="settings-fieldset" style="margin-top:16px;">
+                       <label>Remark</label>
+                       <textarea class="cv-input" id="cfg-ai-remark" rows="2">${remarkValue}</textarea>
+                   </div>
+                   <div style="margin-top:12px; font-size:12px; color:#64748b; display:flex; gap:16px; flex-wrap:wrap;">
+                       <span>Last test: <strong>${lastTestStatus}</strong></span>
+                       <span>At: ${lastTestAt}</span>
+                       <span>Latency: ${lastTestLatency}</span>
+                   </div>
                   <details class="settings-fieldset" style="margin-top:16px; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; background:#fafcff;" open>
                       <summary style="cursor:pointer; font-weight:700; color:#1e293b;">推理 / Thinking</summary>
                       <div style="display:flex; gap:16px; margin-top:14px;">
@@ -562,6 +708,7 @@ export function installAiTab(SettingsView) {
                                     <th>名称</th>
                                     <th>协议</th>
                                     <th>模型标识</th>
+                                    <th>Roles</th>
                                     <th>状态</th>
                                     <th>操作</th>
                                 </tr>
