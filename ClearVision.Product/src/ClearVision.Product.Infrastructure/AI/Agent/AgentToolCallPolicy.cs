@@ -17,18 +17,26 @@ public sealed class AgentToolCallPolicy
 
     private static readonly HashSet<string> DeniedToolNames = new(
     [
-        "capture_" + "test_frame",
-        "replay_" + "flow_with_frame"
+        RuntimePreviewPermissionGate.CaptureToolName,
+        RuntimePreviewPermissionGate.ReplayToolName
     ], StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyList<string> ListAllowedToolNames()
+    public IReadOnlyList<string> ListAllowedToolNames(bool runtimePreviewConsent = false)
     {
-        return AllowedToolNames
+        var names = AllowedToolNames.AsEnumerable();
+        if (runtimePreviewConsent)
+        {
+            names = names.Concat(DeniedToolNames);
+        }
+
+        return names
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
-    public AgentToolCallPolicyResult Validate(VisionAgentProtocolMessage message)
+    public AgentToolCallPolicyResult Validate(
+        VisionAgentProtocolMessage message,
+        bool runtimePreviewConsent = false)
     {
         if (!message.IsToolCall)
         {
@@ -37,7 +45,7 @@ public sealed class AgentToolCallPolicy
 
         foreach (var call in message.ToolCalls)
         {
-            var result = ValidateToolName(call.Name);
+            var result = ValidateToolName(call.Name, runtimePreviewConsent);
             if (!result.Allowed)
             {
                 return result;
@@ -47,7 +55,9 @@ public sealed class AgentToolCallPolicy
         return AgentToolCallPolicyResult.Allow();
     }
 
-    public AgentToolCallPolicyResult ValidateToolName(string? toolName)
+    public AgentToolCallPolicyResult ValidateToolName(
+        string? toolName,
+        bool runtimePreviewConsent = false)
     {
         if (string.IsNullOrWhiteSpace(toolName))
         {
@@ -58,9 +68,14 @@ public sealed class AgentToolCallPolicy
 
         if (DeniedToolNames.Contains(toolName))
         {
+            if (runtimePreviewConsent)
+            {
+                return AgentToolCallPolicyResult.Allow();
+            }
+
             return AgentToolCallPolicyResult.Deny(
-                "tool_policy_denied",
-                $"Planner tool '{toolName}' is not allowed in this phase.");
+                RuntimePreviewPermissionGate.ConsentRequiredErrorCode,
+                $"Planner tool '{toolName}' requires explicit RuntimePreview consent.");
         }
 
         if (!AllowedToolNames.Contains(toolName))

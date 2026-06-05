@@ -74,6 +74,8 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IVisionAgentTool, FlowValidationTool>();
         services.AddScoped<IVisionAgentTool, DryRunFlowTool>();
         services.AddScoped<IVisionAgentTool, RuntimePackagePrecheckTool>();
+        services.AddScoped<IVisionAgentTool, RuntimePreviewCaptureStubTool>();
+        services.AddScoped<IVisionAgentTool, RuntimePreviewReplayStubTool>();
         services.AddScoped<IVisionAgentToolRegistry, VisionAgentToolRegistry>();
         services.AddScoped<IVisionAgentGenerateFlowService, VisionAgentGenerateFlowService>();
         services.AddScoped<IAiFlowGenerationService, AiFlowGenerationService>();

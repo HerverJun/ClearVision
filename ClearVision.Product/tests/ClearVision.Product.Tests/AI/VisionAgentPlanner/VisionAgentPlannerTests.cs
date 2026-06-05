@@ -167,12 +167,32 @@ public sealed class VisionAgentPlannerTests
         result.ErrorMessage.Should().Contain("outside the allowed tool set");
     }
 
-    [Fact(DisplayName = "Planner policy should reject RuntimePreview tool names")]
-    public async Task PlannerPolicy_ShouldRejectRuntimePreviewToolNames()
+    [Fact(DisplayName = "Planner policy should reject RuntimePreview tool names by default")]
+    public void PlannerPolicy_ShouldRejectRuntimePreviewToolNamesByDefault()
+    {
+        var policy = new AgentToolCallPolicy();
+        var runtimePreviewToolName = "capture_" + "test_frame";
+
+        var result = policy.ValidateToolName(runtimePreviewToolName);
+
+        result.Allowed.Should().BeFalse();
+        result.ErrorCode.Should().Be("runtime_preview_consent_required");
+    }
+
+    [Fact(DisplayName = "Planner should surface RuntimePreview consent pendingAction when not authorized")]
+    public async Task Planner_ShouldSurfaceRuntimePreviewPendingActionWhenNotAuthorized()
     {
         var runtimePreviewToolName = "capture_" + "test_frame";
         var service = CreatePlannerService(
-            new DelegatePlannerCompletionSource((_, _) => ToolCall(runtimePreviewToolName, new { })),
+            new DelegatePlannerCompletionSource((request, index) => index switch
+            {
+                0 => ToolCall(runtimePreviewToolName, new { cameraBindingId = "mock-cam" }),
+                _ => JsonSerializer.Serialize(new
+                {
+                    kind = "final",
+                    workflowDraft = TemplateMatchingWithoutOutputFlow()
+                })
+            }),
             new AgentGenerateFlowOptions
             {
                 Mode = AiAgentGenerateFlowModes.Planner,
@@ -181,9 +201,12 @@ public sealed class VisionAgentPlannerTests
 
         var result = await service.GenerateFlowAsync(PlannerRequest("preview frame"), CancellationToken.None);
 
-        result.Success.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("tool policy denied");
-        result.ErrorMessage.Should().Contain("not allowed");
+        result.Success.Should().BeTrue();
+        result.PendingActions.Should().Contain(action =>
+            Json(action).GetRawText().Contains("AuthorizeRuntimePreview", StringComparison.OrdinalIgnoreCase));
+        Trace(result).Should().Contain(trace =>
+            trace.GetProperty("toolName").GetString() == runtimePreviewToolName &&
+            trace.GetProperty("errorCode").GetString() == "runtime_preview_consent_required");
     }
 
     [Fact(DisplayName = "Planner policy should allow DeploymentPrepare only for runtime_package_precheck")]
@@ -402,7 +425,9 @@ public sealed class VisionAgentPlannerTests
             new CurrentFlowInspectTool(),
             new FlowValidationTool(),
             new DryRunFlowTool(),
-            new RuntimePackagePrecheckTool()
+            new RuntimePackagePrecheckTool(),
+            new RuntimePreviewCaptureStubTool(),
+            new RuntimePreviewReplayStubTool()
         ]);
     }
 

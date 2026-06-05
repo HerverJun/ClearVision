@@ -114,20 +114,16 @@ public sealed class VisionAgentPlannerCompletionTests
         result.ErrorMessage.Should().Contain("outside the allowed tool set");
     }
 
-    [Fact(DisplayName = "Preview planner tool should be rejected by policy")]
-    public async Task PreviewTool_ShouldBeRejectedByPolicy()
+    [Fact(DisplayName = "Preview planner tool should be rejected by policy by default")]
+    public void PreviewTool_ShouldBeRejectedByPolicyByDefault()
     {
         var previewToolName = "capture_" + "test_frame";
-        var connector = new FakeConnector(ToolCall(previewToolName, new { camera = "cam_1" }));
-        var service = CreatePlannerGenerateFlowService(connector);
+        var policy = new AgentToolCallPolicy();
 
-        var result = await service.GenerateFlowAsync(
-            PlannerRequest("preview frame"),
-            CancellationToken.None);
+        var result = policy.ValidateToolName(previewToolName);
 
-        result.Success.Should().BeFalse();
-        result.ErrorMessage.Should().Contain("tool policy denied");
-        result.ErrorMessage.Should().Contain("not allowed");
+        result.Allowed.Should().BeFalse();
+        result.ErrorCode.Should().Be("runtime_preview_consent_required");
     }
 
     [Fact(DisplayName = "Invalid planner JSON should repair once successfully")]
@@ -319,8 +315,7 @@ public sealed class VisionAgentPlannerCompletionTests
             "ProcessStartInfo",
             "cmd.exe",
             "powershell.exe",
-            "execute_command",
-            "RuntimePreview"
+            "execute_command"
         };
 
         forbidden.Should().OnlyContain(fragment =>

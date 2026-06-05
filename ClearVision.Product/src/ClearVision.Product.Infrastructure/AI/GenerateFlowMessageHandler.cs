@@ -43,6 +43,7 @@ public class GenerateFlowMessageHandler
         AiTemplateSelectionInfo? templateSelection = null,
         bool useVisionAgentGenerateFlow = false,
         string? agentGenerateFlowMode = null,
+        bool runtimePreviewConsent = false,
         Action<string, string>? onMessage = null,
         CancellationToken cancellationToken = default)
     {
@@ -72,7 +73,8 @@ public class GenerateFlowMessageHandler
                 {
                     RequirementMode = requirementMode ?? AiRequirementModes.Strict,
                     UseVisionAgentGenerateFlow = useVisionAgentGenerateFlow,
-                    AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(agentGenerateFlowMode)
+                    AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(agentGenerateFlowMode),
+                    RuntimePreviewConsent = runtimePreviewConsent
                 },
                 progressMsg => onMessage?.Invoke(
                     "GenerateFlowProgress",

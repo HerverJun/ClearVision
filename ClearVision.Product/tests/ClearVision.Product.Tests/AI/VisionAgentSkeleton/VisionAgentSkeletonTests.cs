@@ -115,8 +115,10 @@ public sealed class VisionAgentSkeletonTests
         result.Success.Should().BeTrue();
         result.ToolTrace.Should().ContainSingle();
         result.ToolTrace[0].Success.Should().BeFalse();
-        result.ToolTrace[0].ErrorCode.Should().Be("tool_permission_denied");
+        result.ToolTrace[0].ErrorCode.Should().Be("runtime_preview_consent_required");
         result.ToolTrace[0].Permission.Should().Be(nameof(VisionAgentToolPermission.RuntimePreview));
+        result.ToolTrace[0].PermissionDecision.Should().NotBeNull();
+        result.PendingActions.Should().ContainSingle(action => action.ActionType == "AuthorizeRuntimePreview");
         tool.ExecuteCount.Should().Be(0);
     }
 
@@ -140,7 +142,8 @@ public sealed class VisionAgentSkeletonTests
                     VisionAgentToolPermission.ReadOnly,
                     VisionAgentToolPermission.Simulation,
                     VisionAgentToolPermission.RuntimePreview
-                }
+                },
+                RuntimePreviewConsent = true
             }), CancellationToken.None);
 
         result.Success.Should().BeTrue();
@@ -287,8 +290,8 @@ public sealed class VisionAgentSkeletonTests
             !source.Contains(fragment, StringComparison.OrdinalIgnoreCase));
     }
 
-    [Fact(DisplayName = "VisionAgent skeleton should not be wired into AI default flow or frontend RuntimePreview UI")]
-    public void VisionAgentSkeleton_ShouldNotBeWiredIntoDefaultFlowOrFrontend()
+    [Fact(DisplayName = "VisionAgent skeleton should keep default flow legacy and RuntimePreview UI hidden")]
+    public void VisionAgentSkeleton_ShouldKeepDefaultFlowLegacyAndRuntimePreviewUiHidden()
     {
         var productRoot = GetProductRoot();
         var aiFlowGenerationService = File.ReadAllText(Path.Combine(
@@ -305,7 +308,6 @@ public sealed class VisionAgentSkeletonTests
             "src"));
 
         aiFlowGenerationService.Should().NotContain("VisionAgentLoop");
-        frontendSource.Should().NotContain("RuntimePreview");
         frontendSource.Should().NotContain("capture_test_frame");
         frontendSource.Should().NotContain("replay_flow_with_frame");
     }

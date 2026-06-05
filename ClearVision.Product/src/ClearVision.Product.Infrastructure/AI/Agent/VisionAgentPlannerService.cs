@@ -40,7 +40,8 @@ public sealed class VisionAgentPlannerService : IVisionAgentPlannerService
         AgentPlannerCompletionRequest request,
         CancellationToken cancellationToken)
     {
-        var allowedToolNames = _toolCallPolicy.ListAllowedToolNames();
+        var runtimePreviewConsent = RuntimePreviewPermissionGate.HasConsent(request.GenerationRequest);
+        var allowedToolNames = _toolCallPolicy.ListAllowedToolNames(runtimePreviewConsent);
         var enriched = request with
         {
             PlannerPrompt = _promptBuilder.Build(
@@ -50,9 +51,17 @@ public sealed class VisionAgentPlannerService : IVisionAgentPlannerService
         };
         var completion = await _completionSource.CompleteAsync(enriched, cancellationToken);
         var parsed = _protocolParser.Parse(completion);
-        var policy = _toolCallPolicy.Validate(parsed);
+        var policy = _toolCallPolicy.Validate(parsed, runtimePreviewConsent);
         if (!policy.Allowed)
         {
+            if (string.Equals(
+                    policy.ErrorCode,
+                    RuntimePreviewPermissionGate.ConsentRequiredErrorCode,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return completion;
+            }
+
             throw new AgentToolCallPolicyViolationException(
                 policy.ErrorCode ?? "tool_policy_denied",
                 policy.ErrorMessage ?? "Planner tool call was denied by policy.");

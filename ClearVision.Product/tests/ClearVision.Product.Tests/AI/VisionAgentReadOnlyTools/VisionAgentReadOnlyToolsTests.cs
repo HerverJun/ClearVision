@@ -85,7 +85,8 @@ public sealed class VisionAgentReadOnlyToolsTests
             CancellationToken.None);
 
         result.Success.Should().BeFalse();
-        result.ErrorCode.Should().Be("tool_permission_denied");
+        result.ErrorCode.Should().Be("runtime_preview_consent_required");
+        result.PendingActions.Should().ContainSingle(action => action.ActionType == "AuthorizeRuntimePreview");
         tool.ExecuteCount.Should().Be(0);
     }
 

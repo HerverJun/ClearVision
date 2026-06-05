@@ -142,6 +142,17 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         VisionAgentLoopResult loopResult;
         try
         {
+            var allowedPermissions = new HashSet<VisionAgentToolPermission>
+            {
+                VisionAgentToolPermission.ReadOnly,
+                VisionAgentToolPermission.Simulation,
+                VisionAgentToolPermission.DeploymentPrepare
+            };
+            if (RuntimePreviewPermissionGate.HasConsent(request))
+            {
+                allowedPermissions.Add(VisionAgentToolPermission.RuntimePreview);
+            }
+
             loopResult = await _loop.RunAsync(new VisionAgentLoopRequest
             {
                 UserPrompt = request.Description,
@@ -151,12 +162,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                     AdditionalContext = request.AdditionalContext,
                     ExistingFlowJson = request.ExistingFlowJson,
                     MaxToolResultChars = _loopOptions.MaxToolResultChars,
-                    AllowedPermissions = new HashSet<VisionAgentToolPermission>
-                    {
-                        VisionAgentToolPermission.ReadOnly,
-                        VisionAgentToolPermission.Simulation,
-                        VisionAgentToolPermission.DeploymentPrepare
-                    }
+                    RuntimePreviewConsent = request.RuntimePreviewConsent,
+                    AllowedPermissions = allowedPermissions
                 },
                 CompleteAsync = completeAsync
             }, cancellationToken);
@@ -195,14 +202,17 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             {
                 structuralValidation = CloneJsonCompatible(capture.ValidationSummary),
                 dryRun = CloneJsonCompatible(capture.DryRunSummary),
-                deploymentPrecheck = CloneJsonCompatible(capture.DeploymentPrecheck)
+                deploymentPrecheck = CloneJsonCompatible(capture.DeploymentPrecheck),
+                runtimePreview = CloneJsonCompatible(capture.RuntimePreviewSummary)
             };
             var missingResources = BuildMissingResources(capture.DeploymentPrecheck);
             var pendingParameters = BuildPendingParameters(capture.DeploymentPrecheck, operatorIdMap);
-            var pendingActions = ReadArray(capture.DeploymentPrecheck, "pendingActions")
+            var pendingActions = loopResult.PendingActions
+                .Select(ClonePendingAction)
+                .Concat(ReadArray(capture.DeploymentPrecheck, "pendingActions")
                 .Select(CloneJsonCompatible)
                 .Where(item => item != null)
-                .Cast<object>()
+                .Cast<object>())
                 .ToList();
 
             return new AiFlowGenerationResult
@@ -572,6 +582,18 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             StringComparer.OrdinalIgnoreCase);
     }
 
+    private static object ClonePendingAction(VisionAgentPendingAction action)
+    {
+        return new
+        {
+            actionType = action.ActionType,
+            title = action.Title,
+            summary = action.Summary,
+            payload = action.Payload,
+            requiresUserConfirmation = action.RequiresUserConfirmation
+        };
+    }
+
     private static object MapTrace(VisionAgentToolTrace trace)
     {
         return new
@@ -581,6 +603,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             errorCode = trace.ErrorCode,
             durationMs = trace.DurationMs,
             permission = trace.Permission,
+            permissionDecision = trace.PermissionDecision,
             arguments = trace.Arguments,
             resultSummary = trace.ResultSummary
         };
@@ -690,6 +713,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         public JsonElement ValidationSummary { get; set; }
         public JsonElement DryRunSummary { get; set; }
         public JsonElement DeploymentPrecheck { get; set; }
+        public JsonElement RuntimePreviewSummary { get; set; }
     }
 
     private sealed class AgentGenerateFlowPlanner
@@ -774,6 +798,9 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                         break;
                     case "runtime_package_precheck":
                         _capture.DeploymentPrecheck = data.Clone();
+                        break;
+                    case var preview when RuntimePreviewPermissionGate.IsRuntimePreviewTool(preview):
+                        _capture.RuntimePreviewSummary = data.Clone();
                         break;
                 }
             }

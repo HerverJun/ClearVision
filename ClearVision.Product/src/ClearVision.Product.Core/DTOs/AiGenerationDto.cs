@@ -25,6 +25,17 @@ public record AiFlowGenerationRequest(
     public bool UseVisionAgentGenerateFlow { get; init; }
 
     public string AgentGenerateFlowMode { get; init; } = AiAgentGenerateFlowModes.Scripted;
+
+    public bool RuntimePreviewConsent { get; init; }
+}
+
+public sealed record RuntimePreviewConsent(
+    bool Granted,
+    string Scope = RuntimePreviewConsentScopes.SingleRequest);
+
+public static class RuntimePreviewConsentScopes
+{
+    public const string SingleRequest = "single_request";
 }
 
 public static class AiRequirementModes

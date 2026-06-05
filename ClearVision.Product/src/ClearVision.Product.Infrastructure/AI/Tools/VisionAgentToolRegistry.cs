@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Infrastructure.AI.Agent;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -63,6 +64,12 @@ public sealed class VisionAgentToolRegistry : IVisionAgentToolRegistry
             return VisionAgentToolResult.Fail(
                 "tool_permission_denied",
                 $"Tool '{tool.Name}' requires DeploymentPrepare and is not allowed in this session.");
+        }
+
+        if (tool.Permission == VisionAgentToolPermission.RuntimePreview &&
+            !RuntimePreviewPermissionGate.CanRun(context))
+        {
+            return RuntimePreviewPermissionGate.DeniedToolResult(tool.Name, context);
         }
 
         if (!context.AllowedPermissions.Contains(tool.Permission))

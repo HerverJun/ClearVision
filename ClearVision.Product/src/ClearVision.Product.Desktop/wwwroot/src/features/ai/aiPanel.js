@@ -104,6 +104,7 @@ export class AiPanel {
         this.isVisionAgentDeveloperUiEnabled = this._isAgentDeveloperControlsEnabled();
         this.useVisionAgentGenerateFlow = this._loadAgentGenerateFlowEnabled();
         this.agentGenerateFlowMode = this._loadAgentGenerateFlowMode();
+        this.runtimePreviewConsent = false;
 
         // 应用预览与撤销
         this._preApplySnapshot = null;
@@ -907,6 +908,10 @@ export class AiPanel {
                     <button class="ai-mode-chip ${mode === 'scripted' ? 'is-active' : ''}" type="button" data-agent-generate-mode="scripted" ${enabled ? '' : 'disabled'}>scripted</button>
                     <button class="ai-mode-chip ${mode === 'planner' ? 'is-active' : ''}" type="button" data-agent-generate-mode="planner" ${enabled ? '' : 'disabled'}>planner</button>
                 </div>
+                <label class="ai-agent-dev-toggle ai-agent-preview-consent">
+                    <input id="ai-agent-runtime-preview-consent" type="checkbox" ${enabled && this.runtimePreviewConsent ? 'checked' : ''} ${enabled ? '' : 'disabled'} />
+                    <span>允许本轮 RuntimePreview</span>
+                </label>
             </div>
         `;
     }
@@ -917,6 +922,7 @@ export class AiPanel {
         }
 
         const toggle = this.container?.querySelector('#ai-agent-generate-toggle');
+        const previewConsentToggle = this.container?.querySelector('#ai-agent-runtime-preview-consent');
         const modeButtons = Array.from(this.container?.querySelectorAll('[data-agent-generate-mode]') || []);
         const refresh = () => {
             const mode = this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode);
@@ -925,13 +931,28 @@ export class AiPanel {
                 button.classList.toggle('is-active', isActive);
                 button.disabled = !this.useVisionAgentGenerateFlow;
             });
+            if (previewConsentToggle) {
+                previewConsentToggle.disabled = !this.useVisionAgentGenerateFlow;
+                previewConsentToggle.checked = Boolean(this.useVisionAgentGenerateFlow && this.runtimePreviewConsent);
+            }
         };
 
         if (toggle) {
             toggle.checked = Boolean(this.useVisionAgentGenerateFlow);
             toggle.addEventListener('change', () => {
                 this.useVisionAgentGenerateFlow = Boolean(toggle.checked);
+                if (!this.useVisionAgentGenerateFlow) {
+                    this.runtimePreviewConsent = false;
+                }
                 this._saveAgentGenerateFlowPreference();
+                refresh();
+            });
+        }
+
+        if (previewConsentToggle) {
+            previewConsentToggle.checked = Boolean(this.useVisionAgentGenerateFlow && this.runtimePreviewConsent);
+            previewConsentToggle.addEventListener('change', () => {
+                this.runtimePreviewConsent = Boolean(previewConsentToggle.checked);
                 refresh();
             });
         }
@@ -953,13 +974,20 @@ export class AiPanel {
 
     _buildAgentGenerateFlowRequestPayload() {
         if (!this.isVisionAgentDeveloperUiEnabled || !this.useVisionAgentGenerateFlow) {
+            this.runtimePreviewConsent = false;
             return {};
         }
 
-        return {
+        const payload = {
             useVisionAgentGenerateFlow: true,
             agentGenerateFlowMode: this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode)
         };
+        if (this.runtimePreviewConsent) {
+            payload.runtimePreviewConsent = true;
+            this.runtimePreviewConsent = false;
+        }
+
+        return payload;
     }
 
     _normalizeRequirementMode(mode) {

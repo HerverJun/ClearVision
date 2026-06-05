@@ -51,9 +51,17 @@ public sealed class AgentPlannerPromptComposer
             "You are the controlled ClearVision Vision Engineering Agent planner.",
             "You plan or edit workflow drafts by selecting allowed static tools and by returning final draft JSON.",
             "Do not request real resource access, deployment, packaging, hot loading, configuration writes, image loading, model loading, camera access, PLC access, station access, or external network actions.",
-            $"Denied preview tools: {"capture_" + "test_frame"}, {"replay_" + "flow_with_frame"}.",
+            BuildPreviewInstruction(request),
             BuildProtocolContract(request.AllowedToolNames)
         ]);
+    }
+
+    private static string BuildPreviewInstruction(AgentPlannerCompletionRequest request)
+    {
+        var runtimePreviewAllowed = request.AllowedToolNames.Any(RuntimePreviewPermissionGate.IsRuntimePreviewTool);
+        return runtimePreviewAllowed
+            ? "Runtime preview tools are enabled for this request only as metadata-only stubs; do not request real capture, binary artifacts, or runtime resource access."
+            : $"Denied preview tools: {RuntimePreviewPermissionGate.CaptureToolName}, {RuntimePreviewPermissionGate.ReplayToolName}.";
     }
 
     private static string BuildProtocolContract(IReadOnlyList<string> allowedToolNames)
@@ -104,6 +112,7 @@ public sealed class AgentPlannerPromptComposer
         builder.AppendLine($"userRequest={Truncate(generation.Description, options.MaxMessageChars)}");
         builder.AppendLine($"mode={(string.IsNullOrWhiteSpace(generation.ExistingFlowJson) ? "new_workflow_draft" : "edit_existing_workflow_draft")}");
         builder.AppendLine($"agentGenerateFlowMode={generation.AgentGenerateFlowMode}");
+        builder.AppendLine($"runtimePreviewConsent={generation.RuntimePreviewConsent.ToString().ToLowerInvariant()}");
         if (!string.IsNullOrWhiteSpace(request.PlannerPrompt))
         {
             builder.AppendLine("plannerPolicy:");

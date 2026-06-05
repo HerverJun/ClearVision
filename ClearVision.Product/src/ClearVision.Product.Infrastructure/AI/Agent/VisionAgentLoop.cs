@@ -165,6 +165,11 @@ public sealed class VisionAgentLoop
                 "tool_permission_denied",
                 $"Tool '{tool.Name}' requires DeploymentPrepare and is not allowed in this session.");
         }
+        else if (tool.Permission == VisionAgentToolPermission.RuntimePreview &&
+                 !RuntimePreviewPermissionGate.CanRun(context))
+        {
+            result = RuntimePreviewPermissionGate.DeniedToolResult(tool.Name, context);
+        }
         else if (!context.AllowedPermissions.Contains(tool.Permission))
         {
             result = VisionAgentToolResult.Fail(
@@ -205,7 +210,10 @@ public sealed class VisionAgentLoop
                 ErrorCode = result.ErrorCode,
                 ErrorMessage = result.ErrorMessage,
                 DurationMs = stopwatch.ElapsedMilliseconds,
-                Permission = permission
+                Permission = permission,
+                PermissionDecision = knownTool
+                    ? RuntimePreviewPermissionGate.PermissionDecision(tool.Permission, context, result)
+                    : null
             });
         }
 

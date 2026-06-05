@@ -10,4 +10,5 @@ public sealed record VisionAgentToolTrace
     public string? ErrorMessage { get; init; }
     public long DurationMs { get; init; }
     public string Permission { get; init; } = string.Empty;
+    public object? PermissionDecision { get; init; }
 }

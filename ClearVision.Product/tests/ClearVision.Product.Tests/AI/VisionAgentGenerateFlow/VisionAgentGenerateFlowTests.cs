@@ -245,8 +245,6 @@ public sealed class VisionAgentGenerateFlowTests
                          "Tools"));
         var forbidden = new[]
         {
-            "capture_test_frame",
-            "replay_flow_with_frame",
             "CameraTestFrameTool",
             "ReplayFlowWithFrameTool",
             "AcquireSingleFrameAsync",

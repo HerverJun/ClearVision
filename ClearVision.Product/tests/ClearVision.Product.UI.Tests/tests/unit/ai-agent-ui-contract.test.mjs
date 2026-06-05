@@ -143,6 +143,7 @@ function createPanel(AiPanel, overrides = {}) {
   panel.isVisionAgentDeveloperUiEnabled = overrides.developer === true;
   panel.useVisionAgentGenerateFlow = overrides.enabled === true;
   panel.agentGenerateFlowMode = overrides.mode || 'scripted';
+  panel.runtimePreviewConsent = overrides.runtimePreviewConsent === true;
   panel.pendingParameterDrafts = {};
   panel.pendingOperatorBindings = {};
   panel.operatorMetadataCache = new Map();
@@ -234,6 +235,13 @@ test('default UI does not render Agent GenerateFlow controls', async () => {
   assert.equal(panel._renderAgentDeveloperControls(), '');
 });
 
+test('default UI does not render RuntimePreview consent control', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+
+  assert.doesNotMatch(panel._renderAgentDeveloperControls(), /RuntimePreview/);
+});
+
 test('default UI payload does not include useVisionAgentGenerateFlow', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true, mode: 'planner' });
@@ -265,6 +273,35 @@ test('scripted mode payload includes agentGenerateFlowMode=scripted', async () =
   assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
     useVisionAgentGenerateFlow: true,
     agentGenerateFlowMode: 'scripted'
+  });
+});
+
+test('developer mode renders RuntimePreview consent switch', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+
+  assert.match(panel._renderAgentDeveloperControls(), /ai-agent-runtime-preview-consent/);
+  assert.match(panel._renderAgentDeveloperControls(), /允许本轮 RuntimePreview/);
+});
+
+test('RuntimePreview consent payload is one request only', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    developer: true,
+    enabled: true,
+    mode: 'planner',
+    runtimePreviewConsent: true
+  });
+
+  assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
+    useVisionAgentGenerateFlow: true,
+    agentGenerateFlowMode: 'planner',
+    runtimePreviewConsent: true
+  });
+  assert.equal(panel.runtimePreviewConsent, false);
+  assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
+    useVisionAgentGenerateFlow: true,
+    agentGenerateFlowMode: 'planner'
   });
 });
 
@@ -377,6 +414,6 @@ test('source guard: Agent UI has no RuntimePreview hardware network or process t
   );
   const guardedSource = `${developerControlSection}\n${artifactSection}`;
 
-  assert.doesNotMatch(guardedSource, /capture_test_frame|replay_flow_with_frame|RuntimePreview|runtime_package_precheck/i);
+  assert.doesNotMatch(guardedSource, /capture_test_frame|replay_flow_with_frame|runtime_package_precheck/i);
   assert.doesNotMatch(guardedSource, /AcquireSingleFrameAsync|EnumerateCamerasAsync|GetOrCreateByBindingAsync|fetch\(|XMLHttpRequest|child_process|process\.|powershell|cmd\.exe|execute_command/i);
 });
