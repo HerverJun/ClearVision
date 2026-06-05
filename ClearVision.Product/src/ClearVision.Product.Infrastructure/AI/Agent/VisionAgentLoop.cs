@@ -213,7 +213,8 @@ public sealed class VisionAgentLoop
                 Permission = permission,
                 PermissionDecision = knownTool
                     ? RuntimePreviewPermissionGate.PermissionDecision(tool.Permission, context, result)
-                    : null
+                    : null,
+                AdapterName = ExtractAdapterName(result.Data)
             });
         }
 
@@ -296,6 +297,55 @@ public sealed class VisionAgentLoop
             charLength = json.Length,
             pendingActionCount = result.PendingActions.Count
         };
+    }
+
+    private static string? ExtractAdapterName(object? data)
+    {
+        if (data is RuntimePreviewResult preview)
+        {
+            return string.IsNullOrWhiteSpace(preview.AdapterName) ? null : preview.AdapterName;
+        }
+
+        if (data == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(data, JsonOptions));
+            if (TryReadString(doc.RootElement, "adapterName", out var adapterName))
+            {
+                return adapterName;
+            }
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return null;
+    }
+
+    private static bool TryReadString(JsonElement element, string propertyName, out string? value)
+    {
+        value = null;
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase) &&
+                property.Value.ValueKind == JsonValueKind.String)
+            {
+                value = property.Value.GetString();
+                return !string.IsNullOrWhiteSpace(value);
+            }
+        }
+
+        return false;
     }
 
     private static object? TruncateForModel(object? data, int maxChars)

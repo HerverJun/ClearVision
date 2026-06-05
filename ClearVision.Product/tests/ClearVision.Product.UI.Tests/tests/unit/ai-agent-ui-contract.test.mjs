@@ -214,14 +214,39 @@ function agentResponse() {
         packageCreated: false,
         stationTouched: false,
         precheckSummary: 'Deployment blocked by missing resources.'
+      },
+      runtimePreview: {
+        previewReady: true,
+        adapterName: 'offline_runtime_preview',
+        previewMode: 'offline_fixture',
+        warnings: [{ code: 'offline_replay_metadata_only', message: 'Offline metadata only.' }],
+        blockingIssues: [],
+        artifacts: [
+          {
+            artifactId: 'operator-result-1',
+            artifactType: 'operator_result_metadata',
+            metadataOnly: true,
+            binaryIncluded: false,
+            byteLength: 0
+          }
+        ]
       }
     },
     toolTrace: [
       {
         toolName: 'validate_flow',
         permission: 'Simulation',
+        adapterName: '',
         success: true,
         durationMs: 12,
+        errorCode: ''
+      },
+      {
+        toolName: 'replay_flow_with_frame',
+        permission: 'RuntimePreview',
+        adapterName: 'offline_runtime_preview',
+        success: true,
+        durationMs: 7,
         errorCode: ''
       }
     ]
@@ -339,6 +364,20 @@ test('response mapping displays validationPreview sections', async () => {
   assert.match(validation.innerHTML, /deploymentPrecheck/);
 });
 
+test('response mapping displays RuntimePreview adapter summary', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+
+  panel._renderValidationConsole(agentResponse());
+
+  assert.match(validation.innerHTML, /runtimePreview/);
+  assert.match(validation.innerHTML, /previewReady=true/);
+  assert.match(validation.innerHTML, /adapterName=offline_runtime_preview/);
+  assert.match(validation.innerHTML, /operator_result_metadata/);
+  assert.match(validation.innerHTML, /binaryIncluded=false/);
+});
+
 test('response mapping displays folded toolTrace summary only', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel);
@@ -348,7 +387,8 @@ test('response mapping displays folded toolTrace summary only', async () => {
 
   assert.match(validation.innerHTML, /<details class="ai-agent-tool-trace"/);
   assert.doesNotMatch(validation.innerHTML, /<details class="ai-agent-tool-trace"[^>]*open/);
-  assert.match(validation.innerHTML, /validate_flow:Simulation:ok:12ms/);
+  assert.match(validation.innerHTML, /validate_flow:Simulation:--:ok:12ms/);
+  assert.match(validation.innerHTML, /replay_flow_with_frame:RuntimePreview:offline_runtime_preview:ok:7ms/);
 });
 
 test('pendingParameters can locate operator parameter from missingResources', async () => {

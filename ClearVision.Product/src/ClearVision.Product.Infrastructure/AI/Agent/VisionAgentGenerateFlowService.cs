@@ -603,6 +603,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             errorCode = trace.ErrorCode,
             durationMs = trace.DurationMs,
             permission = trace.Permission,
+            adapterName = trace.AdapterName,
             permissionDecision = trace.PermissionDecision,
             arguments = trace.Arguments,
             resultSummary = trace.ResultSummary

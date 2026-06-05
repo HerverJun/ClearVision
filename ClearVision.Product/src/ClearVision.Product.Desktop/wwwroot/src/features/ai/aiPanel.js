@@ -5752,7 +5752,8 @@ export class AiPanel {
         return {
             structuralValidation: this._getObjectValue(preview, ['structuralValidation', 'StructuralValidation']),
             dryRun: this._getObjectValue(preview, ['dryRun', 'DryRun']),
-            deploymentPrecheck: this._getObjectValue(preview, ['deploymentPrecheck', 'DeploymentPrecheck'])
+            deploymentPrecheck: this._getObjectValue(preview, ['deploymentPrecheck', 'DeploymentPrecheck']),
+            runtimePreview: this._getObjectValue(preview, ['runtimePreview', 'RuntimePreview'])
         };
     }
 
@@ -5804,6 +5805,7 @@ export class AiPanel {
                 return {
                     toolName: String(item?.toolName ?? item?.ToolName ?? item?.name ?? item?.Name ?? '').trim(),
                     permission: String(item?.permission ?? item?.Permission ?? '').trim(),
+                    adapterName: String(item?.adapterName ?? item?.AdapterName ?? '').trim(),
                     success: typeof successValue === 'boolean' ? successValue : String(successValue ?? '').toLowerCase() === 'true',
                     errorCode: String(item?.errorCode ?? item?.ErrorCode ?? '').trim(),
                     durationMs: Number.isFinite(duration) ? Math.max(0, Math.round(duration)) : 0
@@ -5854,18 +5856,23 @@ export class AiPanel {
         const missing = this._getArrayValue(section, ['missingResources', 'MissingResources']);
         const executed = this._getArrayValue(section, ['executedOperators', 'ExecutedOperators']);
         const skipped = this._getArrayValue(section, ['skippedOperators', 'SkippedOperators']);
+        const artifacts = this._getArrayValue(section, ['artifacts', 'Artifacts']);
         const summary = String(this._getObjectValue(section, ['summary', 'Summary', 'precheckSummary', 'PrecheckSummary', 'dryRunSummary', 'DryRunSummary']) ?? '').trim();
         const readyForDeployment = this._getBooleanValue(section, ['readyForDeployment', 'ReadyForDeployment']);
         const workflowDraftAllowed = this._getBooleanValue(section, ['workflowDraftAllowed', 'WorkflowDraftAllowed']);
+        const previewReady = this._getBooleanValue(section, ['previewReady', 'PreviewReady']);
         const deployed = this._getBooleanValue(section, ['deployed', 'Deployed']);
         const packageCreated = this._getBooleanValue(section, ['packageCreated', 'PackageCreated']);
         const stationTouched = this._getBooleanValue(section, ['stationTouched', 'StationTouched']);
+        const adapterName = String(this._getObjectValue(section, ['adapterName', 'AdapterName']) ?? '').trim();
+        const previewMode = String(this._getObjectValue(section, ['previewMode', 'PreviewMode']) ?? '').trim();
         const countLabel = [
             blocking.length ? `${blocking.length} blocking` : '',
             warnings.length ? `${warnings.length} warning` : '',
             missing.length ? `${missing.length} missing` : '',
             executed.length ? `${executed.length} executed` : '',
-            skipped.length ? `${skipped.length} skipped` : ''
+            skipped.length ? `${skipped.length} skipped` : '',
+            artifacts.length ? `${artifacts.length} artifact` : ''
         ].filter(Boolean).join(' · ') || 'no issues';
 
         return `
@@ -5875,10 +5882,13 @@ export class AiPanel {
                     <small>${this._escapeHtml(countLabel)}</small>
                 </div>
                 ${summary ? `<div class="ai-agent-preview-summary">${this._escapeHtml(summary)}</div>` : ''}
-                ${(readyForDeployment !== null || workflowDraftAllowed !== null) ? `
+                ${(readyForDeployment !== null || workflowDraftAllowed !== null || previewReady !== null || adapterName || previewMode) ? `
                     <div class="ai-agent-preview-state-row">
                         ${readyForDeployment !== null ? `<span>readyForDeployment=${readyForDeployment ? 'true' : 'false'}</span>` : ''}
                         ${workflowDraftAllowed !== null ? `<span>workflowDraftAllowed=${workflowDraftAllowed ? 'true' : 'false'}</span>` : ''}
+                        ${previewReady !== null ? `<span>previewReady=${previewReady ? 'true' : 'false'}</span>` : ''}
+                        ${adapterName ? `<span>adapterName=${this._escapeHtml(adapterName)}</span>` : ''}
+                        ${previewMode ? `<span>previewMode=${this._escapeHtml(previewMode)}</span>` : ''}
                     </div>
                 ` : ''}
                 ${(deployed !== null || packageCreated !== null || stationTouched !== null) ? `
@@ -5891,6 +5901,20 @@ export class AiPanel {
                 ${this._renderAgentPreviewIssueList(blocking, 'blocking')}
                 ${this._renderAgentPreviewIssueList(warnings, 'warning')}
                 ${this._renderAgentPreviewIssueList(missing, 'warning')}
+                ${artifacts.length > 0 ? `
+                    <div class="ai-agent-artifact-list">
+                        ${artifacts.slice(0, 6).map(item => `
+                            <div class="ai-agent-artifact-row">
+                                <span>${this._escapeHtml(String(item?.artifactType ?? item?.ArtifactType ?? 'artifact'))}</span>
+                                <small>${this._escapeHtml([
+                                    item?.artifactId ?? item?.ArtifactId ?? '',
+                                    `metadataOnly=${item?.metadataOnly ?? item?.MetadataOnly ?? true}`,
+                                    `binaryIncluded=${item?.binaryIncluded ?? item?.BinaryIncluded ?? false}`
+                                ].filter(Boolean).join(' · '))}</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
             </div>
         `;
     }
@@ -5900,7 +5924,7 @@ export class AiPanel {
         const pendingActions = this._normalizeAgentPendingActions(data?.pendingActions ?? data?.PendingActions);
         const missingResources = this._normalizeMissingResources(data?.missingResources ?? data?.MissingResources);
         const toolTrace = this._normalizeAgentToolTrace(data?.toolTrace ?? data?.ToolTrace);
-        const hasPreview = Boolean(preview?.structuralValidation || preview?.dryRun || preview?.deploymentPrecheck);
+        const hasPreview = Boolean(preview?.structuralValidation || preview?.dryRun || preview?.deploymentPrecheck || preview?.runtimePreview);
         const hasContent = hasPreview || pendingActions.length > 0 || missingResources.length > 0 || toolTrace.length > 0;
         if (!hasContent) {
             return '';
@@ -5908,7 +5932,7 @@ export class AiPanel {
 
         const deploymentState = this._deriveAgentDeploymentUiState(data);
         const toolSummary = toolTrace
-            .map(item => `${item.toolName}:${item.permission || '--'}:${item.success ? 'ok' : 'failed'}:${item.durationMs}ms${item.errorCode ? `:${item.errorCode}` : ''}`)
+            .map(item => `${item.toolName}:${item.permission || '--'}:${item.adapterName || '--'}:${item.success ? 'ok' : 'failed'}:${item.durationMs}ms${item.errorCode ? `:${item.errorCode}` : ''}`)
             .join(' | ');
 
         return `
@@ -5924,6 +5948,7 @@ export class AiPanel {
                 ${this._renderAgentValidationPreviewSection('structuralValidation', 'structuralValidation', preview?.structuralValidation)}
                 ${this._renderAgentValidationPreviewSection('dryRun', 'dryRun', preview?.dryRun)}
                 ${this._renderAgentValidationPreviewSection('deploymentPrecheck', 'deploymentPrecheck', preview?.deploymentPrecheck)}
+                ${this._renderAgentValidationPreviewSection('runtimePreview', 'runtimePreview', preview?.runtimePreview)}
                 ${missingResources.length > 0 ? `
                     <div class="ai-agent-preview-section" data-agent-artifact="missingResources">
                         <div class="ai-agent-preview-header"><span>missingResources</span><small>${missingResources.length}</small></div>
@@ -5954,6 +5979,7 @@ export class AiPanel {
                                 <div class="ai-agent-tool-trace-row">
                                     <span>${this._escapeHtml(item.toolName)}</span>
                                     <span>${this._escapeHtml(item.permission || '--')}</span>
+                                    <span>${this._escapeHtml(item.adapterName || '--')}</span>
                                     <span>${item.success ? 'success' : 'failed'}</span>
                                     <span>${this._escapeHtml(String(item.durationMs))}ms</span>
                                     <span>${this._escapeHtml(item.errorCode || '--')}</span>
