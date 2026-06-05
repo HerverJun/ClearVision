@@ -1,0 +1,58 @@
+name: Vision Agent Quality Suite
+
+on:
+  workflow_dispatch:
+
+env:
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  agent-quality-suite:
+    name: Agent Engineering Harness
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet Packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-agent-${{ hashFiles('global.json', '**/*.sln', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-agent-
+            ${{ runner.os }}-nuget-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+
+      - name: Install UI Test Dependencies
+        working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
+        run: npm ci
+
+      - name: Run Vision Agent Quality Suite
+        shell: pwsh
+        run: python quality/tools/run_quality_suite.py --suite agent_engineering_harness_suite --run
+
+      - name: Upload Vision Agent Quality Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vision-agent-quality-suite
+          path: |
+            quality/evals/reports/VisionAgent_business_benchmark_baseline.json
+            quality/evals/reports/VisionAgent_business_benchmark_baseline.md
+            quality/evals/reports/planner_autonomy_benchmark.json
+            quality/evals/reports/planner_autonomy_benchmark.md
+            test_results/agent_engineering_harness/**/*.trx
+            test_results/agent_engineering_harness/agent_ui_contract_output.txt
