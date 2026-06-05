@@ -1,5 +1,11 @@
 # Vision Agent AI Model Config Productization
 
+## Codex Config CPA Fallback
+
+`quality/tools/run_real_llm_shadow_eval_from_codex_config.ps1` supports two CPA input paths: explicit CPA environment variables and the current Codex `config.toml`. The config fallback checks `CODEX_CONFIG_PATH`, `CODEX_HOME/config.toml`, and `$HOME/.codex/config.toml`.
+
+The fallback only selects a provider whose provider key, `name`, or `provider` value contains `cpa`. It uses the provider `env_key` to read the key from the process environment and never prints the key or full BaseUrl. A non-CPA default Codex provider is ignored and results in a redacted `configuration_missing` report.
+
 日期：2026-06-06
 
 ## 现状审计

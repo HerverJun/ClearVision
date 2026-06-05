@@ -1,5 +1,11 @@
 # Vision Agent Real LLM Shadow Dry Run
 
+## Codex Config CPA Fallback
+
+`quality/tools/run_real_llm_shadow_eval_from_codex_config.ps1` reads explicit CPA environment variables first. If they are missing, it also reads the current Codex `config.toml` from `CODEX_CONFIG_PATH`, `CODEX_HOME/config.toml`, or `$HOME/.codex/config.toml`.
+
+The Codex config fallback only accepts a provider whose provider key, `name`, or `provider` value contains `cpa`. This prevents the manual CPA bridge from accidentally using a normal OpenAI/Codex provider. If the CPA provider declares `env_key`, the bridge reads that environment variable for the key without printing it.
+
 ## 默认行为
 
 - 稳定 CI 默认保持 `CV_AGENT_REAL_LLM_SHADOW_EVAL=false`。
