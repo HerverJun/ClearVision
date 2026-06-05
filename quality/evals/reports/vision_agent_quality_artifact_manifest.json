@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
+  "generatedAtUtc": "2026-06-05T16:16:28.659734+00:00",
+  "artifactName": "vision-agent-quality-suite",
+  "files": [
+    {
+      "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.json",
+      "sizeBytes": 223452
+    },
+    {
+      "path": "quality/evals/reports/planner_autonomy_benchmark.json",
+      "sizeBytes": 745917
+    },
+    {
+      "path": "quality/evals/reports/real_llm_planner_shadow_eval.json",
+      "sizeBytes": 20909
+    },
+    {
+      "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.md",
+      "sizeBytes": 10516
+    },
+    {
+      "path": "quality/evals/reports/planner_autonomy_benchmark.md",
+      "sizeBytes": 5482
+    },
+    {
+      "path": "quality/evals/reports/real_llm_planner_shadow_eval.md",
+      "sizeBytes": 3599
+    },
+    {
+      "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
+      "sizeBytes": 6908
+    },
+    {
+      "path": "test_results/agent_engineering_harness/agent_contracts_skeleton.trx",
+      "sizeBytes": 35964
+    },
+    {
+      "path": "test_results/agent_engineering_harness/agent_engineering_harness.trx",
+      "sizeBytes": 227028
+    },
+    {
+      "path": "test_results/agent_engineering_harness/agent_planner_parity_subset.trx",
+      "sizeBytes": 16369
+    }
+  ],
+  "reports": [
+    {
+      "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.json",
+      "id": "vision_agent_executable_business_benchmark",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-05T16:15:36.3652073+00:00"
+      },
+      "summary": {
+        "caseCount": 36,
+        "runtimePreviewCaseCount": 6,
+        "passedCaseCount": 36,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/planner_autonomy_benchmark.json",
+      "id": "vision_agent_planner_autonomy_benchmark",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-05T16:15:39.0853877+00:00"
+      },
+      "summary": {
+        "plannerCaseCount": 15,
+        "permissionNegativeCaseCount": 6,
+        "totalCaseCount": 21,
+        "passedCaseCount": 21,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/real_llm_planner_shadow_eval.json",
+      "id": "vision_agent_real_llm_planner_shadow_eval",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-05T16:15:55.0274847+00:00"
+      },
+      "summary": {
+        "caseCount": 12,
+        "runnerStatus": "skipped",
+        "modelName": "not_configured",
+        "enabledReason": "",
+        "skippedReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.",
+        "configurationMissingReason": "",
+        "requestCount": 0,
+        "parseSuccessCount": 0,
+        "parseSuccessRate": 0,
+        "unsafeToolAttemptCount": 0,
+        "unsafeAttemptRate": 0,
+        "fallbackToMockSuggestedCount": 12,
+        "averageToolPlanMatchScore": 0,
+        "reportGenerated": true
+      }
+    }
+  ]
+}
