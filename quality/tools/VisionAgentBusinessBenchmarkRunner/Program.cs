@@ -73,12 +73,14 @@ internal static class VisionAgentBusinessBenchmark
         var accepted = results.All(item => item.Passed) &&
                        thresholdResults.Values.All(item => item.Passed) &&
                        safety.Violations.Count == 0;
+        var workflowRun = VisionAgentWorkflowRunMetadata.FromEnvironment();
 
         return new BenchmarkDocument(
             "2026-06-05.vision-agent-executable-business-benchmark.v1",
             "vision_agent_executable_business_benchmark",
-            "2026-06-05T00:00:00Z",
+            workflowRun.GeneratedAtUtc,
             "offline_metadata_only",
+            workflowRun,
             new BenchmarkSummary(
                 results.Count,
                 results.Count(item => item.ActualRuntimePreviewResult != null),
@@ -878,6 +880,9 @@ internal static class VisionAgentBusinessBenchmarkMarkdown
             "",
             $"- Benchmark: `{document.BenchmarkId}`",
             $"- Generated UTC: `{document.GeneratedAtUtc}`",
+            $"- Commit SHA: `{document.WorkflowRun.CommitSha}`",
+            $"- Branch: `{document.WorkflowRun.BranchName}`",
+            $"- Workflow run: `{document.WorkflowRun.RunId}` attempt `{document.WorkflowRun.RunAttempt}`",
             $"- Mode: `{document.Mode}`",
             $"- Cases: {document.Summary.CaseCount}",
             $"- Accepted: {document.Summary.Accepted}",
@@ -1015,6 +1020,7 @@ internal sealed record BenchmarkDocument(
     string BenchmarkId,
     string GeneratedAtUtc,
     string Mode,
+    VisionAgentWorkflowRunMetadata WorkflowRun,
     BenchmarkSummary Summary,
     IReadOnlyDictionary<string, double> Metrics,
     IReadOnlyDictionary<string, BenchmarkThresholdResult> ThresholdResults,

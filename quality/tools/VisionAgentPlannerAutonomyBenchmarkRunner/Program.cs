@@ -80,12 +80,14 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                        permissionResults.Count == 6 &&
                        allResults.All(item => item.Passed) &&
                        safety.Violations.Count == 0;
+        var workflowRun = VisionAgentWorkflowRunMetadata.FromEnvironment();
 
         return new PlannerBenchmarkDocument(
             "2026-06-05.vision-agent-planner-autonomy-benchmark.v1",
             "vision_agent_planner_autonomy_benchmark",
-            "2026-06-05T00:00:00Z",
+            workflowRun.GeneratedAtUtc,
             "offline_metadata_only",
+            workflowRun,
             new PlannerBenchmarkSummary(
                 plannerResults.Count,
                 permissionResults.Count,
@@ -1836,6 +1838,7 @@ internal sealed record PlannerBenchmarkDocument(
     string BenchmarkId,
     string GeneratedAtUtc,
     string Mode,
+    VisionAgentWorkflowRunMetadata WorkflowRun,
     PlannerBenchmarkSummary Summary,
     IReadOnlyDictionary<string, double> Metrics,
     PlannerBenchmarkSafety Safety,
@@ -1937,6 +1940,9 @@ internal static class VisionAgentPlannerAutonomyBenchmarkMarkdown
             "",
             $"- Benchmark: `{document.BenchmarkId}`",
             $"- Generated UTC: `{document.GeneratedAtUtc}`",
+            $"- Commit SHA: `{document.WorkflowRun.CommitSha}`",
+            $"- Branch: `{document.WorkflowRun.BranchName}`",
+            $"- Workflow run: `{document.WorkflowRun.RunId}` attempt `{document.WorkflowRun.RunAttempt}`",
             $"- Mode: `{document.Mode}`",
             $"- Planner cases: {document.Summary.PlannerCaseCount}",
             $"- Permission negative cases: {document.Summary.PermissionNegativeCaseCount}",

@@ -7,6 +7,7 @@
     <LangVersion>12.0</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\VisionAgentReportMetadata.cs" Link="VisionAgentReportMetadata.cs" />
     <ProjectReference Include="..\..\..\ClearVision.Product\src\ClearVision.Product.Infrastructure\ClearVision.Product.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

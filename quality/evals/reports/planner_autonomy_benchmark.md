@@ -1,7 +1,10 @@
 # Vision Agent Planner Autonomy Benchmark
 
 - Benchmark: `vision_agent_planner_autonomy_benchmark`
-- Generated UTC: `2026-06-05T00:00:00Z`
+- Generated UTC: `2026-06-05T14:03:15.0403503+00:00`
+- Commit SHA: `local`
+- Branch: `local`
+- Workflow run: `local` attempt `local`
 - Mode: `offline_metadata_only`
 - Planner cases: 15
 - Permission negative cases: 6

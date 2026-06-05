@@ -46,6 +46,10 @@ jobs:
         shell: pwsh
         run: python quality/tools/run_quality_suite.py --suite agent_engineering_harness_suite --run
 
+      - name: Generate Real LLM Shadow Eval Sample
+        shell: pwsh
+        run: dotnet run --project quality/tools/VisionAgentPlannerShadowEvalRunner/VisionAgentPlannerShadowEvalRunner.csproj -- --output quality/evals/reports/real_llm_planner_shadow_eval.json --report quality/evals/reports/real_llm_planner_shadow_eval.md
+
       - name: Upload Vision Agent Quality Reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -56,5 +60,7 @@ jobs:
             quality/evals/reports/VisionAgent_business_benchmark_baseline.md
             quality/evals/reports/planner_autonomy_benchmark.json
             quality/evals/reports/planner_autonomy_benchmark.md
+            quality/evals/reports/real_llm_planner_shadow_eval.json
+            quality/evals/reports/real_llm_planner_shadow_eval.md
             test_results/agent_engineering_harness/**/*.trx
             test_results/agent_engineering_harness/agent_ui_contract_output.txt

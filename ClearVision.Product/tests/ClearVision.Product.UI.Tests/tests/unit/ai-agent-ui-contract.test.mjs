@@ -163,6 +163,14 @@ function loadParameterRuleParitySpec() {
   return JSON.parse(fs.readFileSync(specPath, 'utf8'));
 }
 
+function assertWorkflowRunMetadata(workflowRun) {
+  assert.ok(workflowRun);
+  for (const field of ['commitSha', 'branchName', 'runId', 'runAttempt', 'generatedAtUtc']) {
+    assert.equal(typeof workflowRun[field], 'string', field);
+    assert.ok(workflowRun[field].length > 0, field);
+  }
+}
+
 function createPanel(AiPanel, overrides = {}) {
   const panel = Object.create(AiPanel.prototype);
   panel.options = overrides.options || {};
@@ -907,6 +915,7 @@ test('executable business benchmark report exposes actual toolchain fields', () 
 
   assert.equal(report.benchmarkId, 'vision_agent_executable_business_benchmark');
   assert.equal(report.mode, 'offline_metadata_only');
+  assertWorkflowRunMetadata(report.workflowRun);
   assert.ok(report.summary.caseCount >= 30 && report.summary.caseCount <= 50);
   assert.equal(report.summary.accepted, true);
   for (const item of report.cases) {
@@ -937,6 +946,7 @@ test('planner autonomy benchmark report exposes planner and permission negative 
 
   assert.equal(report.benchmarkId, 'vision_agent_planner_autonomy_benchmark');
   assert.equal(report.mode, 'offline_metadata_only');
+  assertWorkflowRunMetadata(report.workflowRun);
   assert.equal(report.summary.plannerCaseCount, 15);
   assert.equal(report.summary.permissionNegativeCaseCount, 6);
   assert.equal(report.summary.accepted, true);
@@ -968,6 +978,40 @@ test('planner autonomy benchmark report exposes planner and permission negative 
   assert.ok(permissionErrors.includes('deployment_prepare_tool_denied'));
 });
 
+test('real LLM planner shadow eval report remains default-off and policy-only', () => {
+  const reportPath = path.resolve(
+    getRepoRoot(),
+    'quality',
+    'evals',
+    'reports',
+    'real_llm_planner_shadow_eval.json'
+  );
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+  assert.equal(report.evalId, 'vision_agent_real_llm_planner_shadow_eval');
+  assert.equal(report.mode, 'offline_metadata_only');
+  assert.equal(report.enabled, false);
+  assert.equal(report.summary.runnerStatus, 'skipped');
+  assert.equal(report.summary.caseCount, 12);
+  assert.equal(report.summary.reportGenerated, true);
+  assertWorkflowRunMetadata(report.workflowRun);
+  assert.equal(report.safety.workflowExecutionAttempted, false);
+  assert.equal(report.safety.deploymentPrepareExecuted, false);
+  assert.equal(report.safety.realCameraSdkTouched, false);
+  assert.equal(report.safety.realStationTouched, false);
+  assert.equal(report.safety.realImageFilesRead, false);
+  assert.equal(report.safety.realModelFilesLoaded, false);
+  assert.equal(report.safety.plcWriteAttempted, false);
+
+  for (const item of report.cases) {
+    assert.ok(Array.isArray(item.expectedToolCalls), item.caseId);
+    assert.ok(Array.isArray(item.mockPlannerToolCalls), item.caseId);
+    assert.ok(Array.isArray(item.plannedToolCalls), item.caseId);
+    assert.ok(Array.isArray(item.policyDecision), item.caseId);
+    assert.equal(item.fallbackToMockSuggested, true, item.caseId);
+  }
+});
+
 test('quality suite tracks raised UI contract minimum', () => {
   const suitePath = path.resolve(getRepoRoot(), 'quality', 'evals', 'suites', 'agent_engineering_harness_suite.json');
   const suite = JSON.parse(fs.readFileSync(suitePath, 'utf8'));
@@ -976,7 +1020,13 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 35);
+  assert.equal(uiEntry.minimumTests, 36);
+
+  const shadowEntry = suite.stages
+    .flatMap(stage => stage.entries)
+    .find(entry => entry.id === 'vision_agent_real_llm_planner_shadow_eval');
+  assert.ok(shadowEntry);
+  assert.equal(shadowEntry.status, 'manual');
 });
 
 test('source guard: Agent UI has no RuntimePreview hardware network or process tool entry', () => {

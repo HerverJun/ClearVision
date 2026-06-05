@@ -46,7 +46,7 @@
             "-Command",
             "$outputDir = 'test_results/agent_engineering_harness'; New-Item -ItemType Directory -Force -Path $outputDir | Out-Null; Set-Location 'ClearVision.Product/tests/ClearVision.Product.UI.Tests'; npm run test:agent-ui-contract 2>&1 | Tee-Object -FilePath '../../../test_results/agent_engineering_harness/agent_ui_contract_output.txt'; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"
           ],
-          "minimumTests": 35,
+          "minimumTests": 36,
           "notes": "Covers Agent UI contract plus 2026-06-05 workbench modularization, shared parameter rules for AI pending/property/precheck preview paths, Chinese operator names, workbench layout, and legacy RuntimePreview artifacts.",
           "estimatedSeconds": 15
         },
@@ -89,6 +89,27 @@
           "minimumNegativeCases": 6,
           "notes": "Planner autonomy benchmark executes mock planner completions through VisionAgentPlannerService, VisionAgentLoop, AgentToolCallPolicy, and registered static/offline tools. Permission negative cases verify denial evidence in policyDecisions, toolTrace, and pendingActions.",
           "estimatedSeconds": 8
+        },
+        {
+          "id": "vision_agent_real_llm_planner_shadow_eval",
+          "status": "manual",
+          "evidenceKind": "vision_agent_real_llm_planner_shadow_eval",
+          "baselineJson": "quality/evals/reports/real_llm_planner_shadow_eval.json",
+          "reportMarkdown": "quality/evals/reports/real_llm_planner_shadow_eval.md",
+          "command": [
+            "dotnet",
+            "run",
+            "--project",
+            "quality/tools/VisionAgentPlannerShadowEvalRunner/VisionAgentPlannerShadowEvalRunner.csproj",
+            "--",
+            "--output",
+            "quality/evals/reports/real_llm_planner_shadow_eval.json",
+            "--report",
+            "quality/evals/reports/real_llm_planner_shadow_eval.md"
+          ],
+          "minimumCases": 12,
+          "notes": "Manual shadow eval only. It runs a real LLM planner completion source only when CV_AGENT_REAL_LLM_SHADOW_EVAL=true; default CI keeps this as a skipped/sample report and uses mock planner autonomy as the stable gate.",
+          "estimatedSeconds": 30
         }
       ]
     }
