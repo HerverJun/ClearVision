@@ -48,7 +48,10 @@ public sealed class RuntimePreviewCaptureStubTool : VisionAgentToolBase
         {
             ToolName = toolName,
             AdapterName = ReadArgumentString(arguments, "adapterName"),
-            PreviewMode = RuntimePreviewModes.OfflineFixture,
+            RequestedAdapterName = ReadArgumentString(arguments, "adapterName"),
+            PreviewMode = context.RuntimePreviewPilot.Enabled
+                ? RuntimePreviewModes.MetadataOnly
+                : RuntimePreviewModes.OfflineFixture,
             Context = context,
             Arguments = arguments
         };
@@ -64,7 +67,10 @@ public sealed class RuntimePreviewCaptureStubTool : VisionAgentToolBase
             : VisionAgentToolResult.Fail(
                 result.ErrorCode ?? "runtime_preview_not_ready",
                 result.ErrorMessage ?? "RuntimePreview adapter did not produce a ready preview.",
-                result);
+                result) with
+            {
+                PendingActions = result.PendingActions.ToList()
+            };
     }
 
     private static string? ReadArgumentString(JsonElement element, string propertyName)

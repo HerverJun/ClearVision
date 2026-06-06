@@ -1,3 +1,5 @@
+using ClearVision.Product.Core.Entities;
+
 namespace ClearVision.Product.Core.AI.Tools;
 
 public sealed record VisionAgentToolContext
@@ -8,6 +10,7 @@ public sealed record VisionAgentToolContext
     public string? ExistingFlowJson { get; init; }
     public bool DebugTrace { get; init; }
     public bool RuntimePreviewConsent { get; init; }
+    public RuntimePreviewPilotConfig RuntimePreviewPilot { get; init; } = new();
     public int MaxToolResultChars { get; init; } = 12_000;
 
     public IReadOnlySet<VisionAgentToolPermission> AllowedPermissions { get; init; } =

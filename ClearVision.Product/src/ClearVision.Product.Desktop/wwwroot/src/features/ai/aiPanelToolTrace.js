@@ -9,6 +9,14 @@ export function normalizeAgentToolTrace(items) {
                 toolName: String(item?.toolName ?? item?.ToolName ?? item?.name ?? item?.Name ?? '').trim(),
                 permission: String(item?.permission ?? item?.Permission ?? '').trim(),
                 adapterName: String(item?.adapterName ?? item?.AdapterName ?? '').trim(),
+                permissionReason: String(item?.permissionDecision?.reasonCode ??
+                    item?.permissionDecision?.ReasonCode ??
+                    item?.permissionDecision?.reason ??
+                    item?.permissionDecision?.Reason ??
+                    item?.PermissionDecision?.reasonCode ??
+                    item?.PermissionDecision?.ReasonCode ??
+                    item?.PermissionDecision?.reason ??
+                    item?.PermissionDecision?.Reason ?? '').trim(),
                 success: typeof successValue === 'boolean' ? successValue : String(successValue ?? '').toLowerCase() === 'true',
                 errorCode: String(item?.errorCode ?? item?.ErrorCode ?? '').trim(),
                 durationMs: Number.isFinite(duration) ? Math.max(0, Math.round(duration)) : 0
@@ -23,7 +31,7 @@ export function renderAgentToolTrace(panel, toolTrace) {
     }
 
     const toolSummary = toolTrace
-        .map(item => `${item.toolName}:${item.permission || '--'}:${item.adapterName || '--'}:${item.success ? 'ok' : 'failed'}:${item.durationMs}ms${item.errorCode ? `:${item.errorCode}` : ''}`)
+        .map(item => `${item.toolName}:${item.permission || '--'}:${item.adapterName || '--'}:${item.success ? 'ok' : 'failed'}:${item.durationMs}ms${item.errorCode ? `:${item.errorCode}` : ''}${item.permissionReason ? `:${item.permissionReason}` : ''}`)
         .join(' | ');
 
     return `
@@ -38,6 +46,7 @@ export function renderAgentToolTrace(panel, toolTrace) {
                         <span>${item.success ? 'success' : 'failed'}</span>
                         <span>${panel._escapeHtml(String(item.durationMs))}ms</span>
                         <span>${panel._escapeHtml(item.errorCode || '--')}</span>
+                        <span>${panel._escapeHtml(item.permissionReason || '--')}</span>
                     </div>
                 `).join('')}
             </div>

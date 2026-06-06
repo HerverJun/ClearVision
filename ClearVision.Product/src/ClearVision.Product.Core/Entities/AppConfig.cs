@@ -402,17 +402,209 @@ public class RuntimeConfig
 
     public bool ApplyProtectionRules { get; set; } = true;
 
+    public RuntimePreviewPilotConfig RuntimePreviewPilot { get; set; } = new();
+
     public void Normalize()
     {
         if (MissingMaterialTimeoutSeconds == LegacyMissingMaterialTimeoutSeconds)
         {
             MissingMaterialTimeoutSeconds = DefaultMissingMaterialTimeoutSeconds;
-            return;
         }
 
         if (MissingMaterialTimeoutSeconds < 0)
         {
             MissingMaterialTimeoutSeconds = DefaultMissingMaterialTimeoutSeconds;
+        }
+
+        RuntimePreviewPilot ??= new RuntimePreviewPilotConfig();
+        RuntimePreviewPilot.Normalize();
+    }
+}
+
+public sealed class RuntimePreviewPilotConfig
+{
+    public const string ModeMetadataOnly = "metadata_only";
+    public const int DefaultMaxPreviewArtifacts = 8;
+    public const int DefaultMaxMetadataBytes = 16 * 1024;
+
+    public bool Enabled { get; set; }
+
+    public string Mode { get; set; } = ModeMetadataOnly;
+
+    public List<string> AllowedCameraBindingIds { get; set; } = new();
+
+    public List<string> AllowedModelIds { get; set; } = new();
+
+    public List<string> AllowedTemplateIds { get; set; } = new();
+
+    public List<string> AllowedFlowIds { get; set; } = new();
+
+    public List<string> AllowedResourceRoots { get; set; } = new();
+
+    public int MaxPreviewArtifacts { get; set; } = DefaultMaxPreviewArtifacts;
+
+    public int MaxMetadataBytes { get; set; } = DefaultMaxMetadataBytes;
+
+    public bool FallbackToOffline { get; set; } = true;
+
+    public bool DenyExternalPath { get; set; } = true;
+
+    public bool DenyImageBytes { get; set; } = true;
+
+    public void Normalize()
+    {
+        Mode = NormalizeMode(Mode);
+        AllowedCameraBindingIds = NormalizeAllowlist(AllowedCameraBindingIds);
+        AllowedModelIds = NormalizeAllowlist(AllowedModelIds);
+        AllowedTemplateIds = NormalizeAllowlist(AllowedTemplateIds);
+        AllowedFlowIds = NormalizeAllowlist(AllowedFlowIds);
+        AllowedResourceRoots = NormalizeAllowlist(AllowedResourceRoots);
+        MaxPreviewArtifacts = MaxPreviewArtifacts <= 0
+            ? DefaultMaxPreviewArtifacts
+            : Math.Min(MaxPreviewArtifacts, 50);
+        MaxMetadataBytes = MaxMetadataBytes <= 0
+            ? DefaultMaxMetadataBytes
+            : Math.Min(MaxMetadataBytes, 512 * 1024);
+    }
+
+    public RuntimePreviewPilotConfig CloneNormalized()
+    {
+        var clone = new RuntimePreviewPilotConfig
+        {
+            Enabled = Enabled,
+            Mode = Mode,
+            AllowedCameraBindingIds = AllowedCameraBindingIds.ToList(),
+            AllowedModelIds = AllowedModelIds.ToList(),
+            AllowedTemplateIds = AllowedTemplateIds.ToList(),
+            AllowedFlowIds = AllowedFlowIds.ToList(),
+            AllowedResourceRoots = AllowedResourceRoots.ToList(),
+            MaxPreviewArtifacts = MaxPreviewArtifacts,
+            MaxMetadataBytes = MaxMetadataBytes,
+            FallbackToOffline = FallbackToOffline,
+            DenyExternalPath = DenyExternalPath,
+            DenyImageBytes = DenyImageBytes
+        };
+        clone.Normalize();
+        return clone;
+    }
+
+    public static string NormalizeMode(string? mode)
+    {
+        return string.Equals(mode?.Trim(), ModeMetadataOnly, StringComparison.OrdinalIgnoreCase)
+            ? ModeMetadataOnly
+            : ModeMetadataOnly;
+    }
+
+    public static List<string> NormalizeAllowlist(IEnumerable<string>? values)
+    {
+        if (values == null)
+        {
+            return new List<string>();
+        }
+
+        return values
+            .Select(NormalizeResourceKey)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+            .ToList()!;
+    }
+
+    public static string? NormalizeResourceKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        if (IsWildcard(trimmed) || LooksUnsafeResourceKey(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.ToLowerInvariant();
+    }
+
+    public static bool IsAllowedToken(string? value)
+    {
+        return NormalizeResourceKey(value) != null;
+    }
+
+    public static bool LooksUnsafeResourceKey(string value)
+    {
+        return value.Contains("..", StringComparison.Ordinal) ||
+               value.Contains("*", StringComparison.Ordinal) ||
+               value.Contains(":\\", StringComparison.Ordinal) ||
+               value.Contains(":/", StringComparison.Ordinal) ||
+               value.Contains("\\", StringComparison.Ordinal) ||
+               value.Contains("/", StringComparison.Ordinal) ||
+               value.Contains("base64", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsWildcard(string value)
+    {
+        return value == "*" ||
+               value.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("any", StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+public static class RuntimePreviewPilotConfigValidator
+{
+    public static IReadOnlyList<string> Validate(RuntimePreviewPilotConfig? config)
+    {
+        if (config == null)
+        {
+            return ["RuntimePreviewPilot config is required."];
+        }
+
+        var failures = new List<string>();
+        if (!string.Equals(config.Mode, RuntimePreviewPilotConfig.ModeMetadataOnly, StringComparison.OrdinalIgnoreCase))
+        {
+            failures.Add("RuntimePreviewPilot:Mode must be metadata_only.");
+        }
+
+        ValidateAllowlist(config.AllowedCameraBindingIds, "AllowedCameraBindingIds", failures);
+        ValidateAllowlist(config.AllowedModelIds, "AllowedModelIds", failures);
+        ValidateAllowlist(config.AllowedTemplateIds, "AllowedTemplateIds", failures);
+        ValidateAllowlist(config.AllowedFlowIds, "AllowedFlowIds", failures);
+        ValidateAllowlist(config.AllowedResourceRoots, "AllowedResourceRoots", failures);
+
+        if (config.MaxPreviewArtifacts < 1)
+        {
+            failures.Add("RuntimePreviewPilot:MaxPreviewArtifacts must be positive.");
+        }
+
+        if (config.MaxMetadataBytes < 1)
+        {
+            failures.Add("RuntimePreviewPilot:MaxMetadataBytes must be positive.");
+        }
+
+        if (!config.DenyExternalPath)
+        {
+            failures.Add("RuntimePreviewPilot:DenyExternalPath must remain true for v0.7.");
+        }
+
+        if (!config.DenyImageBytes)
+        {
+            failures.Add("RuntimePreviewPilot:DenyImageBytes must remain true for v0.7.");
+        }
+
+        return failures;
+    }
+
+    private static void ValidateAllowlist(
+        IEnumerable<string>? values,
+        string fieldName,
+        ICollection<string> failures)
+    {
+        foreach (var value in values ?? [])
+        {
+            if (!RuntimePreviewPilotConfig.IsAllowedToken(value))
+            {
+                failures.Add($"RuntimePreviewPilot:{fieldName} contains an unsafe or wildcard resource token.");
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -25,6 +26,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
     private readonly IVisionAgentPlannerService? _plannerService;
     private readonly VisionAgentProtocolParser _protocolParser;
     private readonly AgentWorkflowDraftEditor _draftEditor;
+    private readonly IConfigurationService? _configurationService;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -39,7 +41,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         IOptions<AgentGenerateFlowOptions>? agentOptions = null,
         IVisionAgentPlannerService? plannerService = null,
         VisionAgentProtocolParser? protocolParser = null,
-        AgentWorkflowDraftEditor? draftEditor = null)
+        AgentWorkflowDraftEditor? draftEditor = null,
+        IConfigurationService? configurationService = null)
     {
         _loop = loop;
         _logger = logger;
@@ -50,6 +53,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         _plannerService = plannerService;
         _protocolParser = protocolParser ?? new VisionAgentProtocolParser();
         _draftEditor = draftEditor ?? new AgentWorkflowDraftEditor();
+        _configurationService = configurationService;
     }
 
     public async Task<AiFlowGenerationResult> GenerateFlowAsync(
@@ -163,6 +167,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                     ExistingFlowJson = request.ExistingFlowJson,
                     MaxToolResultChars = _loopOptions.MaxToolResultChars,
                     RuntimePreviewConsent = request.RuntimePreviewConsent,
+                    RuntimePreviewPilot = ResolveRuntimePreviewPilotConfig(),
                     AllowedPermissions = allowedPermissions
                 },
                 CompleteAsync = completeAsync
@@ -273,6 +278,23 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
 
         var requestMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode);
         return string.Equals(requestMode, AiAgentGenerateFlowModes.Planner, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private ClearVision.Product.Core.Entities.RuntimePreviewPilotConfig ResolveRuntimePreviewPilotConfig()
+    {
+        try
+        {
+            var config = _configurationService?.GetCurrent().Runtime.RuntimePreviewPilot.CloneNormalized()
+                ?? new ClearVision.Product.Core.Entities.RuntimePreviewPilotConfig();
+            config.Normalize();
+            return config;
+        }
+        catch
+        {
+            var fallback = new ClearVision.Product.Core.Entities.RuntimePreviewPilotConfig();
+            fallback.Normalize();
+            return fallback;
+        }
     }
 
     private static AiFlowGenerationResult ControlledFailure(

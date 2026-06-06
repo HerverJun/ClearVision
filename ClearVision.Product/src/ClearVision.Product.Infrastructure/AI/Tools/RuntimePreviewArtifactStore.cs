@@ -6,7 +6,7 @@ namespace ClearVision.Product.Infrastructure.AI.Tools;
 
 public sealed class RuntimePreviewArtifactStore
 {
-    public RuntimePreviewArtifactSummary CreateFrameMetadata(
+    public RuntimePreviewArtifactMetadata CreateFrameMetadata(
         string sourceTool,
         string frameId,
         string operatorTempId,
@@ -25,7 +25,7 @@ public sealed class RuntimePreviewArtifactStore
             });
     }
 
-    public RuntimePreviewArtifactSummary CreateOperatorResultMetadata(
+    public RuntimePreviewArtifactMetadata CreateOperatorResultMetadata(
         string sourceTool,
         string frameId,
         string tempId,
@@ -47,7 +47,7 @@ public sealed class RuntimePreviewArtifactStore
             });
     }
 
-    public RuntimePreviewArtifactSummary CreateReplaySummaryMetadata(
+    public RuntimePreviewArtifactMetadata CreateReplaySummaryMetadata(
         string sourceTool,
         string frameId,
         int executedCount,
@@ -71,13 +71,13 @@ public sealed class RuntimePreviewArtifactStore
             });
     }
 
-    private static RuntimePreviewArtifactSummary Create(
+    private static RuntimePreviewArtifactMetadata Create(
         string artifactType,
         string sourceTool,
         string artifactId,
         object metadata)
     {
-        return new RuntimePreviewArtifactSummary
+        return new RuntimePreviewArtifactMetadata
         {
             ArtifactId = artifactId,
             ArtifactType = artifactType,

@@ -40,7 +40,54 @@ public static class RuntimePreviewPermissionGate
         {
             previewReady = false,
             toolName,
+            adapterName = "none",
+            previewMode = "metadata_only",
+            workflowDraftAllowed = true,
             runtimePreviewConsent = context.RuntimePreviewConsent,
+            permissionDecision = new
+            {
+                allowed = false,
+                permission = nameof(VisionAgentToolPermission.RuntimePreview),
+                runtimePreviewConsent = context.RuntimePreviewConsent,
+                pilotEnabled = context.RuntimePreviewPilot.Enabled,
+                metadataOnly = true,
+                allowlistCounts = new
+                {
+                    camera = context.RuntimePreviewPilot.AllowedCameraBindingIds.Count,
+                    model = context.RuntimePreviewPilot.AllowedModelIds.Count,
+                    template = context.RuntimePreviewPilot.AllowedTemplateIds.Count,
+                    flow = context.RuntimePreviewPilot.AllowedFlowIds.Count,
+                    resourceRoot = context.RuntimePreviewPilot.AllowedResourceRoots.Count
+                },
+                reasonCode = errorCode,
+                reason
+            },
+            resourceTrace = new
+            {
+                allowed = false,
+                reasonCode = errorCode,
+                resourceType = "runtime_preview_permission",
+                resourceId = toolName,
+                normalizedKey = toolName,
+                missingResources = Array.Empty<object>(),
+                trace = new[]
+                {
+                    new
+                    {
+                        resourceType = "runtime_preview_permission",
+                        resourceId = toolName,
+                        reasonCode = errorCode,
+                        allowed = false
+                    }
+                }
+            },
+            fallback = new
+            {
+                used = false,
+                fallbackAdapterName = (string?)null,
+                reasonCode = (string?)null,
+                reason = (string?)null
+            },
             warnings = new[]
             {
                 new
@@ -50,6 +97,10 @@ public static class RuntimePreviewPermissionGate
                 }
             },
             blockingIssues = Array.Empty<object>(),
+            pendingActions = new[]
+            {
+                BuildConsentPendingAction(toolName, reason)
+            },
             artifacts = Array.Empty<object>()
         }) with
         {
@@ -96,7 +147,28 @@ public static class RuntimePreviewPermissionGate
             allowed = result.Success,
             permission = permission.ToString(),
             runtimePreviewConsent = context.RuntimePreviewConsent,
+            pilotEnabled = context.RuntimePreviewPilot.Enabled,
+            metadataOnly = true,
+            effectiveAdapterName = ReadAdapterName(result.Data),
+            allowlistCounts = new
+            {
+                camera = context.RuntimePreviewPilot.AllowedCameraBindingIds.Count,
+                model = context.RuntimePreviewPilot.AllowedModelIds.Count,
+                template = context.RuntimePreviewPilot.AllowedTemplateIds.Count,
+                flow = context.RuntimePreviewPilot.AllowedFlowIds.Count,
+                resourceRoot = context.RuntimePreviewPilot.AllowedResourceRoots.Count
+            },
             reason = result.Success ? "runtime_preview_consent_granted" : result.ErrorCode
         };
+    }
+
+    private static string? ReadAdapterName(object? data)
+    {
+        if (data is RuntimePreviewResult preview)
+        {
+            return preview.AdapterName;
+        }
+
+        return null;
     }
 }

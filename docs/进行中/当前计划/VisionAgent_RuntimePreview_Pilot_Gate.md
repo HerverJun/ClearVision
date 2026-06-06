@@ -64,4 +64,6 @@ The allowlist must cover only explicitly approved preview resources. It must not
 
 ## Current Conclusion
 
-As of this gate document, Real RuntimePreview Pilot is not implemented. The next allowed step is to keep validating fixed and holdout shadow evals plus permission negative and model config regression. A pilot can start only after those gates pass and the implementation proposal preserves the safety boundaries above.
+RuntimePreview Pilot v0.7 skeleton is implemented as a default-off, metadata-only, resource-allowlisted path with offline fallback. This skeleton is not a real RuntimePreview adapter. It does not connect to real cameras, Station, image files, model files, PLC, packaging, deployment, downlink, or hot-load.
+
+The next real adapter step remains gated. It can start only after the v0.7 skeleton, fixed shadow, holdout shadow, permission negative cases, model config regression, artifact assertion, and CI evidence are all green, and only if the implementation preserves default-off behavior, resource allowlist, no image bytes/base64, no PLC write, no package/deploy/hot-load, offline fallback, and `workflowDraftAllowed` independence.

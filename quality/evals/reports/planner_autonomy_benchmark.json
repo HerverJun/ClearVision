@@ -1,14 +1,14 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-planner-autonomy-benchmark.v1",
   "benchmarkId": "vision_agent_planner_autonomy_benchmark",
-  "generatedAtUtc": "2026-06-06T07:39:21.7450851+00:00",
+  "generatedAtUtc": "2026-06-06T08:44:11.0381092+00:00",
   "mode": "offline_metadata_only",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T07:39:21.7450851+00:00"
+    "generatedAtUtc": "2026-06-06T08:44:11.0381092+00:00"
   },
   "summary": {
     "plannerCaseCount": 15,
@@ -8927,7 +8927,7 @@
         {
           "round": 4,
           "role": "user",
-          "content": "{\"kind\":\"tool_result\",\"round\":3,\"toolResults\":[{\"id\":\"call_VA-PL-009_3\",\"name\":\"capture_test_frame\",\"success\":true,\"errorCode\":null,\"errorMessage\":null,\"data\":{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"replaySummary\":null,\"warnings\":[{\"code\":\"offline_capture_metadata_only\",\"message\":\"Offline RuntimePreview returned deterministic frame metadata only.\"}],\"blockingIssues\":[],\"missingResources\":[],\"artifacts\":[{\"artifactId\":\"offline-frame-9927be31\",\"artifactType\":\"frame_metadata\",\"sourceTool\":\"capture_test_frame\",\"metadataOnly\":true,\"binaryIncluded\":false,\"byteLength\":0,\"metadata\":{\"frameId\":\"offline-frame-9927be31\",\"operatorTempId\":\"op_cam\",\"cameraBinding\":\"mock-camera-binding\",\"fi..."
+          "content": "{\"kind\":\"tool_result\",\"round\":3,\"toolResults\":[{\"id\":\"call_VA-PL-009_3\",\"name\":\"capture_test_frame\",\"success\":true,\"errorCode\":null,\"errorMessage\":null,\"data\":{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"permissionDecision\":{\"allowed\":true,\"reasonCode\":\"runtime_preview_offline_metadata_only\",\"reason\":\"Offline RuntimePreview returns deterministic metadata only.\",\"runtimePreviewConsent\":true,\"pilotEnabled\":false,\"metadataOnly\":true,\"requestedAdapterName\":\"offline_runtime_preview\",\"effectiveAdapterName\":\"offline_runtime_preview\",\"allowlistCounts\":{\"camera\":0,\"model\":0,\"template\":0,\"flow\":0,\"resourceRoot\":0}},\"resourceTrace\":{\"allowed\":true,\"reasonCode\":\"runtime_preview_offline_metada..."
         },
         {
           "round": 5,
@@ -8972,7 +8972,7 @@
         {
           "round": 5,
           "role": "user",
-          "content": "{\"kind\":\"tool_result\",\"round\":3,\"toolResults\":[{\"id\":\"call_VA-PL-009_3\",\"name\":\"capture_test_frame\",\"success\":true,\"errorCode\":null,\"errorMessage\":null,\"data\":{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"replaySummary\":null,\"warnings\":[{\"code\":\"offline_capture_metadata_only\",\"message\":\"Offline RuntimePreview returned deterministic frame metadata only.\"}],\"blockingIssues\":[],\"missingResources\":[],\"artifacts\":[{\"artifactId\":\"offline-frame-9927be31\",\"artifactType\":\"frame_metadata\",\"sourceTool\":\"capture_test_frame\",\"metadataOnly\":true,\"binaryIncluded\":false,\"byteLength\":0,\"metadata\":{\"frameId\":\"offline-frame-9927be31\",\"operatorTempId\":\"op_cam\",\"cameraBinding\":\"mock-camera-binding\",\"fi..."
+          "content": "{\"kind\":\"tool_result\",\"round\":3,\"toolResults\":[{\"id\":\"call_VA-PL-009_3\",\"name\":\"capture_test_frame\",\"success\":true,\"errorCode\":null,\"errorMessage\":null,\"data\":{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"permissionDecision\":{\"allowed\":true,\"reasonCode\":\"runtime_preview_offline_metadata_only\",\"reason\":\"Offline RuntimePreview returns deterministic metadata only.\",\"runtimePreviewConsent\":true,\"pilotEnabled\":false,\"metadataOnly\":true,\"requestedAdapterName\":\"offline_runtime_preview\",\"effectiveAdapterName\":\"offline_runtime_preview\",\"allowlistCounts\":{\"camera\":0,\"model\":0,\"template\":0,\"flow\":0,\"resourceRoot\":0}},\"resourceTrace\":{\"allowed\":true,\"reasonCode\":\"runtime_preview_offline_metada..."
         },
         {
           "round": 5,
@@ -8982,7 +8982,7 @@
         {
           "round": 5,
           "role": "user",
-          "content": "{\"kind\":\"tool_result\",\"round\":4,\"toolResults\":[{\"id\":\"call_VA-PL-009_4\",\"name\":\"replay_flow_with_frame\",\"success\":true,\"errorCode\":null,\"errorMessage\":null,\"data\":{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"replaySummary\":{\"replaySucceeded\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"frameId\":\"offline-frame-9927be31\",\"executedOperators\":[{\"tempId\":\"op_cam\",\"operatorType\":\"ImageAcquisition\",\"status\":\"simulated_offline_frame\",\"previewMode\":\"offline_fixture\"},{\"tempId\":\"op_match\",\"operatorType\":\"TemplateMatching\",\"status\":\"simulated_offline_template_match\",\"previewMode\":\"offline_fixture\"},{\"tempId\":\"op_judge\",\"operatorType\":\"ResultJudgment\",\"status\"..."
+          "content": "{\"kind\":\"tool_result\",\"round\":4,\"toolResults\":[{\"id\":\"call_VA-PL-009_4\",\"name\":\"replay_flow_with_frame\",\"success\":true,\"errorCode\":null,\"errorMessage\":null,\"data\":{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"permissionDecision\":{\"allowed\":true,\"reasonCode\":\"runtime_preview_offline_metadata_only\",\"reason\":\"Offline RuntimePreview returns deterministic metadata only.\",\"runtimePreviewConsent\":true,\"pilotEnabled\":false,\"metadataOnly\":true,\"requestedAdapterName\":\"offline_runtime_preview\",\"effectiveAdapterName\":\"offline_runtime_preview\",\"allowlistCounts\":{\"camera\":0,\"model\":0,\"template\":0,\"flow\":0,\"resourceRoot\":0}},\"resourceTrace\":{\"allowed\":true,\"reasonCode\":\"runtime_preview_offline_me..."
         }
       ],
       "plannedToolCalls": [
@@ -9337,6 +9337,45 @@
         "frameSource": "offline_fixture_metadata",
         "frameId": "offline-frame-9927be31",
         "source": "runtime_preview_offline_adapter",
+        "permissionDecision": {
+          "allowed": true,
+          "reasonCode": "runtime_preview_offline_metadata_only",
+          "reason": "Offline RuntimePreview returns deterministic metadata only.",
+          "runtimePreviewConsent": true,
+          "pilotEnabled": false,
+          "metadataOnly": true,
+          "requestedAdapterName": "offline_runtime_preview",
+          "effectiveAdapterName": "offline_runtime_preview",
+          "allowlistCounts": {
+            "camera": 0,
+            "model": 0,
+            "template": 0,
+            "flow": 0,
+            "resourceRoot": 0
+          }
+        },
+        "resourceTrace": {
+          "allowed": true,
+          "reasonCode": "runtime_preview_offline_metadata_only",
+          "resourceType": "replay",
+          "resourceId": "67acb70e",
+          "normalizedKey": "offline_metadata_only",
+          "missingResources": [],
+          "trace": [
+            {
+              "resourceType": "replay",
+              "resourceId": "offline_metadata",
+              "reasonCode": "runtime_preview_offline_metadata_only",
+              "allowed": true
+            }
+          ]
+        },
+        "fallback": {
+          "used": false,
+          "fallbackAdapterName": null,
+          "reasonCode": null,
+          "reason": null
+        },
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
@@ -9374,6 +9413,8 @@
           "accessedHardware": false,
           "stationTouched": false
         },
+        "issues": [],
+        "pendingActions": [],
         "warnings": [
           {
             "code": "offline_replay_metadata_only",
@@ -9647,8 +9688,8 @@
           },
           "success": true,
           "resultSummary": {
-            "summary": "{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"replaySummary\":null,\"warnings\":[{\"code\":\"offline_capture_metadata_only\",\"message\":\"Offline RuntimePreview returned deterministic frame metadata only.\"}],\"blockingIssues\":[],\"missingResources\":[],\"artifacts\":[{\"artifactId\":\"offline-frame-9927be31\",\"artifactType\":\"frame_metadata\",\"sourceTool\":\"capture_test_frame\",\"metadataOnly\":true,\"binaryIncl...",
-            "charLength": 939,
+            "summary": "{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"permissionDecision\":{\"allowed\":true,\"reasonCode\":\"runtime_preview_offline_metadata_only\",\"reason\":\"Offline RuntimePreview returns deterministic metadata only.\",\"runtimePreviewConsent\":true,\"pilotEnabled\":false,\"metadataOnly\":true,\"requestedAdapterName\":\"offline_runtime_preview\",\"effectiveAdapterName\":\"offline_runtime_preview\",\"allowlistCounts...",
+            "charLength": 1800,
             "pendingActionCount": 0
           },
           "errorCode": null,
@@ -9659,6 +9700,16 @@
             "allowed": true,
             "permission": "RuntimePreview",
             "runtimePreviewConsent": true,
+            "pilotEnabled": false,
+            "metadataOnly": true,
+            "effectiveAdapterName": "offline_runtime_preview",
+            "allowlistCounts": {
+              "camera": 0,
+              "model": 0,
+              "template": 0,
+              "flow": 0,
+              "resourceRoot": 0
+            },
             "reason": "runtime_preview_consent_granted"
           },
           "adapterName": "offline_runtime_preview"
@@ -9725,8 +9776,8 @@
           },
           "success": true,
           "resultSummary": {
-            "summary": "{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"replaySummary\":{\"replaySucceeded\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"frameId\":\"offline-frame-9927be31\",\"executedOperators\":[{\"tempId\":\"op_cam\",\"operatorType\":\"ImageAcquisition\",\"status\":\"simulated_offline_frame\",\"previewMode\":\"offline_fixture\"},{\"tempId\":\"op_match\",\"operatorType\":\"TemplateMatching\",\"...",
-            "charLength": 3266,
+            "summary": "{\"success\":true,\"adapterName\":\"offline_runtime_preview\",\"previewMode\":\"offline_fixture\",\"previewReady\":true,\"workflowDraftAllowed\":true,\"frameSource\":\"offline_fixture_metadata\",\"frameId\":\"offline-frame-9927be31\",\"source\":\"runtime_preview_offline_adapter\",\"permissionDecision\":{\"allowed\":true,\"reasonCode\":\"runtime_preview_offline_metadata_only\",\"reason\":\"Offline RuntimePreview returns deterministic metadata only.\",\"runtimePreviewConsent\":true,\"pilotEnabled\":false,\"metadataOnly\":true,\"requestedAdapterName\":\"offline_runtime_preview\",\"effectiveAdapterName\":\"offline_runtime_preview\",\"allowlistCounts...",
+            "charLength": 4125,
             "pendingActionCount": 0
           },
           "errorCode": null,
@@ -9737,6 +9788,16 @@
             "allowed": true,
             "permission": "RuntimePreview",
             "runtimePreviewConsent": true,
+            "pilotEnabled": false,
+            "metadataOnly": true,
+            "effectiveAdapterName": "offline_runtime_preview",
+            "allowlistCounts": {
+              "camera": 0,
+              "model": 0,
+              "template": 0,
+              "flow": 0,
+              "resourceRoot": 0
+            },
             "reason": "runtime_preview_consent_granted"
           },
           "adapterName": "offline_runtime_preview"
@@ -9856,7 +9917,7 @@
         {
           "round": 3,
           "role": "user",
-          "content": "{\"kind\":\"tool_result\",\"round\":2,\"toolResults\":[{\"id\":\"call_VA-PL-010_2\",\"name\":\"capture_test_frame\",\"success\":false,\"errorCode\":\"runtime_preview_consent_required\",\"errorMessage\":\"RuntimePreview requires explicit user consent for this request.\",\"data\":{\"previewReady\":false,\"toolName\":\"capture_test_frame\",\"runtimePreviewConsent\":false,\"warnings\":[{\"code\":\"runtime_preview_consent_required\",\"message\":\"RuntimePreview requires explicit user consent for this request.\"}],\"blockingIssues\":[],\"artifacts\":[]},\"pendingActions\":[{\"actionType\":\"AuthorizeRuntimePreview\",\"title\":\"Authorize RuntimePreview for this request\",\"summary\":\"RuntimePreview requires explicit user consent for this request.\",\"payload\":{\"toolName\":\"capture_test_frame\",\"scope\":\"single_request\",\"runtimePreviewConsentRequired\":true},\"requiresUserConfirmation\":true}]}]}"
+          "content": "{\"kind\":\"tool_result\",\"round\":2,\"toolResults\":[{\"id\":\"call_VA-PL-010_2\",\"name\":\"capture_test_frame\",\"success\":false,\"errorCode\":\"runtime_preview_consent_required\",\"errorMessage\":\"RuntimePreview requires explicit user consent for this request.\",\"data\":{\"previewReady\":false,\"toolName\":\"capture_test_frame\",\"adapterName\":\"none\",\"previewMode\":\"metadata_only\",\"workflowDraftAllowed\":true,\"runtimePreviewConsent\":false,\"permissionDecision\":{\"allowed\":false,\"permission\":\"RuntimePreview\",\"runtimePreviewConsent\":false,\"pilotEnabled\":false,\"metadataOnly\":true,\"allowlistCounts\":{\"camera\":0,\"model\":0,\"template\":0,\"flow\":0,\"resourceRoot\":0},\"reasonCode\":\"runtime_preview_consent_required\",\"reason\":\"RuntimePreview requires explicit user consent for this request.\"},\"resourceTrace\":{\"allowed\":false,\"reasonCode\":\"runtime_preview_consent_required\",\"resourceType\":\"runtime_preview_permission\",\"resourceId\":\"capt..."
         }
       ],
       "plannedToolCalls": [
@@ -10136,9 +10197,19 @@
             "allowed": false,
             "permission": "RuntimePreview",
             "runtimePreviewConsent": false,
+            "pilotEnabled": false,
+            "metadataOnly": true,
+            "effectiveAdapterName": null,
+            "allowlistCounts": {
+              "camera": 0,
+              "model": 0,
+              "template": 0,
+              "flow": 0,
+              "resourceRoot": 0
+            },
             "reason": "runtime_preview_consent_required"
           },
-          "adapterName": null
+          "adapterName": "none"
         }
       ],
       "pendingActions": [
@@ -11312,7 +11383,7 @@
         {
           "round": 2,
           "role": "user",
-          "content": "{\"kind\":\"tool_result\",\"round\":1,\"toolResults\":[{\"id\":\"call_VA-PERM-001_1\",\"name\":\"capture_test_frame\",\"success\":false,\"errorCode\":\"runtime_preview_consent_required\",\"errorMessage\":\"RuntimePreview requires explicit user consent for this request.\",\"data\":{\"previewReady\":false,\"toolName\":\"capture_test_frame\",\"runtimePreviewConsent\":false,\"warnings\":[{\"code\":\"runtime_preview_consent_required\",\"message\":\"RuntimePreview requires explicit user consent for this request.\"}],\"blockingIssues\":[],\"artifacts\":[]},\"pendingActions\":[{\"actionType\":\"AuthorizeRuntimePreview\",\"title\":\"Authorize RuntimePreview for this request\",\"summary\":\"RuntimePreview requires explicit user consent for this request.\",\"payload\":{\"toolName\":\"capture_test_frame\",\"scope\":\"single_request\",\"runtimePreviewConsentRequired\":true},\"requiresUserConfirmation\":true}]}]}"
+          "content": "{\"kind\":\"tool_result\",\"round\":1,\"toolResults\":[{\"id\":\"call_VA-PERM-001_1\",\"name\":\"capture_test_frame\",\"success\":false,\"errorCode\":\"runtime_preview_consent_required\",\"errorMessage\":\"RuntimePreview requires explicit user consent for this request.\",\"data\":{\"previewReady\":false,\"toolName\":\"capture_test_frame\",\"adapterName\":\"none\",\"previewMode\":\"metadata_only\",\"workflowDraftAllowed\":true,\"runtimePreviewConsent\":false,\"permissionDecision\":{\"allowed\":false,\"permission\":\"RuntimePreview\",\"runtimePreviewConsent\":false,\"pilotEnabled\":false,\"metadataOnly\":true,\"allowlistCounts\":{\"camera\":0,\"model\":0,\"template\":0,\"flow\":0,\"resourceRoot\":0},\"reasonCode\":\"runtime_preview_consent_required\",\"reason\":\"RuntimePreview requires explicit user consent for this request.\"},\"resourceTrace\":{\"allowed\":false,\"reasonCode\":\"runtime_preview_consent_required\",\"resourceType\":\"runtime_preview_permission\",\"resourceId\":\"ca..."
         },
         {
           "round": 3,
@@ -11337,7 +11408,7 @@
         {
           "round": 3,
           "role": "user",
-          "content": "{\"kind\":\"tool_result\",\"round\":1,\"toolResults\":[{\"id\":\"call_VA-PERM-001_1\",\"name\":\"capture_test_frame\",\"success\":false,\"errorCode\":\"runtime_preview_consent_required\",\"errorMessage\":\"RuntimePreview requires explicit user consent for this request.\",\"data\":{\"previewReady\":false,\"toolName\":\"capture_test_frame\",\"runtimePreviewConsent\":false,\"warnings\":[{\"code\":\"runtime_preview_consent_required\",\"message\":\"RuntimePreview requires explicit user consent for this request.\"}],\"blockingIssues\":[],\"artifacts\":[]},\"pendingActions\":[{\"actionType\":\"AuthorizeRuntimePreview\",\"title\":\"Authorize RuntimePreview for this request\",\"summary\":\"RuntimePreview requires explicit user consent for this request.\",\"payload\":{\"toolName\":\"capture_test_frame\",\"scope\":\"single_request\",\"runtimePreviewConsentRequired\":true},\"requiresUserConfirmation\":true}]}]}"
+          "content": "{\"kind\":\"tool_result\",\"round\":1,\"toolResults\":[{\"id\":\"call_VA-PERM-001_1\",\"name\":\"capture_test_frame\",\"success\":false,\"errorCode\":\"runtime_preview_consent_required\",\"errorMessage\":\"RuntimePreview requires explicit user consent for this request.\",\"data\":{\"previewReady\":false,\"toolName\":\"capture_test_frame\",\"adapterName\":\"none\",\"previewMode\":\"metadata_only\",\"workflowDraftAllowed\":true,\"runtimePreviewConsent\":false,\"permissionDecision\":{\"allowed\":false,\"permission\":\"RuntimePreview\",\"runtimePreviewConsent\":false,\"pilotEnabled\":false,\"metadataOnly\":true,\"allowlistCounts\":{\"camera\":0,\"model\":0,\"template\":0,\"flow\":0,\"resourceRoot\":0},\"reasonCode\":\"runtime_preview_consent_required\",\"reason\":\"RuntimePreview requires explicit user consent for this request.\"},\"resourceTrace\":{\"allowed\":false,\"reasonCode\":\"runtime_preview_consent_required\",\"resourceType\":\"runtime_preview_permission\",\"resourceId\":\"ca..."
         },
         {
           "round": 3,
@@ -11347,7 +11418,7 @@
         {
           "round": 3,
           "role": "user",
-          "content": "{\"kind\":\"tool_result\",\"round\":2,\"toolResults\":[{\"id\":\"call_VA-PERM-001_2\",\"name\":\"replay_flow_with_frame\",\"success\":false,\"errorCode\":\"runtime_preview_consent_required\",\"errorMessage\":\"RuntimePreview requires explicit user consent for this request.\",\"data\":{\"previewReady\":false,\"toolName\":\"replay_flow_with_frame\",\"runtimePreviewConsent\":false,\"warnings\":[{\"code\":\"runtime_preview_consent_required\",\"message\":\"RuntimePreview requires explicit user consent for this request.\"}],\"blockingIssues\":[],\"artifacts\":[]},\"pendingActions\":[{\"actionType\":\"AuthorizeRuntimePreview\",\"title\":\"Authorize RuntimePreview for this request\",\"summary\":\"RuntimePreview requires explicit user consent for this request.\",\"payload\":{\"toolName\":\"replay_flow_with_frame\",\"scope\":\"single_request\",\"runtimePreviewConsentRequired\":true},\"requiresUserConfirmation\":true}]}]}"
+          "content": "{\"kind\":\"tool_result\",\"round\":2,\"toolResults\":[{\"id\":\"call_VA-PERM-001_2\",\"name\":\"replay_flow_with_frame\",\"success\":false,\"errorCode\":\"runtime_preview_consent_required\",\"errorMessage\":\"RuntimePreview requires explicit user consent for this request.\",\"data\":{\"previewReady\":false,\"toolName\":\"replay_flow_with_frame\",\"adapterName\":\"none\",\"previewMode\":\"metadata_only\",\"workflowDraftAllowed\":true,\"runtimePreviewConsent\":false,\"permissionDecision\":{\"allowed\":false,\"permission\":\"RuntimePreview\",\"runtimePreviewConsent\":false,\"pilotEnabled\":false,\"metadataOnly\":true,\"allowlistCounts\":{\"camera\":0,\"model\":0,\"template\":0,\"flow\":0,\"resourceRoot\":0},\"reasonCode\":\"runtime_preview_consent_required\",\"reason\":\"RuntimePreview requires explicit user consent for this request.\"},\"resourceTrace\":{\"allowed\":false,\"reasonCode\":\"runtime_preview_consent_required\",\"resourceType\":\"runtime_preview_permission\",\"resourc..."
         }
       ],
       "plannedToolCalls": [
@@ -11527,9 +11598,19 @@
             "allowed": false,
             "permission": "RuntimePreview",
             "runtimePreviewConsent": false,
+            "pilotEnabled": false,
+            "metadataOnly": true,
+            "effectiveAdapterName": null,
+            "allowlistCounts": {
+              "camera": 0,
+              "model": 0,
+              "template": 0,
+              "flow": 0,
+              "resourceRoot": 0
+            },
             "reason": "runtime_preview_consent_required"
           },
-          "adapterName": null
+          "adapterName": "none"
         },
         {
           "toolName": "replay_flow_with_frame",
@@ -11604,9 +11685,19 @@
             "allowed": false,
             "permission": "RuntimePreview",
             "runtimePreviewConsent": false,
+            "pilotEnabled": false,
+            "metadataOnly": true,
+            "effectiveAdapterName": null,
+            "allowlistCounts": {
+              "camera": 0,
+              "model": 0,
+              "template": 0,
+              "flow": 0,
+              "resourceRoot": 0
+            },
             "reason": "runtime_preview_consent_required"
           },
-          "adapterName": null
+          "adapterName": "none"
         }
       ],
       "pendingActions": [
@@ -11747,7 +11838,7 @@
         {
           "round": 3,
           "role": "user",
-          "content": "{\"kind\":\"tool_result\",\"round\":2,\"toolResults\":[{\"id\":\"call_VA-PERM-002_2\",\"name\":\"capture_test_frame\",\"success\":false,\"errorCode\":\"runtime_preview_permission_denied\",\"errorMessage\":\"RuntimePreview permission is not enabled in this agent context.\",\"data\":{\"previewReady\":false,\"toolName\":\"capture_test_frame\",\"runtimePreviewConsent\":true,\"warnings\":[{\"code\":\"runtime_preview_permission_denied\",\"message\":\"RuntimePreview permission is not enabled in this agent context.\"}],\"blockingIssues\":[],\"artifacts\":[]},\"pendingActions\":[{\"actionType\":\"AuthorizeRuntimePreview\",\"title\":\"Authorize RuntimePreview for this request\",\"summary\":\"RuntimePreview permission is not enabled in this agent context.\",\"payload\":{\"toolName\":\"capture_test_frame\",\"scope\":\"single_request\",\"runtimePreviewConsentRequired\":true},\"requiresUserConfirmation\":true}]}]}"
+          "content": "{\"kind\":\"tool_result\",\"round\":2,\"toolResults\":[{\"id\":\"call_VA-PERM-002_2\",\"name\":\"capture_test_frame\",\"success\":false,\"errorCode\":\"runtime_preview_permission_denied\",\"errorMessage\":\"RuntimePreview permission is not enabled in this agent context.\",\"data\":{\"previewReady\":false,\"toolName\":\"capture_test_frame\",\"adapterName\":\"none\",\"previewMode\":\"metadata_only\",\"workflowDraftAllowed\":true,\"runtimePreviewConsent\":true,\"permissionDecision\":{\"allowed\":false,\"permission\":\"RuntimePreview\",\"runtimePreviewConsent\":true,\"pilotEnabled\":false,\"metadataOnly\":true,\"allowlistCounts\":{\"camera\":0,\"model\":0,\"template\":0,\"flow\":0,\"resourceRoot\":0},\"reasonCode\":\"runtime_preview_permission_denied\",\"reason\":\"RuntimePreview permission is not enabled in this agent context.\"},\"resourceTrace\":{\"allowed\":false,\"reasonCode\":\"runtime_preview_permission_denied\",\"resourceType\":\"runtime_preview_permission\",\"resourceId\":\"c..."
         }
       ],
       "plannedToolCalls": [
@@ -12027,9 +12118,19 @@
             "allowed": false,
             "permission": "RuntimePreview",
             "runtimePreviewConsent": true,
+            "pilotEnabled": false,
+            "metadataOnly": true,
+            "effectiveAdapterName": null,
+            "allowlistCounts": {
+              "camera": 0,
+              "model": 0,
+              "template": 0,
+              "flow": 0,
+              "resourceRoot": 0
+            },
             "reason": "runtime_preview_permission_denied"
           },
-          "adapterName": null
+          "adapterName": "none"
         }
       ],
       "pendingActions": [

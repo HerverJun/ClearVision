@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace ClearVision.Product.Core.AI.Tools;
 
-public sealed record RuntimePreviewArtifactSummary
+public record RuntimePreviewArtifactSummary
 {
     [JsonPropertyName("artifactId")]
     public string ArtifactId { get; init; } = string.Empty;
@@ -25,3 +25,5 @@ public sealed record RuntimePreviewArtifactSummary
     [JsonPropertyName("metadata")]
     public object? Metadata { get; init; }
 }
+
+public sealed record RuntimePreviewArtifactMetadata : RuntimePreviewArtifactSummary;

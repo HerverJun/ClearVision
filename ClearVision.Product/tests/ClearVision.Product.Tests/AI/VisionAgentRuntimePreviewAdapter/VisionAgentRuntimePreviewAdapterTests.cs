@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using FluentAssertions;
@@ -11,6 +12,137 @@ namespace ClearVision.Product.Tests.AI.VisionAgentRuntimePreviewAdapter;
 
 public sealed class VisionAgentRuntimePreviewAdapterTests
 {
+    private static readonly JsonSerializerOptions CamelCaseJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
+
+    [Fact(DisplayName = "RuntimePreviewPilotConfig should migrate old runtime config to safe defaults")]
+    public void RuntimePreviewPilotConfig_ShouldMigrateOldRuntimeConfigToSafeDefaults()
+    {
+        var config = JsonSerializer.Deserialize<AppConfig>("""{"runtime":{}}""", CamelCaseJsonOptions)!;
+
+        config.Normalize();
+
+        config.Runtime.RuntimePreviewPilot.Enabled.Should().BeFalse();
+        config.Runtime.RuntimePreviewPilot.Mode.Should().Be(RuntimePreviewPilotConfig.ModeMetadataOnly);
+        config.Runtime.RuntimePreviewPilot.FallbackToOffline.Should().BeTrue();
+        config.Runtime.RuntimePreviewPilot.DenyExternalPath.Should().BeTrue();
+        config.Runtime.RuntimePreviewPilot.DenyImageBytes.Should().BeTrue();
+        JsonSerializer.Serialize(config, CamelCaseJsonOptions).Should().Contain("runtimePreviewPilot");
+    }
+
+    [Fact(DisplayName = "RuntimePreviewPilotConfig validator should reject wildcard paths and disabled safety flags")]
+    public void RuntimePreviewPilotConfigValidator_ShouldRejectUnsafeConfiguration()
+    {
+        var failures = RuntimePreviewPilotConfigValidator.Validate(new RuntimePreviewPilotConfig
+        {
+            Enabled = true,
+            AllowedCameraBindingIds = ["*", "C:\\camera\\binding.json"],
+            AllowedResourceRoots = ["../images"],
+            DenyExternalPath = false,
+            DenyImageBytes = false
+        });
+
+        failures.Should().Contain(item => item.Contains("AllowedCameraBindingIds", StringComparison.OrdinalIgnoreCase));
+        failures.Should().Contain(item => item.Contains("AllowedResourceRoots", StringComparison.OrdinalIgnoreCase));
+        failures.Should().Contain(item => item.Contains("DenyExternalPath", StringComparison.OrdinalIgnoreCase));
+        failures.Should().Contain(item => item.Contains("DenyImageBytes", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact(DisplayName = "RuntimePreview allowlist resolver should allow camera capture only when binding is allowlisted")]
+    public void RuntimePreviewAllowlistResolver_ShouldAllowCameraCaptureWhenAllowlisted()
+    {
+        var resolver = new RuntimePreviewResourceAllowlistResolver();
+        var decision = resolver.Resolve(new RuntimePreviewRequest
+        {
+            ToolName = RuntimePreviewPermissionGate.CaptureToolName,
+            Context = RuntimePreviewContext(PilotConfig()),
+            Arguments = Args(new { cameraBindingId = "CAM-A" })
+        });
+
+        decision.Allowed.Should().BeTrue();
+        decision.ResourceType.Should().Be("camera");
+        decision.NormalizedKey.Should().Be("cam-a");
+        decision.ReasonCode.Should().Be("runtime_preview_resource_allowlisted");
+    }
+
+    [Fact(DisplayName = "RuntimePreview allowlist resolver should allow logical resource roots when allowlisted")]
+    public void RuntimePreviewAllowlistResolver_ShouldAllowLogicalResourceRootWhenAllowlisted()
+    {
+        var resolver = new RuntimePreviewResourceAllowlistResolver();
+        var decision = resolver.Resolve(new RuntimePreviewRequest
+        {
+            ToolName = RuntimePreviewPermissionGate.ReplayToolName,
+            Context = RuntimePreviewContext(PilotConfig()),
+            Arguments = Args(new { resourceRootId = "catalog-a", flow = AllowlistedFlow() })
+        });
+
+        decision.Allowed.Should().BeTrue();
+        Json(decision).GetRawText().Should().NotContain("catalog-a/");
+    }
+
+    [Fact(DisplayName = "RuntimePreview allowlist resolver should deny empty allowlist unknown and missing resources")]
+    public void RuntimePreviewAllowlistResolver_ShouldDenyMissingOrUnlistedResources()
+    {
+        var resolver = new RuntimePreviewResourceAllowlistResolver();
+        var empty = new RuntimePreviewPilotConfig { Enabled = true };
+        empty.Normalize();
+
+        var emptyDecision = resolver.Resolve(new RuntimePreviewRequest
+        {
+            ToolName = RuntimePreviewPermissionGate.CaptureToolName,
+            Context = RuntimePreviewContext(empty),
+            Arguments = Args(new { cameraBindingId = "cam-a" })
+        });
+        var missingDecision = resolver.Resolve(new RuntimePreviewRequest
+        {
+            ToolName = RuntimePreviewPermissionGate.CaptureToolName,
+            Context = RuntimePreviewContext(PilotConfig()),
+            Arguments = Args(new { })
+        });
+        var unknownDecision = resolver.Resolve(new RuntimePreviewRequest
+        {
+            ToolName = "unknown_preview",
+            Context = RuntimePreviewContext(PilotConfig()),
+            Arguments = Args(new { stationId = "station-1" })
+        });
+
+        emptyDecision.Allowed.Should().BeFalse();
+        emptyDecision.ReasonCode.Should().Be("runtime_preview_camera_allowlist_empty");
+        missingDecision.ReasonCode.Should().Be("runtime_preview_camera_binding_missing");
+        unknownDecision.Allowed.Should().BeFalse();
+        unknownDecision.ReasonCode.Should().Contain("station");
+    }
+
+    [Theory(DisplayName = "RuntimePreview allowlist resolver should deny paths Station PLC and image bytes")]
+    [InlineData("templatePath", "C:\\secret\\template.png", "runtime_preview_external_path_denied")]
+    [InlineData("filePath", "..\\live\\frame.png", "runtime_preview_path_traversal_denied")]
+    [InlineData("stationId", "station-1", "runtime_preview_station_denied")]
+    [InlineData("plcAddress", "DB1.DBX0.0", "runtime_preview_plc_denied")]
+    [InlineData("imageBase64", "data:image/png;base64,abcd", "runtime_preview_image_bytes_denied")]
+    public void RuntimePreviewAllowlistResolver_ShouldDenyDangerousResources(
+        string field,
+        string value,
+        string expectedReason)
+    {
+        var resolver = new RuntimePreviewResourceAllowlistResolver();
+        var payload = new Dictionary<string, string> { [field] = value };
+
+        var decision = resolver.Resolve(new RuntimePreviewRequest
+        {
+            ToolName = RuntimePreviewPermissionGate.ReplayToolName,
+            Context = RuntimePreviewContext(PilotConfig()),
+            Arguments = Args(payload)
+        });
+
+        decision.Allowed.Should().BeFalse();
+        decision.ReasonCode.Should().Be(expectedReason);
+        Json(decision).GetRawText().Should().NotContain("secret");
+        Json(decision).GetRawText().Should().NotContain("base64");
+    }
+
     [Fact(DisplayName = "RuntimePreview adapter tools should reject capture and replay without consent")]
     public async Task RuntimePreviewTools_ShouldRejectCaptureAndReplayWithoutConsent()
     {
@@ -56,6 +188,125 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         payload.GetProperty("adapterName").GetString().Should().Be(OfflineRuntimePreviewAdapter.AdapterName);
         payload.GetProperty("previewMode").GetString().Should().Be(RuntimePreviewModes.OfflineFixture);
         payload.GetProperty("previewReady").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "RuntimePreview default disabled should route to Offline adapter even with consent")]
+    public async Task RuntimePreviewDefaultDisabled_ShouldRouteToOfflineAdapter()
+    {
+        var result = await CreatePilotRegistry().ExecuteAsync(
+            RuntimePreviewPermissionGate.CaptureToolName,
+            RuntimePreviewContext(),
+            Args(new { cameraBindingId = "cam-a", operatorTempId = "op_cam" }),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var payload = Json(result.Data);
+        payload.GetProperty("adapterName").GetString().Should().Be(OfflineRuntimePreviewAdapter.AdapterName);
+        payload.GetProperty("permissionDecision").GetProperty("pilotEnabled").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "Pilot RuntimePreview should return metadata-only result when resources are allowlisted")]
+    public async Task PilotRuntimePreview_ShouldReturnMetadataOnlyWhenAllowlisted()
+    {
+        var result = await CreatePilotRegistry().ExecuteAsync(
+            RuntimePreviewPermissionGate.ReplayToolName,
+            RuntimePreviewContext(PilotConfig()),
+            Args(new { frameId = "pilot-frame", flow = AllowlistedFlow() }),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var payload = Json(result.Data);
+        payload.GetProperty("adapterName").GetString().Should().Be(PilotRuntimePreviewAdapter.AdapterName);
+        payload.GetProperty("previewMode").GetString().Should().Be(RuntimePreviewModes.MetadataOnly);
+        payload.GetProperty("permissionDecision").GetProperty("allowed").GetBoolean().Should().BeTrue();
+        payload.GetProperty("resourceTrace").GetProperty("allowed").GetBoolean().Should().BeTrue();
+        payload.GetProperty("binaryIncluded").GetBoolean().Should().BeFalse();
+        payload.GetProperty("capturedRealFrame").GetBoolean().Should().BeFalse();
+        payload.GetProperty("loadedModelFiles").GetBoolean().Should().BeFalse();
+        payload.GetProperty("accessedHardware").GetBoolean().Should().BeFalse();
+        payload.GetProperty("stationTouched").GetBoolean().Should().BeFalse();
+        payload.GetRawText().ToLowerInvariant().Should().NotContain("base64");
+    }
+
+    [Fact(DisplayName = "Pilot RuntimePreview should deny allowlist miss with pending action and offline fallback metadata")]
+    public async Task PilotRuntimePreview_ShouldDenyAllowlistMissWithPendingActionAndFallback()
+    {
+        var result = await CreatePilotRegistry().ExecuteAsync(
+            RuntimePreviewPermissionGate.ReplayToolName,
+            RuntimePreviewContext(PilotConfig()),
+            Args(new { frameId = "pilot-frame", flow = AllowlistedFlow(cameraBindingId: "cam-missing") }),
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be("runtime_preview_camera_not_allowlisted");
+        result.PendingActions.Should().Contain(action => action.ActionType == "RuntimePreviewPilotAllowlistReview");
+        var payload = Json(result.Data);
+        payload.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+        payload.GetProperty("fallback").GetProperty("used").GetBoolean().Should().BeTrue();
+        payload.GetProperty("fallback").GetProperty("fallbackAdapterName").GetString()
+            .Should().Be(OfflineRuntimePreviewAdapter.AdapterName);
+        payload.GetProperty("resourceTrace").GetProperty("allowed").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "Pilot RuntimePreview should deny external paths without leaking path fragments")]
+    public async Task PilotRuntimePreview_ShouldDenyExternalPathWithoutLeakingFragments()
+    {
+        var flow = AllowlistedFlow(templatePath: "C:\\secret\\template.png");
+
+        var result = await CreatePilotRegistry().ExecuteAsync(
+            RuntimePreviewPermissionGate.ReplayToolName,
+            RuntimePreviewContext(PilotConfig()),
+            Args(new { frameId = "pilot-frame", flow }),
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        var raw = Json(result.Data).GetRawText().ToLowerInvariant();
+        raw.Should().Contain("runtime_preview_external_path_denied");
+        raw.Should().NotContain("secret");
+        raw.Should().NotContain(".png");
+        raw.Should().NotContain("base64");
+    }
+
+    [Fact(DisplayName = "Pilot RuntimePreview adapter exception should fallback Offline and keep workflow draft editable")]
+    public async Task PilotRuntimePreviewAdapterException_ShouldFallbackOffline()
+    {
+        var offline = new OfflineRuntimePreviewAdapter(new RuntimePreviewArtifactStore());
+        var registry = new VisionAgentToolRegistry(
+        [
+            new RuntimePreviewReplayStubTool(new RuntimePreviewAdapterRegistry(
+            [
+                offline,
+                new ThrowingRuntimePreviewAdapter()
+            ]))
+        ]);
+
+        var result = await registry.ExecuteAsync(
+            RuntimePreviewPermissionGate.ReplayToolName,
+            RuntimePreviewContext(PilotConfig()),
+            Args(new { adapterName = ThrowingRuntimePreviewAdapter.AdapterName, frameId = "pilot-frame", flow = AllowlistedFlow() }),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var payload = Json(result.Data);
+        payload.GetProperty("adapterName").GetString().Should().Be(OfflineRuntimePreviewAdapter.AdapterName);
+        payload.GetProperty("fallback").GetProperty("used").GetBoolean().Should().BeTrue();
+        payload.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Pilot RuntimePreview structural failure should not block workflow draft editing")]
+    public async Task PilotRuntimePreviewStructuralFailure_ShouldKeepWorkflowDraftAllowed()
+    {
+        var result = await CreatePilotRegistry().ExecuteAsync(
+            RuntimePreviewPermissionGate.ReplayToolName,
+            RuntimePreviewContext(PilotConfig()),
+            Args(new { frameId = "pilot-frame", flow = BrokenAllowlistedFlow() }),
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        var payload = Json(result.Data);
+        payload.GetProperty("adapterName").GetString().Should().Be(PilotRuntimePreviewAdapter.AdapterName);
+        payload.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+        payload.GetProperty("binaryIncluded").GetBoolean().Should().BeFalse();
     }
 
     [Fact(DisplayName = "Authorized replay should call OfflineRuntimePreviewAdapter")]
@@ -302,6 +553,26 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         ]);
     }
 
+    private static VisionAgentToolRegistry CreatePilotRegistry()
+    {
+        var adapterRegistry = CreatePilotAdapterRegistry();
+        return new VisionAgentToolRegistry(
+        [
+            new RuntimePreviewCaptureStubTool(adapterRegistry),
+            new RuntimePreviewReplayStubTool(adapterRegistry)
+        ]);
+    }
+
+    private static RuntimePreviewAdapterRegistry CreatePilotAdapterRegistry()
+    {
+        var offline = new OfflineRuntimePreviewAdapter(new RuntimePreviewArtifactStore());
+        return new RuntimePreviewAdapterRegistry(
+        [
+            offline,
+            new PilotRuntimePreviewAdapter(new RuntimePreviewResourceAllowlistResolver(), offline)
+        ]);
+    }
+
     private static VisionAgentGenerateFlowService CreatePlannerService(
         IVisionAgentPlannerCompletionSource completionSource)
     {
@@ -336,11 +607,12 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
             new AgentWorkflowDraftEditor());
     }
 
-    private static VisionAgentToolContext RuntimePreviewContext()
+    private static VisionAgentToolContext RuntimePreviewContext(RuntimePreviewPilotConfig? pilotConfig = null)
     {
         return new VisionAgentToolContext
         {
             RuntimePreviewConsent = true,
+            RuntimePreviewPilot = pilotConfig ?? new RuntimePreviewPilotConfig(),
             AllowedPermissions = new HashSet<VisionAgentToolPermission>
             {
                 VisionAgentToolPermission.ReadOnly,
@@ -348,6 +620,22 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
                 VisionAgentToolPermission.RuntimePreview
             }
         };
+    }
+
+    private static RuntimePreviewPilotConfig PilotConfig()
+    {
+        var config = new RuntimePreviewPilotConfig
+        {
+            Enabled = true,
+            AllowedCameraBindingIds = ["cam-a"],
+            AllowedModelIds = ["model-a"],
+            AllowedTemplateIds = ["template-a"],
+            AllowedFlowIds = ["flow-a"],
+            AllowedResourceRoots = ["catalog-a"],
+            MaxPreviewArtifacts = 10
+        };
+        config.Normalize();
+        return config;
     }
 
     private static AiFlowGenerationRequest PlannerRequest(string description)
@@ -375,6 +663,63 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
                 Connection("op_cam", "Image", "op_match", "Image"),
                 Connection("op_match", "Pose", "op_measure", "PointA"),
                 Connection("op_measure", "Distance", "op_out", "Input")
+            }
+        };
+    }
+
+    private static object AllowlistedFlow(
+        string cameraBindingId = "cam-a",
+        string templateId = "template-a",
+        string? templatePath = null)
+    {
+        var templateParameters = new Dictionary<string, string>();
+        if (!string.IsNullOrWhiteSpace(templatePath))
+        {
+            templateParameters["TemplatePath"] = templatePath;
+        }
+        else
+        {
+            templateParameters["TemplateId"] = templateId;
+        }
+
+        return new
+        {
+            operators = new object[]
+            {
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraBindingId"] = cameraBindingId
+                }),
+                Operator("op_match", "TemplateMatching", templateParameters),
+                Operator("op_judge", "ResultJudgment"),
+                Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["OutputChannelId"] = "memory" })
+            },
+            connections = new object[]
+            {
+                Connection("op_cam", "Image", "op_match", "Image"),
+                Connection("op_match", "Score", "op_judge", "Input"),
+                Connection("op_judge", "Result", "op_out", "Input")
+            }
+        };
+    }
+
+    private static object BrokenAllowlistedFlow()
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string>
+                {
+                    ["SourceType"] = "Camera",
+                    ["CameraBindingId"] = "cam-a"
+                }),
+                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplateId"] = "template-a" })
+            },
+            connections = new object[]
+            {
+                Connection("op_cam", "Image", "op_missing", "Image")
             }
         };
     }
@@ -499,6 +844,26 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(_next(request, _index++));
+        }
+    }
+
+    private sealed class ThrowingRuntimePreviewAdapter : IRuntimePreviewAdapter
+    {
+        public const string AdapterName = "throwing_runtime_preview";
+
+        public string Name => AdapterName;
+
+        public IReadOnlySet<string> SupportedToolNames { get; } =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                RuntimePreviewPermissionGate.ReplayToolName
+            };
+
+        public Task<RuntimePreviewResult> ExecuteAsync(
+            RuntimePreviewRequest request,
+            CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("synthetic adapter failure");
         }
     }
 }

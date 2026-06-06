@@ -467,6 +467,120 @@ test('response mapping displays RuntimePreview adapter summary', async () => {
   assert.match(validation.innerHTML, /binaryIncluded=false/);
 });
 
+test('response mapping displays RuntimePreview pilot permission fallback trace and pending actions', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+  const response = agentResponse();
+  response.validationPreview.runtimePreview = {
+    previewReady: false,
+    adapterName: 'pilot_runtime_preview',
+    previewMode: 'metadata_only',
+    permissionDecision: {
+      allowed: false,
+      reasonCode: 'runtime_preview_camera_not_allowlisted',
+      pilotEnabled: true,
+      metadataOnly: true,
+      effectiveAdapterName: 'offline_runtime_preview',
+      allowlistCounts: { camera: 1, model: 1, template: 1, flow: 1, resourceRoot: 1 }
+    },
+    resourceTrace: {
+      allowed: false,
+      reasonCode: 'runtime_preview_camera_not_allowlisted',
+      resourceType: 'camera',
+      normalizedKey: 'cam-missing',
+      missingResources: [{ resourceType: 'camera', resourceKey: 'cam-missing', description: 'not allowlisted' }],
+      trace: [{ resourceType: 'camera', reasonCode: 'allowlist_miss', allowed: false }]
+    },
+    fallback: {
+      used: true,
+      fallbackAdapterName: 'offline_runtime_preview',
+      reasonCode: 'runtime_preview_camera_not_allowlisted',
+      reason: 'offline metadata fallback retained'
+    },
+    pendingActions: [{ actionType: 'RuntimePreviewPilotAllowlistReview', summary: 'Review allowlist' }],
+    artifacts: [{ artifactId: 'operator-result-1', artifactType: 'operator_result_metadata', metadataOnly: true, binaryIncluded: false, byteLength: 0 }]
+  };
+
+  panel._renderValidationConsole(response);
+
+  assert.match(validation.innerHTML, /adapterName=pilot_runtime_preview/);
+  assert.match(validation.innerHTML, /previewMode=metadata_only/);
+  assert.match(validation.innerHTML, /permission=denied/);
+  assert.match(validation.innerHTML, /permissionReason=runtime_preview_camera_not_allowlisted/);
+  assert.match(validation.innerHTML, /fallbackAdapterName=offline_runtime_preview/);
+  assert.match(validation.innerHTML, /resourceTrace=camera \/ runtime_preview_camera_not_allowlisted \/ cam-missing/);
+  assert.match(validation.innerHTML, /RuntimePreviewPilotAllowlistReview/);
+});
+
+test('RuntimePreview pilot developer status is hidden by default and visible in developer mode', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const defaultPanel = createPanel(AiPanel);
+  const developerPanel = createPanel(AiPanel, { developer: true });
+  const runtimePreview = {
+    previewReady: true,
+    adapterName: 'pilot_runtime_preview',
+    previewMode: 'metadata_only',
+    permissionDecision: {
+      allowed: true,
+      pilotEnabled: true,
+      metadataOnly: true,
+      allowlistCounts: { camera: 2, model: 1, template: 1, flow: 0, resourceRoot: 0 }
+    }
+  };
+
+  const defaultHtml = defaultPanel._renderAgentValidationArtifacts({ validationPreview: { runtimePreview } });
+  const developerHtml = developerPanel._renderAgentValidationArtifacts({ validationPreview: { runtimePreview } });
+
+  assert.match(defaultHtml, /data-runtime-preview-pilot-status="true" hidden/);
+  assert.match(developerHtml, /data-runtime-preview-pilot-status="true"/);
+  assert.doesNotMatch(developerHtml, /data-runtime-preview-pilot-status="true" hidden/);
+  assert.match(developerHtml, /pilotEnabled=true/);
+  assert.match(developerHtml, /metadataOnly=true/);
+  assert.match(developerHtml, /allowlistCounts=camera=2 \/ model=1 \/ template=1 \/ flow=0 \/ root=0/);
+  assert.match(developerHtml, /realResourcesTouched=false/);
+});
+
+test('RuntimePreview UI redacts bytes paths IP BaseUrl and key fragments', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true });
+  const { validation } = attachValidationPanel(panel);
+  const response = agentResponse();
+  response.validationPreview.runtimePreview = {
+    previewReady: false,
+    adapterName: 'pilot_runtime_preview',
+    previewMode: 'metadata_only',
+    permissionDecision: {
+      allowed: false,
+      reason: 'http://192.0.2.10:8317/v1 should not show',
+      pilotEnabled: true,
+      metadataOnly: true
+    },
+    resourceTrace: {
+      allowed: false,
+      reasonCode: 'runtime_preview_external_path_denied',
+      resourceType: 'external_path',
+      resourceId: 'C:\\secret\\live.png',
+      normalizedKey: 'C:\\secret\\live.png',
+      missingResources: [{ resourceKey: 'C:\\secret\\live.png', description: 'apiKey=VALUE_SHOULD_HIDE encoded image' }]
+    },
+    fallback: { used: true, fallbackAdapterName: 'offline_runtime_preview', reason: 'Bearer test token and BaseUrl http://192.0.2.10:8317/v1' },
+    warnings: [{ message: 'C:\\secret\\template.png' }],
+    issues: [{ description: 'apiKey=VALUE_SHOULD_HIDE' }],
+    pendingActions: [{ actionType: 'RuntimePreviewPilotAllowlistReview', summary: 'Authorization Bearer secret' }],
+    artifacts: [{ artifactId: 'C:\\secret\\frame.png', artifactType: 'frame_metadata', metadataOnly: true, binaryIncluded: false, byteLength: 0 }]
+  };
+
+  panel._renderValidationConsole(response);
+
+  assert.doesNotMatch(validation.innerHTML, /192\.0\.2\.10/);
+  assert.doesNotMatch(validation.innerHTML, /VALUE_SHOULD_HIDE/);
+  assert.doesNotMatch(validation.innerHTML, /secret/);
+  assert.doesNotMatch(validation.innerHTML, /\.png/);
+  assert.doesNotMatch(validation.innerHTML, /base64/i);
+  assert.match(validation.innerHTML, /&lt;redacted&gt;/);
+});
+
 test('response mapping displays folded toolTrace summary only', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel);
@@ -1243,7 +1357,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 52);
+  assert.equal(uiEntry.minimumTests, 55);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)

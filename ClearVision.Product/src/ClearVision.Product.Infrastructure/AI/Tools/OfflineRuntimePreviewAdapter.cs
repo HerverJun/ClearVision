@@ -71,6 +71,9 @@ public sealed class OfflineRuntimePreviewAdapter : IRuntimePreviewAdapter
             PreviewReady = true,
             FrameSource = "offline_fixture_metadata",
             FrameId = frameId,
+            PermissionDecision = OfflinePermissionDecision(request),
+            ResourceTrace = OfflineResourceTrace("capture", cameraBindingId),
+            Fallback = RuntimePreviewFallbackInfo.NotUsed(),
             Warnings = new object[]
             {
                 new
@@ -173,6 +176,9 @@ public sealed class OfflineRuntimePreviewAdapter : IRuntimePreviewAdapter
             WorkflowDraftAllowed = true,
             FrameSource = "offline_fixture_metadata",
             FrameId = frameId,
+            PermissionDecision = OfflinePermissionDecision(request),
+            ResourceTrace = OfflineResourceTrace("replay", frameId),
+            Fallback = RuntimePreviewFallbackInfo.NotUsed(),
             ReplaySummary = new
             {
                 replaySucceeded = previewReady,
@@ -197,6 +203,53 @@ public sealed class OfflineRuntimePreviewAdapter : IRuntimePreviewAdapter
             StationTouched = false,
             ErrorCode = previewReady ? null : "runtime_preview_replay_not_ready",
             ErrorMessage = previewReady ? null : "Offline replay stopped because structural validation produced blocking issues."
+        };
+    }
+
+    private static RuntimePreviewPermissionDecision OfflinePermissionDecision(RuntimePreviewRequest request)
+    {
+        return new RuntimePreviewPermissionDecision
+        {
+            Allowed = true,
+            ReasonCode = request.Context.RuntimePreviewPilot.Enabled
+                ? "runtime_preview_pilot_fallback_offline"
+                : "runtime_preview_offline_metadata_only",
+            Reason = "Offline RuntimePreview returns deterministic metadata only.",
+            RuntimePreviewConsent = request.Context.RuntimePreviewConsent,
+            PilotEnabled = request.Context.RuntimePreviewPilot.Enabled,
+            MetadataOnly = true,
+            RequestedAdapterName = request.RequestedAdapterName ?? request.AdapterName,
+            EffectiveAdapterName = AdapterName,
+            AllowlistCounts = new
+            {
+                camera = request.Context.RuntimePreviewPilot.AllowedCameraBindingIds.Count,
+                model = request.Context.RuntimePreviewPilot.AllowedModelIds.Count,
+                template = request.Context.RuntimePreviewPilot.AllowedTemplateIds.Count,
+                flow = request.Context.RuntimePreviewPilot.AllowedFlowIds.Count,
+                resourceRoot = request.Context.RuntimePreviewPilot.AllowedResourceRoots.Count
+            }
+        };
+    }
+
+    private static RuntimePreviewResourceTrace OfflineResourceTrace(string operation, string? resourceId)
+    {
+        return new RuntimePreviewResourceTrace
+        {
+            Allowed = true,
+            ReasonCode = "runtime_preview_offline_metadata_only",
+            ResourceType = operation,
+            ResourceId = RuntimePreviewArtifactStore.StableSuffix(resourceId ?? operation),
+            NormalizedKey = "offline_metadata_only",
+            Trace =
+            [
+                new
+                {
+                    resourceType = operation,
+                    resourceId = "offline_metadata",
+                    reasonCode = "runtime_preview_offline_metadata_only",
+                    allowed = true
+                }
+            ]
         };
     }
 

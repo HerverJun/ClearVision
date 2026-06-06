@@ -66,7 +66,11 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IVisionAgentPlannerService, VisionAgentPlannerService>();
         services.AddScoped<IVisionAgentStationStatusReader, NoOpVisionAgentStationStatusReader>();
         services.AddScoped<RuntimePreviewArtifactStore>();
-        services.AddScoped<IRuntimePreviewAdapter, OfflineRuntimePreviewAdapter>();
+        services.AddScoped<RuntimePreviewResourceAllowlistResolver>();
+        services.AddScoped<OfflineRuntimePreviewAdapter>();
+        services.AddScoped<PilotRuntimePreviewAdapter>();
+        services.AddScoped<IRuntimePreviewAdapter>(sp => sp.GetRequiredService<OfflineRuntimePreviewAdapter>());
+        services.AddScoped<IRuntimePreviewAdapter>(sp => sp.GetRequiredService<PilotRuntimePreviewAdapter>());
         services.AddScoped<RuntimePreviewAdapterRegistry>();
         services.AddScoped<IVisionAgentTool, OperatorCatalogTool>();
         services.AddScoped<IVisionAgentTool, OperatorSchemaTool>();
