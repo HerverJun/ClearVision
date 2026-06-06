@@ -316,7 +316,7 @@ jobs:
 
       - name: Assert Vision Agent Artifact Reports
         shell: pwsh
-        run: python quality/tools/assert_vision_agent_report_artifacts.py --require-non-local-workflow-run --write-manifest quality/evals/reports/vision_agent_quality_artifact_manifest.json --write-report quality/evals/reports/vision_agent_quality_artifact_manifest.md
+        run: python quality/tools/assert_vision_agent_report_artifacts.py --require-non-local-workflow-run --scan-source-files --write-manifest quality/evals/reports/vision_agent_quality_artifact_manifest.json --write-report quality/evals/reports/vision_agent_quality_artifact_manifest.md
 
       - name: Upload Vision Agent Quality Reports
         uses: actions/upload-artifact@v4

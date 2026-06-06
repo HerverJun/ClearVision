@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-06-06T04:41:44.215181+00:00",
+  "generatedAtUtc": "2026-06-06T05:48:49.624676+00:00",
   "artifactName": "vision-agent-quality-suite",
   "files": [
     {
@@ -9,11 +9,11 @@
     },
     {
       "path": "quality/evals/reports/planner_autonomy_benchmark.json",
-      "sizeBytes": 745917
+      "sizeBytes": 752782
     },
     {
       "path": "quality/evals/reports/real_llm_planner_shadow_eval.json",
-      "sizeBytes": 20973
+      "sizeBytes": 25264
     },
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.md",
@@ -25,11 +25,15 @@
     },
     {
       "path": "quality/evals/reports/real_llm_planner_shadow_eval.md",
-      "sizeBytes": 3620
+      "sizeBytes": 4812
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
-      "sizeBytes": 8362
+      "sizeBytes": 8526
+    },
+    {
+      "path": "test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx",
+      "sizeBytes": 29531
     },
     {
       "path": "test_results/agent_engineering_harness/agent_contracts_skeleton.trx",
@@ -53,7 +57,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T04:41:28.7206687+00:00"
+        "generatedAtUtc": "2026-06-06T05:48:25.5877129+00:00"
       },
       "summary": {
         "caseCount": 36,
@@ -70,7 +74,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T04:41:31.8079244+00:00"
+        "generatedAtUtc": "2026-06-06T05:48:27.9732261+00:00"
       },
       "summary": {
         "plannerCaseCount": 15,
@@ -88,7 +92,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-05T18:10:55.6167486+00:00"
+        "generatedAtUtc": "2026-06-06T05:44:08.0980599+00:00"
       },
       "summary": {
         "caseCount": 12,
@@ -106,6 +110,24 @@
         "unsafeAttemptRate": 0,
         "fallbackToMockSuggestedCount": 12,
         "averageToolPlanMatchScore": 0,
+        "averageNextActionMatchScore": 0,
+        "averageFullPlanMatchScore": 0,
+        "averageOrderedPrefixScore": 0,
+        "averagePolicySafetyScore": 1,
+        "badToolNames": [],
+        "missingRequiredLaterTools": [
+          "capture_test_frame",
+          "dryrun_flow",
+          "get_flow_template_skeleton",
+          "get_operator_schema",
+          "inspect_current_flow",
+          "match_flow_template",
+          "replay_flow_with_frame",
+          "runtime_package_precheck",
+          "validate_flow"
+        ],
+        "overPlanningTools": [],
+        "underPlanningCases": [],
         "reportGenerated": true
       }
     }

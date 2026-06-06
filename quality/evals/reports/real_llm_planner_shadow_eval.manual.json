@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-real-llm-planner-shadow-eval.v1",
   "evalId": "vision_agent_real_llm_planner_shadow_eval",
-  "generatedAtUtc": "2026-06-06T04:37:21.2901910+00:00",
+  "generatedAtUtc": "2026-06-06T05:44:21.1030876+00:00",
   "mode": "offline_metadata_only",
   "enabled": true,
   "workflowRun": {
@@ -9,7 +9,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T04:37:21.2901910+00:00"
+    "generatedAtUtc": "2026-06-06T05:44:21.1030876+00:00"
   },
   "llmConfiguration": {
     "provider": "OpenAI",
@@ -26,15 +26,23 @@
     "enabledReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL=true",
     "skippedReason": "",
     "configurationMissingReason": "",
-    "requestCount": 12,
+    "requestCount": 14,
     "parseSuccessCount": 12,
     "parseSuccessRate": 1,
-    "invalidJsonRepairUsedCount": 0,
-    "repairUsedRate": 0,
+    "invalidJsonRepairUsedCount": 2,
+    "repairUsedRate": 0.1667,
     "unsafeToolAttemptCount": 0,
     "unsafeAttemptRate": 0,
-    "fallbackToMockSuggestedCount": 9,
-    "averageToolPlanMatchScore": 0.2986,
+    "fallbackToMockSuggestedCount": 0,
+    "averageToolPlanMatchScore": 1,
+    "averageNextActionMatchScore": 1,
+    "averageFullPlanMatchScore": 1,
+    "averageOrderedPrefixScore": 1,
+    "averagePolicySafetyScore": 1,
+    "badToolNames": [],
+    "missingRequiredLaterTools": [],
+    "overPlanningTools": [],
+    "underPlanningCases": [],
     "reportGenerated": true
   },
   "safety": {
@@ -85,14 +93,22 @@
         {
           "toolName": "match_flow_template",
           "arguments": {
-            "userRequest": "Create a line sequence inspection workflow. Keep camera binding pending and validate the draft.",
-            "businessContext": "wire_sequence_generation",
-            "constraints": {
-              "shadowOnly": true,
-              "offlineMetadataOnly": true,
-              "keepCameraBindingPending": true
-            }
+            "task": "wire_sequence"
           }
+        },
+        {
+          "toolName": "get_flow_template_skeleton",
+          "arguments": {
+            "templateId": "wire_sequence"
+          }
+        },
+        {
+          "toolName": "validate_flow",
+          "arguments": {}
+        },
+        {
+          "toolName": "dryrun_flow",
+          "arguments": {}
         }
       ],
       "policyDecision": [
@@ -102,16 +118,44 @@
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "get_flow_template_skeleton",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "dryrun_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
         }
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.25,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
+      "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-002",
@@ -132,13 +176,13 @@
       ],
       "expectedToolCalls": [
         "match_flow_template",
-        "get_operator_schema",
+        "get_flow_template_skeleton",
         "validate_flow",
         "dryrun_flow"
       ],
       "mockPlannerToolCalls": [
         "match_flow_template",
-        "get_operator_schema",
+        "get_flow_template_skeleton",
         "validate_flow",
         "dryrun_flow"
       ],
@@ -147,19 +191,22 @@
         {
           "toolName": "match_flow_template",
           "arguments": {
-            "intent": "template_matching_generation",
-            "description": "Create a template matching workflow for part alignment. Template source is not known yet.",
-            "constraints": {
-              "offlineMetadataOnly": true,
-              "shadowOnly": true,
-              "noRuntimePreview": true,
-              "missingResourcesAsPlaceholders": [
-                "TemplatePath",
-                "CameraBindingId",
-                "output channels"
-              ]
-            }
+            "task": "template_matching"
           }
+        },
+        {
+          "toolName": "get_flow_template_skeleton",
+          "arguments": {
+            "templateId": "template_matching"
+          }
+        },
+        {
+          "toolName": "validate_flow",
+          "arguments": {}
+        },
+        {
+          "toolName": "dryrun_flow",
+          "arguments": {}
         }
       ],
       "policyDecision": [
@@ -169,16 +216,44 @@
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "get_flow_template_skeleton",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "dryrun_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
         }
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.25,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
+      "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-003",
@@ -198,13 +273,13 @@
         "validate_flow"
       ],
       "expectedToolCalls": [
-        "retrieve_operator_knowledge",
+        "match_flow_template",
         "get_flow_template_skeleton",
         "validate_flow",
         "dryrun_flow"
       ],
       "mockPlannerToolCalls": [
-        "retrieve_operator_knowledge",
+        "match_flow_template",
         "get_flow_template_skeleton",
         "validate_flow",
         "dryrun_flow"
@@ -212,16 +287,51 @@
       "modelName": "gpt-5.5",
       "plannedToolCalls": [
         {
-          "toolName": "retrieve_operator_knowledge",
+          "toolName": "match_flow_template",
           "arguments": {
-            "query": "hole distance measurement workflow with two circle measurements and distance output operators and connections"
+            "task": "hole_distance"
           }
+        },
+        {
+          "toolName": "get_flow_template_skeleton",
+          "arguments": {
+            "templateId": "hole_distance"
+          }
+        },
+        {
+          "toolName": "validate_flow",
+          "arguments": {}
+        },
+        {
+          "toolName": "dryrun_flow",
+          "arguments": {}
         }
       ],
       "policyDecision": [
         {
           "stage": "planner_policy",
-          "toolName": "retrieve_operator_knowledge",
+          "toolName": "match_flow_template",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "get_flow_template_skeleton",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "dryrun_flow",
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
@@ -229,12 +339,19 @@
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.25,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
+      "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-004",
@@ -266,6 +383,10 @@
         {
           "toolName": "inspect_current_flow",
           "arguments": {}
+        },
+        {
+          "toolName": "validate_flow",
+          "arguments": {}
         }
       ],
       "policyDecision": [
@@ -275,16 +396,30 @@
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
         }
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.5,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-005",
@@ -320,6 +455,14 @@
           "arguments": {
             "operatorType": "CameraSource"
           }
+        },
+        {
+          "toolName": "validate_flow",
+          "arguments": {}
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "arguments": {}
         }
       ],
       "policyDecision": [
@@ -329,16 +472,37 @@
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "runtime_package_precheck",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
         }
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.3333,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
+      "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-006",
@@ -374,6 +538,14 @@
           "arguments": {
             "operatorType": "DeepLearning"
           }
+        },
+        {
+          "toolName": "validate_flow",
+          "arguments": {}
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "arguments": {}
         }
       ],
       "policyDecision": [
@@ -383,16 +555,37 @@
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "runtime_package_precheck",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
         }
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.3333,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
+      "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-007",
@@ -428,6 +621,14 @@
           "arguments": {
             "operatorType": "TemplateMatching"
           }
+        },
+        {
+          "toolName": "validate_flow",
+          "arguments": {}
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "arguments": {}
         }
       ],
       "policyDecision": [
@@ -437,16 +638,37 @@
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "runtime_package_precheck",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
         }
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.3333,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
+      "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-008",
@@ -482,6 +704,14 @@
           "arguments": {
             "operatorType": "ResultOutput"
           }
+        },
+        {
+          "toolName": "validate_flow",
+          "arguments": {}
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "arguments": {}
         }
       ],
       "policyDecision": [
@@ -491,16 +721,37 @@
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "runtime_package_precheck",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
         }
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.3333,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
+      "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-009",
@@ -534,14 +785,40 @@
       "modelName": "gpt-5.5",
       "plannedToolCalls": [
         {
-          "toolName": "list_operator_catalog",
+          "toolName": "validate_flow",
           "arguments": {}
+        },
+        {
+          "toolName": "capture_test_frame",
+          "arguments": {
+            "mode": "offline_metadata_only"
+          }
+        },
+        {
+          "toolName": "replay_flow_with_frame",
+          "arguments": {
+            "mode": "offline_metadata_only"
+          }
         }
       ],
       "policyDecision": [
         {
           "stage": "planner_policy",
-          "toolName": "list_operator_catalog",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "capture_test_frame",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "stage": "planner_policy",
+          "toolName": "replay_flow_with_frame",
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
@@ -549,12 +826,19 @@
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
+      "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-010",
@@ -573,9 +857,7 @@
         "runtime_package_precheck",
         "validate_flow"
       ],
-      "expectedToolCalls": [
-        "validate_flow"
-      ],
+      "expectedToolCalls": [],
       "mockPlannerToolCalls": [
         "validate_flow"
       ],
@@ -591,13 +873,20 @@
         }
       ],
       "parseSuccess": true,
-      "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "invalidJsonRepairUsed": true,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
-      "requestCount": 1,
+      "fallbackToMockSuggested": false,
+      "requestCount": 2,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "final",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-011",
@@ -617,7 +906,6 @@
         "validate_flow"
       ],
       "expectedToolCalls": [
-        "validate_flow",
         "runtime_package_precheck"
       ],
       "mockPlannerToolCalls": [
@@ -627,20 +915,14 @@
       "modelName": "gpt-5.5",
       "plannedToolCalls": [
         {
-          "toolName": "validate_flow",
-          "arguments": {
-            "workflowDraft": {
-              "operators": [],
-              "connections": []
-            },
-            "structureOnly": true
-          }
+          "toolName": "runtime_package_precheck",
+          "arguments": {}
         }
       ],
       "policyDecision": [
         {
           "stage": "planner_policy",
-          "toolName": "validate_flow",
+          "toolName": "runtime_package_precheck",
           "allowed": true,
           "errorCode": null,
           "errorMessage": null
@@ -648,12 +930,19 @@
       ],
       "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.5,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": false,
       "requestCount": 1,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "full_plan",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-012",
@@ -672,38 +961,37 @@
         "runtime_package_precheck",
         "validate_flow"
       ],
-      "expectedToolCalls": [
-        "inspect_current_flow",
-        "validate_flow"
-      ],
+      "expectedToolCalls": [],
       "mockPlannerToolCalls": [
         "inspect_current_flow",
         "validate_flow"
       ],
       "modelName": "gpt-5.5",
-      "plannedToolCalls": [
-        {
-          "toolName": "inspect_current_flow",
-          "arguments": {}
-        }
-      ],
+      "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "planner_policy",
-          "toolName": "inspect_current_flow",
+          "stage": "parse",
+          "toolName": null,
           "allowed": true,
           "errorCode": null,
-          "errorMessage": null
+          "errorMessage": ""
         }
       ],
       "parseSuccess": true,
-      "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0.5,
+      "invalidJsonRepairUsed": true,
+      "toolPlanMatchScore": 1,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": false,
-      "requestCount": 1,
+      "requestCount": 2,
       "errorCode": null,
-      "errorMessage": ""
+      "errorMessage": "",
+      "nextActionMatchScore": 1,
+      "fullPlanMatchScore": 1,
+      "orderedPrefixScore": 1,
+      "policySafetyScore": 1,
+      "completionIntent": "final",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     }
   ]
 }

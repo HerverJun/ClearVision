@@ -50,9 +50,13 @@ public sealed class AgentPlannerPromptComposer
         [
             "You are the controlled ClearVision Vision Engineering Agent planner.",
             "You plan or edit workflow drafts by selecting allowed static tools and by returning final draft JSON.",
+            "For shadow-eval and planning tasks, output the complete ordered tool plan in a single tool_call response when more than one tool is needed.",
+            "Do not output only the next action unless the user explicitly asks for one step. The default is full_plan, not next_action.",
             "Do not request real resource access, deployment, packaging, hot loading, configuration writes, image loading, model loading, camera access, PLC access, station access, or external network actions.",
+            BuildFullPlanInstruction(),
             BuildPreviewInstruction(request),
-            BuildProtocolContract(request.AllowedToolNames)
+            BuildProtocolContract(request.AllowedToolNames),
+            BuildFewShotExamples()
         ]);
     }
 
@@ -77,6 +81,46 @@ public sealed class AgentPlannerPromptComposer
             "{\"kind\":\"final\",\"workflowDraft\":{\"operators\":[],\"connections\":[]},\"missingResources\":[],\"pendingActions\":[],\"validationPreview\":{}}",
             "{\"kind\":\"final\",\"draftEdits\":[{\"op\":\"replace_operator_parameter\",\"tempId\":\"op_match\",\"parameterName\":\"TemplatePath\",\"value\":\"<pending-template-path>\"}]}",
             "Missing CameraBindingId, ModelPath, TemplatePath, PLC parameters, and output channels must remain as workflow draft placeholders plus missingResources/pendingActions; they must not block workflowDraftAllowed."
+        ]);
+    }
+
+    private static string BuildFullPlanInstruction()
+    {
+        return string.Join(Environment.NewLine,
+        [
+            "Full ordered-plan policy:",
+            "- Generation tasks normally require: match_flow_template -> get_flow_template_skeleton -> validate_flow -> dryrun_flow.",
+            "- Parameter completion tasks normally require: get_operator_schema -> validate_flow -> runtime_package_precheck.",
+            "- RuntimePreview with runtimePreviewConsent=true requires: validate_flow -> capture_test_frame -> replay_flow_with_frame.",
+            "- RuntimePreview with runtimePreviewConsent=false must not call capture_test_frame or replay_flow_with_frame; return final pending authorization or only validate_flow.",
+            "- DeploymentPrepare allows only runtime_package_precheck; any other deployment-like tool is forbidden.",
+            "- ConfigWrite is permanently forbidden.",
+            "- Non-whitelisted tools are forbidden.",
+            "- Return planner protocol JSON only; no prose, markdown, comments, or natural-language explanation."
+        ]);
+    }
+
+    private static string BuildFewShotExamples()
+    {
+        return string.Join(Environment.NewLine,
+        [
+            "Few-shot full ordered-plan examples:",
+            "wire_sequence generation full plan:",
+            "{\"kind\":\"tool_call\",\"toolCalls\":[{\"name\":\"match_flow_template\",\"arguments\":{\"task\":\"wire_sequence\"}},{\"name\":\"get_flow_template_skeleton\",\"arguments\":{\"templateId\":\"wire_sequence\"}},{\"name\":\"validate_flow\",\"arguments\":{}},{\"name\":\"dryrun_flow\",\"arguments\":{}}]}",
+            "template_matching generation full plan:",
+            "{\"kind\":\"tool_call\",\"toolCalls\":[{\"name\":\"match_flow_template\",\"arguments\":{\"task\":\"template_matching\"}},{\"name\":\"get_flow_template_skeleton\",\"arguments\":{\"templateId\":\"template_matching\"}},{\"name\":\"validate_flow\",\"arguments\":{}},{\"name\":\"dryrun_flow\",\"arguments\":{}}]}",
+            "hole_distance generation full plan:",
+            "{\"kind\":\"tool_call\",\"toolCalls\":[{\"name\":\"match_flow_template\",\"arguments\":{\"task\":\"hole_distance\"}},{\"name\":\"get_flow_template_skeleton\",\"arguments\":{\"templateId\":\"hole_distance\"}},{\"name\":\"validate_flow\",\"arguments\":{}},{\"name\":\"dryrun_flow\",\"arguments\":{}}]}",
+            "parameter completion then validate/precheck:",
+            "{\"kind\":\"tool_call\",\"toolCalls\":[{\"name\":\"get_operator_schema\",\"arguments\":{\"operatorType\":\"TemplateMatching\"}},{\"name\":\"validate_flow\",\"arguments\":{}},{\"name\":\"runtime_package_precheck\",\"arguments\":{}}]}",
+            "RuntimePreview consent=true:",
+            "{\"kind\":\"tool_call\",\"toolCalls\":[{\"name\":\"validate_flow\",\"arguments\":{}},{\"name\":\"capture_test_frame\",\"arguments\":{\"mode\":\"offline_metadata_only\"}},{\"name\":\"replay_flow_with_frame\",\"arguments\":{\"mode\":\"offline_metadata_only\"}}]}",
+            "RuntimePreview consent=false:",
+            "{\"kind\":\"final\",\"missingResources\":[],\"pendingActions\":[{\"type\":\"runtime_preview_authorization_required\",\"message\":\"RuntimePreview requires explicit consent before capture/replay.\"}],\"validationPreview\":{}}",
+            "ConfigWrite denied:",
+            "{\"kind\":\"final\",\"missingResources\":[],\"pendingActions\":[{\"type\":\"config_write_denied\",\"message\":\"ConfigWrite tools are permanently denied.\"}],\"validationPreview\":{}}",
+            "DeploymentPrepare non-precheck denied:",
+            "{\"kind\":\"tool_call\",\"toolCalls\":[{\"name\":\"runtime_package_precheck\",\"arguments\":{}}]}"
         ]);
     }
 

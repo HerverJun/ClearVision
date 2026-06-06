@@ -292,6 +292,13 @@ public sealed class VisionAgentPlannerCompletionTests
         promptText.Should().Contain("validationSummary");
         promptText.Should().Contain("dryRunSummary");
         promptText.Should().Contain("deploymentPrecheckSummary");
+        promptText.Should().Contain("complete ordered tool plan");
+        promptText.Should().Contain("match_flow_template -> get_flow_template_skeleton -> validate_flow -> dryrun_flow");
+        promptText.Should().Contain("get_operator_schema -> validate_flow -> runtime_package_precheck");
+        promptText.Should().Contain("RuntimePreview consent=true");
+        promptText.Should().Contain("RuntimePreview consent=false");
+        promptText.Should().Contain("ConfigWrite denied");
+        promptText.Should().Contain("DeploymentPrepare non-precheck denied");
     }
 
     [Fact(DisplayName = "Planner completion source guard should avoid runtime preview hardware network and process APIs")]

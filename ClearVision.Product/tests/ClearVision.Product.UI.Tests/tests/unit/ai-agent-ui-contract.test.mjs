@@ -1001,6 +1001,14 @@ test('real LLM planner shadow eval report remains default-off and policy-only', 
   assert.equal(report.summary.parseSuccessRate, 0);
   assert.equal(report.summary.unsafeAttemptRate, 0);
   assert.equal(report.summary.averageToolPlanMatchScore, 0);
+  assert.equal(report.summary.averageNextActionMatchScore, 0);
+  assert.equal(report.summary.averageFullPlanMatchScore, 0);
+  assert.equal(report.summary.averageOrderedPrefixScore, 0);
+  assert.equal(report.summary.averagePolicySafetyScore, 1);
+  assert.ok(Array.isArray(report.summary.badToolNames));
+  assert.ok(Array.isArray(report.summary.missingRequiredLaterTools));
+  assert.ok(Array.isArray(report.summary.overPlanningTools));
+  assert.ok(Array.isArray(report.summary.underPlanningCases));
   assert.equal(report.llmConfiguration.provider, 'not_read_when_disabled');
   assert.equal(report.llmConfiguration.protocol, 'not_read_when_disabled');
   assert.equal(report.llmConfiguration.wireApi, 'not_read_when_disabled');
@@ -1020,8 +1028,45 @@ test('real LLM planner shadow eval report remains default-off and policy-only', 
     assert.ok(Array.isArray(item.mockPlannerToolCalls), item.caseId);
     assert.ok(Array.isArray(item.plannedToolCalls), item.caseId);
     assert.ok(Array.isArray(item.policyDecision), item.caseId);
+    assert.equal(typeof item.nextActionMatchScore, 'number', item.caseId);
+    assert.equal(typeof item.fullPlanMatchScore, 'number', item.caseId);
+    assert.equal(typeof item.orderedPrefixScore, 'number', item.caseId);
+    assert.equal(typeof item.policySafetyScore, 'number', item.caseId);
+    assert.ok(['next_action', 'full_plan', 'final', 'invalid'].includes(item.completionIntent), item.caseId);
+    assert.ok(Array.isArray(item.missingRequiredLaterTools), item.caseId);
+    assert.ok(Array.isArray(item.overPlanningTools), item.caseId);
     assert.equal(item.requestCount, 0, item.caseId);
     assert.equal(item.fallbackToMockSuggested, true, item.caseId);
+  }
+});
+
+test('real LLM shadow eval report exposes split planner scoring fields', () => {
+  const reportPath = path.resolve(
+    getRepoRoot(),
+    'quality',
+    'evals',
+    'reports',
+    'real_llm_planner_shadow_eval.manual.json'
+  );
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+  assert.equal(typeof report.summary.averageNextActionMatchScore, 'number');
+  assert.equal(typeof report.summary.averageFullPlanMatchScore, 'number');
+  assert.equal(typeof report.summary.averageOrderedPrefixScore, 'number');
+  assert.equal(typeof report.summary.averagePolicySafetyScore, 'number');
+  assert.ok(Array.isArray(report.summary.badToolNames));
+  assert.ok(Array.isArray(report.summary.missingRequiredLaterTools));
+  assert.ok(Array.isArray(report.summary.overPlanningTools));
+  assert.ok(Array.isArray(report.summary.underPlanningCases));
+
+  for (const item of report.cases) {
+    assert.equal(typeof item.nextActionMatchScore, 'number', item.caseId);
+    assert.equal(typeof item.fullPlanMatchScore, 'number', item.caseId);
+    assert.equal(typeof item.orderedPrefixScore, 'number', item.caseId);
+    assert.equal(typeof item.policySafetyScore, 'number', item.caseId);
+    assert.ok(['next_action', 'full_plan', 'final', 'invalid'].includes(item.completionIntent), item.caseId);
+    assert.ok(Array.isArray(item.missingRequiredLaterTools), item.caseId);
+    assert.ok(Array.isArray(item.overPlanningTools), item.caseId);
   }
 });
 
@@ -1052,10 +1097,14 @@ test('CI artifact assertion enforces non-local workflow metadata before upload',
   const script = fs.readFileSync(scriptPath, 'utf8');
 
   assert.match(script, /--require-non-local-workflow-run/);
+  assert.match(script, /--scan-source-files/);
+  assert.match(script, /CV_AGENT_FORBIDDEN_SECRET_FRAGMENTS/);
+  assert.match(script, /unredacted CGNAT CPA base URL/);
   assert.match(script, /workflowRun\.commitSha.*must not be local|workflowRun\.\{field\} must not be local/s);
   for (const workflow of [dedicatedWorkflow, ciWorkflow]) {
     assert.match(workflow, /Assert Vision Agent Artifact Reports/);
     assert.match(workflow, /assert_vision_agent_report_artifacts\.py --require-non-local-workflow-run/);
+    assert.match(workflow, /--scan-source-files/);
     assert.match(workflow, /vision_agent_quality_artifact_manifest\.json/);
     assert.match(workflow, /VisionAgent_business_benchmark_baseline\.json/);
     assert.match(workflow, /planner_autonomy_benchmark\.json/);
@@ -1151,7 +1200,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 48);
+  assert.equal(uiEntry.minimumTests, 49);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)

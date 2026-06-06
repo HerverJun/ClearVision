@@ -238,6 +238,176 @@ public class AiModelEndpointsTests
     }
 
     [Fact]
+    public async Task UpdateAiModel_ShouldKeepReplaceClearKeyAndRoutePlannerShadowRoles()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync();
+        var originalKey = "old" + "-endpoint-key";
+        var replacementKey = "new" + "-endpoint-key";
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "route-model",
+            Name = "Route Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "https://api.openai.com/v1",
+            ApiKey = originalKey,
+            RoleBindings = new List<string> { AiModelConfig.RoleGeneration },
+            IsEnabled = true,
+            Priority = 20
+        });
+
+        using var keepResponse = await host.Client.PutAsync(
+            "/api/ai/models/route-model",
+            JsonContent(new
+            {
+                name = "Route Model",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrl = "https://api.openai.com/v1",
+                apiKey = "",
+                apiKeyOperation = "keep",
+                roleBindings = new[] { "planner" },
+                isEnabled = true,
+                priority = 10
+            }));
+        keepResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.AiConfigStore.GetById("route-model")!.ApiKey.Should().Be(originalKey);
+
+        using var replaceResponse = await host.Client.PutAsync(
+            "/api/ai/models/route-model",
+            JsonContent(new
+            {
+                name = "Route Model",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrl = "https://api.openai.com/v1",
+                apiKey = replacementKey,
+                apiKeyOperation = "replace",
+                roleBindings = new[] { "planner", "vision-agent-shadow-eval" },
+                isEnabled = true,
+                priority = 5
+            }));
+        replaceResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.AiConfigStore.GetById("route-model")!.ApiKey.Should().Be(replacementKey);
+
+        using var plannerResponse = await host.Client.PostAsync("/api/ai/models/route-model/default-planner", JsonContent(new { }));
+        plannerResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.AiConfigStore.GetById("route-model")!.RoleBindings.Should().Contain(AiModelConfig.RolePlanner);
+
+        using var shadowResponse = await host.Client.PostAsync("/api/ai/models/route-model/default-shadow-eval", JsonContent(new { }));
+        shadowResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.AiConfigStore.GetById("route-model")!.RoleBindings.Should().Contain(AiModelConfig.RoleShadowEval);
+
+        using var clearResponse = await host.Client.PutAsync(
+            "/api/ai/models/route-model",
+            JsonContent(new
+            {
+                name = "Route Model",
+                provider = "OpenAI Compatible",
+                model = "gpt-4o-mini",
+                baseUrl = "https://api.openai.com/v1",
+                apiKey = "",
+                apiKeyOperation = "clear",
+                roleBindings = new[] { "planner", "vision-agent-shadow-eval" },
+                isEnabled = true,
+                priority = 5
+            }));
+        clearResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.AiConfigStore.GetById("route-model")!.ApiKey.Should().BeEmpty();
+
+        using var modelsResponse = await host.Client.GetAsync("/api/ai/models");
+        var modelsJson = await modelsResponse.Content.ReadAsStringAsync();
+        modelsJson.Should().NotContain(originalKey);
+        modelsJson.Should().NotContain(replacementKey);
+        using var modelsDocument = JsonDocument.Parse(modelsJson);
+        var model = modelsDocument.RootElement.EnumerateArray().First(x => x.GetProperty("id").GetString() == "route-model");
+        model.TryGetProperty("apiKey", out _).Should().BeFalse();
+        model.GetProperty("hasApiKey").GetBoolean().Should().BeFalse();
+        model.GetProperty("apiKeyMasked").GetString().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TestAiModel_ShouldClassifyMissingKeyInvalidBaseUrlAuthAndTimeout()
+    {
+        await using var missingHost = await AiModelEndpointTestHost.CreateAsync();
+        missingHost.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "missing-key",
+            Name = "Missing Key",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "https://api.openai.com/v1",
+            ApiKey = ""
+        });
+        using var missingResponse = await missingHost.Client.PostAsync("/api/ai/models/missing-key/test", JsonContent(new { }));
+        var missingJson = await missingResponse.Content.ReadAsStringAsync();
+        using (var missingDocument = JsonDocument.Parse(missingJson))
+        {
+            missingDocument.RootElement.GetProperty("connectionOk").GetBoolean().Should().BeFalse();
+            missingDocument.RootElement.GetProperty("errorCode").GetString().Should().Be("missing_api_key");
+            missingJson.Should().NotContain("api.openai.com/v1");
+        }
+
+        await using var invalidHost = await AiModelEndpointTestHost.CreateAsync();
+        invalidHost.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "invalid-base",
+            Name = "Invalid Base",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "not a url",
+            ApiKey = "key"
+        });
+        using var invalidResponse = await invalidHost.Client.PostAsync("/api/ai/models/invalid-base/test", JsonContent(new { }));
+        using (var invalidDocument = JsonDocument.Parse(await invalidResponse.Content.ReadAsStringAsync()))
+        {
+            invalidDocument.RootElement.GetProperty("errorCode").GetString().Should().Be("base_url_error");
+        }
+
+        await using var authHost = await AiModelEndpointTestHost.CreateAsync((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new StringContent("{\"error\":\"denied\"}", Encoding.UTF8, "application/json")
+            }));
+        authHost.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "auth-fail",
+            Name = "Auth Fail",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "https://api.openai.com/v1",
+            ApiKey = "key"
+        });
+        using var authResponse = await authHost.Client.PostAsync("/api/ai/models/auth-fail/test", JsonContent(new { }));
+        using (var authDocument = JsonDocument.Parse(await authResponse.Content.ReadAsStringAsync()))
+        {
+            authDocument.RootElement.GetProperty("errorCode").GetString().Should().Be("auth_failed");
+            authDocument.RootElement.GetProperty("sanitizedMessage").GetString().Should().NotContain("key");
+        }
+
+        await using var timeoutHost = await AiModelEndpointTestHost.CreateAsync(async (_, cancellationToken) =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        timeoutHost.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "timeout-model",
+            Name = "Timeout Model",
+            Provider = "OpenAI Compatible",
+            Model = "gpt-4o-mini",
+            BaseUrl = "https://api.openai.com/v1",
+            ApiKey = "key",
+            TimeoutMs = 1000
+        });
+        using var timeoutResponse = await timeoutHost.Client.PostAsync("/api/ai/models/timeout-model/test", JsonContent(new { }));
+        using (var timeoutDocument = JsonDocument.Parse(await timeoutResponse.Content.ReadAsStringAsync()))
+        {
+            timeoutDocument.RootElement.GetProperty("errorCode").GetString().Should().Be("timeout");
+        }
+    }
+
+    [Fact]
     public async Task PreviewReasoningSupport_ShouldReturnServerResolvedAllowedModesAndEfforts()
     {
         await using var host = await AiModelEndpointTestHost.CreateAsync();
@@ -260,6 +430,11 @@ public class AiModelEndpointsTests
             .Should().BeEquivalentTo(["auto", "off", "on"]);
         document.RootElement.GetProperty("allowedEfforts").EnumerateArray().Select(x => x.GetString())
             .Should().BeEquivalentTo(["low", "medium", "high"]);
+    }
+
+    private static StringContent JsonContent(object payload)
+    {
+        return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
     }
 
     private sealed class AiModelEndpointTestHost : IAsyncDisposable

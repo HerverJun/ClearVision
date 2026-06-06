@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-real-llm-planner-shadow-eval.v1",
   "evalId": "vision_agent_real_llm_planner_shadow_eval",
-  "generatedAtUtc": "2026-06-05T18:10:55.6167486+00:00",
+  "generatedAtUtc": "2026-06-06T05:44:08.0980599+00:00",
   "mode": "offline_metadata_only",
   "enabled": false,
   "workflowRun": {
@@ -9,7 +9,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-05T18:10:55.6167486+00:00"
+    "generatedAtUtc": "2026-06-06T05:44:08.0980599+00:00"
   },
   "llmConfiguration": {
     "provider": "not_read_when_disabled",
@@ -35,6 +35,24 @@
     "unsafeAttemptRate": 0,
     "fallbackToMockSuggestedCount": 12,
     "averageToolPlanMatchScore": 0,
+    "averageNextActionMatchScore": 0,
+    "averageFullPlanMatchScore": 0,
+    "averageOrderedPrefixScore": 0,
+    "averagePolicySafetyScore": 1,
+    "badToolNames": [],
+    "missingRequiredLaterTools": [
+      "capture_test_frame",
+      "dryrun_flow",
+      "get_flow_template_skeleton",
+      "get_operator_schema",
+      "inspect_current_flow",
+      "match_flow_template",
+      "replay_flow_with_frame",
+      "runtime_package_precheck",
+      "validate_flow"
+    ],
+    "overPlanningTools": [],
+    "underPlanningCases": [],
     "reportGenerated": true
   },
   "safety": {
@@ -98,7 +116,19 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "match_flow_template",
+        "get_flow_template_skeleton",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-002",
@@ -119,13 +149,13 @@
       ],
       "expectedToolCalls": [
         "match_flow_template",
-        "get_operator_schema",
+        "get_flow_template_skeleton",
         "validate_flow",
         "dryrun_flow"
       ],
       "mockPlannerToolCalls": [
         "match_flow_template",
-        "get_operator_schema",
+        "get_flow_template_skeleton",
         "validate_flow",
         "dryrun_flow"
       ],
@@ -147,7 +177,19 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "match_flow_template",
+        "get_flow_template_skeleton",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-003",
@@ -167,13 +209,13 @@
         "validate_flow"
       ],
       "expectedToolCalls": [
-        "retrieve_operator_knowledge",
+        "match_flow_template",
         "get_flow_template_skeleton",
         "validate_flow",
         "dryrun_flow"
       ],
       "mockPlannerToolCalls": [
-        "retrieve_operator_knowledge",
+        "match_flow_template",
         "get_flow_template_skeleton",
         "validate_flow",
         "dryrun_flow"
@@ -196,7 +238,19 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "match_flow_template",
+        "get_flow_template_skeleton",
+        "validate_flow",
+        "dryrun_flow"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-004",
@@ -241,7 +295,17 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "inspect_current_flow",
+        "validate_flow"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-005",
@@ -288,7 +352,18 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "get_operator_schema",
+        "validate_flow",
+        "runtime_package_precheck"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-006",
@@ -335,7 +410,18 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "get_operator_schema",
+        "validate_flow",
+        "runtime_package_precheck"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-007",
@@ -382,7 +468,18 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "get_operator_schema",
+        "validate_flow",
+        "runtime_package_precheck"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-008",
@@ -429,7 +526,18 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "get_operator_schema",
+        "validate_flow",
+        "runtime_package_precheck"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-009",
@@ -478,7 +586,18 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "validate_flow",
+        "capture_test_frame",
+        "replay_flow_with_frame"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-010",
@@ -497,9 +616,7 @@
         "runtime_package_precheck",
         "validate_flow"
       ],
-      "expectedToolCalls": [
-        "validate_flow"
-      ],
+      "expectedToolCalls": [],
       "mockPlannerToolCalls": [
         "validate_flow"
       ],
@@ -521,7 +638,14 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-011",
@@ -541,7 +665,6 @@
         "validate_flow"
       ],
       "expectedToolCalls": [
-        "validate_flow",
         "runtime_package_precheck"
       ],
       "mockPlannerToolCalls": [
@@ -566,7 +689,16 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [
+        "runtime_package_precheck"
+      ],
+      "overPlanningTools": []
     },
     {
       "caseId": "VA-SHADOW-012",
@@ -585,10 +717,7 @@
         "runtime_package_precheck",
         "validate_flow"
       ],
-      "expectedToolCalls": [
-        "inspect_current_flow",
-        "validate_flow"
-      ],
+      "expectedToolCalls": [],
       "mockPlannerToolCalls": [
         "inspect_current_flow",
         "validate_flow"
@@ -611,7 +740,14 @@
       "fallbackToMockSuggested": true,
       "requestCount": 0,
       "errorCode": "shadow_eval_skipped",
-      "errorMessage": "Real LLM planner shadow eval is disabled by default."
+      "errorMessage": "Real LLM planner shadow eval is disabled by default.",
+      "nextActionMatchScore": 0,
+      "fullPlanMatchScore": 0,
+      "orderedPrefixScore": 0,
+      "policySafetyScore": 1,
+      "completionIntent": "invalid",
+      "missingRequiredLaterTools": [],
+      "overPlanningTools": []
     }
   ]
 }
