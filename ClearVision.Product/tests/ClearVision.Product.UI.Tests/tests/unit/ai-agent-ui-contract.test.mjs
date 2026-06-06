@@ -1378,7 +1378,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 78);
+  assert.equal(uiEntry.minimumTests, 90);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)
@@ -1528,6 +1528,119 @@ test('AI settings API wrapper exposes RuntimePreview v1.1 governance endpoints',
   assert.match(source, /loadRuntimePreviewScenarioEvidence/);
   assert.match(source, /runtime-preview-pilot\/sessions\/deploy-readiness/);
   assert.match(source, /runtime-preview-pilot\/scenario-evidence/);
+});
+
+test('settings API wrapper exposes RuntimePreview v1.2 corpus package readiness and governance endpoints', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsApi.js'),
+    'utf8'
+  );
+
+  assert.match(source, /generateRuntimePreviewPackageReadiness/);
+  assert.match(source, /loadRuntimePreviewScenarioCorpus/);
+  assert.match(source, /loadRuntimePreviewAgentExplanationBenchmark/);
+  assert.match(source, /loadRuntimePreviewGovernanceIndex/);
+  assert.match(source, /exportRuntimePreviewGovernance/);
+  assert.match(source, /lookupRuntimePreviewGovernance/);
+  assert.match(source, /runtime-preview-pilot\/sessions\/package-readiness/);
+  assert.match(source, /runtime-preview-pilot\/scenario-corpus/);
+  assert.match(source, /runtime-preview-pilot\/governance\/lookup/);
+});
+
+test('settings view exposes independent developer-only RuntimePreview Pilot Console tab', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsView.js'),
+    'utf8'
+  );
+
+  assert.match(source, /installRuntimePreviewPilotConsole/);
+  assert.match(source, /data-tab="runtime-preview-pilot"/);
+  assert.match(source, /data-section="runtime-preview-pilot"/);
+  assert.match(source, /isRuntimePreviewPilotDeveloperUiEnabled/);
+  assert.match(source, /this\.isAdmin && this\.isRuntimePreviewPilotDeveloperUiEnabled/);
+  assert.match(source, /renderRuntimePreviewPilotConsoleTab/);
+  assert.match(source, /bindRuntimePreviewPilotConsoleEvents/);
+});
+
+test('AI settings tab no longer embeds RuntimePreview Pilot Console as model settings content', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+  const renderAiTab = source.slice(source.indexOf('renderAiTab()'), source.indexOf('refreshAiTableAndForm'));
+
+  assert.doesNotMatch(renderAiTab, /renderRuntimePreviewPilotPanel\(\)/);
+  assert.match(source, /readRuntimePreviewPilotConfigDraft/);
+});
+
+test('independent RuntimePreview Pilot Console module renders v1.2 title and page marker', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /RuntimePreview Pilot Console v1\.2/);
+  assert.match(source, /data-runtime-preview-pilot-console-page="true"/);
+  assert.match(source, /renderRuntimePreviewPilotConsoleV12Panels/);
+  assert.match(source, /metadata-only scenario, session, package readiness/i);
+});
+
+test('independent RuntimePreview Pilot Console renders scenario corpus selector and run action', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-rp-scenario-corpus-panel="true"/);
+  assert.match(source, /data-rp-scenario-corpus="true"/);
+  assert.match(source, /cfg-rp-scenario-case-id/);
+  assert.match(source, /btn-runtime-preview-pilot-load-corpus/);
+  assert.match(source, /btn-runtime-preview-pilot-run-selected-scenario/);
+  assert.match(source, /loadRuntimePreviewScenarioCorpus/);
+});
+
+test('independent RuntimePreview Pilot Console renders package readiness bridge output', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-rp-package-readiness-panel="true"/);
+  assert.match(source, /data-rp-package-readiness-report="true"/);
+  assert.match(source, /btn-runtime-preview-pilot-package-readiness/);
+  assert.match(source, /generateRuntimePreviewPackageReadiness/);
+  assert.match(source, /readyForPackage/);
+  assert.match(source, /packageBlocked/);
+  assert.match(source, /packageCreated/);
+  assert.match(source, /deploymentExecuted/);
+});
+
+test('independent RuntimePreview Pilot Console renders governance index lookup export controls', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-rp-governance-panel="true"/);
+  assert.match(source, /cfg-rp-lookup-session-id/);
+  assert.match(source, /cfg-rp-lookup-report-id/);
+  assert.match(source, /cfg-rp-lookup-case-id/);
+  assert.match(source, /btn-runtime-preview-pilot-governance-index/);
+  assert.match(source, /btn-runtime-preview-pilot-governance-lookup/);
+  assert.match(source, /btn-runtime-preview-pilot-governance-export/);
+  assert.match(source, /lookupRuntimePreviewGovernance/);
+});
+
+test('independent RuntimePreview Pilot Console renders Agent explanation benchmark', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /btn-runtime-preview-pilot-agent-explanation/);
+  assert.match(source, /data-rp-agent-explanation="true"/);
+  assert.match(source, /loadRuntimePreviewAgentExplanationBenchmark/);
+  assert.match(source, /nextEngineerAction/);
 });
 
 test('AI settings RuntimePreview Pilot UI is developer-hidden and exposes config catalog readiness controls', () => {
@@ -1767,6 +1880,42 @@ test('RuntimePreview v1.1 endpoints expose admin gated replay export deploy read
   assert.match(source, /EvaluateEndpointAccess/);
 });
 
+test('RuntimePreview v1.2 endpoints expose admin gated package readiness corpus governance and explanation paths', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'Endpoints', 'SettingsEndpoints.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /runtime-preview-pilot\/sessions\/package-readiness/);
+  assert.match(source, /runtime-preview-pilot\/scenario-corpus/);
+  assert.match(source, /runtime-preview-pilot\/agent-explanation-benchmark/);
+  assert.match(source, /runtime-preview-pilot\/governance\/index/);
+  assert.match(source, /runtime-preview-pilot\/governance\/export/);
+  assert.match(source, /runtime-preview-pilot\/governance\/lookup/);
+  assert.match(source, /RuntimePreviewPackageReadinessBridge/);
+  assert.match(source, /RuntimePreviewScenarioCorpusService/);
+  assert.match(source, /RuntimePreviewAgentExplanationService/);
+});
+
+test('RuntimePreview governance contracts expose v1.2 corpus package readiness export and explanation records', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+
+  for (const token of [
+    'RuntimePreviewScenarioCorpusCase',
+    'RuntimePreviewScenarioCorpusDocument',
+    'RuntimePreviewPackageReadinessReport',
+    'RuntimePreviewPackageReadinessRequest',
+    'RuntimePreviewGovernanceStorageIndexSummary',
+    'RuntimePreviewGovernanceExportManifest',
+    'RuntimePreviewAgentExplanationBenchmarkDocument'
+  ]) {
+    assert.match(source, new RegExp(token));
+  }
+});
+
 test('RuntimePreview simulated harness records audit and report archive events', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
@@ -1810,10 +1959,10 @@ test('RuntimePreview scenario evidence source covers required metadata business 
     'template_matching',
     'hole_distance',
     'remote_control_detection',
-    'missing_resource',
+    'missing_camera',
     'dangerous_path',
-    'station_plc_deny',
-    'precheck_not_ready'
+    'plc_station_deny',
+    'precheck_blocked'
   ]) {
     assert.match(source, new RegExp(scenario));
   }
@@ -1831,9 +1980,36 @@ test('RuntimePreview v1.1 DI registers governance store and metadata-only readin
   assert.match(source, /AddSingleton<RuntimePreviewGovernanceStore>/);
   assert.match(source, /AddScoped<RuntimePreviewGovernanceMaintenanceService>/);
   assert.match(source, /AddScoped<RuntimePreviewDeployReadinessService>/);
+  assert.match(source, /AddScoped<RuntimePreviewPackageReadinessBridge>/);
+  assert.match(source, /AddScoped<RuntimePreviewScenarioCorpusService>/);
   assert.match(source, /AddScoped<RuntimePreviewScenarioEvidenceService>/);
+  assert.match(source, /AddScoped<RuntimePreviewAgentExplanationService>/);
   assert.match(source, /AddScoped<RuntimePackagePrecheckTool>/);
   assert.doesNotMatch(source, /RealRuntimePreview|CameraSdk|StationPackage|HotLoad/i);
+});
+
+test('RuntimePreview v1.2 quality runner writes corpus package readiness governance export and explanation reports', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'quality', 'tools', 'run_runtime_preview_scenario_evidence.py'),
+    'utf8'
+  );
+
+  assert.match(source, /runtime_preview_scenario_corpus/);
+  assert.match(source, /runtime_preview_package_readiness_report\.sample/);
+  assert.match(source, /runtime_preview_governance_export_sample/);
+  assert.match(source, /runtime_preview_agent_explanation_benchmark/);
+  assert.match(source, /minimum-cases/);
+});
+
+test('RuntimePreview v1.2 console source guard keeps real resources and shell tools out of developer UI', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.doesNotMatch(source, /capture_test_frame|replay_flow_with_frame|realRuntimePreview|CameraSdk|StationPackage|write_plc|hot_load/i);
+  assert.doesNotMatch(source, /child_process|powershell|cmd\.exe|process\./i);
+  assert.match(source, /sanitizeRuntimePreviewPilotValue/);
 });
 
 test('AI settings RuntimePreview Pilot UI redacts sensitive display values and keeps metadata-only safety flags', () => {

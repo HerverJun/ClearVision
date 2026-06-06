@@ -1,12 +1,12 @@
 ﻿# Vision Agent Executable Business Benchmark
 
 - Benchmark: `vision_agent_executable_business_benchmark`
-- Generated UTC: `2026-06-06T12:24:33.7249828+00:00`
+- Generated UTC: `2026-06-06T13:40:09.7510007+00:00`
 - Commit SHA: `local`
 - Branch: `local`
 - Workflow run: `local` attempt `local`
 - Mode: `offline_metadata_only`
-- Cases: 37
+- Cases: 45
 - Accepted: True
 - JSON: `quality/evals/reports/VisionAgent_business_benchmark_baseline.json`
 
@@ -22,11 +22,11 @@
 | Metric | Actual | Minimum | Passed |
 | --- | ---: | ---: | --- |
 | generationSuccessRate | 100.00% | 95.00% | True |
-| structuralValidationPassRate | 97.30% | 90.00% | True |
-| dryRunPassRate | 94.59% | 85.00% | True |
-| previewReadyRate | 85.71% | 70.00% | True |
-| parameterCompletionRate | 81.08% | 70.00% | True |
-| userApplicableRate | 97.30% | 90.00% | True |
+| structuralValidationPassRate | 97.78% | 90.00% | True |
+| dryRunPassRate | 95.56% | 85.00% | True |
+| previewReadyRate | 90.00% | 70.00% | True |
+| parameterCompletionRate | 80.00% | 70.00% | True |
+| userApplicableRate | 97.78% | 90.00% | True |
 
 ## Task Set
 
@@ -69,6 +69,14 @@
 | VA-BM-035 | precheck | precheck | stationStatus.review, runtimePackagePrecheck.review | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
 | VA-BM-036 | precheck | precheck | dryrun.required, runtimePackagePrecheck.review | validate_flow, runtime_package_precheck | validate_flow, runtime_package_precheck | True |
 | VA-BM-037 | runtime_preview | runtime_preview_session | create_runtime_preview_session, catalog_snapshot, readiness_gate, metadata_simulation_report | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
+| VA-BM-038 | scenario_corpus | scenario_corpus | scenario_corpus.remote_control_detection, explain_model_metadata_only | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-039 | scenario_corpus | runtime_preview | scenario_corpus.terminal_color_order, render_runtime_preview_metadata | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | True |
+| VA-BM-040 | scenario_corpus | multi_operator_flow | scenario_corpus.multi_operator_flow, operator_trace.review | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-041 | package_readiness | package_readiness | package_readiness_bridge, packageCreated.false, deploymentExecuted.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-042 | package_readiness | runtime_preview_session | create_runtime_preview_session, package_readiness_bridge, resource_trace.review | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
+| VA-BM-043 | governance | runtime_preview | session_replay, audit_timeline.review | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | True |
+| VA-BM-044 | agent_explanation | missing_resource | agent_explain_missing_output, workflowDraftAllowed.true, packageBlocked.true | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-045 | agent_explanation | missing_resource | agent_explain_missing_model, request_model_source, packageBlocked.true | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
 
 ## Field Contract
 

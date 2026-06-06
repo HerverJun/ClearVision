@@ -1,17 +1,17 @@
 {
-  "schemaVersion": "2026-06-06.runtime-preview-deploy-readiness-report.v1",
+  "schemaVersion": "2026-06-06.runtime-preview-deploy-readiness-report.v2",
   "benchmarkId": "runtime_preview_deploy_readiness_report_sample",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T12:31:57.847051+00:00"
+    "generatedAtUtc": "2026-06-06T13:40:09.986508+00:00"
   },
   "summary": {
-    "caseCount": 8,
-    "readyForDeploymentCount": 4,
-    "deploymentBlockedCount": 4,
+    "caseCount": 15,
+    "readyForDeploymentCount": 6,
+    "deploymentBlockedCount": 9,
     "metadataOnly": true,
     "packageCreated": false,
     "deploymentExecuted": false,
@@ -20,7 +20,7 @@
   },
   "behaviorMatrix": [
     {
-      "caseId": "RP-SE-001",
+      "caseId": "RP-SC-001",
       "scenario": "wire_sequence",
       "workflowDraftAllowed": true,
       "readinessStatus": "ready",
@@ -34,7 +34,21 @@
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SE-002",
+      "caseId": "RP-SC-002",
+      "scenario": "terminal_color_order",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "ready",
+      "permissionStatus": "allowed",
+      "simulationPreviewReady": true,
+      "runtimePackagePrecheckReady": true,
+      "readyForDeployment": true,
+      "deploymentBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-003",
       "scenario": "template_matching",
       "workflowDraftAllowed": true,
       "readinessStatus": "ready",
@@ -48,7 +62,7 @@
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SE-003",
+      "caseId": "RP-SC-004",
       "scenario": "hole_distance",
       "workflowDraftAllowed": true,
       "readinessStatus": "ready",
@@ -62,7 +76,7 @@
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SE-004",
+      "caseId": "RP-SC-005",
       "scenario": "remote_control_detection",
       "workflowDraftAllowed": true,
       "readinessStatus": "ready",
@@ -76,8 +90,8 @@
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SE-005",
-      "scenario": "missing_resource",
+      "caseId": "RP-SC-006",
+      "scenario": "missing_camera",
       "workflowDraftAllowed": true,
       "readinessStatus": "not_ready",
       "permissionStatus": "denied",
@@ -90,7 +104,35 @@
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SE-006",
+      "caseId": "RP-SC-007",
+      "scenario": "missing_template",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-008",
+      "scenario": "missing_model",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-009",
       "scenario": "dangerous_path",
       "workflowDraftAllowed": true,
       "readinessStatus": "denied",
@@ -104,8 +146,8 @@
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SE-007",
-      "scenario": "station_plc_deny",
+      "caseId": "RP-SC-010",
+      "scenario": "plc_station_deny",
       "workflowDraftAllowed": true,
       "readinessStatus": "denied",
       "permissionStatus": "denied",
@@ -118,8 +160,64 @@
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SE-008",
-      "scenario": "precheck_not_ready",
+      "caseId": "RP-SC-011",
+      "scenario": "precheck_blocked",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-012",
+      "scenario": "allowlist_mismatch",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-013",
+      "scenario": "multi_operator_flow",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "ready",
+      "permissionStatus": "allowed",
+      "simulationPreviewReady": true,
+      "runtimePackagePrecheckReady": true,
+      "readyForDeployment": true,
+      "deploymentBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-014",
+      "scenario": "missing_parameter",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-015",
+      "scenario": "draft_editable_package_blocked",
       "workflowDraftAllowed": true,
       "readinessStatus": "not_ready",
       "permissionStatus": "denied",

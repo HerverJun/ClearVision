@@ -841,6 +841,47 @@ public static class SettingsEndpoints
             });
         });
 
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/package-readiness", async (
+            RuntimePreviewPackageReadinessRequest request,
+            IConfigurationService configService,
+            AiConfigStore aiConfigStore,
+            RuntimePreviewPackageReadinessBridge packageReadinessBridge,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-package-readiness",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var report = await packageReadinessBridge.GenerateAsync(
+                request,
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext),
+                cancellationToken);
+            return Results.Ok(new
+            {
+                packageReadinessReport = report,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
         app.MapPost("/api/settings/runtime-preview-pilot/retention/cleanup", (
             RuntimePreviewRetentionCleanupEndpointRequest request,
             RuntimePreviewGovernanceMaintenanceService maintenanceService,
@@ -900,6 +941,175 @@ public static class SettingsEndpoints
             return Results.Ok(new
             {
                 evidence,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/scenario-corpus", (
+            RuntimePreviewScenarioCorpusService scenarioCorpusService,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-scenario-corpus",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var corpus = scenarioCorpusService.BuildCorpus();
+            return Results.Ok(new
+            {
+                corpus,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/agent-explanation-benchmark", (
+            RuntimePreviewAgentExplanationService explanationService,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-agent-explanation-benchmark",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var benchmark = explanationService.Run();
+            return Results.Ok(new
+            {
+                benchmark,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/governance/index", (
+            RuntimePreviewGovernanceStore governanceStore,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-governance-index",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                index = governanceStore.BuildIndexSummary(),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/governance/export", (
+            RuntimePreviewGovernanceStore governanceStore,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-governance-export",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                export = governanceStore.ExportManifest(),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/governance/lookup", (
+            string? sessionId,
+            string? reportId,
+            string? caseId,
+            RuntimePreviewSessionStore sessionStore,
+            RuntimePreviewReportArchive reportArchive,
+            RuntimePreviewScenarioCorpusService scenarioCorpusService,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-governance-lookup",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var corpus = scenarioCorpusService.BuildCorpus();
+            var normalizedSessionId = string.IsNullOrWhiteSpace(sessionId) ? string.Empty : sessionId.Trim();
+            var normalizedReportId = string.IsNullOrWhiteSpace(reportId) ? string.Empty : reportId.Trim();
+            var normalizedCaseId = string.IsNullOrWhiteSpace(caseId) ? string.Empty : caseId.Trim();
+            var result = new
+            {
+                session = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : sessionStore.Get(normalizedSessionId),
+                sessionReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetBySessionId(normalizedSessionId),
+                deployReadinessReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetDeployReadinessReportBySessionId(normalizedSessionId),
+                packageReadinessReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetPackageReadinessReportBySessionId(normalizedSessionId),
+                report = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.Get(normalizedReportId),
+                deployReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetDeployReadinessReport(normalizedReportId),
+                packageReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetPackageReadinessReport(normalizedReportId),
+                corpusCase = string.IsNullOrWhiteSpace(normalizedCaseId)
+                    ? null
+                    : corpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase))
+            };
+            return Results.Ok(new
+            {
+                lookup = result,
                 permissionDecision = endpointDecision,
                 metadataOnly = true,
                 realResourcesTouched = false

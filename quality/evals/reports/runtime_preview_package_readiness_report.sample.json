@@ -1,0 +1,444 @@
+{
+  "schemaVersion": "2026-06-06.runtime-preview-package-readiness-report.v1",
+  "benchmarkId": "runtime_preview_package_readiness_report_sample",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-06T13:40:09.986508+00:00"
+  },
+  "summary": {
+    "caseCount": 15,
+    "readyForPackageCount": 6,
+    "packageBlockedCount": 9,
+    "metadataOnly": true,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "realResourcesTouched": false,
+    "accepted": true
+  },
+  "behaviorMatrix": [
+    {
+      "caseId": "RP-SC-001",
+      "scenario": "wire_sequence",
+      "readyForPackage": true,
+      "packageBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [],
+      "missingResources": [],
+      "riskSummary": "metadata package review can continue",
+      "pendingActions": [],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-002",
+      "scenario": "terminal_color_order",
+      "readyForPackage": true,
+      "packageBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [],
+      "missingResources": [],
+      "riskSummary": "metadata package review can continue",
+      "pendingActions": [],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-003",
+      "scenario": "template_matching",
+      "readyForPackage": true,
+      "packageBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [],
+      "missingResources": [],
+      "riskSummary": "metadata package review can continue",
+      "pendingActions": [],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-004",
+      "scenario": "hole_distance",
+      "readyForPackage": true,
+      "packageBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [],
+      "missingResources": [],
+      "riskSummary": "metadata package review can continue",
+      "pendingActions": [],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-005",
+      "scenario": "remote_control_detection",
+      "readyForPackage": true,
+      "packageBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [],
+      "missingResources": [],
+      "riskSummary": "metadata package review can continue",
+      "pendingActions": [],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-006",
+      "scenario": "missing_camera",
+      "readyForPackage": false,
+      "packageBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "missing_camera_binding",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "missingResources": [
+        {
+          "kind": "missing_camera_binding",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: missing_camera_binding",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-007",
+      "scenario": "missing_template",
+      "readyForPackage": false,
+      "packageBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "missing_template",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "missingResources": [
+        {
+          "kind": "missing_template",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: missing_template",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-008",
+      "scenario": "missing_model",
+      "readyForPackage": false,
+      "packageBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "missing_model",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "missingResources": [
+        {
+          "kind": "missing_model",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: missing_model",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-009",
+      "scenario": "dangerous_path",
+      "readyForPackage": false,
+      "packageBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "dangerous_resource",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "missingResources": [],
+      "riskSummary": "package blocked: dangerous_resource",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-010",
+      "scenario": "plc_station_deny",
+      "readyForPackage": false,
+      "packageBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "plc_station_denied",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "missingResources": [],
+      "riskSummary": "package blocked: plc_station_denied",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-011",
+      "scenario": "precheck_blocked",
+      "readyForPackage": false,
+      "packageBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "precheck_not_ready",
+        "DeploymentPrecheckResourceReview"
+      ],
+      "missingResources": [
+        {
+          "kind": "precheck_not_ready",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: precheck_not_ready",
+      "pendingActions": [
+        "DeploymentPrecheckResourceReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-012",
+      "scenario": "allowlist_mismatch",
+      "readyForPackage": false,
+      "packageBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "allowlist_mismatch",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "missingResources": [
+        {
+          "kind": "allowlist_mismatch",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: allowlist_mismatch",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-013",
+      "scenario": "multi_operator_flow",
+      "readyForPackage": true,
+      "packageBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [],
+      "missingResources": [],
+      "riskSummary": "metadata package review can continue",
+      "pendingActions": [],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-014",
+      "scenario": "missing_parameter",
+      "readyForPackage": false,
+      "packageBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "missing_parameter",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "missingResources": [
+        {
+          "kind": "missing_parameter",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: missing_parameter",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    },
+    {
+      "caseId": "RP-SC-015",
+      "scenario": "draft_editable_package_blocked",
+      "readyForPackage": false,
+      "packageBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "draft_allowed_package_blocked",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "missingResources": [
+        {
+          "kind": "draft_allowed_package_blocked",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: draft_allowed_package_blocked",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ]
+    }
+  ],
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

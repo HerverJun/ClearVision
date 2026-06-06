@@ -32,6 +32,10 @@ public static class RuntimePreviewAuditEventTypes
     public const string SessionReplayed = "session_replayed";
     public const string RetentionCleanup = "retention_cleanup";
     public const string DeployReadinessGenerated = "deploy_readiness_generated";
+    public const string PackageReadinessGenerated = "package_readiness_generated";
+    public const string ScenarioCorpusLoaded = "scenario_corpus_loaded";
+    public const string GovernanceExported = "governance_exported";
+    public const string CorruptionRecovered = "corruption_recovered";
     public const string SessionCancelled = "session_cancelled";
     public const string SessionFailed = "session_failed";
 }
@@ -393,6 +397,87 @@ public sealed record RuntimePreviewRetentionCleanupResult
     public bool RealResourcesTouched { get; init; }
 }
 
+public sealed record RuntimePreviewGovernanceStorageIndexSummary
+{
+    [JsonPropertyName("schemaVersion")]
+    public string SchemaVersion { get; init; } = "2026-06-06.runtime-preview-governance-store.v2";
+
+    [JsonPropertyName("storageVersion")]
+    public string StorageVersion { get; init; } = "jsonl.v2";
+
+    [JsonPropertyName("storageMode")]
+    public string StorageMode { get; init; } = "jsonl";
+
+    [JsonPropertyName("recordTypes")]
+    public IReadOnlyList<string> RecordTypes { get; init; } = [];
+
+    [JsonPropertyName("sessionCount")]
+    public int SessionCount { get; init; }
+
+    [JsonPropertyName("auditEventCount")]
+    public int AuditEventCount { get; init; }
+
+    [JsonPropertyName("sessionReportCount")]
+    public int SessionReportCount { get; init; }
+
+    [JsonPropertyName("deployReadinessReportCount")]
+    public int DeployReadinessReportCount { get; init; }
+
+    [JsonPropertyName("packageReadinessReportCount")]
+    public int PackageReadinessReportCount { get; init; }
+
+    [JsonPropertyName("corruptLineCount")]
+    public int CorruptLineCount { get; init; }
+
+    [JsonPropertyName("retentionPolicy")]
+    public string RetentionPolicy { get; init; } = "default_30_days_200_sessions";
+
+    [JsonPropertyName("metadataOnly")]
+    public bool MetadataOnly { get; init; } = true;
+
+    [JsonPropertyName("realResourcesTouched")]
+    public bool RealResourcesTouched { get; init; }
+}
+
+public sealed record RuntimePreviewGovernanceExportManifest
+{
+    [JsonPropertyName("schemaVersion")]
+    public string SchemaVersion { get; init; } = "2026-06-06.runtime-preview-governance-export.v2";
+
+    [JsonPropertyName("exportId")]
+    public string ExportId { get; init; } = string.Empty;
+
+    [JsonPropertyName("generatedAtUtc")]
+    public DateTimeOffset GeneratedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+
+    [JsonPropertyName("indexSummary")]
+    public RuntimePreviewGovernanceStorageIndexSummary IndexSummary { get; init; } = new();
+
+    [JsonPropertyName("sessions")]
+    public IReadOnlyList<RuntimePreviewSession> Sessions { get; init; } = [];
+
+    [JsonPropertyName("auditEvents")]
+    public IReadOnlyList<RuntimePreviewAuditEvent> AuditEvents { get; init; } = [];
+
+    [JsonPropertyName("sessionReports")]
+    public IReadOnlyList<RuntimePreviewSessionReport> SessionReports { get; init; } = [];
+
+    [JsonPropertyName("deployReadinessReports")]
+    public IReadOnlyList<RuntimePreviewDeployReadinessReport> DeployReadinessReports { get; init; } = [];
+
+    [JsonPropertyName("packageReadinessReports")]
+    public IReadOnlyList<RuntimePreviewPackageReadinessReport> PackageReadinessReports { get; init; } = [];
+
+    [JsonPropertyName("redactionPass")]
+    public bool RedactionPass { get; init; } = true;
+
+    [JsonPropertyName("metadataOnly")]
+    public bool MetadataOnly { get; init; } = true;
+
+    [JsonPropertyName("realResourcesTouched")]
+    public bool RealResourcesTouched { get; init; }
+}
+
 public sealed record RuntimePreviewDeployReadinessReport
 {
     [JsonPropertyName("reportId")]
@@ -445,6 +530,123 @@ public sealed record RuntimePreviewDeployReadinessReport
 
     [JsonPropertyName("deploymentExecuted")]
     public bool DeploymentExecuted { get; init; }
+
+    [JsonPropertyName("realResourcesTouched")]
+    public bool RealResourcesTouched { get; init; }
+}
+
+public sealed record RuntimePreviewPackageReadinessReport
+{
+    [JsonPropertyName("reportId")]
+    public string ReportId { get; init; } = string.Empty;
+
+    [JsonPropertyName("sessionId")]
+    public string SessionId { get; init; } = string.Empty;
+
+    [JsonPropertyName("generatedAtUtc")]
+    public DateTimeOffset GeneratedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+
+    [JsonPropertyName("workflowDraftHash")]
+    public string WorkflowDraftHash { get; init; } = string.Empty;
+
+    [JsonPropertyName("previewReportId")]
+    public string PreviewReportId { get; init; } = string.Empty;
+
+    [JsonPropertyName("deployReadinessReportId")]
+    public string DeployReadinessReportId { get; init; } = string.Empty;
+
+    [JsonPropertyName("readyForPackage")]
+    public bool ReadyForPackage { get; init; }
+
+    [JsonPropertyName("packageBlocked")]
+    public bool PackageBlocked { get; init; } = true;
+
+    [JsonPropertyName("packageCreated")]
+    public bool PackageCreated { get; init; }
+
+    [JsonPropertyName("deploymentExecuted")]
+    public bool DeploymentExecuted { get; init; }
+
+    [JsonPropertyName("blockingIssues")]
+    public IReadOnlyList<string> BlockingIssues { get; init; } = [];
+
+    [JsonPropertyName("missingResources")]
+    public IReadOnlyList<object> MissingResources { get; init; } = [];
+
+    [JsonPropertyName("riskSummary")]
+    public string RiskSummary { get; init; } = string.Empty;
+
+    [JsonPropertyName("pendingActions")]
+    public IReadOnlyList<VisionAgentPendingAction> PendingActions { get; init; } = [];
+
+    [JsonPropertyName("operatorTrace")]
+    public IReadOnlyList<string> OperatorTrace { get; init; } = [];
+
+    [JsonPropertyName("resourceTrace")]
+    public IReadOnlyList<string> ResourceTrace { get; init; } = [];
+
+    [JsonPropertyName("workflowDraftAllowed")]
+    public bool WorkflowDraftAllowed { get; init; } = true;
+
+    [JsonPropertyName("runtimePackagePrecheck")]
+    public JsonElement RuntimePackagePrecheck { get; init; }
+
+    [JsonPropertyName("metadataOnly")]
+    public bool MetadataOnly { get; init; } = true;
+
+    [JsonPropertyName("realResourcesTouched")]
+    public bool RealResourcesTouched { get; init; }
+}
+
+public sealed record RuntimePreviewScenarioCorpusCase
+{
+    [JsonPropertyName("caseId")]
+    public string CaseId { get; init; } = string.Empty;
+
+    [JsonPropertyName("scenario")]
+    public string Scenario { get; init; } = string.Empty;
+
+    [JsonPropertyName("workflowDraftHash")]
+    public string WorkflowDraftHash { get; init; } = string.Empty;
+
+    [JsonPropertyName("expectedStatus")]
+    public string ExpectedStatus { get; init; } = RuntimePreviewScenarioEvidenceStatuses.Passed;
+
+    [JsonPropertyName("expectedRisk")]
+    public string ExpectedRisk { get; init; } = string.Empty;
+
+    [JsonPropertyName("expectedPendingActions")]
+    public IReadOnlyList<string> ExpectedPendingActions { get; init; } = [];
+
+    [JsonPropertyName("businessExplanation")]
+    public string BusinessExplanation { get; init; } = string.Empty;
+
+    [JsonPropertyName("workflowDraft")]
+    public JsonElement WorkflowDraft { get; init; }
+
+    [JsonPropertyName("metadataOnly")]
+    public bool MetadataOnly { get; init; } = true;
+
+    [JsonPropertyName("realResourcesTouched")]
+    public bool RealResourcesTouched { get; init; }
+}
+
+public sealed record RuntimePreviewScenarioCorpusDocument
+{
+    [JsonPropertyName("schemaVersion")]
+    public string SchemaVersion { get; init; } = "2026-06-06.runtime-preview-scenario-corpus.v1";
+
+    [JsonPropertyName("generatedAtUtc")]
+    public DateTimeOffset GeneratedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+
+    [JsonPropertyName("caseCount")]
+    public int CaseCount { get; init; }
+
+    [JsonPropertyName("cases")]
+    public IReadOnlyList<RuntimePreviewScenarioCorpusCase> Cases { get; init; } = [];
+
+    [JsonPropertyName("metadataOnly")]
+    public bool MetadataOnly { get; init; } = true;
 
     [JsonPropertyName("realResourcesTouched")]
     public bool RealResourcesTouched { get; init; }
@@ -505,6 +707,75 @@ public sealed record RuntimePreviewScenarioEvidenceResult
 
     [JsonPropertyName("precheckRisk")]
     public string? PrecheckRisk { get; init; }
+
+    [JsonPropertyName("businessExplanation")]
+    public string BusinessExplanation { get; init; } = string.Empty;
+
+    [JsonPropertyName("workflowDraftHash")]
+    public string WorkflowDraftHash { get; init; } = string.Empty;
+
+    [JsonPropertyName("metadataOnly")]
+    public bool MetadataOnly { get; init; } = true;
+
+    [JsonPropertyName("realResourcesTouched")]
+    public bool RealResourcesTouched { get; init; }
+}
+
+public sealed record RuntimePreviewAgentExplanationResult
+{
+    [JsonPropertyName("caseId")]
+    public string CaseId { get; init; } = string.Empty;
+
+    [JsonPropertyName("scenario")]
+    public string Scenario { get; init; } = string.Empty;
+
+    [JsonPropertyName("readyStateExplanation")]
+    public string ReadyStateExplanation { get; init; } = string.Empty;
+
+    [JsonPropertyName("missingResourceExplanation")]
+    public string MissingResourceExplanation { get; init; } = string.Empty;
+
+    [JsonPropertyName("packageRiskExplanation")]
+    public string PackageRiskExplanation { get; init; } = string.Empty;
+
+    [JsonPropertyName("nextEngineerAction")]
+    public string NextEngineerAction { get; init; } = string.Empty;
+
+    [JsonPropertyName("workflowDraftAllowed")]
+    public bool WorkflowDraftAllowed { get; init; } = true;
+
+    [JsonPropertyName("packageBlocked")]
+    public bool PackageBlocked { get; init; }
+
+    [JsonPropertyName("passed")]
+    public bool Passed { get; init; }
+
+    [JsonPropertyName("metadataOnly")]
+    public bool MetadataOnly { get; init; } = true;
+
+    [JsonPropertyName("realResourcesTouched")]
+    public bool RealResourcesTouched { get; init; }
+}
+
+public sealed record RuntimePreviewAgentExplanationBenchmarkDocument
+{
+    [JsonPropertyName("schemaVersion")]
+    public string SchemaVersion { get; init; } = "2026-06-06.runtime-preview-agent-explanation-benchmark.v1";
+
+    [JsonPropertyName("generatedAtUtc")]
+    public DateTimeOffset GeneratedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+
+    [JsonPropertyName("caseCount")]
+    public int CaseCount { get; init; }
+
+    [JsonPropertyName("passedCaseCount")]
+    public int PassedCaseCount { get; init; }
+
+    [JsonPropertyName("accepted")]
+    public bool Accepted { get; init; }
+
+    [JsonPropertyName("cases")]
+    public IReadOnlyList<RuntimePreviewAgentExplanationResult> Cases { get; init; } = [];
 
     [JsonPropertyName("metadataOnly")]
     public bool MetadataOnly { get; init; } = true;
@@ -577,6 +848,27 @@ public sealed record RuntimePreviewDeployReadinessRequest
 
     [JsonPropertyName("targetStationId")]
     public string? TargetStationId { get; init; }
+
+    [JsonPropertyName("requireReplay")]
+    public bool RequireReplay { get; init; } = true;
+}
+
+public sealed record RuntimePreviewPackageReadinessRequest
+{
+    [JsonPropertyName("config")]
+    public RuntimePreviewPilotConfig? Config { get; init; }
+
+    [JsonPropertyName("toolName")]
+    public string? ToolName { get; init; }
+
+    [JsonPropertyName("arguments")]
+    public JsonElement? Arguments { get; init; }
+
+    [JsonPropertyName("workflowDraft")]
+    public JsonElement? WorkflowDraft { get; init; }
+
+    [JsonPropertyName("runtimePreviewConsent")]
+    public bool RuntimePreviewConsent { get; init; } = true;
 
     [JsonPropertyName("requireReplay")]
     public bool RequireReplay { get; init; } = true;

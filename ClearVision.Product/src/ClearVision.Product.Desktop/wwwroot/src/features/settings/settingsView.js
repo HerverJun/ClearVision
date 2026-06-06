@@ -6,6 +6,7 @@ import { installSettingsNormalizers } from './settingsNormalizers.js';
 import { installAiTab } from './tabs/aiTab.js';
 import { installCameraTab } from './tabs/cameraTab.js';
 import { installPlcTab } from './tabs/plcTab.js';
+import { installRuntimePreviewPilotConsole } from './tabs/runtimePreviewPilotConsole.js';
 import { installStationTab } from './tabs/stationTab.js';
 import { installSystemTabs } from './tabs/systemTabs.js';
 
@@ -252,6 +253,11 @@ class SettingsView {
                 title: '保存 AI 模型',
                 body: '保存当前 AI 模型配置。API Key 保存后清空输入框。'
             },
+            'runtime-preview-pilot': {
+                button: '刷新 Pilot Console',
+                title: 'RuntimePreview Pilot Console',
+                body: '查看 metadata-only session、scenario corpus、package readiness、audit/export，不保存普通设置。'
+            },
             users: {
                 button: '保存安全策略',
                 title: '保存安全策略',
@@ -293,6 +299,10 @@ class SettingsView {
             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg> 
             用户管理
         </div>` : '';
+        const runtimePreviewPilotTab = this.isAdmin && this.isRuntimePreviewPilotDeveloperUiEnabled?.() ? `<div class="settings-menu-item" data-tab="runtime-preview-pilot">
+            <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h7v10H4V10zm9 0h7v10h-7V10zm2 2v2h3v-2h-3zm0 4v2h3v-2h-3z"/></svg>
+            RuntimePreview Pilot
+        </div>` : '';
         
         this.container.innerHTML = `
             <div class="settings-layout">
@@ -331,6 +341,7 @@ class SettingsView {
                             <svg class="settings-menu-icon" viewBox="0 0 24 24"><path d="M21 16.5c0 .38-.21.71-.53.88l-7.9 4.44c-.16.12-.36.18-.57.18-.21 0-.41-.06-.57-.18l-7.9-4.44A.991.991 0 013 16.5v-9c0-.38.21-.71.53-.88l7.9-4.44c.16-.12.36-.18.57-.18.21 0 .41.06.57.18l7.9 4.44c.32.17.53.5.53.88v9zM12 4.15L6.04 7.5 12 10.85l5.96-3.35L12 4.15zM5 15.91l6 3.38v-6.71L5 9.21v6.7zM19 15.91v-6.7l-6 3.37v6.71l6-3.38z"/></svg> 
                             AI 大模型
                         </div>
+                        ${runtimePreviewPilotTab}
                         ${userManagementTab}
                     </nav>
                 </aside>
@@ -351,6 +362,7 @@ class SettingsView {
                         <div class="settings-panel" data-section="runtime">${this.renderRuntimeTab()}</div>
                         <div class="settings-panel" data-section="cameras">${this.renderCameraTab()}</div>
                         <div class="settings-panel" data-section="ai">${this.renderAiTab()}</div>
+                        ${this.isAdmin && this.isRuntimePreviewPilotDeveloperUiEnabled?.() ? `<div class="settings-panel" data-section="runtime-preview-pilot">${this.renderRuntimePreviewPilotConsoleTab()}</div>` : ''}
                         ${this.isAdmin ? `<div class="settings-panel" data-section="users">${this.renderUserManagementTab()}</div>` : ''}
                     </div>
                 </div>
@@ -411,6 +423,10 @@ class SettingsView {
             this.loadStationCommunicationSettings();
         } else if (tabName === 'database') {
             this.refreshDatabaseStatus();
+        } else if (tabName === 'runtime-preview-pilot') {
+            this.loadRuntimePreviewPilotState?.()
+                .then(() => this.refreshRuntimePreviewPilotPanel?.())
+                .catch(error => console.warn('[SettingsView] RuntimePreview Pilot console load failed:', error));
         }
     }
 
@@ -444,6 +460,7 @@ class SettingsView {
 
         // 绑定 AI 设置事件
         this.bindAiSettingsEvents();
+        this.bindRuntimePreviewPilotConsoleEvents?.();
         this.bindPlcSettingsEvents();
         this.bindStationCommunicationEvents();
 
@@ -503,6 +520,12 @@ class SettingsView {
             return;
         }
 
+        if (activeTabName === 'runtime-preview-pilot') {
+            await this.loadRuntimePreviewPilotState?.();
+            this.refreshRuntimePreviewPilotPanel?.();
+            return;
+        }
+
         await this.saveAppSettingsForTab(activeTabName);
     }
 }
@@ -511,6 +534,7 @@ installSettingsNormalizers(SettingsView);
 installPlcTab(SettingsView);
 installStationTab(SettingsView);
 installAiTab(SettingsView);
+installRuntimePreviewPilotConsole(SettingsView);
 installCameraTab(SettingsView);
 installSystemTabs(SettingsView);
 

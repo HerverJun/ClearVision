@@ -11,6 +11,9 @@ namespace ClearVision.Product.Infrastructure.AI.Tools;
 
 public sealed class RuntimePreviewGovernanceStore
 {
+    public const string SchemaVersion = "2026-06-06.runtime-preview-governance-store.v2";
+    public const string StorageVersion = "jsonl.v2";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -34,6 +37,8 @@ public sealed class RuntimePreviewGovernanceStore
     }
 
     public string StorageMode => "jsonl";
+
+    public string StorageVersionValue => StorageVersion;
 
     public string DirectoryPath => _directoryPath;
 
@@ -93,6 +98,72 @@ public sealed class RuntimePreviewGovernanceStore
             .ToList();
     }
 
+    public void SavePackageReadinessReport(RuntimePreviewPackageReadinessReport report)
+    {
+        Append(PackageReadinessReportPath, report);
+    }
+
+    public IReadOnlyList<RuntimePreviewPackageReadinessReport> LoadPackageReadinessReports()
+    {
+        return ReadJsonLines<RuntimePreviewPackageReadinessReport>(PackageReadinessReportPath)
+            .GroupBy(report => report.ReportId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(report => report.GeneratedAtUtc).First())
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
+    public RuntimePreviewGovernanceStorageIndexSummary BuildIndexSummary()
+    {
+        return new RuntimePreviewGovernanceStorageIndexSummary
+        {
+            SchemaVersion = SchemaVersion,
+            StorageVersion = StorageVersion,
+            StorageMode = StorageMode,
+            RecordTypes =
+            [
+                "session",
+                "audit",
+                "session_report",
+                "deploy_readiness_report",
+                "package_readiness_report"
+            ],
+            SessionCount = LoadSessions().Count,
+            AuditEventCount = LoadAuditEvents().Count,
+            SessionReportCount = LoadReports().Count,
+            DeployReadinessReportCount = LoadDeployReadinessReports().Count,
+            PackageReadinessReportCount = LoadPackageReadinessReports().Count,
+            CorruptLineCount = CountCorruptLines(SessionPath) +
+                               CountCorruptLines(AuditPath) +
+                               CountCorruptLines(ReportPath) +
+                               CountCorruptLines(DeployReadinessReportPath) +
+                               CountCorruptLines(PackageReadinessReportPath),
+            RetentionPolicy = "default_30_days_200_sessions",
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+    }
+
+    public RuntimePreviewGovernanceExportManifest ExportManifest()
+    {
+        var manifest = new RuntimePreviewGovernanceExportManifest
+        {
+            ExportId = $"rp_export_{Guid.NewGuid():N}",
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            IndexSummary = BuildIndexSummary(),
+            Sessions = LoadSessions(),
+            AuditEvents = LoadAuditEvents(),
+            SessionReports = LoadReports(),
+            DeployReadinessReports = LoadDeployReadinessReports(),
+            PackageReadinessReports = LoadPackageReadinessReports(),
+            RedactionPass = true,
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+        var raw = JsonSerializer.Serialize(manifest, JsonOptions);
+        RuntimePreviewGovernanceRedactor.ThrowIfUnsafeStorageText(raw);
+        return manifest;
+    }
+
     public RuntimePreviewRetentionCleanupResult Cleanup(int retentionDays, int maxSessions)
     {
         var effectiveRetentionDays = retentionDays <= 0 ? 30 : Math.Min(retentionDays, 365);
@@ -105,6 +176,7 @@ public sealed class RuntimePreviewGovernanceStore
             var auditBefore = LoadAuditEvents();
             var reportsBefore = LoadReports();
             var deployBefore = LoadDeployReadinessReports();
+            var packageBefore = LoadPackageReadinessReports();
 
             var sessionsAfter = sessionsBefore
                 .Where(session => session.UpdatedAtUtc >= cutoff)
@@ -123,11 +195,15 @@ public sealed class RuntimePreviewGovernanceStore
             var deployAfter = deployBefore
                 .Where(report => sessionIds.Contains(report.SessionId) && report.GeneratedAtUtc >= cutoff)
                 .ToList();
+            var packageAfter = packageBefore
+                .Where(report => sessionIds.Contains(report.SessionId) && report.GeneratedAtUtc >= cutoff)
+                .ToList();
 
             Rewrite(SessionPath, sessionsAfter);
             Rewrite(AuditPath, auditAfter);
             Rewrite(ReportPath, reportsAfter);
             Rewrite(DeployReadinessReportPath, deployAfter);
+            Rewrite(PackageReadinessReportPath, packageAfter);
 
             return new RuntimePreviewRetentionCleanupResult
             {
@@ -137,8 +213,8 @@ public sealed class RuntimePreviewGovernanceStore
                 SessionsAfter = sessionsAfter.Count,
                 AuditEventsBefore = auditBefore.Count,
                 AuditEventsAfter = auditAfter.Count,
-                ReportsBefore = reportsBefore.Count + deployBefore.Count,
-                ReportsAfter = reportsAfter.Count + deployAfter.Count,
+                ReportsBefore = reportsBefore.Count + deployBefore.Count + packageBefore.Count,
+                ReportsAfter = reportsAfter.Count + deployAfter.Count + packageAfter.Count,
                 MetadataOnly = true,
                 RealResourcesTouched = false
             };
@@ -152,6 +228,8 @@ public sealed class RuntimePreviewGovernanceStore
     private string ReportPath => Path.Combine(_directoryPath, "runtime_preview_reports.jsonl");
 
     private string DeployReadinessReportPath => Path.Combine(_directoryPath, "runtime_preview_deploy_readiness_reports.jsonl");
+
+    private string PackageReadinessReportPath => Path.Combine(_directoryPath, "runtime_preview_package_readiness_reports.jsonl");
 
     private static string GetDefaultDirectory()
     {
@@ -206,6 +284,34 @@ public sealed class RuntimePreviewGovernanceStore
         }
 
         return results;
+    }
+
+    private static int CountCorruptLines(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return 0;
+        }
+
+        var corrupt = 0;
+        foreach (var line in File.ReadLines(path, Encoding.UTF8))
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            try
+            {
+                using var _ = JsonDocument.Parse(line);
+            }
+            catch (JsonException)
+            {
+                corrupt++;
+            }
+        }
+
+        return corrupt;
     }
 
     private static void Rewrite<T>(string path, IReadOnlyList<T> items)
@@ -342,6 +448,7 @@ public sealed class RuntimePreviewReportArchive
 {
     private readonly ConcurrentDictionary<string, RuntimePreviewSessionReport> _reports = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, RuntimePreviewDeployReadinessReport> _deployReadinessReports = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, RuntimePreviewPackageReadinessReport> _packageReadinessReports = new(StringComparer.OrdinalIgnoreCase);
     private readonly RuntimePreviewGovernanceStore? _governanceStore;
 
     public RuntimePreviewReportArchive()
@@ -359,6 +466,11 @@ public sealed class RuntimePreviewReportArchive
         foreach (var report in governanceStore.LoadDeployReadinessReports())
         {
             _deployReadinessReports[report.ReportId] = report;
+        }
+
+        foreach (var report in governanceStore.LoadPackageReadinessReports())
+        {
+            _packageReadinessReports[report.ReportId] = report;
         }
     }
 
@@ -382,6 +494,13 @@ public sealed class RuntimePreviewReportArchive
             .FirstOrDefault();
     }
 
+    public IReadOnlyList<RuntimePreviewSessionReport> ListSessionReports()
+    {
+        return _reports.Values
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
     public RuntimePreviewDeployReadinessReport SaveDeployReadinessReport(RuntimePreviewDeployReadinessReport report)
     {
         _deployReadinessReports[report.ReportId] = report;
@@ -400,6 +519,40 @@ public sealed class RuntimePreviewReportArchive
             .Where(report => string.Equals(report.SessionId, sessionId, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(report => report.GeneratedAtUtc)
             .FirstOrDefault();
+    }
+
+    public IReadOnlyList<RuntimePreviewDeployReadinessReport> ListDeployReadinessReports()
+    {
+        return _deployReadinessReports.Values
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
+    public RuntimePreviewPackageReadinessReport SavePackageReadinessReport(RuntimePreviewPackageReadinessReport report)
+    {
+        _packageReadinessReports[report.ReportId] = report;
+        _governanceStore?.SavePackageReadinessReport(report);
+        return report;
+    }
+
+    public RuntimePreviewPackageReadinessReport? GetPackageReadinessReport(string reportId)
+    {
+        return string.IsNullOrWhiteSpace(reportId) ? null : _packageReadinessReports.GetValueOrDefault(reportId.Trim());
+    }
+
+    public RuntimePreviewPackageReadinessReport? GetPackageReadinessReportBySessionId(string sessionId)
+    {
+        return _packageReadinessReports.Values
+            .Where(report => string.Equals(report.SessionId, sessionId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .FirstOrDefault();
+    }
+
+    public IReadOnlyList<RuntimePreviewPackageReadinessReport> ListPackageReadinessReports()
+    {
+        return _packageReadinessReports.Values
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
     }
 }
 
@@ -1197,6 +1350,398 @@ public sealed class RuntimePreviewDeployReadinessService
     }
 }
 
+public sealed class RuntimePreviewPackageReadinessBridge
+{
+    private readonly RuntimePreviewDeployReadinessService _deployReadinessService;
+    private readonly RuntimePreviewReportArchive _reportArchive;
+    private readonly RuntimePreviewAuditTrail _auditTrail;
+
+    public RuntimePreviewPackageReadinessBridge(
+        RuntimePreviewDeployReadinessService deployReadinessService,
+        RuntimePreviewReportArchive reportArchive,
+        RuntimePreviewAuditTrail auditTrail)
+    {
+        _deployReadinessService = deployReadinessService;
+        _reportArchive = reportArchive;
+        _auditTrail = auditTrail;
+    }
+
+    public async Task<RuntimePreviewPackageReadinessReport> GenerateAsync(
+        RuntimePreviewPackageReadinessRequest request,
+        AppConfig appConfig,
+        AiConfigStore? aiConfigStore,
+        bool isAdmin,
+        bool developerUiRequested,
+        CancellationToken cancellationToken = default)
+    {
+        var deployReport = await _deployReadinessService.GenerateAsync(
+            new RuntimePreviewDeployReadinessRequest
+            {
+                Config = request.Config,
+                ToolName = request.ToolName,
+                Arguments = request.Arguments,
+                WorkflowDraft = request.WorkflowDraft,
+                RuntimePreviewConsent = request.RuntimePreviewConsent,
+                RequireReplay = request.RequireReplay
+            },
+            appConfig,
+            aiConfigStore,
+            isAdmin,
+            developerUiRequested,
+            cancellationToken);
+
+        var blockingIssues = BuildBlockingIssues(deployReport);
+        var operatorTrace = BuildOperatorTrace(deployReport);
+        var resourceTrace = BuildResourceTrace(deployReport);
+        var riskSummary = BuildRiskSummary(deployReport, blockingIssues);
+        var report = new RuntimePreviewPackageReadinessReport
+        {
+            ReportId = $"rp_package_readiness_{Guid.NewGuid():N}",
+            SessionId = deployReport.SessionId,
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            WorkflowDraftHash = deployReport.WorkflowDraftHash,
+            PreviewReportId = deployReport.PreviewReportId,
+            DeployReadinessReportId = deployReport.ReportId,
+            ReadyForPackage = deployReport.ReadyForDeployment,
+            PackageBlocked = !deployReport.ReadyForDeployment,
+            PackageCreated = false,
+            DeploymentExecuted = false,
+            BlockingIssues = blockingIssues,
+            MissingResources = deployReport.Readiness?.MissingResources ?? [],
+            RiskSummary = riskSummary,
+            PendingActions = deployReport.PendingActions,
+            OperatorTrace = operatorTrace,
+            ResourceTrace = resourceTrace,
+            WorkflowDraftAllowed = deployReport.WorkflowDraftAllowed,
+            RuntimePackagePrecheck = deployReport.RuntimePackagePrecheck,
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+        _reportArchive.SavePackageReadinessReport(report);
+        _auditTrail.Append(deployReport.SessionId, RuntimePreviewAuditEventTypes.PackageReadinessGenerated, new
+        {
+            report.ReportId,
+            report.ReadyForPackage,
+            report.PackageBlocked,
+            report.PackageCreated,
+            report.DeploymentExecuted,
+            report.MetadataOnly,
+            report.RealResourcesTouched
+        });
+        return report;
+    }
+
+    private static IReadOnlyList<string> BuildBlockingIssues(RuntimePreviewDeployReadinessReport report)
+    {
+        var issues = new List<string>();
+        if (!report.PreviewReady)
+        {
+            issues.Add("RuntimePreview metadata simulation is not previewReady.");
+        }
+
+        if (report.Readiness?.Status == RuntimePreviewPilotReadinessStatuses.Denied)
+        {
+            issues.Add($"RuntimePreview readiness denied: {report.Readiness.ResourceTrace.ReasonCode}");
+        }
+        else if (report.Readiness?.Status == RuntimePreviewPilotReadinessStatuses.NotReady)
+        {
+            issues.Add("RuntimePreview readiness is not_ready; required metadata is unresolved.");
+        }
+
+        foreach (var action in report.PendingActions)
+        {
+            if (!string.IsNullOrWhiteSpace(action.ActionType))
+            {
+                issues.Add($"Pending engineer action: {action.ActionType}");
+            }
+        }
+
+        if (!report.ReadyForDeployment)
+        {
+            issues.Add("Runtime package precheck did not approve package readiness.");
+        }
+
+        return issues.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static IReadOnlyList<string> BuildOperatorTrace(RuntimePreviewDeployReadinessReport report)
+    {
+        var raw = report.RuntimePackagePrecheck.GetRawText();
+        var matches = Regex.Matches(raw, @"""operatorType""\s*:\s*""(?<type>[^""]+)""", RegexOptions.IgnoreCase);
+        var operators = matches
+            .Select(match => RuntimePreviewGovernanceRedactor.RedactScalar(match.Groups["type"].Value))
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return operators.Count == 0 ? ["metadata_operator_trace_unavailable"] : operators;
+    }
+
+    private static IReadOnlyList<string> BuildResourceTrace(RuntimePreviewDeployReadinessReport report)
+    {
+        var trace = new List<string>();
+        if (report.Readiness?.ResourceTrace is { } resourceTrace)
+        {
+            trace.Add($"allowed={resourceTrace.Allowed}");
+            trace.Add($"reason={resourceTrace.ReasonCode}");
+            trace.Add($"resourceType={resourceTrace.ResourceType}");
+        }
+
+        trace.AddRange(report.ResourceHandles.Select(handle =>
+            $"{handle.ResourceType}:{handle.HandleId}:{(handle.SafeForPilot ? "safe" : "blocked")}"));
+        return trace
+            .Select(RuntimePreviewGovernanceRedactor.RedactScalar)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .ToList();
+    }
+
+    private static string BuildRiskSummary(RuntimePreviewDeployReadinessReport report, IReadOnlyList<string> blockingIssues)
+    {
+        if (report.ReadyForDeployment)
+        {
+            return "Metadata checks passed. The flow can proceed to package review, but no package was created and no deployment was executed.";
+        }
+
+        if (report.Readiness?.Status == RuntimePreviewPilotReadinessStatuses.Denied)
+        {
+            return "Package is blocked because the request hit a denied resource or dangerous intent. Engineer must replace the unsafe metadata handle before package review.";
+        }
+
+        if (report.Readiness?.MissingResources.Count > 0)
+        {
+            return "Package is blocked because required camera/template/model/output metadata is still missing. Workflow editing remains allowed.";
+        }
+
+        return blockingIssues.Count > 0
+            ? "Package is blocked by metadata precheck issues. Review pending actions before attempting any package workflow."
+            : "Package is blocked by an unresolved metadata readiness condition.";
+    }
+}
+
+public sealed class RuntimePreviewScenarioCorpusService
+{
+    public RuntimePreviewScenarioCorpusDocument BuildCorpus()
+    {
+        var cases = CreateCorpusCases();
+        return new RuntimePreviewScenarioCorpusDocument
+        {
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            CaseCount = cases.Count,
+            Cases = cases,
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+    }
+
+    public static IReadOnlyList<RuntimePreviewScenarioCorpusCase> CreateCorpusCases()
+    {
+        return
+        [
+            Corpus("RP-SC-001", "wire_sequence", RuntimePreviewScenarioEvidenceStatuses.Passed, "low", [], "Line sequence check is package-ready after metadata camera and template handles are allowlisted.", Flow("line-cam", templateId: "wire-template")),
+            Corpus("RP-SC-002", "terminal_color_order", RuntimePreviewScenarioEvidenceStatuses.Passed, "low", [], "Terminal color order inspection uses the same metadata camera with a different judgment rule.", Flow("line-cam", templateId: "terminal-color-template")),
+            Corpus("RP-SC-003", "template_matching", RuntimePreviewScenarioEvidenceStatuses.Passed, "low", [], "Template matching positioning is ready when TemplateId is catalog-backed.", Flow("line-cam", templateId: "fixture-template")),
+            Corpus("RP-SC-004", "hole_distance", RuntimePreviewScenarioEvidenceStatuses.Passed, "low", [], "Hole distance measurement can run metadata preview and package precheck without real image input.", HoleDistanceFlow()),
+            Corpus("RP-SC-005", "remote_control_detection", RuntimePreviewScenarioEvidenceStatuses.Passed, "low", [], "Remote controller inspection uses ModelId metadata and does not load a model file.", ModelFlow("line-cam", "remote-control-model")),
+            Corpus("RP-SC-006", "missing_camera", RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_camera_binding", ["RuntimePreviewPilotReadinessReview"], "Camera binding is absent, so preview/package are blocked while the draft remains editable.", Flow("missing-cam", templateId: "wire-template")),
+            Corpus("RP-SC-007", "missing_template", RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_template", ["RuntimePreviewPilotReadinessReview"], "Template source is unresolved; engineer must bind TemplateId before package readiness.", Flow("line-cam")),
+            Corpus("RP-SC-008", "missing_model", RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_model", ["RuntimePreviewPilotReadinessReview"], "Model metadata is unresolved; no model file is loaded and package stays blocked.", ModelFlow("line-cam", "<pending-model>")),
+            Corpus("RP-SC-009", "dangerous_path", RuntimePreviewScenarioEvidenceStatuses.Denied, "dangerous_resource", ["RuntimePreviewPilotReadinessReview"], "External path-like metadata is denied and redacted before any artifact is produced.", Flow("line-cam", templatePath: "external:/blocked-template")),
+            Corpus("RP-SC-010", "plc_station_deny", RuntimePreviewScenarioEvidenceStatuses.Denied, "plc_station_denied", ["RuntimePreviewPilotReadinessReview"], "PLC or Station intent is denied; no PLC write and no Station access are attempted.", PlcFlow()),
+            Corpus("RP-SC-011", "precheck_blocked", RuntimePreviewScenarioEvidenceStatuses.NotReady, "precheck_not_ready", ["DeploymentPrecheckResourceReview"], "Runtime package precheck blocks packaging because replay/readiness metadata is incomplete.", ModelFlow("line-cam", "<pending-model>")),
+            Corpus("RP-SC-012", "allowlist_mismatch", RuntimePreviewScenarioEvidenceStatuses.NotReady, "allowlist_mismatch", ["RuntimePreviewPilotReadinessReview"], "Workflow references a metadata handle outside the pilot allowlist.", Flow("camera-not-allowlisted", templateId: "wire-template")),
+            Corpus("RP-SC-013", "multi_operator_flow", RuntimePreviewScenarioEvidenceStatuses.Passed, "medium", [], "Multi-operator measurement flow is previewable as metadata and requires only review before real pilot.", MultiOperatorFlow()),
+            Corpus("RP-SC-014", "missing_parameter", RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_parameter", ["RuntimePreviewPilotReadinessReview"], "A required operator parameter is missing; workflow remains editable but package is blocked.", MissingParameterFlow()),
+            Corpus("RP-SC-015", "draft_editable_package_blocked", RuntimePreviewScenarioEvidenceStatuses.NotReady, "draft_allowed_package_blocked", ["RuntimePreviewPilotReadinessReview"], "The workflow draft can still be edited even though package readiness is blocked by missing resources.", Flow("missing-cam", templateId: "fixture-template"))
+        ];
+    }
+
+    private static RuntimePreviewScenarioCorpusCase Corpus(
+        string caseId,
+        string scenario,
+        string expectedStatus,
+        string expectedRisk,
+        IReadOnlyList<string> pendingActions,
+        string businessExplanation,
+        object workflowDraft)
+    {
+        var workflow = RuntimePreviewGovernanceRedactor.ToRedactedElement(workflowDraft);
+        return new RuntimePreviewScenarioCorpusCase
+        {
+            CaseId = caseId,
+            Scenario = scenario,
+            WorkflowDraftHash = RuntimePreviewGovernanceHashes.HashJsonElement(workflow),
+            ExpectedStatus = expectedStatus,
+            ExpectedRisk = expectedRisk,
+            ExpectedPendingActions = pendingActions,
+            BusinessExplanation = businessExplanation,
+            WorkflowDraft = workflow,
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+    }
+
+    internal static object Flow(string cameraBindingId, string? templateId = null, string? templatePath = null)
+    {
+        var parameters = new Dictionary<string, string>();
+        if (!string.IsNullOrWhiteSpace(templateId))
+        {
+            parameters["TemplateId"] = templateId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(templatePath))
+        {
+            parameters["TemplatePath"] = templatePath;
+        }
+
+        return Draft(
+            Camera(cameraBindingId),
+            new { tempId = "op_template", operatorType = "TemplateMatching", parameters },
+            Output());
+    }
+
+    internal static object HoleDistanceFlow()
+    {
+        return Draft(
+            Camera("line-cam"),
+            new { tempId = "op_circle_a", operatorType = "CircleMeasurement", parameters = new Dictionary<string, string> { ["Roi"] = "hole-a" } },
+            new { tempId = "op_circle_b", operatorType = "CircleMeasurement", parameters = new Dictionary<string, string> { ["Roi"] = "hole-b" } },
+            new { tempId = "op_distance", operatorType = "MeasureDistance", parameters = new Dictionary<string, string> { ["Unit"] = "mm" } },
+            Output());
+    }
+
+    internal static object ModelFlow(string cameraBindingId, string modelId)
+    {
+        return Draft(
+            Camera(cameraBindingId),
+            new { tempId = "op_model", operatorType = "DeepLearning", parameters = new Dictionary<string, string> { ["ModelId"] = modelId } },
+            Output());
+    }
+
+    internal static object MultiOperatorFlow()
+    {
+        return Draft(
+            Camera("line-cam"),
+            new { tempId = "op_template", operatorType = "TemplateMatching", parameters = new Dictionary<string, string> { ["TemplateId"] = "fixture-template" } },
+            new { tempId = "op_circle", operatorType = "CircleMeasurement", parameters = new Dictionary<string, string> { ["Roi"] = "feature-a" } },
+            new { tempId = "op_model", operatorType = "DeepLearning", parameters = new Dictionary<string, string> { ["ModelId"] = "remote-control-model" } },
+            Output());
+    }
+
+    internal static object MissingParameterFlow()
+    {
+        return Draft(
+            Camera("line-cam"),
+            new { tempId = "op_template", operatorType = "TemplateMatching", parameters = new Dictionary<string, string>() },
+            Output());
+    }
+
+    internal static object PlcFlow()
+    {
+        return Draft(
+            Camera("line-cam"),
+            new { tempId = "op_template", operatorType = "TemplateMatching", parameters = new Dictionary<string, string> { ["TemplateId"] = "wire-template" } },
+            new { tempId = "op_output", operatorType = "ResultOutput", parameters = new Dictionary<string, string> { ["Channel"] = "plc", ["PlcAddress"] = "plc-output-token" } });
+    }
+
+    private static object Camera(string cameraBindingId)
+    {
+        return new
+        {
+            tempId = "op_cam",
+            operatorType = "ImageAcquisition",
+            parameters = new Dictionary<string, string>
+            {
+                ["SourceType"] = "Camera",
+                ["CameraBindingId"] = cameraBindingId
+            }
+        };
+    }
+
+    private static object Output()
+    {
+        return new
+        {
+            tempId = "op_output",
+            operatorType = "ResultOutput",
+            parameters = new Dictionary<string, string>
+            {
+                ["OutputChannelId"] = "qa-metadata"
+            }
+        };
+    }
+
+    private static object Draft(params object[] operators)
+    {
+        return new
+        {
+            operators,
+            connections = Array.Empty<object>()
+        };
+    }
+}
+
+public sealed class RuntimePreviewAgentExplanationService
+{
+    private readonly RuntimePreviewScenarioCorpusService _corpusService;
+
+    public RuntimePreviewAgentExplanationService(RuntimePreviewScenarioCorpusService corpusService)
+    {
+        _corpusService = corpusService;
+    }
+
+    public RuntimePreviewAgentExplanationBenchmarkDocument Run()
+    {
+        var corpus = _corpusService.BuildCorpus();
+        var results = corpus.Cases.Select(Explain).ToList();
+        return new RuntimePreviewAgentExplanationBenchmarkDocument
+        {
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            CaseCount = results.Count,
+            PassedCaseCount = results.Count(item => item.Passed),
+            Accepted = results.All(item => item.Passed),
+            Cases = results,
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+    }
+
+    private static RuntimePreviewAgentExplanationResult Explain(RuntimePreviewScenarioCorpusCase item)
+    {
+        var packageBlocked = !string.Equals(item.ExpectedStatus, RuntimePreviewScenarioEvidenceStatuses.Passed, StringComparison.OrdinalIgnoreCase);
+        var readyText = packageBlocked
+            ? $"Scenario {item.Scenario} is {item.ExpectedStatus}; workflow editing is allowed but package readiness is blocked."
+            : $"Scenario {item.Scenario} is metadata-ready for preview and package review.";
+        var missingText = item.ExpectedPendingActions.Count == 0
+            ? "No unresolved metadata resource is expected in this corpus case."
+            : $"Engineer must resolve: {string.Join(", ", item.ExpectedPendingActions)}.";
+        var riskText = packageBlocked
+            ? $"Risk: {item.ExpectedRisk}. Do not package or deploy until the metadata issue is cleared."
+            : $"Risk: {item.ExpectedRisk}. This is still metadata-only; real pilot gates remain required.";
+        var nextAction = packageBlocked
+            ? "Confirm the missing or denied metadata handle, then rerun readiness and package precheck."
+            : "Review the metadata report and keep the real RuntimePreview pilot gate closed.";
+        var passed = readyText.Length > 20 &&
+                     missingText.Length > 20 &&
+                     riskText.Contains("Risk:", StringComparison.OrdinalIgnoreCase) &&
+                     nextAction.Length > 20 &&
+                     !readyText.Contains("AI", StringComparison.OrdinalIgnoreCase);
+
+        return new RuntimePreviewAgentExplanationResult
+        {
+            CaseId = item.CaseId,
+            Scenario = item.Scenario,
+            ReadyStateExplanation = readyText,
+            MissingResourceExplanation = missingText,
+            PackageRiskExplanation = riskText,
+            NextEngineerAction = nextAction,
+            WorkflowDraftAllowed = true,
+            PackageBlocked = packageBlocked,
+            Passed = passed,
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+    }
+}
+
 public sealed class RuntimePreviewScenarioEvidenceService
 {
     private readonly RuntimePreviewDeployReadinessService _deployReadinessService;
@@ -1249,17 +1794,19 @@ public sealed class RuntimePreviewScenarioEvidenceService
 
     public static IReadOnlyList<RuntimePreviewScenarioEvidenceCase> CreateCases()
     {
-        return
-        [
-            Case("RP-SE-001", "wire_sequence", "Line sequence inspection with allowlisted camera/template metadata.", RuntimePreviewScenarioEvidenceStatuses.Passed, Flow("line-cam", templateId: "wire-template")),
-            Case("RP-SE-002", "template_matching", "Template matching localization with catalog TemplateId.", RuntimePreviewScenarioEvidenceStatuses.Passed, Flow("line-cam", templateId: "fixture-template")),
-            Case("RP-SE-003", "hole_distance", "Hole center distance measurement using metadata camera handle.", RuntimePreviewScenarioEvidenceStatuses.Passed, HoleDistanceFlow()),
-            Case("RP-SE-004", "remote_control_detection", "Remote controller defect detection using ModelId metadata.", RuntimePreviewScenarioEvidenceStatuses.Passed, ModelFlow("line-cam", "remote-control-model")),
-            Case("RP-SE-005", "missing_resource", "Camera resource is missing from allowlist; workflow draft stays editable.", RuntimePreviewScenarioEvidenceStatuses.NotReady, Flow("missing-cam", templateId: "wire-template")),
-            Case("RP-SE-006", "dangerous_path", "TemplatePath attempts to reference an external resource and must be denied.", RuntimePreviewScenarioEvidenceStatuses.Denied, Flow("line-cam", templatePath: "external:/blocked-template")),
-            Case("RP-SE-007", "station_plc_deny", "PLC output request must be denied before any write or Station access.", RuntimePreviewScenarioEvidenceStatuses.Denied, PlcFlow()),
-            Case("RP-SE-008", "precheck_not_ready", "Runtime package precheck remains blocked when ModelId metadata is missing.", RuntimePreviewScenarioEvidenceStatuses.NotReady, ModelFlow("line-cam", "<pending-model>"))
-        ];
+        return RuntimePreviewScenarioCorpusService.CreateCorpusCases()
+            .Select(item => new RuntimePreviewScenarioEvidenceCase
+            {
+                CaseId = item.CaseId.Replace("RP-SC-", "RP-SE-", StringComparison.OrdinalIgnoreCase),
+                Scenario = item.Scenario,
+                BusinessSummary = item.BusinessExplanation,
+                ExpectedStatus = item.ExpectedStatus,
+                ExpectedSignals = item.ExpectedStatus == RuntimePreviewScenarioEvidenceStatuses.Passed
+                    ? ["previewReady", "readyForDeployment"]
+                    : ["missingResources", "pendingActions", "denyReason"],
+                WorkflowDraft = item.WorkflowDraft
+            })
+            .ToList();
     }
 
     private static RuntimePreviewScenarioEvidenceResult ToResult(
@@ -1286,6 +1833,8 @@ public sealed class RuntimePreviewScenarioEvidenceService
             PendingActions = report.PendingActions,
             DenyReason = report.Readiness?.ResourceTrace.ReasonCode,
             PrecheckRisk = report.DeploymentBlocked ? "deployment_blocked_metadata_only" : null,
+            BusinessExplanation = scenario.BusinessSummary,
+            WorkflowDraftHash = report.WorkflowDraftHash,
             MetadataOnly = true,
             RealResourcesTouched = false
         };
@@ -1298,7 +1847,7 @@ public sealed class RuntimePreviewScenarioEvidenceService
             Enabled = true,
             Mode = RuntimePreviewPilotConfig.ModeMetadataOnly,
             AllowedCameraBindingIds = ["line-cam"],
-            AllowedTemplateIds = ["wire-template", "fixture-template"],
+            AllowedTemplateIds = ["wire-template", "terminal-color-template", "fixture-template"],
             AllowedModelIds = ["remote-control-model"],
             FallbackToOffline = true,
             DenyExternalPath = true,

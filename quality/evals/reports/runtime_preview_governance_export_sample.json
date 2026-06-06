@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "2026-06-06.runtime-preview-governance-export.v2",
+  "benchmarkId": "runtime_preview_governance_export_sample",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-06T13:40:09.986508+00:00"
+  },
+  "summary": {
+    "storageVersion": "jsonl.v2",
+    "recordTypes": [
+      "session",
+      "audit",
+      "session_report",
+      "deploy_readiness_report",
+      "package_readiness_report"
+    ],
+    "sessionCount": 15,
+    "auditEventCount": 105,
+    "sessionReportCount": 15,
+    "deployReadinessReportCount": 15,
+    "packageReadinessReportCount": 15,
+    "corruptLineCount": 1,
+    "corruptionRecovered": true,
+    "redactionPass": true,
+    "metadataOnly": true,
+    "realResourcesTouched": false,
+    "accepted": true
+  },
+  "exportManifest": {
+    "exportId": "rp_export_sample",
+    "storageMode": "jsonl",
+    "storageVersion": "jsonl.v2",
+    "retentionPolicy": "default_30_days_200_sessions",
+    "lookupKeys": [
+      "sessionId",
+      "reportId",
+      "caseId"
+    ]
+  },
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

@@ -802,7 +802,8 @@ public class AiModelEndpointsTests
         json.Should().Contain("template_matching");
         json.Should().Contain("hole_distance");
         json.Should().Contain("remote_control_detection");
-        json.Should().Contain("\"caseCount\":8");
+        json.Should().Contain("allowlist_mismatch");
+        json.Should().Contain("\"caseCount\":15");
         json.Should().Contain("\"realResourcesTouched\":false");
         json.Should().NotContain("192.0.2.20");
         json.Should().NotContain("DB1");
@@ -855,6 +856,104 @@ public class AiModelEndpointsTests
         deployResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         scenarioResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         cleanupResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotV12Endpoints_ShouldReturnScenarioCorpusPackageReadinessAndGovernanceEvidence()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var corpusResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/scenario-corpus");
+        corpusResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var corpusJson = await corpusResponse.Content.ReadAsStringAsync();
+        corpusJson.Should().Contain("\"caseCount\":15");
+        corpusJson.Should().Contain("draft_editable_package_blocked");
+        corpusJson.Should().NotContain("192.0.2.20");
+
+        using var packageResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/package-readiness",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templateId: "template-a") },
+                runtimePreviewConsent = true
+            }));
+        packageResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var packageDocument = JsonDocument.Parse(await packageResponse.Content.ReadAsStringAsync());
+        var packageReport = packageDocument.RootElement.GetProperty("packageReadinessReport");
+        var sessionId = packageReport.GetProperty("sessionId").GetString();
+        packageReport.GetProperty("readyForPackage").GetBoolean().Should().BeTrue();
+        packageReport.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+        packageReport.GetProperty("deploymentExecuted").GetBoolean().Should().BeFalse();
+
+        using var indexResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/governance/index");
+        indexResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var indexJson = await indexResponse.Content.ReadAsStringAsync();
+        indexJson.Should().Contain("jsonl.v2");
+        indexJson.Should().Contain("packageReadinessReportCount");
+
+        using var lookupResponse = await host.Client.GetAsync($"/api/settings/runtime-preview-pilot/governance/lookup?sessionId={sessionId}&caseId=RP-SC-001");
+        lookupResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var lookupJson = await lookupResponse.Content.ReadAsStringAsync();
+        lookupJson.Should().Contain("packageReadinessReport");
+        lookupJson.Should().Contain("wire_sequence");
+
+        using var explanationResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/agent-explanation-benchmark");
+        explanationResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var explanationJson = await explanationResponse.Content.ReadAsStringAsync();
+        explanationJson.Should().Contain("\"accepted\":true");
+        explanationJson.Should().Contain("nextEngineerAction");
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotPackageReadiness_ShouldBlockNotReadyWithoutCreatingPackage()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/package-readiness",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-missing", templateId: "template-a") },
+                runtimePreviewConsent = true
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var report = document.RootElement.GetProperty("packageReadinessReport");
+        report.GetProperty("readyForPackage").GetBoolean().Should().BeFalse();
+        report.GetProperty("packageBlocked").GetBoolean().Should().BeTrue();
+        report.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+        report.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+        report.GetProperty("deploymentExecuted").GetBoolean().Should().BeFalse();
+        report.GetProperty("riskSummary").GetString().Should().Contain("blocked");
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotV12Endpoints_ShouldRequireAdminBrokerGate()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync(userRole: "Engineer");
+
+        using var corpusResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/scenario-corpus");
+        using var packageResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/package-readiness",
+            JsonContent(new { arguments = new { flow = RuntimePreviewFlow("cam-a") }, runtimePreviewConsent = true }));
+        using var indexResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/governance/index");
+        using var exportResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/governance/export");
+        using var lookupResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/governance/lookup?caseId=RP-SC-001");
+        using var explanationResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/agent-explanation-benchmark");
+
+        corpusResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        packageResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        indexResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        exportResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        lookupResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        explanationResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private static StringContent JsonContent(object payload)
@@ -1010,6 +1109,9 @@ public class AiModelEndpointsTests
             builder.Services.AddSingleton<RuntimePreviewGovernanceMaintenanceService>();
             builder.Services.AddSingleton<RuntimePreviewDeployReadinessService>();
             builder.Services.AddSingleton<RuntimePreviewScenarioEvidenceService>();
+            builder.Services.AddSingleton<RuntimePreviewPackageReadinessBridge>();
+            builder.Services.AddSingleton<RuntimePreviewScenarioCorpusService>();
+            builder.Services.AddSingleton<RuntimePreviewAgentExplanationService>();
 
             var aiConfigStore = new AiConfigStore(
                 Options.Create(new AiGenerationOptions

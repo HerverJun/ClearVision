@@ -1212,8 +1212,6 @@ export function installAiTab(SettingsView) {
                     <p>集成深度学习本地模型与云端大语言模型 API 配置。</p>
                 </div>
                 ${this.renderScopeNotice('ai')}
-                ${this.renderRuntimePreviewPilotPanel()}
-
                 <!-- Block 1: Model Tab & List -->
                 <div class="settings-modern-card">
                     <div class="settings-card-header" style="background:white; border-bottom:1px solid #e2e8f0; padding:0; display:flex;">

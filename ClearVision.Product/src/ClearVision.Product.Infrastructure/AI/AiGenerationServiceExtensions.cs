@@ -78,7 +78,10 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<RuntimePreviewSimulatedExecutionHarness>();
         services.AddScoped<RuntimePreviewGovernanceMaintenanceService>();
         services.AddScoped<RuntimePreviewDeployReadinessService>();
+        services.AddScoped<RuntimePreviewPackageReadinessBridge>();
+        services.AddScoped<RuntimePreviewScenarioCorpusService>();
         services.AddScoped<RuntimePreviewScenarioEvidenceService>();
+        services.AddScoped<RuntimePreviewAgentExplanationService>();
         services.AddScoped<OfflineRuntimePreviewAdapter>();
         services.AddScoped<PilotRuntimePreviewAdapter>();
         services.AddScoped<IRuntimePreviewAdapter>(sp => sp.GetRequiredService<OfflineRuntimePreviewAdapter>());

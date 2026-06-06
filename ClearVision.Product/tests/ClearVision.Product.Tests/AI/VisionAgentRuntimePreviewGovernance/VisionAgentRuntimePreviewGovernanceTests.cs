@@ -616,17 +616,17 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
 
         var document = await service.RunAsync(AppConfigWithCamera(), null, CancellationToken.None);
 
-        document.CaseCount.Should().Be(8);
+        document.CaseCount.Should().BeGreaterThanOrEqualTo(14);
         document.Cases.Select(item => item.Scenario).Should().Contain(new[]
         {
             "wire_sequence",
             "template_matching",
             "hole_distance",
             "remote_control_detection",
-            "missing_resource",
+            "missing_camera",
             "dangerous_path",
-            "station_plc_deny",
-            "precheck_not_ready"
+            "plc_station_deny",
+            "precheck_blocked"
         });
         document.Cases.Should().OnlyContain(item => item.MetadataOnly && !item.RealResourcesTouched);
         document.Cases.Should().Contain(item => item.ActualStatus == RuntimePreviewScenarioEvidenceStatuses.Denied);
@@ -641,7 +641,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     {
         var cases = RuntimePreviewScenarioEvidenceService.CreateCases();
 
-        cases.Should().HaveCount(8);
+        cases.Should().HaveCountGreaterThanOrEqualTo(14);
         cases.Should().Contain(item => item.ExpectedSignals.Contains("previewReady"));
         cases.Should().Contain(item => item.ExpectedSignals.Contains("denyReason"));
         cases.Should().OnlyContain(item => item.WorkflowDraft.ValueKind == JsonValueKind.Object);
@@ -649,6 +649,278 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         raw.Should().NotContain("DB1");
         raw.Should().NotContain("external:/");
         raw.Should().NotContain("base64");
+    }
+
+    [Fact]
+    public void ScenarioCorpusService_ShouldExposeBusinessCorpusWithoutUnsafeResources()
+    {
+        var corpus = new RuntimePreviewScenarioCorpusService().BuildCorpus();
+
+        corpus.CaseCount.Should().BeGreaterThanOrEqualTo(14);
+        corpus.Cases.Should().OnlyContain(item => item.MetadataOnly && !item.RealResourcesTouched);
+        corpus.Cases.Should().OnlyContain(item => !string.IsNullOrWhiteSpace(item.WorkflowDraftHash));
+        corpus.Cases.Select(item => item.Scenario).Should().Contain(new[]
+        {
+            "wire_sequence",
+            "template_matching",
+            "hole_distance",
+            "remote_control_detection",
+            "missing_camera",
+            "missing_template",
+            "missing_model",
+            "dangerous_path",
+            "plc_station_deny",
+            "precheck_blocked",
+            "allowlist_mismatch",
+            "multi_operator_flow",
+            "missing_parameter",
+            "draft_editable_package_blocked"
+        });
+        var raw = JsonSerializer.Serialize(corpus);
+        raw.Should().NotContain("external:/");
+        raw.Should().NotContain("192.0.2.20");
+        raw.Should().NotContain("DB1");
+        raw.Should().NotContain("base64");
+    }
+
+    [Theory]
+    [MemberData(nameof(CorpusCaseIds))]
+    public void ScenarioCorpusCases_ShouldCarryExpectedRiskAndEngineerExplanation(string caseId)
+    {
+        var item = RuntimePreviewScenarioCorpusService.CreateCorpusCases()
+            .Single(entry => entry.CaseId == caseId);
+
+        item.WorkflowDraftHash.Should().NotBeNullOrWhiteSpace();
+        item.ExpectedRisk.Should().NotBeNullOrWhiteSpace();
+        item.BusinessExplanation.Should().NotBeNullOrWhiteSpace();
+        item.MetadataOnly.Should().BeTrue();
+        item.RealResourcesTouched.Should().BeFalse();
+        JsonSerializer.Serialize(item).Should().NotContain("external:/");
+    }
+
+    [Theory]
+    [MemberData(nameof(CorpusCaseIds))]
+    public void AgentExplanationService_ShouldExplainCorpusCasesForEngineers(string caseId)
+    {
+        var benchmark = new RuntimePreviewAgentExplanationService(new RuntimePreviewScenarioCorpusService()).Run();
+        var result = benchmark.Cases.Single(item => item.CaseId == caseId);
+
+        result.Passed.Should().BeTrue();
+        result.ReadyStateExplanation.Should().NotContain("AI");
+        result.PackageRiskExplanation.Should().Contain("Risk:");
+        result.NextEngineerAction.Should().NotBeNullOrWhiteSpace();
+        result.WorkflowDraftAllowed.Should().BeTrue();
+        result.MetadataOnly.Should().BeTrue();
+        result.RealResourcesTouched.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task PackageReadinessBridge_ShouldGenerateMetadataOnlyPackageReport()
+    {
+        var archive = new RuntimePreviewReportArchive();
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var bridge = new RuntimePreviewPackageReadinessBridge(
+            new RuntimePreviewDeployReadinessService(
+                Harness(auditTrail: auditTrail, reportArchive: archive),
+                archive,
+                auditTrail,
+                new RuntimePackagePrecheckTool()),
+            archive,
+            auditTrail);
+
+        var report = await bridge.GenerateAsync(
+            new RuntimePreviewPackageReadinessRequest
+            {
+                Config = PilotConfig(),
+                ToolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                Arguments = Args(new { flow = ValidFlow() }),
+                RuntimePreviewConsent = true,
+                RequireReplay = true
+            },
+            AppConfigWithCamera(),
+            null,
+            isAdmin: true,
+            developerUiRequested: true,
+            CancellationToken.None);
+
+        report.ReadyForPackage.Should().BeTrue();
+        report.PackageBlocked.Should().BeFalse();
+        report.PackageCreated.Should().BeFalse();
+        report.DeploymentExecuted.Should().BeFalse();
+        report.OperatorTrace.Should().NotBeEmpty();
+        report.ResourceTrace.Should().NotBeEmpty();
+        archive.GetPackageReadinessReport(report.ReportId).Should().NotBeNull();
+        auditTrail.ListForSession(report.SessionId).Should().Contain(item => item.EventType == RuntimePreviewAuditEventTypes.PackageReadinessGenerated);
+    }
+
+    [Fact]
+    public async Task PackageReadinessBridge_ShouldBlockMissingResourcesButKeepDraftEditable()
+    {
+        var archive = new RuntimePreviewReportArchive();
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var bridge = new RuntimePreviewPackageReadinessBridge(
+            new RuntimePreviewDeployReadinessService(
+                Harness(auditTrail: auditTrail, reportArchive: archive),
+                archive,
+                auditTrail,
+                new RuntimePackagePrecheckTool()),
+            archive,
+            auditTrail);
+
+        var report = await bridge.GenerateAsync(
+            new RuntimePreviewPackageReadinessRequest
+            {
+                Config = PilotConfig(),
+                ToolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                Arguments = Args(new { flow = ValidFlow(cameraBindingId: "cam-missing") }),
+                RuntimePreviewConsent = true,
+                RequireReplay = true
+            },
+            AppConfigWithCamera(),
+            null,
+            isAdmin: true,
+            developerUiRequested: true,
+            CancellationToken.None);
+
+        report.ReadyForPackage.Should().BeFalse();
+        report.PackageBlocked.Should().BeTrue();
+        report.WorkflowDraftAllowed.Should().BeTrue();
+        report.PackageCreated.Should().BeFalse();
+        report.RiskSummary.Should().Contain("blocked");
+        report.BlockingIssues.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void GovernanceStore_ShouldExposeIndexSummaryAndRecoverCorruptLines()
+    {
+        var directory = TempDirectory();
+        try
+        {
+            var store = new RuntimePreviewGovernanceStore(directory);
+            store.SaveSession(new RuntimePreviewSession
+            {
+                SessionId = "rp_session_index",
+                WorkflowDraftHash = "hash",
+                PilotConfigRevision = "config",
+                CatalogSnapshotId = "catalog"
+            });
+            File.AppendAllText(Path.Combine(directory, "runtime_preview_sessions.jsonl"), "{bad json" + Environment.NewLine);
+
+            var summary = store.BuildIndexSummary();
+            var sessions = store.LoadSessions();
+
+            summary.SchemaVersion.Should().Be(RuntimePreviewGovernanceStore.SchemaVersion);
+            summary.StorageVersion.Should().Be(RuntimePreviewGovernanceStore.StorageVersion);
+            summary.CorruptLineCount.Should().BeGreaterThan(0);
+            sessions.Should().Contain(item => item.SessionId == "rp_session_index");
+            summary.MetadataOnly.Should().BeTrue();
+            summary.RealResourcesTouched.Should().BeFalse();
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public void GovernanceStore_ShouldExportRedactedManifestWithPackageReports()
+    {
+        var directory = TempDirectory();
+        try
+        {
+            var store = new RuntimePreviewGovernanceStore(directory);
+            store.SaveSession(new RuntimePreviewSession
+            {
+                SessionId = "rp_session_export",
+                WorkflowDraftHash = "hash",
+                PilotConfigRevision = "config",
+                CatalogSnapshotId = "catalog"
+            });
+            store.SavePackageReadinessReport(new RuntimePreviewPackageReadinessReport
+            {
+                ReportId = "rp_package_readiness_export",
+                SessionId = "rp_session_export",
+                WorkflowDraftHash = "hash",
+                RiskSummary = "Metadata only package readiness export.",
+                RuntimePackagePrecheck = Args(new { packageCreated = false, deploymentExecuted = false }),
+                MetadataOnly = true,
+                RealResourcesTouched = false
+            });
+
+            var manifest = store.ExportManifest();
+
+            manifest.ExportId.Should().StartWith("rp_export_");
+            manifest.IndexSummary.PackageReadinessReportCount.Should().Be(1);
+            manifest.PackageReadinessReports.Should().Contain(item => item.ReportId == "rp_package_readiness_export");
+            manifest.RedactionPass.Should().BeTrue();
+            var raw = JsonSerializer.Serialize(manifest);
+            raw.Should().NotContain("192.0.2.20");
+            raw.Should().NotContain("external:/");
+            raw.Should().NotContain("apiKey");
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public void ReportArchive_ShouldLookupPackageReadinessBySessionAndReport()
+    {
+        var archive = new RuntimePreviewReportArchive();
+        var report = new RuntimePreviewPackageReadinessReport
+        {
+            ReportId = "rp_package_readiness_lookup",
+            SessionId = "rp_session_lookup",
+            RuntimePackagePrecheck = Args(new { packageCreated = false }),
+            MetadataOnly = true
+        };
+
+        archive.SavePackageReadinessReport(report);
+
+        archive.GetPackageReadinessReport("rp_package_readiness_lookup").Should().NotBeNull();
+        archive.GetPackageReadinessReportBySessionId("rp_session_lookup")!.ReportId.Should().Be(report.ReportId);
+        archive.ListPackageReadinessReports().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void AgentExplanationBenchmark_ShouldBeAcceptedForFullCorpus()
+    {
+        var benchmark = new RuntimePreviewAgentExplanationService(new RuntimePreviewScenarioCorpusService()).Run();
+
+        benchmark.CaseCount.Should().BeGreaterThanOrEqualTo(14);
+        benchmark.PassedCaseCount.Should().Be(benchmark.CaseCount);
+        benchmark.Accepted.Should().BeTrue();
+        benchmark.Cases.Should().OnlyContain(item => item.WorkflowDraftAllowed && item.MetadataOnly && !item.RealResourcesTouched);
+    }
+
+    [Fact]
+    public void PackageReadinessReport_ShouldSerializeWithoutUnsafeFragments()
+    {
+        var report = new RuntimePreviewPackageReadinessReport
+        {
+            ReportId = "rp_package_readiness_safe",
+            SessionId = "rp_session_safe",
+            RuntimePackagePrecheck = Args(new { packageCreated = false, deploymentExecuted = false, baseUrl = "<redacted>" }),
+            BlockingIssues = ["RuntimePreview metadata simulation is not previewReady."],
+            RiskSummary = "Package is blocked by metadata precheck issues.",
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+
+        var raw = JsonSerializer.Serialize(report);
+
+        raw.Should().Contain("\"packageCreated\":false");
+        raw.Should().Contain("\"deploymentExecuted\":false");
+        raw.Should().NotContain("http://");
+        raw.Should().NotContain("external:/");
+        raw.Should().NotContain("apiKey");
+    }
+
+    public static IEnumerable<object[]> CorpusCaseIds()
+    {
+        return RuntimePreviewScenarioCorpusService.CreateCorpusCases()
+            .Select(item => new object[] { item.CaseId });
     }
 
     private static RuntimePreviewSimulatedExecutionHarness Harness(

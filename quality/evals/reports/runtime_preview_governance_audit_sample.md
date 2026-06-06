@@ -1,11 +1,12 @@
 # RuntimePreview Governance Audit Sample
 
-- Generated UTC: `2026-06-06T12:31:57.847051+00:00`
+- Generated UTC: `2026-06-06T13:40:09.986508+00:00`
 - Commit: `local`
 - Branch: `local`
 - Run: `local` attempt `local`
 - Metadata only: `True`
 - Real resources touched: `False`
+- Accepted: `True`
 
 | Event | Redacted | Metadata only |
 | --- | --- | --- |
@@ -13,6 +14,7 @@
 | config_changed | True | True |
 | catalog_loaded | True | True |
 | allowlist_changed | True | True |
+| scenario_corpus_loaded | True | True |
 | readiness_checked | True | True |
 | permission_denied | True | True |
 | simulation_started | True | True |
@@ -20,7 +22,10 @@
 | report_generated | True | True |
 | session_replayed | True | True |
 | deploy_readiness_generated | True | True |
+| package_readiness_generated | True | True |
+| governance_exported | True | True |
 | retention_cleanup | True | True |
+| corruption_recovered | True | True |
 | session_cancelled | True | True |
 
-Safety boundary: no real camera SDK, Station access, image file read, model file load, PLC write, packaging, deployment, hot-load, or Real RuntimePreview adapter.
+Safety boundary: no real camera SDK, Station access, image file read, model file load, PLC write, package creation, deployment, hot-load, or Real RuntimePreview adapter.

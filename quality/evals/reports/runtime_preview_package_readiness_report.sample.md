@@ -1,4 +1,4 @@
-# RuntimePreview Deploy Readiness Report
+# RuntimePreview Package Readiness Report
 
 - Generated UTC: `2026-06-06T13:40:09.986508+00:00`
 - Commit: `local`

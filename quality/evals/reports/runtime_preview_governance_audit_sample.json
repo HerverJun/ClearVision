@@ -1,15 +1,15 @@
 {
-  "schemaVersion": "2026-06-06.runtime-preview-governance-audit-sample.v1",
+  "schemaVersion": "2026-06-06.runtime-preview-governance-audit-sample.v2",
   "benchmarkId": "runtime_preview_governance_audit_sample",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T12:31:57.847051+00:00"
+    "generatedAtUtc": "2026-06-06T13:40:09.986508+00:00"
   },
   "summary": {
-    "eventCount": 13,
+    "eventCount": 17,
     "metadataOnly": true,
     "realResourcesTouched": false,
     "redactionPass": true,
@@ -40,6 +40,13 @@
     },
     {
       "eventType": "allowlist_changed",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "scenario_corpus_loaded",
       "sessionId": "rp_session_sample",
       "payloadRedacted": true,
       "metadataOnly": true,
@@ -95,7 +102,28 @@
       "realResourcesTouched": false
     },
     {
+      "eventType": "package_readiness_generated",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "governance_exported",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
       "eventType": "retention_cleanup",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "corruption_recovered",
       "sessionId": "rp_session_sample",
       "payloadRedacted": true,
       "metadataOnly": true,
