@@ -20,12 +20,14 @@ JSON_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.json",
     REPORTS_DIR / "planner_autonomy_benchmark.json",
     REPORTS_DIR / "real_llm_planner_shadow_eval.json",
+    REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.json",
 ]
 
 MARKDOWN_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.md",
     REPORTS_DIR / "planner_autonomy_benchmark.md",
     REPORTS_DIR / "real_llm_planner_shadow_eval.md",
+    REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.md",
 ]
 
 TEXT_OUTPUTS = [
@@ -299,7 +301,7 @@ def main() -> int:
             continue
         report = load_json(path)
         workflow_run = validate_workflow_run(path, report, args.require_non_local_workflow_run, errors)
-        if path.name == "real_llm_planner_shadow_eval.json":
+        if path.name in {"real_llm_planner_shadow_eval.json", "real_llm_planner_shadow_eval.holdout.json"}:
             validate_shadow_report(path, report, errors)
         report_summaries.append(
             {

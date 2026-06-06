@@ -4,6 +4,8 @@ param(
     [string]$ModelConfigId = "",
     [string]$ModelConfigRole = "",
     [string]$ModelConfigDir = "",
+    [ValidateSet("fixed", "holdout")]
+    [string]$CaseSet = "fixed",
     [string]$CpaProviderAliases = "",
     [switch]$InspectConfigOnly,
     [string]$InspectOutput = ""
@@ -332,7 +334,9 @@ $args = @(
     "--output",
     $Output,
     "--report",
-    $Report
+    $Report,
+    "--case-set",
+    $CaseSet
 )
 
 if (-not [string]::IsNullOrWhiteSpace($ModelConfigId)) {

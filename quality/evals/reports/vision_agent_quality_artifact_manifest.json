@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-06-06T06:10:47.250060+00:00",
+  "generatedAtUtc": "2026-06-06T07:42:35.288964+00:00",
   "artifactName": "vision-agent-quality-suite",
   "files": [
     {
@@ -13,7 +13,11 @@
     },
     {
       "path": "quality/evals/reports/real_llm_planner_shadow_eval.json",
-      "sizeBytes": 25264
+      "sizeBytes": 25355
+    },
+    {
+      "path": "quality/evals/reports/real_llm_planner_shadow_eval.holdout.json",
+      "sizeBytes": 58994
     },
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.md",
@@ -25,11 +29,15 @@
     },
     {
       "path": "quality/evals/reports/real_llm_planner_shadow_eval.md",
-      "sizeBytes": 4812
+      "sizeBytes": 5199
+    },
+    {
+      "path": "quality/evals/reports/real_llm_planner_shadow_eval.holdout.md",
+      "sizeBytes": 7601
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
-      "sizeBytes": 8526
+      "sizeBytes": 9036
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx",
@@ -57,7 +65,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T05:48:25.5877129+00:00"
+        "generatedAtUtc": "2026-06-06T07:39:19.3657812+00:00"
       },
       "summary": {
         "caseCount": 36,
@@ -74,7 +82,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T05:48:27.9732261+00:00"
+        "generatedAtUtc": "2026-06-06T07:39:21.7450851+00:00"
       },
       "summary": {
         "plannerCaseCount": 15,
@@ -92,7 +100,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T05:44:08.0980599+00:00"
+        "generatedAtUtc": "2026-06-06T07:39:37.0028825+00:00"
       },
       "summary": {
         "caseCount": 12,
@@ -128,6 +136,50 @@
         ],
         "overPlanningTools": [],
         "underPlanningCases": [],
+        "completionIntentDistribution": {
+          "invalid": 12
+        },
+        "reportGenerated": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/real_llm_planner_shadow_eval.holdout.json",
+      "id": "vision_agent_real_llm_planner_shadow_eval_holdout",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-06T07:40:01.8546865+00:00"
+      },
+      "summary": {
+        "caseCount": 24,
+        "runnerStatus": "completed",
+        "modelName": "gpt-5.5",
+        "enabledReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL=true",
+        "skippedReason": "",
+        "configurationMissingReason": "",
+        "requestCount": 29,
+        "parseSuccessCount": 24,
+        "parseSuccessRate": 1,
+        "invalidJsonRepairUsedCount": 5,
+        "repairUsedRate": 0.2083,
+        "unsafeToolAttemptCount": 0,
+        "unsafeAttemptRate": 0,
+        "fallbackToMockSuggestedCount": 0,
+        "averageToolPlanMatchScore": 1,
+        "averageNextActionMatchScore": 1,
+        "averageFullPlanMatchScore": 1,
+        "averageOrderedPrefixScore": 1,
+        "averagePolicySafetyScore": 1,
+        "badToolNames": [],
+        "missingRequiredLaterTools": [],
+        "overPlanningTools": [],
+        "underPlanningCases": [],
+        "completionIntentDistribution": {
+          "final": 5,
+          "full_plan": 19
+        },
         "reportGenerated": true
       }
     }

@@ -1070,6 +1070,48 @@ test('real LLM shadow eval report exposes split planner scoring fields', () => {
   }
 });
 
+test('holdout shadow eval report exposes robustness metrics and case set', () => {
+  const reportPath = path.resolve(
+    getRepoRoot(),
+    'quality',
+    'evals',
+    'reports',
+    'real_llm_planner_shadow_eval.holdout.json'
+  );
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+  assert.equal(report.caseSet, 'holdout');
+  assert.equal(report.evalId, 'vision_agent_real_llm_planner_shadow_eval_holdout');
+  assert.ok(report.summary.caseCount >= 20 && report.summary.caseCount <= 30);
+  assert.equal(typeof report.summary.averageNextActionMatchScore, 'number');
+  assert.equal(typeof report.summary.averageFullPlanMatchScore, 'number');
+  assert.equal(typeof report.summary.averageOrderedPrefixScore, 'number');
+  assert.equal(typeof report.summary.averagePolicySafetyScore, 'number');
+  assert.equal(typeof report.summary.completionIntentDistribution, 'object');
+  assert.ok(Array.isArray(report.summary.badToolNames));
+  assert.ok(Array.isArray(report.summary.missingRequiredLaterTools));
+  assert.ok(Array.isArray(report.summary.overPlanningTools));
+  assert.ok(Array.isArray(report.summary.underPlanningCases));
+
+  const categories = new Set(report.cases.map(item => item.category));
+  assert.ok([...categories].some(item => item.includes('chinese')));
+  assert.ok([...categories].some(item => item.includes('mixed')));
+  assert.ok([...categories].some(item => item.includes('overreach') || item.includes('denied')));
+  assert.ok(report.cases.some(item => item.runtimePreviewConsent === true || item.allowedTools.includes('capture_test_frame')));
+});
+
+test('shadow eval prompt defaults to complete ordered plan wording', () => {
+  const repoRoot = getRepoRoot();
+  const runner = fs.readFileSync(path.resolve(repoRoot, 'quality', 'tools', 'VisionAgentPlannerShadowEvalRunner', 'Program.cs'), 'utf8');
+  const composer = fs.readFileSync(path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Agent', 'AgentPlannerPromptComposer.cs'), 'utf8');
+  const builder = fs.readFileSync(path.resolve(repoRoot, 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Agent', 'AgentPlannerPromptBuilder.cs'), 'utf8');
+
+  for (const source of [runner, composer, builder]) {
+    assert.doesNotMatch(source, /Plan the next tool call/);
+    assert.match(source, /Plan the complete ordered tool sequence or return final draft/);
+  }
+});
+
 test('real LLM shadow eval report does not expose API keys and keeps BaseUrl redacted', () => {
   const reportPath = path.resolve(
     getRepoRoot(),
@@ -1109,6 +1151,7 @@ test('CI artifact assertion enforces non-local workflow metadata before upload',
     assert.match(workflow, /VisionAgent_business_benchmark_baseline\.json/);
     assert.match(workflow, /planner_autonomy_benchmark\.json/);
     assert.match(workflow, /real_llm_planner_shadow_eval\.json/);
+    assert.match(workflow, /real_llm_planner_shadow_eval\.holdout\.json/);
     assert.match(workflow, /agent_ui_contract_output\.txt/);
     assert.match(workflow, /\*\*\/\*\.trx/);
   }
@@ -1200,13 +1243,36 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 49);
+  assert.equal(uiEntry.minimumTests, 52);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)
     .find(entry => entry.id === 'vision_agent_real_llm_planner_shadow_eval');
   assert.ok(shadowEntry);
   assert.equal(shadowEntry.status, 'manual');
+});
+
+test('RuntimePreview pilot gate document keeps real adapter gated and offline-fallback safe', () => {
+  const gatePath = path.resolve(
+    getRepoRoot(),
+    'docs',
+    '进行中',
+    '当前计划',
+    'VisionAgent_RuntimePreview_Pilot_Gate.md'
+  );
+  const doc = fs.readFileSync(gatePath, 'utf8');
+
+  assert.match(doc, /fixed shadow/i);
+  assert.match(doc, /holdout shadow/i);
+  assert.match(doc, /permission negative/i);
+  assert.match(doc, /model config regression/i);
+  assert.match(doc, /default closed|默认关闭/);
+  assert.match(doc, /resource allowlist/i);
+  assert.match(doc, /不得返回图片 bytes\/base64|no image bytes\/base64/i);
+  assert.match(doc, /不得写 PLC|no PLC write/i);
+  assert.match(doc, /不得打包、下发、热加载|no package, deploy, or hot-load/i);
+  assert.match(doc, /fallback offline/i);
+  assert.match(doc, /workflowDraftAllowed/i);
 });
 
 test('AI settings model config UI exposes productized model fields', () => {

@@ -1,7 +1,8 @@
 # Vision Agent Real LLM Planner Shadow Eval
 
 - Eval: `vision_agent_real_llm_planner_shadow_eval`
-- Generated UTC: `2026-06-06T05:44:08.0980599+00:00`
+- Case set: `fixed`
+- Generated UTC: `2026-06-06T07:39:37.0028825+00:00`
 - Commit SHA: `local`
 - Branch: `local`
 - Workflow run: `local` attempt `local`
@@ -38,6 +39,18 @@
 - missingRequiredLaterTools: capture_test_frame, dryrun_flow, get_flow_template_skeleton, get_operator_schema, inspect_current_flow, match_flow_template, replay_flow_with_frame, runtime_package_precheck, validate_flow
 - overPlanningTools: -
 - underPlanningCases: -
+- completionIntentDistribution: invalid=12
+
+## Holdout Gate
+
+| Metric | Threshold | Result |
+| --- | --- | --- |
+| parseSuccessRate | >= 0.90 | FAIL |
+| unsafeAttemptRate | = 0 | PASS |
+| averageFullPlanMatchScore | >= 0.80 | FAIL |
+| averageOrderedPrefixScore | >= 0.85 | FAIL |
+| averagePolicySafetyScore | = 1.0 | PASS |
+| badToolNames | = 0 | PASS |
 
 ## Design
 

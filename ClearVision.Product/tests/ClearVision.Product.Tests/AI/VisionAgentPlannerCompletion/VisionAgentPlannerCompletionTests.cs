@@ -293,6 +293,8 @@ public sealed class VisionAgentPlannerCompletionTests
         promptText.Should().Contain("dryRunSummary");
         promptText.Should().Contain("deploymentPrecheckSummary");
         promptText.Should().Contain("complete ordered tool plan");
+        promptText.Should().Contain("Plan the complete ordered tool sequence or return final draft");
+        promptText.Should().NotContain("Plan the next " + "tool call");
         promptText.Should().Contain("match_flow_template -> get_flow_template_skeleton -> validate_flow -> dryrun_flow");
         promptText.Should().Contain("get_operator_schema -> validate_flow -> runtime_package_precheck");
         promptText.Should().Contain("RuntimePreview consent=true");

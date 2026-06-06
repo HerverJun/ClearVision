@@ -1,17 +1,19 @@
 # Vision Agent Quality Artifact Manifest
 
-- Generated UTC: `2026-06-06T06:10:47.250060+00:00`
+- Generated UTC: `2026-06-06T07:42:35.288964+00:00`
 - Artifact: `vision-agent-quality-suite`
 
 | File | Size bytes |
 | --- | ---: |
 | quality/evals/reports/VisionAgent_business_benchmark_baseline.json | 223452 |
 | quality/evals/reports/planner_autonomy_benchmark.json | 752782 |
-| quality/evals/reports/real_llm_planner_shadow_eval.json | 25264 |
+| quality/evals/reports/real_llm_planner_shadow_eval.json | 25355 |
+| quality/evals/reports/real_llm_planner_shadow_eval.holdout.json | 58994 |
 | quality/evals/reports/VisionAgent_business_benchmark_baseline.md | 10516 |
 | quality/evals/reports/planner_autonomy_benchmark.md | 5482 |
-| quality/evals/reports/real_llm_planner_shadow_eval.md | 4812 |
-| test_results/agent_engineering_harness/agent_ui_contract_output.txt | 8526 |
+| quality/evals/reports/real_llm_planner_shadow_eval.md | 5199 |
+| quality/evals/reports/real_llm_planner_shadow_eval.holdout.md | 7601 |
+| test_results/agent_engineering_harness/agent_ui_contract_output.txt | 9036 |
 | test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx | 29531 |
 | test_results/agent_engineering_harness/agent_contracts_skeleton.trx | 35964 |
 | test_results/agent_engineering_harness/agent_engineering_harness.trx | 263369 |

@@ -48,7 +48,9 @@ jobs:
 
       - name: Generate Real LLM Shadow Eval Sample
         shell: pwsh
-        run: dotnet run --project quality/tools/VisionAgentPlannerShadowEvalRunner/VisionAgentPlannerShadowEvalRunner.csproj -- --output quality/evals/reports/real_llm_planner_shadow_eval.json --report quality/evals/reports/real_llm_planner_shadow_eval.md
+        run: |
+          dotnet run --project quality/tools/VisionAgentPlannerShadowEvalRunner/VisionAgentPlannerShadowEvalRunner.csproj -- --output quality/evals/reports/real_llm_planner_shadow_eval.json --report quality/evals/reports/real_llm_planner_shadow_eval.md
+          dotnet run --project quality/tools/VisionAgentPlannerShadowEvalRunner/VisionAgentPlannerShadowEvalRunner.csproj -- --case-set holdout --output quality/evals/reports/real_llm_planner_shadow_eval.holdout.json --report quality/evals/reports/real_llm_planner_shadow_eval.holdout.md
 
       - name: Assert Vision Agent Artifact Reports
         shell: pwsh
@@ -66,6 +68,8 @@ jobs:
             quality/evals/reports/planner_autonomy_benchmark.md
             quality/evals/reports/real_llm_planner_shadow_eval.json
             quality/evals/reports/real_llm_planner_shadow_eval.md
+            quality/evals/reports/real_llm_planner_shadow_eval.holdout.json
+            quality/evals/reports/real_llm_planner_shadow_eval.holdout.md
             quality/evals/reports/vision_agent_quality_artifact_manifest.json
             quality/evals/reports/vision_agent_quality_artifact_manifest.md
             test_results/agent_engineering_harness/**/*.trx

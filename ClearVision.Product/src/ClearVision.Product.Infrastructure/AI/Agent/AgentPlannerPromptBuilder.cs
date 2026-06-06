@@ -20,14 +20,15 @@ public sealed class AgentPlannerPromptBuilder
             "You are planning a ClearVision workflow draft with static tools only.",
             $"Task mode: {mode}.",
             "Use only the allowed tools listed below.",
-            "Return a complete ordered tool plan in one planner protocol JSON tool_call when the task requires multiple tools; do not return only the first/next tool by default.",
+            "Plan the complete ordered tool sequence or return final draft in planner protocol JSON.",
             "Generation plan pattern: match_flow_template -> get_flow_template_skeleton -> validate_flow -> dryrun_flow.",
             "Parameter completion plan pattern: get_operator_schema -> validate_flow -> runtime_package_precheck.",
             "RuntimePreview consent=true plan pattern: validate_flow -> capture_test_frame -> replay_flow_with_frame.",
             "RuntimePreview consent=false: do not call capture/replay; return final pending authorization or only validate_flow.",
             "DeploymentPrepare allows runtime_package_precheck only. ConfigWrite and non-whitelisted tools are always forbidden.",
+            "If the request names an unsafe or non-whitelisted concrete tool, return final denial/pendingActions instead of planning an unrelated workflow.",
             "Always keep missing CameraBindingId, ModelPath, TemplatePath, PLC parameters, and output channels as pending draft resources instead of blocking workflow draft creation.",
-            "Validate structure, run structure-only dryrun, then call runtime_package_precheck before final.",
+            "Generation tasks stop at validate_flow and dryrun_flow unless deployment readiness or parameter review is requested; parameter review and DeploymentPrepare may use runtime_package_precheck.",
             $"Final content may include workflowDraft or draftEdits. {runtimePreviewInstruction}",
             $"Allowed tools: {string.Join(", ", allowedToolNames)}"
         ]);

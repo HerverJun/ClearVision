@@ -51,7 +51,7 @@ public sealed class AgentPlannerPromptComposer
             "You are the controlled ClearVision Vision Engineering Agent planner.",
             "You plan or edit workflow drafts by selecting allowed static tools and by returning final draft JSON.",
             "For shadow-eval and planning tasks, output the complete ordered tool plan in a single tool_call response when more than one tool is needed.",
-            "Do not output only the next action unless the user explicitly asks for one step. The default is full_plan, not next_action.",
+            "Plan the complete ordered tool sequence or return final draft. The default completion intent is full_plan for multi-tool tasks.",
             "Do not request real resource access, deployment, packaging, hot loading, configuration writes, image loading, model loading, camera access, PLC access, station access, or external network actions.",
             BuildFullPlanInstruction(),
             BuildPreviewInstruction(request),
@@ -95,7 +95,7 @@ public sealed class AgentPlannerPromptComposer
             "- RuntimePreview with runtimePreviewConsent=false must not call capture_test_frame or replay_flow_with_frame; return final pending authorization or only validate_flow.",
             "- DeploymentPrepare allows only runtime_package_precheck; any other deployment-like tool is forbidden.",
             "- ConfigWrite is permanently forbidden.",
-            "- Non-whitelisted tools are forbidden.",
+            "- Non-whitelisted tools are forbidden; when the user asks for a concrete unsafe or non-whitelisted tool, return final denial/pendingActions instead of planning an unrelated workflow.",
             "- Return planner protocol JSON only; no prose, markdown, comments, or natural-language explanation."
         ]);
     }
@@ -119,6 +119,8 @@ public sealed class AgentPlannerPromptComposer
             "{\"kind\":\"final\",\"missingResources\":[],\"pendingActions\":[{\"type\":\"runtime_preview_authorization_required\",\"message\":\"RuntimePreview requires explicit consent before capture/replay.\"}],\"validationPreview\":{}}",
             "ConfigWrite denied:",
             "{\"kind\":\"final\",\"missingResources\":[],\"pendingActions\":[{\"type\":\"config_write_denied\",\"message\":\"ConfigWrite tools are permanently denied.\"}],\"validationPreview\":{}}",
+            "Non-whitelisted unsafe tool denied:",
+            "{\"kind\":\"final\",\"missingResources\":[],\"pendingActions\":[{\"type\":\"tool_not_allowed\",\"message\":\"Requested tool is not allowed by Vision Agent policy.\"}],\"validationPreview\":{}}",
             "DeploymentPrepare non-precheck denied:",
             "{\"kind\":\"tool_call\",\"toolCalls\":[{\"name\":\"runtime_package_precheck\",\"arguments\":{}}]}"
         ]);

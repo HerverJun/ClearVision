@@ -1,7 +1,8 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-real-llm-planner-shadow-eval.v1",
   "evalId": "vision_agent_real_llm_planner_shadow_eval",
-  "generatedAtUtc": "2026-06-06T05:44:21.1030876+00:00",
+  "caseSet": "fixed",
+  "generatedAtUtc": "2026-06-06T07:29:38.6419861+00:00",
   "mode": "offline_metadata_only",
   "enabled": true,
   "workflowRun": {
@@ -9,7 +10,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T05:44:21.1030876+00:00"
+    "generatedAtUtc": "2026-06-06T07:29:38.6419861+00:00"
   },
   "llmConfiguration": {
     "provider": "OpenAI",
@@ -43,6 +44,10 @@
     "missingRequiredLaterTools": [],
     "overPlanningTools": [],
     "underPlanningCases": [],
+    "completionIntentDistribution": {
+      "final": 2,
+      "full_plan": 10
+    },
     "reportGenerated": true
   },
   "safety": {
