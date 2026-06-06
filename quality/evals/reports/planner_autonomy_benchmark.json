@@ -1,14 +1,14 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-planner-autonomy-benchmark.v1",
   "benchmarkId": "vision_agent_planner_autonomy_benchmark",
-  "generatedAtUtc": "2026-06-06T09:52:09.9764807+00:00",
+  "generatedAtUtc": "2026-06-06T11:14:27.1671024+00:00",
   "mode": "offline_metadata_only",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T09:52:09.9764807+00:00"
+    "generatedAtUtc": "2026-06-06T11:14:27.1671024+00:00"
   },
   "summary": {
     "plannerCaseCount": 15,

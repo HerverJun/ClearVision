@@ -1,11 +1,18 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-06-06T10:26:06.382176+00:00",
+  "generatedAtUtc": "2026-06-06T11:16:22.930810+00:00",
   "artifactName": "vision-agent-quality-suite",
+  "scanPolicyVersion": "2026-06-06.runtime-preview-v1-governance-scan.v1",
+  "sourceFilesScanned": 3315,
+  "reportsScanned": 4,
+  "auditReportsScanned": 0,
+  "sessionReportsScanned": 0,
+  "forbiddenHitCount": 0,
+  "redactionPass": true,
   "files": [
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.json",
-      "sizeBytes": 232014
+      "sizeBytes": 252117
     },
     {
       "path": "quality/evals/reports/planner_autonomy_benchmark.json",
@@ -21,7 +28,7 @@
     },
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.md",
-      "sizeBytes": 10516
+      "sizeBytes": 10821
     },
     {
       "path": "quality/evals/reports/planner_autonomy_benchmark.md",
@@ -37,11 +44,11 @@
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
-      "sizeBytes": 10268
+      "sizeBytes": 11976
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx",
-      "sizeBytes": 36736
+      "sizeBytes": 52586
     },
     {
       "path": "test_results/agent_engineering_harness/agent_contracts_skeleton.trx",
@@ -49,7 +56,7 @@
     },
     {
       "path": "test_results/agent_engineering_harness/agent_engineering_harness.trx",
-      "sizeBytes": 293291
+      "sizeBytes": 362063
     },
     {
       "path": "test_results/agent_engineering_harness/agent_planner_parity_subset.trx",
@@ -65,12 +72,12 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T09:52:07.2834541+00:00"
+        "generatedAtUtc": "2026-06-06T11:14:24.7562998+00:00"
       },
       "summary": {
-        "caseCount": 36,
-        "runtimePreviewCaseCount": 6,
-        "passedCaseCount": 36,
+        "caseCount": 37,
+        "runtimePreviewCaseCount": 7,
+        "passedCaseCount": 37,
         "accepted": true
       }
     },
@@ -82,7 +89,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T09:52:09.9764807+00:00"
+        "generatedAtUtc": "2026-06-06T11:14:27.1671024+00:00"
       },
       "summary": {
         "plannerCaseCount": 15,

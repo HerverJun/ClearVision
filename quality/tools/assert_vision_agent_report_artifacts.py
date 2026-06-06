@@ -15,6 +15,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 TEST_RESULTS_DIR = REPO_ROOT / "test_results" / "agent_engineering_harness"
+SCAN_POLICY_VERSION = "2026-06-06.runtime-preview-v1-governance-scan.v1"
 
 JSON_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.json",
@@ -226,11 +227,25 @@ def validate_source_secret_scan(files: list[Path], fragments: list[str], errors:
                 errors.append(f"{repo_relative(path)} leaks forbidden source credential pattern: {label}")
 
 
-def build_manifest(json_reports: list[dict[str, Any]], files: list[Path]) -> dict[str, Any]:
+def build_manifest(
+    json_reports: list[dict[str, Any]],
+    files: list[Path],
+    source_files_scanned: int,
+    audit_reports_scanned: int,
+    session_reports_scanned: int,
+    forbidden_hit_count: int,
+) -> dict[str, Any]:
     return {
         "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
         "generatedAtUtc": datetime.now(timezone.utc).isoformat(),
         "artifactName": "vision-agent-quality-suite",
+        "scanPolicyVersion": SCAN_POLICY_VERSION,
+        "sourceFilesScanned": source_files_scanned,
+        "reportsScanned": len(json_reports),
+        "auditReportsScanned": audit_reports_scanned,
+        "sessionReportsScanned": session_reports_scanned,
+        "forbiddenHitCount": forbidden_hit_count,
+        "redactionPass": forbidden_hit_count == 0,
         "files": [
             {"path": repo_relative(path), "sizeBytes": path.stat().st_size}
             for path in files
@@ -245,6 +260,13 @@ def write_manifest_markdown(path: Path, manifest: dict[str, Any]) -> None:
         "",
         f"- Generated UTC: `{manifest['generatedAtUtc']}`",
         f"- Artifact: `{manifest['artifactName']}`",
+        f"- Scan policy: `{manifest['scanPolicyVersion']}`",
+        f"- Source files scanned: `{manifest['sourceFilesScanned']}`",
+        f"- Reports scanned: `{manifest['reportsScanned']}`",
+        f"- Audit reports scanned: `{manifest['auditReportsScanned']}`",
+        f"- Session reports scanned: `{manifest['sessionReportsScanned']}`",
+        f"- Forbidden hits: `{manifest['forbiddenHitCount']}`",
+        f"- Redaction pass: `{manifest['redactionPass']}`",
         "",
         "| File | Size bytes |",
         "| --- | ---: |",
@@ -328,7 +350,22 @@ def main() -> int:
         if not manifest_path.is_absolute():
             manifest_path = REPO_ROOT / manifest_path
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        manifest = build_manifest(report_summaries, expected_files)
+        audit_reports_scanned = len([
+            path for path in expected_files
+            if "audit" in path.name.lower()
+        ])
+        session_reports_scanned = len([
+            path for path in expected_files
+            if "session" in path.name.lower() or "runtime_preview" in path.name.lower()
+        ])
+        manifest = build_manifest(
+            report_summaries,
+            expected_files,
+            source_files_scanned,
+            audit_reports_scanned,
+            session_reports_scanned,
+            forbidden_hit_count=0,
+        )
         manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         if args.write_report:
             report_path = Path(args.write_report)

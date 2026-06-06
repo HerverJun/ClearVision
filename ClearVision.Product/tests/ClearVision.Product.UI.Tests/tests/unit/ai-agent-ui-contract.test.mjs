@@ -1378,7 +1378,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 58);
+  assert.equal(uiEntry.minimumTests, 68);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)
@@ -1501,6 +1501,20 @@ test('AI settings API wrapper exposes RuntimePreview Pilot management endpoints'
   assert.match(source, /\/settings\/runtime-preview-pilot\/readiness/);
 });
 
+test('AI settings API wrapper exposes RuntimePreview Pilot session endpoints', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsApi.js'),
+    'utf8'
+  );
+
+  assert.match(source, /listRuntimePreviewPilotSessions/);
+  assert.match(source, /createRuntimePreviewPilotSession/);
+  assert.match(source, /simulateRuntimePreviewPilotSession/);
+  assert.match(source, /loadRuntimePreviewPilotSessionReport/);
+  assert.match(source, /cancelRuntimePreviewPilotSession/);
+  assert.match(source, /\/settings\/runtime-preview-pilot\/sessions\/simulate/);
+});
+
 test('AI settings RuntimePreview Pilot UI is developer-hidden and exposes config catalog readiness controls', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
@@ -1524,6 +1538,142 @@ test('AI settings RuntimePreview Pilot UI is developer-hidden and exposes config
   assert.match(source, /resourceTrace/);
   assert.match(source, /fallback/);
   assert.match(source, /allowlistCoverage/);
+});
+
+test('AI settings RuntimePreview Pilot Console exposes session controls', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /RuntimePreview Pilot Console v1\.0/);
+  assert.match(source, /btn-runtime-preview-pilot-create-session/);
+  assert.match(source, /btn-runtime-preview-pilot-simulate/);
+  assert.match(source, /btn-runtime-preview-pilot-load-report/);
+  assert.match(source, /btn-runtime-preview-pilot-cancel-session/);
+  assert.match(source, /data-rp-session-console/);
+});
+
+test('AI settings RuntimePreview Pilot Console renders session list fields', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /runtimePreviewPilotSessions/);
+  assert.match(source, /data-rp-session-list/);
+  assert.match(source, /session\.sessionId/);
+  assert.match(source, /session\.readinessStatus/);
+  assert.match(source, /session\.permissionStatus/);
+  assert.match(source, /session\.reportId/);
+});
+
+test('AI settings RuntimePreview Pilot Console renders audit timeline and report preview', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /runtimePreviewPilotSessionReport/);
+  assert.match(source, /data-rp-report-preview/);
+  assert.match(source, /data-rp-audit-timeline/);
+  assert.match(source, /simulatedTimeline/);
+  assert.match(source, /auditTimeline/);
+  assert.match(source, /resourceHandles/);
+});
+
+test('AI settings RuntimePreview Pilot session payload remains metadata-only', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /buildRuntimePreviewPilotSessionPayload/);
+  assert.match(source, /toolName:\s*'runtime_preview_metadata'/);
+  assert.match(source, /runtimePreviewConsent:\s*true/);
+  assert.doesNotMatch(source, /capture_test_frame|replay_flow_with_frame/);
+});
+
+test('RuntimePreview governance source defines session lifecycle and audit events', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+
+  for (const token of [
+    'RuntimePreviewSessionStatuses',
+    'Created',
+    'Configured',
+    'ReadinessChecked',
+    'Authorized',
+    'Simulated',
+    'Completed',
+    'Denied',
+    'Failed',
+    'Cancelled',
+    'RuntimePreviewAuditEventTypes',
+    'ReportGenerated'
+  ]) {
+    assert.match(source, new RegExp(token));
+  }
+});
+
+test('RuntimePreview governance source exposes brokers and metadata resource handles', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /RuntimePreviewPermissionBroker/);
+  assert.match(source, /RuntimePreviewResourceBroker/);
+  assert.match(source, /RuntimePreviewSimulatedExecutionHarness/);
+  assert.match(source, /RuntimePreviewResourceHandle/);
+  assert.match(source, /RealResourcesTouched = false/);
+});
+
+test('RuntimePreview readiness endpoint uses PermissionBroker admin gate', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'Endpoints', 'SettingsEndpoints.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /runtime-preview-pilot\/readiness/);
+  assert.match(source, /RuntimePreviewPermissionBroker/);
+  assert.match(source, /EvaluateEndpointAccess/);
+  assert.match(source, /runtime-preview-pilot-readiness/);
+  assert.match(source, /Status403Forbidden/);
+});
+
+test('RuntimePreview simulated harness records audit and report archive events', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
+    'utf8'
+  );
+
+  for (const token of [
+    'SessionCreated',
+    'CatalogLoaded',
+    'ReadinessChecked',
+    'PermissionDenied',
+    'SimulationStarted',
+    'SimulationCompleted',
+    'ReportGenerated',
+    'RuntimePreviewReportArchive'
+  ]) {
+    assert.match(source, new RegExp(token));
+  }
+});
+
+test('business benchmark includes RuntimePreview session simulation case', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'quality', 'tools', 'VisionAgentBusinessBenchmarkRunner', 'Program.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /VA-BM-037/);
+  assert.match(source, /runtime_preview_session/);
+  assert.match(source, /RuntimePreviewSimulateMetadataSessionTool\.ToolName/);
+  assert.match(source, /create_runtime_preview_session/);
 });
 
 test('AI settings RuntimePreview Pilot UI redacts sensitive display values and keeps metadata-only safety flags', () => {

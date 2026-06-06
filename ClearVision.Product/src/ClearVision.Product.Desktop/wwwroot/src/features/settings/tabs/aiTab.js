@@ -78,15 +78,18 @@ export function installAiTab(SettingsView) {
             }
 
             try {
-                const [configResult, catalog] = await Promise.all([
+                const [configResult, catalog, sessionsResult] = await Promise.all([
                     settingsApi.loadRuntimePreviewPilotConfig(),
-                    settingsApi.loadRuntimePreviewPilotCatalog()
+                    settingsApi.loadRuntimePreviewPilotCatalog(),
+                    settingsApi.listRuntimePreviewPilotSessions()
                 ]);
                 this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(configResult);
                 this.runtimePreviewPilotCatalog = catalog || { items: [] };
+                this.runtimePreviewPilotSessions = sessionsResult?.sessions || [];
             } catch {
                 this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig({});
                 this.runtimePreviewPilotCatalog = { items: [] };
+                this.runtimePreviewPilotSessions = [];
             }
         }
         ,
@@ -362,31 +365,53 @@ export function installAiTab(SettingsView) {
                     }
                 } else if (btn.id === 'btn-runtime-preview-pilot-readiness') {
                     try {
-                        const payload = {
-                            config: this.readRuntimePreviewPilotConfigDraft(aiTab),
-                            toolName: 'runtime_preview_metadata',
-                            arguments: {
-                                flow: {
-                                    operators: [
-                                        {
-                                            tempId: 'op_cam',
-                                            operatorType: 'ImageAcquisition',
-                                            parameters: {
-                                                SourceType: 'Camera',
-                                                CameraBindingId: (aiTab.querySelector('#cfg-rp-allow-cameras')?.value || '').split(',')[0]?.trim() || '<pending-camera-binding>'
-                                            }
-                                        }
-                                    ],
-                                    connections: []
-                                }
-                            }
-                        };
+                        const payload = this.buildRuntimePreviewPilotSessionPayload(aiTab);
                         const result = await settingsApi.checkRuntimePreviewPilotReadiness(payload);
                         this.runtimePreviewPilotReadiness = result?.readiness || result;
                         this.runtimePreviewPilotCatalog = result?.catalog || this.runtimePreviewPilotCatalog;
                         this.refreshRuntimePreviewPilotPanel();
                     } catch (err) {
                         showToast('RuntimePreview Pilot readiness failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-create-session') {
+                    try {
+                        const result = await settingsApi.createRuntimePreviewPilotSession(this.buildRuntimePreviewPilotSessionPayload(aiTab));
+                        this.runtimePreviewPilotSelectedSessionId = result?.session?.sessionId || null;
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot session create failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-simulate') {
+                    try {
+                        const result = await settingsApi.simulateRuntimePreviewPilotSession(this.buildRuntimePreviewPilotSessionPayload(aiTab));
+                        this.runtimePreviewPilotSessionReport = result?.report || null;
+                        this.runtimePreviewPilotSelectedSessionId = result?.session?.sessionId || result?.report?.sessionId || null;
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot simulation failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-load-report') {
+                    try {
+                        const sessionId = aiTab.querySelector('#cfg-rp-session-id')?.value || this.runtimePreviewPilotSelectedSessionId;
+                        if (!sessionId) return;
+                        const result = await settingsApi.loadRuntimePreviewPilotSessionReport(sessionId);
+                        this.runtimePreviewPilotSessionReport = result?.report || null;
+                        this.runtimePreviewPilotSelectedSessionId = sessionId;
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot report failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-cancel-session') {
+                    try {
+                        const sessionId = aiTab.querySelector('#cfg-rp-session-id')?.value || this.runtimePreviewPilotSelectedSessionId;
+                        if (!sessionId) return;
+                        await settingsApi.cancelRuntimePreviewPilotSession(sessionId);
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot cancel failed: ' + err.message, 'error');
                     }
                 }
             });
@@ -803,11 +828,38 @@ export function installAiTab(SettingsView) {
             };
         }
         ,
+        buildRuntimePreviewPilotSessionPayload(aiTab) {
+            const cameraBindingId = (aiTab.querySelector('#cfg-rp-allow-cameras')?.value || '')
+                .split(',')[0]?.trim() || '<pending-camera-binding>';
+            return {
+                config: this.readRuntimePreviewPilotConfigDraft(aiTab),
+                toolName: 'runtime_preview_metadata',
+                runtimePreviewConsent: true,
+                arguments: {
+                    flow: {
+                        operators: [
+                            {
+                                tempId: 'op_cam',
+                                operatorType: 'ImageAcquisition',
+                                parameters: {
+                                    SourceType: 'Camera',
+                                    CameraBindingId: cameraBindingId
+                                }
+                            }
+                        ],
+                        connections: []
+                    }
+                }
+            };
+        }
+        ,
         renderRuntimePreviewPilotPanel() {
             const developerEnabled = this.isRuntimePreviewPilotDeveloperUiEnabled();
             const config = this.normalizeRuntimePreviewPilotConfig(this.runtimePreviewPilotConfig || {});
             const catalogItems = Array.isArray(this.runtimePreviewPilotCatalog?.items) ? this.runtimePreviewPilotCatalog.items : [];
             const readiness = this.runtimePreviewPilotReadiness || null;
+            const sessions = Array.isArray(this.runtimePreviewPilotSessions) ? this.runtimePreviewPilotSessions : [];
+            const report = this.runtimePreviewPilotSessionReport || null;
             const listValue = value => this.escapeHtml((value || []).join(', '));
             const catalogHtml = catalogItems.length
                 ? catalogItems.slice(0, 16).map(item => `
@@ -838,11 +890,37 @@ export function installAiTab(SettingsView) {
                     }, null, 2))}</pre>
                 `
                 : '<div style="font-size:12px; color:#64748b;">Readiness has not been run.</div>';
+            const sessionRows = sessions.length
+                ? sessions.slice(0, 10).map(session => `
+                    <tr>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.sessionId)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.status)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.readinessStatus)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.permissionStatus)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(session.reportId || '')}</td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="5" style="color:#64748b;">No RuntimePreview sessions.</td></tr>';
+            const reportHtml = report
+                ? `
+                    <div data-rp-report-preview="true" style="font-size:12px;">
+                        <div>Report: <strong>${this.sanitizeRuntimePreviewPilotValue(report.reportId)}</strong></div>
+                        <div>Preview ready: <strong>${report.previewReady ? 'true' : 'false'}</strong></div>
+                        <div>Real resources touched: <strong>${report.realResourcesTouched ? 'true' : 'false'}</strong></div>
+                    </div>
+                    <pre data-rp-audit-timeline="true" style="margin-top:8px; white-space:pre-wrap; font-size:11px; max-height:160px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                        simulatedTimeline: report.simulation?.timeline || [],
+                        auditTimeline: report.auditEvents || [],
+                        permissionDecision: report.permissionDecision || {},
+                        resourceHandles: report.resourceHandles || []
+                    }, null, 2))}</pre>
+                `
+                : '<div style="font-size:12px; color:#64748b;">No report selected.</div>';
 
             return `
                 <details class="settings-modern-card" data-runtime-preview-pilot-admin="hidden" ${developerEnabled ? '' : 'hidden'}>
                     <summary class="settings-card-header" style="cursor:pointer;">
-                        <span>RuntimePreview Pilot v0.8</span>
+                        <span>RuntimePreview Pilot Console v1.0</span>
                         <span class="settings-status-badge ${config.enabled ? 'status-connected' : 'status-disconnected'}" style="margin-left:auto;">
                             <span class="status-dot"></span> ${config.enabled ? 'enabled' : 'disabled'}
                         </span>
@@ -866,6 +944,8 @@ export function installAiTab(SettingsView) {
                         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
                             <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-refresh">Refresh catalog</button>
                             <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-readiness">Run readiness</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-create-session">Create metadata session</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-simulate">Simulate metadata session</button>
                             <button class="cv-btn settings-btn-danger" id="btn-runtime-preview-pilot-save">Save pilot config</button>
                         </div>
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
@@ -878,6 +958,22 @@ export function installAiTab(SettingsView) {
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
                             <h4 style="margin:0 0 8px;">Readiness</h4>
                             ${readinessHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-session-console="true">
+                            <h4 style="margin:0 0 8px;">Session Console</h4>
+                            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                                <input class="cv-input" id="cfg-rp-session-id" placeholder="sessionId for report/cancel" value="${this.sanitizeRuntimePreviewPilotValue(this.runtimePreviewPilotSelectedSessionId || '')}">
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-load-report">Load report</button>
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-cancel-session">Cancel session</button>
+                            </div>
+                            <table class="settings-modern-table" data-rp-session-list="true">
+                                <thead><tr><th>Session</th><th>Status</th><th>Readiness</th><th>Permission</th><th>Report</th></tr></thead>
+                                <tbody>${sessionRows}</tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-report-export="true">
+                            <h4 style="margin:0 0 8px;">Audit timeline & report preview</h4>
+                            ${reportHtml}
                         </div>
                     </div>
                 </details>

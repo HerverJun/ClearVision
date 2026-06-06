@@ -116,7 +116,9 @@ internal static class VisionAgentBusinessBenchmark
         {
             UserDescription = benchmarkCase.UserRequest,
             ExistingFlowJson = benchmarkCase.ExistingFlow == null ? null : SerializeFlow(benchmarkCase.ExistingFlow),
-            RuntimePreviewConsent = benchmarkCase.ExpectedToolCalls.Any(RuntimePreviewPermissionGate.IsRuntimePreviewTool),
+            RuntimePreviewConsent = benchmarkCase.ExpectedToolCalls.Any(RuntimePreviewPermissionGate.IsRuntimePreviewTool) ||
+                                    benchmarkCase.ExpectedToolCalls.Any(toolName =>
+                                        string.Equals(toolName, RuntimePreviewSimulateMetadataSessionTool.ToolName, StringComparison.OrdinalIgnoreCase)),
             AllowedPermissions = new HashSet<VisionAgentToolPermission>
             {
                 VisionAgentToolPermission.ReadOnly,
@@ -160,6 +162,10 @@ internal static class VisionAgentBusinessBenchmark
                 runtimePreviewResult = result;
             }
             else if (string.Equals(toolName, RuntimePreviewPermissionGate.ReplayToolName, StringComparison.OrdinalIgnoreCase))
+            {
+                runtimePreviewResult = result;
+            }
+            else if (string.Equals(toolName, RuntimePreviewSimulateMetadataSessionTool.ToolName, StringComparison.OrdinalIgnoreCase))
             {
                 runtimePreviewResult = result;
             }
@@ -314,6 +320,28 @@ internal static class VisionAgentBusinessBenchmark
             });
         }
 
+        if (string.Equals(toolName, RuntimePreviewSimulateMetadataSessionTool.ToolName, StringComparison.OrdinalIgnoreCase))
+        {
+            return Args(new
+            {
+                flow = benchmarkCase.Flow,
+                runtimePreviewConsent = true,
+                config = new
+                {
+                    enabled = true,
+                    mode = RuntimePreviewModes.MetadataOnly,
+                    allowedCameraBindingIds = new[] { benchmarkCase.CameraBindingId },
+                    allowedTemplateIds = new[] { "template-a", "catalog-template-a", "catalog-template-b" },
+                    allowedModelIds = new[] { "model-a", "model-catalog-a" },
+                    allowedFlowIds = Array.Empty<string>(),
+                    allowedResourceRoots = Array.Empty<string>(),
+                    fallbackToOffline = true,
+                    denyExternalPath = true,
+                    denyImageBytes = true
+                }
+            });
+        }
+
         return Args(new { });
     }
 
@@ -373,6 +401,7 @@ internal static class VisionAgentBusinessBenchmark
             new CurrentFlowInspectTool(),
             new FlowValidationTool(),
             new DryRunFlowTool(),
+            new RuntimePreviewSimulateMetadataSessionTool(),
             new RuntimePreviewCaptureStubTool(),
             new RuntimePreviewReplayStubTool(),
             new RuntimePackagePrecheckTool(new BenchmarkStationStatusReader())
@@ -536,7 +565,8 @@ internal static class VisionAgentBusinessBenchmark
             Case("VA-BM-033", "runtime_preview", "runtime_preview", "Show RuntimePreview metadata without frame bytes, image files, or model files.", ValidTemplateFlow(), ["render_metadata_without_binary"], validateDryrunPreview, expectedRuntimePreviewReady: true),
             Case("VA-BM-034", "precheck", "precheck", "Run static runtime package precheck for a ready draft.", ValidTemplateFlow(), ["runtimePackagePrecheck.review"], validateDryrunPrecheck),
             Case("VA-BM-035", "precheck", "precheck", "Block deployment when mock Station status is offline, without touching a real Station.", ValidTemplateFlow(), ["stationStatus.review", "runtimePackagePrecheck.review"], validateDryrunPrecheck, targetStationId: "offline-station", expectedPrecheckReady: false),
-            Case("VA-BM-036", "precheck", "precheck", "Block deployment when structure-only dryrun summary is missing.", ValidTemplateFlow(), ["dryrun.required", "runtimePackagePrecheck.review"], ["validate_flow", "runtime_package_precheck"], expectsDryRun: false, expectedDryRunSucceeded: false, expectedPrecheckReady: false)
+            Case("VA-BM-036", "precheck", "precheck", "Block deployment when structure-only dryrun summary is missing.", ValidTemplateFlow(), ["dryrun.required", "runtimePackagePrecheck.review"], ["validate_flow", "runtime_package_precheck"], expectsDryRun: false, expectedDryRunSucceeded: false, expectedPrecheckReady: false),
+            Case("VA-BM-037", "runtime_preview", "runtime_preview_session", "Run metadata-only RuntimePreview governance session simulation and generate an audit report.", ValidTemplateFlow(templateId: "catalog-template-a"), ["create_runtime_preview_session", "catalog_snapshot", "readiness_gate", "metadata_simulation_report"], ["validate_flow", "dryrun_flow", RuntimePreviewSimulateMetadataSessionTool.ToolName], cameraBindingId: "mock-cam-template", expectedRuntimePreviewReady: true)
         ];
     }
 
@@ -553,6 +583,7 @@ internal static class VisionAgentBusinessBenchmark
         string? schemaOperatorType = null,
         BenchmarkFlow? existingFlow = null,
         string? targetStationId = null,
+        string? cameraBindingId = null,
         bool expectedStructurallyValid = true,
         bool expectsDryRun = true,
         bool expectedDryRunSucceeded = true,
@@ -573,6 +604,7 @@ internal static class VisionAgentBusinessBenchmark
             SchemaOperatorType = schemaOperatorType ?? flow.Operators.FirstOrDefault()?.OperatorType ?? "ImageAcquisition",
             ExistingFlow = existingFlow,
             TargetStationId = targetStationId,
+            CameraBindingId = cameraBindingId ?? "mock-camera-binding",
             ExpectedStructurallyValid = expectedStructurallyValid,
             ExpectsDryRun = expectsDryRun,
             ExpectedDryRunSucceeded = expectedDryRunSucceeded,

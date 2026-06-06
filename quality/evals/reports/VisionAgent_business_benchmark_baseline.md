@@ -1,12 +1,12 @@
 ﻿# Vision Agent Executable Business Benchmark
 
 - Benchmark: `vision_agent_executable_business_benchmark`
-- Generated UTC: `2026-06-06T09:52:07.2834541+00:00`
+- Generated UTC: `2026-06-06T11:14:24.7562998+00:00`
 - Commit SHA: `local`
 - Branch: `local`
 - Workflow run: `local` attempt `local`
 - Mode: `offline_metadata_only`
-- Cases: 36
+- Cases: 37
 - Accepted: True
 - JSON: `quality/evals/reports/VisionAgent_business_benchmark_baseline.json`
 
@@ -22,11 +22,11 @@
 | Metric | Actual | Minimum | Passed |
 | --- | ---: | ---: | --- |
 | generationSuccessRate | 100.00% | 95.00% | True |
-| structuralValidationPassRate | 97.22% | 90.00% | True |
-| dryRunPassRate | 94.44% | 85.00% | True |
-| previewReadyRate | 83.33% | 70.00% | True |
-| parameterCompletionRate | 80.56% | 70.00% | True |
-| userApplicableRate | 97.22% | 90.00% | True |
+| structuralValidationPassRate | 97.30% | 90.00% | True |
+| dryRunPassRate | 94.59% | 85.00% | True |
+| previewReadyRate | 85.71% | 70.00% | True |
+| parameterCompletionRate | 81.08% | 70.00% | True |
+| userApplicableRate | 97.30% | 90.00% | True |
 
 ## Task Set
 
@@ -68,6 +68,7 @@
 | VA-BM-034 | precheck | precheck | runtimePackagePrecheck.review | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
 | VA-BM-035 | precheck | precheck | stationStatus.review, runtimePackagePrecheck.review | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
 | VA-BM-036 | precheck | precheck | dryrun.required, runtimePackagePrecheck.review | validate_flow, runtime_package_precheck | validate_flow, runtime_package_precheck | True |
+| VA-BM-037 | runtime_preview | runtime_preview_session | create_runtime_preview_session, catalog_snapshot, readiness_gate, metadata_simulation_report | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
 
 ## Field Contract
 

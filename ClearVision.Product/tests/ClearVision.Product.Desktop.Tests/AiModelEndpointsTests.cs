@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Desktop.Endpoints;
@@ -568,6 +569,146 @@ public class AiModelEndpointsTests
         }
     }
 
+    [Fact]
+    public async Task RuntimePreviewPilotReadinessEndpoint_ShouldRequireAdminBrokerGate()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync(userRole: "Engineer");
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/readiness",
+            JsonContent(new
+            {
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-a") }
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var json = await response.Content.ReadAsStringAsync();
+        json.Should().Contain("runtime_preview_endpoint_admin_required");
+        json.Should().NotContain("secret");
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotSessionEndpoints_ShouldRunMetadataSimulationAndReturnReport()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+        host.Client.DefaultRequestHeaders.Add("X-CV-Developer-UI", "true");
+
+        using var simulateResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/simulate",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templateId: "template-a") },
+                runtimePreviewConsent = true
+            }));
+
+        simulateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var simulateJson = await simulateResponse.Content.ReadAsStringAsync();
+        simulateJson.Should().Contain("session_created");
+        simulateJson.Should().Contain("simulation_completed");
+        simulateJson.Should().Contain("report_generated");
+        simulateJson.Should().NotContain("192.0.2.20");
+        using var simulateDocument = JsonDocument.Parse(simulateJson);
+        var report = simulateDocument.RootElement.GetProperty("report");
+        report.GetProperty("previewReady").GetBoolean().Should().BeTrue();
+        report.GetProperty("realResourcesTouched").GetBoolean().Should().BeFalse();
+        report.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        var sessionId = simulateDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString();
+        sessionId.Should().NotBeNullOrWhiteSpace();
+
+        using var listResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/sessions");
+        listResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var listJson = await listResponse.Content.ReadAsStringAsync();
+        listJson.Should().Contain(sessionId!);
+
+        using var reportResponse = await host.Client.GetAsync($"/api/settings/runtime-preview-pilot/sessions/{sessionId}/report");
+        reportResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var reportJson = await reportResponse.Content.ReadAsStringAsync();
+        reportJson.Should().Contain("runtime_preview_session_metadata");
+        reportJson.Should().NotContain("template.png");
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotSessionCancel_ShouldRecordCancelledStatus()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+        using var createResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templateId: "template-a") },
+                runtimePreviewConsent = true
+            }));
+        createResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDocument = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+        var sessionId = createDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString();
+
+        using var cancelResponse = await host.Client.PostAsync(
+            $"/api/settings/runtime-preview-pilot/sessions/{sessionId}/cancel",
+            JsonContent(new { }));
+
+        cancelResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var cancelDocument = JsonDocument.Parse(await cancelResponse.Content.ReadAsStringAsync());
+        cancelDocument.RootElement.GetProperty("session").GetProperty("status").GetString()
+            .Should().Be(RuntimePreviewSessionStatuses.Cancelled);
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotSessionSimulation_ShouldDenyDangerousPathWithoutArtifact()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/simulate",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templatePath: "C:\\secret\\template.png") },
+                runtimePreviewConsent = true
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadAsStringAsync();
+        json.Should().NotContain("secret");
+        json.Should().NotContain("template.png");
+        using var document = JsonDocument.Parse(json);
+        var report = document.RootElement.GetProperty("report");
+        report.GetProperty("previewReady").GetBoolean().Should().BeFalse();
+        report.GetProperty("realResourcesTouched").GetBoolean().Should().BeFalse();
+        report.GetProperty("permissionDecision").GetProperty("dangerousDenied").GetBoolean().Should().BeTrue();
+        report.GetProperty("simulation").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotSessionSimulation_ShouldKeepWorkflowDraftAllowedWhenNotReady()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/simulate",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                arguments = new { flow = RuntimePreviewFlow("cam-missing", templateId: "template-a") },
+                runtimePreviewConsent = true
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var report = document.RootElement.GetProperty("report");
+        report.GetProperty("previewReady").GetBoolean().Should().BeFalse();
+        report.GetProperty("readiness").GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+        report.GetProperty("readiness").GetProperty("pendingActions").GetArrayLength().Should().BeGreaterThan(0);
+        report.GetProperty("permissionDecision").GetProperty("status").GetString().Should().Be("denied");
+    }
+
     private static StringContent JsonContent(object payload)
     {
         return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
@@ -622,6 +763,37 @@ public class AiModelEndpointsTests
         };
     }
 
+    private static AppConfig RuntimePreviewEndpointConfig()
+    {
+        var appConfig = new AppConfig
+        {
+            Cameras =
+            [
+                new CameraBindingConfig
+                {
+                    Id = "cam-a",
+                    DisplayName = "Line Camera",
+                    IpAddress = "192.0.2.20"
+                }
+            ],
+            Runtime = new RuntimeConfig
+            {
+                RuntimePreviewPilot = new RuntimePreviewPilotConfig
+                {
+                    Enabled = true,
+                    Mode = RuntimePreviewPilotConfig.ModeMetadataOnly,
+                    AllowedCameraBindingIds = ["cam-a"],
+                    AllowedTemplateIds = ["template-a"],
+                    FallbackToOffline = true,
+                    DenyExternalPath = true,
+                    DenyImageBytes = true
+                }
+            }
+        };
+        appConfig.Normalize();
+        return appConfig;
+    }
+
     private sealed class AiModelEndpointTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -659,7 +831,8 @@ public class AiModelEndpointsTests
 
         public static async Task<AiModelEndpointTestHost> CreateAsync(
             Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? aiSendAsync = null,
-            AppConfig? appConfig = null)
+            AppConfig? appConfig = null,
+            string userRole = "Admin")
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -675,8 +848,14 @@ public class AiModelEndpointsTests
             builder.Services.AddSingleton(configService);
             builder.Services.AddSingleton(Substitute.For<ClearVision.Product.Core.Cameras.ICameraManager>());
             builder.Services.AddSingleton<RuntimePreviewPilotResourceCatalog>();
+            builder.Services.AddSingleton<RuntimePreviewSessionStore>();
+            builder.Services.AddSingleton<RuntimePreviewAuditTrail>();
+            builder.Services.AddSingleton<RuntimePreviewReportArchive>();
+            builder.Services.AddSingleton<RuntimePreviewResourceBroker>();
+            builder.Services.AddSingleton<RuntimePreviewPermissionBroker>();
             builder.Services.AddSingleton<RuntimePreviewResourceAllowlistResolver>();
             builder.Services.AddSingleton<RuntimePreviewPilotReadinessGate>();
+            builder.Services.AddSingleton<RuntimePreviewSimulatedExecutionHarness>();
 
             var storageDirectory = Path.Combine(Path.GetTempPath(), $"cv-ai-model-endpoints-{Guid.NewGuid():N}");
             var aiConfigStore = new AiConfigStore(
@@ -703,7 +882,7 @@ public class AiModelEndpointsTests
                 {
                     UserId = "admin",
                     Username = "admin",
-                    Role = "Admin"
+                    Role = userRole
                 };
                 await next();
             });

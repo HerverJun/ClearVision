@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Continuous;
 using ClearVision.Product.Core.Entities;
@@ -496,8 +497,25 @@ public static class SettingsEndpoints
             IConfigurationService configService,
             AiConfigStore aiConfigStore,
             RuntimePreviewPilotResourceCatalog catalogBuilder,
-            RuntimePreviewPilotReadinessGate readinessGate) =>
+            RuntimePreviewPilotReadinessGate readinessGate,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
         {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-readiness",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
             var appConfig = await configService.LoadAsync();
             var pilot = request.Config ?? appConfig.Runtime.RuntimePreviewPilot.CloneNormalized();
             var failures = RuntimePreviewPilotConfigValidator.Validate(pilot);
@@ -536,6 +554,176 @@ public static class SettingsEndpoints
                 metadataOnly = true,
                 realResourcesTouched = false
             });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/sessions", (
+            RuntimePreviewSessionStore sessionStore,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-sessions",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                sessions = sessionStore.List(),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions", async (
+            RuntimePreviewSessionCreateRequest request,
+            IConfigurationService configService,
+            AiConfigStore aiConfigStore,
+            RuntimePreviewSimulatedExecutionHarness harness,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-create",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var session = harness.CreateMetadataSession(request, appConfig, aiConfigStore);
+            return Results.Ok(new
+            {
+                session,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/simulate", async (
+            RuntimePreviewSessionCreateRequest request,
+            IConfigurationService configService,
+            AiConfigStore aiConfigStore,
+            RuntimePreviewSimulatedExecutionHarness harness,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-sessions-simulate",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var report = harness.RunEndToEnd(
+                request,
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext));
+            return Results.Ok(new
+            {
+                session = report.Session,
+                report,
+                auditEvents = report.AuditEvents,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/sessions/{sessionId}/report", (
+            string sessionId,
+            RuntimePreviewReportArchive reportArchive,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-report",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var report = reportArchive.GetBySessionId(sessionId);
+            return report == null
+                ? Results.NotFound(new { error = "RuntimePreview session report was not found." })
+                : Results.Ok(new
+                {
+                    report,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/{sessionId}/cancel", (
+            string sessionId,
+            RuntimePreviewSimulatedExecutionHarness harness,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-cancel",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var session = harness.Cancel(sessionId);
+            return session == null
+                ? Results.NotFound(new { error = "RuntimePreview session was not found." })
+                : Results.Ok(new
+                {
+                    session,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                });
         });
 
         app.MapGet("/api/cameras/discover", async (ClearVision.Product.Core.Cameras.ICameraManager cameraManager) =>
@@ -957,6 +1145,12 @@ public static class SettingsEndpoints
         return context.Items.TryGetValue("CurrentUser", out var userObj) &&
                userObj is UserSession user &&
                string.Equals(user.Role, UserRole.Admin.ToString(), StringComparison.Ordinal);
+    }
+
+    private static bool IsDeveloperUiRequested(HttpContext context)
+    {
+        return context.Request.Headers.TryGetValue("X-CV-Developer-UI", out var value) &&
+               value.Any(item => string.Equals(item, "true", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsSuccessfulAiHealthCheck(string? content)

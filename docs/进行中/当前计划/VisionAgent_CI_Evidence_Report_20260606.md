@@ -95,9 +95,24 @@ RuntimePreview Pilot v0.8 is covered by run #18 and the matching local pre-push 
 
 Stable CI continues to keep fixed/holdout real LLM shadow eval default-off.
 
+## RuntimePreview v1.0 Local Pre-Push Evidence
+
+RuntimePreview v1.0 Readiness local quality suite completed on 2026-06-06 before push. Remote CI evidence must be refreshed after this commit is pushed.
+
+| Gate | Result |
+| --- | --- |
+| backend Agent tests | 243 total / 243 passed |
+| AI endpoint regression | 14 total / 14 passed |
+| UI contract tests | 68 total / 68 passed |
+| executable business benchmark | 37 / 37 accepted |
+| planner autonomy + permission negative benchmark | 21 / 21 accepted |
+| artifact/source assertion | 13 artifact files validated, 4 reports validated, 3315 source files scanned |
+
+v1.0 adds RuntimePreview session governance, PermissionBroker, ResourceBroker, metadata-only simulation harness, append-only audit trail, report archive, developer-hidden Pilot Console, and Real RuntimePreview RFC boundaries.
+
 ## RuntimePreview Pilot Endpoint Permission Note
 
-This evidence-only update does not change production logic. `POST /api/settings/runtime-preview-pilot/readiness` currently returns metadata-only readiness information and still does not touch real camera SDKs, Station, image files, model files, PLC, packaging, deployment, or hot-load paths. The next RuntimePreview Pilot hardening step should add an explicit admin/developer authorization gate for this readiness endpoint and cover it with endpoint regression tests.
+RuntimePreview v1.0 adds an explicit `RuntimePreviewPermissionBroker` gate for `POST /api/settings/runtime-preview-pilot/readiness` and covers it with endpoint regression. The endpoint remains metadata-only and still does not touch real camera SDKs, Station, image files, model files, PLC, packaging, deployment, or hot-load paths.
 
 ## Safety Boundary
 
