@@ -119,7 +119,7 @@ public sealed class VisionAgentParameterRuleParityTests
         var root = doc.RootElement;
         root.GetProperty("benchmarkId").GetString().Should().Be("vision_agent_executable_business_benchmark");
         root.GetProperty("mode").GetString().Should().Be("offline_metadata_only");
-        root.GetProperty("summary").GetProperty("caseCount").GetInt32().Should().BeInRange(30, 50);
+        root.GetProperty("summary").GetProperty("caseCount").GetInt32().Should().BeGreaterThanOrEqualTo(55);
         root.GetProperty("summary").GetProperty("accepted").GetBoolean().Should().BeTrue();
 
         var cases = root.GetProperty("cases").EnumerateArray().ToList();

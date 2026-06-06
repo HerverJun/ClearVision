@@ -1,6 +1,6 @@
 # RuntimePreview Scenario Corpus
 
-- Generated UTC: `2026-06-06T13:40:09.986508+00:00`
+- Generated UTC: `2026-06-06T15:00:30.583603+00:00`
 - Commit: `local`
 - Branch: `local`
 - Run: `local` attempt `local`
@@ -25,5 +25,10 @@
 | RP-SC-013 | multi_operator_flow | passed | medium | Multi-operator measurement flow is previewable as metadata and requires only review before real pilot. |
 | RP-SC-014 | missing_parameter | not_ready | missing_parameter | A required operator parameter is missing; workflow remains editable but package is blocked. |
 | RP-SC-015 | draft_editable_package_blocked | not_ready | draft_allowed_package_blocked | The workflow draft can still be edited even though package readiness is blocked by missing resources. |
+| RP-SC-016 | package_manifest_blocked | not_ready | manifest_dependency_blocked | Manifest dry-run blocks package review because dependency metadata is incomplete. |
+| RP-SC-017 | multi_camera_flow | not_ready | multi_camera_review | Two-camera workflow requires both camera metadata handles to be allowlisted. |
+| RP-SC-018 | multi_model_flow | not_ready | multi_model_review | Multiple model dependencies require catalog ownership review before package review. |
+| RP-SC-019 | template_plus_hole_distance | passed | medium | Template positioning and hole distance measurement can be reviewed as a metadata manifest. |
+| RP-SC-020 | direct_deploy_request_denied | denied | deployment_intent_denied | Direct Station release intent is denied; no package or deployment is created. |
 
 Safety boundary: no real camera SDK, Station access, image file read, model file load, PLC write, package creation, deployment, hot-load, or Real RuntimePreview adapter.

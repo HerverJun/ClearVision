@@ -1051,7 +1051,7 @@ test('executable business benchmark report exposes actual toolchain fields', () 
   assert.equal(report.benchmarkId, 'vision_agent_executable_business_benchmark');
   assert.equal(report.mode, 'offline_metadata_only');
   assertWorkflowRunMetadata(report.workflowRun);
-  assert.ok(report.summary.caseCount >= 30 && report.summary.caseCount <= 50);
+  assert.ok(report.summary.caseCount >= 55);
   assert.equal(report.summary.accepted, true);
   for (const item of report.cases) {
     assert.ok(Array.isArray(item.expectedBusinessActions), item.caseId);
@@ -1378,7 +1378,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 90);
+  assert.equal(uiEntry.minimumTests, 110);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)
@@ -1573,16 +1573,17 @@ test('AI settings tab no longer embeds RuntimePreview Pilot Console as model set
   assert.match(source, /readRuntimePreviewPilotConfigDraft/);
 });
 
-test('independent RuntimePreview Pilot Console module renders v1.2 title and page marker', () => {
+test('independent RuntimePreview Pilot Console module renders v1.3 title and page marker', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
     'utf8'
   );
 
-  assert.match(source, /RuntimePreview Pilot Console v1\.2/);
+  assert.match(source, /RuntimePreview Pilot Console v1\.3/);
+  assert.match(source, /RuntimePreview Pre-release Review Desk/);
   assert.match(source, /data-runtime-preview-pilot-console-page="true"/);
   assert.match(source, /renderRuntimePreviewPilotConsoleV12Panels/);
-  assert.match(source, /metadata-only scenario, session, package readiness/i);
+  assert.match(source, /metadata-only scenario, manifest dry-run, package readiness/i);
 });
 
 test('independent RuntimePreview Pilot Console renders scenario corpus selector and run action', () => {
@@ -1895,6 +1896,294 @@ test('RuntimePreview v1.2 endpoints expose admin gated package readiness corpus 
   assert.match(source, /RuntimePreviewPackageReadinessBridge/);
   assert.match(source, /RuntimePreviewScenarioCorpusService/);
   assert.match(source, /RuntimePreviewAgentExplanationService/);
+});
+
+test('settings API wrapper exposes RuntimePreview v1.3 redacted corpus manifest dry-run endpoints', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsApi.js'),
+    'utf8'
+  );
+
+  assert.match(source, /generateRuntimePackageManifestDryRun/);
+  assert.match(source, /loadRuntimePreviewRedactedFlowCorpus/);
+  assert.match(source, /runtime-preview-pilot\/sessions\/manifest-dry-run/);
+  assert.match(source, /runtime-preview-pilot\/redacted-flow-corpus/);
+  assert.match(source, /manifestId = ''/);
+  assert.match(source, /encodeURIComponent\(manifestId\)/);
+});
+
+test('independent RuntimePreview Pilot Console renders redacted flow corpus controls', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-rp-redacted-flow-corpus-panel="true"/);
+  assert.match(source, /data-rp-redacted-flow-corpus="true"/);
+  assert.match(source, /cfg-rp-redacted-flow-case-id/);
+  assert.match(source, /btn-runtime-preview-pilot-load-redacted-flow-corpus/);
+  assert.match(source, /btn-runtime-preview-pilot-run-redacted-flow-chain/);
+  assert.match(source, /loadRuntimePreviewRedactedFlowCorpus/);
+});
+
+test('independent RuntimePreview Pilot Console renders manifest dry-run report surface', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-rp-manifest-dry-run-panel="true"/);
+  assert.match(source, /data-rp-manifest-dry-run-report="true"/);
+  assert.match(source, /btn-runtime-preview-pilot-manifest-dry-run/);
+  assert.match(source, /generateRuntimePackageManifestDryRun/);
+  assert.match(source, /manifestId/);
+  assert.match(source, /manifestHash/);
+  assert.match(source, /manifestArtifactGenerated/);
+});
+
+test('independent RuntimePreview Pilot Console surfaces Package Readiness Bridge v2 fields', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /packageReviewAllowed/);
+  assert.match(source, /manifestDryRunReportId/);
+  assert.match(source, /packageRiskLevel/);
+  assert.match(source, /packageReviewExplanation/);
+  assert.match(source, /dependencyTrace/);
+});
+
+test('independent RuntimePreview Pilot Console lookup supports manifestId', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /cfg-rp-lookup-manifest-id/);
+  assert.match(source, /placeholder="manifestId"/);
+  assert.match(source, /manifestId:\s*root\.querySelector\('#cfg-rp-lookup-manifest-id'\)\?\.value/);
+});
+
+test('independent RuntimePreview Pilot Console redacted flow chain builds selected case payload', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /ensureRuntimePreviewRedactedFlowCorpusLoaded/);
+  assert.match(source, /findRuntimePreviewRedactedFlowCase/);
+  assert.match(source, /flowCase\.workflowDraft/);
+  assert.match(source, /const caseId = root\.querySelector\('#cfg-rp-redacted-flow-case-id'\)\?\.value/);
+  assert.match(source, /runtimePreviewGovernanceLookup = \{ redactedFlowCase: flowCase \}/);
+});
+
+test('RuntimePreview v1.3 endpoints expose admin gated redacted corpus manifest dry-run and manifest lookup', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'Endpoints', 'SettingsEndpoints.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /runtime-preview-pilot\/sessions\/manifest-dry-run/);
+  assert.match(source, /runtime-preview-pilot\/redacted-flow-corpus/);
+  assert.match(source, /manifestId/);
+  assert.match(source, /RuntimePreviewPackageReadinessBridge/);
+  assert.match(source, /RuntimePreviewRedactedFlowCorpusService/);
+  assert.match(source, /EvaluateEndpointAccess/);
+  assert.match(source, /manifestDryRunReport/);
+});
+
+test('RuntimePreview governance contracts expose v1.3 manifest dry-run and redacted corpus records', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+
+  for (const token of [
+    'RuntimePackageManifestDryRunReport',
+    'RuntimePackageManifestDryRunRequest',
+    'RuntimePreviewRedactedFlowCorpusCase',
+    'RuntimePreviewRedactedFlowCorpusDocument',
+    'manifestDryRunReports',
+    'manifestDryRunReportCount'
+  ]) {
+    assert.match(source, new RegExp(token));
+  }
+});
+
+test('RuntimePreview governance contracts expose v1.3 manifest safety flags', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /manifestArtifactGenerated/);
+  assert.match(source, /PackageCreated/);
+  assert.match(source, /DeploymentExecuted/);
+  assert.match(source, /MetadataOnly/);
+  assert.match(source, /RealResourcesTouched/);
+  assert.match(source, /packageReviewAllowed/);
+});
+
+test('RuntimePreview governance store v3 persists manifest dry-run stream and export counts', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /jsonl\.v3/);
+  assert.match(source, /runtime_package_manifest_dry_run_reports\.jsonl/);
+  assert.match(source, /SaveManifestDryRunReport/);
+  assert.match(source, /LoadManifestDryRunReports/);
+  assert.match(source, /ManifestDryRunReportCount/);
+  assert.match(source, /manifest_dry_run_report/);
+});
+
+test('RuntimePreview report archive can lookup manifest dry-run by manifest report and session ids', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /GetManifestDryRunReport\(string manifestId\)/);
+  assert.match(source, /GetManifestDryRunReportByReportId/);
+  assert.match(source, /GetManifestDryRunReportBySessionId/);
+  assert.match(source, /ListManifestDryRunReports/);
+});
+
+test('RuntimePackage manifest dry-run service builds dependency operator and resource traces only from metadata', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /RuntimePackageManifestDryRunService/);
+  assert.match(source, /GenerateFromPackageReadiness/);
+  assert.match(source, /BuildMissingDependencies/);
+  assert.match(source, /BuildDependencyTrace/);
+  assert.match(source, /OperatorTrace/);
+  assert.match(source, /ResourceTrace/);
+  assert.match(source, /ManifestDryRunGenerated/);
+});
+
+test('RuntimePreview redacted flow corpus service exposes at least twenty metadata-only production-like cases', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /RuntimePreviewRedactedFlowCorpusService/);
+  assert.match(source, /RP-RF-001/);
+  assert.match(source, /RP-RF-020/);
+  assert.match(source, /redacted_metadata_only/);
+  assert.match(source, /package_manifest_blocked/);
+});
+
+test('RuntimePreview Package Readiness Bridge v2 links manifest dry-run report id and review decision', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /ManifestDryRunReportId = manifestReport\.ManifestId/);
+  assert.match(source, /PackageReviewAllowed = manifestReport\.PackageReviewAllowed/);
+  assert.match(source, /PackageBlocked = !manifestReport\.PackageReviewAllowed/);
+  assert.match(source, /PackageReviewExplanation/);
+  assert.match(source, /ResourceContract/);
+});
+
+test('RuntimePreview v1.3 DI registers manifest dry-run and redacted corpus services', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'AiGenerationServiceExtensions.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /AddScoped<RuntimePackageManifestDryRunService>/);
+  assert.match(source, /AddScoped<RuntimePreviewRedactedFlowCorpusService>/);
+});
+
+test('RuntimePreview v1.3 quality runner writes redacted flow manifest dry-run and explanation v2 reports', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'quality', 'tools', 'run_runtime_preview_scenario_evidence.py'),
+    'utf8'
+  );
+
+  assert.match(source, /RuntimePreview v1\.3/);
+  assert.match(source, /runtime_preview_redacted_flow_corpus/);
+  assert.match(source, /runtime_package_manifest_dry_run\.sample/);
+  assert.match(source, /expectedManifestRisk/);
+  assert.match(source, /manifestDryRunReportId/);
+  assert.match(source, /case\.get\("scenario", case\.get\("workflowKind"/);
+});
+
+test('RuntimePreview v1.3 artifact assertion scans new manifest dry-run reports and package fragments', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'quality', 'tools', 'assert_vision_agent_report_artifacts.py'),
+    'utf8'
+  );
+
+  assert.match(source, /runtime-preview-v1\.3-manifest-dry-run-scan/);
+  assert.match(source, /runtime_preview_redacted_flow_corpus\.json/);
+  assert.match(source, /runtime_package_manifest_dry_run\.sample\.json/);
+  assert.match(source, /runtime_preview_redacted_flow_corpus\.md/);
+  assert.match(source, /runtime_package_manifest_dry_run\.sample\.md/);
+  assert.match(source, /\\.cvpkg\\b/);
+});
+
+test('Vision Agent quality workflow uploads v1.3 redacted corpus and manifest dry-run artifacts', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), '.github', 'workflows', 'vision-agent-quality.yml'),
+    'utf8'
+  );
+
+  assert.match(source, /runtime_preview_redacted_flow_corpus\.json/);
+  assert.match(source, /runtime_preview_redacted_flow_corpus\.md/);
+  assert.match(source, /runtime_package_manifest_dry_run\.sample\.json/);
+  assert.match(source, /runtime_package_manifest_dry_run\.sample\.md/);
+});
+
+test('business benchmark includes v1.3 manifest dry-run and redacted flow cases through registered tools', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'quality', 'tools', 'VisionAgentBusinessBenchmarkRunner', 'Program.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /VA-BM-046/);
+  assert.match(source, /VA-BM-055/);
+  assert.match(source, /redacted_flow_corpus/);
+  assert.match(source, /manifest_dry_run/);
+  assert.match(source, /packageReviewAllowed\.false/);
+  assert.match(source, /RuntimePreviewSimulateMetadataSessionTool\.ToolName/);
+});
+
+test('Agent explanation v2 output includes status affected operators blocked reasons and manifest risk', () => {
+  const contractSource = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+  const serviceSource = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
+    'utf8'
+  );
+
+  assert.match(contractSource, /AffectedOperators/);
+  assert.match(contractSource, /BlockedReasons/);
+  assert.match(contractSource, /ManifestRisk/);
+  assert.match(contractSource, /PackageReviewAllowed/);
+  assert.match(serviceSource, /ExplainRedacted/);
+  assert.match(serviceSource, /WorkflowDraftAllowed = true/);
+});
+
+test('RuntimePreview v1.3 source guard keeps manifest dry-run from creating package or deployment artifacts', () => {
+  const sources = [
+    fs.readFileSync(path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'), 'utf8'),
+    fs.readFileSync(path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'), 'utf8')
+  ].join('\n');
+
+  assert.match(sources, /PackageCreated = false|packageCreated: manifestDryRun\.packageCreated/);
+  assert.match(sources, /DeploymentExecuted = false|deploymentExecuted: manifestDryRun\.deploymentExecuted/);
+  assert.match(sources, /RealResourcesTouched = false|realResourcesTouched/);
+  assert.doesNotMatch(sources, /ZipArchive|CreatePackage|deployPackage|HotLoad|write_plc|StationPackage/i);
 });
 
 test('RuntimePreview governance contracts expose v1.2 corpus package readiness export and explanation records', () => {

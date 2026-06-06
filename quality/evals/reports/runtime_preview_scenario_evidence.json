@@ -1,27 +1,27 @@
 {
-  "schemaVersion": "2026-06-06.runtime-preview-scenario-evidence.v2",
+  "schemaVersion": "2026-06-06.runtime-preview-scenario-evidence.v3",
   "benchmarkId": "runtime_preview_scenario_evidence_set",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T13:40:09.986508+00:00"
+    "generatedAtUtc": "2026-06-06T15:00:30.583603+00:00"
   },
   "summary": {
-    "caseCount": 15,
-    "passedCaseCount": 15,
+    "caseCount": 20,
+    "passedCaseCount": 20,
     "accepted": true,
     "metadataOnly": true,
     "realResourcesTouched": false,
-    "deniedCaseCount": 2,
-    "notReadyCaseCount": 7
+    "deniedCaseCount": 3,
+    "notReadyCaseCount": 10
   },
   "cases": [
     {
       "caseId": "RP-SC-001",
       "scenario": "wire_sequence",
-      "workflowDraftHash": "14fca541b961862b7b244ccbcaf714203984e2482977e5ca4316ed5a07d690cc",
+      "workflowDraftHash": "45649defb897912ef5005455292fcbbcc0b7e4d13f9679a15d02efc0c1ab718b",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "low",
@@ -46,12 +46,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-002",
       "scenario": "terminal_color_order",
-      "workflowDraftHash": "521b54eb003b8590bedda33046ef37aa219ac528f9ccd251319a1c4298004f2e",
+      "workflowDraftHash": "595f21cd03ec81346fa323c0f11c27f23c95abd5c332a9e90cec1734ba9f94d3",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "low",
@@ -76,12 +78,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-003",
       "scenario": "template_matching",
-      "workflowDraftHash": "16f23fc2809a9622d54d76e720d39b588e6f756e0689d45907604005afcbdce9",
+      "workflowDraftHash": "5dfd965dfe10ef102b2c6d089f33adbda6643621c5ecbad320c5b75f191d6855",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "low",
@@ -106,12 +110,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-004",
       "scenario": "hole_distance",
-      "workflowDraftHash": "977bf1220d00b80cbf46d64e3870ccf492ddf0cd8a981347432b4e6be4de20da",
+      "workflowDraftHash": "9caa8b1f75c3e14f9c2821cd99f7badab0082660825830529aeeb65799739ba3",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "low",
@@ -136,12 +142,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-005",
       "scenario": "remote_control_detection",
-      "workflowDraftHash": "1c146552ad9318cbf045f3812112692e5157931b4ba3204877249accf4962f89",
+      "workflowDraftHash": "6ebdbb16e84a97d67aff185a1269c26c9a4b7a3d1d4c4cc4249a47b235576552",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "low",
@@ -166,12 +174,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-006",
       "scenario": "missing_camera",
-      "workflowDraftHash": "1dc60c16f5b1f29456bb3f121eefb60dea224126c6dccbbc02277a06c7299827",
+      "workflowDraftHash": "c682a4b0c637a6db6e3f34d59832f53b12983ea46ee7a364feb3274d917ccee2",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "missing_camera_binding",
@@ -206,12 +216,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-007",
       "scenario": "missing_template",
-      "workflowDraftHash": "cdf7e9161272ffbdf46028d59a1f07f93fa1f58ab530bc01962d8b69a88a8cc5",
+      "workflowDraftHash": "755a93d83ae41b193d105e4de9adafce9a67a67223ffc36f9dddaa792ab601e3",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "missing_template",
@@ -246,12 +258,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-008",
       "scenario": "missing_model",
-      "workflowDraftHash": "3bcfaa9cf35b42f634572f19daa100855f16d6d62a6f5bb3470a0d9fde966076",
+      "workflowDraftHash": "4763e0c0b1e06d87da1377294c88d682e148ba655524a1635634ff5116305c98",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "missing_model",
@@ -286,12 +300,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-009",
       "scenario": "dangerous_path",
-      "workflowDraftHash": "f770169736c136416d2dd7c6f987b13a88cf6e4a0d006ae8493ecf28deed15c2",
+      "workflowDraftHash": "2759fec4e0c501c5794cd1f52e17df949def4c823e989252c45dd59258359b15",
       "expectedStatus": "denied",
       "actualStatus": "denied",
       "expectedRisk": "dangerous_resource",
@@ -321,12 +337,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-010",
       "scenario": "plc_station_deny",
-      "workflowDraftHash": "59a2465238f9764c9aeaeb7c7382156ecbb71447b67ccf50e092763e443e1972",
+      "workflowDraftHash": "60906f57676c01e14064dd1c7fa23cc0b020adccf050a6b59fb6eb594bf33618",
       "expectedStatus": "denied",
       "actualStatus": "denied",
       "expectedRisk": "plc_station_denied",
@@ -356,12 +374,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-011",
       "scenario": "precheck_blocked",
-      "workflowDraftHash": "7af98409d4a6867dd1ef18e81d80384b08939a88908d36cd7e743ab42a0754b8",
+      "workflowDraftHash": "a8eb8453d9e96ea5f7b824b4730bde76189cbbad40b56b0f5784acbd461ccf1e",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "precheck_not_ready",
@@ -396,12 +416,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-012",
       "scenario": "allowlist_mismatch",
-      "workflowDraftHash": "9d8bc235ee68a7bc98b75c1b637eaa0e4e16bc81c389662ee739b0204a67c6f6",
+      "workflowDraftHash": "4d5584f5ab5f07e39954e716c81b1a6c2f5c77f675c66d4f8b1b5a76046e663e",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "allowlist_mismatch",
@@ -436,12 +458,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-013",
       "scenario": "multi_operator_flow",
-      "workflowDraftHash": "9ed9da353571511257efd8a1ce361277b708765e0af36bb93856eee3d0aaded8",
+      "workflowDraftHash": "59da8b08bdbdadbe44e8bde51901264e94243f1f958731ecdfe6a4fb2de793ef",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "medium",
@@ -466,12 +490,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-014",
       "scenario": "missing_parameter",
-      "workflowDraftHash": "d048584ddecc9b6d74293e122985bfc439f4d8d3b27598ed6f43b0a57666f52c",
+      "workflowDraftHash": "c370cff60767321da4105fe51d76ddb7438a4c2c095abb6416ce541111919db0",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "missing_parameter",
@@ -506,12 +532,14 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     },
     {
       "caseId": "RP-SC-015",
       "scenario": "draft_editable_package_blocked",
-      "workflowDraftHash": "8832598c9fef92f751e6ba1fbda07bff6eadd983a70c615d743bd67fc2343500",
+      "workflowDraftHash": "da4bb47f621f1bf958e31a06da3401cea52f4e39e3c0ecec4a357639654deb65",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "draft_allowed_package_blocked",
@@ -546,6 +574,203 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-016",
+      "scenario": "package_manifest_blocked",
+      "workflowDraftHash": "bf8c4c2af529961a1c7a09192cc3577541b142f17cbd3207abe5e2d7eb10f6a5",
+      "expectedStatus": "not_ready",
+      "actualStatus": "not_ready",
+      "expectedRisk": "manifest_dependency_blocked",
+      "expectedPendingActions": [
+        "ManifestDependencyReview"
+      ],
+      "businessExplanation": "Manifest dry-run blocks package review because dependency metadata is incomplete.",
+      "expectedSignals": [
+        "missingResources",
+        "pendingActions",
+        "riskSummary"
+      ],
+      "missingResources": [
+        {
+          "kind": "manifest_dependency_blocked",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "pendingActions": [
+        "ManifestDependencyReview"
+      ],
+      "denyReason": "",
+      "precheckRisk": "manifest_dependency_blocked",
+      "workflowDraftAllowed": true,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-017",
+      "scenario": "multi_camera_flow",
+      "workflowDraftHash": "3f1a3c5da3eecbc3da83a7419926cf85116f4c1b117be7459b92c4371913f9cd",
+      "expectedStatus": "not_ready",
+      "actualStatus": "not_ready",
+      "expectedRisk": "multi_camera_review",
+      "expectedPendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "businessExplanation": "Two-camera workflow requires both camera metadata handles to be allowlisted.",
+      "expectedSignals": [
+        "missingResources",
+        "pendingActions",
+        "riskSummary"
+      ],
+      "missingResources": [
+        {
+          "kind": "multi_camera_review",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "denyReason": "",
+      "precheckRisk": "multi_camera_review",
+      "workflowDraftAllowed": true,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-018",
+      "scenario": "multi_model_flow",
+      "workflowDraftHash": "7fd3a9e193422255bbaf1f505d7da5f5b60c925a8afd8bc829651ba43f520d3f",
+      "expectedStatus": "not_ready",
+      "actualStatus": "not_ready",
+      "expectedRisk": "multi_model_review",
+      "expectedPendingActions": [
+        "ManifestDependencyReview"
+      ],
+      "businessExplanation": "Multiple model dependencies require catalog ownership review before package review.",
+      "expectedSignals": [
+        "missingResources",
+        "pendingActions",
+        "riskSummary"
+      ],
+      "missingResources": [
+        {
+          "kind": "multi_model_review",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "pendingActions": [
+        "ManifestDependencyReview"
+      ],
+      "denyReason": "",
+      "precheckRisk": "multi_model_review",
+      "workflowDraftAllowed": true,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-019",
+      "scenario": "template_plus_hole_distance",
+      "workflowDraftHash": "5d2bf71234cefb32558caf4631c1b7475ec50c4c41e874c04d41f0381ba80a95",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "medium",
+      "expectedPendingActions": [],
+      "businessExplanation": "Template positioning and hole distance measurement can be reviewed as a metadata manifest.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-020",
+      "scenario": "direct_deploy_request_denied",
+      "workflowDraftHash": "30e76420a0e2a693be6bf9df44d0a6e3ca48d42588a3db33e15611024aa65263",
+      "expectedStatus": "denied",
+      "actualStatus": "denied",
+      "expectedRisk": "deployment_intent_denied",
+      "expectedPendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "businessExplanation": "Direct Station release intent is denied; no package or deployment is created.",
+      "expectedSignals": [
+        "missingResources",
+        "pendingActions",
+        "riskSummary"
+      ],
+      "missingResources": [],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "denyReason": "runtime_preview_dangerous_or_denied_metadata",
+      "precheckRisk": "deployment_intent_denied",
+      "workflowDraftAllowed": true,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
       "realRuntimePreviewAdapterImplemented": false
     }
   ],
@@ -751,6 +976,76 @@
       "scenario": "draft_editable_package_blocked",
       "workflowDraftAllowed": true,
       "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-016",
+      "scenario": "package_manifest_blocked",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-017",
+      "scenario": "multi_camera_flow",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-018",
+      "scenario": "multi_model_flow",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-019",
+      "scenario": "template_plus_hole_distance",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "ready",
+      "permissionStatus": "allowed",
+      "simulationPreviewReady": true,
+      "runtimePackagePrecheckReady": true,
+      "readyForDeployment": true,
+      "deploymentBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-020",
+      "scenario": "direct_deploy_request_denied",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "denied",
       "permissionStatus": "denied",
       "simulationPreviewReady": false,
       "runtimePackagePrecheckReady": false,

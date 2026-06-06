@@ -846,6 +846,7 @@ public static class SettingsEndpoints
             IConfigurationService configService,
             AiConfigStore aiConfigStore,
             RuntimePreviewPackageReadinessBridge packageReadinessBridge,
+            RuntimePreviewReportArchive reportArchive,
             RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
@@ -876,8 +877,68 @@ public static class SettingsEndpoints
             return Results.Ok(new
             {
                 packageReadinessReport = report,
+                manifestDryRunReport = string.IsNullOrWhiteSpace(report.ManifestDryRunReportId)
+                    ? null
+                    : reportArchive.GetManifestDryRunReport(report.ManifestDryRunReportId),
                 permissionDecision = endpointDecision,
                 metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/manifest-dry-run", async (
+            RuntimePackageManifestDryRunRequest request,
+            IConfigurationService configService,
+            AiConfigStore aiConfigStore,
+            RuntimePreviewPackageReadinessBridge packageReadinessBridge,
+            RuntimePreviewReportArchive reportArchive,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-manifest-dry-run",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var packageReport = await packageReadinessBridge.GenerateAsync(
+                new RuntimePreviewPackageReadinessRequest
+                {
+                    Config = request.Config,
+                    ToolName = request.ToolName,
+                    Arguments = request.Arguments,
+                    WorkflowDraft = request.WorkflowDraft,
+                    RuntimePreviewConsent = request.RuntimePreviewConsent,
+                    RequireReplay = request.RequireReplay
+                },
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext),
+                cancellationToken);
+            var manifestReport = string.IsNullOrWhiteSpace(packageReport.ManifestDryRunReportId)
+                ? null
+                : reportArchive.GetManifestDryRunReport(packageReport.ManifestDryRunReportId);
+            return Results.Ok(new
+            {
+                packageReadinessReport = packageReport,
+                manifestDryRunReportId = packageReport.ManifestDryRunReportId,
+                manifestDryRunReport = manifestReport,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                packageCreated = false,
+                deploymentExecuted = false,
                 realResourcesTouched = false
             });
         });
@@ -968,6 +1029,36 @@ public static class SettingsEndpoints
             }
 
             var corpus = scenarioCorpusService.BuildCorpus();
+            return Results.Ok(new
+            {
+                corpus,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/redacted-flow-corpus", (
+            RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-redacted-flow-corpus",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var corpus = redactedFlowCorpusService.BuildCorpus();
             return Results.Ok(new
             {
                 corpus,
@@ -1069,9 +1160,11 @@ public static class SettingsEndpoints
             string? sessionId,
             string? reportId,
             string? caseId,
+            string? manifestId,
             RuntimePreviewSessionStore sessionStore,
             RuntimePreviewReportArchive reportArchive,
             RuntimePreviewScenarioCorpusService scenarioCorpusService,
+            RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
             RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
@@ -1094,18 +1187,26 @@ public static class SettingsEndpoints
             var normalizedSessionId = string.IsNullOrWhiteSpace(sessionId) ? string.Empty : sessionId.Trim();
             var normalizedReportId = string.IsNullOrWhiteSpace(reportId) ? string.Empty : reportId.Trim();
             var normalizedCaseId = string.IsNullOrWhiteSpace(caseId) ? string.Empty : caseId.Trim();
+            var normalizedManifestId = string.IsNullOrWhiteSpace(manifestId) ? string.Empty : manifestId.Trim();
+            var redactedCorpus = redactedFlowCorpusService.BuildCorpus();
             var result = new
             {
                 session = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : sessionStore.Get(normalizedSessionId),
                 sessionReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetBySessionId(normalizedSessionId),
                 deployReadinessReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetDeployReadinessReportBySessionId(normalizedSessionId),
                 packageReadinessReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetPackageReadinessReportBySessionId(normalizedSessionId),
+                manifestDryRunReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetManifestDryRunReportBySessionId(normalizedSessionId),
                 report = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.Get(normalizedReportId),
                 deployReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetDeployReadinessReport(normalizedReportId),
                 packageReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetPackageReadinessReport(normalizedReportId),
+                manifestReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetManifestDryRunReportByReportId(normalizedReportId),
+                manifest = string.IsNullOrWhiteSpace(normalizedManifestId) ? null : reportArchive.GetManifestDryRunReport(normalizedManifestId),
                 corpusCase = string.IsNullOrWhiteSpace(normalizedCaseId)
                     ? null
-                    : corpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase))
+                    : corpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase)),
+                redactedFlowCase = string.IsNullOrWhiteSpace(normalizedCaseId)
+                    ? null
+                    : redactedCorpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase))
             };
             return Results.Ok(new
             {

@@ -1,6 +1,6 @@
 # RuntimePreview Deploy Readiness Report
 
-- Generated UTC: `2026-06-06T13:40:09.986508+00:00`
+- Generated UTC: `2026-06-06T15:00:30.583603+00:00`
 - Commit: `local`
 - Branch: `local`
 - Run: `local` attempt `local`
@@ -25,5 +25,10 @@
 | RP-SC-013 | multi_operator_flow | True | False | False |
 | RP-SC-014 | missing_parameter | False | True | False |
 | RP-SC-015 | draft_editable_package_blocked | False | True | False |
+| RP-SC-016 | package_manifest_blocked | False | True | False |
+| RP-SC-017 | multi_camera_flow | False | True | False |
+| RP-SC-018 | multi_model_flow | False | True | False |
+| RP-SC-019 | template_plus_hole_distance | True | False | False |
+| RP-SC-020 | direct_deploy_request_denied | False | True | False |
 
 Safety boundary: no real camera SDK, Station access, image file read, model file load, PLC write, package creation, deployment, hot-load, or Real RuntimePreview adapter.

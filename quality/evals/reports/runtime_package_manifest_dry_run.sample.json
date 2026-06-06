@@ -1,0 +1,1239 @@
+{
+  "schemaVersion": "2026-06-06.runtime-package-manifest-dry-run.v1",
+  "benchmarkId": "runtime_package_manifest_dry_run_sample",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-06T15:00:30.583603+00:00"
+  },
+  "summary": {
+    "caseCount": 20,
+    "packageReviewAllowedCount": 7,
+    "manifestBlockedCount": 13,
+    "metadataOnly": true,
+    "manifestArtifactGenerated": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "realResourcesTouched": false,
+    "accepted": true
+  },
+  "behaviorMatrix": [
+    {
+      "caseId": "RP-SC-001",
+      "scenario": "wire_sequence",
+      "manifestId": "rp_manifest_dry_run_rp-sc-001",
+      "workflowDraftHash": "45649defb897912ef5005455292fcbbcc0b7e4d13f9679a15d02efc0c1ab718b",
+      "manifestHash": "12c7ecf1e984dc960616bcbbbd36032693971aea0c9a9724bbcc8e20b47826a0",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [
+        "template:metadata"
+      ],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [],
+      "blockedReasons": [],
+      "dependencyTrace": [
+        "manifest_hash:metadata",
+        "operator_graph:metadata_only"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "low",
+      "packageReviewAllowed": true,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-002",
+      "scenario": "terminal_color_order",
+      "manifestId": "rp_manifest_dry_run_rp-sc-002",
+      "workflowDraftHash": "595f21cd03ec81346fa323c0f11c27f23c95abd5c332a9e90cec1734ba9f94d3",
+      "manifestHash": "898e7987ab0ca336cedadc8c9decfef2f61f60b309e0d54a912aa49d6a943ba7",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [],
+      "blockedReasons": [],
+      "dependencyTrace": [
+        "manifest_hash:metadata",
+        "operator_graph:metadata_only"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "low",
+      "packageReviewAllowed": true,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-003",
+      "scenario": "template_matching",
+      "manifestId": "rp_manifest_dry_run_rp-sc-003",
+      "workflowDraftHash": "5dfd965dfe10ef102b2c6d089f33adbda6643621c5ecbad320c5b75f191d6855",
+      "manifestHash": "90a6269e54ade9261b86e21cc765a857033354cadfd6a3ccf1e3b9cb963eba3a",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [
+        "template:metadata"
+      ],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [],
+      "blockedReasons": [],
+      "dependencyTrace": [
+        "manifest_hash:metadata",
+        "operator_graph:metadata_only"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "low",
+      "packageReviewAllowed": true,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-004",
+      "scenario": "hole_distance",
+      "manifestId": "rp_manifest_dry_run_rp-sc-004",
+      "workflowDraftHash": "9caa8b1f75c3e14f9c2821cd99f7badab0082660825830529aeeb65799739ba3",
+      "manifestHash": "356915b6acd9886542dbd9f87b5dad3b8709bf24937ef36a5ad433d0444cc309",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [],
+      "blockedReasons": [],
+      "dependencyTrace": [
+        "manifest_hash:metadata",
+        "operator_graph:metadata_only"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "low",
+      "packageReviewAllowed": true,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-005",
+      "scenario": "remote_control_detection",
+      "manifestId": "rp_manifest_dry_run_rp-sc-005",
+      "workflowDraftHash": "6ebdbb16e84a97d67aff185a1269c26c9a4b7a3d1d4c4cc4249a47b235576552",
+      "manifestHash": "956271928d6dd1ac60d2ff4901749895da69e8c791bd94a0ff27485c1e50afde",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [],
+      "blockedReasons": [],
+      "dependencyTrace": [
+        "manifest_hash:metadata",
+        "operator_graph:metadata_only"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "low",
+      "packageReviewAllowed": true,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-006",
+      "scenario": "missing_camera",
+      "manifestId": "rp_manifest_dry_run_rp-sc-006",
+      "workflowDraftHash": "c682a4b0c637a6db6e3f34d59832f53b12983ea46ee7a364feb3274d917ccee2",
+      "manifestHash": "45c76c6573d7eca74290b626e6f3c7b2d05db4ad40a79ee1c03ca9d95b2cf48f",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:missing_camera_binding"
+      ],
+      "blockedReasons": [
+        "missing_camera_binding",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:missing_camera_binding"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-007",
+      "scenario": "missing_template",
+      "manifestId": "rp_manifest_dry_run_rp-sc-007",
+      "workflowDraftHash": "755a93d83ae41b193d105e4de9adafce9a67a67223ffc36f9dddaa792ab601e3",
+      "manifestHash": "5d2784b34f1dc58157d4d775180cc9cf251480b85e52c6af6b40cbe780336af4",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [
+        "template:metadata"
+      ],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:missing_template"
+      ],
+      "blockedReasons": [
+        "missing_template",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:missing_template"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-008",
+      "scenario": "missing_model",
+      "manifestId": "rp_manifest_dry_run_rp-sc-008",
+      "workflowDraftHash": "4763e0c0b1e06d87da1377294c88d682e148ba655524a1635634ff5116305c98",
+      "manifestHash": "938ed9e74dacf4818cd685a665f4b49b1b16c7ed1cd0d521076d21bd3bea6f0d",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [
+        "model:metadata"
+      ],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:missing_model"
+      ],
+      "blockedReasons": [
+        "missing_model",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:missing_model"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-009",
+      "scenario": "dangerous_path",
+      "manifestId": "rp_manifest_dry_run_rp-sc-009",
+      "workflowDraftHash": "2759fec4e0c501c5794cd1f52e17df949def4c823e989252c45dd59258359b15",
+      "manifestHash": "f1099dffa26a3ece219c5172a819f6a1001a38d76443676938a2aef2a8ad66c2",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:dangerous_resource"
+      ],
+      "blockedReasons": [
+        "dangerous_resource",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:dangerous_resource"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "denied",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-010",
+      "scenario": "plc_station_deny",
+      "manifestId": "rp_manifest_dry_run_rp-sc-010",
+      "workflowDraftHash": "60906f57676c01e14064dd1c7fa23cc0b020adccf050a6b59fb6eb594bf33618",
+      "manifestHash": "c1c76dad3b9ac99ca6ad123cff579081f67e92678fe8e9aa263d5ce80ad5a461",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:plc_station_denied"
+      ],
+      "blockedReasons": [
+        "plc_station_denied",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:plc_station_denied"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "denied",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-011",
+      "scenario": "precheck_blocked",
+      "manifestId": "rp_manifest_dry_run_rp-sc-011",
+      "workflowDraftHash": "a8eb8453d9e96ea5f7b824b4730bde76189cbbad40b56b0f5784acbd461ccf1e",
+      "manifestHash": "ba6873255ea7097256928dd74766a0de3728f17ae857bf7675fc4ae8e85da8b9",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:precheck_not_ready"
+      ],
+      "blockedReasons": [
+        "precheck_not_ready",
+        "DeploymentPrecheckResourceReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:precheck_not_ready"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-012",
+      "scenario": "allowlist_mismatch",
+      "manifestId": "rp_manifest_dry_run_rp-sc-012",
+      "workflowDraftHash": "4d5584f5ab5f07e39954e716c81b1a6c2f5c77f675c66d4f8b1b5a76046e663e",
+      "manifestHash": "32aa807648cac55d6beeb9172c664c0b926fe9a0ab33993e9775e15fddad764a",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:allowlist_mismatch"
+      ],
+      "blockedReasons": [
+        "allowlist_mismatch",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:allowlist_mismatch"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-013",
+      "scenario": "multi_operator_flow",
+      "manifestId": "rp_manifest_dry_run_rp-sc-013",
+      "workflowDraftHash": "59da8b08bdbdadbe44e8bde51901264e94243f1f958731ecdfe6a4fb2de793ef",
+      "manifestHash": "123a2da9f18a14662be56d1c922c9feb90a0e11b48b46afa7144c2fa3c7e0493",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [],
+      "blockedReasons": [],
+      "dependencyTrace": [
+        "manifest_hash:metadata",
+        "operator_graph:metadata_only"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "low",
+      "packageReviewAllowed": true,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-014",
+      "scenario": "missing_parameter",
+      "manifestId": "rp_manifest_dry_run_rp-sc-014",
+      "workflowDraftHash": "c370cff60767321da4105fe51d76ddb7438a4c2c095abb6416ce541111919db0",
+      "manifestHash": "07fc95259c1176ea1a7687c3d49e17710d6ca33dc1b2376890fd599ab6b1abf4",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:missing_parameter"
+      ],
+      "blockedReasons": [
+        "missing_parameter",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:missing_parameter"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-015",
+      "scenario": "draft_editable_package_blocked",
+      "manifestId": "rp_manifest_dry_run_rp-sc-015",
+      "workflowDraftHash": "da4bb47f621f1bf958e31a06da3401cea52f4e39e3c0ecec4a357639654deb65",
+      "manifestHash": "2eb1011ae24270aed4a73fda6a122f6a15eab479b306a197941c33733e670015",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:draft_allowed_package_blocked"
+      ],
+      "blockedReasons": [
+        "draft_allowed_package_blocked",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:draft_allowed_package_blocked"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-016",
+      "scenario": "package_manifest_blocked",
+      "manifestId": "rp_manifest_dry_run_rp-sc-016",
+      "workflowDraftHash": "bf8c4c2af529961a1c7a09192cc3577541b142f17cbd3207abe5e2d7eb10f6a5",
+      "manifestHash": "d6b4b24ba8c0f50e5fd79a6d61fc252dc0c7e6813294d1b28c145775849a2b4e",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:manifest_dependency_blocked"
+      ],
+      "blockedReasons": [
+        "manifest_dependency_blocked",
+        "ManifestDependencyReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:manifest_dependency_blocked"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-017",
+      "scenario": "multi_camera_flow",
+      "manifestId": "rp_manifest_dry_run_rp-sc-017",
+      "workflowDraftHash": "3f1a3c5da3eecbc3da83a7419926cf85116f4c1b117be7459b92c4371913f9cd",
+      "manifestHash": "24ac827edea43b523c932e6d57ee3070df4f1de6553981cf36d5537b1121f3ec",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:multi_camera_review"
+      ],
+      "blockedReasons": [
+        "multi_camera_review",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:multi_camera_review"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-018",
+      "scenario": "multi_model_flow",
+      "manifestId": "rp_manifest_dry_run_rp-sc-018",
+      "workflowDraftHash": "7fd3a9e193422255bbaf1f505d7da5f5b60c925a8afd8bc829651ba43f520d3f",
+      "manifestHash": "487005acc2952e437de363ffe02a8ffe2869b429f986790e664c6caea329f629",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [
+        "model:metadata"
+      ],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:multi_model_review"
+      ],
+      "blockedReasons": [
+        "multi_model_review",
+        "ManifestDependencyReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:multi_model_review"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "high",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-019",
+      "scenario": "template_plus_hole_distance",
+      "manifestId": "rp_manifest_dry_run_rp-sc-019",
+      "workflowDraftHash": "5d2bf71234cefb32558caf4631c1b7475ec50c4c41e874c04d41f0381ba80a95",
+      "manifestHash": "11649ec9ae385891080c2cb831d6bdb100b1a88810ea91cfc59a9ff3028ecd2e",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [
+        "template:metadata"
+      ],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [],
+      "blockedReasons": [],
+      "dependencyTrace": [
+        "manifest_hash:metadata",
+        "operator_graph:metadata_only"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "low",
+      "packageReviewAllowed": true,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-020",
+      "scenario": "direct_deploy_request_denied",
+      "manifestId": "rp_manifest_dry_run_rp-sc-020",
+      "workflowDraftHash": "30e76420a0e2a693be6bf9df44d0a6e3ca48d42588a3db33e15611024aa65263",
+      "manifestHash": "ce9f81ba3b4eb4e0c3a836d9d15250dd8223941c90ab085e2ee0732dda83080a",
+      "operatorCount": 3,
+      "operatorTypes": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceDependencies": [
+        "camera:metadata",
+        "template:metadata",
+        "output:metadata"
+      ],
+      "modelDependencies": [],
+      "templateDependencies": [],
+      "cameraBindings": [
+        "camera:metadata"
+      ],
+      "outputChannels": [
+        "qa-metadata"
+      ],
+      "missingDependencies": [
+        "missing_or_blocked:deployment_intent_denied"
+      ],
+      "blockedReasons": [
+        "deployment_intent_denied",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "dependencyTrace": [
+        "dependency_blocked:deployment_intent_denied"
+      ],
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "realResourcesTouched=false",
+        "metadataOnly=true"
+      ],
+      "riskLevel": "denied",
+      "packageReviewAllowed": false,
+      "workflowDraftAllowed": true,
+      "manifestArtifactGenerated": false,
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "realRuntimePreviewAdapterImplemented": false
+    }
+  ],
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

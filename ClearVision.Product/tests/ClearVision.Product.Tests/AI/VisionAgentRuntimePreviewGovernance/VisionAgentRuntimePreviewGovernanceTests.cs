@@ -715,6 +715,113 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     }
 
     [Fact]
+    public void RedactedFlowCorpusService_ShouldExposeRealWorldMetadataOnlyCorpus()
+    {
+        var corpus = new RuntimePreviewRedactedFlowCorpusService().BuildCorpus();
+
+        corpus.CaseCount.Should().BeGreaterThanOrEqualTo(20);
+        corpus.Cases.Should().OnlyContain(item => item.MetadataOnly && !item.RealResourcesTouched);
+        corpus.Cases.Select(item => item.WorkflowKind).Should().Contain(new[]
+        {
+            "wire_sequence",
+            "remote_control_defect",
+            "template_measurement_combo",
+            "hole_distance",
+            "terminal_color_order",
+            "missing_camera",
+            "missing_template",
+            "missing_model",
+            "missing_output_channel",
+            "plc_station_deny",
+            "dangerous_path",
+            "allowlist_mismatch",
+            "multi_camera_flow",
+            "multi_model_flow",
+            "parameter_missing",
+            "package_manifest_blocked",
+            "workflow_editable_package_blocked"
+        });
+        var raw = JsonSerializer.Serialize(corpus);
+        raw.Should().NotContain("external:/");
+        raw.Should().NotContain(".cvpkg");
+        raw.Should().NotContain("192.0.2.20");
+        raw.Should().NotContain("DB1");
+        raw.Should().NotContain("base64");
+    }
+
+    [Theory]
+    [MemberData(nameof(RedactedFlowCaseIds))]
+    public void RedactedFlowCorpusCases_ShouldCarryManifestReviewMetadata(string caseId)
+    {
+        var item = RuntimePreviewRedactedFlowCorpusService.CreateCases()
+            .Single(entry => entry.CaseId == caseId);
+
+        item.StationType.Should().NotBeNullOrWhiteSpace();
+        item.WorkflowKind.Should().NotBeNullOrWhiteSpace();
+        item.BusinessPurpose.Should().NotBeNullOrWhiteSpace();
+        item.WorkflowDraftHash.Should().NotBeNullOrWhiteSpace();
+        item.OperatorSummary.Should().NotBeEmpty();
+        item.ExpectedManifestRisk.Should().NotBeNullOrWhiteSpace();
+        item.ExpectedEngineerAction.Should().NotBeNullOrWhiteSpace();
+        item.RedactionStatus.Should().Be("redacted_metadata_only");
+        item.MetadataOnly.Should().BeTrue();
+        item.RealResourcesTouched.Should().BeFalse();
+        JsonSerializer.Serialize(item).Should().NotContain("external:/");
+    }
+
+    [Theory]
+    [MemberData(nameof(RedactedFlowCaseIds))]
+    public void ManifestDryRunService_ShouldGenerateMetadataManifestForRedactedFlowCase(string caseId)
+    {
+        var item = RuntimePreviewRedactedFlowCorpusService.CreateCases()
+            .Single(entry => entry.CaseId == caseId);
+        var ready = item.ExpectedPackageReadiness == RuntimePreviewScenarioEvidenceStatuses.Passed;
+        var archive = new RuntimePreviewReportArchive();
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var service = new RuntimePackageManifestDryRunService(archive, auditTrail);
+        var packageReport = new RuntimePreviewPackageReadinessReport
+        {
+            ReportId = $"rp_package_{caseId}",
+            SessionId = $"rp_session_{caseId}",
+            WorkflowDraftHash = item.WorkflowDraftHash,
+            ReadyForPackage = ready,
+            PackageReviewAllowed = ready,
+            PackageBlocked = !ready,
+            BlockingIssues = ready ? [] : [item.ExpectedManifestRisk],
+            BlockedReason = ready ? string.Empty : item.ExpectedManifestRisk,
+            RiskSummary = item.ExpectedManifestRisk,
+            RuntimePackagePrecheck = Args(new { packageCreated = false, deploymentExecuted = false }),
+            WorkflowDraftAllowed = true,
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+
+        var report = service.GenerateFromPackageReadiness(
+            packageReport,
+            new RuntimePreviewPackageReadinessRequest
+            {
+                Arguments = Args(new { flow = item.WorkflowDraft }),
+                RuntimePreviewConsent = true
+            });
+
+        report.ManifestId.Should().StartWith("rp_manifest_dry_run_");
+        report.ManifestHash.Should().NotBeNullOrWhiteSpace();
+        report.OperatorCount.Should().BeGreaterThan(0);
+        report.OperatorTypes.Should().NotBeEmpty();
+        report.DependencyTrace.Should().NotBeEmpty();
+        report.WorkflowDraftAllowed.Should().BeTrue();
+        report.PackageCreated.Should().BeFalse();
+        report.DeploymentExecuted.Should().BeFalse();
+        report.ManifestArtifactGenerated.Should().BeFalse();
+        report.MetadataOnly.Should().BeTrue();
+        report.RealResourcesTouched.Should().BeFalse();
+        report.PackageReviewAllowed.Should().Be(ready && report.MissingDependencies.Count == 0);
+        archive.GetManifestDryRunReport(report.ManifestId).Should().NotBeNull();
+        auditTrail.ListForSession(packageReport.SessionId).Should().Contain(entry => entry.EventType == RuntimePreviewAuditEventTypes.ManifestDryRunGenerated);
+        JsonSerializer.Serialize(report).Should().NotContain(".cvpkg");
+    }
+
+    [Fact]
     public async Task PackageReadinessBridge_ShouldGenerateMetadataOnlyPackageReport()
     {
         var archive = new RuntimePreviewReportArchive();
@@ -744,13 +851,19 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
             CancellationToken.None);
 
         report.ReadyForPackage.Should().BeTrue();
+        report.PackageReviewAllowed.Should().BeTrue();
         report.PackageBlocked.Should().BeFalse();
+        report.ManifestDryRunReportId.Should().NotBeNullOrWhiteSpace();
         report.PackageCreated.Should().BeFalse();
         report.DeploymentExecuted.Should().BeFalse();
+        report.DependencyTrace.Should().NotBeEmpty();
+        report.PackageRiskLevel.Should().Be("low");
         report.OperatorTrace.Should().NotBeEmpty();
         report.ResourceTrace.Should().NotBeEmpty();
         archive.GetPackageReadinessReport(report.ReportId).Should().NotBeNull();
+        archive.GetManifestDryRunReport(report.ManifestDryRunReportId).Should().NotBeNull();
         auditTrail.ListForSession(report.SessionId).Should().Contain(item => item.EventType == RuntimePreviewAuditEventTypes.PackageReadinessGenerated);
+        auditTrail.ListForSession(report.SessionId).Should().Contain(item => item.EventType == RuntimePreviewAuditEventTypes.ManifestDryRunGenerated);
     }
 
     [Fact]
@@ -783,10 +896,13 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
             CancellationToken.None);
 
         report.ReadyForPackage.Should().BeFalse();
+        report.PackageReviewAllowed.Should().BeFalse();
         report.PackageBlocked.Should().BeTrue();
         report.WorkflowDraftAllowed.Should().BeTrue();
         report.PackageCreated.Should().BeFalse();
         report.RiskSummary.Should().Contain("blocked");
+        report.PackageReviewExplanation.Should().Contain("workflow edits");
+        report.ManifestDryRunReportId.Should().NotBeNullOrWhiteSpace();
         report.BlockingIssues.Should().NotBeEmpty();
     }
 
@@ -846,12 +962,26 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
                 MetadataOnly = true,
                 RealResourcesTouched = false
             });
+            store.SaveManifestDryRunReport(new RuntimePackageManifestDryRunReport
+            {
+                ManifestId = "rp_manifest_export",
+                ReportId = "rp_manifest_report_export",
+                SessionId = "rp_session_export",
+                WorkflowDraftHash = "hash",
+                ManifestHash = "manifest-hash",
+                OperatorCount = 1,
+                OperatorTypes = ["ImageAcquisition"],
+                MetadataOnly = true,
+                RealResourcesTouched = false
+            });
 
             var manifest = store.ExportManifest();
 
             manifest.ExportId.Should().StartWith("rp_export_");
             manifest.IndexSummary.PackageReadinessReportCount.Should().Be(1);
+            manifest.IndexSummary.ManifestDryRunReportCount.Should().Be(1);
             manifest.PackageReadinessReports.Should().Contain(item => item.ReportId == "rp_package_readiness_export");
+            manifest.ManifestDryRunReports.Should().Contain(item => item.ManifestId == "rp_manifest_export");
             manifest.RedactionPass.Should().BeTrue();
             var raw = JsonSerializer.Serialize(manifest);
             raw.Should().NotContain("192.0.2.20");
@@ -884,14 +1014,41 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     }
 
     [Fact]
+    public void ReportArchive_ShouldLookupManifestDryRunByManifestSessionAndReport()
+    {
+        var archive = new RuntimePreviewReportArchive();
+        var report = new RuntimePackageManifestDryRunReport
+        {
+            ManifestId = "rp_manifest_lookup",
+            ReportId = "rp_manifest_report_lookup",
+            SessionId = "rp_session_manifest_lookup",
+            PackageReadinessReportId = "rp_package_lookup",
+            MetadataOnly = true
+        };
+
+        archive.SaveManifestDryRunReport(report);
+
+        archive.GetManifestDryRunReport("rp_manifest_lookup").Should().NotBeNull();
+        archive.GetManifestDryRunReportBySessionId("rp_session_manifest_lookup")!.ManifestId.Should().Be(report.ManifestId);
+        archive.GetManifestDryRunReportByReportId("rp_package_lookup")!.ManifestId.Should().Be(report.ManifestId);
+        archive.ListManifestDryRunReports().Should().ContainSingle();
+    }
+
+    [Fact]
     public void AgentExplanationBenchmark_ShouldBeAcceptedForFullCorpus()
     {
-        var benchmark = new RuntimePreviewAgentExplanationService(new RuntimePreviewScenarioCorpusService()).Run();
+        var benchmark = new RuntimePreviewAgentExplanationService(
+            new RuntimePreviewScenarioCorpusService(),
+            new RuntimePreviewRedactedFlowCorpusService()).Run();
 
-        benchmark.CaseCount.Should().BeGreaterThanOrEqualTo(14);
+        benchmark.CaseCount.Should().BeGreaterThanOrEqualTo(20);
         benchmark.PassedCaseCount.Should().Be(benchmark.CaseCount);
         benchmark.Accepted.Should().BeTrue();
         benchmark.Cases.Should().OnlyContain(item => item.WorkflowDraftAllowed && item.MetadataOnly && !item.RealResourcesTouched);
+        benchmark.Cases.Should().OnlyContain(item => !string.IsNullOrWhiteSpace(item.Status));
+        benchmark.Cases.Should().OnlyContain(item => !string.IsNullOrWhiteSpace(item.ManifestRisk));
+        benchmark.Cases.Should().Contain(item => item.PackageReviewAllowed);
+        benchmark.Cases.Should().Contain(item => !item.PackageReviewAllowed && item.BlockedReasons.Count > 0);
     }
 
     [Fact]
@@ -912,14 +1069,22 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
 
         raw.Should().Contain("\"packageCreated\":false");
         raw.Should().Contain("\"deploymentExecuted\":false");
+        raw.Should().Contain("\"packageReviewAllowed\":false");
         raw.Should().NotContain("http://");
         raw.Should().NotContain("external:/");
         raw.Should().NotContain("apiKey");
+        raw.Should().NotContain(".cvpkg");
     }
 
     public static IEnumerable<object[]> CorpusCaseIds()
     {
         return RuntimePreviewScenarioCorpusService.CreateCorpusCases()
+            .Select(item => new object[] { item.CaseId });
+    }
+
+    public static IEnumerable<object[]> RedactedFlowCaseIds()
+    {
+        return RuntimePreviewRedactedFlowCorpusService.CreateCases()
             .Select(item => new object[] { item.CaseId });
     }
 

@@ -15,15 +15,17 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 TEST_RESULTS_DIR = REPO_ROOT / "test_results" / "agent_engineering_harness"
-SCAN_POLICY_VERSION = "2026-06-06.runtime-preview-v1.2-governance-scan.v2"
+SCAN_POLICY_VERSION = "2026-06-06.runtime-preview-v1.3-manifest-dry-run-scan.v3"
 
 JSON_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.json",
     REPORTS_DIR / "planner_autonomy_benchmark.json",
     REPORTS_DIR / "runtime_preview_scenario_corpus.json",
+    REPORTS_DIR / "runtime_preview_redacted_flow_corpus.json",
     REPORTS_DIR / "runtime_preview_scenario_evidence.json",
     REPORTS_DIR / "runtime_preview_deploy_readiness_report.sample.json",
     REPORTS_DIR / "runtime_preview_package_readiness_report.sample.json",
+    REPORTS_DIR / "runtime_package_manifest_dry_run.sample.json",
     REPORTS_DIR / "runtime_preview_governance_audit_sample.json",
     REPORTS_DIR / "runtime_preview_governance_export_sample.json",
     REPORTS_DIR / "runtime_preview_agent_explanation_benchmark.json",
@@ -35,9 +37,11 @@ MARKDOWN_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.md",
     REPORTS_DIR / "planner_autonomy_benchmark.md",
     REPORTS_DIR / "runtime_preview_scenario_corpus.md",
+    REPORTS_DIR / "runtime_preview_redacted_flow_corpus.md",
     REPORTS_DIR / "runtime_preview_scenario_evidence.md",
     REPORTS_DIR / "runtime_preview_deploy_readiness_report.sample.md",
     REPORTS_DIR / "runtime_preview_package_readiness_report.sample.md",
+    REPORTS_DIR / "runtime_package_manifest_dry_run.sample.md",
     REPORTS_DIR / "runtime_preview_governance_audit_sample.md",
     REPORTS_DIR / "runtime_preview_governance_export_sample.md",
     REPORTS_DIR / "runtime_preview_agent_explanation_benchmark.md",
@@ -87,6 +91,7 @@ FORBIDDEN_SECRET_PATTERNS = [
         r'"apiKey"\s*:\s*"[^"]+"',
         r"api_key=[^&\s]+",
         r"access_token=[^&\s]+",
+        r"\.cvpkg\b",
     ]
 ]
 

@@ -891,8 +891,9 @@ public class AiModelEndpointsTests
         using var indexResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/governance/index");
         indexResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var indexJson = await indexResponse.Content.ReadAsStringAsync();
-        indexJson.Should().Contain("jsonl.v2");
+        indexJson.Should().Contain("jsonl.v3");
         indexJson.Should().Contain("packageReadinessReportCount");
+        indexJson.Should().Contain("manifestDryRunReportCount");
 
         using var lookupResponse = await host.Client.GetAsync($"/api/settings/runtime-preview-pilot/governance/lookup?sessionId={sessionId}&caseId=RP-SC-001");
         lookupResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -954,6 +955,90 @@ public class AiModelEndpointsTests
         exportResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         lookupResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         explanationResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotV13Endpoints_ShouldReturnRedactedCorpusManifestDryRunAndLookup()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var corpusResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/redacted-flow-corpus");
+        corpusResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var corpusJson = await corpusResponse.Content.ReadAsStringAsync();
+        corpusJson.Should().Contain("\"caseCount\":20");
+        corpusJson.Should().Contain("remote_control_defect");
+        corpusJson.Should().NotContain("192.0.2.20");
+        corpusJson.Should().NotContain(".cvpkg");
+
+        using var manifestResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/manifest-dry-run",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templateId: "template-a") },
+                runtimePreviewConsent = true
+            }));
+        manifestResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var manifestDocument = JsonDocument.Parse(await manifestResponse.Content.ReadAsStringAsync());
+        var manifest = manifestDocument.RootElement.GetProperty("manifestDryRunReport");
+        var manifestId = manifest.GetProperty("manifestId").GetString();
+        manifest.GetProperty("packageReviewAllowed").GetBoolean().Should().BeTrue();
+        manifest.GetProperty("manifestArtifactGenerated").GetBoolean().Should().BeFalse();
+        manifest.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+        manifest.GetProperty("deploymentExecuted").GetBoolean().Should().BeFalse();
+        manifest.GetProperty("dependencyTrace").GetArrayLength().Should().BeGreaterThan(0);
+
+        using var lookupResponse = await host.Client.GetAsync($"/api/settings/runtime-preview-pilot/governance/lookup?manifestId={manifestId}&caseId=RP-RF-001");
+        lookupResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var lookupJson = await lookupResponse.Content.ReadAsStringAsync();
+        lookupJson.Should().Contain("manifest");
+        lookupJson.Should().Contain("redactedFlowCase");
+        lookupJson.Should().NotContain(".cvpkg");
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotManifestDryRun_ShouldBlockMissingDependenciesWithoutPackageArtifact()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/manifest-dry-run",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-missing", templateId: "template-a") },
+                runtimePreviewConsent = true
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var manifest = document.RootElement.GetProperty("manifestDryRunReport");
+        manifest.GetProperty("packageReviewAllowed").GetBoolean().Should().BeFalse();
+        manifest.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+        manifest.GetProperty("manifestArtifactGenerated").GetBoolean().Should().BeFalse();
+        manifest.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+        manifest.GetProperty("deploymentExecuted").GetBoolean().Should().BeFalse();
+        manifest.GetProperty("blockedReasons").GetArrayLength().Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotV13Endpoints_ShouldRequireAdminBrokerGate()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync(userRole: "Engineer");
+
+        using var corpusResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/redacted-flow-corpus");
+        using var manifestResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/manifest-dry-run",
+            JsonContent(new { arguments = new { flow = RuntimePreviewFlow("cam-a") }, runtimePreviewConsent = true }));
+        using var lookupResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/governance/lookup?manifestId=rp_manifest_dry_run_test");
+
+        corpusResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        manifestResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        lookupResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private static StringContent JsonContent(object payload)
@@ -1108,9 +1193,11 @@ public class AiModelEndpointsTests
             builder.Services.AddSingleton(new RuntimePackagePrecheckTool());
             builder.Services.AddSingleton<RuntimePreviewGovernanceMaintenanceService>();
             builder.Services.AddSingleton<RuntimePreviewDeployReadinessService>();
+            builder.Services.AddSingleton<RuntimePackageManifestDryRunService>();
             builder.Services.AddSingleton<RuntimePreviewScenarioEvidenceService>();
             builder.Services.AddSingleton<RuntimePreviewPackageReadinessBridge>();
             builder.Services.AddSingleton<RuntimePreviewScenarioCorpusService>();
+            builder.Services.AddSingleton<RuntimePreviewRedactedFlowCorpusService>();
             builder.Services.AddSingleton<RuntimePreviewAgentExplanationService>();
 
             var aiConfigStore = new AiConfigStore(

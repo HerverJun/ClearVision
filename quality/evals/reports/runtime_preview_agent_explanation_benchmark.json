@@ -1,212 +1,491 @@
 {
-  "schemaVersion": "2026-06-06.runtime-preview-agent-explanation-benchmark.v1",
+  "schemaVersion": "2026-06-06.runtime-preview-agent-explanation-benchmark.v2",
   "benchmarkId": "runtime_preview_agent_explanation_benchmark",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T13:40:09.986508+00:00"
+    "generatedAtUtc": "2026-06-06T15:00:30.583603+00:00"
   },
   "summary": {
-    "caseCount": 15,
-    "passedCaseCount": 15,
+    "caseCount": 20,
+    "passedCaseCount": 20,
     "accepted": true,
     "metadataOnly": true,
     "realResourcesTouched": false
   },
   "cases": [
     {
-      "caseId": "RP-SC-001",
+      "caseId": "RP-RF-001",
       "scenario": "wire_sequence",
+      "status": "passed",
       "readyStateExplanation": "wire_sequence is passed; workflow editing remains allowed.",
       "missingResourceExplanation": "No unresolved metadata resource is expected.",
       "packageRiskExplanation": "Risk: low. Metadata review can continue.",
-      "nextEngineerAction": "Review metadata report and keep real pilot disabled.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [],
+      "manifestRisk": "low",
+      "nextEngineerAction": "Review metadata manifest and keep real pilot gate closed.",
       "workflowDraftAllowed": true,
       "packageBlocked": false,
+      "packageReviewAllowed": true,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-002",
-      "scenario": "terminal_color_order",
-      "readyStateExplanation": "terminal_color_order is passed; workflow editing remains allowed.",
+      "caseId": "RP-RF-002",
+      "scenario": "remote_control_defect",
+      "status": "passed",
+      "readyStateExplanation": "remote_control_defect is passed; workflow editing remains allowed.",
       "missingResourceExplanation": "No unresolved metadata resource is expected.",
       "packageRiskExplanation": "Risk: low. Metadata review can continue.",
-      "nextEngineerAction": "Review metadata report and keep real pilot disabled.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "DeepLearning",
+        "ResultOutput"
+      ],
+      "blockedReasons": [],
+      "manifestRisk": "low",
+      "nextEngineerAction": "Confirm ModelId catalog ownership before real pilot.",
       "workflowDraftAllowed": true,
       "packageBlocked": false,
+      "packageReviewAllowed": true,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-003",
-      "scenario": "template_matching",
-      "readyStateExplanation": "template_matching is passed; workflow editing remains allowed.",
+      "caseId": "RP-RF-003",
+      "scenario": "template_measurement_combo",
+      "status": "passed",
+      "readyStateExplanation": "template_measurement_combo is passed; workflow editing remains allowed.",
       "missingResourceExplanation": "No unresolved metadata resource is expected.",
-      "packageRiskExplanation": "Risk: low. Metadata review can continue.",
-      "nextEngineerAction": "Review metadata report and keep real pilot disabled.",
+      "packageRiskExplanation": "Risk: medium. Metadata review can continue.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "CircleMeasurement",
+        "ResultOutput"
+      ],
+      "blockedReasons": [],
+      "manifestRisk": "medium",
+      "nextEngineerAction": "Review combined template and measurement contract.",
       "workflowDraftAllowed": true,
       "packageBlocked": false,
+      "packageReviewAllowed": true,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-004",
+      "caseId": "RP-RF-004",
       "scenario": "hole_distance",
+      "status": "passed",
       "readyStateExplanation": "hole_distance is passed; workflow editing remains allowed.",
       "missingResourceExplanation": "No unresolved metadata resource is expected.",
       "packageRiskExplanation": "Risk: low. Metadata review can continue.",
-      "nextEngineerAction": "Review metadata report and keep real pilot disabled.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "CircleMeasurement",
+        "MeasureDistance",
+        "ResultOutput"
+      ],
+      "blockedReasons": [],
+      "manifestRisk": "low",
+      "nextEngineerAction": "Confirm measurement unit and tolerance source.",
       "workflowDraftAllowed": true,
       "packageBlocked": false,
+      "packageReviewAllowed": true,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-005",
-      "scenario": "remote_control_detection",
-      "readyStateExplanation": "remote_control_detection is passed; workflow editing remains allowed.",
+      "caseId": "RP-RF-005",
+      "scenario": "terminal_color_order",
+      "status": "passed",
+      "readyStateExplanation": "terminal_color_order is passed; workflow editing remains allowed.",
       "missingResourceExplanation": "No unresolved metadata resource is expected.",
       "packageRiskExplanation": "Risk: low. Metadata review can continue.",
-      "nextEngineerAction": "Review metadata report and keep real pilot disabled.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [],
+      "manifestRisk": "low",
+      "nextEngineerAction": "Confirm template ownership and output mapping.",
       "workflowDraftAllowed": true,
       "packageBlocked": false,
+      "packageReviewAllowed": true,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-006",
+      "caseId": "RP-RF-006",
       "scenario": "missing_camera",
+      "status": "not_ready",
       "readyStateExplanation": "missing_camera is not_ready; workflow editing remains allowed.",
-      "missingResourceExplanation": "Engineer must resolve RuntimePreviewPilotReadinessReview.",
+      "missingResourceExplanation": "Engineer must resolve Bind an allowlisted metadata camera before package review..",
       "packageRiskExplanation": "Risk: missing_camera_binding. Do not package or deploy.",
-      "nextEngineerAction": "Resolve metadata handle, rerun readiness, then rerun package precheck.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "missing_camera_binding"
+      ],
+      "manifestRisk": "missing_camera_binding",
+      "nextEngineerAction": "Bind an allowlisted metadata camera before package review.",
       "workflowDraftAllowed": true,
       "packageBlocked": true,
+      "packageReviewAllowed": false,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-007",
+      "caseId": "RP-RF-007",
       "scenario": "missing_template",
+      "status": "not_ready",
       "readyStateExplanation": "missing_template is not_ready; workflow editing remains allowed.",
-      "missingResourceExplanation": "Engineer must resolve RuntimePreviewPilotReadinessReview.",
+      "missingResourceExplanation": "Engineer must resolve Assign an allowlisted TemplateId; do not use file paths..",
       "packageRiskExplanation": "Risk: missing_template. Do not package or deploy.",
-      "nextEngineerAction": "Resolve metadata handle, rerun readiness, then rerun package precheck.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "missing_template"
+      ],
+      "manifestRisk": "missing_template",
+      "nextEngineerAction": "Assign an allowlisted TemplateId; do not use file paths.",
       "workflowDraftAllowed": true,
       "packageBlocked": true,
+      "packageReviewAllowed": false,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-008",
+      "caseId": "RP-RF-008",
       "scenario": "missing_model",
+      "status": "not_ready",
       "readyStateExplanation": "missing_model is not_ready; workflow editing remains allowed.",
-      "missingResourceExplanation": "Engineer must resolve RuntimePreviewPilotReadinessReview.",
+      "missingResourceExplanation": "Engineer must resolve Bind ModelId from catalog; do not load a model file..",
       "packageRiskExplanation": "Risk: missing_model. Do not package or deploy.",
-      "nextEngineerAction": "Resolve metadata handle, rerun readiness, then rerun package precheck.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "DeepLearning",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "missing_model"
+      ],
+      "manifestRisk": "missing_model",
+      "nextEngineerAction": "Bind ModelId from catalog; do not load a model file.",
       "workflowDraftAllowed": true,
       "packageBlocked": true,
+      "packageReviewAllowed": false,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-009",
-      "scenario": "dangerous_path",
-      "readyStateExplanation": "dangerous_path is denied; workflow editing remains allowed.",
-      "missingResourceExplanation": "Engineer must resolve RuntimePreviewPilotReadinessReview.",
-      "packageRiskExplanation": "Risk: dangerous_resource. Do not package or deploy.",
-      "nextEngineerAction": "Resolve metadata handle, rerun readiness, then rerun package precheck.",
+      "caseId": "RP-RF-009",
+      "scenario": "missing_output_channel",
+      "status": "not_ready",
+      "readyStateExplanation": "missing_output_channel is not_ready; workflow editing remains allowed.",
+      "missingResourceExplanation": "Engineer must resolve Choose OutputChannelId before package review..",
+      "packageRiskExplanation": "Risk: missing_output_channel. Do not package or deploy.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "missing_output_channel"
+      ],
+      "manifestRisk": "missing_output_channel",
+      "nextEngineerAction": "Choose OutputChannelId before package review.",
       "workflowDraftAllowed": true,
       "packageBlocked": true,
+      "packageReviewAllowed": false,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-010",
+      "caseId": "RP-RF-010",
       "scenario": "plc_station_deny",
+      "status": "denied",
       "readyStateExplanation": "plc_station_deny is denied; workflow editing remains allowed.",
-      "missingResourceExplanation": "Engineer must resolve RuntimePreviewPilotReadinessReview.",
+      "missingResourceExplanation": "Engineer must resolve Remove PLC/Station intent; this console cannot write or deploy..",
       "packageRiskExplanation": "Risk: plc_station_denied. Do not package or deploy.",
-      "nextEngineerAction": "Resolve metadata handle, rerun readiness, then rerun package precheck.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "plc_station_denied"
+      ],
+      "manifestRisk": "plc_station_denied",
+      "nextEngineerAction": "Remove PLC/Station intent; this console cannot write or deploy.",
       "workflowDraftAllowed": true,
       "packageBlocked": true,
+      "packageReviewAllowed": false,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-011",
-      "scenario": "precheck_blocked",
-      "readyStateExplanation": "precheck_blocked is not_ready; workflow editing remains allowed.",
-      "missingResourceExplanation": "Engineer must resolve DeploymentPrecheckResourceReview.",
-      "packageRiskExplanation": "Risk: precheck_not_ready. Do not package or deploy.",
-      "nextEngineerAction": "Resolve metadata handle, rerun readiness, then rerun package precheck.",
+      "caseId": "RP-RF-011",
+      "scenario": "dangerous_path",
+      "status": "denied",
+      "readyStateExplanation": "dangerous_path is denied; workflow editing remains allowed.",
+      "missingResourceExplanation": "Engineer must resolve Replace path-like metadata with catalog TemplateId..",
+      "packageRiskExplanation": "Risk: dangerous_resource. Do not package or deploy.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "dangerous_resource"
+      ],
+      "manifestRisk": "dangerous_resource",
+      "nextEngineerAction": "Replace path-like metadata with catalog TemplateId.",
       "workflowDraftAllowed": true,
       "packageBlocked": true,
+      "packageReviewAllowed": false,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-012",
+      "caseId": "RP-RF-012",
       "scenario": "allowlist_mismatch",
+      "status": "not_ready",
       "readyStateExplanation": "allowlist_mismatch is not_ready; workflow editing remains allowed.",
-      "missingResourceExplanation": "Engineer must resolve RuntimePreviewPilotReadinessReview.",
+      "missingResourceExplanation": "Engineer must resolve Review allowlist diff and confirm catalog handle..",
       "packageRiskExplanation": "Risk: allowlist_mismatch. Do not package or deploy.",
-      "nextEngineerAction": "Resolve metadata handle, rerun readiness, then rerun package precheck.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "allowlist_mismatch"
+      ],
+      "manifestRisk": "allowlist_mismatch",
+      "nextEngineerAction": "Review allowlist diff and confirm catalog handle.",
       "workflowDraftAllowed": true,
       "packageBlocked": true,
+      "packageReviewAllowed": false,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-013",
-      "scenario": "multi_operator_flow",
-      "readyStateExplanation": "multi_operator_flow is passed; workflow editing remains allowed.",
+      "caseId": "RP-RF-013",
+      "scenario": "multi_camera_flow",
+      "status": "not_ready",
+      "readyStateExplanation": "multi_camera_flow is not_ready; workflow editing remains allowed.",
+      "missingResourceExplanation": "Engineer must resolve Confirm both camera bindings are catalog allowlisted..",
+      "packageRiskExplanation": "Risk: multi_camera_review. Do not package or deploy.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "multi_camera_review"
+      ],
+      "manifestRisk": "multi_camera_review",
+      "nextEngineerAction": "Confirm both camera bindings are catalog allowlisted.",
+      "workflowDraftAllowed": true,
+      "packageBlocked": true,
+      "packageReviewAllowed": false,
+      "passed": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-RF-014",
+      "scenario": "multi_model_flow",
+      "status": "not_ready",
+      "readyStateExplanation": "multi_model_flow is not_ready; workflow editing remains allowed.",
+      "missingResourceExplanation": "Engineer must resolve Confirm all ModelIds and output aggregation..",
+      "packageRiskExplanation": "Risk: multi_model_review. Do not package or deploy.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "DeepLearning",
+        "DeepLearning",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "multi_model_review"
+      ],
+      "manifestRisk": "multi_model_review",
+      "nextEngineerAction": "Confirm all ModelIds and output aggregation.",
+      "workflowDraftAllowed": true,
+      "packageBlocked": true,
+      "packageReviewAllowed": false,
+      "passed": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-RF-015",
+      "scenario": "parameter_missing",
+      "status": "not_ready",
+      "readyStateExplanation": "parameter_missing is not_ready; workflow editing remains allowed.",
+      "missingResourceExplanation": "Engineer must resolve Complete required operator parameters and rerun readiness..",
+      "packageRiskExplanation": "Risk: missing_parameter. Do not package or deploy.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "missing_parameter"
+      ],
+      "manifestRisk": "missing_parameter",
+      "nextEngineerAction": "Complete required operator parameters and rerun readiness.",
+      "workflowDraftAllowed": true,
+      "packageBlocked": true,
+      "packageReviewAllowed": false,
+      "passed": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-RF-016",
+      "scenario": "package_manifest_blocked",
+      "status": "not_ready",
+      "readyStateExplanation": "package_manifest_blocked is not_ready; workflow editing remains allowed.",
+      "missingResourceExplanation": "Engineer must resolve Resolve manifest dependencies; no package may be created..",
+      "packageRiskExplanation": "Risk: manifest_dependency_blocked. Do not package or deploy.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "DeepLearning",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "manifest_dependency_blocked"
+      ],
+      "manifestRisk": "manifest_dependency_blocked",
+      "nextEngineerAction": "Resolve manifest dependencies; no package may be created.",
+      "workflowDraftAllowed": true,
+      "packageBlocked": true,
+      "packageReviewAllowed": false,
+      "passed": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-RF-017",
+      "scenario": "workflow_editable_package_blocked",
+      "status": "not_ready",
+      "readyStateExplanation": "workflow_editable_package_blocked is not_ready; workflow editing remains allowed.",
+      "missingResourceExplanation": "Engineer must resolve Keep editing; do not start release review yet..",
+      "packageRiskExplanation": "Risk: draft_allowed_package_blocked. Do not package or deploy.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "draft_allowed_package_blocked"
+      ],
+      "manifestRisk": "draft_allowed_package_blocked",
+      "nextEngineerAction": "Keep editing; do not start release review yet.",
+      "workflowDraftAllowed": true,
+      "packageBlocked": true,
+      "packageReviewAllowed": false,
+      "passed": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-RF-018",
+      "scenario": "runtime_package_precheck_blocked",
+      "status": "not_ready",
+      "readyStateExplanation": "runtime_package_precheck_blocked is not_ready; workflow editing remains allowed.",
+      "missingResourceExplanation": "Engineer must resolve Rerun readiness after metadata is resolved..",
+      "packageRiskExplanation": "Risk: precheck_not_ready. Do not package or deploy.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "DeepLearning",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "precheck_not_ready"
+      ],
+      "manifestRisk": "precheck_not_ready",
+      "nextEngineerAction": "Rerun readiness after metadata is resolved.",
+      "workflowDraftAllowed": true,
+      "packageBlocked": true,
+      "packageReviewAllowed": false,
+      "passed": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-RF-019",
+      "scenario": "template_plus_hole_distance",
+      "status": "passed",
+      "readyStateExplanation": "template_plus_hole_distance is passed; workflow editing remains allowed.",
       "missingResourceExplanation": "No unresolved metadata resource is expected.",
       "packageRiskExplanation": "Risk: medium. Metadata review can continue.",
-      "nextEngineerAction": "Review metadata report and keep real pilot disabled.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "CircleMeasurement",
+        "MeasureDistance",
+        "ResultOutput"
+      ],
+      "blockedReasons": [],
+      "manifestRisk": "medium",
+      "nextEngineerAction": "Review dependency trace before requesting real pilot.",
       "workflowDraftAllowed": true,
       "packageBlocked": false,
+      "packageReviewAllowed": true,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false
     },
     {
-      "caseId": "RP-SC-014",
-      "scenario": "missing_parameter",
-      "readyStateExplanation": "missing_parameter is not_ready; workflow editing remains allowed.",
-      "missingResourceExplanation": "Engineer must resolve RuntimePreviewPilotReadinessReview.",
-      "packageRiskExplanation": "Risk: missing_parameter. Do not package or deploy.",
-      "nextEngineerAction": "Resolve metadata handle, rerun readiness, then rerun package precheck.",
+      "caseId": "RP-RF-020",
+      "scenario": "direct_deploy_request_denied",
+      "status": "denied",
+      "readyStateExplanation": "direct_deploy_request_denied is denied; workflow editing remains allowed.",
+      "missingResourceExplanation": "Engineer must resolve Use metadata review only; direct deployment remains forbidden..",
+      "packageRiskExplanation": "Risk: deployment_intent_denied. Do not package or deploy.",
+      "affectedOperators": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "blockedReasons": [
+        "deployment_intent_denied"
+      ],
+      "manifestRisk": "deployment_intent_denied",
+      "nextEngineerAction": "Use metadata review only; direct deployment remains forbidden.",
       "workflowDraftAllowed": true,
       "packageBlocked": true,
-      "passed": true,
-      "metadataOnly": true,
-      "realResourcesTouched": false
-    },
-    {
-      "caseId": "RP-SC-015",
-      "scenario": "draft_editable_package_blocked",
-      "readyStateExplanation": "draft_editable_package_blocked is not_ready; workflow editing remains allowed.",
-      "missingResourceExplanation": "Engineer must resolve RuntimePreviewPilotReadinessReview.",
-      "packageRiskExplanation": "Risk: draft_allowed_package_blocked. Do not package or deploy.",
-      "nextEngineerAction": "Resolve metadata handle, rerun readiness, then rerun package precheck.",
-      "workflowDraftAllowed": true,
-      "packageBlocked": true,
+      "packageReviewAllowed": false,
       "passed": true,
       "metadataOnly": true,
       "realResourcesTouched": false

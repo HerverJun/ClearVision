@@ -8,8 +8,8 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
         renderRuntimePreviewPilotConsoleTab() {
             return `
                 <div class="settings-section-title" data-runtime-preview-pilot-console-page="true">
-                    <h2>RuntimePreview Pilot Console</h2>
-                    <p>Metadata-only scenario, session, package readiness, and governance evidence for developer review.</p>
+                    <h2>RuntimePreview Pre-release Review Desk</h2>
+                    <p>Metadata-only scenario, manifest dry-run, package readiness, and governance evidence for developer review.</p>
                 </div>
                 ${this.renderScopeNotice('runtime-preview-pilot')}
                 ${this.renderRuntimePreviewPilotPanel()}
@@ -17,7 +17,7 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
         }
         ,
         renderRuntimePreviewPilotPanel() {
-            const html = baseRenderRuntimePreviewPilotPanel.call(this).replace('RuntimePreview Pilot Console v1.1', 'RuntimePreview Pilot Console v1.2');
+            const html = baseRenderRuntimePreviewPilotPanel.call(this).replace('RuntimePreview Pilot Console v1.1', 'RuntimePreview Pilot Console v1.3');
             const extras = this.renderRuntimePreviewPilotConsoleV12Panels();
             return html.replace(
                 '</div>\n                </details>',
@@ -26,14 +26,20 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
         ,
         renderRuntimePreviewPilotConsoleV12Panels() {
             const corpus = this.runtimePreviewScenarioCorpus || null;
+            const redactedCorpus = this.runtimePreviewRedactedFlowCorpus || null;
             const packageReadiness = this.runtimePreviewPilotPackageReadinessReport || null;
+            const manifestDryRun = this.runtimePackageManifestDryRunReport || null;
             const governanceIndex = this.runtimePreviewGovernanceIndex || null;
             const governanceExport = this.runtimePreviewGovernanceExport || null;
             const governanceLookup = this.runtimePreviewGovernanceLookup || null;
             const explanation = this.runtimePreviewAgentExplanationBenchmark || null;
             const corpusCases = Array.isArray(corpus?.cases) ? corpus.cases : [];
+            const redactedCases = Array.isArray(redactedCorpus?.cases) ? redactedCorpus.cases : [];
             const corpusOptions = corpusCases
                 .map(item => `<option value="${this.sanitizeRuntimePreviewPilotValue(item.caseId)}">${this.sanitizeRuntimePreviewPilotValue(`${item.caseId} ${item.scenario}`)}</option>`)
+                .join('');
+            const redactedOptions = redactedCases
+                .map(item => `<option value="${this.sanitizeRuntimePreviewPilotValue(item.caseId)}">${this.sanitizeRuntimePreviewPilotValue(`${item.caseId} ${item.workflowKind}`)}</option>`)
                 .join('');
             const corpusRows = corpusCases.length
                 ? corpusCases.slice(0, 18).map(item => `
@@ -46,23 +52,61 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                     </tr>
                 `).join('')
                 : '<tr><td colspan="5" style="color:#64748b;">Scenario corpus has not been loaded.</td></tr>';
+            const redactedRows = redactedCases.length
+                ? redactedCases.slice(0, 24).map(item => `
+                    <tr>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.caseId)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.stationType)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.workflowKind)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.expectedManifestRisk)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.expectedEngineerAction)}</td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="5" style="color:#64748b;">Redacted flow corpus has not been loaded.</td></tr>';
             const packageHtml = packageReadiness
                 ? `<pre data-rp-package-readiness-report="true" style="white-space:pre-wrap; font-size:11px; max-height:170px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
                     reportId: packageReadiness.reportId,
                     sessionId: packageReadiness.sessionId,
                     readyForPackage: packageReadiness.readyForPackage,
+                    packageReviewAllowed: packageReadiness.packageReviewAllowed,
                     packageBlocked: packageReadiness.packageBlocked,
+                    manifestDryRunReportId: packageReadiness.manifestDryRunReportId,
                     packageCreated: packageReadiness.packageCreated,
                     deploymentExecuted: packageReadiness.deploymentExecuted,
                     workflowDraftAllowed: packageReadiness.workflowDraftAllowed,
                     riskSummary: packageReadiness.riskSummary,
+                    packageRiskLevel: packageReadiness.packageRiskLevel,
+                    packageReviewExplanation: packageReadiness.packageReviewExplanation,
                     blockingIssues: packageReadiness.blockingIssues || [],
                     missingResources: packageReadiness.missingResources || [],
                     pendingActions: packageReadiness.pendingActions || [],
                     operatorTrace: packageReadiness.operatorTrace || [],
-                    resourceTrace: packageReadiness.resourceTrace || []
+                    resourceTrace: packageReadiness.resourceTrace || [],
+                    dependencyTrace: packageReadiness.dependencyTrace || []
                 }, null, 2))}</pre>`
                 : '<div data-rp-package-readiness-report="true" style="font-size:12px; color:#64748b;">No package readiness report generated.</div>';
+            const manifestHtml = manifestDryRun
+                ? `<pre data-rp-manifest-dry-run-report="true" style="white-space:pre-wrap; font-size:11px; max-height:190px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    manifestId: manifestDryRun.manifestId,
+                    manifestHash: manifestDryRun.manifestHash,
+                    workflowDraftHash: manifestDryRun.workflowDraftHash,
+                    operatorCount: manifestDryRun.operatorCount,
+                    operatorTypes: manifestDryRun.operatorTypes || [],
+                    resourceDependencies: manifestDryRun.resourceDependencies || [],
+                    modelDependencies: manifestDryRun.modelDependencies || [],
+                    templateDependencies: manifestDryRun.templateDependencies || [],
+                    cameraBindings: manifestDryRun.cameraBindings || [],
+                    outputChannels: manifestDryRun.outputChannels || [],
+                    missingDependencies: manifestDryRun.missingDependencies || [],
+                    blockedReasons: manifestDryRun.blockedReasons || [],
+                    dependencyTrace: manifestDryRun.dependencyTrace || [],
+                    riskLevel: manifestDryRun.riskLevel,
+                    packageReviewAllowed: manifestDryRun.packageReviewAllowed,
+                    manifestArtifactGenerated: manifestDryRun.manifestArtifactGenerated,
+                    packageCreated: manifestDryRun.packageCreated,
+                    deploymentExecuted: manifestDryRun.deploymentExecuted
+                }, null, 2))}</pre>`
+                : '<div data-rp-manifest-dry-run-report="true" style="font-size:12px; color:#64748b;">No manifest dry-run report generated.</div>';
             const governanceIndexHtml = governanceIndex
                 ? `<pre data-rp-governance-index="true" style="white-space:pre-wrap; font-size:11px; max-height:130px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify(governanceIndex, null, 2))}</pre>`
                 : '<div data-rp-governance-index="true" style="font-size:12px; color:#64748b;">No governance index loaded.</div>';
@@ -104,6 +148,20 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                                 <tbody>${corpusRows}</tbody>
                             </table>
                         </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-redacted-flow-corpus-panel="true">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                <h4 style="margin:0 0 8px;">Redacted Flow Corpus</h4>
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <select class="cv-input" id="cfg-rp-redacted-flow-case-id" style="min-width:260px;">${redactedOptions}</select>
+                                    <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-load-redacted-flow-corpus">Load redacted flows</button>
+                                    <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-run-redacted-flow-chain">Run pre-release chain</button>
+                                </div>
+                            </div>
+                            <table class="settings-modern-table" data-rp-redacted-flow-corpus="true">
+                                <thead><tr><th>Case</th><th>Station type</th><th>Workflow kind</th><th>Manifest risk</th><th>Engineer action</th></tr></thead>
+                                <tbody>${redactedRows}</tbody>
+                            </table>
+                        </div>
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-package-readiness-panel="true">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                                 <h4 style="margin:0 0 8px;">Package readiness bridge</h4>
@@ -111,12 +169,20 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                             </div>
                             ${packageHtml}
                         </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-manifest-dry-run-panel="true">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                <h4 style="margin:0 0 8px;">RuntimePackage manifest dry-run</h4>
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-manifest-dry-run">Manifest dry-run</button>
+                            </div>
+                            ${manifestHtml}
+                        </div>
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-governance-panel="true">
                             <h4 style="margin:0 0 8px;">Governance index, lookup, and export</h4>
-                            <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;">
+                            <div style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px;">
                                 <input class="cv-input" id="cfg-rp-lookup-session-id" placeholder="sessionId">
                                 <input class="cv-input" id="cfg-rp-lookup-report-id" placeholder="reportId">
                                 <input class="cv-input" id="cfg-rp-lookup-case-id" placeholder="caseId">
+                                <input class="cv-input" id="cfg-rp-lookup-manifest-id" placeholder="manifestId">
                             </div>
                             <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
                                 <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-governance-index">Load index</button>
@@ -200,6 +266,13 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                 } else if (btn.id === 'btn-runtime-preview-pilot-package-readiness') {
                     const result = await settingsApi.generateRuntimePreviewPackageReadiness(this.buildRuntimePreviewPilotSessionPayload(root));
                     this.runtimePreviewPilotPackageReadinessReport = result?.packageReadinessReport || null;
+                    this.runtimePackageManifestDryRunReport = result?.manifestDryRunReport || this.runtimePackageManifestDryRunReport;
+                    this.runtimePreviewPilotSelectedSessionId = result?.packageReadinessReport?.sessionId || this.runtimePreviewPilotSelectedSessionId;
+                    await this.loadRuntimePreviewPilotState();
+                } else if (btn.id === 'btn-runtime-preview-pilot-manifest-dry-run') {
+                    const result = await settingsApi.generateRuntimePackageManifestDryRun(this.buildRuntimePreviewPilotSessionPayload(root));
+                    this.runtimePreviewPilotPackageReadinessReport = result?.packageReadinessReport || null;
+                    this.runtimePackageManifestDryRunReport = result?.manifestDryRunReport || null;
                     this.runtimePreviewPilotSelectedSessionId = result?.packageReadinessReport?.sessionId || this.runtimePreviewPilotSelectedSessionId;
                     await this.loadRuntimePreviewPilotState();
                 } else if (btn.id === 'btn-runtime-preview-pilot-scenario-evidence') {
@@ -208,6 +281,9 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                 } else if (btn.id === 'btn-runtime-preview-pilot-load-corpus') {
                     const result = await settingsApi.loadRuntimePreviewScenarioCorpus();
                     this.runtimePreviewScenarioCorpus = result?.corpus || result;
+                } else if (btn.id === 'btn-runtime-preview-pilot-load-redacted-flow-corpus') {
+                    const result = await settingsApi.loadRuntimePreviewRedactedFlowCorpus();
+                    this.runtimePreviewRedactedFlowCorpus = result?.corpus || result;
                 } else if (btn.id === 'btn-runtime-preview-pilot-run-selected-scenario') {
                     await this.ensureRuntimePreviewScenarioCorpusLoaded();
                     const caseId = root.querySelector('#cfg-rp-scenario-case-id')?.value || '';
@@ -221,7 +297,23 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                     };
                     const result = await settingsApi.generateRuntimePreviewPackageReadiness(payload);
                     this.runtimePreviewPilotPackageReadinessReport = result?.packageReadinessReport || null;
+                    this.runtimePackageManifestDryRunReport = result?.manifestDryRunReport || this.runtimePackageManifestDryRunReport;
                     this.runtimePreviewGovernanceLookup = { corpusCase: scenarioCase };
+                } else if (btn.id === 'btn-runtime-preview-pilot-run-redacted-flow-chain') {
+                    await this.ensureRuntimePreviewRedactedFlowCorpusLoaded();
+                    const caseId = root.querySelector('#cfg-rp-redacted-flow-case-id')?.value || '';
+                    const flowCase = this.findRuntimePreviewRedactedFlowCase(caseId);
+                    if (!flowCase) return;
+                    const payload = {
+                        config: this.readRuntimePreviewPilotConfigDraft(root),
+                        toolName: 'runtime_preview_metadata',
+                        runtimePreviewConsent: true,
+                        arguments: { flow: flowCase.workflowDraft }
+                    };
+                    const result = await settingsApi.generateRuntimePackageManifestDryRun(payload);
+                    this.runtimePreviewPilotPackageReadinessReport = result?.packageReadinessReport || null;
+                    this.runtimePackageManifestDryRunReport = result?.manifestDryRunReport || null;
+                    this.runtimePreviewGovernanceLookup = { redactedFlowCase: flowCase };
                 } else if (btn.id === 'btn-runtime-preview-pilot-governance-index') {
                     const result = await settingsApi.loadRuntimePreviewGovernanceIndex();
                     this.runtimePreviewGovernanceIndex = result?.index || result;
@@ -232,7 +324,8 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                     const result = await settingsApi.lookupRuntimePreviewGovernance({
                         sessionId: root.querySelector('#cfg-rp-lookup-session-id')?.value || '',
                         reportId: root.querySelector('#cfg-rp-lookup-report-id')?.value || '',
-                        caseId: root.querySelector('#cfg-rp-lookup-case-id')?.value || ''
+                        caseId: root.querySelector('#cfg-rp-lookup-case-id')?.value || '',
+                        manifestId: root.querySelector('#cfg-rp-lookup-manifest-id')?.value || ''
                     });
                     this.runtimePreviewGovernanceLookup = result?.lookup || result;
                 } else if (btn.id === 'btn-runtime-preview-pilot-agent-explanation') {
@@ -268,9 +361,25 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
             this.runtimePreviewScenarioCorpus = result?.corpus || result;
         }
         ,
+        async ensureRuntimePreviewRedactedFlowCorpusLoaded() {
+            if (Array.isArray(this.runtimePreviewRedactedFlowCorpus?.cases) && this.runtimePreviewRedactedFlowCorpus.cases.length > 0) {
+                return;
+            }
+
+            const result = await settingsApi.loadRuntimePreviewRedactedFlowCorpus();
+            this.runtimePreviewRedactedFlowCorpus = result?.corpus || result;
+        }
+        ,
         findRuntimePreviewScenarioCase(caseId) {
             const cases = Array.isArray(this.runtimePreviewScenarioCorpus?.cases)
                 ? this.runtimePreviewScenarioCorpus.cases
+                : [];
+            return cases.find(item => String(item.caseId || '').toLowerCase() === String(caseId || '').toLowerCase()) || null;
+        }
+        ,
+        findRuntimePreviewRedactedFlowCase(caseId) {
+            const cases = Array.isArray(this.runtimePreviewRedactedFlowCorpus?.cases)
+                ? this.runtimePreviewRedactedFlowCorpus.cases
                 : [];
             return cases.find(item => String(item.caseId || '').toLowerCase() === String(caseId || '').toLowerCase()) || null;
         }

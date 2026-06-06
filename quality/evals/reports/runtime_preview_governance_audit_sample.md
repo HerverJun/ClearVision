@@ -1,6 +1,6 @@
 # RuntimePreview Governance Audit Sample
 
-- Generated UTC: `2026-06-06T13:40:09.986508+00:00`
+- Generated UTC: `2026-06-06T15:00:30.583603+00:00`
 - Commit: `local`
 - Branch: `local`
 - Run: `local` attempt `local`
@@ -23,6 +23,7 @@
 | session_replayed | True | True |
 | deploy_readiness_generated | True | True |
 | package_readiness_generated | True | True |
+| manifest_dry_run_generated | True | True |
 | governance_exported | True | True |
 | retention_cleanup | True | True |
 | corruption_recovered | True | True |

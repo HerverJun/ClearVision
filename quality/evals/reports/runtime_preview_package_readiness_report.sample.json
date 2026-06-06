@@ -1,17 +1,17 @@
 {
-  "schemaVersion": "2026-06-06.runtime-preview-package-readiness-report.v1",
+  "schemaVersion": "2026-06-06.runtime-preview-package-readiness-report.v2",
   "benchmarkId": "runtime_preview_package_readiness_report_sample",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T13:40:09.986508+00:00"
+    "generatedAtUtc": "2026-06-06T15:00:30.583603+00:00"
   },
   "summary": {
-    "caseCount": 15,
-    "readyForPackageCount": 6,
-    "packageBlockedCount": 9,
+    "caseCount": 20,
+    "readyForPackageCount": 7,
+    "packageBlockedCount": 13,
     "metadataOnly": true,
     "packageCreated": false,
     "deploymentExecuted": false,
@@ -23,12 +23,17 @@
       "caseId": "RP-SC-001",
       "scenario": "wire_sequence",
       "readyForPackage": true,
+      "packageReviewAllowed": true,
       "packageBlocked": false,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-001",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [],
+      "blockedReason": "",
       "missingResources": [],
       "riskSummary": "metadata package review can continue",
+      "packageRiskLevel": "low",
+      "packageReviewExplanation": "Manifest dry-run can proceed; no package is created.",
       "pendingActions": [],
       "workflowDraftAllowed": true,
       "operatorTrace": [
@@ -39,18 +44,35 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "operator_contract:metadata",
+        "resource_contract:metadata_only"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-002",
       "scenario": "terminal_color_order",
       "readyForPackage": true,
+      "packageReviewAllowed": true,
       "packageBlocked": false,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-002",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [],
+      "blockedReason": "",
       "missingResources": [],
       "riskSummary": "metadata package review can continue",
+      "packageRiskLevel": "low",
+      "packageReviewExplanation": "Manifest dry-run can proceed; no package is created.",
       "pendingActions": [],
       "workflowDraftAllowed": true,
       "operatorTrace": [
@@ -61,18 +83,35 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "operator_contract:metadata",
+        "resource_contract:metadata_only"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-003",
       "scenario": "template_matching",
       "readyForPackage": true,
+      "packageReviewAllowed": true,
       "packageBlocked": false,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-003",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [],
+      "blockedReason": "",
       "missingResources": [],
       "riskSummary": "metadata package review can continue",
+      "packageRiskLevel": "low",
+      "packageReviewExplanation": "Manifest dry-run can proceed; no package is created.",
       "pendingActions": [],
       "workflowDraftAllowed": true,
       "operatorTrace": [
@@ -83,18 +122,35 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "operator_contract:metadata",
+        "resource_contract:metadata_only"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-004",
       "scenario": "hole_distance",
       "readyForPackage": true,
+      "packageReviewAllowed": true,
       "packageBlocked": false,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-004",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [],
+      "blockedReason": "",
       "missingResources": [],
       "riskSummary": "metadata package review can continue",
+      "packageRiskLevel": "low",
+      "packageReviewExplanation": "Manifest dry-run can proceed; no package is created.",
       "pendingActions": [],
       "workflowDraftAllowed": true,
       "operatorTrace": [
@@ -105,18 +161,35 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "operator_contract:metadata",
+        "resource_contract:metadata_only"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-005",
       "scenario": "remote_control_detection",
       "readyForPackage": true,
+      "packageReviewAllowed": true,
       "packageBlocked": false,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-005",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [],
+      "blockedReason": "",
       "missingResources": [],
       "riskSummary": "metadata package review can continue",
+      "packageRiskLevel": "low",
+      "packageReviewExplanation": "Manifest dry-run can proceed; no package is created.",
       "pendingActions": [],
       "workflowDraftAllowed": true,
       "operatorTrace": [
@@ -127,19 +200,34 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "operator_contract:metadata",
+        "resource_contract:metadata_only"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-006",
       "scenario": "missing_camera",
       "readyForPackage": false,
+      "packageReviewAllowed": false,
       "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-006",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [
         "missing_camera_binding",
         "RuntimePreviewPilotReadinessReview"
       ],
+      "blockedReason": "missing_camera_binding",
       "missingResources": [
         {
           "kind": "missing_camera_binding",
@@ -147,6 +235,8 @@
         }
       ],
       "riskSummary": "package blocked: missing_camera_binding",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
@@ -159,19 +249,33 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:missing_camera_binding"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-007",
       "scenario": "missing_template",
       "readyForPackage": false,
+      "packageReviewAllowed": false,
       "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-007",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [
         "missing_template",
         "RuntimePreviewPilotReadinessReview"
       ],
+      "blockedReason": "missing_template",
       "missingResources": [
         {
           "kind": "missing_template",
@@ -179,6 +283,8 @@
         }
       ],
       "riskSummary": "package blocked: missing_template",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
@@ -191,19 +297,33 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:missing_template"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-008",
       "scenario": "missing_model",
       "readyForPackage": false,
+      "packageReviewAllowed": false,
       "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-008",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [
         "missing_model",
         "RuntimePreviewPilotReadinessReview"
       ],
+      "blockedReason": "missing_model",
       "missingResources": [
         {
           "kind": "missing_model",
@@ -211,6 +331,8 @@
         }
       ],
       "riskSummary": "package blocked: missing_model",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
@@ -223,21 +345,37 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:missing_model"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-009",
       "scenario": "dangerous_path",
       "readyForPackage": false,
+      "packageReviewAllowed": false,
       "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-009",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [
         "dangerous_resource",
         "RuntimePreviewPilotReadinessReview"
       ],
+      "blockedReason": "dangerous_resource",
       "missingResources": [],
       "riskSummary": "package blocked: dangerous_resource",
+      "packageRiskLevel": "denied",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
@@ -250,21 +388,37 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:dangerous_resource"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-010",
       "scenario": "plc_station_deny",
       "readyForPackage": false,
+      "packageReviewAllowed": false,
       "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-010",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [
         "plc_station_denied",
         "RuntimePreviewPilotReadinessReview"
       ],
+      "blockedReason": "plc_station_denied",
       "missingResources": [],
       "riskSummary": "package blocked: plc_station_denied",
+      "packageRiskLevel": "denied",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
@@ -277,19 +431,33 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:plc_station_denied"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-011",
       "scenario": "precheck_blocked",
       "readyForPackage": false,
+      "packageReviewAllowed": false,
       "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-011",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [
         "precheck_not_ready",
         "DeploymentPrecheckResourceReview"
       ],
+      "blockedReason": "precheck_not_ready",
       "missingResources": [
         {
           "kind": "precheck_not_ready",
@@ -297,6 +465,8 @@
         }
       ],
       "riskSummary": "package blocked: precheck_not_ready",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
         "DeploymentPrecheckResourceReview"
       ],
@@ -309,19 +479,33 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:precheck_not_ready"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-012",
       "scenario": "allowlist_mismatch",
       "readyForPackage": false,
+      "packageReviewAllowed": false,
       "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-012",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [
         "allowlist_mismatch",
         "RuntimePreviewPilotReadinessReview"
       ],
+      "blockedReason": "allowlist_mismatch",
       "missingResources": [
         {
           "kind": "allowlist_mismatch",
@@ -329,6 +513,8 @@
         }
       ],
       "riskSummary": "package blocked: allowlist_mismatch",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
@@ -341,18 +527,34 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:allowlist_mismatch"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-013",
       "scenario": "multi_operator_flow",
       "readyForPackage": true,
+      "packageReviewAllowed": true,
       "packageBlocked": false,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-013",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [],
+      "blockedReason": "",
       "missingResources": [],
       "riskSummary": "metadata package review can continue",
+      "packageRiskLevel": "low",
+      "packageReviewExplanation": "Manifest dry-run can proceed; no package is created.",
       "pendingActions": [],
       "workflowDraftAllowed": true,
       "operatorTrace": [
@@ -363,19 +565,34 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "operator_contract:metadata",
+        "resource_contract:metadata_only"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-014",
       "scenario": "missing_parameter",
       "readyForPackage": false,
+      "packageReviewAllowed": false,
       "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-014",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [
         "missing_parameter",
         "RuntimePreviewPilotReadinessReview"
       ],
+      "blockedReason": "missing_parameter",
       "missingResources": [
         {
           "kind": "missing_parameter",
@@ -383,6 +600,8 @@
         }
       ],
       "riskSummary": "package blocked: missing_parameter",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
@@ -395,19 +614,33 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:missing_parameter"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     },
     {
       "caseId": "RP-SC-015",
       "scenario": "draft_editable_package_blocked",
       "readyForPackage": false,
+      "packageReviewAllowed": false,
       "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-015",
       "packageCreated": false,
       "deploymentExecuted": false,
       "blockingIssues": [
         "draft_allowed_package_blocked",
         "RuntimePreviewPilotReadinessReview"
       ],
+      "blockedReason": "draft_allowed_package_blocked",
       "missingResources": [
         {
           "kind": "draft_allowed_package_blocked",
@@ -415,6 +648,8 @@
         }
       ],
       "riskSummary": "package blocked: draft_allowed_package_blocked",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
@@ -427,6 +662,243 @@
       "resourceTrace": [
         "metadata_handle_only",
         "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:draft_allowed_package_blocked"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
+      ]
+    },
+    {
+      "caseId": "RP-SC-016",
+      "scenario": "package_manifest_blocked",
+      "readyForPackage": false,
+      "packageReviewAllowed": false,
+      "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-016",
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "manifest_dependency_blocked",
+        "ManifestDependencyReview"
+      ],
+      "blockedReason": "manifest_dependency_blocked",
+      "missingResources": [
+        {
+          "kind": "manifest_dependency_blocked",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: manifest_dependency_blocked",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
+      "pendingActions": [
+        "ManifestDependencyReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:manifest_dependency_blocked"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
+      ]
+    },
+    {
+      "caseId": "RP-SC-017",
+      "scenario": "multi_camera_flow",
+      "readyForPackage": false,
+      "packageReviewAllowed": false,
+      "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-017",
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "multi_camera_review",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "blockedReason": "multi_camera_review",
+      "missingResources": [
+        {
+          "kind": "multi_camera_review",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: multi_camera_review",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:multi_camera_review"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
+      ]
+    },
+    {
+      "caseId": "RP-SC-018",
+      "scenario": "multi_model_flow",
+      "readyForPackage": false,
+      "packageReviewAllowed": false,
+      "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-018",
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "multi_model_review",
+        "ManifestDependencyReview"
+      ],
+      "blockedReason": "multi_model_review",
+      "missingResources": [
+        {
+          "kind": "multi_model_review",
+          "handle": "<pending-metadata-handle>"
+        }
+      ],
+      "riskSummary": "package blocked: multi_model_review",
+      "packageRiskLevel": "high",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
+      "pendingActions": [
+        "ManifestDependencyReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:multi_model_review"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
+      ]
+    },
+    {
+      "caseId": "RP-SC-019",
+      "scenario": "template_plus_hole_distance",
+      "readyForPackage": true,
+      "packageReviewAllowed": true,
+      "packageBlocked": false,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-019",
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [],
+      "blockedReason": "",
+      "missingResources": [],
+      "riskSummary": "metadata package review can continue",
+      "packageRiskLevel": "low",
+      "packageReviewExplanation": "Manifest dry-run can proceed; no package is created.",
+      "pendingActions": [],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "operator_contract:metadata",
+        "resource_contract:metadata_only"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
+      ]
+    },
+    {
+      "caseId": "RP-SC-020",
+      "scenario": "direct_deploy_request_denied",
+      "readyForPackage": false,
+      "packageReviewAllowed": false,
+      "packageBlocked": true,
+      "manifestDryRunReportId": "rp_manifest_dry_run_rp-sc-020",
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "blockingIssues": [
+        "deployment_intent_denied",
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "blockedReason": "deployment_intent_denied",
+      "missingResources": [],
+      "riskSummary": "package blocked: deployment_intent_denied",
+      "packageRiskLevel": "denied",
+      "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "workflowDraftAllowed": true,
+      "operatorTrace": [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "ResultOutput"
+      ],
+      "resourceTrace": [
+        "metadata_handle_only",
+        "realResourcesTouched=false"
+      ],
+      "dependencyTrace": [
+        "blocked:deployment_intent_denied"
+      ],
+      "operatorContract": [
+        "ImageAcquisition:metadata",
+        "TemplateMatching:metadata",
+        "ResultOutput:metadata"
+      ],
+      "resourceContract": [
+        "camera/template/model/output:metadata_only"
       ]
     }
   ],

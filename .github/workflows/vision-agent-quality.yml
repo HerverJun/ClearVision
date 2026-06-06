@@ -68,12 +68,16 @@ jobs:
             quality/evals/reports/planner_autonomy_benchmark.md
             quality/evals/reports/runtime_preview_scenario_corpus.json
             quality/evals/reports/runtime_preview_scenario_corpus.md
+            quality/evals/reports/runtime_preview_redacted_flow_corpus.json
+            quality/evals/reports/runtime_preview_redacted_flow_corpus.md
             quality/evals/reports/runtime_preview_scenario_evidence.json
             quality/evals/reports/runtime_preview_scenario_evidence.md
             quality/evals/reports/runtime_preview_deploy_readiness_report.sample.json
             quality/evals/reports/runtime_preview_deploy_readiness_report.sample.md
             quality/evals/reports/runtime_preview_package_readiness_report.sample.json
             quality/evals/reports/runtime_preview_package_readiness_report.sample.md
+            quality/evals/reports/runtime_package_manifest_dry_run.sample.json
+            quality/evals/reports/runtime_package_manifest_dry_run.sample.md
             quality/evals/reports/runtime_preview_governance_audit_sample.json
             quality/evals/reports/runtime_preview_governance_audit_sample.md
             quality/evals/reports/runtime_preview_governance_export_sample.json

@@ -6,12 +6,12 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T13:40:09.986508+00:00"
+    "generatedAtUtc": "2026-06-06T15:00:30.583603+00:00"
   },
   "summary": {
-    "caseCount": 15,
-    "readyForDeploymentCount": 6,
-    "deploymentBlockedCount": 9,
+    "caseCount": 20,
+    "readyForDeploymentCount": 7,
+    "deploymentBlockedCount": 13,
     "metadataOnly": true,
     "packageCreated": false,
     "deploymentExecuted": false,
@@ -228,6 +228,76 @@
       "packageCreated": false,
       "deploymentExecuted": false,
       "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-016",
+      "scenario": "package_manifest_blocked",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-017",
+      "scenario": "multi_camera_flow",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-018",
+      "scenario": "multi_model_flow",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-019",
+      "scenario": "template_plus_hole_distance",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "ready",
+      "permissionStatus": "allowed",
+      "simulationPreviewReady": true,
+      "runtimePackagePrecheckReady": true,
+      "readyForDeployment": true,
+      "deploymentBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SC-020",
+      "scenario": "direct_deploy_request_denied",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "denied",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
     }
   ],
   "timelineTemplate": [
@@ -238,7 +308,8 @@
     "permission_decision",
     "simulated_preview",
     "runtime_package_precheck",
-    "deploy_readiness_report"
+    "deploy_readiness_report",
+    "manifest_dry_run"
   ],
   "safetyBoundary": {
     "realCameraSdkTouched": false,
