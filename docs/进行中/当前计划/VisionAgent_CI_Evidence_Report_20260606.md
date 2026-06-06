@@ -1,33 +1,34 @@
 # Vision Agent CI Evidence Report 20260606
 
-## Workflow Run #16
+## Workflow Run #18 - RuntimePreview Pilot v0.8 Final Evidence
 
 | Field | Value |
 | --- | --- |
 | workflow | Vision Agent Quality Suite |
 | branchName | codex初稿 |
-| commitSha | ae8117cf7d39a181278752d8e65ff3ee8cd142c4 |
-| runId | 27056660772 |
+| commitSha | 941cffbd5cd53eca3924081f4da7694ae64bd0f3 |
+| headSha | 941cffbd5cd53eca3924081f4da7694ae64bd0f3 |
+| runId | 27059205031 |
 | runAttempt | 1 |
-| runNumber | 16 |
+| runNumber | 18 |
 | event | push |
 | status | completed |
 | conclusion | success |
-| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27056660772 |
-| startedAtUtc | 2026-06-06T07:49:54Z |
-| completedAtUtc | 2026-06-06T07:52:44Z |
+| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27059205031 |
+| startedAtUtc | 2026-06-06T09:56:08Z |
+| completedAtUtc | 2026-06-06T09:59:06Z |
 
 ## Artifact
 
 | Field | Value |
 | --- | --- |
 | artifactName | vision-agent-quality-suite |
-| artifactId | 7452601406 |
-| sizeBytes | 121613 |
-| digest | sha256:42e5af47dbad085a5d41512d73fa20c87b35f4bc7f6efd5341bb165ed5eb8159 |
-| createdAtUtc | 2026-06-06T07:52:36Z |
+| artifactId | 7453442164 |
+| sizeBytes | 129534 |
+| digest | sha256:6ae2e0f2a09cf951554389fcd0a70e960586c6ce2cf304b219648561045b83f4 |
+| createdAtUtc | 2026-06-06T09:58:57Z |
 
-The artifact zip is available from GitHub Actions for authenticated users. The public REST metadata confirms artifact name, id, digest, run id, branch, and head SHA. `Assert Vision Agent Artifact Reports` completed successfully before upload, enforcing non-local `workflowRun` metadata and secret/BaseUrl redaction.
+The artifact zip is available from GitHub Actions for authenticated users. GitHub Actions metadata confirms artifact name, id, digest, run id, branch, and head SHA. `Assert Vision Agent Artifact Reports` completed successfully before upload, enforcing non-local `workflowRun` metadata and secret/BaseUrl redaction.
 
 Expected artifact contents:
 
@@ -56,7 +57,7 @@ Expected artifact contents:
 
 The shadow sample step generates both fixed and holdout reports with the real LLM disabled by default. Manual CPA fixed/holdout results remain planner-shadow evidence only and are not part of the stable CI gate.
 
-## Run #16 Benchmark Summary
+## Run #18 Benchmark Summary
 
 Executable business benchmark:
 
@@ -81,9 +82,9 @@ Default real LLM shadow eval samples:
 - skippedReason: `CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.`
 - safety mode: offline metadata only
 
-## RuntimePreview Pilot v0.8 Local Evidence
+## RuntimePreview Pilot v0.8 Evidence
 
-The RuntimePreview Pilot v0.8 implementation raises local quality gates beyond run #16:
+RuntimePreview Pilot v0.8 is covered by run #18 and the matching local pre-push run:
 
 - backend Agent tests: 203 total / 203 passed
 - AI model endpoint regression: 9 total / 9 passed
@@ -92,11 +93,15 @@ The RuntimePreview Pilot v0.8 implementation raises local quality gates beyond r
 - planner autonomy + permission negative benchmark: 21 / 21 accepted
 - artifact/source assertion: 13 artifact files validated, 4 reports validated, 3310 source files scanned
 
-Stable CI continues to keep fixed/holdout real LLM shadow eval default-off. The latest remote run metadata for the pushed v0.8 commit is recorded in the task completion output.
+Stable CI continues to keep fixed/holdout real LLM shadow eval default-off.
+
+## RuntimePreview Pilot Endpoint Permission Note
+
+This evidence-only update does not change production logic. `POST /api/settings/runtime-preview-pilot/readiness` currently returns metadata-only readiness information and still does not touch real camera SDKs, Station, image files, model files, PLC, packaging, deployment, or hot-load paths. The next RuntimePreview Pilot hardening step should add an explicit admin/developer authorization gate for this readiness endpoint and cover it with endpoint regression tests.
 
 ## Safety Boundary
 
-Run #16 and the RuntimePreview Pilot v0.8 implementation do not advance real camera, real Station, or real deployment capability:
+Run #18 and RuntimePreview Pilot v0.8 do not advance real camera, real Station, real RuntimePreview, or real deployment capability:
 
 - no real camera SDK integration
 - no real Station access
