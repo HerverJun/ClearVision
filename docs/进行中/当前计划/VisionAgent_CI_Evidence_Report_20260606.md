@@ -1,5 +1,102 @@
 # Vision Agent CI Evidence Report 20260606
 
+## Workflow Run #26 - Latest RuntimePreview v1.2 Scenario Corpus Evidence
+
+| Field | Value |
+| --- | --- |
+| workflow | Vision Agent Quality Suite |
+| job | Agent Engineering Harness |
+| branchName | codex初稿 |
+| commitSha | 78392d9f031d14d4a5cbf0ed4e8842db8ca4bf29 |
+| headSha | 78392d9f031d14d4a5cbf0ed4e8842db8ca4bf29 |
+| runId | 27063945580 |
+| runAttempt | 1 |
+| runNumber | 26 |
+| event | push |
+| status | completed |
+| conclusion | success |
+| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27063945580 |
+| completedAtUtc | 2026-06-06T13:47:45Z |
+
+## Workflow Run #26 Artifact
+
+| Field | Value |
+| --- | --- |
+| artifactName | vision-agent-quality-suite |
+| artifactId | 7454900152 |
+| sizeBytes | 180974 |
+| digest | sha256:f15249e4e07a55f5d1995443fb32f7bfaa33d75f42cb418297b0e07801c4b45d |
+| createdAtUtc | 2026-06-06T13:47:38Z |
+| expired | false |
+
+Run #26 is the latest v1.2 evidence for RuntimePreview Scenario Corpus + Package Readiness Bridge + Independent Pilot Console. It supersedes run #24 for artifact evidence because the upload list now includes v1.2 corpus, package readiness, governance export, and Agent explanation reports.
+
+Artifact contents verified after download:
+
+- `VisionAgent_business_benchmark_baseline.json`
+- `VisionAgent_business_benchmark_baseline.md`
+- `planner_autonomy_benchmark.json`
+- `planner_autonomy_benchmark.md`
+- `runtime_preview_scenario_corpus.json`
+- `runtime_preview_scenario_corpus.md`
+- `runtime_preview_scenario_evidence.json`
+- `runtime_preview_scenario_evidence.md`
+- `runtime_preview_deploy_readiness_report.sample.json`
+- `runtime_preview_deploy_readiness_report.sample.md`
+- `runtime_preview_package_readiness_report.sample.json`
+- `runtime_preview_package_readiness_report.sample.md`
+- `runtime_preview_governance_audit_sample.json`
+- `runtime_preview_governance_audit_sample.md`
+- `runtime_preview_governance_export_sample.json`
+- `runtime_preview_governance_export_sample.md`
+- `runtime_preview_agent_explanation_benchmark.json`
+- `runtime_preview_agent_explanation_benchmark.md`
+- `real_llm_planner_shadow_eval.json`
+- `real_llm_planner_shadow_eval.md`
+- `real_llm_planner_shadow_eval.holdout.json`
+- `real_llm_planner_shadow_eval.holdout.md`
+- `vision_agent_quality_artifact_manifest.json`
+- `vision_agent_quality_artifact_manifest.md`
+- `agent_engineering_harness.trx`
+- `agent_ai_model_config_endpoints.trx`
+- `agent_ui_contract_output.txt`
+
+## Run #26 RuntimePreview v1.2 Summary
+
+| Gate | Result |
+| --- | --- |
+| backend Agent tests | 291 total / 291 passed |
+| AI endpoint regression | 22 total / 22 passed |
+| UI contract tests | 90 total / 90 passed |
+| executable business benchmark | 45 / 45 accepted |
+| planner autonomy + permission negative benchmark | 21 / 21 accepted |
+| RuntimePreview scenario corpus | 15 cases, accepted |
+| RuntimePreview scenario evidence | 15 / 15 accepted |
+| Package readiness bridge sample | 6 ready / 9 blocked, packageCreated=false, deploymentExecuted=false |
+| Agent explanation benchmark | 15 / 15 accepted |
+| artifact/source/report/session/audit scan | forbiddenHitCount=0, redactionPass=true |
+
+Artifact manifest scan fields:
+
+- scanPolicyVersion: `2026-06-06.runtime-preview-v1.2-governance-scan.v2`
+- sourceFilesScanned: 2809
+- reportsScanned: 11
+- auditReportsScanned: 2
+- sessionReportsScanned: 14
+- forbiddenHitCount: 0
+- redactionPass: true
+
+CI artifact report checks:
+
+- business benchmark `workflowRun.commitSha`: `78392d9f031d14d4a5cbf0ed4e8842db8ca4bf29`
+- business benchmark `workflowRun.runId`: `27063945580`
+- scenario corpus `workflowRun.runId`: `27063945580`
+- package readiness `workflowRun.runId`: `27063945580`
+- Agent explanation `workflowRun.runId`: `27063945580`
+- All checked `workflowRun.commitSha`, `branchName`, `runId`, and `runAttempt` fields are non-local.
+
+RuntimePreview v1.2 adds metadata-only Scenario Corpus, Package Readiness Bridge, independent developer Pilot Console, governance index/export hardening, and Agent explanation benchmark. It still does not touch real camera SDKs, Station, image files, model files, PLC, `.cvpkg` creation, packaging, deployment, hot-load paths, or a Real RuntimePreview adapter.
+
 ## Workflow Run #24 - Latest RuntimePreview v1.1 Persistent Governance Evidence
 
 | Field | Value |
