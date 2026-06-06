@@ -1,5 +1,84 @@
 # Vision Agent CI Evidence Report 20260606
 
+## Workflow Run #24 - Latest RuntimePreview v1.1 Persistent Governance Evidence
+
+| Field | Value |
+| --- | --- |
+| workflow | Vision Agent Quality Suite |
+| job | Agent Engineering Harness |
+| branchName | codex初稿 |
+| commitSha | 888568abb4a3b108f1af1690f5a656ba5f26cf6e |
+| headSha | 888568abb4a3b108f1af1690f5a656ba5f26cf6e |
+| runId | 27062552222 |
+| runAttempt | 1 |
+| runNumber | 24 |
+| event | push |
+| status | completed |
+| conclusion | success |
+| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27062552222 |
+| completedAtUtc | 2026-06-06T12:43:52Z |
+
+## Workflow Run #24 Artifact
+
+| Field | Value |
+| --- | --- |
+| artifactName | vision-agent-quality-suite |
+| artifactId | 7454479284 |
+| sizeBytes | 152933 |
+| digest | sha256:fce70cdf762750f5251e5045696accf3b1890a0eb66fc4667a8a26794e304484 |
+| createdAtUtc | 2026-06-06T12:43:44Z |
+| expired | false |
+
+Run #24 is the latest v1.1 evidence for RuntimePreview Persistent Governance. It supersedes run #23 for artifact evidence because the upload list now includes the v1.1 scenario, deploy-readiness, and audit sample reports.
+
+Artifact contents verified after download:
+
+- `VisionAgent_business_benchmark_baseline.json`
+- `VisionAgent_business_benchmark_baseline.md`
+- `planner_autonomy_benchmark.json`
+- `planner_autonomy_benchmark.md`
+- `runtime_preview_scenario_evidence.json`
+- `runtime_preview_scenario_evidence.md`
+- `runtime_preview_deploy_readiness_report.sample.json`
+- `runtime_preview_deploy_readiness_report.sample.md`
+- `runtime_preview_governance_audit_sample.json`
+- `runtime_preview_governance_audit_sample.md`
+- `real_llm_planner_shadow_eval.json`
+- `real_llm_planner_shadow_eval.md`
+- `real_llm_planner_shadow_eval.holdout.json`
+- `real_llm_planner_shadow_eval.holdout.md`
+- `vision_agent_quality_artifact_manifest.json`
+- `vision_agent_quality_artifact_manifest.md`
+- `agent_engineering_harness.trx`
+- `agent_ai_model_config_endpoints.trx`
+- `agent_ui_contract_output.txt`
+
+## Run #24 RuntimePreview v1.1 Summary
+
+| Gate | Result |
+| --- | --- |
+| backend Agent tests | 253 total / 253 passed |
+| AI endpoint regression | 19 total / 19 passed |
+| UI contract tests | 78 total / 78 passed |
+| executable business benchmark | 37 / 37 accepted |
+| planner autonomy + permission negative benchmark | 21 / 21 accepted |
+| RuntimePreview scenario evidence | 8 / 8 accepted |
+| deploy readiness sample | 4 ready / 4 blocked, packageCreated=false, deploymentExecuted=false |
+| governance audit sample | 13 redacted append-only events |
+| artifact/source/report/session/audit scan | forbiddenHitCount=0, redactionPass=true |
+
+Artifact manifest scan fields:
+
+- scanPolicyVersion: `2026-06-06.runtime-preview-v1-governance-scan.v1`
+- sourceFilesScanned: 2799
+- reportsScanned: 7
+- auditReportsScanned: 2
+- sessionReportsScanned: 6
+- forbiddenHitCount: 0
+- redactionPass: true
+
+RuntimePreview v1.1 adds persistent metadata governance storage, retention cleanup, session replay, report export, scenario evidence, metadata-only deploy readiness reporting, and a fuller developer Pilot Console. It still does not touch real camera SDKs, Station, image files, model files, PLC, packaging, deployment, hot-load paths, or a Real RuntimePreview adapter.
+
 ## Workflow Run #21 - Latest RuntimePreview v1.0 Readiness Evidence
 
 | Field | Value |
