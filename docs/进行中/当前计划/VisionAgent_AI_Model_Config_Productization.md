@@ -4,7 +4,7 @@
 
 `quality/tools/run_real_llm_shadow_eval_from_codex_config.ps1` supports two CPA input paths: explicit CPA environment variables and the current Codex `config.toml`. The config fallback checks `CODEX_CONFIG_PATH`, `CODEX_HOME/config.toml`, and `$HOME/.codex/config.toml`.
 
-The fallback only selects a provider whose provider key, `name`, or `provider` value contains `cpa`. It uses the provider `env_key` to read the key from the process environment and never prints the key or full BaseUrl. A non-CPA default Codex provider is ignored and results in a redacted `configuration_missing` report.
+The fallback selects a provider whose provider key, `name`, or `provider` value contains `cpa`, plus explicit aliases from `-CpaProviderAliases` or `CV_AGENT_CPA_PROVIDER_ALIASES` / `CPA_PROVIDER_ALIASES` / `CODEX_CPA_PROVIDER_ALIASES`. The default alias set is `cpa,ccswitch` because the internal Codex CPA provider can be named `ccswitch`. It uses the provider `env_key` to read the key from the process environment and never prints the key or full BaseUrl. A provider outside this alias set is ignored and results in a redacted `configuration_missing` report.
 
 The bridge also supports an inspect-only mode for validating CPA config without calling the shadow eval runner or any network endpoint:
 

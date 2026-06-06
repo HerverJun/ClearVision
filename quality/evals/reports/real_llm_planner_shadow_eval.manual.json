@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-real-llm-planner-shadow-eval.v1",
   "evalId": "vision_agent_real_llm_planner_shadow_eval",
-  "generatedAtUtc": "2026-06-05T18:28:30.4314415+00:00",
+  "generatedAtUtc": "2026-06-06T04:37:21.2901910+00:00",
   "mode": "offline_metadata_only",
   "enabled": true,
   "workflowRun": {
@@ -9,33 +9,33 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-05T18:28:30.4314415+00:00"
+    "generatedAtUtc": "2026-06-06T04:37:21.2901910+00:00"
   },
   "llmConfiguration": {
-    "provider": "CPA OpenAI Compatible",
+    "provider": "OpenAI",
     "protocol": "openai_compatible",
     "wireApi": "chat_completions",
     "authMode": "bearer",
-    "baseUrl": null,
+    "baseUrl": "http://<redacted-host>/<redacted-path>",
     "modelRole": "vision-agent-shadow-eval"
   },
   "summary": {
     "caseCount": 12,
-    "runnerStatus": "configuration_missing",
-    "modelName": "not_configured",
+    "runnerStatus": "completed",
+    "modelName": "gpt-5.5",
     "enabledReason": "CV_AGENT_REAL_LLM_SHADOW_EVAL=true",
     "skippedReason": "",
-    "configurationMissingReason": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url.",
-    "requestCount": 0,
-    "parseSuccessCount": 0,
-    "parseSuccessRate": 0,
+    "configurationMissingReason": "",
+    "requestCount": 12,
+    "parseSuccessCount": 12,
+    "parseSuccessRate": 1,
     "invalidJsonRepairUsedCount": 0,
     "repairUsedRate": 0,
     "unsafeToolAttemptCount": 0,
     "unsafeAttemptRate": 0,
-    "fallbackToMockSuggestedCount": 12,
-    "averageToolPlanMatchScore": 0,
-    "reportGenerated": false
+    "fallbackToMockSuggestedCount": 9,
+    "averageToolPlanMatchScore": 0.2986,
+    "reportGenerated": true
   },
   "safety": {
     "realCameraSdkTouched": false,
@@ -80,25 +80,38 @@
         "validate_flow",
         "dryrun_flow"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "match_flow_template",
+          "arguments": {
+            "userRequest": "Create a line sequence inspection workflow. Keep camera binding pending and validate the draft.",
+            "businessContext": "wire_sequence_generation",
+            "constraints": {
+              "shadowOnly": true,
+              "offlineMetadataOnly": true,
+              "keepCameraBindingPending": true
+            }
+          }
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "match_flow_template",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.25,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-002",
@@ -129,25 +142,43 @@
         "validate_flow",
         "dryrun_flow"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "match_flow_template",
+          "arguments": {
+            "intent": "template_matching_generation",
+            "description": "Create a template matching workflow for part alignment. Template source is not known yet.",
+            "constraints": {
+              "offlineMetadataOnly": true,
+              "shadowOnly": true,
+              "noRuntimePreview": true,
+              "missingResourcesAsPlaceholders": [
+                "TemplatePath",
+                "CameraBindingId",
+                "output channels"
+              ]
+            }
+          }
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "match_flow_template",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.25,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-003",
@@ -178,25 +209,32 @@
         "validate_flow",
         "dryrun_flow"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "retrieve_operator_knowledge",
+          "arguments": {
+            "query": "hole distance measurement workflow with two circle measurements and distance output operators and connections"
+          }
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "retrieve_operator_knowledge",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.25,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-004",
@@ -223,25 +261,30 @@
         "inspect_current_flow",
         "validate_flow"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "inspect_current_flow",
+          "arguments": {}
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "inspect_current_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.5,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "fallbackToMockSuggested": false,
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-005",
@@ -270,25 +313,32 @@
         "validate_flow",
         "runtime_package_precheck"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "get_operator_schema",
+          "arguments": {
+            "operatorType": "CameraSource"
+          }
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "get_operator_schema",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.3333,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-006",
@@ -317,25 +367,32 @@
         "validate_flow",
         "runtime_package_precheck"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "get_operator_schema",
+          "arguments": {
+            "operatorType": "DeepLearning"
+          }
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "get_operator_schema",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.3333,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-007",
@@ -364,25 +421,32 @@
         "validate_flow",
         "runtime_package_precheck"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "get_operator_schema",
+          "arguments": {
+            "operatorType": "TemplateMatching"
+          }
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "get_operator_schema",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.3333,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-008",
@@ -411,25 +475,32 @@
         "validate_flow",
         "runtime_package_precheck"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "get_operator_schema",
+          "arguments": {
+            "operatorType": "ResultOutput"
+          }
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "get_operator_schema",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.3333,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-009",
@@ -460,25 +531,30 @@
         "capture_test_frame",
         "replay_flow_with_frame"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "list_operator_catalog",
+          "arguments": {}
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "list_operator_catalog",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-010",
@@ -503,25 +579,25 @@
       "mockPlannerToolCalls": [
         "validate_flow"
       ],
-      "modelName": "not_configured",
+      "modelName": "gpt-5.5",
       "plannedToolCalls": [],
       "policyDecision": [
         {
-          "stage": "configuration",
+          "stage": "parse",
           "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": ""
         }
       ],
-      "parseSuccess": false,
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
       "toolPlanMatchScore": 0,
       "unsafeToolAttempted": false,
       "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-011",
@@ -548,25 +624,36 @@
         "validate_flow",
         "runtime_package_precheck"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "validate_flow",
+          "arguments": {
+            "workflowDraft": {
+              "operators": [],
+              "connections": []
+            },
+            "structureOnly": true
+          }
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "validate_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.5,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "fallbackToMockSuggested": false,
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     },
     {
       "caseId": "VA-SHADOW-012",
@@ -593,25 +680,30 @@
         "inspect_current_flow",
         "validate_flow"
       ],
-      "modelName": "not_configured",
-      "plannedToolCalls": [],
-      "policyDecision": [
+      "modelName": "gpt-5.5",
+      "plannedToolCalls": [
         {
-          "stage": "configuration",
-          "toolName": null,
-          "allowed": false,
-          "errorCode": "configuration_missing",
-          "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+          "toolName": "inspect_current_flow",
+          "arguments": {}
         }
       ],
-      "parseSuccess": false,
+      "policyDecision": [
+        {
+          "stage": "planner_policy",
+          "toolName": "inspect_current_flow",
+          "allowed": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "parseSuccess": true,
       "invalidJsonRepairUsed": false,
-      "toolPlanMatchScore": 0,
+      "toolPlanMatchScore": 0.5,
       "unsafeToolAttempted": false,
-      "fallbackToMockSuggested": true,
-      "requestCount": 0,
-      "errorCode": "configuration_missing",
-      "errorMessage": "No CPA provider was found in explicit CPA environment variables or Codex config.toml. CPA model is missing; set CV_AGENT_CPA_MODEL, CPA_MODEL, CODEX_CPA_MODEL, or Codex root model with a CPA provider. CPA API key is missing; set CV_AGENT_CPA_API_KEY, CPA_API_KEY, CODEX_CPA_API_KEY, or the Codex provider env_key variable. CPA BaseUrl is missing; set CV_AGENT_CPA_BASE_URL, CPA_BASE_URL, CODEX_CPA_BASE_URL, or Codex provider base_url."
+      "fallbackToMockSuggested": false,
+      "requestCount": 1,
+      "errorCode": null,
+      "errorMessage": ""
     }
   ]
 }

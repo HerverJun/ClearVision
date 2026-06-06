@@ -4,6 +4,7 @@ param(
     [string]$ModelConfigId = "",
     [string]$ModelConfigRole = "",
     [string]$ModelConfigDir = "",
+    [string]$CpaProviderAliases = "",
     [switch]$InspectConfigOnly,
     [string]$InspectOutput = ""
 )
@@ -26,6 +27,20 @@ function Set-ShadowEnv {
     if (-not [string]::IsNullOrWhiteSpace($Value)) {
         [Environment]::SetEnvironmentVariable($Name, $Value, "Process")
     }
+}
+
+function Read-CpaProviderAliases {
+    param([string]$Aliases)
+
+    $raw = $Aliases
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+        $raw = Read-FirstEnv @("CV_AGENT_CPA_PROVIDER_ALIASES", "CPA_PROVIDER_ALIASES", "CODEX_CPA_PROVIDER_ALIASES") "cpa,ccswitch"
+    }
+
+    return $raw.Split(",", [System.StringSplitOptions]::RemoveEmptyEntries) |
+        ForEach-Object { $_.Trim().ToLowerInvariant() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -Unique
 }
 
 function Redact-BaseUrlForReport {
@@ -133,9 +148,12 @@ function Read-CodexConfig {
 }
 
 function Test-IsCpaProvider {
-    param([string]$ProviderKey, [hashtable]$ProviderConfig)
+    param([string]$ProviderKey, [hashtable]$ProviderConfig, [string[]]$ProviderAliases)
 
     if ($ProviderKey -match 'cpa') {
+        return $true
+    }
+    if ($ProviderAliases -contains $ProviderKey.ToLowerInvariant()) {
         return $true
     }
     if ($ProviderConfig.ContainsKey("name") -and [string]$ProviderConfig["name"] -match 'cpa') {
@@ -148,6 +166,8 @@ function Test-IsCpaProvider {
 }
 
 function Get-CodexCpaConfig {
+    param([string[]]$ProviderAliases)
+
     $path = Get-CodexConfigPath
     $config = Read-CodexConfig $path
     $selectedKey = ""
@@ -160,7 +180,7 @@ function Get-CodexCpaConfig {
 
     if (-not [string]::IsNullOrWhiteSpace($rootProvider) -and $config.Providers.ContainsKey($rootProvider)) {
         $candidate = $config.Providers[$rootProvider]
-        if (Test-IsCpaProvider $rootProvider $candidate) {
+        if (Test-IsCpaProvider $rootProvider $candidate $ProviderAliases) {
             $selectedKey = $rootProvider
             $providerConfig = $candidate
         }
@@ -169,7 +189,7 @@ function Get-CodexCpaConfig {
     if ($null -eq $providerConfig) {
         foreach ($key in $config.Providers.Keys) {
             $candidate = $config.Providers[$key]
-            if (Test-IsCpaProvider $key $candidate) {
+            if (Test-IsCpaProvider $key $candidate $ProviderAliases) {
                 $selectedKey = $key
                 $providerConfig = $candidate
                 break
@@ -193,6 +213,7 @@ function Get-CodexCpaConfig {
 
     return @{
         Provider = $(if ($providerConfig.ContainsKey("name")) { [string]$providerConfig["name"] } else { $selectedKey })
+        ProviderKey = $selectedKey
         Model = $(if ($config.Root.ContainsKey("model")) { [string]$config.Root["model"] } else { "" })
         BaseUrl = $(if ($providerConfig.ContainsKey("base_url")) { [string]$providerConfig["base_url"] } else { "" })
         WireApi = $(if ($providerConfig.ContainsKey("wire_api")) { [string]$providerConfig["wire_api"] } else { "chat_completions" })
@@ -203,7 +224,8 @@ function Get-CodexCpaConfig {
     }
 }
 
-$codexCpa = Get-CodexCpaConfig
+$providerAliases = @(Read-CpaProviderAliases $CpaProviderAliases)
+$codexCpa = Get-CodexCpaConfig $providerAliases
 
 $provider = Read-FirstEnv @("CV_AGENT_CPA_PROVIDER", "CPA_PROVIDER", "CODEX_CPA_PROVIDER") "CPA OpenAI Compatible"
 $model = Read-FirstEnv @("CV_AGENT_CPA_MODEL", "CPA_MODEL", "CODEX_CPA_MODEL", "CV_AGENT_REAL_LLM_MODEL")
@@ -261,6 +283,7 @@ if ($InspectConfigOnly) {
         mode = "inspect_config_only"
         configSource = $configSource
         provider = $provider
+        providerAliases = $providerAliases
         protocol = $protocol
         wireApi = $wireApi
         authMode = $authMode

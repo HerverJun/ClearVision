@@ -4,7 +4,7 @@
 
 `quality/tools/run_real_llm_shadow_eval_from_codex_config.ps1` reads explicit CPA environment variables first. If they are missing, it also reads the current Codex `config.toml` from `CODEX_CONFIG_PATH`, `CODEX_HOME/config.toml`, or `$HOME/.codex/config.toml`.
 
-The Codex config fallback only accepts a provider whose provider key, `name`, or `provider` value contains `cpa`. This prevents the manual CPA bridge from accidentally using a normal OpenAI/Codex provider. If the CPA provider declares `env_key`, the bridge reads that environment variable for the key without printing it.
+The Codex config fallback accepts a provider whose provider key, `name`, or `provider` value contains `cpa`, plus explicit aliases from `-CpaProviderAliases` or `CV_AGENT_CPA_PROVIDER_ALIASES` / `CPA_PROVIDER_ALIASES` / `CODEX_CPA_PROVIDER_ALIASES`. The default alias set is `cpa,ccswitch` because the internal Codex CPA provider can be named `ccswitch`. If the CPA provider declares `env_key`, the bridge reads that environment variable for the key without printing it.
 
 Use inspect mode before a manual trial when you need to verify that CPA config will be selected. Inspect mode does not call the shadow eval runner and does not make network requests:
 

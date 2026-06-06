@@ -1098,7 +1098,11 @@ test('CPA shadow bridge reads only explicit CPA or Codex CPA provider config', (
   assert.match(bridge, /\$HOME.*\.codex\/config\.toml/s);
   assert.match(bridge, /\[model_providers\\\./);
   assert.match(bridge, /function Test-IsCpaProvider/);
+  assert.match(bridge, /Read-CpaProviderAliases/);
+  assert.match(bridge, /CV_AGENT_CPA_PROVIDER_ALIASES/);
+  assert.match(bridge, /cpa,ccswitch/);
   assert.match(bridge, /ProviderKey -match 'cpa'/);
+  assert.match(bridge, /ProviderAliases -contains/);
   assert.match(bridge, /env_key/);
   assert.match(bridge, /CV_AGENT_CPA_MODEL/);
   assert.match(bridge, /CV_AGENT_CPA_BASE_URL/);
@@ -1126,9 +1130,14 @@ test('CPA shadow bridge reports missing config without printing secrets', () => 
   assert.match(bridge, /mode = "inspect_config_only"/);
   assert.match(bridge, /apiKeyConfigured/);
   assert.match(bridge, /Redact-BaseUrlForReport/);
-  assert.equal(manualReport.summary.runnerStatus, 'configuration_missing');
-  assert.match(manualReport.summary.configurationMissingReason, /CPA model is missing/);
-  assert.equal(manualReport.summary.requestCount, 0);
+  assert.ok(['configuration_missing', 'completed'].includes(manualReport.summary.runnerStatus));
+  if (manualReport.summary.runnerStatus === 'configuration_missing') {
+    assert.match(manualReport.summary.configurationMissingReason, /CPA model is missing|CPA API key is missing/);
+    assert.equal(manualReport.summary.requestCount, 0);
+  } else {
+    assert.equal(manualReport.summary.configurationMissingReason, '');
+    assert.ok(manualReport.summary.requestCount > 0);
+  }
   assert.equal(manualReport.safety.workflowExecutionAttempted, false);
   assert.equal(manualReport.safety.deploymentPrepareExecuted, false);
   assert.doesNotMatch(manualText, /Bearer\s+|Authorization|x-api-key|sk-[A-Za-z0-9_-]{8,}/);
