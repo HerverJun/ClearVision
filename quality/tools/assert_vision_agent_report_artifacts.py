@@ -204,15 +204,14 @@ def validate_forbidden_fragments(path: Path, text: str, fragments: list[str], er
 
 def iter_source_scan_files() -> list[Path]:
     files: list[Path] = []
-    for path in REPO_ROOT.rglob("*"):
-        if not path.is_file():
-            continue
-        parts = set(path.relative_to(REPO_ROOT).parts)
-        if parts & SOURCE_SCAN_EXCLUDED_PARTS:
-            continue
-        if path.suffix.lower() not in SOURCE_SCAN_EXTENSIONS:
-            continue
-        files.append(path)
+    for root, dirs, names in os.walk(REPO_ROOT):
+        dirs[:] = [name for name in dirs if name not in SOURCE_SCAN_EXCLUDED_PARTS]
+        root_path = Path(root)
+        for name in names:
+            path = root_path / name
+            if path.suffix.lower() not in SOURCE_SCAN_EXTENSIONS:
+                continue
+            files.append(path)
     return sorted(files)
 
 
