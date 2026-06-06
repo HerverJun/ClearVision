@@ -1,5 +1,92 @@
 # Vision Agent CI Evidence Report 20260606
 
+## Workflow Run #20 - RuntimePreview v1.0 Readiness Evidence
+
+| Field | Value |
+| --- | --- |
+| workflow | Vision Agent Quality Suite |
+| job | Agent Engineering Harness |
+| branchName | codex初稿 |
+| commitSha | 40aa090efcfd2e2995a9fa09f842331e533f8db9 |
+| headSha | 40aa090efcfd2e2995a9fa09f842331e533f8db9 |
+| runId | 27060841427 |
+| runAttempt | 1 |
+| runNumber | 20 |
+| event | push |
+| status | completed |
+| conclusion | success |
+| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27060841427 |
+| startedAtUtc | 2026-06-06T11:18:11Z |
+| completedAtUtc | 2026-06-06T11:21:24Z |
+
+## Workflow Run #20 Artifact
+
+| Field | Value |
+| --- | --- |
+| artifactName | vision-agent-quality-suite |
+| artifactId | 7453957488 |
+| sizeBytes | 142781 |
+| digest | sha256:3bdcd8fdb330077c3cfd24a580d3fcee50e6b3da425fb6e9a784aa3f4d53b024 |
+| createdAtUtc | 2026-06-06T11:21:16Z |
+| expired | false |
+
+Artifact contents verified after download:
+
+- `VisionAgent_business_benchmark_baseline.json`
+- `VisionAgent_business_benchmark_baseline.md`
+- `planner_autonomy_benchmark.json`
+- `planner_autonomy_benchmark.md`
+- `real_llm_planner_shadow_eval.json`
+- `real_llm_planner_shadow_eval.md`
+- `real_llm_planner_shadow_eval.holdout.json`
+- `real_llm_planner_shadow_eval.holdout.md`
+- `vision_agent_quality_artifact_manifest.json`
+- `vision_agent_quality_artifact_manifest.md`
+- `agent_engineering_harness.trx`
+- `agent_ai_model_config_endpoints.trx`
+- `agent_ui_contract_output.txt`
+
+CI artifact report checks:
+
+- business benchmark `workflowRun.commitSha`: `40aa090efcfd2e2995a9fa09f842331e533f8db9`
+- business benchmark `workflowRun.runId`: `27060841427`
+- planner benchmark `workflowRun.runId`: `27060841427`
+- fixed shadow eval `workflowRun.runId`: `27060841427`
+- holdout shadow eval `workflowRun.runId`: `27060841427`
+- all inspected JSON report `workflowRun` values were non-local
+
+## Run #20 Benchmark Summary
+
+Executable business benchmark:
+
+- caseCount: 37
+- runtimePreviewCaseCount: 7
+- passedCaseCount: 37
+- accepted: true
+
+Planner autonomy benchmark:
+
+- plannerCaseCount: 15
+- permissionNegativeCaseCount: 6
+- totalCaseCount: 21
+- passedCaseCount: 21
+- accepted: true
+
+Default real LLM shadow eval samples:
+
+- fixed caseSet runnerStatus: skipped
+- holdout caseSet runnerStatus: skipped
+- requestCount: 0
+- skippedReason: `CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.`
+- safety mode: offline metadata only
+
+Artifact manifest:
+
+- scanPolicyVersion: `2026-06-06.runtime-preview-v1-governance-scan.v1`
+- sourceFilesScanned: 2791
+- reportsScanned: 4
+- redactionPass: true
+
 ## Workflow Run #18 - RuntimePreview Pilot v0.8 Final Evidence
 
 | Field | Value |

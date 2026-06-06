@@ -1,6 +1,6 @@
 # Vision Agent Quality Artifact Manifest
 
-- Generated UTC: `2026-06-06T11:16:22.930810+00:00`
+- Generated UTC: `2026-06-06T11:23:22.290667+00:00`
 - Artifact: `vision-agent-quality-suite`
 - Scan policy: `2026-06-06.runtime-preview-v1-governance-scan.v1`
 - Source files scanned: `3315`
