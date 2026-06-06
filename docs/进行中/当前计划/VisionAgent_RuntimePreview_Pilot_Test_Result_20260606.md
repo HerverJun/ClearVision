@@ -1,49 +1,57 @@
-# Vision Agent RuntimePreview Pilot v0.7 Test Result 20260606
+# Vision Agent RuntimePreview Pilot v0.8 Test Result 20260606
 
 ## Summary
 
-RuntimePreview Pilot v0.7 skeleton is implemented as default-off, metadata-only, allowlist-gated, and offline-fallback capable. Local quality suite passed after raising minimum gates.
+RuntimePreview Pilot v0.8 is implemented as a default-off, configurable, metadata-only pilot framework with a safe resource catalog, readiness gate, hidden developer UI, endpoint coverage, adapter fallback/deny behavior, and quality-suite regression gates.
 
 ## Backend Coverage
 
-New backend cases cover:
+New and updated backend cases cover:
 
 - old `AppConfig` migration to safe `RuntimePreviewPilotConfig` defaults
-- config validator rejects wildcard/path-like allowlist tokens
+- config validator rejects wildcard/path/IP/URL/token-like allowlist values
 - config validator rejects disabled `denyExternalPath` and `denyImageBytes`
-- allowlist resolver camera hit
-- allowlist resolver empty allowlist deny
-- allowlist resolver missing camera deny
-- allowlist resolver unknown/dangerous resource deny
-- external path deny
-- path traversal deny
-- Station deny
-- PLC deny
-- encoded image payload deny
-- pilot disabled routes to Offline
-- pilot allowlist hit returns `pilot_runtime_preview` + `metadata_only`
-- allowlist miss returns deny + pendingAction + fallback metadata
-- external path deny does not leak path fragments
-- adapter exception falls back Offline
-- structural preview failure keeps `workflowDraftAllowed=true`
-- source guard remains free of camera/Station/file/model/PLC/process/network access in RuntimePreview code
+- catalog exposes AppConfig/AiConfigStore/workflow draft metadata only
+- catalog redacts unsafe identifiers and does not leak API keys or BaseUrl/path fragments
+- readiness gate returns `ready`, `not_ready`, and `denied`
+- readiness gate keeps `workflowDraftAllowed=true` for `not_ready`
+- allowlist resolver supports the safe `runtime_preview_metadata` readiness tool
+- allowlist resolver camera/model/template/flow/resource-root hit/miss/empty cases
+- external path, path traversal, Station, PLC, and encoded image payload deny cases
+- pilot adapter runs readiness before metadata result/fallback/deny
+- allowlist miss returns `RuntimePreviewPilotReadinessReview`
+- dangerous deny returns no fallback artifact
+- adapter exception falls back offline and keeps draft editing allowed
+- source guard keeps frontend free of `capture_test_frame` and `replay_flow_with_frame`
+
+## Endpoint Coverage
+
+`AiModelEndpointsTests` now covers RuntimePreview Pilot endpoints:
+
+- `GET /api/settings/runtime-preview-pilot/config`
+- invalid `PUT` rejects unsafe keys
+- valid `PUT` saves normalized metadata-only config
+- `GET /api/settings/runtime-preview-pilot/catalog` returns redacted metadata
+- `POST /api/settings/runtime-preview-pilot/readiness` returns ready/not-ready/denied details
+- no API key, full BaseUrl, IP-like value, or path fragment leaks in endpoint responses
 
 ## UI Coverage
 
-New UI contract cases cover:
+UI contract cases cover:
 
-- RuntimePreview adapter/mode/permission/fallback/resource trace display
-- RuntimePreview pending actions display
-- RuntimePreview artifact metadata display
-- developer pilot status hidden by default
-- developer pilot status visible only when developer UI is enabled
-- allowlist counts display as counts only
-- UI redacts path/IP/BaseUrl/key/encoded image fragments
-- denied RuntimePreview still leaves workflow draft editable
+- RuntimePreview adapter/mode/permission/readiness/fallback/resource trace display
+- `workflowDraftAllowed=true` remains visible when preview is not ready
+- pending actions and missing resources display
+- developer pilot panel hidden by default
+- developer panel visible only through the hidden developer flag
+- pilot config, catalog, readiness controls render
+- catalog/readiness values are sanitized
+- no key appears in DOM text or captured console output
+- frontend source has no RuntimePreview hardware/network/process tool entry
 
 ## Local Test Commands
 
-RuntimePreview targeted backend:
+Targeted RuntimePreview backend:
 
 ```powershell
 & "./scripts/run-dotnet-test-serial.ps1" `
@@ -54,11 +62,20 @@ RuntimePreview targeted backend:
   -Verbosity minimal
 ```
 
-Result:
+Result: 42 total / 42 passed.
 
-- total: 40
-- passed: 40
-- failed: 0
+AI model + RuntimePreview Pilot endpoint regression:
+
+```powershell
+& "./scripts/run-dotnet-test-serial.ps1" `
+  -Project "ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj" `
+  -FullyQualifiedName "ClearVision.Product.Desktop.Tests.AiModelEndpointsTests" `
+  -NoBuild `
+  -NoRestore `
+  -Verbosity minimal
+```
+
+Result: 9 total / 9 passed.
 
 UI contract:
 
@@ -67,11 +84,7 @@ Set-Location "ClearVision.Product/tests/ClearVision.Product.UI.Tests"
 npm run test:agent-ui-contract
 ```
 
-Result:
-
-- total: 55
-- passed: 55
-- failed: 0
+Result: 58 total / 58 passed.
 
 Full quality suite:
 
@@ -81,40 +94,57 @@ python quality/tools/run_quality_suite.py --suite agent_engineering_harness_suit
 
 Result:
 
-- backend Agent tests: 200 / 200 passed
-- AI model endpoint regression: 8 / 8 passed
-- UI contract tests: 55 / 55 passed
+- backend Agent tests: 203 total / 203 passed
+- AI model endpoint regression: 9 total / 9 passed
+- UI contract tests: 58 total / 58 passed
 - executable business benchmark: 36 / 36 accepted
-- planner autonomy benchmark: 21 / 21 accepted
+- planner autonomy + permission negative benchmark: 21 / 21 accepted
+
+## Secret And Source Scan
+
+Command:
+
+```powershell
+python quality/tools/assert_vision_agent_report_artifacts.py `
+  --scan-source-files `
+  --write-manifest quality/evals/reports/vision_agent_quality_artifact_manifest.json `
+  --write-report quality/evals/reports/vision_agent_quality_artifact_manifest.md
+```
+
+Result:
+
+- artifact files validated: 13
+- reports validated: 4
+- source files scanned: 3310
+- forbidden key/IP/BaseUrl fragments: not found
 
 ## Gate Updates
 
-`agent_engineering_harness_suite` was raised:
+`agent_engineering_harness_suite` gates:
 
-- backend Agent tests minimum: 200
-- UI contract tests minimum: 55
-- AI endpoint tests minimum: 8
+- backend Agent tests minimum: 203
+- UI contract tests minimum: 58
+- AI endpoint tests minimum: 9
 - business benchmark minimum: 36
 - planner autonomy minimum: 15
 - permission negative minimum: 6
 
-Stable CI still keeps fixed/holdout real LLM shadow eval default-off.
+Stable CI keeps real LLM shadow eval default-off. Manual fixed/holdout shadow eval remains planner-shadow evidence only.
 
 ## Safety Result
 
-No forbidden resource capability was added:
+No forbidden real-resource capability was added:
 
-- realCameraSdkTouched=false
-- realStationTouched=false
-- realImageFilesRead=false
-- realModelFilesLoaded=false
-- plcWriteAttempted=false
-- packageCreated=false
-- hotLoadAttempted=false
-- imageBytesReturned=false
-- arbitraryPathRead=false
-- workflowDraftAllowed remains true when preview fails
+- real camera SDK: not added
+- real Station access: not added
+- real image file read: not added
+- real vision model file load: not added
+- PLC write: not added
+- package/deploy/hot-load/downlink: not added
+- image bytes/base64 returned: false
+- arbitrary path read: false
+- RuntimePreview remains offline/metadata-only
 
 ## Pilot Conclusion
 
-RuntimePreview Pilot v0.7 skeleton is allowed to exist as a default-off metadata-only internal path. It is not a real RuntimePreview adapter and does not authorize real camera, Station, file, model, PLC, packaging, deployment, or hot-load work.
+RuntimePreview Pilot v0.8 can proceed only as an internal, default-off, metadata-only pilot framework. It is not a Real RuntimePreview adapter and does not authorize real camera, Station, image, model, PLC, packaging, deployment, or hot-load work.

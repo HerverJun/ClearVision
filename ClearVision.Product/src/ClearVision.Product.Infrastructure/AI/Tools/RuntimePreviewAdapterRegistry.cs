@@ -122,7 +122,10 @@ public sealed class RuntimePreviewAdapterRegistry
         return new RuntimePreviewAdapterRegistry(
         [
             offline,
-            new PilotRuntimePreviewAdapter(new RuntimePreviewResourceAllowlistResolver(), offline)
+            new PilotRuntimePreviewAdapter(
+                new RuntimePreviewPilotResourceCatalog(),
+                new RuntimePreviewPilotReadinessGate(new RuntimePreviewResourceAllowlistResolver()),
+                offline)
         ]);
     }
 

@@ -129,6 +129,26 @@ function normalizePendingActions(items) {
         .filter(item => item.actionType || item.summary || item.title);
 }
 
+function normalizeReadiness(item) {
+    if (!item || typeof item !== 'object') {
+        return null;
+    }
+
+    const coverage = readValue(item, ['allowlistCoverage', 'AllowlistCoverage']) || {};
+    return {
+        status: redactDisplayValue(readValue(item, ['status', 'Status'])),
+        canRunMetadataPilot: readBoolean(item, ['canRunMetadataPilot', 'CanRunMetadataPilot']),
+        workflowDraftAllowed: readBoolean(item, ['workflowDraftAllowed', 'WorkflowDraftAllowed']),
+        issues: readArray(item, ['issues', 'Issues']).map(normalizeIssueItem),
+        blockingIssues: readArray(item, ['blockingIssues', 'BlockingIssues']).map(normalizeIssueItem),
+        missingResources: readArray(item, ['missingResources', 'MissingResources']).map(normalizeIssueItem),
+        unsafeFindings: readArray(item, ['unsafeFindings', 'UnsafeFindings']).map(normalizeIssueItem),
+        resourceTrace: normalizeResourceTrace(readValue(item, ['resourceTrace', 'ResourceTrace']) || {}),
+        pendingActions: normalizePendingActions(readArray(item, ['pendingActions', 'PendingActions'])),
+        allowlistCoverage: redactDisplayValue(JSON.stringify(coverage || {}))
+    };
+}
+
 export function normalizeRuntimePreviewSummary(runtimePreview) {
     if (!runtimePreview || typeof runtimePreview !== 'object') {
         return null;
@@ -137,12 +157,14 @@ export function normalizeRuntimePreviewSummary(runtimePreview) {
     const fallback = readValue(runtimePreview, ['fallback', 'Fallback']) || {};
     const permissionDecision = normalizePermissionDecision(readValue(runtimePreview, ['permissionDecision', 'PermissionDecision']) || {});
     const resourceTrace = normalizeResourceTrace(readValue(runtimePreview, ['resourceTrace', 'ResourceTrace']) || {});
+    const readiness = normalizeReadiness(readValue(runtimePreview, ['readiness', 'Readiness']));
     return {
         previewReady: readBoolean(runtimePreview, ['previewReady', 'PreviewReady']),
         adapterName: redactDisplayValue(readValue(runtimePreview, ['adapterName', 'AdapterName'])),
         previewMode: redactDisplayValue(readValue(runtimePreview, ['previewMode', 'PreviewMode'])),
         permissionDecision,
         resourceTrace,
+        readiness,
         artifacts: readArray(runtimePreview, ['artifacts', 'Artifacts']).map(normalizeArtifact),
         blockingIssues: readArray(runtimePreview, ['blockingIssues', 'BlockingIssues']).map(normalizeIssueItem),
         warnings: readArray(runtimePreview, ['warnings', 'Warnings']).map(normalizeIssueItem),
@@ -173,6 +195,7 @@ export function renderRuntimePreviewSection(panel, runtimePreview) {
         summary.warnings.length ? `${summary.warnings.length} warning` : '',
         summary.missingResources.length ? `${summary.missingResources.length} missing` : '',
         summary.pendingActions.length ? `${summary.pendingActions.length} pending` : '',
+        summary.readiness?.status ? `readiness=${summary.readiness.status}` : '',
         summary.artifacts.length ? `${summary.artifacts.length} artifact` : ''
     ].filter(Boolean).join(' / ') || 'metadata-only';
 
@@ -205,6 +228,13 @@ export function renderRuntimePreviewSection(panel, runtimePreview) {
                     ${summary.fallback.reason ? `<span>fallbackReason=${panel._escapeHtml(summary.fallback.reason)}</span>` : ''}
                     ${summary.fallback.errorCode ? `<span>errorCode=${panel._escapeHtml(summary.fallback.errorCode)}</span>` : ''}
                 </div>
+                ${summary.readiness ? `
+                    <div class="ai-agent-preview-state-row" data-runtime-preview-readiness="true">
+                        ${summary.readiness.status ? `<span>readiness=${panel._escapeHtml(summary.readiness.status)}</span>` : ''}
+                        ${summary.readiness.canRunMetadataPilot !== null ? `<span>canRunMetadataPilot=${summary.readiness.canRunMetadataPilot ? 'true' : 'false'}</span>` : ''}
+                        ${summary.readiness.workflowDraftAllowed !== null ? `<span>workflowDraftAllowed=${summary.readiness.workflowDraftAllowed ? 'true' : 'false'}</span>` : ''}
+                    </div>
+                ` : ''}
                 ${(traceText || summary.resourceTrace.allowed !== null) ? `
                     <div class="ai-agent-preview-state-row" data-runtime-preview-resource-trace="true">
                         ${summary.resourceTrace.allowed !== null ? `<span>resourceAllowed=${summary.resourceTrace.allowed ? 'true' : 'false'}</span>` : ''}
@@ -212,8 +242,11 @@ export function renderRuntimePreviewSection(panel, runtimePreview) {
                     </div>
                 ` : ''}
                 ${panel._renderAgentPreviewIssueList(summary.blockingIssues, 'blocking')}
+                ${summary.readiness ? panel._renderAgentPreviewIssueList(summary.readiness.blockingIssues, 'blocking') : ''}
                 ${panel._renderAgentPreviewIssueList(summary.warnings, 'warning')}
                 ${panel._renderAgentPreviewIssueList(summary.missingResources, 'warning')}
+                ${summary.readiness ? panel._renderAgentPreviewIssueList(summary.readiness.missingResources, 'warning') : ''}
+                ${summary.readiness ? panel._renderAgentPreviewIssueList(summary.readiness.unsafeFindings, 'warning') : ''}
                 ${panel._renderAgentPreviewIssueList(summary.resourceTrace.missingResources, 'warning')}
                 ${panel._renderAgentPreviewIssueList(summary.issues, 'warning')}
                 ${summary.pendingActions.length > 0 ? `
@@ -247,6 +280,7 @@ export function renderRuntimePreviewSection(panel, runtimePreview) {
                         <span>pilotEnabled=${summary.permissionDecision.pilotEnabled === true ? 'true' : 'false'}</span>
                         <span>metadataOnly=${summary.permissionDecision.metadataOnly ? 'true' : 'false'}</span>
                         <span>allowlistCounts=${panel._escapeHtml(countText)}</span>
+                        ${summary.readiness?.allowlistCoverage ? `<span>readinessCoverage=${panel._escapeHtml(summary.readiness.allowlistCoverage)}</span>` : ''}
                         <span>realResourcesTouched=false</span>
                     </div>
                 </details>

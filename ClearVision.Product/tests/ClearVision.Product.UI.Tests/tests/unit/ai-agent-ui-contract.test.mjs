@@ -492,13 +492,24 @@ test('response mapping displays RuntimePreview pilot permission fallback trace a
       missingResources: [{ resourceType: 'camera', resourceKey: 'cam-missing', description: 'not allowlisted' }],
       trace: [{ resourceType: 'camera', reasonCode: 'allowlist_miss', allowed: false }]
     },
+    readiness: {
+      status: 'not_ready',
+      canRunMetadataPilot: false,
+      workflowDraftAllowed: true,
+      blockingIssues: [],
+      missingResources: [{ resourceType: 'camera', resourceKey: 'cam-missing', description: 'not allowlisted' }],
+      pendingActions: [{ actionType: 'RuntimePreviewPilotReadinessReview', summary: 'Review readiness' }],
+      resourceTrace: { allowed: false, reasonCode: 'runtime_preview_camera_not_allowlisted', resourceType: 'camera' },
+      fallback: { used: true, fallbackAdapterName: 'offline_runtime_preview' },
+      allowlistCoverage: { counts: { camera: 1 }, safeCatalogItems: 1 }
+    },
     fallback: {
       used: true,
       fallbackAdapterName: 'offline_runtime_preview',
       reasonCode: 'runtime_preview_camera_not_allowlisted',
       reason: 'offline metadata fallback retained'
     },
-    pendingActions: [{ actionType: 'RuntimePreviewPilotAllowlistReview', summary: 'Review allowlist' }],
+    pendingActions: [{ actionType: 'RuntimePreviewPilotReadinessReview', summary: 'Review readiness' }],
     artifacts: [{ artifactId: 'operator-result-1', artifactType: 'operator_result_metadata', metadataOnly: true, binaryIncluded: false, byteLength: 0 }]
   };
 
@@ -508,9 +519,12 @@ test('response mapping displays RuntimePreview pilot permission fallback trace a
   assert.match(validation.innerHTML, /previewMode=metadata_only/);
   assert.match(validation.innerHTML, /permission=denied/);
   assert.match(validation.innerHTML, /permissionReason=runtime_preview_camera_not_allowlisted/);
+  assert.match(validation.innerHTML, /readiness=not_ready/);
+  assert.match(validation.innerHTML, /canRunMetadataPilot=false/);
+  assert.match(validation.innerHTML, /workflowDraftAllowed=true/);
   assert.match(validation.innerHTML, /fallbackAdapterName=offline_runtime_preview/);
   assert.match(validation.innerHTML, /resourceTrace=camera \/ runtime_preview_camera_not_allowlisted \/ cam-missing/);
-  assert.match(validation.innerHTML, /RuntimePreviewPilotAllowlistReview/);
+  assert.match(validation.innerHTML, /RuntimePreviewPilotReadinessReview/);
 });
 
 test('RuntimePreview pilot developer status is hidden by default and visible in developer mode', async () => {
@@ -526,6 +540,12 @@ test('RuntimePreview pilot developer status is hidden by default and visible in 
       pilotEnabled: true,
       metadataOnly: true,
       allowlistCounts: { camera: 2, model: 1, template: 1, flow: 0, resourceRoot: 0 }
+    },
+    readiness: {
+      status: 'ready',
+      canRunMetadataPilot: true,
+      workflowDraftAllowed: true,
+      allowlistCoverage: { safeCatalogItems: 4, allowlistedCatalogItems: 3 }
     }
   };
 
@@ -538,6 +558,7 @@ test('RuntimePreview pilot developer status is hidden by default and visible in 
   assert.match(developerHtml, /pilotEnabled=true/);
   assert.match(developerHtml, /metadataOnly=true/);
   assert.match(developerHtml, /allowlistCounts=camera=2 \/ model=1 \/ template=1 \/ flow=0 \/ root=0/);
+  assert.match(developerHtml, /readinessCoverage=/);
   assert.match(developerHtml, /realResourcesTouched=false/);
 });
 
@@ -567,7 +588,7 @@ test('RuntimePreview UI redacts bytes paths IP BaseUrl and key fragments', async
     fallback: { used: true, fallbackAdapterName: 'offline_runtime_preview', reason: 'Bearer test token and BaseUrl http://192.0.2.10:8317/v1' },
     warnings: [{ message: 'C:\\secret\\template.png' }],
     issues: [{ description: 'apiKey=VALUE_SHOULD_HIDE' }],
-    pendingActions: [{ actionType: 'RuntimePreviewPilotAllowlistReview', summary: 'Authorization Bearer secret' }],
+    pendingActions: [{ actionType: 'RuntimePreviewPilotReadinessReview', summary: 'Authorization Bearer secret' }],
     artifacts: [{ artifactId: 'C:\\secret\\frame.png', artifactType: 'frame_metadata', metadataOnly: true, binaryIncluded: false, byteLength: 0 }]
   };
 
@@ -1357,7 +1378,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 55);
+  assert.equal(uiEntry.minimumTests, 58);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)
@@ -1463,6 +1484,60 @@ test('AI settings API wrapper exposes planner and shadow default endpoints', () 
 
   assert.match(source, /default-planner/);
   assert.match(source, /default-shadow-eval/);
+});
+
+test('AI settings API wrapper exposes RuntimePreview Pilot management endpoints', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsApi.js'),
+    'utf8'
+  );
+
+  assert.match(source, /loadRuntimePreviewPilotConfig/);
+  assert.match(source, /saveRuntimePreviewPilotConfig/);
+  assert.match(source, /loadRuntimePreviewPilotCatalog/);
+  assert.match(source, /checkRuntimePreviewPilotReadiness/);
+  assert.match(source, /\/settings\/runtime-preview-pilot\/config/);
+  assert.match(source, /\/settings\/runtime-preview-pilot\/catalog/);
+  assert.match(source, /\/settings\/runtime-preview-pilot\/readiness/);
+});
+
+test('AI settings RuntimePreview Pilot UI is developer-hidden and exposes config catalog readiness controls', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-runtime-preview-pilot-admin="hidden"/);
+  assert.match(source, /isRuntimePreviewPilotDeveloperUiEnabled/);
+  assert.match(source, /cv_ai_agent_dev_ui/);
+  assert.match(source, /cfg-rp-enabled/);
+  assert.match(source, /cfg-rp-allow-cameras/);
+  assert.match(source, /cfg-rp-allow-models/);
+  assert.match(source, /cfg-rp-allow-templates/);
+  assert.match(source, /cfg-rp-allow-flows/);
+  assert.match(source, /cfg-rp-allow-roots/);
+  assert.match(source, /btn-runtime-preview-pilot-readiness/);
+  assert.match(source, /data-rp-readiness-status/);
+  assert.match(source, /blockingIssues/);
+  assert.match(source, /missingResources/);
+  assert.match(source, /pendingActions/);
+  assert.match(source, /resourceTrace/);
+  assert.match(source, /fallback/);
+  assert.match(source, /allowlistCoverage/);
+});
+
+test('AI settings RuntimePreview Pilot UI redacts sensitive display values and keeps metadata-only safety flags', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'aiTab.js'),
+    'utf8'
+  );
+
+  assert.match(source, /sanitizeRuntimePreviewPilotValue/);
+  assert.match(source, /<redacted>/);
+  assert.match(source, /denyExternalPath:\s*true/);
+  assert.match(source, /denyImageBytes:\s*true/);
+  assert.match(source, /mode:\s*'metadata_only'/);
+  assert.doesNotMatch(source, /console\.log/);
 });
 
 test('AI settings source does not log or render full API key values', () => {

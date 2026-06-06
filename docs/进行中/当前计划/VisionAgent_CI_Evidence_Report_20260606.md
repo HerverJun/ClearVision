@@ -81,21 +81,22 @@ Default real LLM shadow eval samples:
 - skippedReason: `CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.`
 - safety mode: offline metadata only
 
-## RuntimePreview Pilot v0.7 Local Evidence
+## RuntimePreview Pilot v0.8 Local Evidence
 
-The RuntimePreview Pilot v0.7 skeleton commit raises local quality gates beyond run #16:
+The RuntimePreview Pilot v0.8 implementation raises local quality gates beyond run #16:
 
-- backend Agent tests: 200 total / 200 passed
-- AI model endpoint regression: 8 total / 8 passed
-- UI contract tests: 55 total / 55 passed
+- backend Agent tests: 203 total / 203 passed
+- AI model endpoint regression: 9 total / 9 passed
+- UI contract tests: 58 total / 58 passed
 - executable business benchmark: 36 / 36 accepted
 - planner autonomy + permission negative benchmark: 21 / 21 accepted
+- artifact/source assertion: 13 artifact files validated, 4 reports validated, 3310 source files scanned
 
-The final CI run for the v0.7 skeleton must be recorded after this commit is pushed. Stable CI must continue to keep fixed/holdout real LLM shadow eval default-off.
+Stable CI continues to keep fixed/holdout real LLM shadow eval default-off. The latest remote run metadata for the pushed v0.8 commit is recorded in the task completion output.
 
 ## Safety Boundary
 
-Run #16 and the RuntimePreview Pilot v0.7 skeleton do not advance real camera, real Station, or real deployment capability:
+Run #16 and the RuntimePreview Pilot v0.8 implementation do not advance real camera, real Station, or real deployment capability:
 
 - no real camera SDK integration
 - no real Station access

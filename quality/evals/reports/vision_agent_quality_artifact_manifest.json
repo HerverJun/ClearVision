@@ -1,15 +1,15 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-06-06T08:44:33.368296+00:00",
+  "generatedAtUtc": "2026-06-06T09:54:54.956653+00:00",
   "artifactName": "vision-agent-quality-suite",
   "files": [
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.json",
-      "sizeBytes": 231846
+      "sizeBytes": 232014
     },
     {
       "path": "quality/evals/reports/planner_autonomy_benchmark.json",
-      "sizeBytes": 756448
+      "sizeBytes": 756476
     },
     {
       "path": "quality/evals/reports/real_llm_planner_shadow_eval.json",
@@ -37,11 +37,11 @@
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
-      "sizeBytes": 9612
+      "sizeBytes": 10268
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx",
-      "sizeBytes": 29530
+      "sizeBytes": 36736
     },
     {
       "path": "test_results/agent_engineering_harness/agent_contracts_skeleton.trx",
@@ -49,7 +49,7 @@
     },
     {
       "path": "test_results/agent_engineering_harness/agent_engineering_harness.trx",
-      "sizeBytes": 288766
+      "sizeBytes": 293291
     },
     {
       "path": "test_results/agent_engineering_harness/agent_planner_parity_subset.trx",
@@ -65,7 +65,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T08:44:08.6839892+00:00"
+        "generatedAtUtc": "2026-06-06T09:52:07.2834541+00:00"
       },
       "summary": {
         "caseCount": 36,
@@ -82,7 +82,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T08:44:11.0381092+00:00"
+        "generatedAtUtc": "2026-06-06T09:52:09.9764807+00:00"
       },
       "summary": {
         "plannerCaseCount": 15,

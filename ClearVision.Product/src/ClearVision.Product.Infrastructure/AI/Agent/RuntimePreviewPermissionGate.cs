@@ -81,6 +81,64 @@ public static class RuntimePreviewPermissionGate
                     }
                 }
             },
+            readiness = new
+            {
+                status = "not_ready",
+                canRunMetadataPilot = false,
+                workflowDraftAllowed = true,
+                issues = new[]
+                {
+                    new
+                    {
+                        code = errorCode,
+                        message = reason,
+                        resourceType = "runtime_preview_permission"
+                    }
+                },
+                blockingIssues = Array.Empty<object>(),
+                missingResources = Array.Empty<object>(),
+                unsafeFindings = Array.Empty<object>(),
+                allowlistCoverage = new
+                {
+                    metadataOnly = true,
+                    counts = new
+                    {
+                        camera = context.RuntimePreviewPilot.AllowedCameraBindingIds.Count,
+                        model = context.RuntimePreviewPilot.AllowedModelIds.Count,
+                        template = context.RuntimePreviewPilot.AllowedTemplateIds.Count,
+                        flow = context.RuntimePreviewPilot.AllowedFlowIds.Count,
+                        resourceRoot = context.RuntimePreviewPilot.AllowedResourceRoots.Count
+                    }
+                },
+                resourceTrace = new
+                {
+                    allowed = false,
+                    reasonCode = errorCode,
+                    resourceType = "runtime_preview_permission",
+                    resourceId = toolName,
+                    normalizedKey = toolName,
+                    missingResources = Array.Empty<object>(),
+                    trace = new[]
+                    {
+                        new
+                        {
+                            resourceType = "runtime_preview_permission",
+                            resourceId = toolName,
+                            reasonCode = errorCode,
+                            allowed = false
+                        }
+                    }
+                },
+                pendingActions = new[]
+                {
+                    BuildConsentPendingAction(toolName, reason)
+                },
+                binaryIncluded = false,
+                capturedRealFrame = false,
+                loadedModelFiles = false,
+                accessedHardware = false,
+                stationTouched = false
+            },
             fallback = new
             {
                 used = false,

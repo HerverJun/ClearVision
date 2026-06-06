@@ -6,6 +6,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Infrastructure.AI;
+using ClearVision.Product.Infrastructure.AI.Tools;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -432,9 +433,193 @@ public class AiModelEndpointsTests
             .Should().BeEquivalentTo(["low", "medium", "high"]);
     }
 
+    [Fact]
+    public async Task RuntimePreviewPilotEndpoints_ShouldManageConfigCatalogAndReadinessWithoutLeakingSecrets()
+    {
+        var appConfig = new AppConfig
+        {
+            Cameras =
+            [
+                new CameraBindingConfig
+                {
+                    Id = "cam-a",
+                    DisplayName = "Line Camera",
+                    IpAddress = "192.0.2.20"
+                }
+            ],
+            Runtime = new RuntimeConfig
+            {
+                RuntimePreviewPilot = new RuntimePreviewPilotConfig
+                {
+                    Enabled = true,
+                    AllowedCameraBindingIds = ["cam-a"],
+                    AllowedTemplateIds = ["template-a"]
+                }
+            }
+        };
+        appConfig.Normalize();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+        host.AiConfigStore.Add(new AiModelConfig
+        {
+            Id = "model-a",
+            Name = "Shadow Model",
+            Provider = "OpenAI Compatible",
+            BaseUrl = "https://example.invalid/v1",
+            ApiKey = "runtime-preview-secret"
+        });
+
+        using var getConfigResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/config");
+        getConfigResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var invalidPutResponse = await host.Client.PutAsync(
+            "/api/settings/runtime-preview-pilot/config",
+            JsonContent(new
+            {
+                enabled = true,
+                mode = "metadata_only",
+                allowedCameraBindingIds = new[] { "192.0.2.20:8317" },
+                denyExternalPath = true,
+                denyImageBytes = true
+            }));
+        invalidPutResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        using var validPutResponse = await host.Client.PutAsync(
+            "/api/settings/runtime-preview-pilot/config",
+            JsonContent(new
+            {
+                enabled = true,
+                mode = "metadata_only",
+                allowedCameraBindingIds = new[] { "cam-a" },
+                allowedTemplateIds = new[] { "template-a" },
+                fallbackToOffline = true,
+                denyExternalPath = true,
+                denyImageBytes = true
+            }));
+        validPutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var catalogResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/catalog");
+        catalogResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var catalogJson = await catalogResponse.Content.ReadAsStringAsync();
+        catalogJson.Should().Contain("cam-a");
+        catalogJson.Should().Contain("model-a");
+        catalogJson.Should().Contain("<redacted>");
+        catalogJson.Should().NotContain("runtime-preview-secret");
+        catalogJson.Should().NotContain("192.0.2.20");
+        catalogJson.Should().NotContain("example.invalid/v1");
+
+        using var readyResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/readiness",
+            JsonContent(new
+            {
+                config = new
+                {
+                    enabled = true,
+                    mode = "metadata_only",
+                    allowedCameraBindingIds = new[] { "cam-a" },
+                    allowedTemplateIds = new[] { "template-a" },
+                    fallbackToOffline = true,
+                    denyExternalPath = true,
+                    denyImageBytes = true
+                },
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new
+                {
+                    flow = RuntimePreviewFlow("cam-a", templateId: "template-a")
+                }
+            }));
+        readyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using (var readyDocument = JsonDocument.Parse(await readyResponse.Content.ReadAsStringAsync()))
+        {
+            var readiness = readyDocument.RootElement.GetProperty("readiness");
+            readiness.GetProperty("status").GetString().Should().Be("ready");
+            readiness.GetProperty("canRunMetadataPilot").GetBoolean().Should().BeTrue();
+            readiness.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+        }
+
+        using var deniedResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/readiness",
+            JsonContent(new
+            {
+                config = new
+                {
+                    enabled = true,
+                    mode = "metadata_only",
+                    allowedCameraBindingIds = new[] { "cam-a" },
+                    fallbackToOffline = true,
+                    denyExternalPath = true,
+                    denyImageBytes = true
+                },
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new
+                {
+                    flow = RuntimePreviewFlow("cam-a", templatePath: "C:\\secret\\template.png")
+                }
+            }));
+        deniedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var deniedJson = await deniedResponse.Content.ReadAsStringAsync();
+        deniedJson.Should().NotContain("secret");
+        deniedJson.Should().NotContain(".png");
+        using (var deniedDocument = JsonDocument.Parse(deniedJson))
+        {
+            var readiness = deniedDocument.RootElement.GetProperty("readiness");
+            readiness.GetProperty("status").GetString().Should().Be("denied");
+            readiness.GetProperty("canRunMetadataPilot").GetBoolean().Should().BeFalse();
+            readiness.GetProperty("fallback").GetProperty("used").GetBoolean().Should().BeFalse();
+        }
+    }
+
     private static StringContent JsonContent(object payload)
     {
         return new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+    }
+
+    private static object RuntimePreviewFlow(
+        string cameraBindingId,
+        string? templateId = null,
+        string? templatePath = null)
+    {
+        var templateParameters = new Dictionary<string, string>();
+        if (!string.IsNullOrWhiteSpace(templatePath))
+        {
+            templateParameters["TemplatePath"] = templatePath;
+        }
+        else
+        {
+            templateParameters["TemplateId"] = templateId ?? "template-a";
+        }
+
+        return new
+        {
+            operators = new object[]
+            {
+                new
+                {
+                    tempId = "op_cam",
+                    operatorType = "ImageAcquisition",
+                    parameters = new Dictionary<string, string>
+                    {
+                        ["SourceType"] = "Camera",
+                        ["CameraBindingId"] = cameraBindingId
+                    }
+                },
+                new
+                {
+                    tempId = "op_template",
+                    operatorType = "TemplateMatching",
+                    parameters = templateParameters
+                }
+            },
+            connections = new object[]
+            {
+                new
+                {
+                    sourceTempId = "op_cam",
+                    sourcePortName = "Image",
+                    targetTempId = "op_template",
+                    targetPortName = "Image"
+                }
+            }
+        };
     }
 
     private sealed class AiModelEndpointTestHost : IAsyncDisposable
@@ -455,6 +640,8 @@ public class AiModelEndpointsTests
 
         public AiConfigStore AiConfigStore { get; }
 
+        public IConfigurationService ConfigurationService { get; private init; } = null!;
+
         public AiConfigStore CreateReloadedStore()
         {
             return new AiConfigStore(
@@ -471,7 +658,8 @@ public class AiModelEndpointsTests
         }
 
         public static async Task<AiModelEndpointTestHost> CreateAsync(
-            Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? aiSendAsync = null)
+            Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? aiSendAsync = null,
+            AppConfig? appConfig = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -479,12 +667,16 @@ public class AiModelEndpointsTests
             });
             builder.WebHost.UseTestServer();
 
+            var effectiveConfig = appConfig ?? new AppConfig();
             var configService = Substitute.For<IConfigurationService>();
-            configService.LoadAsync().Returns(Task.FromResult(new AppConfig()));
-            configService.GetCurrent().Returns(new AppConfig());
+            configService.LoadAsync().Returns(_ => Task.FromResult(effectiveConfig));
+            configService.GetCurrent().Returns(_ => effectiveConfig);
             configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
             builder.Services.AddSingleton(configService);
             builder.Services.AddSingleton(Substitute.For<ClearVision.Product.Core.Cameras.ICameraManager>());
+            builder.Services.AddSingleton<RuntimePreviewPilotResourceCatalog>();
+            builder.Services.AddSingleton<RuntimePreviewResourceAllowlistResolver>();
+            builder.Services.AddSingleton<RuntimePreviewPilotReadinessGate>();
 
             var storageDirectory = Path.Combine(Path.GetTempPath(), $"cv-ai-model-endpoints-{Guid.NewGuid():N}");
             var aiConfigStore = new AiConfigStore(
@@ -517,7 +709,10 @@ public class AiModelEndpointsTests
             });
             app.MapSettingsEndpoints();
             await app.StartAsync();
-            return new AiModelEndpointTestHost(app, aiConfigStore, storageDirectory);
+            return new AiModelEndpointTestHost(app, aiConfigStore, storageDirectory)
+            {
+                ConfigurationService = configService
+            };
         }
 
         public async ValueTask DisposeAsync()

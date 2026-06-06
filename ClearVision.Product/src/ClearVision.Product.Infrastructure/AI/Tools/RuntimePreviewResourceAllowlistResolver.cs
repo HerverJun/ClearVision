@@ -7,6 +7,8 @@ namespace ClearVision.Product.Infrastructure.AI.Tools;
 
 public sealed class RuntimePreviewResourceAllowlistResolver
 {
+    public const string MetadataToolName = "runtime_preview_metadata";
+
     public RuntimePreviewResourceTrace Resolve(RuntimePreviewRequest request)
     {
         var config = request.PilotConfig;
@@ -27,7 +29,7 @@ public sealed class RuntimePreviewResourceAllowlistResolver
                 "pilot",
                 config.Mode,
                 "runtime_preview_mode_denied",
-                "RuntimePreview Pilot v0.7 only supports metadata_only mode.");
+                "RuntimePreview Pilot v0.8 only supports metadata_only mode.");
         }
 
         if (ContainsImageBytes(request.Arguments))
@@ -53,7 +55,8 @@ public sealed class RuntimePreviewResourceAllowlistResolver
             return ResolveCapture(request, config);
         }
 
-        if (string.Equals(request.ToolName, RuntimePreviewPermissionGate.ReplayToolName, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(request.ToolName, RuntimePreviewPermissionGate.ReplayToolName, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(request.ToolName, MetadataToolName, StringComparison.OrdinalIgnoreCase))
         {
             return ResolveReplay(request, config);
         }
@@ -62,7 +65,7 @@ public sealed class RuntimePreviewResourceAllowlistResolver
             "tool",
             request.ToolName,
             "runtime_preview_tool_not_supported",
-            "RuntimePreview Pilot supports only capture_test_frame and replay_flow_with_frame.");
+            "RuntimePreview Pilot supports metadata-only runtime_preview_metadata plus gated capture/replay tool names.");
     }
 
     private static RuntimePreviewResourceTrace ResolveCapture(

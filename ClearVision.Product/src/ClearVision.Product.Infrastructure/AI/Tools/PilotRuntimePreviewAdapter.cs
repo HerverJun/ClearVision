@@ -7,14 +7,17 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
 {
     public const string AdapterName = "pilot_runtime_preview";
 
-    private readonly RuntimePreviewResourceAllowlistResolver _allowlistResolver;
+    private readonly RuntimePreviewPilotResourceCatalog _resourceCatalog;
+    private readonly RuntimePreviewPilotReadinessGate _readinessGate;
     private readonly OfflineRuntimePreviewAdapter _offlineAdapter;
 
     public PilotRuntimePreviewAdapter(
-        RuntimePreviewResourceAllowlistResolver allowlistResolver,
+        RuntimePreviewPilotResourceCatalog resourceCatalog,
+        RuntimePreviewPilotReadinessGate readinessGate,
         OfflineRuntimePreviewAdapter offlineAdapter)
     {
-        _allowlistResolver = allowlistResolver;
+        _resourceCatalog = resourceCatalog;
+        _readinessGate = readinessGate;
         _offlineAdapter = offlineAdapter;
     }
 
@@ -44,6 +47,7 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
                     ReasonCode = "runtime_preview_pilot_disabled",
                     ResourceType = "pilot"
                 },
+                readiness: null,
                 "runtime_preview_pilot_disabled",
                 "RuntimePreview Pilot is disabled; Offline adapter was used.",
                 cancellationToken);
@@ -51,17 +55,25 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
 
         try
         {
-            var resourceTrace = _allowlistResolver.Resolve(request);
-            if (!resourceTrace.Allowed)
+            var catalog = _resourceCatalog.Build(config, null, null, ExtractWorkflowDraft(request));
+            var readiness = _readinessGate.Evaluate(
+                config,
+                catalog,
+                request.ToolName,
+                request.Arguments,
+                request.Context);
+            if (!readiness.CanRunMetadataPilot)
             {
-                return await DenyWithFallbackAsync(request, resourceTrace, cancellationToken);
+                return string.Equals(readiness.Status, RuntimePreviewPilotReadinessStatuses.Denied, StringComparison.OrdinalIgnoreCase)
+                    ? DenyDangerousRequest(request, readiness)
+                    : await NotReadyWithFallbackAsync(request, readiness, cancellationToken);
             }
 
             var offline = await ExecuteOfflineAsync(request, cancellationToken);
             return WrapPilotMetadataResult(
                 offline,
                 request,
-                resourceTrace,
+                readiness,
                 PermissionDecision(
                     request,
                     allowed: offline.Success,
@@ -86,51 +98,30 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
                     ReasonCode = "runtime_preview_pilot_adapter_exception",
                     ResourceType = "pilot"
                 },
+                readiness: null,
                 "runtime_preview_pilot_adapter_exception",
                 "RuntimePreview Pilot adapter failed; Offline fallback was used.",
                 cancellationToken);
         }
     }
 
-    private async Task<RuntimePreviewResult> DenyWithFallbackAsync(
+    private async Task<RuntimePreviewResult> NotReadyWithFallbackAsync(
         RuntimePreviewRequest request,
-        RuntimePreviewResourceTrace resourceTrace,
+        RuntimePreviewPilotReadinessResult readiness,
         CancellationToken cancellationToken)
     {
-        var fallback = RuntimePreviewFallbackInfo.NotUsed();
-        IReadOnlyList<RuntimePreviewArtifactSummary> artifacts = [];
-        if (request.PilotConfig.FallbackToOffline && !IsDangerousDeny(resourceTrace.ReasonCode))
-        {
-            var offline = await ExecuteOfflineAsync(request, cancellationToken);
-            artifacts = offline.Artifacts;
-            fallback = new RuntimePreviewFallbackInfo
-            {
-                Used = true,
-                FallbackAdapterName = OfflineRuntimePreviewAdapter.AdapterName,
-                ReasonCode = resourceTrace.ReasonCode,
-                Reason = "Pilot was denied by resource allowlist; offline metadata fallback was retained."
-            };
-        }
-        else if (request.PilotConfig.FallbackToOffline)
-        {
-            fallback = new RuntimePreviewFallbackInfo
-            {
-                Used = true,
-                FallbackAdapterName = OfflineRuntimePreviewAdapter.AdapterName,
-                ReasonCode = resourceTrace.ReasonCode,
-                Reason = "Pilot was denied before executing fallback metadata because the request referenced a dangerous resource."
-            };
-        }
-
-        var pendingAction = BuildPilotPendingAction(resourceTrace);
-        var message = resourceTrace.MissingResources.Count > 0
-            ? "RuntimePreview Pilot requires allowlisted metadata resources before pilot preview can run."
-            : "RuntimePreview Pilot denied the request.";
+        var offline = request.PilotConfig.FallbackToOffline
+            ? await ExecuteOfflineAsync(request, cancellationToken)
+            : RuntimePreviewResult.Fail(
+                Name,
+                readiness.ResourceTrace.ReasonCode,
+                "RuntimePreview Pilot is not ready and offline fallback is disabled.");
+        var message = "RuntimePreview Pilot requires ready allowlisted metadata resources before pilot preview can run.";
         return RuntimePreviewResult.Fail(
             Name,
-            resourceTrace.ReasonCode,
+            readiness.ResourceTrace.ReasonCode,
             message,
-            resourceTrace.MissingResources.Count > 0 ? resourceTrace.MissingResources : null) with
+            readiness.MissingResources.Count > 0 ? readiness.MissingResources : null) with
         {
             PreviewMode = RuntimePreviewModes.MetadataOnly,
             WorkflowDraftAllowed = true,
@@ -138,30 +129,57 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
             PermissionDecision = PermissionDecision(
                 request,
                 allowed: false,
-                reasonCode: resourceTrace.ReasonCode,
+                reasonCode: readiness.ResourceTrace.ReasonCode,
                 reason: message),
-            ResourceTrace = resourceTrace,
-            Fallback = fallback,
-            MissingResources = resourceTrace.MissingResources,
-            Issues =
-            [
-                new
-                {
-                    code = resourceTrace.ReasonCode,
-                    message,
-                    resourceType = resourceTrace.ResourceType
-                }
-            ],
-            PendingActions = [pendingAction],
+            ResourceTrace = readiness.ResourceTrace,
+            Readiness = readiness,
+            Fallback = readiness.Fallback,
+            MissingResources = readiness.MissingResources,
+            Issues = readiness.Issues,
+            PendingActions = readiness.PendingActions,
             Warnings =
             [
                 new
                 {
                     code = "runtime_preview_metadata_only_boundary",
-                    message = "RuntimePreview Pilot v0.7 is metadata-only and did not access real resources."
+                    message = "RuntimePreview Pilot v0.8 is metadata-only and did not access real resources."
                 }
             ],
-            Artifacts = artifacts.Take(request.PilotConfig.MaxPreviewArtifacts).ToList(),
+            Artifacts = offline.Artifacts.Take(request.PilotConfig.MaxPreviewArtifacts).ToList(),
+            BinaryIncluded = false,
+            CapturedRealFrame = false,
+            LoadedModelFiles = false,
+            AccessedHardware = false,
+            StationTouched = false
+        };
+    }
+
+    private RuntimePreviewResult DenyDangerousRequest(
+        RuntimePreviewRequest request,
+        RuntimePreviewPilotReadinessResult readiness)
+    {
+        var message = "RuntimePreview Pilot denied a dangerous resource request.";
+        return RuntimePreviewResult.Fail(
+            Name,
+            readiness.ResourceTrace.ReasonCode,
+            message,
+            readiness.BlockingIssues.Count > 0 ? readiness.BlockingIssues : readiness.UnsafeFindings) with
+        {
+            PreviewMode = RuntimePreviewModes.MetadataOnly,
+            WorkflowDraftAllowed = true,
+            Source = "runtime_preview_pilot_adapter",
+            PermissionDecision = PermissionDecision(
+                request,
+                allowed: false,
+                reasonCode: readiness.ResourceTrace.ReasonCode,
+                reason: message),
+            ResourceTrace = readiness.ResourceTrace,
+            Readiness = readiness,
+            Fallback = RuntimePreviewFallbackInfo.NotUsed(),
+            Issues = readiness.Issues,
+            MissingResources = readiness.MissingResources,
+            PendingActions = readiness.PendingActions,
+            Artifacts = [],
             BinaryIncluded = false,
             CapturedRealFrame = false,
             LoadedModelFiles = false,
@@ -173,6 +191,7 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
     private async Task<RuntimePreviewResult> ExecuteOfflineFallbackAsync(
         RuntimePreviewRequest request,
         RuntimePreviewResourceTrace resourceTrace,
+        RuntimePreviewPilotReadinessResult? readiness,
         string reasonCode,
         string reason,
         CancellationToken cancellationToken)
@@ -189,6 +208,7 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
                 reasonCode: offline.Success ? reasonCode : offline.ErrorCode ?? reasonCode,
                 reason: offline.Success ? reason : "Offline fallback was not ready."),
             ResourceTrace = resourceTrace,
+            Readiness = readiness,
             Fallback = new RuntimePreviewFallbackInfo
             {
                 Used = true,
@@ -228,7 +248,7 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
     private static RuntimePreviewResult WrapPilotMetadataResult(
         RuntimePreviewResult result,
         RuntimePreviewRequest request,
-        RuntimePreviewResourceTrace resourceTrace,
+        RuntimePreviewPilotReadinessResult readiness,
         RuntimePreviewPermissionDecision permissionDecision)
     {
         var warnings = result.Warnings.Concat(new object[]
@@ -247,7 +267,8 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
             WorkflowDraftAllowed = true,
             Source = "runtime_preview_pilot_adapter",
             PermissionDecision = permissionDecision,
-            ResourceTrace = resourceTrace,
+            ResourceTrace = readiness.ResourceTrace,
+            Readiness = readiness,
             Fallback = RuntimePreviewFallbackInfo.NotUsed(),
             Warnings = warnings,
             Artifacts = result.Artifacts
@@ -288,29 +309,22 @@ public sealed class PilotRuntimePreviewAdapter : IRuntimePreviewAdapter
         };
     }
 
-    private static VisionAgentPendingAction BuildPilotPendingAction(RuntimePreviewResourceTrace resourceTrace)
+    private static System.Text.Json.JsonElement? ExtractWorkflowDraft(RuntimePreviewRequest request)
     {
-        return new VisionAgentPendingAction
+        if (request.Arguments.ValueKind != System.Text.Json.JsonValueKind.Object)
         {
-            ActionType = "RuntimePreviewPilotAllowlistReview",
-            Title = "Review RuntimePreview Pilot allowlist",
-            Summary = $"RuntimePreview Pilot denied {resourceTrace.ResourceType}: {resourceTrace.ReasonCode}.",
-            RequiresUserConfirmation = true,
-            Payload = new
-            {
-                resourceType = resourceTrace.ResourceType,
-                reasonCode = resourceTrace.ReasonCode,
-                missingResources = resourceTrace.MissingResources
-            }
-        };
-    }
+            return null;
+        }
 
-    private static bool IsDangerousDeny(string reasonCode)
-    {
-        return reasonCode.Contains("path", StringComparison.OrdinalIgnoreCase) ||
-               reasonCode.Contains("file", StringComparison.OrdinalIgnoreCase) ||
-               reasonCode.Contains("plc", StringComparison.OrdinalIgnoreCase) ||
-               reasonCode.Contains("station", StringComparison.OrdinalIgnoreCase) ||
-               reasonCode.Contains("image_bytes", StringComparison.OrdinalIgnoreCase);
+        foreach (var propertyName in new[] { "flow", "workflowDraft", "existingFlowJson" })
+        {
+            if (request.Arguments.TryGetProperty(propertyName, out var value) &&
+                value.ValueKind == System.Text.Json.JsonValueKind.Object)
+            {
+                return value.Clone();
+            }
+        }
+
+        return null;
     }
 }

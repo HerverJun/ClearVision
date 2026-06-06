@@ -1,12 +1,28 @@
-# Vision Agent RuntimePreview Pilot v0.7 Design
+# Vision Agent RuntimePreview Pilot v0.8 Design
 
 ## Scope
 
-This is a metadata-only RuntimePreview Pilot skeleton. It is default-off and exists to test configuration, allowlist resolution, adapter routing, policy trace, UI display, and regression gates. It does not connect to real cameras, Station, image files, model files, PLC, packaging, deployment, downlink, or hot-load.
+RuntimePreview Pilot v0.8 upgrades the v0.7 metadata-only skeleton into a configurable, auditable internal pilot framework. It remains default-off and offline/metadata-only. It does not implement a real RuntimePreview adapter and does not connect to real cameras, Station, image files, model files, PLC, packaging, deployment, downlink, or hot-load.
+
+## v0.7 Audit
+
+Reviewed and reused existing pieces instead of replacing them:
+
+- `RuntimePreviewPilotConfig` under `AppConfig.Runtime.RuntimePreviewPilot`
+- `RuntimePreviewPilotConfigValidator`
+- `RuntimePreviewPermissionGate`
+- `RuntimePreviewResourceAllowlistResolver`
+- `PilotRuntimePreviewAdapter`
+- `OfflineRuntimePreviewAdapter`
+- AI workbench RuntimePreview summary UI
+- Settings API / AI settings tab structure
+- `agent_engineering_harness_suite`
+
+The audit found v0.7 already had a safe default-off config, permission gate, allowlist resolver, pilot adapter skeleton, offline fallback, and UI redaction. v0.8 adds catalog discovery, a separate readiness gate, hidden Settings management UI, and endpoint/UI/backend regression coverage.
 
 ## Configuration
 
-`RuntimePreviewPilotConfig` is stored under `AppConfig.Runtime.RuntimePreviewPilot` and is normalized during `AppConfig.Normalize()`:
+`RuntimePreviewPilotConfig` is normalized during `AppConfig.Normalize()`:
 
 - `enabled=false`
 - `mode=metadata_only`
@@ -21,184 +37,141 @@ This is a metadata-only RuntimePreview Pilot skeleton. It is default-off and exi
 - `denyExternalPath=true`
 - `denyImageBytes=true`
 
-Migration behavior:
+Validation rejects unsafe allowlist keys:
 
-- old configs missing `runtimePreviewPilot` receive safe defaults
-- wildcard tokens such as `*`, `all`, and `any` are removed by normalization
-- path-like tokens, traversal tokens, and encoded image markers are not valid allowlist keys
-- validator rejects disabled `denyExternalPath` or `denyImageBytes`
+- wildcard or broad tokens: `*`, `all`, `any`
+- path-like tokens, traversal, slashes, drive markers
+- URL markers and IP-like values
+- `base64`, `token`, `apikey`, `api-key`
+- disabled `denyExternalPath` or `denyImageBytes`
 
-## Resolver
+## Resource Catalog
 
-`RuntimePreviewResourceAllowlistResolver` evaluates the tool request, workflow draft, operator parameters, and `VisionAgentToolContext.RuntimePreviewPilot`.
+`RuntimePreviewPilotResourceCatalog` builds safe metadata-only catalog items from:
 
-Decision fields:
+- `AppConfig.Cameras` with source `app_config`
+- `AiConfigStore` model summaries with source `ai_config_store`
+- current workflow draft logical ids with source `workflow_draft`
+- fixture fallback only when no items exist, with source `fixture` and `safeForPilot=false`
 
-- `allowed`
-- `reasonCode`
+Each catalog item contains:
+
+- `id`
+- `displayName`
 - `resourceType`
-- `resourceId`
-- `normalizedKey`
+- `source`
+- `metadataOnly`
+- `safeForPilot`
+- `reasonCode`
+- `redacted`
+- `metadata`
+
+The catalog intentionally does not return real paths, IP/BaseUrl values, API keys, tokens, base64, image bytes, Station addresses, PLC addresses, or model file paths.
+
+## Readiness Gate
+
+`RuntimePreviewPilotReadinessGate` evaluates:
+
+- pilot config
+- catalog
+- workflow draft
+- `toolName`
+- arguments
+- `VisionAgentToolContext`
+
+It returns:
+
+- `status`: `ready`, `not_ready`, or `denied`
+- `canRunMetadataPilot`
+- `workflowDraftAllowed`
+- `issues`
+- `blockingIssues`
 - `missingResources`
-- `trace`
+- `unsafeFindings`
+- `allowlistCoverage`
+- `resourceTrace`
+- `pendingActions`
+- `fallback`
+- real-resource flags, all false
 
-Covered decisions:
+Decision rules:
 
-- camera allowlist hit/miss/empty
-- model allowlist hit/miss/empty
-- template allowlist hit/miss/empty
-- flow allowlist hit/miss/empty
-- unknown RuntimePreview tool deny
-- external path deny
-- path traversal deny
-- image bytes / encoded image payload deny
-- Station field deny
-- PLC field deny
-- real image file source deny
-- real model/template path deny
+- pilot disabled or missing allowlist: `not_ready`
+- non-`metadata_only` mode: `denied`
+- external path, file path, model path, template path, Station, PLC, image bytes/base64: `denied`
+- metadata-only request with allowlisted resources: `ready`
+- `not_ready` keeps `workflowDraftAllowed=true` and returns `RuntimePreviewPilotReadinessReview`
 
-The resolver only reads JSON values already present in the Agent request. It does not read files, enumerate cameras, contact Station, load models, or touch PLC.
+The Settings UI readiness probe uses `runtime_preview_metadata` so frontend source does not hard-code `capture_test_frame` or `replay_flow_with_frame`.
 
-## Adapter Routing
+## Endpoints
 
-Registered adapters:
+Minimal Settings endpoints:
 
-- `OfflineRuntimePreviewAdapter`
-- `PilotRuntimePreviewAdapter`
+- `GET /api/settings/runtime-preview-pilot/config`
+- `PUT /api/settings/runtime-preview-pilot/config`
+- `GET /api/settings/runtime-preview-pilot/catalog`
+- `POST /api/settings/runtime-preview-pilot/readiness`
 
-Routing rules:
+`PUT` normalizes and validates config before saving. The endpoints return metadata-only summaries and no secrets. They do not affect PLC, Station, Camera, or general settings save semantics.
 
-- pilot disabled and no explicit adapter: use `offline_runtime_preview`
-- pilot disabled and explicit `pilot_runtime_preview`: use `offline_runtime_preview`
-- pilot enabled and no explicit adapter: use `pilot_runtime_preview`
-- pilot enabled and explicit `pilot_runtime_preview`: use `pilot_runtime_preview`
-- explicit unknown adapter: controlled adapter-not-found failure
-- adapter exception with `fallbackToOffline=true`: use offline fallback
+## Adapter Behavior
 
-`PilotRuntimePreviewAdapter` reuses the offline adapter to generate deterministic metadata after allowlist approval, then wraps the result as:
+`PilotRuntimePreviewAdapter` now runs readiness first:
 
-- `adapterName=pilot_runtime_preview`
-- `previewMode=metadata_only`
+- `ready`: returns `pilot_runtime_preview` metadata-only result
+- `not_ready`: returns offline fallback metadata plus pending actions
+- dangerous `denied`: returns deny evidence with no fallback artifact
+- exception: falls back to `offline_runtime_preview` when configured
+
+All adapter results include:
+
 - `permissionDecision`
 - `resourceTrace`
+- `readiness`
 - `fallback`
-- `artifacts`
 - `issues`
 - `pendingActions`
 
-All artifacts remain `metadataOnly=true`, `binaryIncluded=false`, and `byteLength=0`.
+All resource-touch flags remain false:
 
-## Policy
+- `binaryIncluded=false`
+- `capturedRealFrame=false`
+- `loadedModelFiles=false`
+- `accessedHardware=false`
+- `stationTouched=false`
 
-Existing Agent gates remain authoritative:
+## Developer UI
 
-- `RuntimePreviewConsent=false` denies `capture_test_frame` and `replay_flow_with_frame`
-- missing `RuntimePreview` permission denies preview tools
-- `ConfigWrite` remains permanently denied
-- `DeploymentPrepare` remains limited to `runtime_package_precheck`
+The AI Settings tab has a developer-hidden RuntimePreview Pilot panel. It is visible only when `localStorage.cv_ai_agent_dev_ui=true`.
 
-Pilot-specific decisions are additional:
+Controls:
 
-- allowlist hit: metadata-only pilot result
-- allowlist miss: deny, pendingAction, fallback info
-- dangerous resource: deny, pendingAction, no real fallback execution
-- adapter failure: offline fallback when enabled
+- enabled
+- metadata-only mode display
+- offline fallback
+- max artifacts / metadata bytes
+- allowlist inputs for camera, model, template, flow, resource root
+- refresh catalog
+- save config
+- run readiness
 
-Preview failure never changes `workflowDraftAllowed`; draft editing remains allowed.
+Display:
 
-## Agent Result Shape
+- catalog rows with source, resource type, safe flag, redacted flag
+- readiness status
+- `blockingIssues`
+- `missingResources`
+- `pendingActions`
+- `resourceTrace`
+- fallback summary
+- allowlist/catalog counts
 
-`validationPreview.runtimePreview` now carries:
-
-```json
-{
-  "adapterName": "pilot_runtime_preview",
-  "previewMode": "metadata_only",
-  "permissionDecision": {
-    "allowed": true,
-    "reasonCode": "runtime_preview_pilot_metadata_only_allowed",
-    "runtimePreviewConsent": true,
-    "pilotEnabled": true,
-    "metadataOnly": true,
-    "effectiveAdapterName": "pilot_runtime_preview",
-    "allowlistCounts": {
-      "camera": 1,
-      "model": 1,
-      "template": 1,
-      "flow": 1,
-      "resourceRoot": 1
-    }
-  },
-  "resourceTrace": {
-    "allowed": true,
-    "reasonCode": "runtime_preview_resources_allowlisted",
-    "resourceType": "workflow",
-    "missingResources": [],
-    "trace": []
-  },
-  "fallback": {
-    "used": false
-  },
-  "artifacts": [
-    {
-      "artifactType": "operator_result_metadata",
-      "metadataOnly": true,
-      "binaryIncluded": false,
-      "byteLength": 0
-    }
-  ]
-}
-```
-
-Denied example:
-
-```json
-{
-  "adapterName": "pilot_runtime_preview",
-  "previewMode": "metadata_only",
-  "previewReady": false,
-  "workflowDraftAllowed": true,
-  "permissionDecision": {
-    "allowed": false,
-    "reasonCode": "runtime_preview_camera_not_allowlisted"
-  },
-  "fallback": {
-    "used": true,
-    "fallbackAdapterName": "offline_runtime_preview"
-  },
-  "pendingActions": [
-    {
-      "actionType": "RuntimePreviewPilotAllowlistReview"
-    }
-  ]
-}
-```
-
-## UI
-
-AI Workbench RuntimePreview section displays:
-
-- Adapter
-- Mode
-- Permission
-- Resource trace
-- Missing resources
-- Pending actions
-- Artifact metadata
-- Fallback reason
-
-Developer-only status shows:
-
-- pilot enabled state
-- allowlist counts
-- metadata-only flag
-- `realResourcesTouched=false`
-
-The developer section is hidden by default. RuntimePreview UI display redacts path-like strings, IP/BaseUrl-like strings, authorization/key markers, and encoded image markers.
+All visible values are sanitized; no keys, full BaseUrl, IP-like identifiers, paths, or base64 markers are shown.
 
 ## Safety Boundary
 
-This skeleton intentionally does not add:
+RuntimePreview Pilot v0.8 intentionally does not add:
 
 - real camera SDK
 - real Station access

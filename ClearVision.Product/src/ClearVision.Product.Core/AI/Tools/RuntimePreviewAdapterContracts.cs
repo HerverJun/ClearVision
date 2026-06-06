@@ -73,6 +73,9 @@ public sealed record RuntimePreviewResult
     [JsonPropertyName("fallback")]
     public RuntimePreviewFallbackInfo Fallback { get; init; } = RuntimePreviewFallbackInfo.NotUsed();
 
+    [JsonPropertyName("readiness")]
+    public RuntimePreviewPilotReadinessResult? Readiness { get; init; }
+
     [JsonPropertyName("replaySummary")]
     public object? ReplaySummary { get; init; }
 
@@ -238,4 +241,107 @@ public static class RuntimePreviewModes
 {
     public const string OfflineFixture = "offline_fixture";
     public const string MetadataOnly = RuntimePreviewPilotConfig.ModeMetadataOnly;
+}
+
+public static class RuntimePreviewPilotReadinessStatuses
+{
+    public const string Ready = "ready";
+    public const string NotReady = "not_ready";
+    public const string Denied = "denied";
+}
+
+public sealed record RuntimePreviewPilotCatalog
+{
+    [JsonPropertyName("generatedAtUtc")]
+    public DateTimeOffset GeneratedAtUtc { get; init; } = DateTimeOffset.UtcNow;
+
+    [JsonPropertyName("items")]
+    public IReadOnlyList<RuntimePreviewPilotCatalogItem> Items { get; init; } = [];
+
+    [JsonPropertyName("sourceSummary")]
+    public object? SourceSummary { get; init; }
+
+    [JsonPropertyName("allowlistCounts")]
+    public object? AllowlistCounts { get; init; }
+}
+
+public sealed record RuntimePreviewPilotCatalogItem
+{
+    [JsonPropertyName("id")]
+    public string Id { get; init; } = string.Empty;
+
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; init; } = string.Empty;
+
+    [JsonPropertyName("resourceType")]
+    public string ResourceType { get; init; } = string.Empty;
+
+    [JsonPropertyName("source")]
+    public string Source { get; init; } = string.Empty;
+
+    [JsonPropertyName("metadataOnly")]
+    public bool MetadataOnly { get; init; } = true;
+
+    [JsonPropertyName("safeForPilot")]
+    public bool SafeForPilot { get; init; }
+
+    [JsonPropertyName("reasonCode")]
+    public string ReasonCode { get; init; } = string.Empty;
+
+    [JsonPropertyName("redacted")]
+    public bool Redacted { get; init; }
+
+    [JsonPropertyName("metadata")]
+    public object? Metadata { get; init; }
+}
+
+public sealed record RuntimePreviewPilotReadinessResult
+{
+    [JsonPropertyName("status")]
+    public string Status { get; init; } = RuntimePreviewPilotReadinessStatuses.NotReady;
+
+    [JsonPropertyName("canRunMetadataPilot")]
+    public bool CanRunMetadataPilot { get; init; }
+
+    [JsonPropertyName("workflowDraftAllowed")]
+    public bool WorkflowDraftAllowed { get; init; } = true;
+
+    [JsonPropertyName("issues")]
+    public IReadOnlyList<object> Issues { get; init; } = [];
+
+    [JsonPropertyName("blockingIssues")]
+    public IReadOnlyList<object> BlockingIssues { get; init; } = [];
+
+    [JsonPropertyName("missingResources")]
+    public IReadOnlyList<object> MissingResources { get; init; } = [];
+
+    [JsonPropertyName("unsafeFindings")]
+    public IReadOnlyList<object> UnsafeFindings { get; init; } = [];
+
+    [JsonPropertyName("allowlistCoverage")]
+    public object? AllowlistCoverage { get; init; }
+
+    [JsonPropertyName("resourceTrace")]
+    public RuntimePreviewResourceTrace ResourceTrace { get; init; } = RuntimePreviewResourceTrace.NotEvaluated();
+
+    [JsonPropertyName("pendingActions")]
+    public IReadOnlyList<VisionAgentPendingAction> PendingActions { get; init; } = [];
+
+    [JsonPropertyName("fallback")]
+    public RuntimePreviewFallbackInfo Fallback { get; init; } = RuntimePreviewFallbackInfo.NotUsed();
+
+    [JsonPropertyName("binaryIncluded")]
+    public bool BinaryIncluded { get; init; }
+
+    [JsonPropertyName("capturedRealFrame")]
+    public bool CapturedRealFrame { get; init; }
+
+    [JsonPropertyName("loadedModelFiles")]
+    public bool LoadedModelFiles { get; init; }
+
+    [JsonPropertyName("accessedHardware")]
+    public bool AccessedHardware { get; init; }
+
+    [JsonPropertyName("stationTouched")]
+    public bool StationTouched { get; init; }
 }

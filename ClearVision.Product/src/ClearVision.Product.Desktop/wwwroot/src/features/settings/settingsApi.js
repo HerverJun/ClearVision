@@ -27,6 +27,10 @@ const settingsApi = {
     setDefaultShadowEvalAiModel: id => httpClient.post(`/ai/models/${id}/default-shadow-eval`, {}),
     testAiModel: id => httpClient.post(`/ai/models/${id}/test`, {}),
     resolveAiReasoningSupport: payload => httpClient.post('/ai/reasoning-support', payload),
+    loadRuntimePreviewPilotConfig: () => httpClient.get('/settings/runtime-preview-pilot/config'),
+    saveRuntimePreviewPilotConfig: payload => httpClient.put('/settings/runtime-preview-pilot/config', payload),
+    loadRuntimePreviewPilotCatalog: () => httpClient.get('/settings/runtime-preview-pilot/catalog'),
+    checkRuntimePreviewPilotReadiness: payload => httpClient.post('/settings/runtime-preview-pilot/readiness', payload),
 
     loadPlcSettings: () => httpClient.get('/plc/settings'),
     savePlcSettings: payload => httpClient.put('/plc/settings', payload),

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Continuous;
 
 namespace ClearVision.Product.Core.Entities;
@@ -539,7 +540,12 @@ public sealed class RuntimePreviewPilotConfig
                value.Contains(":/", StringComparison.Ordinal) ||
                value.Contains("\\", StringComparison.Ordinal) ||
                value.Contains("/", StringComparison.Ordinal) ||
-               value.Contains("base64", StringComparison.OrdinalIgnoreCase);
+               value.Contains("base64", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("token", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("apikey", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("api-key", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("http", StringComparison.OrdinalIgnoreCase) ||
+               RuntimePreviewPilotConfigRegexes.IpAddressLikeRegex.IsMatch(value);
     }
 
     private static bool IsWildcard(string value)
@@ -548,6 +554,13 @@ public sealed class RuntimePreviewPilotConfig
                value.Equals("all", StringComparison.OrdinalIgnoreCase) ||
                value.Equals("any", StringComparison.OrdinalIgnoreCase);
     }
+}
+
+file static class RuntimePreviewPilotConfigRegexes
+{
+    public static readonly Regex IpAddressLikeRegex = new(
+        @"^(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 }
 
 public static class RuntimePreviewPilotConfigValidator
@@ -583,12 +596,12 @@ public static class RuntimePreviewPilotConfigValidator
 
         if (!config.DenyExternalPath)
         {
-            failures.Add("RuntimePreviewPilot:DenyExternalPath must remain true for v0.7.");
+            failures.Add("RuntimePreviewPilot:DenyExternalPath must remain true for v0.8.");
         }
 
         if (!config.DenyImageBytes)
         {
-            failures.Add("RuntimePreviewPilot:DenyImageBytes must remain true for v0.7.");
+            failures.Add("RuntimePreviewPilot:DenyImageBytes must remain true for v0.8.");
         }
 
         return failures;

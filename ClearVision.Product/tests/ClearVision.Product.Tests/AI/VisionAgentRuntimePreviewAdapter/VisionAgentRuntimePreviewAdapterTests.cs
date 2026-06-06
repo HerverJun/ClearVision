@@ -2,9 +2,11 @@ using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -39,8 +41,8 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         var failures = RuntimePreviewPilotConfigValidator.Validate(new RuntimePreviewPilotConfig
         {
             Enabled = true,
-            AllowedCameraBindingIds = ["*", "C:\\camera\\binding.json"],
-            AllowedResourceRoots = ["../images"],
+            AllowedCameraBindingIds = ["*", "C:\\camera\\binding.json", "100.83.146.106:8317", "token-camera"],
+            AllowedResourceRoots = ["../images", "https://example.invalid/v1"],
             DenyExternalPath = false,
             DenyImageBytes = false
         });
@@ -49,6 +51,89 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         failures.Should().Contain(item => item.Contains("AllowedResourceRoots", StringComparison.OrdinalIgnoreCase));
         failures.Should().Contain(item => item.Contains("DenyExternalPath", StringComparison.OrdinalIgnoreCase));
         failures.Should().Contain(item => item.Contains("DenyImageBytes", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact(DisplayName = "RuntimePreview Pilot catalog should expose only safe metadata and redact unsafe resource identifiers")]
+    public void RuntimePreviewPilotCatalog_ShouldExposeOnlySafeRedactedMetadata()
+    {
+        var aiStore = CreateAiConfigStore();
+        aiStore.Add(new AiModelConfig
+        {
+            Id = "model-a",
+            Name = "Planner Model",
+            Provider = "OpenAI Compatible",
+            BaseUrl = "https://example.invalid/v1",
+            ApiKey = "catalog-secret-key"
+        });
+        var appConfig = new AppConfig
+        {
+            Cameras =
+            [
+                new CameraBindingConfig
+                {
+                    Id = "cam-a",
+                    DisplayName = "Line Camera",
+                    IpAddress = "100.83.146.106"
+                },
+                new CameraBindingConfig
+                {
+                    Id = "100.83.146.106:8317",
+                    DisplayName = "Unsafe Camera"
+                }
+            ]
+        };
+        var catalog = new RuntimePreviewPilotResourceCatalog().Build(
+            PilotConfig(),
+            appConfig,
+            aiStore,
+            Args(AllowlistedFlow()).Clone());
+
+        catalog.Items.Should().Contain(item => item.ResourceType == "camera" && item.Id == "cam-a" && item.Source == "app_config");
+        catalog.Items.Should().Contain(item => item.ResourceType == "model" && item.Id == "model-a" && item.Source == "ai_config_store");
+        catalog.Items.Should().Contain(item => item.Redacted && item.Id == "<redacted>");
+        var raw = Json(catalog).GetRawText();
+        raw.Should().NotContain("catalog-secret-key");
+        raw.Should().NotContain("100.83.146.106");
+        raw.Should().NotContain("example.invalid/v1");
+    }
+
+    [Fact(DisplayName = "RuntimePreview Pilot readiness gate should return ready not_ready and denied states")]
+    public void RuntimePreviewPilotReadinessGate_ShouldReturnThreeStates()
+    {
+        var catalogBuilder = new RuntimePreviewPilotResourceCatalog();
+        var gate = new RuntimePreviewPilotReadinessGate(new RuntimePreviewResourceAllowlistResolver());
+        var config = PilotConfig();
+        var catalog = catalogBuilder.Build(config, new AppConfig(), null, Args(AllowlistedFlow()).Clone());
+
+        var ready = gate.Evaluate(
+            config,
+            catalog,
+            RuntimePreviewPermissionGate.ReplayToolName,
+            Args(new { flow = AllowlistedFlow() }),
+            RuntimePreviewContext(config));
+        var disabled = gate.Evaluate(
+            new RuntimePreviewPilotConfig(),
+            catalog,
+            RuntimePreviewPermissionGate.ReplayToolName,
+            Args(new { flow = AllowlistedFlow() }),
+            RuntimePreviewContext(new RuntimePreviewPilotConfig()));
+        var denied = gate.Evaluate(
+            config,
+            catalog,
+            RuntimePreviewPermissionGate.ReplayToolName,
+            Args(new { flow = AllowlistedFlow(templatePath: "C:\\secret\\template.png") }),
+            RuntimePreviewContext(config));
+
+        ready.Status.Should().Be(RuntimePreviewPilotReadinessStatuses.Ready);
+        ready.CanRunMetadataPilot.Should().BeTrue();
+        disabled.Status.Should().Be(RuntimePreviewPilotReadinessStatuses.NotReady);
+        disabled.WorkflowDraftAllowed.Should().BeTrue();
+        disabled.PendingActions.Should().NotBeEmpty();
+        denied.Status.Should().Be(RuntimePreviewPilotReadinessStatuses.Denied);
+        denied.CanRunMetadataPilot.Should().BeFalse();
+        denied.UnsafeFindings.Should().NotBeEmpty();
+        denied.Fallback.Used.Should().BeFalse();
+        Json(denied).GetRawText().Should().NotContain("secret");
     }
 
     [Fact(DisplayName = "RuntimePreview allowlist resolver should allow camera capture only when binding is allowlisted")]
@@ -81,6 +166,22 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
 
         decision.Allowed.Should().BeTrue();
         Json(decision).GetRawText().Should().NotContain("catalog-a/");
+    }
+
+    [Fact(DisplayName = "RuntimePreview allowlist resolver should support metadata readiness tool name")]
+    public void RuntimePreviewAllowlistResolver_ShouldSupportMetadataReadinessToolName()
+    {
+        var resolver = new RuntimePreviewResourceAllowlistResolver();
+        var decision = resolver.Resolve(new RuntimePreviewRequest
+        {
+            ToolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+            Context = RuntimePreviewContext(PilotConfig()),
+            Arguments = Args(new { flow = AllowlistedFlow() })
+        });
+
+        decision.Allowed.Should().BeTrue();
+        decision.ResourceType.Should().Be("workflow");
+        decision.ReasonCode.Should().Be("runtime_preview_resources_allowlisted");
     }
 
     [Fact(DisplayName = "RuntimePreview allowlist resolver should deny empty allowlist unknown and missing resources")]
@@ -239,9 +340,11 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
 
         result.Success.Should().BeFalse();
         result.ErrorCode.Should().Be("runtime_preview_camera_not_allowlisted");
-        result.PendingActions.Should().Contain(action => action.ActionType == "RuntimePreviewPilotAllowlistReview");
+        result.PendingActions.Should().Contain(action => action.ActionType == "RuntimePreviewPilotReadinessReview");
         var payload = Json(result.Data);
         payload.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+        payload.GetProperty("readiness").GetProperty("status").GetString().Should().Be(RuntimePreviewPilotReadinessStatuses.NotReady);
+        payload.GetProperty("readiness").GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
         payload.GetProperty("fallback").GetProperty("used").GetBoolean().Should().BeTrue();
         payload.GetProperty("fallback").GetProperty("fallbackAdapterName").GetString()
             .Should().Be(OfflineRuntimePreviewAdapter.AdapterName);
@@ -265,6 +368,10 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         raw.Should().NotContain("secret");
         raw.Should().NotContain(".png");
         raw.Should().NotContain("base64");
+        var payload = Json(result.Data);
+        payload.GetProperty("readiness").GetProperty("status").GetString().Should().Be(RuntimePreviewPilotReadinessStatuses.Denied);
+        payload.GetProperty("fallback").GetProperty("used").GetBoolean().Should().BeFalse();
+        payload.GetProperty("artifacts").EnumerateArray().Should().BeEmpty();
     }
 
     [Fact(DisplayName = "Pilot RuntimePreview adapter exception should fallback Offline and keep workflow draft editable")]
@@ -569,7 +676,10 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         return new RuntimePreviewAdapterRegistry(
         [
             offline,
-            new PilotRuntimePreviewAdapter(new RuntimePreviewResourceAllowlistResolver(), offline)
+            new PilotRuntimePreviewAdapter(
+                new RuntimePreviewPilotResourceCatalog(),
+                new RuntimePreviewPilotReadinessGate(new RuntimePreviewResourceAllowlistResolver()),
+                offline)
         ]);
     }
 
@@ -636,6 +746,22 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         };
         config.Normalize();
         return config;
+    }
+
+    private static AiConfigStore CreateAiConfigStore()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"cv-rp-catalog-{Guid.NewGuid():N}");
+        return new AiConfigStore(
+            Options.Create(new AiGenerationOptions
+            {
+                Provider = "OpenAI Compatible",
+                Model = "gpt-4o-mini",
+                ApiKey = string.Empty,
+                BaseUrl = string.Empty,
+                TimeoutSeconds = 90
+            }),
+            NullLogger<AiConfigStore>.Instance,
+            directory);
     }
 
     private static AiFlowGenerationRequest PlannerRequest(string description)

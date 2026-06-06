@@ -18,6 +18,7 @@ using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Desktop.Data;
 using ClearVision.Product.Desktop.Triggers;
 using ClearVision.Product.Infrastructure.AI;
+using ClearVision.Product.Infrastructure.AI.Tools;
 using ClearVision.Product.Infrastructure.Cameras;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -431,6 +432,112 @@ public static class SettingsEndpoints
         // ==================== 相机管理 API ====================
 
         // 搜索在线相机设备
+        app.MapGet("/api/settings/runtime-preview-pilot/config", async (IConfigurationService configService) =>
+        {
+            var config = await configService.LoadAsync();
+            var pilot = config.Runtime.RuntimePreviewPilot.CloneNormalized();
+            return Results.Ok(new
+            {
+                config = pilot,
+                validation = RuntimePreviewPilotConfigValidator.Validate(pilot),
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPut("/api/settings/runtime-preview-pilot/config", async (
+            RuntimePreviewPilotConfig request,
+            IConfigurationService configService,
+            HttpContext context) =>
+        {
+            if (!IsAdmin(context))
+            {
+                return Results.Forbid();
+            }
+
+            var failures = RuntimePreviewPilotConfigValidator.Validate(request);
+            if (failures.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    error = "RuntimePreview Pilot config validation failed.",
+                    failures
+                });
+            }
+
+            var normalized = request.CloneNormalized();
+            var config = await configService.LoadAsync();
+            config.Runtime ??= new RuntimeConfig();
+            config.Runtime.RuntimePreviewPilot = normalized;
+            await configService.SaveAsync(config);
+            return Results.Ok(new
+            {
+                message = "RuntimePreview Pilot config saved.",
+                config = normalized,
+                validation = Array.Empty<string>(),
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/catalog", async (
+            IConfigurationService configService,
+            AiConfigStore aiConfigStore,
+            RuntimePreviewPilotResourceCatalog catalogBuilder) =>
+        {
+            var config = await configService.LoadAsync();
+            var pilot = config.Runtime.RuntimePreviewPilot.CloneNormalized();
+            var catalog = catalogBuilder.Build(pilot, config, aiConfigStore);
+            return Results.Ok(catalog);
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/readiness", async (
+            RuntimePreviewPilotReadinessEndpointRequest request,
+            IConfigurationService configService,
+            AiConfigStore aiConfigStore,
+            RuntimePreviewPilotResourceCatalog catalogBuilder,
+            RuntimePreviewPilotReadinessGate readinessGate) =>
+        {
+            var appConfig = await configService.LoadAsync();
+            var pilot = request.Config ?? appConfig.Runtime.RuntimePreviewPilot.CloneNormalized();
+            var failures = RuntimePreviewPilotConfigValidator.Validate(pilot);
+            if (failures.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    error = "RuntimePreview Pilot config validation failed.",
+                    failures
+                });
+            }
+
+            pilot.Normalize();
+            var toolName = string.IsNullOrWhiteSpace(request.ToolName)
+                ? ClearVision.Product.Infrastructure.AI.Agent.RuntimePreviewPermissionGate.ReplayToolName
+                : request.ToolName.Trim();
+            var workflowDraft = ExtractRuntimePreviewWorkflowDraft(request);
+            var arguments = BuildRuntimePreviewReadinessArguments(request, workflowDraft);
+            var catalog = catalogBuilder.Build(pilot, appConfig, aiConfigStore, workflowDraft);
+            var context = new ClearVision.Product.Core.AI.Tools.VisionAgentToolContext
+            {
+                RuntimePreviewConsent = true,
+                RuntimePreviewPilot = pilot,
+                AllowedPermissions = new HashSet<ClearVision.Product.Core.AI.Tools.VisionAgentToolPermission>
+                {
+                    ClearVision.Product.Core.AI.Tools.VisionAgentToolPermission.ReadOnly,
+                    ClearVision.Product.Core.AI.Tools.VisionAgentToolPermission.Simulation,
+                    ClearVision.Product.Core.AI.Tools.VisionAgentToolPermission.RuntimePreview
+                }
+            };
+            var result = readinessGate.Evaluate(pilot, catalog, toolName, arguments, context);
+            return Results.Ok(new
+            {
+                readiness = result,
+                catalog,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
         app.MapGet("/api/cameras/discover", async (ClearVision.Product.Core.Cameras.ICameraManager cameraManager) =>
         {
             var devices = await cameraManager.EnumerateCamerasAsync();
@@ -1750,6 +1857,48 @@ public static class SettingsEndpoints
         return new List<string>(source);
     }
 
+    private static JsonElement? ExtractRuntimePreviewWorkflowDraft(RuntimePreviewPilotReadinessEndpointRequest request)
+    {
+        if (request.WorkflowDraft is { ValueKind: JsonValueKind.Object } workflowDraft)
+        {
+            return workflowDraft.Clone();
+        }
+
+        if (request.Arguments is { ValueKind: JsonValueKind.Object } arguments)
+        {
+            foreach (var propertyName in new[] { "flow", "workflowDraft", "existingFlowJson" })
+            {
+                if (arguments.TryGetProperty(propertyName, out var value) &&
+                    value.ValueKind == JsonValueKind.Object)
+                {
+                    return value.Clone();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static JsonElement BuildRuntimePreviewReadinessArguments(
+        RuntimePreviewPilotReadinessEndpointRequest request,
+        JsonElement? workflowDraft)
+    {
+        if (request.Arguments is { ValueKind: JsonValueKind.Object } arguments)
+        {
+            return arguments.Clone();
+        }
+
+        if (workflowDraft is { ValueKind: JsonValueKind.Object } flow)
+        {
+            return JsonSerializer.SerializeToElement(new
+            {
+                flow
+            });
+        }
+
+        return JsonSerializer.SerializeToElement(new { });
+    }
+
     private sealed class AiModelTestConnectionResult
     {
         public bool ConnectionOk { get; init; }
@@ -1829,6 +1978,14 @@ public class AiReasoningSupportRequest
 }
 
 /// <summary>软触发抓图请求</summary>
+public class RuntimePreviewPilotReadinessEndpointRequest
+{
+    public RuntimePreviewPilotConfig? Config { get; set; }
+    public string? ToolName { get; set; }
+    public JsonElement? Arguments { get; set; }
+    public JsonElement? WorkflowDraft { get; set; }
+}
+
 public class CameraSoftTriggerCaptureRequest
 {
     public string CameraBindingId { get; set; } = string.Empty;

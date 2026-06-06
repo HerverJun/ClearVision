@@ -1,14 +1,14 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-executable-business-benchmark.v1",
   "benchmarkId": "vision_agent_executable_business_benchmark",
-  "generatedAtUtc": "2026-06-06T08:44:08.6839892+00:00",
+  "generatedAtUtc": "2026-06-06T09:52:07.2834541+00:00",
   "mode": "offline_metadata_only",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T08:44:08.6839892+00:00"
+    "generatedAtUtc": "2026-06-06T09:52:07.2834541+00:00"
   },
   "summary": {
     "caseCount": 36,
@@ -817,6 +817,7 @@
           "reasonCode": null,
           "reason": null
         },
+        "readiness": null,
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
@@ -2003,6 +2004,7 @@
           "reasonCode": null,
           "reason": null
         },
+        "readiness": null,
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
@@ -4575,6 +4577,7 @@
           "reasonCode": null,
           "reason": null
         },
+        "readiness": null,
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
@@ -5802,6 +5805,7 @@
           "reasonCode": null,
           "reason": null
         },
+        "readiness": null,
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",
@@ -6124,6 +6128,7 @@
           "reasonCode": null,
           "reason": null
         },
+        "readiness": null,
         "replaySummary": {
           "replaySucceeded": false,
           "adapterName": "offline_runtime_preview",
@@ -6530,6 +6535,7 @@
           "reasonCode": null,
           "reason": null
         },
+        "readiness": null,
         "replaySummary": {
           "replaySucceeded": true,
           "adapterName": "offline_runtime_preview",

@@ -30,6 +30,66 @@ export function installAiTab(SettingsView) {
             this._aiReasoningSupportRequestId += 1;
         }
         ,
+        isRuntimePreviewPilotDeveloperUiEnabled() {
+            try {
+                return String(localStorage.getItem('cv_ai_agent_dev_ui') || '').toLowerCase() === 'true';
+            } catch {
+                return false;
+            }
+        }
+        ,
+        sanitizeRuntimePreviewPilotValue(value) {
+            const text = String(value ?? '');
+            if (!text) return '';
+            if (/base64|data:image|authorization|bearer|x-api-key|api[_-]?key|token=/i.test(text)) {
+                return '<redacted>';
+            }
+            if (/https?:\/\/|(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:\/\S*)?/i.test(text)) {
+                return '<redacted>';
+            }
+            if (/[A-Za-z]:\\|\\\\|\/[^/\s]+\/|\.\./.test(text)) {
+                return '<redacted>';
+            }
+            return this.escapeHtml(text);
+        }
+        ,
+        normalizeRuntimePreviewPilotConfig(payload) {
+            const source = payload?.config || payload || {};
+            const list = value => Array.isArray(value) ? value.map(item => String(item || '').trim()).filter(Boolean) : [];
+            return {
+                enabled: source.enabled === true,
+                mode: 'metadata_only',
+                allowedCameraBindingIds: list(source.allowedCameraBindingIds),
+                allowedModelIds: list(source.allowedModelIds),
+                allowedTemplateIds: list(source.allowedTemplateIds),
+                allowedFlowIds: list(source.allowedFlowIds),
+                allowedResourceRoots: list(source.allowedResourceRoots),
+                maxPreviewArtifacts: Number.isFinite(Number(source.maxPreviewArtifacts)) ? Number(source.maxPreviewArtifacts) : 8,
+                maxMetadataBytes: Number.isFinite(Number(source.maxMetadataBytes)) ? Number(source.maxMetadataBytes) : 16384,
+                fallbackToOffline: source.fallbackToOffline !== false,
+                denyExternalPath: true,
+                denyImageBytes: true
+            };
+        }
+        ,
+        async loadRuntimePreviewPilotState() {
+            if (!this.isRuntimePreviewPilotDeveloperUiEnabled()) {
+                return;
+            }
+
+            try {
+                const [configResult, catalog] = await Promise.all([
+                    settingsApi.loadRuntimePreviewPilotConfig(),
+                    settingsApi.loadRuntimePreviewPilotCatalog()
+                ]);
+                this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(configResult);
+                this.runtimePreviewPilotCatalog = catalog || { items: [] };
+            } catch {
+                this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig({});
+                this.runtimePreviewPilotCatalog = { items: [] };
+            }
+        }
+        ,
         getAiPerformanceModelLabel() {
             const active = this.aiModels.find(m => m.id === this.activeAiModelId)
                 || this.aiModels.find(m => m.isActive)
@@ -286,6 +346,48 @@ export function installAiTab(SettingsView) {
                     } catch(err) {
                         showToast('保存失败: ' + err.message, 'error');
                     }
+                } else if (btn.id === 'btn-runtime-preview-pilot-refresh') {
+                    await this.loadRuntimePreviewPilotState();
+                    this.refreshRuntimePreviewPilotPanel();
+                } else if (btn.id === 'btn-runtime-preview-pilot-save') {
+                    try {
+                        const payload = this.readRuntimePreviewPilotConfigDraft(aiTab);
+                        const result = await settingsApi.saveRuntimePreviewPilotConfig(payload);
+                        this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(result);
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                        showToast('RuntimePreview Pilot config saved.', 'success');
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot config failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-readiness') {
+                    try {
+                        const payload = {
+                            config: this.readRuntimePreviewPilotConfigDraft(aiTab),
+                            toolName: 'runtime_preview_metadata',
+                            arguments: {
+                                flow: {
+                                    operators: [
+                                        {
+                                            tempId: 'op_cam',
+                                            operatorType: 'ImageAcquisition',
+                                            parameters: {
+                                                SourceType: 'Camera',
+                                                CameraBindingId: (aiTab.querySelector('#cfg-rp-allow-cameras')?.value || '').split(',')[0]?.trim() || '<pending-camera-binding>'
+                                            }
+                                        }
+                                    ],
+                                    connections: []
+                                }
+                            }
+                        };
+                        const result = await settingsApi.checkRuntimePreviewPilotReadiness(payload);
+                        this.runtimePreviewPilotReadiness = result?.readiness || result;
+                        this.runtimePreviewPilotCatalog = result?.catalog || this.runtimePreviewPilotCatalog;
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot readiness failed: ' + err.message, 'error');
+                    }
                 }
             });
 
@@ -338,6 +440,9 @@ export function installAiTab(SettingsView) {
             this.setTrackedTimeout(() => {
                 this.refreshAiTableAndForm();
                 this.syncAiReasoningUiState();
+                if (this.isRuntimePreviewPilotDeveloperUiEnabled()) {
+                    this.loadRuntimePreviewPilotState().then(() => this.refreshRuntimePreviewPilotPanel()).catch(() => {});
+                }
             }, 0);
         }
         ,
@@ -673,8 +778,118 @@ export function installAiTab(SettingsView) {
                       <button class="cv-btn settings-btn-danger" id="btn-ai-save">💾 保存并应用该模型集</button>
                  </div>
                   <div id="ai-test-result" style="margin-top:10px; text-align:right; font-size:13px; font-weight:500;"></div>
-             `;
+            `;
             this.syncAiReasoningUiState();
+        }
+        ,
+        readRuntimePreviewPilotConfigDraft(aiTab) {
+            const readList = selector => (aiTab.querySelector(selector)?.value || '')
+                .split(',')
+                .map(item => item.trim())
+                .filter(Boolean);
+            return {
+                enabled: aiTab.querySelector('#cfg-rp-enabled')?.checked === true,
+                mode: 'metadata_only',
+                allowedCameraBindingIds: readList('#cfg-rp-allow-cameras'),
+                allowedModelIds: readList('#cfg-rp-allow-models'),
+                allowedTemplateIds: readList('#cfg-rp-allow-templates'),
+                allowedFlowIds: readList('#cfg-rp-allow-flows'),
+                allowedResourceRoots: readList('#cfg-rp-allow-roots'),
+                maxPreviewArtifacts: Number(aiTab.querySelector('#cfg-rp-max-artifacts')?.value || 8),
+                maxMetadataBytes: Number(aiTab.querySelector('#cfg-rp-max-metadata')?.value || 16384),
+                fallbackToOffline: aiTab.querySelector('#cfg-rp-fallback')?.checked !== false,
+                denyExternalPath: true,
+                denyImageBytes: true
+            };
+        }
+        ,
+        renderRuntimePreviewPilotPanel() {
+            const developerEnabled = this.isRuntimePreviewPilotDeveloperUiEnabled();
+            const config = this.normalizeRuntimePreviewPilotConfig(this.runtimePreviewPilotConfig || {});
+            const catalogItems = Array.isArray(this.runtimePreviewPilotCatalog?.items) ? this.runtimePreviewPilotCatalog.items : [];
+            const readiness = this.runtimePreviewPilotReadiness || null;
+            const listValue = value => this.escapeHtml((value || []).join(', '));
+            const catalogHtml = catalogItems.length
+                ? catalogItems.slice(0, 16).map(item => `
+                    <tr>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.resourceType)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.id)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.displayName)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.source)}</td>
+                        <td>${item.safeForPilot ? 'safe' : 'blocked'}</td>
+                        <td>${item.redacted ? '&lt;redacted&gt;' : 'no'}</td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="6" style="color:#64748b;">No catalog loaded.</td></tr>';
+            const readinessHtml = readiness
+                ? `
+                    <div data-rp-readiness-status="${this.sanitizeRuntimePreviewPilotValue(readiness.status)}" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; font-size:12px;">
+                        <span>Status: <strong>${this.sanitizeRuntimePreviewPilotValue(readiness.status)}</strong></span>
+                        <span>Can run: <strong>${readiness.canRunMetadataPilot ? 'true' : 'false'}</strong></span>
+                        <span>Draft editable: <strong>${readiness.workflowDraftAllowed !== false ? 'true' : 'false'}</strong></span>
+                    </div>
+                    <pre style="margin-top:8px; white-space:pre-wrap; font-size:11px; max-height:180px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                        blockingIssues: readiness.blockingIssues || [],
+                        missingResources: readiness.missingResources || [],
+                        pendingActions: readiness.pendingActions || [],
+                        resourceTrace: readiness.resourceTrace || {},
+                        fallback: readiness.fallback || {},
+                        allowlistCoverage: readiness.allowlistCoverage || {}
+                    }, null, 2))}</pre>
+                `
+                : '<div style="font-size:12px; color:#64748b;">Readiness has not been run.</div>';
+
+            return `
+                <details class="settings-modern-card" data-runtime-preview-pilot-admin="hidden" ${developerEnabled ? '' : 'hidden'}>
+                    <summary class="settings-card-header" style="cursor:pointer;">
+                        <span>RuntimePreview Pilot v0.8</span>
+                        <span class="settings-status-badge ${config.enabled ? 'status-connected' : 'status-disconnected'}" style="margin-left:auto;">
+                            <span class="status-dot"></span> ${config.enabled ? 'enabled' : 'disabled'}
+                        </span>
+                    </summary>
+                    <div class="settings-card-body" id="runtime-preview-pilot-panel">
+                        <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px;">
+                            <label class="settings-fieldset"><span>Enabled</span><input type="checkbox" id="cfg-rp-enabled" ${config.enabled ? 'checked' : ''}></label>
+                            <label class="settings-fieldset"><span>Mode</span><input class="cv-input" value="metadata_only" disabled></label>
+                            <label class="settings-fieldset"><span>Fallback offline</span><input type="checkbox" id="cfg-rp-fallback" ${config.fallbackToOffline ? 'checked' : ''}></label>
+                            <label class="settings-fieldset"><span>Max artifacts</span><input class="cv-input" type="number" id="cfg-rp-max-artifacts" value="${config.maxPreviewArtifacts}" min="1" max="50"></label>
+                            <label class="settings-fieldset"><span>Max metadata bytes</span><input class="cv-input" type="number" id="cfg-rp-max-metadata" value="${config.maxMetadataBytes}" min="1" max="524288"></label>
+                            <div class="settings-fieldset"><span>Safety</span><div style="font-size:12px;">metadata_only, denyExternalPath=true, denyImageBytes=true</div></div>
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:12px;">
+                            <label class="settings-fieldset"><span>Camera allowlist</span><input class="cv-input" id="cfg-rp-allow-cameras" value="${listValue(config.allowedCameraBindingIds)}"></label>
+                            <label class="settings-fieldset"><span>Model allowlist</span><input class="cv-input" id="cfg-rp-allow-models" value="${listValue(config.allowedModelIds)}"></label>
+                            <label class="settings-fieldset"><span>Template allowlist</span><input class="cv-input" id="cfg-rp-allow-templates" value="${listValue(config.allowedTemplateIds)}"></label>
+                            <label class="settings-fieldset"><span>Flow allowlist</span><input class="cv-input" id="cfg-rp-allow-flows" value="${listValue(config.allowedFlowIds)}"></label>
+                            <label class="settings-fieldset"><span>Resource root allowlist</span><input class="cv-input" id="cfg-rp-allow-roots" value="${listValue(config.allowedResourceRoots)}"></label>
+                        </div>
+                        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-refresh">Refresh catalog</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-readiness">Run readiness</button>
+                            <button class="cv-btn settings-btn-danger" id="btn-runtime-preview-pilot-save">Save pilot config</button>
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
+                            <h4 style="margin:0 0 8px;">Catalog</h4>
+                            <table class="settings-modern-table" data-rp-catalog-table="true">
+                                <thead><tr><th>Type</th><th>ID</th><th>Name</th><th>Source</th><th>Safe</th><th>Redacted</th></tr></thead>
+                                <tbody>${catalogHtml}</tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
+                            <h4 style="margin:0 0 8px;">Readiness</h4>
+                            ${readinessHtml}
+                        </div>
+                    </div>
+                </details>
+            `;
+        }
+        ,
+        refreshRuntimePreviewPilotPanel() {
+            const panel = this.container?.querySelector('[data-runtime-preview-pilot-admin]');
+            if (!panel) return;
+            const replacement = document.createElement('div');
+            replacement.innerHTML = this.renderRuntimePreviewPilotPanel();
+            panel.replaceWith(replacement.firstElementChild);
         }
         ,
         renderAiTab() {
@@ -685,6 +900,7 @@ export function installAiTab(SettingsView) {
                     <p>集成深度学习本地模型与云端大语言模型 API 配置。</p>
                 </div>
                 ${this.renderScopeNotice('ai')}
+                ${this.renderRuntimePreviewPilotPanel()}
 
                 <!-- Block 1: Model Tab & List -->
                 <div class="settings-modern-card">
