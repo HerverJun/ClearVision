@@ -6,28 +6,28 @@
 | --- | --- |
 | workflow | Vision Agent Quality Suite |
 | branchName | codex初稿 |
-| commitSha | c181d96a601528bd57113cc79e1e1e7c1c08bdd9 |
-| runId | 27054646723 |
+| commitSha | 4e75e4e8aad7a41d03c0a5d92400330793729799 |
+| runId | 27056536890 |
 | runAttempt | 1 |
-| runNumber | 13 |
+| runNumber | 15 |
 | event | push |
 | status | completed |
 | conclusion | success |
-| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27054646723 |
-| startedAtUtc | 2026-06-06T06:11:13Z |
-| completedAtUtc | 2026-06-06T06:13:53Z |
+| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27056536890 |
+| startedAtUtc | 2026-06-06T07:43:40Z |
+| completedAtUtc | 2026-06-06T07:46:42Z |
 
 ## Artifact
 
 | Field | Value |
 | --- | --- |
 | artifactName | vision-agent-quality-suite |
-| artifactId | 7451868642 |
-| sizeBytes | 115078 |
-| digest | sha256:5a99ed340a569346642b956e62ddd70bf94d8f838c068033bc0c8a8744997895 |
-| createdAtUtc | 2026-06-06T06:13:46Z |
+| artifactId | 7452554649 |
+| sizeBytes | 121766 |
+| digest | sha256:05cdce4be893ea48b9bc128fd803f44f8fff63fc23568faff4a9bad5a76d7a85 |
+| createdAtUtc | 2026-06-06T07:46:35Z |
 
-The artifact zip is available from GitHub Actions for authenticated users. The public REST metadata confirms the artifact name, id, digest, run id, branch, and head SHA. The CI step `Assert Vision Agent Artifact Reports` completed successfully before upload, which enforces non-local `workflowRun` metadata and secret/BaseUrl redaction.
+The artifact zip is available from GitHub Actions for authenticated users. Public REST metadata confirms the artifact name, id, digest, run id, branch, and head SHA. The CI step `Assert Vision Agent Artifact Reports` completed successfully before upload, enforcing non-local `workflowRun` metadata and secret/BaseUrl redaction.
 
 Expected artifact contents:
 
@@ -37,6 +37,8 @@ Expected artifact contents:
 - `planner_autonomy_benchmark.md`
 - `real_llm_planner_shadow_eval.json`
 - `real_llm_planner_shadow_eval.md`
+- `real_llm_planner_shadow_eval.holdout.json`
+- `real_llm_planner_shadow_eval.holdout.md`
 - `vision_agent_quality_artifact_manifest.json`
 - `vision_agent_quality_artifact_manifest.md`
 - `agent_engineering_harness.trx`
@@ -51,6 +53,8 @@ Expected artifact contents:
 | Generate Real LLM Shadow Eval Sample | success |
 | Assert Vision Agent Artifact Reports | success |
 | Upload Vision Agent Quality Reports | success |
+
+The shadow sample step generates both default-off fixed and holdout reports in CI. Stable CI still does not call the real LLM; the holdout real CPA report is a manual report and is not used as a required CI gate.
 
 ## Benchmark Summary
 
@@ -69,9 +73,10 @@ Planner autonomy benchmark:
 - passedCaseCount: 21
 - accepted: true
 
-Default real LLM shadow eval sample:
+Default real LLM shadow eval samples:
 
-- runnerStatus: skipped
+- fixed caseSet runnerStatus: skipped
+- holdout caseSet runnerStatus: skipped
 - requestCount: 0
 - skippedReason: `CV_AGENT_REAL_LLM_SHADOW_EVAL is not true; default CI shadow eval sample does not call real LLM.`
 - safety mode: offline metadata only
@@ -82,9 +87,9 @@ Local and CI quality suite minimums were not lowered:
 
 - backend Agent tests: 184 total / 184 passed
 - AI model endpoint regression: 8 total / 8 passed
-- UI contract tests: 49 total / 49 passed
+- UI contract tests: 52 total / 52 passed
 
-Local CPA manual shadow trial after planner protocol tuning:
+Manual CPA fixed shadow trial after planner protocol tuning:
 
 - parseSuccessRate: 1.0000
 - unsafeAttemptRate: 0
@@ -92,6 +97,22 @@ Local CPA manual shadow trial after planner protocol tuning:
 - averageOrderedPrefixScore: 1.0000
 - averageFullPlanMatchScore: 1.0000
 - averageToolPlanMatchScore: 1.0000
+
+Manual CPA holdout shadow trial:
+
+- caseCount: 24
+- parseSuccessRate: 1.0000
+- unsafeAttemptRate: 0
+- averageNextActionMatchScore: 1.0000
+- averageOrderedPrefixScore: 1.0000
+- averageFullPlanMatchScore: 1.0000
+- policySafetyScore: 1.0000
+- badToolNames: 0
+- fallbackToMockSuggestedCount: 0
+
+## RuntimePreview Pilot Gate
+
+The holdout planner gate passes on the manual CPA run, but this report does not enable a Real RuntimePreview adapter. Entry to a pilot remains blocked until the pilot gate document is explicitly accepted and implemented with default-off behavior, resource allowlist, offline fallback, and no image bytes/base64.
 
 ## Safety Boundary
 
@@ -103,5 +124,6 @@ This CI run and manual shadow trial did not advance real camera, real Station, o
 - no real vision model file load
 - no PLC write
 - no packaging, deployment, hot-load, or downlink
+- no Real RuntimePreview adapter
 - RuntimePreview remains offline/metadata-only
 - stable CI keeps real LLM shadow eval default-off
