@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "2026-06-06.runtime-preview-governance-audit-sample.v1",
+  "benchmarkId": "runtime_preview_governance_audit_sample",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-06T12:31:57.847051+00:00"
+  },
+  "summary": {
+    "eventCount": 13,
+    "metadataOnly": true,
+    "realResourcesTouched": false,
+    "redactionPass": true,
+    "appendOnly": true,
+    "accepted": true
+  },
+  "events": [
+    {
+      "eventType": "session_created",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "config_changed",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "catalog_loaded",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "allowlist_changed",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "readiness_checked",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "permission_denied",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "simulation_started",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "simulation_completed",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "report_generated",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "session_replayed",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "deploy_readiness_generated",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "retention_cleanup",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "session_cancelled",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    }
+  ],
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

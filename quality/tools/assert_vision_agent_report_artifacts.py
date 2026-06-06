@@ -20,6 +20,9 @@ SCAN_POLICY_VERSION = "2026-06-06.runtime-preview-v1-governance-scan.v1"
 JSON_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.json",
     REPORTS_DIR / "planner_autonomy_benchmark.json",
+    REPORTS_DIR / "runtime_preview_scenario_evidence.json",
+    REPORTS_DIR / "runtime_preview_deploy_readiness_report.sample.json",
+    REPORTS_DIR / "runtime_preview_governance_audit_sample.json",
     REPORTS_DIR / "real_llm_planner_shadow_eval.json",
     REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.json",
 ]
@@ -27,6 +30,9 @@ JSON_REPORTS = [
 MARKDOWN_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.md",
     REPORTS_DIR / "planner_autonomy_benchmark.md",
+    REPORTS_DIR / "runtime_preview_scenario_evidence.md",
+    REPORTS_DIR / "runtime_preview_deploy_readiness_report.sample.md",
+    REPORTS_DIR / "runtime_preview_governance_audit_sample.md",
     REPORTS_DIR / "real_llm_planner_shadow_eval.md",
     REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.md",
 ]

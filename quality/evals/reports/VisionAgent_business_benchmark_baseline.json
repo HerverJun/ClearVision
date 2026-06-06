@@ -1,14 +1,14 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-executable-business-benchmark.v1",
   "benchmarkId": "vision_agent_executable_business_benchmark",
-  "generatedAtUtc": "2026-06-06T11:14:24.7562998+00:00",
+  "generatedAtUtc": "2026-06-06T12:24:33.7249828+00:00",
   "mode": "offline_metadata_only",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T11:14:24.7562998+00:00"
+    "generatedAtUtc": "2026-06-06T12:24:33.7249828+00:00"
   },
   "summary": {
     "caseCount": 37,
@@ -7210,31 +7210,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_7a3359e06e4243f981f8c4c4da61c472",
-        "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
-        "generatedAtUtc": "2026-06-06T11:14:24.738113+00:00",
+        "reportId": "rp_report_d490a662a5a142019371aef04fdbeae5",
+        "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
+        "generatedAtUtc": "2026-06-06T12:24:33.7117404+00:00",
         "session": {
-          "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+          "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
           "status": "completed",
-          "createdAtUtc": "2026-06-06T11:14:24.7148294+00:00",
-          "updatedAtUtc": "2026-06-06T11:14:24.7394942+00:00",
+          "createdAtUtc": "2026-06-06T12:24:33.692765+00:00",
+          "updatedAtUtc": "2026-06-06T12:24:33.7127194+00:00",
           "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
           "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
-          "catalogSnapshotId": "rp_catalog_8c986e220eea65b7",
+          "catalogSnapshotId": "rp_catalog_f159e794619fb213",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_3947c97193e4403588e8cd989f5562e2",
-            "rp_audit_b9e829fc4eeb4149be41495182a9c1dc",
-            "rp_audit_a62186ca322a4d64b14d26a37294c8ca",
-            "rp_audit_2c93d38097964efe97d63208a4e02765",
-            "rp_audit_bf8e39f4053e4f83ac15a379d762da3c",
-            "rp_audit_b271c650c63a433e8cc5c148dcaef8d0",
-            "rp_audit_923df57bfcc64f7cb0735f17c0ce8654",
-            "rp_audit_59971aa686154085a86cf2711a4f3e9e",
-            "rp_audit_c57dae263b6a4c709f520c3a06d88f55"
+            "rp_audit_fda659f12e1c4d5692b0c99f882a71d2",
+            "rp_audit_8931c24759b4487ea8dde0f378ada0a4",
+            "rp_audit_611a2f75c49f4f26846a34ed806cd68c",
+            "rp_audit_d286bfdf8a044c3997bd01094e7c5e44",
+            "rp_audit_e336a50eaf29498180235b96eb2b7506",
+            "rp_audit_b09035a4f97a4f628e3a76fbab67e0ab",
+            "rp_audit_666499b637734635b450cd8ca36a2276",
+            "rp_audit_1cae344e06ac4814afc7acd823e0d7d7",
+            "rp_audit_d84d86d713834384a3f89c5cbc6cd763"
           ],
-          "reportId": "rp_report_7a3359e06e4243f981f8c4c4da61c472",
+          "reportId": "rp_report_d490a662a5a142019371aef04fdbeae5",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -7349,12 +7349,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_3947c97193e4403588e8cd989f5562e2",
-            "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+            "eventId": "rp_audit_fda659f12e1c4d5692b0c99f882a71d2",
+            "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
             "eventType": "session_created",
-            "createdAtUtc": "2026-06-06T11:14:24.7181052+00:00",
+            "createdAtUtc": "2026-06-06T12:24:33.6956461+00:00",
             "payload": {
-              "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+              "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
               "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
               "metadataOnly": true
             },
@@ -7362,10 +7362,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_b9e829fc4eeb4149be41495182a9c1dc",
-            "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+            "eventId": "rp_audit_8931c24759b4487ea8dde0f378ada0a4",
+            "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-06-06T11:14:24.719401+00:00",
+            "createdAtUtc": "2026-06-06T12:24:33.6970077+00:00",
             "payload": {
               "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
               "enabled": true,
@@ -7377,12 +7377,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_a62186ca322a4d64b14d26a37294c8ca",
-            "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+            "eventId": "rp_audit_611a2f75c49f4f26846a34ed806cd68c",
+            "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-06-06T11:14:24.721573+00:00",
+            "createdAtUtc": "2026-06-06T12:24:33.699015+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_8c986e220eea65b7",
+              "catalogSnapshotId": "rp_catalog_f159e794619fb213",
               "handleCount": 2,
               "sourceSummary": {
                 "appConfig": 0,
@@ -7397,10 +7397,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_2c93d38097964efe97d63208a4e02765",
-            "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+            "eventId": "rp_audit_d286bfdf8a044c3997bd01094e7c5e44",
+            "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-06-06T11:14:24.721652+00:00",
+            "createdAtUtc": "2026-06-06T12:24:33.6990863+00:00",
             "payload": {
               "camera": 1,
               "model": 2,
@@ -7412,10 +7412,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_bf8e39f4053e4f83ac15a379d762da3c",
-            "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+            "eventId": "rp_audit_e336a50eaf29498180235b96eb2b7506",
+            "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-06-06T11:14:24.7289918+00:00",
+            "createdAtUtc": "2026-06-06T12:24:33.7053055+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -7426,10 +7426,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_b271c650c63a433e8cc5c148dcaef8d0",
-            "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+            "eventId": "rp_audit_b09035a4f97a4f628e3a76fbab67e0ab",
+            "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-06-06T11:14:24.7326075+00:00",
+            "createdAtUtc": "2026-06-06T12:24:33.7077033+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -7448,23 +7448,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_923df57bfcc64f7cb0735f17c0ce8654",
-            "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+            "eventId": "rp_audit_666499b637734635b450cd8ca36a2276",
+            "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-06-06T11:14:24.7333925+00:00",
+            "createdAtUtc": "2026-06-06T12:24:33.7083299+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_8c986e220eea65b7",
+              "catalogSnapshotId": "rp_catalog_f159e794619fb213",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_59971aa686154085a86cf2711a4f3e9e",
-            "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+            "eventId": "rp_audit_1cae344e06ac4814afc7acd823e0d7d7",
+            "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-06-06T11:14:24.7350269+00:00",
+            "createdAtUtc": "2026-06-06T12:24:33.7095092+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -7474,12 +7474,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c57dae263b6a4c709f520c3a06d88f55",
-            "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+            "eventId": "rp_audit_d84d86d713834384a3f89c5cbc6cd763",
+            "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-06-06T11:14:24.7390635+00:00",
+            "createdAtUtc": "2026-06-06T12:24:33.7124191+00:00",
             "payload": {
-              "reportId": "rp_report_7a3359e06e4243f981f8c4c4da61c472",
+              "reportId": "rp_report_d490a662a5a142019371aef04fdbeae5",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -7488,19 +7488,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+          "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_759d645e7fd94f04969d612b30fa72ba",
+              "status": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_8c986e220eea65b7",
+              "status": "rp_catalog_f159e794619fb213",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -7610,15 +7610,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_7313eeb3645f",
+              "artifactId": "rp_artifact_43e9fc020138",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_759d645e7fd94f04969d612b30fa72ba",
-                "catalogSnapshotId": "rp_catalog_8c986e220eea65b7",
+                "sessionId": "rp_session_26b6b4c959e04072886e7b1085aa0b1d",
+                "catalogSnapshotId": "rp_catalog_f159e794619fb213",
                 "handleCount": 2,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false

@@ -93,6 +93,68 @@ export function installAiTab(SettingsView) {
             }
         }
         ,
+        getRuntimePreviewPilotSelectedSessionId(aiTab) {
+            return (aiTab.querySelector('#cfg-rp-session-id')?.value || this.runtimePreviewPilotSelectedSessionId || '').trim();
+        }
+        ,
+        getRuntimePreviewPilotCatalogSelections(aiTab) {
+            const selected = {
+                allowedCameraBindingIds: [],
+                allowedModelIds: [],
+                allowedTemplateIds: [],
+                allowedFlowIds: [],
+                allowedResourceRoots: []
+            };
+            const mapType = resourceType => {
+                const type = String(resourceType || '').toLowerCase();
+                if (type.includes('camera')) return 'allowedCameraBindingIds';
+                if (type.includes('model')) return 'allowedModelIds';
+                if (type.includes('template')) return 'allowedTemplateIds';
+                if (type.includes('flow')) return 'allowedFlowIds';
+                if (type.includes('root')) return 'allowedResourceRoots';
+                return null;
+            };
+
+            aiTab.querySelectorAll('[data-rp-catalog-allowlist="true"]:checked').forEach(input => {
+                const key = mapType(input.dataset.resourceType);
+                const id = String(input.dataset.resourceId || '').trim();
+                if (key && id && !selected[key].includes(id)) {
+                    selected[key].push(id);
+                }
+            });
+            return selected;
+        }
+        ,
+        buildRuntimePreviewPilotConfigDiff(beforeConfig, afterConfig) {
+            const fields = [
+                'allowedCameraBindingIds',
+                'allowedModelIds',
+                'allowedTemplateIds',
+                'allowedFlowIds',
+                'allowedResourceRoots'
+            ];
+            const before = this.normalizeRuntimePreviewPilotConfig(beforeConfig || {});
+            const after = this.normalizeRuntimePreviewPilotConfig(afterConfig || {});
+            return fields
+                .map(field => ({
+                    field,
+                    before: before[field] || [],
+                    after: after[field] || []
+                }))
+                .filter(item => item.before.join('|') !== item.after.join('|'));
+        }
+        ,
+        applyRuntimePreviewPilotCatalogAllowlist(aiTab) {
+            const before = this.normalizeRuntimePreviewPilotConfig(this.runtimePreviewPilotConfig || {});
+            const selected = this.getRuntimePreviewPilotCatalogSelections(aiTab);
+            const draft = {
+                ...this.readRuntimePreviewPilotConfigDraft(aiTab),
+                ...selected
+            };
+            this.runtimePreviewPilotConfigDiff = this.buildRuntimePreviewPilotConfigDiff(before, draft);
+            this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(draft);
+        }
+        ,
         getAiPerformanceModelLabel() {
             const active = this.aiModels.find(m => m.id === this.activeAiModelId)
                 || this.aiModels.find(m => m.isActive)
@@ -355,6 +417,11 @@ export function installAiTab(SettingsView) {
                 } else if (btn.id === 'btn-runtime-preview-pilot-save') {
                     try {
                         const payload = this.readRuntimePreviewPilotConfigDraft(aiTab);
+                        this.runtimePreviewPilotConfigDiff = this.buildRuntimePreviewPilotConfigDiff(this.runtimePreviewPilotConfig || {}, payload);
+                        const confirmed = typeof window?.confirm === 'function'
+                            ? window.confirm('Save metadata-only RuntimePreview Pilot allowlist changes?')
+                            : true;
+                        if (!confirmed) return;
                         const result = await settingsApi.saveRuntimePreviewPilotConfig(payload);
                         this.runtimePreviewPilotConfig = this.normalizeRuntimePreviewPilotConfig(result);
                         await this.loadRuntimePreviewPilotState();
@@ -362,6 +429,13 @@ export function installAiTab(SettingsView) {
                         showToast('RuntimePreview Pilot config saved.', 'success');
                     } catch (err) {
                         showToast('RuntimePreview Pilot config failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-apply-catalog-allowlist') {
+                    try {
+                        this.applyRuntimePreviewPilotCatalogAllowlist(aiTab);
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot catalog allowlist failed: ' + err.message, 'error');
                     }
                 } else if (btn.id === 'btn-runtime-preview-pilot-readiness') {
                     try {
@@ -403,9 +477,60 @@ export function installAiTab(SettingsView) {
                     } catch (err) {
                         showToast('RuntimePreview Pilot report failed: ' + err.message, 'error');
                     }
+                } else if (btn.id === 'btn-runtime-preview-pilot-replay-session') {
+                    try {
+                        const sessionId = this.getRuntimePreviewPilotSelectedSessionId(aiTab);
+                        if (!sessionId) return;
+                        const result = await settingsApi.replayRuntimePreviewPilotSession(sessionId);
+                        this.runtimePreviewPilotReplay = result?.replay || null;
+                        this.runtimePreviewPilotSelectedSessionId = sessionId;
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot replay failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-export-report') {
+                    try {
+                        const sessionId = this.getRuntimePreviewPilotSelectedSessionId(aiTab);
+                        if (!sessionId) return;
+                        const result = await settingsApi.exportRuntimePreviewPilotSessionReport(sessionId);
+                        this.runtimePreviewPilotExport = result?.export || null;
+                        this.runtimePreviewPilotSelectedSessionId = sessionId;
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot export failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-deploy-readiness') {
+                    try {
+                        const result = await settingsApi.generateRuntimePreviewDeployReadiness(this.buildRuntimePreviewPilotSessionPayload(aiTab));
+                        this.runtimePreviewPilotDeployReadinessReport = result?.deployReadinessReport || null;
+                        this.runtimePreviewPilotSessionReport = result?.deployReadinessReport?.simulationReport || this.runtimePreviewPilotSessionReport;
+                        this.runtimePreviewPilotSelectedSessionId = result?.deployReadinessReport?.sessionId || result?.session?.sessionId || this.runtimePreviewPilotSelectedSessionId;
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot deploy readiness failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-scenario-evidence') {
+                    try {
+                        this.runtimePreviewPilotScenarioEvidence = await settingsApi.loadRuntimePreviewScenarioEvidence();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot scenario evidence failed: ' + err.message, 'error');
+                    }
+                } else if (btn.id === 'btn-runtime-preview-pilot-cleanup') {
+                    try {
+                        const retentionDays = Number(aiTab.querySelector('#cfg-rp-retention-days')?.value || 30);
+                        const maxSessions = Number(aiTab.querySelector('#cfg-rp-max-sessions')?.value || 200);
+                        const result = await settingsApi.cleanupRuntimePreviewPilotRetention({ retentionDays, maxSessions });
+                        this.runtimePreviewPilotRetentionCleanup = result?.cleanup || result;
+                        await this.loadRuntimePreviewPilotState();
+                        this.refreshRuntimePreviewPilotPanel();
+                    } catch (err) {
+                        showToast('RuntimePreview Pilot cleanup failed: ' + err.message, 'error');
+                    }
                 } else if (btn.id === 'btn-runtime-preview-pilot-cancel-session') {
                     try {
-                        const sessionId = aiTab.querySelector('#cfg-rp-session-id')?.value || this.runtimePreviewPilotSelectedSessionId;
+                        const sessionId = this.getRuntimePreviewPilotSelectedSessionId(aiTab);
                         if (!sessionId) return;
                         await settingsApi.cancelRuntimePreviewPilotSession(sessionId);
                         await this.loadRuntimePreviewPilotState();
@@ -860,10 +985,28 @@ export function installAiTab(SettingsView) {
             const readiness = this.runtimePreviewPilotReadiness || null;
             const sessions = Array.isArray(this.runtimePreviewPilotSessions) ? this.runtimePreviewPilotSessions : [];
             const report = this.runtimePreviewPilotSessionReport || null;
+            const replay = this.runtimePreviewPilotReplay || null;
+            const reportExport = this.runtimePreviewPilotExport || null;
+            const deployReadiness = this.runtimePreviewPilotDeployReadinessReport || null;
+            const scenarioEvidence = this.runtimePreviewPilotScenarioEvidence || null;
+            const cleanup = this.runtimePreviewPilotRetentionCleanup || null;
+            const configDiff = Array.isArray(this.runtimePreviewPilotConfigDiff) ? this.runtimePreviewPilotConfigDiff : [];
             const listValue = value => this.escapeHtml((value || []).join(', '));
+            const isCatalogChecked = item => {
+                const type = String(item.resourceType || '').toLowerCase();
+                const id = String(item.id || '').trim();
+                if (!id) return false;
+                if (type.includes('camera')) return config.allowedCameraBindingIds.includes(id);
+                if (type.includes('model')) return config.allowedModelIds.includes(id);
+                if (type.includes('template')) return config.allowedTemplateIds.includes(id);
+                if (type.includes('flow')) return config.allowedFlowIds.includes(id);
+                if (type.includes('root')) return config.allowedResourceRoots.includes(id);
+                return false;
+            };
             const catalogHtml = catalogItems.length
                 ? catalogItems.slice(0, 16).map(item => `
                     <tr>
+                        <td><input type="checkbox" data-rp-catalog-allowlist="true" data-resource-type="${this.sanitizeRuntimePreviewPilotValue(item.resourceType)}" data-resource-id="${this.sanitizeRuntimePreviewPilotValue(item.id)}" ${isCatalogChecked(item) ? 'checked' : ''} ${item.safeForPilot ? '' : 'disabled'}></td>
                         <td>${this.sanitizeRuntimePreviewPilotValue(item.resourceType)}</td>
                         <td>${this.sanitizeRuntimePreviewPilotValue(item.id)}</td>
                         <td>${this.sanitizeRuntimePreviewPilotValue(item.displayName)}</td>
@@ -872,7 +1015,7 @@ export function installAiTab(SettingsView) {
                         <td>${item.redacted ? '&lt;redacted&gt;' : 'no'}</td>
                     </tr>
                 `).join('')
-                : '<tr><td colspan="6" style="color:#64748b;">No catalog loaded.</td></tr>';
+                : '<tr><td colspan="7" style="color:#64748b;">No catalog loaded.</td></tr>';
             const readinessHtml = readiness
                 ? `
                     <div data-rp-readiness-status="${this.sanitizeRuntimePreviewPilotValue(readiness.status)}" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; font-size:12px;">
@@ -901,6 +1044,9 @@ export function installAiTab(SettingsView) {
                     </tr>
                 `).join('')
                 : '<tr><td colspan="5" style="color:#64748b;">No RuntimePreview sessions.</td></tr>';
+            const diffHtml = configDiff.length
+                ? `<pre data-rp-allowlist-diff="true" style="margin-top:8px; white-space:pre-wrap; font-size:11px; max-height:120px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify(configDiff, null, 2))}</pre>`
+                : '<div data-rp-allowlist-diff="true" style="font-size:12px; color:#64748b;">No catalog allowlist diff.</div>';
             const reportHtml = report
                 ? `
                     <div data-rp-report-preview="true" style="font-size:12px;">
@@ -916,11 +1062,54 @@ export function installAiTab(SettingsView) {
                     }, null, 2))}</pre>
                 `
                 : '<div style="font-size:12px; color:#64748b;">No report selected.</div>';
+            const replayHtml = replay
+                ? `<pre data-rp-session-replay="true" style="white-space:pre-wrap; font-size:11px; max-height:140px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    sessionId: replay.sessionId,
+                    reportId: replay.reportId,
+                    previewReady: replay.previewReady,
+                    timeline: replay.timeline || [],
+                    auditEvents: replay.auditEvents || [],
+                    realResourcesTouched: replay.realResourcesTouched
+                }, null, 2))}</pre>`
+                : '<div data-rp-session-replay="true" style="font-size:12px; color:#64748b;">No replay loaded.</div>';
+            const exportHtml = reportExport
+                ? `<pre data-rp-report-export-payload="true" style="white-space:pre-wrap; font-size:11px; max-height:120px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    fileName: reportExport.fileName,
+                    exportedAtUtc: reportExport.exportedAtUtc,
+                    metadataOnly: reportExport.metadataOnly,
+                    realResourcesTouched: reportExport.realResourcesTouched
+                }, null, 2))}</pre>`
+                : '<div data-rp-report-export-payload="true" style="font-size:12px; color:#64748b;">No report export loaded.</div>';
+            const deployReadinessHtml = deployReadiness
+                ? `<pre data-rp-deploy-readiness-report="true" style="white-space:pre-wrap; font-size:11px; max-height:160px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    reportId: deployReadiness.reportId,
+                    sessionId: deployReadiness.sessionId,
+                    previewReady: deployReadiness.previewReady,
+                    readyForDeployment: deployReadiness.readyForDeployment,
+                    deploymentBlocked: deployReadiness.deploymentBlocked,
+                    packageCreated: deployReadiness.packageCreated,
+                    deploymentExecuted: deployReadiness.deploymentExecuted,
+                    realResourcesTouched: deployReadiness.realResourcesTouched,
+                    pendingActions: deployReadiness.pendingActions || []
+                }, null, 2))}</pre>`
+                : '<div data-rp-deploy-readiness-report="true" style="font-size:12px; color:#64748b;">No deploy readiness report generated.</div>';
+            const scenarioEvidenceHtml = scenarioEvidence
+                ? `<pre data-rp-scenario-evidence="true" style="white-space:pre-wrap; font-size:11px; max-height:180px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    caseCount: scenarioEvidence.caseCount,
+                    passedCaseCount: scenarioEvidence.passedCaseCount,
+                    accepted: scenarioEvidence.accepted,
+                    realResourcesTouched: scenarioEvidence.realResourcesTouched,
+                    cases: scenarioEvidence.cases || []
+                }, null, 2))}</pre>`
+                : '<div data-rp-scenario-evidence="true" style="font-size:12px; color:#64748b;">Scenario evidence has not been loaded.</div>';
+            const cleanupHtml = cleanup
+                ? `<pre data-rp-retention-cleanup="true" style="white-space:pre-wrap; font-size:11px; max-height:100px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify(cleanup, null, 2))}</pre>`
+                : '<div data-rp-retention-cleanup="true" style="font-size:12px; color:#64748b;">No retention cleanup result.</div>';
 
             return `
                 <details class="settings-modern-card" data-runtime-preview-pilot-admin="hidden" ${developerEnabled ? '' : 'hidden'}>
                     <summary class="settings-card-header" style="cursor:pointer;">
-                        <span>RuntimePreview Pilot Console v1.0</span>
+                        <span>RuntimePreview Pilot Console v1.1</span>
                         <span class="settings-status-badge ${config.enabled ? 'status-connected' : 'status-disconnected'}" style="margin-left:auto;">
                             <span class="status-dot"></span> ${config.enabled ? 'enabled' : 'disabled'}
                         </span>
@@ -943,15 +1132,18 @@ export function installAiTab(SettingsView) {
                         </div>
                         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
                             <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-refresh">Refresh catalog</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-apply-catalog-allowlist">Apply catalog allowlist</button>
                             <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-readiness">Run readiness</button>
                             <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-create-session">Create metadata session</button>
                             <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-simulate">Simulate metadata session</button>
+                            <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-deploy-readiness">Deploy readiness report</button>
                             <button class="cv-btn settings-btn-danger" id="btn-runtime-preview-pilot-save">Save pilot config</button>
                         </div>
+                        ${diffHtml}
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
                             <h4 style="margin:0 0 8px;">Catalog</h4>
                             <table class="settings-modern-table" data-rp-catalog-table="true">
-                                <thead><tr><th>Type</th><th>ID</th><th>Name</th><th>Source</th><th>Safe</th><th>Redacted</th></tr></thead>
+                                <thead><tr><th>Allow</th><th>Type</th><th>ID</th><th>Name</th><th>Source</th><th>Safe</th><th>Redacted</th></tr></thead>
                                 <tbody>${catalogHtml}</tbody>
                             </table>
                         </div>
@@ -962,8 +1154,10 @@ export function installAiTab(SettingsView) {
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-session-console="true">
                             <h4 style="margin:0 0 8px;">Session Console</h4>
                             <div style="display:flex; gap:8px; margin-bottom:8px;">
-                                <input class="cv-input" id="cfg-rp-session-id" placeholder="sessionId for report/cancel" value="${this.sanitizeRuntimePreviewPilotValue(this.runtimePreviewPilotSelectedSessionId || '')}">
+                                <input class="cv-input" id="cfg-rp-session-id" placeholder="sessionId for replay/report/export/cancel" value="${this.sanitizeRuntimePreviewPilotValue(this.runtimePreviewPilotSelectedSessionId || '')}">
                                 <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-load-report">Load report</button>
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-replay-session">Replay session</button>
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-export-report">Export report</button>
                                 <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-cancel-session">Cancel session</button>
                             </div>
                             <table class="settings-modern-table" data-rp-session-list="true">
@@ -974,6 +1168,28 @@ export function installAiTab(SettingsView) {
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-report-export="true">
                             <h4 style="margin:0 0 8px;">Audit timeline & report preview</h4>
                             ${reportHtml}
+                            ${replayHtml}
+                            ${exportHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-deploy-readiness="true">
+                            <h4 style="margin:0 0 8px;">Deploy readiness report</h4>
+                            ${deployReadinessHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-scenario-evidence-panel="true">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                                <h4 style="margin:0 0 8px;">Scenario evidence</h4>
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-scenario-evidence">Load scenario evidence</button>
+                            </div>
+                            ${scenarioEvidenceHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-retention-panel="true">
+                            <h4 style="margin:0 0 8px;">Retention cleanup</h4>
+                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                <input class="cv-input" type="number" id="cfg-rp-retention-days" value="30" min="1" max="365" style="max-width:120px;">
+                                <input class="cv-input" type="number" id="cfg-rp-max-sessions" value="200" min="1" max="5000" style="max-width:120px;">
+                                <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-cleanup">Run cleanup</button>
+                            </div>
+                            ${cleanupHtml}
                         </div>
                     </div>
                 </details>

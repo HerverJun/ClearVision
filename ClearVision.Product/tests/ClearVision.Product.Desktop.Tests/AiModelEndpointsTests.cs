@@ -553,7 +553,7 @@ public class AiModelEndpointsTests
                 toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
                 arguments = new
                 {
-                    flow = RuntimePreviewFlow("cam-a", templatePath: "C:\\secret\\template.png")
+                    flow = RuntimePreviewFlow("cam-a", templatePath: "external:/blocked-template")
                 }
             }));
         deniedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -628,7 +628,7 @@ public class AiModelEndpointsTests
         reportResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var reportJson = await reportResponse.Content.ReadAsStringAsync();
         reportJson.Should().Contain("runtime_preview_session_metadata");
-        reportJson.Should().NotContain("template.png");
+        reportJson.Should().NotContain("blocked-template");
     }
 
     [Fact]
@@ -669,14 +669,14 @@ public class AiModelEndpointsTests
             JsonContent(new
             {
                 config = appConfig.Runtime.RuntimePreviewPilot,
-                arguments = new { flow = RuntimePreviewFlow("cam-a", templatePath: "C:\\secret\\template.png") },
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templatePath: "external:/blocked-template") },
                 runtimePreviewConsent = true
             }));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadAsStringAsync();
         json.Should().NotContain("secret");
-        json.Should().NotContain("template.png");
+        json.Should().NotContain("blocked-template");
         using var document = JsonDocument.Parse(json);
         var report = document.RootElement.GetProperty("report");
         report.GetProperty("previewReady").GetBoolean().Should().BeFalse();
@@ -707,6 +707,154 @@ public class AiModelEndpointsTests
         report.GetProperty("readiness").GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
         report.GetProperty("readiness").GetProperty("pendingActions").GetArrayLength().Should().BeGreaterThan(0);
         report.GetProperty("permissionDecision").GetProperty("status").GetString().Should().Be("denied");
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotSessionReplayExportAndDeployReadiness_ShouldRemainMetadataOnly()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var simulateResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/simulate",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templateId: "template-a") },
+                runtimePreviewConsent = true
+            }));
+        simulateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var simulateDocument = JsonDocument.Parse(await simulateResponse.Content.ReadAsStringAsync());
+        var sessionId = simulateDocument.RootElement.GetProperty("session").GetProperty("sessionId").GetString();
+
+        using var replayResponse = await host.Client.GetAsync($"/api/settings/runtime-preview-pilot/sessions/{sessionId}/replay");
+        replayResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var replayJson = await replayResponse.Content.ReadAsStringAsync();
+        replayJson.Should().Contain("session_replayed");
+        replayJson.Should().Contain("\"realResourcesTouched\":false");
+        replayJson.Should().NotContain("192.0.2.20");
+
+        using var exportResponse = await host.Client.GetAsync($"/api/settings/runtime-preview-pilot/sessions/{sessionId}/report/export");
+        exportResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var exportJson = await exportResponse.Content.ReadAsStringAsync();
+        exportJson.Should().Contain("metadata-only.json");
+        exportJson.Should().Contain("\"metadataOnly\":true");
+        exportJson.Should().NotContain("blocked-template");
+
+        using var deployResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/deploy-readiness",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templateId: "template-a") },
+                runtimePreviewConsent = true,
+                requireReplay = true
+            }));
+        deployResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var deployDocument = JsonDocument.Parse(await deployResponse.Content.ReadAsStringAsync());
+        var readinessReport = deployDocument.RootElement.GetProperty("deployReadinessReport");
+        readinessReport.GetProperty("readyForDeployment").GetBoolean().Should().BeTrue();
+        readinessReport.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+        readinessReport.GetProperty("deploymentExecuted").GetBoolean().Should().BeFalse();
+        readinessReport.GetProperty("realResourcesTouched").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotDeployReadiness_ShouldKeepDraftEditableWhenPrecheckNotReady()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/deploy-readiness",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-missing", templateId: "template-a") },
+                runtimePreviewConsent = true,
+                requireReplay = true
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var report = document.RootElement.GetProperty("deployReadinessReport");
+        report.GetProperty("previewReady").GetBoolean().Should().BeFalse();
+        report.GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
+        report.GetProperty("deploymentBlocked").GetBoolean().Should().BeTrue();
+        report.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+        report.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotScenarioEvidenceEndpoint_ShouldReturnSafeBusinessScenarioSet()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/scenario-evidence");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadAsStringAsync();
+        json.Should().Contain("wire_sequence");
+        json.Should().Contain("template_matching");
+        json.Should().Contain("hole_distance");
+        json.Should().Contain("remote_control_detection");
+        json.Should().Contain("\"caseCount\":8");
+        json.Should().Contain("\"realResourcesTouched\":false");
+        json.Should().NotContain("192.0.2.20");
+        json.Should().NotContain("DB1");
+        json.Should().NotContain("external:/");
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotRetentionCleanupEndpoint_ShouldReturnPersistentGovernanceEvidence()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+        await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/simulate",
+            JsonContent(new
+            {
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templateId: "template-a") },
+                runtimePreviewConsent = true
+            }));
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/retention/cleanup",
+            JsonContent(new { retentionDays = 30, maxSessions = 200 }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var cleanup = document.RootElement.GetProperty("cleanup");
+        cleanup.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        cleanup.GetProperty("realResourcesTouched").GetBoolean().Should().BeFalse();
+        cleanup.GetProperty("sessionsBefore").GetInt32().Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotV11Endpoints_ShouldRequireAdminBrokerGate()
+    {
+        await using var host = await AiModelEndpointTestHost.CreateAsync(userRole: "Engineer");
+
+        using var replayResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/sessions/rp_session_missing/replay");
+        using var exportResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/sessions/rp_session_missing/report/export");
+        using var deployResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/deploy-readiness",
+            JsonContent(new { arguments = new { flow = RuntimePreviewFlow("cam-a") }, runtimePreviewConsent = true }));
+        using var scenarioResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/scenario-evidence");
+        using var cleanupResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/retention/cleanup",
+            JsonContent(new { retentionDays = 30, maxSessions = 200 }));
+
+        replayResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        exportResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        deployResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        scenarioResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        cleanupResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private static StringContent JsonContent(object payload)
@@ -840,6 +988,7 @@ public class AiModelEndpointsTests
             });
             builder.WebHost.UseTestServer();
 
+            var storageDirectory = Path.Combine(Path.GetTempPath(), $"cv-ai-model-endpoints-{Guid.NewGuid():N}");
             var effectiveConfig = appConfig ?? new AppConfig();
             var configService = Substitute.For<IConfigurationService>();
             configService.LoadAsync().Returns(_ => Task.FromResult(effectiveConfig));
@@ -847,6 +996,7 @@ public class AiModelEndpointsTests
             configService.SaveAsync(Arg.Any<AppConfig>()).Returns(Task.CompletedTask);
             builder.Services.AddSingleton(configService);
             builder.Services.AddSingleton(Substitute.For<ClearVision.Product.Core.Cameras.ICameraManager>());
+            builder.Services.AddSingleton(new RuntimePreviewGovernanceStore(Path.Combine(storageDirectory, "runtime-preview-governance")));
             builder.Services.AddSingleton<RuntimePreviewPilotResourceCatalog>();
             builder.Services.AddSingleton<RuntimePreviewSessionStore>();
             builder.Services.AddSingleton<RuntimePreviewAuditTrail>();
@@ -856,8 +1006,11 @@ public class AiModelEndpointsTests
             builder.Services.AddSingleton<RuntimePreviewResourceAllowlistResolver>();
             builder.Services.AddSingleton<RuntimePreviewPilotReadinessGate>();
             builder.Services.AddSingleton<RuntimePreviewSimulatedExecutionHarness>();
+            builder.Services.AddSingleton(new RuntimePackagePrecheckTool());
+            builder.Services.AddSingleton<RuntimePreviewGovernanceMaintenanceService>();
+            builder.Services.AddSingleton<RuntimePreviewDeployReadinessService>();
+            builder.Services.AddSingleton<RuntimePreviewScenarioEvidenceService>();
 
-            var storageDirectory = Path.Combine(Path.GetTempPath(), $"cv-ai-model-endpoints-{Guid.NewGuid():N}");
             var aiConfigStore = new AiConfigStore(
                 Options.Create(new AiGenerationOptions
                 {

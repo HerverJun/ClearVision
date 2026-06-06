@@ -726,6 +726,186 @@ public static class SettingsEndpoints
                 });
         });
 
+        app.MapGet("/api/settings/runtime-preview-pilot/sessions/{sessionId}/replay", (
+            string sessionId,
+            RuntimePreviewSimulatedExecutionHarness harness,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-replay",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var replay = harness.Replay(sessionId);
+            return replay == null
+                ? Results.NotFound(new { error = "RuntimePreview session replay was not found." })
+                : Results.Ok(new
+                {
+                    replay,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/sessions/{sessionId}/report/export", (
+            string sessionId,
+            RuntimePreviewReportArchive reportArchive,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-session-report-export",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var report = reportArchive.GetBySessionId(sessionId);
+            return report == null
+                ? Results.NotFound(new { error = "RuntimePreview session report export was not found." })
+                : Results.Ok(new
+                {
+                    export = new
+                    {
+                        fileName = $"{report.ReportId}.metadata-only.json",
+                        exportedAtUtc = DateTimeOffset.UtcNow,
+                        report,
+                        metadataOnly = true,
+                        realResourcesTouched = false
+                    },
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/deploy-readiness", async (
+            RuntimePreviewDeployReadinessRequest request,
+            IConfigurationService configService,
+            AiConfigStore aiConfigStore,
+            RuntimePreviewDeployReadinessService deployReadinessService,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-deploy-readiness",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var report = await deployReadinessService.GenerateAsync(
+                request,
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext),
+                cancellationToken);
+            return Results.Ok(new
+            {
+                deployReadinessReport = report,
+                session = report.SimulationReport?.Session,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapPost("/api/settings/runtime-preview-pilot/retention/cleanup", (
+            RuntimePreviewRetentionCleanupEndpointRequest request,
+            RuntimePreviewGovernanceMaintenanceService maintenanceService,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-retention-cleanup",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var cleanup = maintenanceService.Cleanup(request.RetentionDays, request.MaxSessions);
+            return Results.Ok(new
+            {
+                cleanup,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/scenario-evidence", async (
+            IConfigurationService configService,
+            AiConfigStore aiConfigStore,
+            RuntimePreviewScenarioEvidenceService scenarioEvidenceService,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-scenario-evidence",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var evidence = await scenarioEvidenceService.RunAsync(appConfig, aiConfigStore, cancellationToken);
+            return Results.Ok(new
+            {
+                evidence,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
         app.MapGet("/api/cameras/discover", async (ClearVision.Product.Core.Cameras.ICameraManager cameraManager) =>
         {
             var devices = await cameraManager.EnumerateCamerasAsync();
@@ -2178,6 +2358,13 @@ public class RuntimePreviewPilotReadinessEndpointRequest
     public string? ToolName { get; set; }
     public JsonElement? Arguments { get; set; }
     public JsonElement? WorkflowDraft { get; set; }
+}
+
+public class RuntimePreviewRetentionCleanupEndpointRequest
+{
+    public int RetentionDays { get; set; } = 30;
+
+    public int MaxSessions { get; set; } = 200;
 }
 
 public class CameraSoftTriggerCaptureRequest

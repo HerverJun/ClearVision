@@ -35,7 +35,12 @@ const settingsApi = {
     createRuntimePreviewPilotSession: payload => httpClient.post('/settings/runtime-preview-pilot/sessions', payload),
     simulateRuntimePreviewPilotSession: payload => httpClient.post('/settings/runtime-preview-pilot/sessions/simulate', payload),
     loadRuntimePreviewPilotSessionReport: sessionId => httpClient.get(`/settings/runtime-preview-pilot/sessions/${encodeURIComponent(sessionId)}/report`),
+    replayRuntimePreviewPilotSession: sessionId => httpClient.get(`/settings/runtime-preview-pilot/sessions/${encodeURIComponent(sessionId)}/replay`),
+    exportRuntimePreviewPilotSessionReport: sessionId => httpClient.get(`/settings/runtime-preview-pilot/sessions/${encodeURIComponent(sessionId)}/report/export`),
     cancelRuntimePreviewPilotSession: sessionId => httpClient.post(`/settings/runtime-preview-pilot/sessions/${encodeURIComponent(sessionId)}/cancel`, {}),
+    generateRuntimePreviewDeployReadiness: payload => httpClient.post('/settings/runtime-preview-pilot/sessions/deploy-readiness', payload),
+    cleanupRuntimePreviewPilotRetention: payload => httpClient.post('/settings/runtime-preview-pilot/retention/cleanup', payload),
+    loadRuntimePreviewScenarioEvidence: () => httpClient.get('/settings/runtime-preview-pilot/scenario-evidence'),
 
     loadPlcSettings: () => httpClient.get('/plc/settings'),
     savePlcSettings: payload => httpClient.put('/plc/settings', payload),

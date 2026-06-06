@@ -67,6 +67,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IVisionAgentStationStatusReader, NoOpVisionAgentStationStatusReader>();
         services.AddScoped<RuntimePreviewArtifactStore>();
         services.AddScoped<RuntimePreviewPilotResourceCatalog>();
+        services.AddSingleton<RuntimePreviewGovernanceStore>();
         services.AddSingleton<RuntimePreviewSessionStore>();
         services.AddSingleton<RuntimePreviewAuditTrail>();
         services.AddSingleton<RuntimePreviewReportArchive>();
@@ -75,6 +76,9 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<RuntimePreviewResourceAllowlistResolver>();
         services.AddScoped<RuntimePreviewPilotReadinessGate>();
         services.AddScoped<RuntimePreviewSimulatedExecutionHarness>();
+        services.AddScoped<RuntimePreviewGovernanceMaintenanceService>();
+        services.AddScoped<RuntimePreviewDeployReadinessService>();
+        services.AddScoped<RuntimePreviewScenarioEvidenceService>();
         services.AddScoped<OfflineRuntimePreviewAdapter>();
         services.AddScoped<PilotRuntimePreviewAdapter>();
         services.AddScoped<IRuntimePreviewAdapter>(sp => sp.GetRequiredService<OfflineRuntimePreviewAdapter>());
@@ -88,7 +92,8 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IVisionAgentTool, CurrentFlowInspectTool>();
         services.AddScoped<IVisionAgentTool, FlowValidationTool>();
         services.AddScoped<IVisionAgentTool, DryRunFlowTool>();
-        services.AddScoped<IVisionAgentTool, RuntimePackagePrecheckTool>();
+        services.AddScoped<RuntimePackagePrecheckTool>();
+        services.AddScoped<IVisionAgentTool>(sp => sp.GetRequiredService<RuntimePackagePrecheckTool>());
         services.AddScoped<IVisionAgentTool, RuntimePreviewSimulateMetadataSessionTool>();
         services.AddScoped<IVisionAgentTool, RuntimePreviewCaptureStubTool>();
         services.AddScoped<IVisionAgentTool, RuntimePreviewReplayStubTool>();

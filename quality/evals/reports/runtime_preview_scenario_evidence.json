@@ -1,0 +1,374 @@
+{
+  "schemaVersion": "2026-06-06.runtime-preview-scenario-evidence.v1",
+  "benchmarkId": "runtime_preview_scenario_evidence_set",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-06T12:31:57.847051+00:00"
+  },
+  "summary": {
+    "caseCount": 8,
+    "passedCaseCount": 8,
+    "accepted": true,
+    "metadataOnly": true,
+    "realResourcesTouched": false,
+    "deniedCaseCount": 2,
+    "notReadyCaseCount": 2
+  },
+  "cases": [
+    {
+      "caseId": "RP-SE-001",
+      "scenario": "wire_sequence",
+      "businessSummary": "Line sequence inspection with metadata camera and template handles.",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedSignals": [
+        "previewReady",
+        "readyForDeployment"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false
+    },
+    {
+      "caseId": "RP-SE-002",
+      "scenario": "template_matching",
+      "businessSummary": "Template matching localization with catalog TemplateId.",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedSignals": [
+        "previewReady",
+        "readyForDeployment"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false
+    },
+    {
+      "caseId": "RP-SE-003",
+      "scenario": "hole_distance",
+      "businessSummary": "Hole center distance measurement using metadata-only camera handle.",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedSignals": [
+        "previewReady",
+        "readyForDeployment"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false
+    },
+    {
+      "caseId": "RP-SE-004",
+      "scenario": "remote_control_detection",
+      "businessSummary": "Remote controller defect detection using ModelId metadata.",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedSignals": [
+        "previewReady",
+        "readyForDeployment"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false
+    },
+    {
+      "caseId": "RP-SE-005",
+      "scenario": "missing_resource",
+      "businessSummary": "Missing camera binding should create pending action while draft remains editable.",
+      "expectedStatus": "not_ready",
+      "actualStatus": "not_ready",
+      "expectedSignals": [
+        "missingResources",
+        "pendingActions",
+        "workflowDraftAllowed"
+      ],
+      "missingResources": [
+        {
+          "kind": "camera",
+          "parameter": "CameraBindingId",
+          "handle": "<pending-camera-binding>"
+        }
+      ],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "denyReason": "",
+      "precheckRisk": "deployment_blocked_metadata_only",
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false
+    },
+    {
+      "caseId": "RP-SE-006",
+      "scenario": "dangerous_path",
+      "businessSummary": "External path-like resource must be denied and redacted before any artifact is produced.",
+      "expectedStatus": "denied",
+      "actualStatus": "denied",
+      "expectedSignals": [
+        "denyReason",
+        "dangerousDenied",
+        "noArtifact"
+      ],
+      "missingResources": [],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "denyReason": "runtime_preview_external_path_denied",
+      "precheckRisk": "dangerous_resource_denied",
+      "redactedResourceHandle": "<redacted-path-handle>",
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false
+    },
+    {
+      "caseId": "RP-SE-007",
+      "scenario": "station_plc_deny",
+      "businessSummary": "Station or PLC output intent must be denied before any Station access or PLC write.",
+      "expectedStatus": "denied",
+      "actualStatus": "denied",
+      "expectedSignals": [
+        "denyReason",
+        "plcWriteAttempted=false",
+        "realStationTouched=false"
+      ],
+      "missingResources": [],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "denyReason": "runtime_preview_station_plc_denied",
+      "precheckRisk": "dangerous_resource_denied",
+      "redactedResourceHandle": "<redacted-plc-handle>",
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false
+    },
+    {
+      "caseId": "RP-SE-008",
+      "scenario": "precheck_not_ready",
+      "businessSummary": "Runtime package precheck remains blocked when model metadata is unresolved.",
+      "expectedStatus": "not_ready",
+      "actualStatus": "not_ready",
+      "expectedSignals": [
+        "pendingActions",
+        "deploymentBlocked",
+        "workflowDraftAllowed"
+      ],
+      "missingResources": [
+        {
+          "kind": "model",
+          "parameter": "ModelId",
+          "handle": "<pending-model>"
+        }
+      ],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview",
+        "DeploymentPrecheckResourceReview"
+      ],
+      "denyReason": "",
+      "precheckRisk": "deployment_blocked_metadata_only",
+      "metadataOnly": true,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false
+    }
+  ],
+  "deployReadinessMatrix": [
+    {
+      "caseId": "RP-SE-001",
+      "scenario": "wire_sequence",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "ready",
+      "permissionStatus": "allowed",
+      "simulationPreviewReady": true,
+      "runtimePackagePrecheckReady": true,
+      "readyForDeployment": true,
+      "deploymentBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SE-002",
+      "scenario": "template_matching",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "ready",
+      "permissionStatus": "allowed",
+      "simulationPreviewReady": true,
+      "runtimePackagePrecheckReady": true,
+      "readyForDeployment": true,
+      "deploymentBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SE-003",
+      "scenario": "hole_distance",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "ready",
+      "permissionStatus": "allowed",
+      "simulationPreviewReady": true,
+      "runtimePackagePrecheckReady": true,
+      "readyForDeployment": true,
+      "deploymentBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SE-004",
+      "scenario": "remote_control_detection",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "ready",
+      "permissionStatus": "allowed",
+      "simulationPreviewReady": true,
+      "runtimePackagePrecheckReady": true,
+      "readyForDeployment": true,
+      "deploymentBlocked": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SE-005",
+      "scenario": "missing_resource",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SE-006",
+      "scenario": "dangerous_path",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "denied",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SE-007",
+      "scenario": "station_plc_deny",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "denied",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    },
+    {
+      "caseId": "RP-SE-008",
+      "scenario": "precheck_not_ready",
+      "workflowDraftAllowed": true,
+      "readinessStatus": "not_ready",
+      "permissionStatus": "denied",
+      "simulationPreviewReady": false,
+      "runtimePackagePrecheckReady": false,
+      "readyForDeployment": false,
+      "deploymentBlocked": true,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "realResourcesTouched": false
+    }
+  ],
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

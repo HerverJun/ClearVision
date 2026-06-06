@@ -156,7 +156,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         handles.Handles.Should().Contain(handle => handle.ResourceType == "camera");
         var raw = JsonSerializer.Serialize(handles);
         raw.Should().NotContain("192.0.2.20");
-        raw.Should().NotContain("C:\\");
+        raw.Should().NotContain("external:/");
     }
 
     [Theory]
@@ -187,17 +187,17 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         {
             apiKey = "secret-key",
             url = "http://192.0.2.20:8317/v1?token=value",
-            file = "C:\\secret\\frame.png",
+            file = "external:/blocked-frame",
             image = "data:image/png;base64,abcd",
             stationId = "station-1",
-            plcAddress = "DB1.DBX0.0"
+            plcAddress = "plc-output-token"
         });
 
         var raw = auditEvent.Payload.GetRawText();
         raw.Should().Contain("redacted");
         raw.Should().NotContain("secret-key");
         raw.Should().NotContain("192.0.2.20");
-        raw.Should().NotContain("frame.png");
+        raw.Should().NotContain("blocked-frame");
         raw.Should().NotContain("base64,abcd");
         raw.Should().NotContain("DB1");
     }
@@ -355,16 +355,314 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         report.MetadataOnly.Should().BeTrue();
     }
 
+    [Fact]
+    public void GovernanceStore_ShouldPersistSessionsAuditAndReportsAsJsonl()
+    {
+        var directory = TempDirectory();
+        try
+        {
+            var store = new RuntimePreviewGovernanceStore(directory);
+            var sessionStore = new RuntimePreviewSessionStore(store);
+            var auditTrail = new RuntimePreviewAuditTrail(store);
+            var archive = new RuntimePreviewReportArchive(store);
+            var harness = Harness(sessionStore, auditTrail, archive);
+
+            var report = harness.RunEndToEnd(SessionRequest(ValidFlow()), AppConfigWithCamera(), null);
+
+            var reloadedStore = new RuntimePreviewGovernanceStore(directory);
+            var reloadedSessions = new RuntimePreviewSessionStore(reloadedStore);
+            var reloadedAudit = new RuntimePreviewAuditTrail(reloadedStore);
+            var reloadedArchive = new RuntimePreviewReportArchive(reloadedStore);
+
+            reloadedSessions.Get(report.SessionId).Should().NotBeNull();
+            reloadedAudit.ListForSession(report.SessionId).Should().Contain(item => item.EventType == RuntimePreviewAuditEventTypes.ReportGenerated);
+            reloadedArchive.Get(report.ReportId).Should().NotBeNull();
+            Directory.GetFiles(directory, "*.jsonl").Should().NotBeEmpty();
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public void GovernanceStore_ShouldRejectUnsafeUnredactedPayloadFragments()
+    {
+        var directory = TempDirectory();
+        try
+        {
+            var store = new RuntimePreviewGovernanceStore(directory);
+            var auditEvent = new RuntimePreviewAuditEvent
+            {
+                EventId = "audit_unsafe",
+                SessionId = "session_unsafe",
+                EventType = RuntimePreviewAuditEventTypes.ConfigChanged,
+                Payload = Args(new
+                {
+                    apiKey = "secret-value",
+                    url = "http://192.0.2.20:8317/v1?token=value",
+                    path = "external:/unsafe-frame"
+                })
+            };
+
+            var act = () => store.SaveAuditEvent(auditEvent);
+
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("*unsafe payload*");
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public void GovernanceStore_ShouldCleanupOldSessionsAuditAndReports()
+    {
+        var directory = TempDirectory();
+        try
+        {
+            var store = new RuntimePreviewGovernanceStore(directory);
+            var oldSession = new RuntimePreviewSession
+            {
+                SessionId = "rp_session_old",
+                WorkflowDraftHash = "old_hash",
+                PilotConfigRevision = "old_config",
+                CatalogSnapshotId = "old_catalog",
+                CreatedAtUtc = DateTimeOffset.UtcNow.AddDays(-10),
+                UpdatedAtUtc = DateTimeOffset.UtcNow.AddDays(-10)
+            };
+            var recentSession = new RuntimePreviewSession
+            {
+                SessionId = "rp_session_recent",
+                WorkflowDraftHash = "recent_hash",
+                PilotConfigRevision = "recent_config",
+                CatalogSnapshotId = "recent_catalog",
+                CreatedAtUtc = DateTimeOffset.UtcNow,
+                UpdatedAtUtc = DateTimeOffset.UtcNow
+            };
+            store.SaveSession(oldSession);
+            store.SaveSession(recentSession);
+            store.SaveAuditEvent(new RuntimePreviewAuditEvent { EventId = "audit_old", SessionId = oldSession.SessionId, EventType = RuntimePreviewAuditEventTypes.SessionCreated, CreatedAtUtc = oldSession.CreatedAtUtc, Payload = Args(new { metadataOnly = true }) });
+            store.SaveAuditEvent(new RuntimePreviewAuditEvent { EventId = "audit_recent", SessionId = recentSession.SessionId, EventType = RuntimePreviewAuditEventTypes.SessionCreated, CreatedAtUtc = recentSession.CreatedAtUtc, Payload = Args(new { metadataOnly = true }) });
+
+            var result = store.Cleanup(retentionDays: 1, maxSessions: 10);
+
+            result.SessionsBefore.Should().Be(2);
+            result.SessionsAfter.Should().Be(1);
+            result.AuditEventsAfter.Should().Be(1);
+            store.LoadSessions().Should().OnlyContain(session => session.SessionId == recentSession.SessionId);
+            store.LoadAuditEvents().Should().OnlyContain(audit => audit.SessionId == recentSession.SessionId);
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public void SimulationHarness_ShouldReplayPersistedMetadataTimeline()
+    {
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var archive = new RuntimePreviewReportArchive();
+        var harness = Harness(auditTrail: auditTrail, reportArchive: archive);
+        var report = harness.RunEndToEnd(SessionRequest(ValidFlow()), AppConfigWithCamera(), null);
+
+        var replay = harness.Replay(report.SessionId);
+
+        replay.Should().NotBeNull();
+        replay!.Timeline.Should().NotBeEmpty();
+        replay.AuditEvents.Should().Contain(item => item.EventType == RuntimePreviewAuditEventTypes.SessionReplayed);
+        replay.MetadataOnly.Should().BeTrue();
+        replay.RealResourcesTouched.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DeployReadinessService_ShouldGenerateMetadataOnlyPreDeploymentReport()
+    {
+        var archive = new RuntimePreviewReportArchive();
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var service = new RuntimePreviewDeployReadinessService(
+            Harness(auditTrail: auditTrail, reportArchive: archive),
+            archive,
+            auditTrail,
+            new RuntimePackagePrecheckTool());
+
+        var report = await service.GenerateAsync(
+            new RuntimePreviewDeployReadinessRequest
+            {
+                Config = PilotConfig(),
+                ToolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                Arguments = Args(new { flow = ValidFlow() }),
+                RuntimePreviewConsent = true,
+                RequireReplay = true
+            },
+            AppConfigWithCamera(),
+            null,
+            isAdmin: true,
+            developerUiRequested: true,
+            CancellationToken.None);
+
+        report.PreviewReady.Should().BeTrue();
+        report.ReadyForDeployment.Should().BeTrue();
+        report.PackageCreated.Should().BeFalse();
+        report.DeploymentExecuted.Should().BeFalse();
+        report.RealResourcesTouched.Should().BeFalse();
+        report.RuntimePackagePrecheck.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+        archive.GetDeployReadinessReport(report.ReportId).Should().NotBeNull();
+        auditTrail.ListForSession(report.SessionId).Should().Contain(item => item.EventType == RuntimePreviewAuditEventTypes.DeployReadinessGenerated);
+    }
+
+    [Fact]
+    public async Task DeployReadinessService_ShouldBlockDangerousPathWithoutPackageOrDeployment()
+    {
+        var archive = new RuntimePreviewReportArchive();
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var service = new RuntimePreviewDeployReadinessService(
+            Harness(auditTrail: auditTrail, reportArchive: archive),
+            archive,
+            auditTrail,
+            new RuntimePackagePrecheckTool());
+
+        var report = await service.GenerateAsync(
+            new RuntimePreviewDeployReadinessRequest
+            {
+                Config = PilotConfig(),
+                ToolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                Arguments = Args(new { flow = FlowWithTemplatePath() }),
+                RuntimePreviewConsent = true,
+                RequireReplay = true
+            },
+            AppConfigWithCamera(),
+            null,
+            isAdmin: true,
+            developerUiRequested: true,
+            CancellationToken.None);
+
+        report.PreviewReady.Should().BeFalse();
+        report.ReadyForDeployment.Should().BeFalse();
+        report.DeploymentBlocked.Should().BeTrue();
+        report.PackageCreated.Should().BeFalse();
+        report.DeploymentExecuted.Should().BeFalse();
+        report.RealResourcesTouched.Should().BeFalse();
+        JsonSerializer.Serialize(report).Should().NotContain("blocked-template");
+    }
+
+    [Fact]
+    public void ReportArchive_ShouldPersistDeployReadinessReports()
+    {
+        var directory = TempDirectory();
+        try
+        {
+            var store = new RuntimePreviewGovernanceStore(directory);
+            var archive = new RuntimePreviewReportArchive(store);
+            var report = new RuntimePreviewDeployReadinessReport
+            {
+                ReportId = "rp_deploy_readiness_test",
+                SessionId = "rp_session_test",
+                WorkflowDraftHash = "hash",
+                RuntimePackagePrecheck = Args(new { readyForDeployment = false, packageCreated = false, deployed = false }),
+                MetadataOnly = true,
+                RealResourcesTouched = false,
+                PackageCreated = false,
+                DeploymentExecuted = false
+            };
+
+            archive.SaveDeployReadinessReport(report);
+
+            var reloaded = new RuntimePreviewReportArchive(new RuntimePreviewGovernanceStore(directory));
+            reloaded.GetDeployReadinessReport(report.ReportId).Should().NotBeNull();
+            reloaded.GetDeployReadinessReportBySessionId(report.SessionId)!.ReportId.Should().Be(report.ReportId);
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public void MaintenanceService_ShouldAppendRetentionCleanupAuditEvent()
+    {
+        var directory = TempDirectory();
+        try
+        {
+            var store = new RuntimePreviewGovernanceStore(directory);
+            var auditTrail = new RuntimePreviewAuditTrail(store);
+            var service = new RuntimePreviewGovernanceMaintenanceService(store, auditTrail);
+
+            var cleanup = service.Cleanup(retentionDays: 30, maxSessions: 200);
+
+            cleanup.MetadataOnly.Should().BeTrue();
+            cleanup.RealResourcesTouched.Should().BeFalse();
+            auditTrail.ListForSession("runtime_preview_governance")
+                .Should().Contain(item => item.EventType == RuntimePreviewAuditEventTypes.RetentionCleanup);
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ScenarioEvidenceService_ShouldCoverMetadataOnlyBusinessScenarios()
+    {
+        var archive = new RuntimePreviewReportArchive();
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var service = new RuntimePreviewScenarioEvidenceService(new RuntimePreviewDeployReadinessService(
+            Harness(auditTrail: auditTrail, reportArchive: archive),
+            archive,
+            auditTrail,
+            new RuntimePackagePrecheckTool()));
+
+        var document = await service.RunAsync(AppConfigWithCamera(), null, CancellationToken.None);
+
+        document.CaseCount.Should().Be(8);
+        document.Cases.Select(item => item.Scenario).Should().Contain(new[]
+        {
+            "wire_sequence",
+            "template_matching",
+            "hole_distance",
+            "remote_control_detection",
+            "missing_resource",
+            "dangerous_path",
+            "station_plc_deny",
+            "precheck_not_ready"
+        });
+        document.Cases.Should().OnlyContain(item => item.MetadataOnly && !item.RealResourcesTouched);
+        document.Cases.Should().Contain(item => item.ActualStatus == RuntimePreviewScenarioEvidenceStatuses.Denied);
+        document.Cases.Should().Contain(item => item.ActualStatus == RuntimePreviewScenarioEvidenceStatuses.NotReady);
+        JsonSerializer.Serialize(document).Should().NotContain("192.0.2.20");
+        JsonSerializer.Serialize(document).Should().NotContain("DB1");
+        JsonSerializer.Serialize(document).Should().NotContain("external:/");
+    }
+
+    [Fact]
+    public void ScenarioEvidenceCases_ShouldExposeExpectedSignalsWithoutUnsafeDraftFragments()
+    {
+        var cases = RuntimePreviewScenarioEvidenceService.CreateCases();
+
+        cases.Should().HaveCount(8);
+        cases.Should().Contain(item => item.ExpectedSignals.Contains("previewReady"));
+        cases.Should().Contain(item => item.ExpectedSignals.Contains("denyReason"));
+        cases.Should().OnlyContain(item => item.WorkflowDraft.ValueKind == JsonValueKind.Object);
+        var raw = JsonSerializer.Serialize(cases);
+        raw.Should().NotContain("DB1");
+        raw.Should().NotContain("external:/");
+        raw.Should().NotContain("base64");
+    }
+
     private static RuntimePreviewSimulatedExecutionHarness Harness(
+        RuntimePreviewSessionStore? sessionStore = null,
+        RuntimePreviewAuditTrail? auditTrail = null,
         RuntimePreviewReportArchive? reportArchive = null)
     {
         var catalog = new RuntimePreviewPilotResourceCatalog();
         return new RuntimePreviewSimulatedExecutionHarness(
-            new RuntimePreviewSessionStore(),
+            sessionStore ?? new RuntimePreviewSessionStore(),
             new RuntimePreviewResourceBroker(catalog),
             new RuntimePreviewPilotReadinessGate(new RuntimePreviewResourceAllowlistResolver()),
             new RuntimePreviewPermissionBroker(),
-            new RuntimePreviewAuditTrail(),
+            auditTrail ?? new RuntimePreviewAuditTrail(),
             reportArchive ?? new RuntimePreviewReportArchive());
     }
 
@@ -509,7 +807,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
                     operatorType = "TemplateMatching",
                     parameters = new Dictionary<string, string>
                     {
-                        ["TemplatePath"] = "C:\\secret\\template.png"
+                        ["TemplatePath"] = "external:/blocked-template"
                     }
                 }
             },
@@ -521,5 +819,18 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     {
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(value));
         return document.RootElement.Clone();
+    }
+
+    private static string TempDirectory()
+    {
+        return Path.Combine(Path.GetTempPath(), $"cv-runtime-preview-governance-{Guid.NewGuid():N}");
+    }
+
+    private static void DeleteDirectory(string directory)
+    {
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 }
