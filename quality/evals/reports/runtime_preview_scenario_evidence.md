@@ -1,6 +1,6 @@
 # RuntimePreview Scenario Evidence
 
-- Generated UTC: `2026-06-06T15:00:30.583603+00:00`
+- Generated UTC: `2026-06-06T16:17:44.241304+00:00`
 - Commit: `local`
 - Branch: `local`
 - Run: `local` attempt `local`
@@ -8,27 +8,39 @@
 - Real resources touched: `False`
 - Accepted: `True`
 
-| Case | Scenario | Status | Risk | Explanation |
-| --- | --- | --- | --- | --- |
-| RP-SC-001 | wire_sequence | passed | low | Line sequence check is package-ready after metadata camera and template handles are allowlisted. |
-| RP-SC-002 | terminal_color_order | passed | low | Terminal color order inspection uses the same metadata camera with a different judgment rule. |
-| RP-SC-003 | template_matching | passed | low | Template matching positioning is ready when TemplateId is catalog-backed. |
-| RP-SC-004 | hole_distance | passed | low | Hole distance measurement can run metadata preview and package precheck without real image input. |
-| RP-SC-005 | remote_control_detection | passed | low | Remote controller inspection uses ModelId metadata and does not load a model file. |
-| RP-SC-006 | missing_camera | not_ready | missing_camera_binding | Camera binding is absent, so preview/package are blocked while the draft remains editable. |
-| RP-SC-007 | missing_template | not_ready | missing_template | Template source is unresolved; engineer must bind TemplateId before package readiness. |
-| RP-SC-008 | missing_model | not_ready | missing_model | Model metadata is unresolved; no model file is loaded and package stays blocked. |
-| RP-SC-009 | dangerous_path | denied | dangerous_resource | External path-like metadata is denied and redacted before any artifact is produced. |
-| RP-SC-010 | plc_station_deny | denied | plc_station_denied | PLC or Station intent is denied; no PLC write and no Station access are attempted. |
-| RP-SC-011 | precheck_blocked | not_ready | precheck_not_ready | Runtime package precheck blocks packaging because replay/readiness metadata is incomplete. |
-| RP-SC-012 | allowlist_mismatch | not_ready | allowlist_mismatch | Workflow references a metadata handle outside the pilot allowlist. |
-| RP-SC-013 | multi_operator_flow | passed | medium | Multi-operator measurement flow is previewable as metadata and requires only review before real pilot. |
-| RP-SC-014 | missing_parameter | not_ready | missing_parameter | A required operator parameter is missing; workflow remains editable but package is blocked. |
-| RP-SC-015 | draft_editable_package_blocked | not_ready | draft_allowed_package_blocked | The workflow draft can still be edited even though package readiness is blocked by missing resources. |
-| RP-SC-016 | package_manifest_blocked | not_ready | manifest_dependency_blocked | Manifest dry-run blocks package review because dependency metadata is incomplete. |
-| RP-SC-017 | multi_camera_flow | not_ready | multi_camera_review | Two-camera workflow requires both camera metadata handles to be allowlisted. |
-| RP-SC-018 | multi_model_flow | not_ready | multi_model_review | Multiple model dependencies require catalog ownership review before package review. |
-| RP-SC-019 | template_plus_hole_distance | passed | medium | Template positioning and hole distance measurement can be reviewed as a metadata manifest. |
-| RP-SC-020 | direct_deploy_request_denied | denied | deployment_intent_denied | Direct Station release intent is denied; no package or deployment is created. |
+| Id | Scenario / Type | Status / Decision | Risk / Notes |
+| --- | --- | --- | --- |
+| RP-SC-001 | wire_sequence | passed | - |
+| RP-SC-002 | remote_control_defect | passed | - |
+| RP-SC-003 | template_measurement_combo | passed | - |
+| RP-SC-004 | hole_distance | passed | - |
+| RP-SC-005 | terminal_color_order | passed | - |
+| RP-SC-006 | missing_camera | not_ready | - |
+| RP-SC-007 | missing_template | not_ready | - |
+| RP-SC-008 | missing_model | not_ready | - |
+| RP-SC-009 | missing_output_channel | not_ready | - |
+| RP-SC-010 | plc_station_deny | denied | - |
+| RP-SC-011 | dangerous_path | denied | - |
+| RP-SC-012 | allowlist_mismatch | not_ready | - |
+| RP-SC-013 | multi_camera_flow | not_ready | - |
+| RP-SC-014 | multi_model_flow | not_ready | - |
+| RP-SC-015 | parameter_missing | not_ready | - |
+| RP-SC-016 | package_manifest_blocked | not_ready | - |
+| RP-SC-017 | workflow_editable_package_blocked | not_ready | - |
+| RP-SC-018 | runtime_package_precheck_blocked | not_ready | - |
+| RP-SC-019 | template_plus_hole_distance | passed | - |
+| RP-SC-020 | direct_deploy_request_denied | denied | - |
+| RP-SC-021 | low_ipc_operator_count_exceeded | passed | - |
+| RP-SC-022 | multi_camera_slot_shortage | passed | - |
+| RP-SC-023 | unsupported_deep_learning | passed | - |
+| RP-SC-024 | output_channel_kind_missing | passed | - |
+| RP-SC-025 | plc_write_forbidden | denied | - |
+| RP-SC-026 | runtime_version_too_low | passed | - |
+| RP-SC-027 | model_type_incompatible | passed | - |
+| RP-SC-028 | template_dependency_missing | not_ready | - |
+| RP-SC-029 | traditional_vision_release_allowed | passed | - |
+| RP-SC-030 | deep_learning_requires_engineer_approval | passed | - |
+| RP-SC-031 | multi_station_requires_engineer_approval | passed | - |
+| RP-SC-032 | release_blocked_operator_contract | not_ready | - |
 
 Safety boundary: no real camera SDK, Station access, image file read, model file load, PLC write, package creation, deployment, hot-load, or Real RuntimePreview adapter.

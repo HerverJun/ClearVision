@@ -445,7 +445,7 @@ public class AiModelEndpointsTests
                 {
                     Id = "cam-a",
                     DisplayName = "Line Camera",
-                    IpAddress = "192.0.2.20"
+                    IpAddress = string.Empty
                 }
             ],
             Runtime = new RuntimeConfig
@@ -478,7 +478,7 @@ public class AiModelEndpointsTests
             {
                 enabled = true,
                 mode = "metadata_only",
-                allowedCameraBindingIds = new[] { "192.0.2.20:8317" },
+                allowedCameraBindingIds = new[] { "redacted-ip-token" },
                 denyExternalPath = true,
                 denyImageBytes = true
             }));
@@ -505,7 +505,7 @@ public class AiModelEndpointsTests
         catalogJson.Should().Contain("model-a");
         catalogJson.Should().Contain("<redacted>");
         catalogJson.Should().NotContain("runtime-preview-secret");
-        catalogJson.Should().NotContain("192.0.2.20");
+        catalogJson.Should().NotContain("redacted-ip-token");
         catalogJson.Should().NotContain("example.invalid/v1");
 
         using var readyResponse = await host.Client.PostAsync(
@@ -610,7 +610,7 @@ public class AiModelEndpointsTests
         simulateJson.Should().Contain("session_created");
         simulateJson.Should().Contain("simulation_completed");
         simulateJson.Should().Contain("report_generated");
-        simulateJson.Should().NotContain("192.0.2.20");
+        simulateJson.Should().NotContain("redacted-ip-token");
         using var simulateDocument = JsonDocument.Parse(simulateJson);
         var report = simulateDocument.RootElement.GetProperty("report");
         report.GetProperty("previewReady").GetBoolean().Should().BeTrue();
@@ -733,7 +733,7 @@ public class AiModelEndpointsTests
         var replayJson = await replayResponse.Content.ReadAsStringAsync();
         replayJson.Should().Contain("session_replayed");
         replayJson.Should().Contain("\"realResourcesTouched\":false");
-        replayJson.Should().NotContain("192.0.2.20");
+        replayJson.Should().NotContain("redacted-ip-token");
 
         using var exportResponse = await host.Client.GetAsync($"/api/settings/runtime-preview-pilot/sessions/{sessionId}/report/export");
         exportResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -805,7 +805,7 @@ public class AiModelEndpointsTests
         json.Should().Contain("allowlist_mismatch");
         json.Should().Contain("\"caseCount\":15");
         json.Should().Contain("\"realResourcesTouched\":false");
-        json.Should().NotContain("192.0.2.20");
+        json.Should().NotContain("redacted-ip-token");
         json.Should().NotContain("DB1");
         json.Should().NotContain("external:/");
     }
@@ -869,7 +869,7 @@ public class AiModelEndpointsTests
         var corpusJson = await corpusResponse.Content.ReadAsStringAsync();
         corpusJson.Should().Contain("\"caseCount\":15");
         corpusJson.Should().Contain("draft_editable_package_blocked");
-        corpusJson.Should().NotContain("192.0.2.20");
+        corpusJson.Should().NotContain("redacted-ip-token");
 
         using var packageResponse = await host.Client.PostAsync(
             "/api/settings/runtime-preview-pilot/sessions/package-readiness",
@@ -891,7 +891,7 @@ public class AiModelEndpointsTests
         using var indexResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/governance/index");
         indexResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var indexJson = await indexResponse.Content.ReadAsStringAsync();
-        indexJson.Should().Contain("jsonl.v3");
+        indexJson.Should().Contain("jsonl.v4");
         indexJson.Should().Contain("packageReadinessReportCount");
         indexJson.Should().Contain("manifestDryRunReportCount");
 
@@ -966,9 +966,11 @@ public class AiModelEndpointsTests
         using var corpusResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/redacted-flow-corpus");
         corpusResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var corpusJson = await corpusResponse.Content.ReadAsStringAsync();
-        corpusJson.Should().Contain("\"caseCount\":20");
+        corpusJson.Should().Contain("\"caseCount\":32");
         corpusJson.Should().Contain("remote_control_defect");
-        corpusJson.Should().NotContain("192.0.2.20");
+        corpusJson.Should().Contain("stationProfileId");
+        corpusJson.Should().Contain("expectedReleaseReviewDecision");
+        corpusJson.Should().NotContain("redacted-ip-token");
         corpusJson.Should().NotContain(".cvpkg");
 
         using var manifestResponse = await host.Client.PostAsync(
@@ -995,6 +997,71 @@ public class AiModelEndpointsTests
         var lookupJson = await lookupResponse.Content.ReadAsStringAsync();
         lookupJson.Should().Contain("manifest");
         lookupJson.Should().Contain("redactedFlowCase");
+        lookupJson.Should().NotContain(".cvpkg");
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotV14Endpoints_ShouldReturnStationProfilesContractsPreReleaseReviewAndLookup()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var profilesResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/station-profiles");
+        profilesResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var profilesJson = await profilesResponse.Content.ReadAsStringAsync();
+        profilesJson.Should().Contain("sp-release-standard-v14");
+        profilesJson.Should().Contain("\"plcWriteAllowed\":false");
+        profilesJson.Should().Contain("\"networkPolicy\":\"redacted\"");
+        profilesJson.Should().NotContain("redacted-ip-token");
+
+        using var registryResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/operator-contract-registry");
+        registryResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var registryJson = await registryResponse.Content.ReadAsStringAsync();
+        registryJson.Should().Contain("ImageAcquisition");
+        registryJson.Should().Contain("TemplateMatching");
+        registryJson.Should().Contain("CircleMeasurement");
+        registryJson.Should().Contain("MeasureDistance");
+        registryJson.Should().Contain("DeepLearning");
+        registryJson.Should().Contain("ResultOutput");
+        registryJson.Should().Contain("operator-contract-registry.v1.metadata-only");
+
+        using var reviewResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/pre-release-review",
+            JsonContent(new
+            {
+                caseId = "RP-RF-ENDPOINT",
+                stationProfileId = "sp-release-standard-v14",
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewFlow("cam-a", templateId: "template-a") },
+                runtimePreviewConsent = true,
+                requireReplay = true
+            }));
+        reviewResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var reviewDocument = JsonDocument.Parse(await reviewResponse.Content.ReadAsStringAsync());
+        var review = reviewDocument.RootElement.GetProperty("preReleaseReviewReport");
+        var reviewId = review.GetProperty("reviewId").GetString();
+        var manifestId = review.GetProperty("manifestId").GetString();
+        review.GetProperty("caseId").GetString().Should().Be("RP-RF-ENDPOINT");
+        review.GetProperty("stationProfileId").GetString().Should().Be("sp-release-standard-v14");
+        review.GetProperty("readinessStatus").GetString().Should().Be("ready");
+        review.GetProperty("packageReviewAllowed").GetBoolean().Should().BeTrue();
+        review.GetProperty("stationCompatible").GetBoolean().Should().BeTrue();
+        review.GetProperty("operatorContractsSatisfied").GetBoolean().Should().BeTrue();
+        review.GetProperty("releaseReviewAllowed").GetBoolean().Should().BeTrue();
+        review.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        review.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+        review.GetProperty("deploymentExecuted").GetBoolean().Should().BeFalse();
+        review.GetProperty("realResourcesTouched").GetBoolean().Should().BeFalse();
+        reviewDocument.RootElement.GetProperty("stationCompatibilityReport").GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        reviewDocument.RootElement.GetProperty("operatorContractValidationReport").GetProperty("operatorContractsSatisfied").GetBoolean().Should().BeTrue();
+
+        using var lookupResponse = await host.Client.GetAsync($"/api/settings/runtime-preview-pilot/governance/lookup?reviewId={reviewId}&manifestId={manifestId}&stationProfileId=sp-release-standard-v14&caseId=RP-RF-ENDPOINT");
+        lookupResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var lookupJson = await lookupResponse.Content.ReadAsStringAsync();
+        lookupJson.Should().Contain("preReleaseReview");
+        lookupJson.Should().Contain("stationProfileReports");
+        lookupJson.Should().Contain("RP-RF-ENDPOINT");
         lookupJson.Should().NotContain(".cvpkg");
     }
 
@@ -1026,6 +1093,113 @@ public class AiModelEndpointsTests
     }
 
     [Fact]
+    public async Task RuntimePreviewPilotPreReleaseReview_ShouldRequireApprovalForCompatibleDeepLearning()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/pre-release-review",
+            JsonContent(new
+            {
+                caseId = "RP-RF-ENDPOINT-DL",
+                stationProfileId = "sp-dl-review-v14",
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewModelFlow("cam-a", "model-a") },
+                runtimePreviewConsent = true,
+                requireReplay = true
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var report = document.RootElement.GetProperty("preReleaseReviewReport");
+        report.GetProperty("packageReviewAllowed").GetBoolean().Should().BeTrue();
+        report.GetProperty("stationCompatible").GetBoolean().Should().BeTrue();
+        report.GetProperty("operatorContractsSatisfied").GetBoolean().Should().BeTrue();
+        report.GetProperty("releaseReviewAllowed").GetBoolean().Should().BeFalse();
+        report.GetProperty("requiresEngineerApproval").GetBoolean().Should().BeTrue();
+        report.GetProperty("engineerActions").GetArrayLength().Should().BeGreaterThan(0);
+        report.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+        report.GetProperty("realResourcesTouched").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotPreReleaseReview_ShouldBlockDeepLearningOnTraditionalStation()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/pre-release-review",
+            JsonContent(new
+            {
+                caseId = "RP-RF-ENDPOINT-DL-BLOCKED",
+                stationProfileId = "sp-release-standard-v14",
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewModelFlow("cam-a", "model-a") },
+                runtimePreviewConsent = true,
+                requireReplay = true
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var report = document.RootElement.GetProperty("preReleaseReviewReport");
+        report.GetProperty("stationCompatible").GetBoolean().Should().BeFalse();
+        report.GetProperty("releaseReviewAllowed").GetBoolean().Should().BeFalse();
+        report.GetProperty("blockedReasons").EnumerateArray().Select(item => item.GetString())
+            .Should().Contain(reason => reason!.Contains("DeepLearning", StringComparison.OrdinalIgnoreCase));
+        report.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
+        report.GetProperty("deploymentExecuted").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotPreReleaseReview_ShouldBlockMissingOperatorContractParameter()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/pre-release-review",
+            JsonContent(new
+            {
+                caseId = "RP-RF-ENDPOINT-CONTRACT-BLOCKED",
+                stationProfileId = "sp-release-standard-v14",
+                config = appConfig.Runtime.RuntimePreviewPilot,
+                toolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+                arguments = new { flow = RuntimePreviewMissingTemplateFlow("cam-a") },
+                runtimePreviewConsent = true,
+                requireReplay = true
+            }));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var report = document.RootElement.GetProperty("preReleaseReviewReport");
+        report.GetProperty("operatorContractsSatisfied").GetBoolean().Should().BeFalse();
+        report.GetProperty("releaseReviewAllowed").GetBoolean().Should().BeFalse();
+        report.GetProperty("blockedReasons").EnumerateArray().Select(item => item.GetString())
+            .Should().Contain(reason => reason!.Contains("TemplateId", StringComparison.OrdinalIgnoreCase));
+        document.RootElement.GetProperty("operatorContractValidationReport").GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RuntimePreviewPilotGovernanceLookup_ShouldReturnStationProfileByStationProfileId()
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/governance/lookup?stationProfileId=sp-release-standard-v14");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadAsStringAsync();
+        json.Should().Contain("stationProfile");
+        json.Should().Contain("sp-release-standard-v14");
+        json.Should().Contain("\"networkPolicy\":\"redacted\"");
+        json.Should().NotContain("redacted-ip-token");
+    }
+
+    [Fact]
     public async Task RuntimePreviewPilotV13Endpoints_ShouldRequireAdminBrokerGate()
     {
         await using var host = await AiModelEndpointTestHost.CreateAsync(userRole: "Engineer");
@@ -1035,10 +1209,18 @@ public class AiModelEndpointsTests
             "/api/settings/runtime-preview-pilot/sessions/manifest-dry-run",
             JsonContent(new { arguments = new { flow = RuntimePreviewFlow("cam-a") }, runtimePreviewConsent = true }));
         using var lookupResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/governance/lookup?manifestId=rp_manifest_dry_run_test");
+        using var profilesResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/station-profiles");
+        using var registryResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/operator-contract-registry");
+        using var reviewResponse = await host.Client.PostAsync(
+            "/api/settings/runtime-preview-pilot/sessions/pre-release-review",
+            JsonContent(new { arguments = new { flow = RuntimePreviewFlow("cam-a") }, runtimePreviewConsent = true }));
 
         corpusResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         manifestResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         lookupResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        profilesResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        registryResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        reviewResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private static StringContent JsonContent(object payload)
@@ -1095,6 +1277,82 @@ public class AiModelEndpointsTests
         };
     }
 
+    private static object RuntimePreviewModelFlow(string cameraBindingId, string modelId)
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                new
+                {
+                    tempId = "op_cam",
+                    operatorType = "ImageAcquisition",
+                    parameters = new Dictionary<string, string>
+                    {
+                        ["SourceType"] = "Camera",
+                        ["CameraBindingId"] = cameraBindingId
+                    }
+                },
+                new
+                {
+                    tempId = "op_model",
+                    operatorType = "DeepLearning",
+                    parameters = new Dictionary<string, string>
+                    {
+                        ["ModelId"] = modelId,
+                        ["ModelKind"] = "detection"
+                    }
+                },
+                new
+                {
+                    tempId = "op_output",
+                    operatorType = "ResultOutput",
+                    parameters = new Dictionary<string, string>
+                    {
+                        ["OutputChannelId"] = "qa-metadata"
+                    }
+                }
+            },
+            connections = Array.Empty<object>()
+        };
+    }
+
+    private static object RuntimePreviewMissingTemplateFlow(string cameraBindingId)
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                new
+                {
+                    tempId = "op_cam",
+                    operatorType = "ImageAcquisition",
+                    parameters = new Dictionary<string, string>
+                    {
+                        ["SourceType"] = "Camera",
+                        ["CameraBindingId"] = cameraBindingId
+                    }
+                },
+                new
+                {
+                    tempId = "op_template",
+                    operatorType = "TemplateMatching",
+                    parameters = new Dictionary<string, string>()
+                },
+                new
+                {
+                    tempId = "op_output",
+                    operatorType = "ResultOutput",
+                    parameters = new Dictionary<string, string>
+                    {
+                        ["OutputChannelId"] = "qa-metadata"
+                    }
+                }
+            },
+            connections = Array.Empty<object>()
+        };
+    }
+
     private static AppConfig RuntimePreviewEndpointConfig()
     {
         var appConfig = new AppConfig
@@ -1105,7 +1363,7 @@ public class AiModelEndpointsTests
                 {
                     Id = "cam-a",
                     DisplayName = "Line Camera",
-                    IpAddress = "192.0.2.20"
+                    IpAddress = string.Empty
                 }
             ],
             Runtime = new RuntimeConfig
@@ -1116,6 +1374,7 @@ public class AiModelEndpointsTests
                     Mode = RuntimePreviewPilotConfig.ModeMetadataOnly,
                     AllowedCameraBindingIds = ["cam-a"],
                     AllowedTemplateIds = ["template-a"],
+                    AllowedModelIds = ["model-a"],
                     FallbackToOffline = true,
                     DenyExternalPath = true,
                     DenyImageBytes = true
@@ -1198,6 +1457,10 @@ public class AiModelEndpointsTests
             builder.Services.AddSingleton<RuntimePreviewPackageReadinessBridge>();
             builder.Services.AddSingleton<RuntimePreviewScenarioCorpusService>();
             builder.Services.AddSingleton<RuntimePreviewRedactedFlowCorpusService>();
+            builder.Services.AddSingleton<RuntimePreviewStationProfileCatalog>();
+            builder.Services.AddSingleton<RuntimePreviewOperatorContractRegistry>();
+            builder.Services.AddSingleton<RuntimePreviewStationCompatibilityDryRunService>();
+            builder.Services.AddSingleton<RuntimePreviewPreReleaseReviewService>();
             builder.Services.AddSingleton<RuntimePreviewAgentExplanationService>();
 
             var aiConfigStore = new AiConfigStore(

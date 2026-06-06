@@ -1,16 +1,16 @@
 {
-  "schemaVersion": "2026-06-06.runtime-preview-scenario-corpus.v2",
+  "schemaVersion": "2026-06-06.runtime-preview-scenario-corpus.v3",
   "benchmarkId": "runtime_preview_scenario_corpus",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T15:00:30.583603+00:00"
+    "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
   },
   "summary": {
-    "caseCount": 20,
-    "minimumCases": 20,
+    "caseCount": 32,
+    "minimumCases": 30,
     "accepted": true,
     "metadataOnly": true,
     "realResourcesTouched": false
@@ -19,12 +19,12 @@
     {
       "caseId": "RP-SC-001",
       "scenario": "wire_sequence",
-      "workflowDraftHash": "45649defb897912ef5005455292fcbbcc0b7e4d13f9679a15d02efc0c1ab718b",
+      "workflowDraftHash": "fd83facb6ce240c613d112594c2566682bec9cfbeb6dccfaf5fc104ee13507c0",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "low",
       "expectedPendingActions": [],
-      "businessExplanation": "Line sequence check is package-ready after metadata camera and template handles are allowlisted.",
+      "businessExplanation": "Review metadata manifest and keep real pilot gate closed.",
       "expectedSignals": [
         "previewReady",
         "readyForPackage"
@@ -34,7 +34,35 @@
       "denyReason": "",
       "precheckRisk": "",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -50,13 +78,13 @@
     },
     {
       "caseId": "RP-SC-002",
-      "scenario": "terminal_color_order",
-      "workflowDraftHash": "595f21cd03ec81346fa323c0f11c27f23c95abd5c332a9e90cec1734ba9f94d3",
+      "scenario": "remote_control_defect",
+      "workflowDraftHash": "0c8a73d93e5658933f3783e32e9f9a23c05b870743ee24e554c0a9c7029f6488",
       "expectedStatus": "passed",
       "actualStatus": "passed",
-      "expectedRisk": "low",
+      "expectedRisk": "medium",
       "expectedPendingActions": [],
-      "businessExplanation": "Terminal color order inspection uses the same metadata camera with a different judgment rule.",
+      "businessExplanation": "Request DeepLearning release review approval.",
       "expectedSignals": [
         "previewReady",
         "readyForPackage"
@@ -66,7 +94,36 @@
       "denyReason": "",
       "precheckRisk": "",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "DeepLearning",
+            "parameters": {
+              "ModelId": "remote-control-model",
+              "ModelKind": "detection"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -82,13 +139,13 @@
     },
     {
       "caseId": "RP-SC-003",
-      "scenario": "template_matching",
-      "workflowDraftHash": "5dfd965dfe10ef102b2c6d089f33adbda6643621c5ecbad320c5b75f191d6855",
+      "scenario": "template_measurement_combo",
+      "workflowDraftHash": "83c69ad11367555716a16473898a740a4dcd2ab6ffc40f10b7d88637be8ec7e8",
       "expectedStatus": "passed",
       "actualStatus": "passed",
-      "expectedRisk": "low",
+      "expectedRisk": "medium",
       "expectedPendingActions": [],
-      "businessExplanation": "Template matching positioning is ready when TemplateId is catalog-backed.",
+      "businessExplanation": "Review combined template, measurement, and DeepLearning contracts.",
       "expectedSignals": [
         "previewReady",
         "readyForPackage"
@@ -98,7 +155,50 @@
       "denyReason": "",
       "precheckRisk": "",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "CircleMeasurement",
+            "parameters": {
+              "Roi": "feature-a"
+            }
+          },
+          {
+            "tempId": "op_4",
+            "operatorType": "DeepLearning",
+            "parameters": {
+              "ModelId": "remote-control-model",
+              "ModelKind": "detection"
+            }
+          },
+          {
+            "tempId": "op_5",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -115,12 +215,12 @@
     {
       "caseId": "RP-SC-004",
       "scenario": "hole_distance",
-      "workflowDraftHash": "9caa8b1f75c3e14f9c2821cd99f7badab0082660825830529aeeb65799739ba3",
+      "workflowDraftHash": "6e8d7b8d944df894c9e114cb1a6b4954f67e6f28812583e6558072accd393192",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "low",
       "expectedPendingActions": [],
-      "businessExplanation": "Hole distance measurement can run metadata preview and package precheck without real image input.",
+      "businessExplanation": "Confirm measurement unit and tolerance source.",
       "expectedSignals": [
         "previewReady",
         "readyForPackage"
@@ -130,7 +230,42 @@
       "denyReason": "",
       "precheckRisk": "",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "CircleMeasurement",
+            "parameters": {
+              "Roi": "feature-a"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "MeasureDistance",
+            "parameters": {
+              "Unit": "mm"
+            }
+          },
+          {
+            "tempId": "op_4",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -146,13 +281,13 @@
     },
     {
       "caseId": "RP-SC-005",
-      "scenario": "remote_control_detection",
-      "workflowDraftHash": "6ebdbb16e84a97d67aff185a1269c26c9a4b7a3d1d4c4cc4249a47b235576552",
+      "scenario": "terminal_color_order",
+      "workflowDraftHash": "8844621e58c341fa1089fcab0b52b998d2aa661049ba4f6fdb08b4fead302e3d",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "low",
       "expectedPendingActions": [],
-      "businessExplanation": "Remote controller inspection uses ModelId metadata and does not load a model file.",
+      "businessExplanation": "Confirm template ownership and output channel mapping.",
       "expectedSignals": [
         "previewReady",
         "readyForPackage"
@@ -162,7 +297,35 @@
       "denyReason": "",
       "precheckRisk": "",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -179,14 +342,14 @@
     {
       "caseId": "RP-SC-006",
       "scenario": "missing_camera",
-      "workflowDraftHash": "c682a4b0c637a6db6e3f34d59832f53b12983ea46ee7a364feb3274d917ccee2",
+      "workflowDraftHash": "2bec83579a27d49699f3d2bc87669cb9fe7d40697c335f2431fd38d73dc5229f",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "missing_camera_binding",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "Camera binding is absent, so preview/package are blocked while the draft remains editable.",
+      "businessExplanation": "Bind an allowlisted metadata camera before package review.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -195,7 +358,7 @@
       "missingResources": [
         {
           "kind": "missing_camera_binding",
-          "handle": "<pending-metadata-handle>"
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
@@ -204,7 +367,35 @@
       "denyReason": "",
       "precheckRisk": "missing_camera_binding",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -221,14 +412,14 @@
     {
       "caseId": "RP-SC-007",
       "scenario": "missing_template",
-      "workflowDraftHash": "755a93d83ae41b193d105e4de9adafce9a67a67223ffc36f9dddaa792ab601e3",
+      "workflowDraftHash": "3f62275443281be7fa55edc28b790af0b40b2e757090c4059794eccc5e974a8e",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "missing_template",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "Template source is unresolved; engineer must bind TemplateId before package readiness.",
+      "businessExplanation": "Assign an allowlisted TemplateId; do not use file paths.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -237,7 +428,7 @@
       "missingResources": [
         {
           "kind": "missing_template",
-          "handle": "<pending-metadata-handle>"
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
@@ -246,7 +437,33 @@
       "denyReason": "",
       "precheckRisk": "missing_template",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {}
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -263,14 +480,14 @@
     {
       "caseId": "RP-SC-008",
       "scenario": "missing_model",
-      "workflowDraftHash": "4763e0c0b1e06d87da1377294c88d682e148ba655524a1635634ff5116305c98",
+      "workflowDraftHash": "2bba76e8556d58aa507ba7216b4ea4fb992593ede3c03095aa126ad73139aef5",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "missing_model",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "Model metadata is unresolved; no model file is loaded and package stays blocked.",
+      "businessExplanation": "Bind ModelId from catalog; do not load a model file.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -279,7 +496,7 @@
       "missingResources": [
         {
           "kind": "missing_model",
-          "handle": "<pending-metadata-handle>"
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
@@ -288,7 +505,33 @@
       "denyReason": "",
       "precheckRisk": "missing_model",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "DeepLearning",
+            "parameters": {}
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -304,28 +547,59 @@
     },
     {
       "caseId": "RP-SC-009",
-      "scenario": "dangerous_path",
-      "workflowDraftHash": "2759fec4e0c501c5794cd1f52e17df949def4c823e989252c45dd59258359b15",
-      "expectedStatus": "denied",
-      "actualStatus": "denied",
-      "expectedRisk": "dangerous_resource",
+      "scenario": "missing_output_channel",
+      "workflowDraftHash": "b210cac6d63a2f4ccbdc9adfb3c15ff0ecded689f51ab8ffb0e3d65ea502290c",
+      "expectedStatus": "not_ready",
+      "actualStatus": "not_ready",
+      "expectedRisk": "missing_output_channel",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "External path-like metadata is denied and redacted before any artifact is produced.",
+      "businessExplanation": "Choose OutputChannelId before package review.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
         "riskSummary"
       ],
-      "missingResources": [],
+      "missingResources": [
+        {
+          "kind": "missing_output_channel",
+          "handle": "<redacted-metadata-handle>"
+        }
+      ],
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "denyReason": "runtime_preview_dangerous_or_denied_metadata",
-      "precheckRisk": "dangerous_resource",
+      "denyReason": "",
+      "precheckRisk": "missing_output_channel",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {}
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -342,27 +616,61 @@
     {
       "caseId": "RP-SC-010",
       "scenario": "plc_station_deny",
-      "workflowDraftHash": "60906f57676c01e14064dd1c7fa23cc0b020adccf050a6b59fb6eb594bf33618",
+      "workflowDraftHash": "64953ce6aa34a17a7d4016ea6e1714ab7914634e861131192510ef77bc231412",
       "expectedStatus": "denied",
       "actualStatus": "denied",
       "expectedRisk": "plc_station_denied",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "PLC or Station intent is denied; no PLC write and no Station access are attempted.",
+      "businessExplanation": "Remove PLC/Station intent; this console cannot write or deploy.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
         "riskSummary"
       ],
-      "missingResources": [],
+      "missingResources": [
+        {
+          "kind": "plc_station_denied",
+          "handle": "<redacted-metadata-handle>"
+        }
+      ],
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
       "denyReason": "runtime_preview_dangerous_or_denied_metadata",
       "precheckRisk": "plc_station_denied",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "Channel": "plc-redacted",
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -378,15 +686,15 @@
     },
     {
       "caseId": "RP-SC-011",
-      "scenario": "precheck_blocked",
-      "workflowDraftHash": "a8eb8453d9e96ea5f7b824b4730bde76189cbbad40b56b0f5784acbd461ccf1e",
-      "expectedStatus": "not_ready",
-      "actualStatus": "not_ready",
-      "expectedRisk": "precheck_not_ready",
+      "scenario": "dangerous_path",
+      "workflowDraftHash": "682a30145cdd25b600c43eab8ab6b822be5515b6bba58ac6e8d2b0bae85fdef1",
+      "expectedStatus": "denied",
+      "actualStatus": "denied",
+      "expectedRisk": "dangerous_resource",
       "expectedPendingActions": [
-        "DeploymentPrecheckResourceReview"
+        "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "Runtime package precheck blocks packaging because replay/readiness metadata is incomplete.",
+      "businessExplanation": "Replace path-like metadata with a catalog TemplateId.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -394,17 +702,45 @@
       ],
       "missingResources": [
         {
-          "kind": "precheck_not_ready",
-          "handle": "<pending-metadata-handle>"
+          "kind": "dangerous_resource",
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
-        "DeploymentPrecheckResourceReview"
+        "RuntimePreviewPilotReadinessReview"
       ],
-      "denyReason": "",
-      "precheckRisk": "precheck_not_ready",
+      "denyReason": "runtime_preview_dangerous_or_denied_metadata",
+      "precheckRisk": "dangerous_resource",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -421,14 +757,14 @@
     {
       "caseId": "RP-SC-012",
       "scenario": "allowlist_mismatch",
-      "workflowDraftHash": "4d5584f5ab5f07e39954e716c81b1a6c2f5c77f675c66d4f8b1b5a76046e663e",
+      "workflowDraftHash": "5ae10927888bb2d306a0d364c9d45974f5e52ce1ef14d5bac4c067ae9a7728bd",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "allowlist_mismatch",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "Workflow references a metadata handle outside the pilot allowlist.",
+      "businessExplanation": "Review allowlist diff and confirm the catalog handle.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -437,7 +773,7 @@
       "missingResources": [
         {
           "kind": "allowlist_mismatch",
-          "handle": "<pending-metadata-handle>"
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
@@ -446,7 +782,35 @@
       "denyReason": "",
       "precheckRisk": "allowlist_mismatch",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -462,23 +826,69 @@
     },
     {
       "caseId": "RP-SC-013",
-      "scenario": "multi_operator_flow",
-      "workflowDraftHash": "59da8b08bdbdadbe44e8bde51901264e94243f1f958731ecdfe6a4fb2de793ef",
-      "expectedStatus": "passed",
-      "actualStatus": "passed",
-      "expectedRisk": "medium",
-      "expectedPendingActions": [],
-      "businessExplanation": "Multi-operator measurement flow is previewable as metadata and requires only review before real pilot.",
-      "expectedSignals": [
-        "previewReady",
-        "readyForPackage"
+      "scenario": "multi_camera_flow",
+      "workflowDraftHash": "993fae2d93373ca478e164b1c96cbcdbcd7c86f336f461907ab728a707ee6db8",
+      "expectedStatus": "not_ready",
+      "actualStatus": "not_ready",
+      "expectedRisk": "multi_camera_review",
+      "expectedPendingActions": [
+        "RuntimePreviewPilotReadinessReview"
       ],
-      "missingResources": [],
-      "pendingActions": [],
+      "businessExplanation": "Confirm both camera bindings are catalog allowlisted.",
+      "expectedSignals": [
+        "missingResources",
+        "pendingActions",
+        "riskSummary"
+      ],
+      "missingResources": [
+        {
+          "kind": "multi_camera_review",
+          "handle": "<redacted-metadata-handle>"
+        }
+      ],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
       "denyReason": "",
-      "precheckRisk": "",
+      "precheckRisk": "multi_camera_review",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "side-cam"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_4",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -494,15 +904,15 @@
     },
     {
       "caseId": "RP-SC-014",
-      "scenario": "missing_parameter",
-      "workflowDraftHash": "c370cff60767321da4105fe51d76ddb7438a4c2c095abb6416ce541111919db0",
+      "scenario": "multi_model_flow",
+      "workflowDraftHash": "bd65711efa3aa4b8b2d7ed0c81bf30970400400a4589740373731c00a6c0bdcb",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
-      "expectedRisk": "missing_parameter",
+      "expectedRisk": "multi_model_review",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "A required operator parameter is missing; workflow remains editable but package is blocked.",
+      "businessExplanation": "Confirm all ModelIds and output aggregation before package review.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -510,17 +920,48 @@
       ],
       "missingResources": [
         {
-          "kind": "missing_parameter",
-          "handle": "<pending-metadata-handle>"
+          "kind": "multi_model_review",
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
       "denyReason": "",
-      "precheckRisk": "missing_parameter",
+      "precheckRisk": "multi_model_review",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "DeepLearning",
+            "parameters": {}
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "DeepLearning",
+            "parameters": {}
+          },
+          {
+            "tempId": "op_4",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -536,15 +977,15 @@
     },
     {
       "caseId": "RP-SC-015",
-      "scenario": "draft_editable_package_blocked",
-      "workflowDraftHash": "da4bb47f621f1bf958e31a06da3401cea52f4e39e3c0ecec4a357639654deb65",
+      "scenario": "parameter_missing",
+      "workflowDraftHash": "319669eacec9033d1675c64a856151c18003b00089405e02383a5cd0142bf37b",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
-      "expectedRisk": "draft_allowed_package_blocked",
+      "expectedRisk": "missing_parameter",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "The workflow draft can still be edited even though package readiness is blocked by missing resources.",
+      "businessExplanation": "Complete required operator parameters and rerun readiness.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -552,17 +993,45 @@
       ],
       "missingResources": [
         {
-          "kind": "draft_allowed_package_blocked",
-          "handle": "<pending-metadata-handle>"
+          "kind": "missing_parameter",
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
       "denyReason": "",
-      "precheckRisk": "draft_allowed_package_blocked",
+      "precheckRisk": "missing_parameter",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -579,14 +1048,14 @@
     {
       "caseId": "RP-SC-016",
       "scenario": "package_manifest_blocked",
-      "workflowDraftHash": "bf8c4c2af529961a1c7a09192cc3577541b142f17cbd3207abe5e2d7eb10f6a5",
+      "workflowDraftHash": "4497eb458d14092441148f20c34a3580ec84be04e581303b6e9454f46efeeb79",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
       "expectedRisk": "manifest_dependency_blocked",
       "expectedPendingActions": [
-        "ManifestDependencyReview"
+        "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "Manifest dry-run blocks package review because dependency metadata is incomplete.",
+      "businessExplanation": "Resolve manifest dependencies; no package may be created.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -595,16 +1064,45 @@
       "missingResources": [
         {
           "kind": "manifest_dependency_blocked",
-          "handle": "<pending-metadata-handle>"
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
-        "ManifestDependencyReview"
+        "RuntimePreviewPilotReadinessReview"
       ],
       "denyReason": "",
       "precheckRisk": "manifest_dependency_blocked",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "DeepLearning",
+            "parameters": {
+              "ModelId": "remote-control-model",
+              "ModelKind": "detection"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -620,15 +1118,15 @@
     },
     {
       "caseId": "RP-SC-017",
-      "scenario": "multi_camera_flow",
-      "workflowDraftHash": "3f1a3c5da3eecbc3da83a7419926cf85116f4c1b117be7459b92c4371913f9cd",
+      "scenario": "workflow_editable_package_blocked",
+      "workflowDraftHash": "b071a667ea721a242e1342befb6c805ee0bcc09734ff7c56c1f25a95a9881221",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
-      "expectedRisk": "multi_camera_review",
+      "expectedRisk": "draft_allowed_package_blocked",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "Two-camera workflow requires both camera metadata handles to be allowlisted.",
+      "businessExplanation": "Keep editing the workflow; do not start release review yet.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -636,17 +1134,45 @@
       ],
       "missingResources": [
         {
-          "kind": "multi_camera_review",
-          "handle": "<pending-metadata-handle>"
+          "kind": "draft_allowed_package_blocked",
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
       "denyReason": "",
-      "precheckRisk": "multi_camera_review",
+      "precheckRisk": "draft_allowed_package_blocked",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -662,15 +1188,15 @@
     },
     {
       "caseId": "RP-SC-018",
-      "scenario": "multi_model_flow",
-      "workflowDraftHash": "7fd3a9e193422255bbaf1f505d7da5f5b60c925a8afd8bc829651ba43f520d3f",
+      "scenario": "runtime_package_precheck_blocked",
+      "workflowDraftHash": "62438b8835134bd07ee7b51f90cc5db7cbdbd373e4443e2f7446a2ee41741d01",
       "expectedStatus": "not_ready",
       "actualStatus": "not_ready",
-      "expectedRisk": "multi_model_review",
+      "expectedRisk": "precheck_not_ready",
       "expectedPendingActions": [
-        "ManifestDependencyReview"
+        "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "Multiple model dependencies require catalog ownership review before package review.",
+      "businessExplanation": "Rerun readiness after model metadata is resolved.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
@@ -678,17 +1204,46 @@
       ],
       "missingResources": [
         {
-          "kind": "multi_model_review",
-          "handle": "<pending-metadata-handle>"
+          "kind": "precheck_not_ready",
+          "handle": "<redacted-metadata-handle>"
         }
       ],
       "pendingActions": [
-        "ManifestDependencyReview"
+        "RuntimePreviewPilotReadinessReview"
       ],
       "denyReason": "",
-      "precheckRisk": "multi_model_review",
+      "precheckRisk": "precheck_not_ready",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "DeepLearning",
+            "parameters": {
+              "ModelId": "remote-control-model",
+              "ModelKind": "detection"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -705,12 +1260,12 @@
     {
       "caseId": "RP-SC-019",
       "scenario": "template_plus_hole_distance",
-      "workflowDraftHash": "5d2bf71234cefb32558caf4631c1b7475ec50c4c41e874c04d41f0381ba80a95",
+      "workflowDraftHash": "171206f8a2518e2a855a7274a1a80c7fcd3f5495dbd60703b843b26092b471d0",
       "expectedStatus": "passed",
       "actualStatus": "passed",
       "expectedRisk": "medium",
       "expectedPendingActions": [],
-      "businessExplanation": "Template positioning and hole distance measurement can be reviewed as a metadata manifest.",
+      "businessExplanation": "Request approval for medium-risk measurement release review.",
       "expectedSignals": [
         "previewReady",
         "readyForPackage"
@@ -720,7 +1275,50 @@
       "denyReason": "",
       "precheckRisk": "",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "CircleMeasurement",
+            "parameters": {
+              "Roi": "feature-a"
+            }
+          },
+          {
+            "tempId": "op_4",
+            "operatorType": "DeepLearning",
+            "parameters": {
+              "ModelId": "remote-control-model",
+              "ModelKind": "detection"
+            }
+          },
+          {
+            "tempId": "op_5",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,
@@ -737,27 +1335,853 @@
     {
       "caseId": "RP-SC-020",
       "scenario": "direct_deploy_request_denied",
-      "workflowDraftHash": "30e76420a0e2a693be6bf9df44d0a6e3ca48d42588a3db33e15611024aa65263",
+      "workflowDraftHash": "308eae2026de1f376cf8ce54239f9c9330b7341813f0427713078b9570cface2",
       "expectedStatus": "denied",
       "actualStatus": "denied",
       "expectedRisk": "deployment_intent_denied",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
-      "businessExplanation": "Direct Station release intent is denied; no package or deployment is created.",
+      "businessExplanation": "Use only metadata review; direct deployment remains forbidden.",
       "expectedSignals": [
         "missingResources",
         "pendingActions",
         "riskSummary"
       ],
-      "missingResources": [],
+      "missingResources": [
+        {
+          "kind": "deployment_intent_denied",
+          "handle": "<redacted-metadata-handle>"
+        }
+      ],
       "pendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
       "denyReason": "runtime_preview_dangerous_or_denied_metadata",
       "precheckRisk": "deployment_intent_denied",
       "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "Channel": "plc-redacted",
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
       "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-021",
+      "scenario": "low_ipc_operator_count_exceeded",
+      "workflowDraftHash": "a198a2220a8cb35fffd86f3c5f664979ad82fdaa54c55af4fcbebd8ece9d8233",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "high",
+      "expectedPendingActions": [],
+      "businessExplanation": "Split the workflow or target a higher-capacity IPC profile.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "CircleMeasurement",
+            "parameters": {
+              "Roi": "feature-a"
+            }
+          },
+          {
+            "tempId": "op_4",
+            "operatorType": "MeasureDistance",
+            "parameters": {
+              "Unit": "mm"
+            }
+          },
+          {
+            "tempId": "op_5",
+            "operatorType": "LineMeasurement",
+            "parameters": {}
+          },
+          {
+            "tempId": "op_6",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-022",
+      "scenario": "multi_camera_slot_shortage",
+      "workflowDraftHash": "675faea6e8f7057417ec43f6df65f4bbb6f8160fa8734e093f684f61f54c7a60",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "high",
+      "expectedPendingActions": [],
+      "businessExplanation": "Choose a Station profile with enough camera binding slots.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "side-cam"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_4",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-023",
+      "scenario": "unsupported_deep_learning",
+      "workflowDraftHash": "7c3eb413d73480fd2c5e76b9d93b2e18d816cd4f098a54c19478ea8a95dba31c",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "high",
+      "expectedPendingActions": [],
+      "businessExplanation": "Move the flow to a DeepLearning-capable Station profile.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "DeepLearning",
+            "parameters": {
+              "ModelId": "remote-control-model",
+              "ModelKind": "detection"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-024",
+      "scenario": "output_channel_kind_missing",
+      "workflowDraftHash": "bebba900c40c40a8dec1ecaddb92956d4aa609e537534980abd1fd2e1343e0b0",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "high",
+      "expectedPendingActions": [],
+      "businessExplanation": "Remap ResultOutput to a Station-supported output channel kind.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-025",
+      "scenario": "plc_write_forbidden",
+      "workflowDraftHash": "55d47062458dcbf11b639ac44495e692711bd41c9fa5ec5f8412a108c6f24366",
+      "expectedStatus": "denied",
+      "actualStatus": "denied",
+      "expectedRisk": "plc_write_forbidden",
+      "expectedPendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "businessExplanation": "Remove PLC write intent and keep output metadata-only.",
+      "expectedSignals": [
+        "missingResources",
+        "pendingActions",
+        "riskSummary"
+      ],
+      "missingResources": [
+        {
+          "kind": "plc_write_forbidden",
+          "handle": "<redacted-metadata-handle>"
+        }
+      ],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "denyReason": "runtime_preview_dangerous_or_denied_metadata",
+      "precheckRisk": "plc_write_forbidden",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "Channel": "plc-redacted",
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-026",
+      "scenario": "runtime_version_too_low",
+      "workflowDraftHash": "96a6bf9c43459dc6d0479115ca986e33d78ef1df2da796c2154e0be7546b20d5",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "high",
+      "expectedPendingActions": [],
+      "businessExplanation": "Select a Runtime 1.4.0 Station profile before release review.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "DeepLearning",
+            "parameters": {
+              "ModelId": "remote-control-model",
+              "ModelKind": "detection"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-027",
+      "scenario": "model_type_incompatible",
+      "workflowDraftHash": "5ae1aa488b1a4a4403cbd0a1c484d323aaea8a21726d68395b897fcfe48d2599",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "high",
+      "expectedPendingActions": [],
+      "businessExplanation": "Use a supported detection model or target a segmentation-capable Station profile.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "DeepLearning",
+            "parameters": {
+              "ModelId": "segmentation-model",
+              "ModelKind": "segmentation"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-028",
+      "scenario": "template_dependency_missing",
+      "workflowDraftHash": "6224c65f237cd5ad61f89aa0adb0cd8a62ce72eacf3c2472889870def2958094",
+      "expectedStatus": "not_ready",
+      "actualStatus": "not_ready",
+      "expectedRisk": "template_dependency_missing",
+      "expectedPendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "businessExplanation": "Bind TemplateId metadata and rerun manifest dry-run.",
+      "expectedSignals": [
+        "missingResources",
+        "pendingActions",
+        "riskSummary"
+      ],
+      "missingResources": [
+        {
+          "kind": "template_dependency_missing",
+          "handle": "<redacted-metadata-handle>"
+        }
+      ],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "denyReason": "",
+      "precheckRisk": "template_dependency_missing",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {}
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-029",
+      "scenario": "traditional_vision_release_allowed",
+      "workflowDraftHash": "7e7dcafca1c1ddc0f371d7951c9ba0f9c669acfe9b5be6735316e8294807e8ae",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "low",
+      "expectedPendingActions": [],
+      "businessExplanation": "Release review simulator can allow this metadata-only traditional flow.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "CircleMeasurement",
+            "parameters": {
+              "Roi": "feature-a"
+            }
+          },
+          {
+            "tempId": "op_4",
+            "operatorType": "MeasureDistance",
+            "parameters": {
+              "Unit": "mm"
+            }
+          },
+          {
+            "tempId": "op_5",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-030",
+      "scenario": "deep_learning_requires_engineer_approval",
+      "workflowDraftHash": "6bd6d28ac1e4302ac77dac1b561b34e3af49ce9e9d43a08d1f14597adef0af0a",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "medium",
+      "expectedPendingActions": [],
+      "businessExplanation": "Obtain DeepLearning release approval before allowing release review.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "DeepLearning",
+            "parameters": {
+              "ModelId": "remote-control-model",
+              "ModelKind": "detection"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-031",
+      "scenario": "multi_station_requires_engineer_approval",
+      "workflowDraftHash": "242b00c45ac49522a62a5a47a2eabb89dd592ff493c13f821580c8b456da8c5d",
+      "expectedStatus": "passed",
+      "actualStatus": "passed",
+      "expectedRisk": "medium",
+      "expectedPendingActions": [],
+      "businessExplanation": "Obtain multi-station release approval before allowing release review.",
+      "expectedSignals": [
+        "previewReady",
+        "readyForPackage"
+      ],
+      "missingResources": [],
+      "pendingActions": [],
+      "denyReason": "",
+      "precheckRisk": "",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {
+              "TemplateId": "wire-template"
+            }
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "metadata-summary"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "caseId": "RP-SC-032",
+      "scenario": "release_blocked_operator_contract",
+      "workflowDraftHash": "35944ce0d444fe14e2962eb73055b7c3556b8b4cbf56cd5458139919d1c9bd4b",
+      "expectedStatus": "not_ready",
+      "actualStatus": "not_ready",
+      "expectedRisk": "operator_contract_missing_parameter",
+      "expectedPendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "businessExplanation": "Fix TemplateMatching TemplateId before rerunning release review.",
+      "expectedSignals": [
+        "missingResources",
+        "pendingActions",
+        "riskSummary"
+      ],
+      "missingResources": [
+        {
+          "kind": "operator_contract_missing_parameter",
+          "handle": "<redacted-metadata-handle>"
+        }
+      ],
+      "pendingActions": [
+        "RuntimePreviewPilotReadinessReview"
+      ],
+      "denyReason": "",
+      "precheckRisk": "operator_contract_missing_parameter",
+      "workflowDraftAllowed": true,
+      "workflowDraft": {
+        "operators": [
+          {
+            "tempId": "op_1",
+            "operatorType": "ImageAcquisition",
+            "parameters": {
+              "SourceType": "Camera",
+              "CameraBindingId": "line-cam"
+            }
+          },
+          {
+            "tempId": "op_2",
+            "operatorType": "TemplateMatching",
+            "parameters": {}
+          },
+          {
+            "tempId": "op_3",
+            "operatorType": "ResultOutput",
+            "parameters": {
+              "OutputChannelId": "qa-metadata"
+            }
+          }
+        ],
+        "connections": []
+      },
+      "metadataOnly": true,
+      "realResourcesTouched": false,
       "realResourceTouched": false,
       "realCameraSdkTouched": false,
       "realStationTouched": false,

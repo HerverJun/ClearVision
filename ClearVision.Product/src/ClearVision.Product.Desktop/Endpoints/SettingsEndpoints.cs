@@ -943,6 +943,62 @@ public static class SettingsEndpoints
             });
         });
 
+        app.MapPost("/api/settings/runtime-preview-pilot/sessions/pre-release-review", async (
+            RuntimePreviewPreReleaseReviewRequest request,
+            IConfigurationService configService,
+            AiConfigStore aiConfigStore,
+            RuntimePreviewPreReleaseReviewService preReleaseReviewService,
+            RuntimePreviewReportArchive reportArchive,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext,
+            CancellationToken cancellationToken) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-pre-release-review",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            var appConfig = await configService.LoadAsync();
+            var report = await preReleaseReviewService.GenerateAsync(
+                request,
+                appConfig,
+                aiConfigStore,
+                isAdmin: IsAdmin(httpContext),
+                developerUiRequested: IsDeveloperUiRequested(httpContext),
+                cancellationToken);
+            return Results.Ok(new
+            {
+                preReleaseReviewReport = report,
+                packageReadinessReport = string.IsNullOrWhiteSpace(report.PackageReadinessReportId)
+                    ? null
+                    : reportArchive.GetPackageReadinessReport(report.PackageReadinessReportId),
+                manifestDryRunReport = string.IsNullOrWhiteSpace(report.ManifestId)
+                    ? null
+                    : reportArchive.GetManifestDryRunReport(report.ManifestId),
+                stationCompatibilityReport = string.IsNullOrWhiteSpace(report.StationCompatibilityReportId)
+                    ? null
+                    : reportArchive.GetStationCompatibilityReport(report.StationCompatibilityReportId),
+                operatorContractValidationReport = string.IsNullOrWhiteSpace(report.OperatorContractValidationReportId)
+                    ? null
+                    : reportArchive.GetOperatorContractValidationReport(report.OperatorContractValidationReportId),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                packageCreated = false,
+                deploymentExecuted = false,
+                realResourcesTouched = false
+            });
+        });
+
         app.MapPost("/api/settings/runtime-preview-pilot/retention/cleanup", (
             RuntimePreviewRetentionCleanupEndpointRequest request,
             RuntimePreviewGovernanceMaintenanceService maintenanceService,
@@ -968,6 +1024,64 @@ public static class SettingsEndpoints
             return Results.Ok(new
             {
                 cleanup,
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/station-profiles", (
+            RuntimePreviewStationProfileCatalog stationProfileCatalog,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-station-profiles",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                stationProfiles = stationProfileCatalog.BuildProfiles(),
+                permissionDecision = endpointDecision,
+                metadataOnly = true,
+                realResourcesTouched = false
+            });
+        });
+
+        app.MapGet("/api/settings/runtime-preview-pilot/operator-contract-registry", (
+            RuntimePreviewOperatorContractRegistry operatorContractRegistry,
+            RuntimePreviewPermissionBroker permissionBroker,
+            HttpContext httpContext) =>
+        {
+            var endpointDecision = permissionBroker.EvaluateEndpointAccess(
+                "runtime-preview-pilot-operator-contract-registry",
+                IsAdmin(httpContext),
+                IsDeveloperUiRequested(httpContext));
+            if (!endpointDecision.Allowed)
+            {
+                return Results.Json(new
+                {
+                    error = endpointDecision.ReasonCode,
+                    permissionDecision = endpointDecision,
+                    metadataOnly = true,
+                    realResourcesTouched = false
+                }, statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                operatorContractRegistry = operatorContractRegistry.BuildRegistry(),
                 permissionDecision = endpointDecision,
                 metadataOnly = true,
                 realResourcesTouched = false
@@ -1161,10 +1275,13 @@ public static class SettingsEndpoints
             string? reportId,
             string? caseId,
             string? manifestId,
+            string? reviewId,
+            string? stationProfileId,
             RuntimePreviewSessionStore sessionStore,
             RuntimePreviewReportArchive reportArchive,
             RuntimePreviewScenarioCorpusService scenarioCorpusService,
             RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
+            RuntimePreviewStationProfileCatalog stationProfileCatalog,
             RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
@@ -1188,7 +1305,10 @@ public static class SettingsEndpoints
             var normalizedReportId = string.IsNullOrWhiteSpace(reportId) ? string.Empty : reportId.Trim();
             var normalizedCaseId = string.IsNullOrWhiteSpace(caseId) ? string.Empty : caseId.Trim();
             var normalizedManifestId = string.IsNullOrWhiteSpace(manifestId) ? string.Empty : manifestId.Trim();
+            var normalizedReviewId = string.IsNullOrWhiteSpace(reviewId) ? string.Empty : reviewId.Trim();
+            var normalizedStationProfileId = string.IsNullOrWhiteSpace(stationProfileId) ? string.Empty : stationProfileId.Trim();
             var redactedCorpus = redactedFlowCorpusService.BuildCorpus();
+            var stationProfiles = stationProfileCatalog.BuildProfiles();
             var result = new
             {
                 session = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : sessionStore.Get(normalizedSessionId),
@@ -1196,17 +1316,31 @@ public static class SettingsEndpoints
                 deployReadinessReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetDeployReadinessReportBySessionId(normalizedSessionId),
                 packageReadinessReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetPackageReadinessReportBySessionId(normalizedSessionId),
                 manifestDryRunReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetManifestDryRunReportBySessionId(normalizedSessionId),
+                stationCompatibilityReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetStationCompatibilityReportBySessionId(normalizedSessionId),
+                operatorContractValidationReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetOperatorContractValidationReportBySessionId(normalizedSessionId),
+                preReleaseReviewReport = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : reportArchive.GetPreReleaseReviewReportBySessionId(normalizedSessionId),
                 report = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.Get(normalizedReportId),
                 deployReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetDeployReadinessReport(normalizedReportId),
                 packageReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetPackageReadinessReport(normalizedReportId),
                 manifestReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetManifestDryRunReportByReportId(normalizedReportId),
                 manifest = string.IsNullOrWhiteSpace(normalizedManifestId) ? null : reportArchive.GetManifestDryRunReport(normalizedManifestId),
+                preReleaseReview = string.IsNullOrWhiteSpace(normalizedReviewId) ? null : reportArchive.GetPreReleaseReviewReport(normalizedReviewId),
+                preReleaseReviewByManifest = string.IsNullOrWhiteSpace(normalizedManifestId) ? null : reportArchive.GetPreReleaseReviewReportByManifestId(normalizedManifestId),
+                stationProfile = string.IsNullOrWhiteSpace(normalizedStationProfileId)
+                    ? null
+                    : stationProfiles.Profiles.FirstOrDefault(item => string.Equals(item.StationProfileId, normalizedStationProfileId, StringComparison.OrdinalIgnoreCase)),
+                stationProfileReports = string.IsNullOrWhiteSpace(normalizedStationProfileId)
+                    ? Array.Empty<RuntimePreviewStationCompatibilityReport>()
+                    : reportArchive.GetStationCompatibilityReportsByStationProfileId(normalizedStationProfileId),
                 corpusCase = string.IsNullOrWhiteSpace(normalizedCaseId)
                     ? null
                     : corpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase)),
                 redactedFlowCase = string.IsNullOrWhiteSpace(normalizedCaseId)
                     ? null
-                    : redactedCorpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase))
+                    : redactedCorpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase)),
+                preReleaseReviewsByCase = string.IsNullOrWhiteSpace(normalizedCaseId)
+                    ? Array.Empty<RuntimePreviewPreReleaseReviewReport>()
+                    : reportArchive.GetPreReleaseReviewReportsByCaseId(normalizedCaseId)
             };
             return Results.Ok(new
             {

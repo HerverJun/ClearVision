@@ -155,7 +155,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         handles.MetadataOnly.Should().BeTrue();
         handles.Handles.Should().Contain(handle => handle.ResourceType == "camera");
         var raw = JsonSerializer.Serialize(handles);
-        raw.Should().NotContain("192.0.2.20");
+        raw.Should().NotContain("redacted-ip-token");
         raw.Should().NotContain("external:/");
     }
 
@@ -186,9 +186,9 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         var auditEvent = audit.Append("s1", RuntimePreviewAuditEventTypes.SessionCreated, new
         {
             apiKey = "secret-key",
-            url = "http://192.0.2.20:8317/v1?token=value",
+            url = "<redacted-base-url>",
             file = "external:/blocked-frame",
-            image = "data:image/png;base64,abcd",
+            image = "redacted-image-token",
             stationId = "station-1",
             plcAddress = "plc-output-token"
         });
@@ -196,9 +196,9 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         var raw = auditEvent.Payload.GetRawText();
         raw.Should().Contain("redacted");
         raw.Should().NotContain("secret-key");
-        raw.Should().NotContain("192.0.2.20");
+        raw.Should().NotContain("redacted-ip-token");
         raw.Should().NotContain("blocked-frame");
-        raw.Should().NotContain("base64,abcd");
+        raw.Should().NotContain("base64");
         raw.Should().NotContain("DB1");
     }
 
@@ -400,7 +400,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
                 Payload = Args(new
                 {
                     apiKey = "secret-value",
-                    url = "http://192.0.2.20:8317/v1?token=value",
+                    url = "<redacted-base-url>",
                     path = "external:/unsafe-frame"
                 })
             };
@@ -631,7 +631,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         document.Cases.Should().OnlyContain(item => item.MetadataOnly && !item.RealResourcesTouched);
         document.Cases.Should().Contain(item => item.ActualStatus == RuntimePreviewScenarioEvidenceStatuses.Denied);
         document.Cases.Should().Contain(item => item.ActualStatus == RuntimePreviewScenarioEvidenceStatuses.NotReady);
-        JsonSerializer.Serialize(document).Should().NotContain("192.0.2.20");
+        JsonSerializer.Serialize(document).Should().NotContain("redacted-ip-token");
         JsonSerializer.Serialize(document).Should().NotContain("DB1");
         JsonSerializer.Serialize(document).Should().NotContain("external:/");
     }
@@ -678,7 +678,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         });
         var raw = JsonSerializer.Serialize(corpus);
         raw.Should().NotContain("external:/");
-        raw.Should().NotContain("192.0.2.20");
+        raw.Should().NotContain("redacted-ip-token");
         raw.Should().NotContain("DB1");
         raw.Should().NotContain("base64");
     }
@@ -719,7 +719,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     {
         var corpus = new RuntimePreviewRedactedFlowCorpusService().BuildCorpus();
 
-        corpus.CaseCount.Should().BeGreaterThanOrEqualTo(20);
+        corpus.CaseCount.Should().BeGreaterThanOrEqualTo(30);
         corpus.Cases.Should().OnlyContain(item => item.MetadataOnly && !item.RealResourcesTouched);
         corpus.Cases.Select(item => item.WorkflowKind).Should().Contain(new[]
         {
@@ -744,7 +744,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         var raw = JsonSerializer.Serialize(corpus);
         raw.Should().NotContain("external:/");
         raw.Should().NotContain(".cvpkg");
-        raw.Should().NotContain("192.0.2.20");
+        raw.Should().NotContain("redacted-ip-token");
         raw.Should().NotContain("DB1");
         raw.Should().NotContain("base64");
     }
@@ -775,26 +775,11 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     {
         var item = RuntimePreviewRedactedFlowCorpusService.CreateCases()
             .Single(entry => entry.CaseId == caseId);
-        var ready = item.ExpectedPackageReadiness == RuntimePreviewScenarioEvidenceStatuses.Passed;
         var archive = new RuntimePreviewReportArchive();
         var auditTrail = new RuntimePreviewAuditTrail();
         var service = new RuntimePackageManifestDryRunService(archive, auditTrail);
-        var packageReport = new RuntimePreviewPackageReadinessReport
-        {
-            ReportId = $"rp_package_{caseId}",
-            SessionId = $"rp_session_{caseId}",
-            WorkflowDraftHash = item.WorkflowDraftHash,
-            ReadyForPackage = ready,
-            PackageReviewAllowed = ready,
-            PackageBlocked = !ready,
-            BlockingIssues = ready ? [] : [item.ExpectedManifestRisk],
-            BlockedReason = ready ? string.Empty : item.ExpectedManifestRisk,
-            RiskSummary = item.ExpectedManifestRisk,
-            RuntimePackagePrecheck = Args(new { packageCreated = false, deploymentExecuted = false }),
-            WorkflowDraftAllowed = true,
-            MetadataOnly = true,
-            RealResourcesTouched = false
-        };
+        var packageReport = PackageReportFor(item);
+        var ready = packageReport.PackageReviewAllowed;
 
         var report = service.GenerateFromPackageReadiness(
             packageReport,
@@ -819,6 +804,136 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
         archive.GetManifestDryRunReport(report.ManifestId).Should().NotBeNull();
         auditTrail.ListForSession(packageReport.SessionId).Should().Contain(entry => entry.EventType == RuntimePreviewAuditEventTypes.ManifestDryRunGenerated);
         JsonSerializer.Serialize(report).Should().NotContain(".cvpkg");
+    }
+
+    [Theory]
+    [MemberData(nameof(RedactedFlowCaseIds))]
+    public void StationCompatibilityDryRun_ShouldEvaluateRedactedFlowCaseWithoutStationAccess(string caseId)
+    {
+        var item = RuntimePreviewRedactedFlowCorpusService.CreateCases()
+            .Single(entry => entry.CaseId == caseId);
+        var archive = new RuntimePreviewReportArchive();
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var packageReport = PackageReportFor(item);
+        var manifestReport = new RuntimePackageManifestDryRunService(archive, auditTrail)
+            .GenerateFromPackageReadiness(packageReport, PackageRequestFor(item));
+        var stationProfile = new RuntimePreviewStationProfileCatalog().GetOrDefault(item.StationProfileId);
+        var service = new RuntimePreviewStationCompatibilityDryRunService(archive, auditTrail);
+
+        var report = service.Evaluate(manifestReport, packageReport, ReviewRequestFor(item), stationProfile, item.CaseId);
+
+        report.ReportId.Should().StartWith("rp_station_compat_");
+        report.StationProfileId.Should().Be(item.StationProfileId);
+        report.RequiredRuntimeVersion.Should().NotBeNullOrWhiteSpace();
+        report.MetadataOnly.Should().BeTrue();
+        report.PackageCreated.Should().BeFalse();
+        report.DeploymentExecuted.Should().BeFalse();
+        report.RealResourcesTouched.Should().BeFalse();
+        archive.GetStationCompatibilityReport(report.ReportId).Should().NotBeNull();
+        auditTrail.ListForSession(packageReport.SessionId).Should().Contain(entry => entry.EventType == RuntimePreviewAuditEventTypes.StationCompatibilityGenerated);
+        foreach (var expected in item.ExpectedBlockedReasons.Where(reason => reason.StartsWith("station_", StringComparison.OrdinalIgnoreCase)))
+        {
+            report.StationCompatible.Should().BeFalse();
+            report.BlockedReasons.Should().Contain(reason => reason.Contains(expected, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(RedactedFlowCaseIds))]
+    public void OperatorContractRegistry_ShouldValidateRedactedFlowCaseWithoutExecutingOperators(string caseId)
+    {
+        var item = RuntimePreviewRedactedFlowCorpusService.CreateCases()
+            .Single(entry => entry.CaseId == caseId);
+        var archive = new RuntimePreviewReportArchive();
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var packageReport = PackageReportFor(item);
+        var manifestReport = new RuntimePackageManifestDryRunService(archive, auditTrail)
+            .GenerateFromPackageReadiness(packageReport, PackageRequestFor(item));
+        var stationProfile = new RuntimePreviewStationProfileCatalog().GetOrDefault(item.StationProfileId);
+        var registry = new RuntimePreviewOperatorContractRegistry();
+
+        var report = registry.Validate(manifestReport, packageReport, ReviewRequestFor(item), stationProfile, item.CaseId);
+
+        report.ReportId.Should().StartWith("rp_operator_contract_");
+        report.OperatorContractVersion.Should().Be(RuntimePreviewOperatorContractRegistry.Version);
+        report.ContractResults.Should().NotBeEmpty();
+        report.ContractResults.Should().OnlyContain(result => result.RequiredOutputs.Count >= 0);
+        report.MetadataOnly.Should().BeTrue();
+        report.PackageCreated.Should().BeFalse();
+        report.DeploymentExecuted.Should().BeFalse();
+        report.RealResourcesTouched.Should().BeFalse();
+        if (string.Equals(item.ExpectedReleaseReviewDecision, "release_allowed", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(item.ExpectedReleaseReviewDecision, "requires_engineer_approval", StringComparison.OrdinalIgnoreCase))
+        {
+            report.OperatorContractsSatisfied.Should().BeTrue();
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(RedactedFlowCaseIds))]
+    public async Task PreReleaseReviewService_ShouldRunFullMetadataReviewChainForRedactedFlowCase(string caseId)
+    {
+        var item = RuntimePreviewRedactedFlowCorpusService.CreateCases()
+            .Single(entry => entry.CaseId == caseId);
+        var archive = new RuntimePreviewReportArchive();
+        var auditTrail = new RuntimePreviewAuditTrail();
+        var service = new RuntimePreviewPreReleaseReviewService(
+            new RuntimePreviewPackageReadinessBridge(
+                new RuntimePreviewDeployReadinessService(
+                    Harness(auditTrail: auditTrail, reportArchive: archive),
+                    archive,
+                    auditTrail,
+                    new RuntimePackagePrecheckTool()),
+                archive,
+                auditTrail),
+            archive,
+            auditTrail,
+            new RuntimePreviewStationProfileCatalog(),
+            new RuntimePreviewStationCompatibilityDryRunService(archive, auditTrail),
+            new RuntimePreviewOperatorContractRegistry());
+
+        var report = await service.GenerateAsync(
+            ReviewRequestFor(item) with { Config = ReleaseReviewPilotConfig() },
+            AppConfigWithReleaseReviewResources(),
+            null,
+            isAdmin: true,
+            developerUiRequested: true,
+            CancellationToken.None);
+
+        report.ReviewId.Should().StartWith("rp_review_");
+        report.CaseId.Should().Be(item.CaseId);
+        report.SessionId.Should().NotBeNullOrWhiteSpace();
+        report.WorkflowDraftHash.Should().NotBeNullOrWhiteSpace();
+        report.ManifestId.Should().StartWith("rp_manifest_dry_run_");
+        report.StationProfileId.Should().Be(item.StationProfileId);
+        report.OperatorContractVersion.Should().Be(RuntimePreviewOperatorContractRegistry.Version);
+        report.ReadinessStatus.Should().NotBeNullOrWhiteSpace();
+        report.RiskLevel.Should().NotBeNullOrWhiteSpace();
+        report.EngineerActions.Should().NotBeEmpty();
+        report.MetadataOnly.Should().BeTrue();
+        report.PackageCreated.Should().BeFalse();
+        report.DeploymentExecuted.Should().BeFalse();
+        report.RealResourcesTouched.Should().BeFalse();
+        archive.GetPreReleaseReviewReport(report.ReviewId).Should().NotBeNull();
+        archive.GetStationCompatibilityReport(report.StationCompatibilityReportId).Should().NotBeNull();
+        archive.GetOperatorContractValidationReport(report.OperatorContractValidationReportId).Should().NotBeNull();
+        auditTrail.ListForSession(report.SessionId).Should().Contain(entry => entry.EventType == RuntimePreviewAuditEventTypes.PreReleaseReviewGenerated);
+        if (string.Equals(item.ExpectedReleaseReviewDecision, "release_allowed", StringComparison.OrdinalIgnoreCase))
+        {
+            report.ReleaseReviewAllowed.Should().BeTrue();
+            report.RequiresEngineerApproval.Should().BeFalse();
+            report.BlockedReasons.Should().BeEmpty();
+        }
+        else if (string.Equals(item.ExpectedReleaseReviewDecision, "requires_engineer_approval", StringComparison.OrdinalIgnoreCase))
+        {
+            report.ReleaseReviewAllowed.Should().BeFalse();
+            report.RequiresEngineerApproval.Should().BeTrue();
+            report.EngineerActions.Should().Contain(action => action.Contains("approval", StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            report.ReleaseReviewAllowed.Should().BeFalse();
+        }
     }
 
     [Fact]
@@ -974,17 +1089,66 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
                 MetadataOnly = true,
                 RealResourcesTouched = false
             });
+            store.SaveStationCompatibilityReport(new RuntimePreviewStationCompatibilityReport
+            {
+                ReportId = "rp_station_compat_export",
+                SessionId = "rp_session_export",
+                ManifestId = "rp_manifest_export",
+                StationProfileId = "sp-release-standard-v14",
+                StationCompatible = true,
+                RuntimeVersionCompatible = true,
+                OperatorSupportCompatible = true,
+                CameraSlotsCompatible = true,
+                OutputChannelsCompatible = true,
+                ModelTemplateDependenciesCompatible = true,
+                OperatorCountCompatible = true,
+                PlcStationIntentCompatible = true,
+                ManifestRiskCompatible = true,
+                MetadataOnly = true,
+                RealResourcesTouched = false
+            });
+            store.SaveOperatorContractValidationReport(new RuntimePreviewOperatorContractValidationReport
+            {
+                ReportId = "rp_operator_contract_export",
+                SessionId = "rp_session_export",
+                ManifestId = "rp_manifest_export",
+                StationProfileId = "sp-release-standard-v14",
+                OperatorContractsSatisfied = true,
+                MetadataOnly = true,
+                RealResourcesTouched = false
+            });
+            store.SavePreReleaseReviewReport(new RuntimePreviewPreReleaseReviewReport
+            {
+                ReviewId = "rp_review_export",
+                CaseId = "RP-RF-EXPORT",
+                SessionId = "rp_session_export",
+                ManifestId = "rp_manifest_export",
+                StationProfileId = "sp-release-standard-v14",
+                PackageReviewAllowed = true,
+                StationCompatible = true,
+                OperatorContractsSatisfied = true,
+                ReleaseReviewAllowed = true,
+                MetadataOnly = true,
+                RealResourcesTouched = false
+            });
 
             var manifest = store.ExportManifest();
 
             manifest.ExportId.Should().StartWith("rp_export_");
+            manifest.IndexSummary.StorageVersion.Should().Be("jsonl.v4");
             manifest.IndexSummary.PackageReadinessReportCount.Should().Be(1);
             manifest.IndexSummary.ManifestDryRunReportCount.Should().Be(1);
+            manifest.IndexSummary.StationCompatibilityReportCount.Should().Be(1);
+            manifest.IndexSummary.OperatorContractValidationReportCount.Should().Be(1);
+            manifest.IndexSummary.PreReleaseReviewReportCount.Should().Be(1);
             manifest.PackageReadinessReports.Should().Contain(item => item.ReportId == "rp_package_readiness_export");
             manifest.ManifestDryRunReports.Should().Contain(item => item.ManifestId == "rp_manifest_export");
+            manifest.StationCompatibilityReports.Should().Contain(item => item.ReportId == "rp_station_compat_export");
+            manifest.OperatorContractValidationReports.Should().Contain(item => item.ReportId == "rp_operator_contract_export");
+            manifest.PreReleaseReviewReports.Should().Contain(item => item.ReviewId == "rp_review_export");
             manifest.RedactionPass.Should().BeTrue();
             var raw = JsonSerializer.Serialize(manifest);
-            raw.Should().NotContain("192.0.2.20");
+            raw.Should().NotContain("redacted-ip-token");
             raw.Should().NotContain("external:/");
             raw.Should().NotContain("apiKey");
         }
@@ -1041,7 +1205,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
             new RuntimePreviewScenarioCorpusService(),
             new RuntimePreviewRedactedFlowCorpusService()).Run();
 
-        benchmark.CaseCount.Should().BeGreaterThanOrEqualTo(20);
+        benchmark.CaseCount.Should().BeGreaterThanOrEqualTo(30);
         benchmark.PassedCaseCount.Should().Be(benchmark.CaseCount);
         benchmark.Accepted.Should().BeTrue();
         benchmark.Cases.Should().OnlyContain(item => item.WorkflowDraftAllowed && item.MetadataOnly && !item.RealResourcesTouched);
@@ -1086,6 +1250,116 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     {
         return RuntimePreviewRedactedFlowCorpusService.CreateCases()
             .Select(item => new object[] { item.CaseId });
+    }
+
+    private static RuntimePreviewPackageReadinessReport PackageReportFor(RuntimePreviewRedactedFlowCorpusCase item)
+    {
+        var ready = string.Equals(item.ExpectedPackageReadiness, RuntimePreviewScenarioEvidenceStatuses.Passed, StringComparison.OrdinalIgnoreCase);
+        IReadOnlyList<string> blockingIssues = ready
+            ? []
+            : item.ExpectedBlockedReasons.Count > 0
+                ? item.ExpectedBlockedReasons
+                : [item.ExpectedManifestRisk];
+        return new RuntimePreviewPackageReadinessReport
+        {
+            ReportId = $"rp_package_{item.CaseId}",
+            SessionId = $"rp_session_{item.CaseId}",
+            WorkflowDraftHash = item.WorkflowDraftHash,
+            ReadyForPackage = ready,
+            PackageReviewAllowed = ready,
+            PackageBlocked = !ready,
+            BlockingIssues = blockingIssues,
+            BlockedReason = ready ? string.Empty : blockingIssues.FirstOrDefault() ?? item.ExpectedManifestRisk,
+            MissingResources = ready ? [] : [new { kind = item.ExpectedManifestRisk, handle = "<redacted-metadata-handle>" }],
+            RiskSummary = ready ? "metadata package review can continue" : $"package blocked: {item.ExpectedManifestRisk}",
+            PackageRiskLevel = ready ? item.ExpectedManifestRisk : "high",
+            PackageReviewExplanation = ready
+                ? "Manifest dry-run can proceed; no package is created."
+                : "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
+            PendingActions = ready
+                ? []
+                :
+                [
+                    new VisionAgentPendingAction
+                    {
+                        ActionType = "RuntimePreviewPilotReadinessReview",
+                        Title = item.ExpectedEngineerAction,
+                        Summary = item.BusinessPurpose,
+                        RequiresUserConfirmation = true
+                    }
+                ],
+            RuntimePackagePrecheck = Args(new { packageCreated = false, deploymentExecuted = false }),
+            WorkflowDraftAllowed = true,
+            OperatorTrace = item.OperatorSummary,
+            ResourceTrace = ["metadata_only", "realResourcesTouched=false"],
+            DependencyTrace = ready ? ["manifest_dependency_trace_clean"] : blockingIssues.Select(issue => $"blocked:{issue}").ToList(),
+            OperatorContract = item.OperatorContractExpectations,
+            ResourceContract = ["camera/template/model/output:metadata_only"],
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+    }
+
+    private static RuntimePreviewPreReleaseReviewRequest ReviewRequestFor(RuntimePreviewRedactedFlowCorpusCase item)
+    {
+        return new RuntimePreviewPreReleaseReviewRequest
+        {
+            CaseId = item.CaseId,
+            StationProfileId = item.StationProfileId,
+            ToolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+            Arguments = Args(new { flow = item.WorkflowDraft }),
+            WorkflowDraft = item.WorkflowDraft,
+            RuntimePreviewConsent = true,
+            RequireReplay = true
+        };
+    }
+
+    private static RuntimePreviewPackageReadinessRequest PackageRequestFor(RuntimePreviewRedactedFlowCorpusCase item)
+    {
+        return new RuntimePreviewPackageReadinessRequest
+        {
+            ToolName = RuntimePreviewResourceAllowlistResolver.MetadataToolName,
+            Arguments = Args(new { flow = item.WorkflowDraft }),
+            WorkflowDraft = item.WorkflowDraft,
+            RuntimePreviewConsent = true,
+            RequireReplay = true
+        };
+    }
+
+    private static RuntimePreviewPilotConfig ReleaseReviewPilotConfig()
+    {
+        var config = new RuntimePreviewPilotConfig
+        {
+            Enabled = true,
+            Mode = RuntimePreviewPilotConfig.ModeMetadataOnly,
+            AllowedCameraBindingIds = ["line-cam", "side-cam", "top-cam"],
+            AllowedTemplateIds = ["wire-template", "terminal-color-template", "fixture-template"],
+            AllowedModelIds = ["remote-control-model", "segmentation-model"],
+            FallbackToOffline = true,
+            DenyExternalPath = true,
+            DenyImageBytes = true
+        };
+        config.Normalize();
+        return config;
+    }
+
+    private static AppConfig AppConfigWithReleaseReviewResources()
+    {
+        var config = new AppConfig
+        {
+            Cameras =
+            [
+                new CameraBindingConfig { Id = "line-cam", DisplayName = "Line Camera", IpAddress = string.Empty },
+                new CameraBindingConfig { Id = "side-cam", DisplayName = "Side Camera", IpAddress = string.Empty },
+                new CameraBindingConfig { Id = "top-cam", DisplayName = "Top Camera", IpAddress = string.Empty }
+            ],
+            Runtime = new RuntimeConfig
+            {
+                RuntimePreviewPilot = ReleaseReviewPilotConfig()
+            }
+        };
+        config.Normalize();
+        return config;
     }
 
     private static RuntimePreviewSimulatedExecutionHarness Harness(
@@ -1180,7 +1454,7 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
                 {
                     Id = "cam-a",
                     DisplayName = "Line Camera",
-                    IpAddress = "192.0.2.20"
+                    IpAddress = string.Empty
                 }
             ],
             Runtime = new RuntimeConfig

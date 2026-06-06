@@ -41,15 +41,18 @@ const settingsApi = {
     generateRuntimePreviewDeployReadiness: payload => httpClient.post('/settings/runtime-preview-pilot/sessions/deploy-readiness', payload),
     generateRuntimePreviewPackageReadiness: payload => httpClient.post('/settings/runtime-preview-pilot/sessions/package-readiness', payload),
     generateRuntimePackageManifestDryRun: payload => httpClient.post('/settings/runtime-preview-pilot/sessions/manifest-dry-run', payload),
+    generateRuntimePreviewPreReleaseReview: payload => httpClient.post('/settings/runtime-preview-pilot/sessions/pre-release-review', payload),
     cleanupRuntimePreviewPilotRetention: payload => httpClient.post('/settings/runtime-preview-pilot/retention/cleanup', payload),
+    loadRuntimePreviewStationProfiles: () => httpClient.get('/settings/runtime-preview-pilot/station-profiles'),
+    loadRuntimePreviewOperatorContractRegistry: () => httpClient.get('/settings/runtime-preview-pilot/operator-contract-registry'),
     loadRuntimePreviewScenarioEvidence: () => httpClient.get('/settings/runtime-preview-pilot/scenario-evidence'),
     loadRuntimePreviewScenarioCorpus: () => httpClient.get('/settings/runtime-preview-pilot/scenario-corpus'),
     loadRuntimePreviewRedactedFlowCorpus: () => httpClient.get('/settings/runtime-preview-pilot/redacted-flow-corpus'),
     loadRuntimePreviewAgentExplanationBenchmark: () => httpClient.get('/settings/runtime-preview-pilot/agent-explanation-benchmark'),
     loadRuntimePreviewGovernanceIndex: () => httpClient.get('/settings/runtime-preview-pilot/governance/index'),
     exportRuntimePreviewGovernance: () => httpClient.get('/settings/runtime-preview-pilot/governance/export'),
-    lookupRuntimePreviewGovernance: ({ sessionId = '', reportId = '', caseId = '', manifestId = '' } = {}) =>
-        httpClient.get(`/settings/runtime-preview-pilot/governance/lookup?sessionId=${encodeURIComponent(sessionId)}&reportId=${encodeURIComponent(reportId)}&caseId=${encodeURIComponent(caseId)}&manifestId=${encodeURIComponent(manifestId)}`),
+    lookupRuntimePreviewGovernance: ({ sessionId = '', reportId = '', caseId = '', manifestId = '', reviewId = '', stationProfileId = '' } = {}) =>
+        httpClient.get(`/settings/runtime-preview-pilot/governance/lookup?sessionId=${encodeURIComponent(sessionId)}&reportId=${encodeURIComponent(reportId)}&caseId=${encodeURIComponent(caseId)}&manifestId=${encodeURIComponent(manifestId)}&reviewId=${encodeURIComponent(reviewId)}&stationProfileId=${encodeURIComponent(stationProfileId)}`),
 
     loadPlcSettings: () => httpClient.get('/plc/settings'),
     savePlcSettings: payload => httpClient.put('/plc/settings', payload),

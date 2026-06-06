@@ -1,0 +1,532 @@
+{
+  "schemaVersion": "2026-06-06.runtime-preview-operator-contract-registry.v1",
+  "benchmarkId": "runtime_preview_operator_contract_registry",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+  },
+  "summary": {
+    "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+    "contractCount": 16,
+    "metadataOnly": true,
+    "realResourcesTouched": false,
+    "accepted": true
+  },
+  "contracts": [
+    {
+      "operatorType": "ImageAcquisition",
+      "requiredInputs": [],
+      "requiredOutputs": [
+        "image"
+      ],
+      "requiredParameters": [
+        "SourceType",
+        "CameraBindingId"
+      ],
+      "resourceDependencies": [
+        "cameraBinding"
+      ],
+      "forbiddenParameters": [
+        "ImagePath",
+        "FrameBytes",
+        "RawImageBytes"
+      ],
+      "runtimeDependencies": [
+        "metadata_runtime"
+      ],
+      "manifestFields": [
+        "operatorType",
+        "parameters.CameraBindingId"
+      ],
+      "stationCompatibilityRequirements": [
+        "camera slot available"
+      ],
+      "riskTags": [
+        "camera_metadata"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "TemplateMatching",
+      "requiredInputs": [
+        "image"
+      ],
+      "requiredOutputs": [
+        "match"
+      ],
+      "requiredParameters": [
+        "TemplateId"
+      ],
+      "resourceDependencies": [
+        "templateMetadata"
+      ],
+      "forbiddenParameters": [
+        "TemplatePath",
+        "TemplateFile",
+        "ImagePath"
+      ],
+      "runtimeDependencies": [
+        "traditional_vision_runtime"
+      ],
+      "manifestFields": [
+        "operatorType",
+        "parameters.TemplateId"
+      ],
+      "stationCompatibilityRequirements": [
+        "template metadata dependency closed"
+      ],
+      "riskTags": [
+        "template_dependency"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "CircleMeasurement",
+      "requiredInputs": [
+        "image"
+      ],
+      "requiredOutputs": [
+        "circle"
+      ],
+      "requiredParameters": [
+        "Roi"
+      ],
+      "resourceDependencies": [],
+      "forbiddenParameters": [
+        "ImagePath"
+      ],
+      "runtimeDependencies": [
+        "measurement_runtime"
+      ],
+      "manifestFields": [
+        "operatorType",
+        "parameters.Roi"
+      ],
+      "stationCompatibilityRequirements": [
+        "traditional measurement supported"
+      ],
+      "riskTags": [
+        "measurement"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "MeasureDistance",
+      "requiredInputs": [
+        "geometry"
+      ],
+      "requiredOutputs": [
+        "distance"
+      ],
+      "requiredParameters": [
+        "Unit"
+      ],
+      "resourceDependencies": [],
+      "forbiddenParameters": [
+        "ImagePath"
+      ],
+      "runtimeDependencies": [
+        "measurement_runtime"
+      ],
+      "manifestFields": [
+        "operatorType",
+        "parameters.Unit"
+      ],
+      "stationCompatibilityRequirements": [
+        "traditional measurement supported"
+      ],
+      "riskTags": [
+        "measurement"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "DeepLearning",
+      "requiredInputs": [
+        "image"
+      ],
+      "requiredOutputs": [
+        "inference"
+      ],
+      "requiredParameters": [
+        "ModelId"
+      ],
+      "resourceDependencies": [
+        "modelMetadata"
+      ],
+      "forbiddenParameters": [
+        "ModelPath",
+        "ModelFile",
+        "WeightsPath",
+        "ImagePath"
+      ],
+      "runtimeDependencies": [
+        "deep_learning_runtime"
+      ],
+      "manifestFields": [
+        "operatorType",
+        "parameters.ModelId",
+        "parameters.ModelKind"
+      ],
+      "stationCompatibilityRequirements": [
+        "DeepLearning supported",
+        "model kind supported"
+      ],
+      "riskTags": [
+        "deep_learning_review",
+        "engineer_approval_required"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "ResultOutput",
+      "requiredInputs": [
+        "result"
+      ],
+      "requiredOutputs": [
+        "metadataOutput"
+      ],
+      "requiredParameters": [
+        "OutputChannelId"
+      ],
+      "resourceDependencies": [
+        "outputChannel"
+      ],
+      "forbiddenParameters": [
+        "PlcAddress",
+        "StationAddress",
+        "PackagePath",
+        "CvpkgPath"
+      ],
+      "runtimeDependencies": [
+        "result_output_runtime"
+      ],
+      "manifestFields": [
+        "operatorType",
+        "parameters.OutputChannelId"
+      ],
+      "stationCompatibilityRequirements": [
+        "output channel kind supported",
+        "plc write disabled"
+      ],
+      "riskTags": [
+        "output_contract"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "ResultJudgment",
+      "requiredInputs": [
+        "result"
+      ],
+      "requiredOutputs": [
+        "judgment"
+      ],
+      "requiredParameters": [
+        "RuleId"
+      ],
+      "resourceDependencies": [],
+      "forbiddenParameters": [
+        "ScriptPath"
+      ],
+      "runtimeDependencies": [
+        "judgment_runtime"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "traditional judgment supported"
+      ],
+      "riskTags": [
+        "judgment"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "BlobAnalysis",
+      "requiredInputs": [
+        "image"
+      ],
+      "requiredOutputs": [
+        "blob"
+      ],
+      "requiredParameters": [],
+      "resourceDependencies": [],
+      "forbiddenParameters": [
+        "ImagePath"
+      ],
+      "runtimeDependencies": [
+        "traditional_vision_runtime"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "traditional vision supported"
+      ],
+      "riskTags": [
+        "blob"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "Thresholding",
+      "requiredInputs": [
+        "image"
+      ],
+      "requiredOutputs": [
+        "binary"
+      ],
+      "requiredParameters": [
+        "Threshold"
+      ],
+      "resourceDependencies": [],
+      "forbiddenParameters": [
+        "ImagePath"
+      ],
+      "runtimeDependencies": [
+        "traditional_vision_runtime"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "traditional vision supported"
+      ],
+      "riskTags": [
+        "threshold"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "EdgeDetection",
+      "requiredInputs": [
+        "image"
+      ],
+      "requiredOutputs": [
+        "edges"
+      ],
+      "requiredParameters": [],
+      "resourceDependencies": [],
+      "forbiddenParameters": [
+        "ImagePath"
+      ],
+      "runtimeDependencies": [
+        "traditional_vision_runtime"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "traditional vision supported"
+      ],
+      "riskTags": [
+        "edge"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "ShapeMatching",
+      "requiredInputs": [
+        "image"
+      ],
+      "requiredOutputs": [
+        "pose"
+      ],
+      "requiredParameters": [
+        "TemplateId"
+      ],
+      "resourceDependencies": [
+        "templateMetadata"
+      ],
+      "forbiddenParameters": [
+        "TemplatePath"
+      ],
+      "runtimeDependencies": [
+        "traditional_vision_runtime"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "shape matching supported"
+      ],
+      "riskTags": [
+        "template_dependency"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "SemanticSegmentation",
+      "requiredInputs": [
+        "image"
+      ],
+      "requiredOutputs": [
+        "mask"
+      ],
+      "requiredParameters": [
+        "ModelId"
+      ],
+      "resourceDependencies": [
+        "modelMetadata"
+      ],
+      "forbiddenParameters": [
+        "ModelPath",
+        "ImagePath"
+      ],
+      "runtimeDependencies": [
+        "deep_learning_runtime"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "segmentation model kind supported"
+      ],
+      "riskTags": [
+        "deep_learning_review",
+        "engineer_approval_required"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "SurfaceDefectDetection",
+      "requiredInputs": [
+        "image"
+      ],
+      "requiredOutputs": [
+        "defect"
+      ],
+      "requiredParameters": [
+        "ModelId"
+      ],
+      "resourceDependencies": [
+        "modelMetadata"
+      ],
+      "forbiddenParameters": [
+        "ModelPath",
+        "ImagePath"
+      ],
+      "runtimeDependencies": [
+        "deep_learning_runtime"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "defect model kind supported"
+      ],
+      "riskTags": [
+        "deep_learning_review",
+        "engineer_approval_required"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "ModbusCommunication",
+      "requiredInputs": [
+        "result"
+      ],
+      "requiredOutputs": [
+        "plc"
+      ],
+      "requiredParameters": [],
+      "resourceDependencies": [
+        "plcEndpoint"
+      ],
+      "forbiddenParameters": [
+        "Address",
+        "PlcAddress",
+        "BaseUrl"
+      ],
+      "runtimeDependencies": [
+        "forbidden_for_preview"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "plc write forbidden"
+      ],
+      "riskTags": [
+        "plc_write_forbidden"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "HttpRequest",
+      "requiredInputs": [
+        "result"
+      ],
+      "requiredOutputs": [
+        "http"
+      ],
+      "requiredParameters": [],
+      "resourceDependencies": [
+        "networkEndpoint"
+      ],
+      "forbiddenParameters": [
+        "Url",
+        "BaseUrl",
+        "Authorization"
+      ],
+      "runtimeDependencies": [
+        "forbidden_for_preview"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "network access forbidden"
+      ],
+      "riskTags": [
+        "network_write_forbidden"
+      ],
+      "metadataOnly": true
+    },
+    {
+      "operatorType": "ScriptOperator",
+      "requiredInputs": [
+        "metadata"
+      ],
+      "requiredOutputs": [
+        "metadata"
+      ],
+      "requiredParameters": [],
+      "resourceDependencies": [],
+      "forbiddenParameters": [
+        "ScriptPath",
+        "Command",
+        "Shell"
+      ],
+      "runtimeDependencies": [
+        "forbidden_for_preview"
+      ],
+      "manifestFields": [
+        "operatorType"
+      ],
+      "stationCompatibilityRequirements": [
+        "system command forbidden"
+      ],
+      "riskTags": [
+        "system_command_forbidden"
+      ],
+      "metadataOnly": true
+    }
+  ],
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

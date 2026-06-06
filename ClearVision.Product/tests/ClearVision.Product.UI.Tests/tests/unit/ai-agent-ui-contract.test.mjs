@@ -1378,7 +1378,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 110);
+  assert.equal(uiEntry.minimumTests, 135);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)
@@ -1573,13 +1573,13 @@ test('AI settings tab no longer embeds RuntimePreview Pilot Console as model set
   assert.match(source, /readRuntimePreviewPilotConfigDraft/);
 });
 
-test('independent RuntimePreview Pilot Console module renders v1.3 title and page marker', () => {
+test('independent RuntimePreview Pilot Console module renders v1.4 title and page marker', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
     'utf8'
   );
 
-  assert.match(source, /RuntimePreview Pilot Console v1\.3/);
+  assert.match(source, /RuntimePreview Pilot Console v1\.4/);
   assert.match(source, /RuntimePreview Pre-release Review Desk/);
   assert.match(source, /data-runtime-preview-pilot-console-page="true"/);
   assert.match(source, /renderRuntimePreviewPilotConsoleV12Panels/);
@@ -1975,7 +1975,7 @@ test('independent RuntimePreview Pilot Console redacted flow chain builds select
   assert.match(source, /findRuntimePreviewRedactedFlowCase/);
   assert.match(source, /flowCase\.workflowDraft/);
   assert.match(source, /const caseId = root\.querySelector\('#cfg-rp-redacted-flow-case-id'\)\?\.value/);
-  assert.match(source, /runtimePreviewGovernanceLookup = \{ redactedFlowCase: flowCase \}/);
+  assert.match(source, /runtimePreviewGovernanceLookup = \{ redactedFlowCase: flowCase, preReleaseReviewReport: this\.runtimePreviewPreReleaseReviewReport \}/);
 });
 
 test('RuntimePreview v1.3 endpoints expose admin gated redacted corpus manifest dry-run and manifest lookup', () => {
@@ -1991,6 +1991,278 @@ test('RuntimePreview v1.3 endpoints expose admin gated redacted corpus manifest 
   assert.match(source, /RuntimePreviewRedactedFlowCorpusService/);
   assert.match(source, /EvaluateEndpointAccess/);
   assert.match(source, /manifestDryRunReport/);
+});
+
+test('settings API wrapper exposes RuntimePreview v1.4 pre-release review endpoint', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsApi.js'),
+    'utf8'
+  );
+
+  assert.match(source, /generateRuntimePreviewPreReleaseReview/);
+  assert.match(source, /runtime-preview-pilot\/sessions\/pre-release-review/);
+});
+
+test('settings API wrapper exposes RuntimePreview v1.4 station profiles endpoint', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsApi.js'),
+    'utf8'
+  );
+
+  assert.match(source, /loadRuntimePreviewStationProfiles/);
+  assert.match(source, /runtime-preview-pilot\/station-profiles/);
+});
+
+test('settings API wrapper exposes RuntimePreview v1.4 operator contract registry endpoint', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsApi.js'),
+    'utf8'
+  );
+
+  assert.match(source, /loadRuntimePreviewOperatorContractRegistry/);
+  assert.match(source, /runtime-preview-pilot\/operator-contract-registry/);
+});
+
+test('settings API wrapper sends RuntimePreview v1.4 review and station lookup keys', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'settingsApi.js'),
+    'utf8'
+  );
+
+  assert.match(source, /reviewId = ''/);
+  assert.match(source, /stationProfileId = ''/);
+  assert.match(source, /encodeURIComponent\(reviewId\)/);
+  assert.match(source, /encodeURIComponent\(stationProfileId\)/);
+});
+
+test('RuntimePreview Review Desk v2 renders station profile selector', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /cfg-rp-station-profile-id/);
+  assert.match(source, /stationProfileOptions/);
+});
+
+test('RuntimePreview Review Desk v2 renders station profile load action', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /btn-runtime-preview-pilot-load-station-profiles/);
+  assert.match(source, /loadRuntimePreviewStationProfiles/);
+});
+
+test('RuntimePreview Review Desk v2 renders operator contract load action', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /btn-runtime-preview-pilot-load-operator-contract-registry/);
+  assert.match(source, /loadRuntimePreviewOperatorContractRegistry/);
+});
+
+test('RuntimePreview Review Desk v2 runs full pre-release review chain', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /Run full review chain/);
+  assert.match(source, /generateRuntimePreviewPreReleaseReview/);
+});
+
+test('RuntimePreview Review Desk v2 renders pre-release report panel', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-rp-pre-release-review-panel="true"/);
+  assert.match(source, /data-rp-pre-release-review-report="true"/);
+});
+
+test('RuntimePreview Review Desk v2 renders station compatibility panel', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-rp-station-compatibility-panel="true"/);
+  assert.match(source, /data-rp-station-compatibility-report="true"/);
+});
+
+test('RuntimePreview Review Desk v2 renders operator contract validation panel', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /data-rp-operator-contract-validation-panel="true"/);
+  assert.match(source, /data-rp-operator-contract-validation-report="true"/);
+});
+
+test('RuntimePreview Review Desk v2 displays release decision fields', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  for (const token of ['reviewId', 'releaseReviewAllowed', 'requiresEngineerApproval', 'riskLevel', 'engineerActions']) {
+    assert.match(source, new RegExp(token));
+  }
+});
+
+test('RuntimePreview Review Desk v2 displays station compatibility fields', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  for (const token of ['stationCompatible', 'runtimeVersionCompatible', 'operatorSupportCompatible', 'cameraSlotsCompatible']) {
+    assert.match(source, new RegExp(token));
+  }
+});
+
+test('RuntimePreview Review Desk v2 displays operator validation fields', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  for (const token of ['operatorContractsSatisfied', 'contractResults', 'blockedReasons', 'requiredEngineerApprovals']) {
+    assert.match(source, new RegExp(token));
+  }
+});
+
+test('RuntimePreview Review Desk v2 lookup includes reviewId input', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /cfg-rp-lookup-review-id/);
+  assert.match(source, /placeholder="reviewId"/);
+});
+
+test('RuntimePreview Review Desk v2 lookup includes stationProfileId input', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'settings', 'tabs', 'runtimePreviewPilotConsole.js'),
+    'utf8'
+  );
+
+  assert.match(source, /cfg-rp-lookup-station-profile-id/);
+  assert.match(source, /placeholder="stationProfileId"/);
+});
+
+test('RuntimePreview v1.4 endpoints expose admin gated station contract and review paths', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'Endpoints', 'SettingsEndpoints.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /runtime-preview-pilot\/sessions\/pre-release-review/);
+  assert.match(source, /runtime-preview-pilot\/station-profiles/);
+  assert.match(source, /runtime-preview-pilot\/operator-contract-registry/);
+  assert.match(source, /RuntimePreviewPreReleaseReviewService/);
+});
+
+test('RuntimePreview v1.4 governance lookup accepts review and station keys', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'Endpoints', 'SettingsEndpoints.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /string\? reviewId/);
+  assert.match(source, /string\? stationProfileId/);
+  assert.match(source, /GetPreReleaseReviewReport/);
+  assert.match(source, /GetStationCompatibilityReportsByStationProfileId/);
+});
+
+test('RuntimePreview v1.4 contracts expose station profile records', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /RuntimePreviewStationProfile/);
+  assert.match(source, /supportedOperatorTypes/);
+  assert.match(source, /plcWriteAllowed/);
+  assert.match(source, /networkPolicy/);
+});
+
+test('RuntimePreview v1.4 contracts expose operator contract registry records', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /RuntimePreviewOperatorContractDefinition/);
+  assert.match(source, /requiredInputs/);
+  assert.match(source, /forbiddenParameters/);
+  assert.match(source, /stationCompatibilityRequirements/);
+});
+
+test('RuntimePreview v1.4 contracts expose pre-release review report fields', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+
+  for (const token of ['RuntimePreviewPreReleaseReviewReport', 'reviewId', 'stationProfileId', 'operatorContractVersion', 'releaseReviewAllowed']) {
+    assert.match(source, new RegExp(token));
+  }
+});
+
+test('RuntimePreview governance store v4 persists v1.4 report streams', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /jsonl\.v4/);
+  assert.match(source, /runtime_preview_station_compatibility_reports\.jsonl/);
+  assert.match(source, /runtime_preview_operator_contract_validation_reports\.jsonl/);
+  assert.match(source, /runtime_preview_pre_release_review_reports\.jsonl/);
+});
+
+test('RuntimePreview v1.4 services register full review simulator dependencies', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'AiGenerationServiceExtensions.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /AddScoped<RuntimePreviewStationProfileCatalog>/);
+  assert.match(source, /AddScoped<RuntimePreviewOperatorContractRegistry>/);
+  assert.match(source, /AddScoped<RuntimePreviewStationCompatibilityDryRunService>/);
+  assert.match(source, /AddScoped<RuntimePreviewPreReleaseReviewService>/);
+});
+
+test('RuntimePreview v1.4 explanation fields cover release station and contract reasoning', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /releaseDecisionExplanation/);
+  assert.match(source, /stationCompatibilityExplanation/);
+  assert.match(source, /operatorContractExplanation/);
+  assert.match(source, /workflowDraftVsReleaseExplanation/);
+});
+
+test('RuntimePreview v1.4 redacted corpus exposes station and release expectations', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
+    'utf8'
+  );
+
+  assert.match(source, /expectedStationCompatibility/);
+  assert.match(source, /expectedReleaseReviewDecision/);
+  assert.match(source, /requiredEngineerApprovals/);
+  assert.match(source, /operatorContractExpectations/);
 });
 
 test('RuntimePreview governance contracts expose v1.3 manifest dry-run and redacted corpus records', () => {
@@ -2025,13 +2297,13 @@ test('RuntimePreview governance contracts expose v1.3 manifest safety flags', ()
   assert.match(source, /packageReviewAllowed/);
 });
 
-test('RuntimePreview governance store v3 persists manifest dry-run stream and export counts', () => {
+test('RuntimePreview governance store v4 persists manifest dry-run stream and export counts', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
     'utf8'
   );
 
-  assert.match(source, /jsonl\.v3/);
+  assert.match(source, /jsonl\.v4/);
   assert.match(source, /runtime_package_manifest_dry_run_reports\.jsonl/);
   assert.match(source, /SaveManifestDryRunReport/);
   assert.match(source, /LoadManifestDryRunReports/);
@@ -2060,13 +2332,13 @@ test('RuntimePackage manifest dry-run service builds dependency operator and res
   assert.match(source, /RuntimePackageManifestDryRunService/);
   assert.match(source, /GenerateFromPackageReadiness/);
   assert.match(source, /BuildMissingDependencies/);
-  assert.match(source, /BuildDependencyTrace/);
+  assert.match(source, /BuildManifestDependencyTrace/);
   assert.match(source, /OperatorTrace/);
   assert.match(source, /ResourceTrace/);
   assert.match(source, /ManifestDryRunGenerated/);
 });
 
-test('RuntimePreview redacted flow corpus service exposes at least twenty metadata-only production-like cases', () => {
+test('RuntimePreview redacted flow corpus service exposes at least thirty metadata-only production-like cases', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Infrastructure', 'AI', 'Tools', 'RuntimePreviewGovernanceServices.cs'),
     'utf8'
@@ -2074,7 +2346,7 @@ test('RuntimePreview redacted flow corpus service exposes at least twenty metada
 
   assert.match(source, /RuntimePreviewRedactedFlowCorpusService/);
   assert.match(source, /RP-RF-001/);
-  assert.match(source, /RP-RF-020/);
+  assert.match(source, /RP-RF-032/);
   assert.match(source, /redacted_metadata_only/);
   assert.match(source, /package_manifest_blocked/);
 });
@@ -2102,35 +2374,39 @@ test('RuntimePreview v1.3 DI registers manifest dry-run and redacted corpus serv
   assert.match(source, /AddScoped<RuntimePreviewRedactedFlowCorpusService>/);
 });
 
-test('RuntimePreview v1.3 quality runner writes redacted flow manifest dry-run and explanation v2 reports', () => {
+test('RuntimePreview v1.4 quality runner writes release review simulator reports', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'quality', 'tools', 'run_runtime_preview_scenario_evidence.py'),
     'utf8'
   );
 
-  assert.match(source, /RuntimePreview v1\.3/);
+  assert.match(source, /RuntimePreview v1\.4/);
   assert.match(source, /runtime_preview_redacted_flow_corpus/);
+  assert.match(source, /runtime_preview_redacted_flow_corpus_v2/);
   assert.match(source, /runtime_package_manifest_dry_run\.sample/);
-  assert.match(source, /expectedManifestRisk/);
-  assert.match(source, /manifestDryRunReportId/);
-  assert.match(source, /case\.get\("scenario", case\.get\("workflowKind"/);
+  assert.match(source, /runtime_preview_station_compatibility_dry_run\.sample/);
+  assert.match(source, /runtime_preview_operator_contract_validation_sample/);
+  assert.match(source, /runtime_preview_pre_release_review_report\.sample/);
+  assert.match(source, /runtime_preview_agent_explanation_v3/);
 });
 
-test('RuntimePreview v1.3 artifact assertion scans new manifest dry-run reports and package fragments', () => {
+test('RuntimePreview v1.4 artifact assertion scans release review reports and package fragments', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'quality', 'tools', 'assert_vision_agent_report_artifacts.py'),
     'utf8'
   );
 
-  assert.match(source, /runtime-preview-v1\.3-manifest-dry-run-scan/);
+  assert.match(source, /runtime-preview-v1\.4-release-review-simulator-scan/);
   assert.match(source, /runtime_preview_redacted_flow_corpus\.json/);
+  assert.match(source, /runtime_preview_redacted_flow_corpus_v2\.json/);
   assert.match(source, /runtime_package_manifest_dry_run\.sample\.json/);
-  assert.match(source, /runtime_preview_redacted_flow_corpus\.md/);
-  assert.match(source, /runtime_package_manifest_dry_run\.sample\.md/);
+  assert.match(source, /runtime_preview_station_compatibility_dry_run\.sample\.json/);
+  assert.match(source, /runtime_preview_operator_contract_validation_sample\.json/);
+  assert.match(source, /runtime_preview_pre_release_review_report\.sample\.json/);
   assert.match(source, /\\.cvpkg\\b/);
 });
 
-test('Vision Agent quality workflow uploads v1.3 redacted corpus and manifest dry-run artifacts', () => {
+test('Vision Agent quality workflow uploads v1.4 release review artifacts', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), '.github', 'workflows', 'vision-agent-quality.yml'),
     'utf8'
@@ -2138,25 +2414,31 @@ test('Vision Agent quality workflow uploads v1.3 redacted corpus and manifest dr
 
   assert.match(source, /runtime_preview_redacted_flow_corpus\.json/);
   assert.match(source, /runtime_preview_redacted_flow_corpus\.md/);
+  assert.match(source, /runtime_preview_redacted_flow_corpus_v2\.json/);
   assert.match(source, /runtime_package_manifest_dry_run\.sample\.json/);
   assert.match(source, /runtime_package_manifest_dry_run\.sample\.md/);
+  assert.match(source, /runtime_preview_station_profiles_sample\.json/);
+  assert.match(source, /runtime_preview_operator_contract_registry\.json/);
+  assert.match(source, /runtime_preview_pre_release_review_report\.sample\.json/);
 });
 
-test('business benchmark includes v1.3 manifest dry-run and redacted flow cases through registered tools', () => {
+test('business benchmark includes v1.4 release review cases through registered tools', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'quality', 'tools', 'VisionAgentBusinessBenchmarkRunner', 'Program.cs'),
     'utf8'
   );
 
   assert.match(source, /VA-BM-046/);
-  assert.match(source, /VA-BM-055/);
+  assert.match(source, /VA-BM-070/);
   assert.match(source, /redacted_flow_corpus/);
+  assert.match(source, /pre_release_review/);
+  assert.match(source, /operator_contract_validation/);
   assert.match(source, /manifest_dry_run/);
   assert.match(source, /packageReviewAllowed\.false/);
   assert.match(source, /RuntimePreviewSimulateMetadataSessionTool\.ToolName/);
 });
 
-test('Agent explanation v2 output includes status affected operators blocked reasons and manifest risk', () => {
+test('Agent explanation v3 output includes status release station contract and manifest risk', () => {
   const contractSource = fs.readFileSync(
     path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Core', 'AI', 'Tools', 'RuntimePreviewGovernanceContracts.cs'),
     'utf8'
@@ -2170,6 +2452,9 @@ test('Agent explanation v2 output includes status affected operators blocked rea
   assert.match(contractSource, /BlockedReasons/);
   assert.match(contractSource, /ManifestRisk/);
   assert.match(contractSource, /PackageReviewAllowed/);
+  assert.match(contractSource, /ReleaseDecisionExplanation/);
+  assert.match(contractSource, /StationCompatibilityExplanation/);
+  assert.match(contractSource, /OperatorContractExplanation/);
   assert.match(serviceSource, /ExplainRedacted/);
   assert.match(serviceSource, /WorkflowDraftAllowed = true/);
 });

@@ -17,7 +17,7 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
         }
         ,
         renderRuntimePreviewPilotPanel() {
-            const html = baseRenderRuntimePreviewPilotPanel.call(this).replace('RuntimePreview Pilot Console v1.1', 'RuntimePreview Pilot Console v1.3');
+            const html = baseRenderRuntimePreviewPilotPanel.call(this).replace('RuntimePreview Pilot Console v1.1', 'RuntimePreview Pilot Console v1.4');
             const extras = this.renderRuntimePreviewPilotConsoleV12Panels();
             return html.replace(
                 '</div>\n                </details>',
@@ -29,17 +29,26 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
             const redactedCorpus = this.runtimePreviewRedactedFlowCorpus || null;
             const packageReadiness = this.runtimePreviewPilotPackageReadinessReport || null;
             const manifestDryRun = this.runtimePackageManifestDryRunReport || null;
+            const stationProfiles = this.runtimePreviewStationProfiles || null;
+            const operatorRegistry = this.runtimePreviewOperatorContractRegistry || null;
+            const preReleaseReview = this.runtimePreviewPreReleaseReviewReport || null;
+            const stationCompatibility = this.runtimePreviewStationCompatibilityReport || null;
+            const operatorValidation = this.runtimePreviewOperatorContractValidationReport || null;
             const governanceIndex = this.runtimePreviewGovernanceIndex || null;
             const governanceExport = this.runtimePreviewGovernanceExport || null;
             const governanceLookup = this.runtimePreviewGovernanceLookup || null;
             const explanation = this.runtimePreviewAgentExplanationBenchmark || null;
             const corpusCases = Array.isArray(corpus?.cases) ? corpus.cases : [];
             const redactedCases = Array.isArray(redactedCorpus?.cases) ? redactedCorpus.cases : [];
+            const stationProfileRows = Array.isArray(stationProfiles?.profiles) ? stationProfiles.profiles : [];
             const corpusOptions = corpusCases
                 .map(item => `<option value="${this.sanitizeRuntimePreviewPilotValue(item.caseId)}">${this.sanitizeRuntimePreviewPilotValue(`${item.caseId} ${item.scenario}`)}</option>`)
                 .join('');
             const redactedOptions = redactedCases
                 .map(item => `<option value="${this.sanitizeRuntimePreviewPilotValue(item.caseId)}">${this.sanitizeRuntimePreviewPilotValue(`${item.caseId} ${item.workflowKind}`)}</option>`)
+                .join('');
+            const stationProfileOptions = stationProfileRows
+                .map(item => `<option value="${this.sanitizeRuntimePreviewPilotValue(item.stationProfileId)}">${this.sanitizeRuntimePreviewPilotValue(`${item.stationProfileId} ${item.stationType}`)}</option>`)
                 .join('');
             const corpusRows = corpusCases.length
                 ? corpusCases.slice(0, 18).map(item => `
@@ -56,13 +65,39 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                 ? redactedCases.slice(0, 24).map(item => `
                     <tr>
                         <td>${this.sanitizeRuntimePreviewPilotValue(item.caseId)}</td>
-                        <td>${this.sanitizeRuntimePreviewPilotValue(item.stationType)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.stationProfileId || item.stationType)}</td>
                         <td>${this.sanitizeRuntimePreviewPilotValue(item.workflowKind)}</td>
                         <td>${this.sanitizeRuntimePreviewPilotValue(item.expectedManifestRisk)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.expectedStationCompatibility)}</td>
+                        <td>${this.sanitizeRuntimePreviewPilotValue(item.expectedReleaseReviewDecision)}</td>
                         <td>${this.sanitizeRuntimePreviewPilotValue(item.expectedEngineerAction)}</td>
                     </tr>
                 `).join('')
-                : '<tr><td colspan="5" style="color:#64748b;">Redacted flow corpus has not been loaded.</td></tr>';
+                : '<tr><td colspan="7" style="color:#64748b;">Redacted flow corpus has not been loaded.</td></tr>';
+            const preReleaseHtml = preReleaseReview
+                ? `<pre data-rp-pre-release-review-report="true" style="white-space:pre-wrap; font-size:11px; max-height:210px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    reviewId: preReleaseReview.reviewId,
+                    caseId: preReleaseReview.caseId,
+                    sessionId: preReleaseReview.sessionId,
+                    workflowDraftHash: preReleaseReview.workflowDraftHash,
+                    manifestId: preReleaseReview.manifestId,
+                    stationProfileId: preReleaseReview.stationProfileId,
+                    operatorContractVersion: preReleaseReview.operatorContractVersion,
+                    readinessStatus: preReleaseReview.readinessStatus,
+                    packageReviewAllowed: preReleaseReview.packageReviewAllowed,
+                    stationCompatible: preReleaseReview.stationCompatible,
+                    operatorContractsSatisfied: preReleaseReview.operatorContractsSatisfied,
+                    releaseReviewAllowed: preReleaseReview.releaseReviewAllowed,
+                    requiresEngineerApproval: preReleaseReview.requiresEngineerApproval,
+                    riskLevel: preReleaseReview.riskLevel,
+                    blockedReasons: preReleaseReview.blockedReasons || [],
+                    engineerActions: preReleaseReview.engineerActions || [],
+                    metadataOnly: preReleaseReview.metadataOnly,
+                    packageCreated: preReleaseReview.packageCreated,
+                    deploymentExecuted: preReleaseReview.deploymentExecuted,
+                    realResourcesTouched: preReleaseReview.realResourcesTouched
+                }, null, 2))}</pre>`
+                : '<div data-rp-pre-release-review-report="true" style="font-size:12px; color:#64748b;">No pre-release review report generated.</div>';
             const packageHtml = packageReadiness
                 ? `<pre data-rp-package-readiness-report="true" style="white-space:pre-wrap; font-size:11px; max-height:170px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
                     reportId: packageReadiness.reportId,
@@ -107,6 +142,64 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                     deploymentExecuted: manifestDryRun.deploymentExecuted
                 }, null, 2))}</pre>`
                 : '<div data-rp-manifest-dry-run-report="true" style="font-size:12px; color:#64748b;">No manifest dry-run report generated.</div>';
+            const stationHtml = stationCompatibility
+                ? `<pre data-rp-station-compatibility-report="true" style="white-space:pre-wrap; font-size:11px; max-height:190px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    reportId: stationCompatibility.reportId,
+                    manifestId: stationCompatibility.manifestId,
+                    stationProfileId: stationCompatibility.stationProfileId,
+                    stationCompatible: stationCompatibility.stationCompatible,
+                    runtimeVersionCompatible: stationCompatibility.runtimeVersionCompatible,
+                    operatorSupportCompatible: stationCompatibility.operatorSupportCompatible,
+                    cameraSlotsCompatible: stationCompatibility.cameraSlotsCompatible,
+                    outputChannelsCompatible: stationCompatibility.outputChannelsCompatible,
+                    modelTemplateDependenciesCompatible: stationCompatibility.modelTemplateDependenciesCompatible,
+                    operatorCountCompatible: stationCompatibility.operatorCountCompatible,
+                    plcStationIntentCompatible: stationCompatibility.plcStationIntentCompatible,
+                    manifestRiskCompatible: stationCompatibility.manifestRiskCompatible,
+                    blockedReasons: stationCompatibility.blockedReasons || [],
+                    riskLevel: stationCompatibility.riskLevel,
+                    engineerActions: stationCompatibility.engineerActions || [],
+                    networkPolicy: stationCompatibility.stationProfile?.networkPolicy || 'redacted',
+                    plcWriteAllowed: stationCompatibility.stationProfile?.plcWriteAllowed === true
+                }, null, 2))}</pre>`
+                : '<div data-rp-station-compatibility-report="true" style="font-size:12px; color:#64748b;">No station compatibility dry-run generated.</div>';
+            const operatorHtml = operatorValidation
+                ? `<pre data-rp-operator-contract-validation-report="true" style="white-space:pre-wrap; font-size:11px; max-height:190px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    reportId: operatorValidation.reportId,
+                    manifestId: operatorValidation.manifestId,
+                    stationProfileId: operatorValidation.stationProfileId,
+                    operatorContractVersion: operatorValidation.operatorContractVersion,
+                    operatorContractsSatisfied: operatorValidation.operatorContractsSatisfied,
+                    blockedReasons: operatorValidation.blockedReasons || [],
+                    riskTags: operatorValidation.riskTags || [],
+                    requiredEngineerApprovals: operatorValidation.requiredEngineerApprovals || [],
+                    contractResults: operatorValidation.contractResults || []
+                }, null, 2))}</pre>`
+                : '<div data-rp-operator-contract-validation-report="true" style="font-size:12px; color:#64748b;">No operator contract validation generated.</div>';
+            const stationProfilesHtml = stationProfiles
+                ? `<pre data-rp-station-profiles="true" style="white-space:pre-wrap; font-size:11px; max-height:130px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    profileCount: stationProfiles.profileCount,
+                    profiles: stationProfileRows.map(item => ({
+                        stationProfileId: item.stationProfileId,
+                        stationType: item.stationType,
+                        runtimeVersion: item.runtimeVersion,
+                        supportedOperatorTypes: item.supportedOperatorTypes || [],
+                        supportedModelKinds: item.supportedModelKinds || [],
+                        cameraBindingSlots: item.cameraBindingSlots || [],
+                        outputChannelKinds: item.outputChannelKinds || [],
+                        maxOperatorCount: item.maxOperatorCount,
+                        plcWriteAllowed: item.plcWriteAllowed === true,
+                        networkPolicy: item.networkPolicy || 'redacted'
+                    }))
+                }, null, 2))}</pre>`
+                : '<div data-rp-station-profiles="true" style="font-size:12px; color:#64748b;">No station profiles loaded.</div>';
+            const operatorRegistryHtml = operatorRegistry
+                ? `<pre data-rp-operator-contract-registry="true" style="white-space:pre-wrap; font-size:11px; max-height:130px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    operatorContractVersion: operatorRegistry.operatorContractVersion,
+                    contractCount: operatorRegistry.contractCount,
+                    contracts: operatorRegistry.contracts || []
+                }, null, 2))}</pre>`
+                : '<div data-rp-operator-contract-registry="true" style="font-size:12px; color:#64748b;">No operator contract registry loaded.</div>';
             const governanceIndexHtml = governanceIndex
                 ? `<pre data-rp-governance-index="true" style="white-space:pre-wrap; font-size:11px; max-height:130px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify(governanceIndex, null, 2))}</pre>`
                 : '<div data-rp-governance-index="true" style="font-size:12px; color:#64748b;">No governance index loaded.</div>';
@@ -128,7 +221,7 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                     caseCount: explanation.caseCount,
                     passedCaseCount: explanation.passedCaseCount,
                     accepted: explanation.accepted,
-                    expectedFields: ['readyStateExplanation', 'missingResourceExplanation', 'packageRiskExplanation', 'nextEngineerAction'],
+                    expectedFields: ['readyStateExplanation', 'missingResourceExplanation', 'packageRiskExplanation', 'operatorContractExplanation', 'stationCompatibilityExplanation', 'releaseDecisionExplanation', 'workflowDraftVsReleaseExplanation', 'nextEngineerAction'],
                     cases: explanation.cases || []
                 }, null, 2))}</pre>`
                 : '<div data-rp-agent-explanation="true" style="font-size:12px; color:#64748b;">Agent explanation benchmark has not been loaded.</div>';
@@ -153,14 +246,23 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                                 <h4 style="margin:0 0 8px;">Redacted Flow Corpus</h4>
                                 <div style="display:flex; gap:8px; align-items:center;">
                                     <select class="cv-input" id="cfg-rp-redacted-flow-case-id" style="min-width:260px;">${redactedOptions}</select>
+                                    <select class="cv-input" id="cfg-rp-station-profile-id" style="min-width:260px;">${stationProfileOptions}</select>
                                     <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-load-redacted-flow-corpus">Load redacted flows</button>
-                                    <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-run-redacted-flow-chain">Run pre-release chain</button>
+                                    <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-load-station-profiles">Load station profiles</button>
+                                    <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-load-operator-contract-registry">Load contracts</button>
+                                    <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-run-redacted-flow-chain">Run full review chain</button>
                                 </div>
                             </div>
                             <table class="settings-modern-table" data-rp-redacted-flow-corpus="true">
-                                <thead><tr><th>Case</th><th>Station type</th><th>Workflow kind</th><th>Manifest risk</th><th>Engineer action</th></tr></thead>
+                                <thead><tr><th>Case</th><th>Station profile</th><th>Workflow kind</th><th>Manifest risk</th><th>Station</th><th>Decision</th><th>Engineer action</th></tr></thead>
                                 <tbody>${redactedRows}</tbody>
                             </table>
+                            ${stationProfilesHtml}
+                            ${operatorRegistryHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-pre-release-review-panel="true">
+                            <h4 style="margin:0 0 8px;">Release review decision</h4>
+                            ${preReleaseHtml}
                         </div>
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-package-readiness-panel="true">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
@@ -176,13 +278,23 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                             </div>
                             ${manifestHtml}
                         </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-station-compatibility-panel="true">
+                            <h4 style="margin:0 0 8px;">Station compatibility dry-run</h4>
+                            ${stationHtml}
+                        </div>
+                        <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-operator-contract-validation-panel="true">
+                            <h4 style="margin:0 0 8px;">Operator contract validation</h4>
+                            ${operatorHtml}
+                        </div>
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-governance-panel="true">
                             <h4 style="margin:0 0 8px;">Governance index, lookup, and export</h4>
-                            <div style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px;">
+                            <div style="display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px;">
                                 <input class="cv-input" id="cfg-rp-lookup-session-id" placeholder="sessionId">
                                 <input class="cv-input" id="cfg-rp-lookup-report-id" placeholder="reportId">
                                 <input class="cv-input" id="cfg-rp-lookup-case-id" placeholder="caseId">
                                 <input class="cv-input" id="cfg-rp-lookup-manifest-id" placeholder="manifestId">
+                                <input class="cv-input" id="cfg-rp-lookup-review-id" placeholder="reviewId">
+                                <input class="cv-input" id="cfg-rp-lookup-station-profile-id" placeholder="stationProfileId">
                             </div>
                             <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
                                 <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-governance-index">Load index</button>
@@ -284,6 +396,12 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                 } else if (btn.id === 'btn-runtime-preview-pilot-load-redacted-flow-corpus') {
                     const result = await settingsApi.loadRuntimePreviewRedactedFlowCorpus();
                     this.runtimePreviewRedactedFlowCorpus = result?.corpus || result;
+                } else if (btn.id === 'btn-runtime-preview-pilot-load-station-profiles') {
+                    const result = await settingsApi.loadRuntimePreviewStationProfiles();
+                    this.runtimePreviewStationProfiles = result?.stationProfiles || result;
+                } else if (btn.id === 'btn-runtime-preview-pilot-load-operator-contract-registry') {
+                    const result = await settingsApi.loadRuntimePreviewOperatorContractRegistry();
+                    this.runtimePreviewOperatorContractRegistry = result?.operatorContractRegistry || result;
                 } else if (btn.id === 'btn-runtime-preview-pilot-run-selected-scenario') {
                     await this.ensureRuntimePreviewScenarioCorpusLoaded();
                     const caseId = root.querySelector('#cfg-rp-scenario-case-id')?.value || '';
@@ -301,19 +419,26 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                     this.runtimePreviewGovernanceLookup = { corpusCase: scenarioCase };
                 } else if (btn.id === 'btn-runtime-preview-pilot-run-redacted-flow-chain') {
                     await this.ensureRuntimePreviewRedactedFlowCorpusLoaded();
+                    await this.ensureRuntimePreviewStationProfilesLoaded();
                     const caseId = root.querySelector('#cfg-rp-redacted-flow-case-id')?.value || '';
                     const flowCase = this.findRuntimePreviewRedactedFlowCase(caseId);
                     if (!flowCase) return;
+                    const stationProfileId = root.querySelector('#cfg-rp-station-profile-id')?.value || flowCase.stationProfileId || '';
                     const payload = {
                         config: this.readRuntimePreviewPilotConfigDraft(root),
                         toolName: 'runtime_preview_metadata',
                         runtimePreviewConsent: true,
-                        arguments: { flow: flowCase.workflowDraft }
+                        arguments: { flow: flowCase.workflowDraft },
+                        caseId: flowCase.caseId,
+                        stationProfileId
                     };
-                    const result = await settingsApi.generateRuntimePackageManifestDryRun(payload);
+                    const result = await settingsApi.generateRuntimePreviewPreReleaseReview(payload);
+                    this.runtimePreviewPreReleaseReviewReport = result?.preReleaseReviewReport || null;
                     this.runtimePreviewPilotPackageReadinessReport = result?.packageReadinessReport || null;
                     this.runtimePackageManifestDryRunReport = result?.manifestDryRunReport || null;
-                    this.runtimePreviewGovernanceLookup = { redactedFlowCase: flowCase };
+                    this.runtimePreviewStationCompatibilityReport = result?.stationCompatibilityReport || null;
+                    this.runtimePreviewOperatorContractValidationReport = result?.operatorContractValidationReport || null;
+                    this.runtimePreviewGovernanceLookup = { redactedFlowCase: flowCase, preReleaseReviewReport: this.runtimePreviewPreReleaseReviewReport };
                 } else if (btn.id === 'btn-runtime-preview-pilot-governance-index') {
                     const result = await settingsApi.loadRuntimePreviewGovernanceIndex();
                     this.runtimePreviewGovernanceIndex = result?.index || result;
@@ -325,7 +450,9 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                         sessionId: root.querySelector('#cfg-rp-lookup-session-id')?.value || '',
                         reportId: root.querySelector('#cfg-rp-lookup-report-id')?.value || '',
                         caseId: root.querySelector('#cfg-rp-lookup-case-id')?.value || '',
-                        manifestId: root.querySelector('#cfg-rp-lookup-manifest-id')?.value || ''
+                        manifestId: root.querySelector('#cfg-rp-lookup-manifest-id')?.value || '',
+                        reviewId: root.querySelector('#cfg-rp-lookup-review-id')?.value || '',
+                        stationProfileId: root.querySelector('#cfg-rp-lookup-station-profile-id')?.value || ''
                     });
                     this.runtimePreviewGovernanceLookup = result?.lookup || result;
                 } else if (btn.id === 'btn-runtime-preview-pilot-agent-explanation') {
@@ -368,6 +495,15 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
 
             const result = await settingsApi.loadRuntimePreviewRedactedFlowCorpus();
             this.runtimePreviewRedactedFlowCorpus = result?.corpus || result;
+        }
+        ,
+        async ensureRuntimePreviewStationProfilesLoaded() {
+            if (Array.isArray(this.runtimePreviewStationProfiles?.profiles) && this.runtimePreviewStationProfiles.profiles.length > 0) {
+                return;
+            }
+
+            const result = await settingsApi.loadRuntimePreviewStationProfiles();
+            this.runtimePreviewStationProfiles = result?.stationProfiles || result;
         }
         ,
         findRuntimePreviewScenarioCase(caseId) {

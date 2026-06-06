@@ -1,15 +1,15 @@
 {
-  "schemaVersion": "2026-06-06.runtime-preview-governance-audit-sample.v2",
+  "schemaVersion": "2026-06-06.runtime-preview-governance-audit-sample.v3",
   "benchmarkId": "runtime_preview_governance_audit_sample",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T15:00:30.583603+00:00"
+    "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
   },
   "summary": {
-    "eventCount": 18,
+    "eventCount": 19,
     "metadataOnly": true,
     "realResourcesTouched": false,
     "redactionPass": true,
@@ -40,13 +40,6 @@
     },
     {
       "eventType": "allowlist_changed",
-      "sessionId": "rp_session_sample",
-      "payloadRedacted": true,
-      "metadataOnly": true,
-      "realResourcesTouched": false
-    },
-    {
-      "eventType": "scenario_corpus_loaded",
       "sessionId": "rp_session_sample",
       "payloadRedacted": true,
       "metadataOnly": true,
@@ -88,13 +81,6 @@
       "realResourcesTouched": false
     },
     {
-      "eventType": "session_replayed",
-      "sessionId": "rp_session_sample",
-      "payloadRedacted": true,
-      "metadataOnly": true,
-      "realResourcesTouched": false
-    },
-    {
       "eventType": "deploy_readiness_generated",
       "sessionId": "rp_session_sample",
       "payloadRedacted": true,
@@ -110,6 +96,27 @@
     },
     {
       "eventType": "manifest_dry_run_generated",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "station_compatibility_generated",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "operator_contract_validation_generated",
+      "sessionId": "rp_session_sample",
+      "payloadRedacted": true,
+      "metadataOnly": true,
+      "realResourcesTouched": false
+    },
+    {
+      "eventType": "pre_release_review_generated",
       "sessionId": "rp_session_sample",
       "payloadRedacted": true,
       "metadataOnly": true,

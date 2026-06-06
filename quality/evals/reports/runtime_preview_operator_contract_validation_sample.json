@@ -1,0 +1,1645 @@
+{
+  "schemaVersion": "2026-06-06.runtime-preview-operator-contract-validation.v1",
+  "benchmarkId": "runtime_preview_operator_contract_validation_sample",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+  },
+  "summary": {
+    "caseCount": 32,
+    "minimumCases": 30,
+    "operatorContractsSatisfiedCount": 30,
+    "blockedCount": 2,
+    "metadataOnly": true,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "realResourcesTouched": false,
+    "accepted": true
+  },
+  "reports": [
+    {
+      "reportId": "rp_operator_contract_rp-rf-001",
+      "caseId": "RP-RF-001",
+      "manifestId": "rp_manifest_dry_run_rp-rf-001",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-002",
+      "caseId": "RP-RF-002",
+      "manifestId": "rp_manifest_dry_run_rp-rf-002",
+      "stationProfileId": "sp-dl-review-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [
+        "deep_learning_release_review"
+      ],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-003",
+      "caseId": "RP-RF-003",
+      "manifestId": "rp_manifest_dry_run_rp-rf-003",
+      "stationProfileId": "sp-dl-review-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "CircleMeasurement",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [
+        "deep_learning_release_review",
+        "medium_manifest_risk"
+      ],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-004",
+      "caseId": "RP-RF-004",
+      "manifestId": "rp_manifest_dry_run_rp-rf-004",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "CircleMeasurement",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "MeasureDistance",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-005",
+      "caseId": "RP-RF-005",
+      "manifestId": "rp_manifest_dry_run_rp-rf-005",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-006",
+      "caseId": "RP-RF-006",
+      "manifestId": "rp_manifest_dry_run_rp-rf-006",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-007",
+      "caseId": "RP-RF-007",
+      "manifestId": "rp_manifest_dry_run_rp-rf-007",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-008",
+      "caseId": "RP-RF-008",
+      "manifestId": "rp_manifest_dry_run_rp-rf-008",
+      "stationProfileId": "sp-dl-review-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-009",
+      "caseId": "RP-RF-009",
+      "manifestId": "rp_manifest_dry_run_rp-rf-009",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-010",
+      "caseId": "RP-RF-010",
+      "manifestId": "rp_manifest_dry_run_rp-rf-010",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-011",
+      "caseId": "RP-RF-011",
+      "manifestId": "rp_manifest_dry_run_rp-rf-011",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-012",
+      "caseId": "RP-RF-012",
+      "manifestId": "rp_manifest_dry_run_rp-rf-012",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-013",
+      "caseId": "RP-RF-013",
+      "manifestId": "rp_manifest_dry_run_rp-rf-013",
+      "stationProfileId": "sp-low-ipc-v12",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-014",
+      "caseId": "RP-RF-014",
+      "manifestId": "rp_manifest_dry_run_rp-rf-014",
+      "stationProfileId": "sp-dl-review-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [
+        "deep_learning_release_review"
+      ],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-015",
+      "caseId": "RP-RF-015",
+      "manifestId": "rp_manifest_dry_run_rp-rf-015",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": false,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": false,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": [
+            "operator_contract_missing_parameter:TemplateMatching:TemplateId"
+          ]
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [
+        "operator_contract_missing_parameter:TemplateMatching:TemplateId"
+      ],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-016",
+      "caseId": "RP-RF-016",
+      "manifestId": "rp_manifest_dry_run_rp-rf-016",
+      "stationProfileId": "sp-dl-review-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-017",
+      "caseId": "RP-RF-017",
+      "manifestId": "rp_manifest_dry_run_rp-rf-017",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-018",
+      "caseId": "RP-RF-018",
+      "manifestId": "rp_manifest_dry_run_rp-rf-018",
+      "stationProfileId": "sp-dl-review-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-019",
+      "caseId": "RP-RF-019",
+      "manifestId": "rp_manifest_dry_run_rp-rf-019",
+      "stationProfileId": "sp-dl-review-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "CircleMeasurement",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [
+        "medium_manifest_risk",
+        "deep_learning_release_review"
+      ],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-020",
+      "caseId": "RP-RF-020",
+      "manifestId": "rp_manifest_dry_run_rp-rf-020",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-021",
+      "caseId": "RP-RF-021",
+      "manifestId": "rp_manifest_dry_run_rp-rf-021",
+      "stationProfileId": "sp-low-ipc-v12",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "CircleMeasurement",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "MeasureDistance",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "LineMeasurement",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-022",
+      "caseId": "RP-RF-022",
+      "manifestId": "rp_manifest_dry_run_rp-rf-022",
+      "stationProfileId": "sp-low-ipc-v12",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-023",
+      "caseId": "RP-RF-023",
+      "manifestId": "rp_manifest_dry_run_rp-rf-023",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-024",
+      "caseId": "RP-RF-024",
+      "manifestId": "rp_manifest_dry_run_rp-rf-024",
+      "stationProfileId": "sp-output-lite-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-025",
+      "caseId": "RP-RF-025",
+      "manifestId": "rp_manifest_dry_run_rp-rf-025",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-026",
+      "caseId": "RP-RF-026",
+      "manifestId": "rp_manifest_dry_run_rp-rf-026",
+      "stationProfileId": "sp-low-ipc-v12",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-027",
+      "caseId": "RP-RF-027",
+      "manifestId": "rp_manifest_dry_run_rp-rf-027",
+      "stationProfileId": "sp-detection-only-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-028",
+      "caseId": "RP-RF-028",
+      "manifestId": "rp_manifest_dry_run_rp-rf-028",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-029",
+      "caseId": "RP-RF-029",
+      "manifestId": "rp_manifest_dry_run_rp-rf-029",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "CircleMeasurement",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "MeasureDistance",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-030",
+      "caseId": "RP-RF-030",
+      "manifestId": "rp_manifest_dry_run_rp-rf-030",
+      "stationProfileId": "sp-dl-review-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "DeepLearning",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "ModelId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [
+        "deep_learning_review"
+      ],
+      "requiredEngineerApprovals": [
+        "deep_learning_release_review"
+      ],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-031",
+      "caseId": "RP-RF-031",
+      "manifestId": "rp_manifest_dry_run_rp-rf-031",
+      "stationProfileId": "sp-multi-station-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": true,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": true,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [],
+      "riskTags": [],
+      "requiredEngineerApprovals": [
+        "multi_station_review"
+      ],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    },
+    {
+      "reportId": "rp_operator_contract_rp-rf-032",
+      "caseId": "RP-RF-032",
+      "manifestId": "rp_manifest_dry_run_rp-rf-032",
+      "stationProfileId": "sp-release-standard-v14",
+      "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+      "operatorContractsSatisfied": false,
+      "contractResults": [
+        {
+          "operatorType": "ImageAcquisition",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        },
+        {
+          "operatorType": "TemplateMatching",
+          "contractSatisfied": false,
+          "requiredParameters": [
+            "TemplateId"
+          ],
+          "blockedReasons": [
+            "operator_contract_missing_parameter:TemplateMatching:TemplateId"
+          ]
+        },
+        {
+          "operatorType": "ResultOutput",
+          "contractSatisfied": true,
+          "requiredParameters": [],
+          "blockedReasons": []
+        }
+      ],
+      "blockedReasons": [
+        "operator_contract_missing_parameter:TemplateMatching:TemplateId"
+      ],
+      "riskTags": [],
+      "requiredEngineerApprovals": [],
+      "metadataOnly": true,
+      "realResourcesTouched": false,
+      "realResourceTouched": false,
+      "realCameraSdkTouched": false,
+      "realStationTouched": false,
+      "realImageFilesRead": false,
+      "realModelFilesLoaded": false,
+      "plcWriteAttempted": false,
+      "packageCreated": false,
+      "deploymentExecuted": false,
+      "hotLoadAttempted": false,
+      "realPackageFileWritten": false,
+      "manifestArtifactGenerated": false,
+      "realRuntimePreviewAdapterImplemented": false
+    }
+  ],
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

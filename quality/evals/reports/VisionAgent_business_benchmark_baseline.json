@@ -1,28 +1,28 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-executable-business-benchmark.v1",
   "benchmarkId": "vision_agent_executable_business_benchmark",
-  "generatedAtUtc": "2026-06-06T15:00:30.4738419+00:00",
+  "generatedAtUtc": "2026-06-06T16:17:28.2557886+00:00",
   "mode": "offline_metadata_only",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T15:00:30.4738419+00:00"
+    "generatedAtUtc": "2026-06-06T16:17:28.2557886+00:00"
   },
   "summary": {
-    "caseCount": 55,
-    "runtimePreviewCaseCount": 12,
-    "passedCaseCount": 55,
+    "caseCount": 70,
+    "runtimePreviewCaseCount": 13,
+    "passedCaseCount": 70,
     "accepted": true
   },
   "metrics": {
     "generationSuccessRate": 1,
-    "structuralValidationPassRate": 0.9818,
-    "dryRunPassRate": 0.9636,
-    "previewReadyRate": 0.9167,
-    "parameterCompletionRate": 0.7455,
-    "userApplicableRate": 0.9818
+    "structuralValidationPassRate": 0.9714,
+    "dryRunPassRate": 0.9571,
+    "previewReadyRate": 0.9231,
+    "parameterCompletionRate": 0.7429,
+    "userApplicableRate": 0.9714
   },
   "thresholdResults": {
     "generationSuccessRate": {
@@ -31,27 +31,27 @@
       "passed": true
     },
     "structuralValidationPassRate": {
-      "actual": 0.9818,
+      "actual": 0.9714,
       "minimum": 0.9,
       "passed": true
     },
     "dryRunPassRate": {
-      "actual": 0.9636,
+      "actual": 0.9571,
       "minimum": 0.85,
       "passed": true
     },
     "previewReadyRate": {
-      "actual": 0.9167,
+      "actual": 0.9231,
       "minimum": 0.7,
       "passed": true
     },
     "parameterCompletionRate": {
-      "actual": 0.7455,
+      "actual": 0.7429,
       "minimum": 0.7,
       "passed": true
     },
     "userApplicableRate": {
-      "actual": 0.9818,
+      "actual": 0.9714,
       "minimum": 0.9,
       "passed": true
     }
@@ -59,33 +59,40 @@
   "categoryCounts": {
     "agent_explanation": 2,
     "agent_explanation_v2": 1,
+    "agent_explanation_v3": 1,
     "governance": 1,
     "governance_v3": 1,
+    "governance_v4": 1,
     "hole_distance": 5,
     "manifest_dry_run": 2,
     "missing_resources": 5,
     "modify_existing_flow": 4,
+    "operator_contract_validation": 4,
     "package_readiness": 2,
     "package_readiness_v2": 2,
     "parameter_completion": 5,
     "precheck": 3,
+    "pre_release_review": 4,
     "redacted_flow_corpus": 4,
+    "redacted_flow_corpus_v2": 1,
     "runtime_preview": 5,
     "scenario_corpus": 3,
+    "station_compatibility": 4,
     "template_matching": 5,
     "wire_sequence": 5
   },
   "taskTypeCounts": {
     "generate": 3,
-    "manifest_dry_run": 4,
-    "missing_resource": 12,
+    "manifest_dry_run": 5,
+    "missing_resource": 15,
     "modify_existing_flow": 6,
     "multi_operator_flow": 2,
     "package_readiness": 2,
     "parameter_completion": 8,
     "precheck": 4,
+    "release_review": 10,
     "runtime_preview": 9,
-    "runtime_preview_session": 4,
+    "runtime_preview_session": 5,
     "scenario_corpus": 1
   },
   "safety": {
@@ -7223,31 +7230,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_adcaa3d5ccf34dbd834aa20364f26b38",
-        "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
-        "generatedAtUtc": "2026-06-06T15:00:30.451761+00:00",
+        "reportId": "rp_report_a30c497ffc844020836cefd7cfc102ba",
+        "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
+        "generatedAtUtc": "2026-06-06T16:17:28.2023751+00:00",
         "session": {
-          "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+          "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
           "status": "completed",
-          "createdAtUtc": "2026-06-06T15:00:30.4334574+00:00",
-          "updatedAtUtc": "2026-06-06T15:00:30.4526949+00:00",
+          "createdAtUtc": "2026-06-06T16:17:28.171509+00:00",
+          "updatedAtUtc": "2026-06-06T16:17:28.2043718+00:00",
           "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
           "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
-          "catalogSnapshotId": "rp_catalog_bffefb7337580c2f",
+          "catalogSnapshotId": "rp_catalog_0258773575908bac",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_611b437a3ea14c1cb8ac8da43bdc2ad8",
-            "rp_audit_9e9c88cb331643da9cd29f4066c42596",
-            "rp_audit_714bd1b6c4f94776ab6e64bb82b32427",
-            "rp_audit_b1a2346ed57b498797c75664a4501975",
-            "rp_audit_c586558f8106431d91887f6edc58ecca",
-            "rp_audit_ab4e33dcce1144f9b43c392411d7ba2f",
-            "rp_audit_8f4abb51d5fa49ef80c9b050f72f93bf",
-            "rp_audit_b7589c1ec3ab464e8f9ea5208a660a84",
-            "rp_audit_17a36e5ef76d40feafcb4ec56816dd72"
+            "rp_audit_ddae7289121d43949e4be8893714e32b",
+            "rp_audit_6bc85ff845c7464db2f9f76525b3d4b1",
+            "rp_audit_7c58d681969244aaaf893a6e2c75efc8",
+            "rp_audit_c7b71f26e5fb4adaa937ddcc65812e13",
+            "rp_audit_070d4cb3c3b74e59a5583a12f853ee7f",
+            "rp_audit_21750361d028445b94ab933060a1004d",
+            "rp_audit_423ead4fceee48128401172650d3645a",
+            "rp_audit_edcab02723604f59b0072f7c8c5ec4ab",
+            "rp_audit_fc2baec416454d8e9f7d1e2bef1bd395"
           ],
-          "reportId": "rp_report_adcaa3d5ccf34dbd834aa20364f26b38",
+          "reportId": "rp_report_a30c497ffc844020836cefd7cfc102ba",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -7362,12 +7369,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_611b437a3ea14c1cb8ac8da43bdc2ad8",
-            "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+            "eventId": "rp_audit_ddae7289121d43949e4be8893714e32b",
+            "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
             "eventType": "session_created",
-            "createdAtUtc": "2026-06-06T15:00:30.4363656+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.1759923+00:00",
             "payload": {
-              "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+              "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
               "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
               "metadataOnly": true
             },
@@ -7375,10 +7382,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_9e9c88cb331643da9cd29f4066c42596",
-            "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+            "eventId": "rp_audit_6bc85ff845c7464db2f9f76525b3d4b1",
+            "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-06-06T15:00:30.4376055+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.1780612+00:00",
             "payload": {
               "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
               "enabled": true,
@@ -7390,12 +7397,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_714bd1b6c4f94776ab6e64bb82b32427",
-            "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+            "eventId": "rp_audit_7c58d681969244aaaf893a6e2c75efc8",
+            "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-06-06T15:00:30.4396436+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.1824294+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_bffefb7337580c2f",
+              "catalogSnapshotId": "rp_catalog_0258773575908bac",
               "handleCount": 2,
               "sourceSummary": {
                 "appConfig": 0,
@@ -7410,10 +7417,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_b1a2346ed57b498797c75664a4501975",
-            "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+            "eventId": "rp_audit_c7b71f26e5fb4adaa937ddcc65812e13",
+            "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-06-06T15:00:30.439718+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.1825405+00:00",
             "payload": {
               "camera": 1,
               "model": 2,
@@ -7425,10 +7432,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c586558f8106431d91887f6edc58ecca",
-            "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+            "eventId": "rp_audit_070d4cb3c3b74e59a5583a12f853ee7f",
+            "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-06-06T15:00:30.4454385+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.1917472+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -7439,10 +7446,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_ab4e33dcce1144f9b43c392411d7ba2f",
-            "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+            "eventId": "rp_audit_21750361d028445b94ab933060a1004d",
+            "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-06-06T15:00:30.4479053+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.1955831+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -7461,23 +7468,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_8f4abb51d5fa49ef80c9b050f72f93bf",
-            "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+            "eventId": "rp_audit_423ead4fceee48128401172650d3645a",
+            "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-06-06T15:00:30.4484769+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.1966715+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_bffefb7337580c2f",
+              "catalogSnapshotId": "rp_catalog_0258773575908bac",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_b7589c1ec3ab464e8f9ea5208a660a84",
-            "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+            "eventId": "rp_audit_edcab02723604f59b0072f7c8c5ec4ab",
+            "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-06-06T15:00:30.4496183+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.1990708+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -7487,12 +7494,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_17a36e5ef76d40feafcb4ec56816dd72",
-            "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+            "eventId": "rp_audit_fc2baec416454d8e9f7d1e2bef1bd395",
+            "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-06-06T15:00:30.4524017+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2034898+00:00",
             "payload": {
-              "reportId": "rp_report_adcaa3d5ccf34dbd834aa20364f26b38",
+              "reportId": "rp_report_a30c497ffc844020836cefd7cfc102ba",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -7501,19 +7508,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+          "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_574f69b82dc3447faaa315cd41c68d43",
+              "status": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_bffefb7337580c2f",
+              "status": "rp_catalog_0258773575908bac",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -7623,15 +7630,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_cc9302bb7c21",
+              "artifactId": "rp_artifact_b98b2b1028e7",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_574f69b82dc3447faaa315cd41c68d43",
-                "catalogSnapshotId": "rp_catalog_bffefb7337580c2f",
+                "sessionId": "rp_session_c830e623ff5545ac8104a62eb7e524e4",
+                "catalogSnapshotId": "rp_catalog_0258773575908bac",
                 "handleCount": 2,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -8572,31 +8579,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_37d973ad6a964254b1ac98a0b30827f5",
-        "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
-        "generatedAtUtc": "2026-06-06T15:00:30.4633549+00:00",
+        "reportId": "rp_report_dea04e2e48654c4488bb3ea87e41d20d",
+        "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
+        "generatedAtUtc": "2026-06-06T16:17:28.2263363+00:00",
         "session": {
-          "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+          "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
           "status": "completed",
-          "createdAtUtc": "2026-06-06T15:00:30.4629569+00:00",
-          "updatedAtUtc": "2026-06-06T15:00:30.463388+00:00",
+          "createdAtUtc": "2026-06-06T16:17:28.2258404+00:00",
+          "updatedAtUtc": "2026-06-06T16:17:28.2264509+00:00",
           "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
           "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
-          "catalogSnapshotId": "rp_catalog_98bb1bc3d165fde3",
+          "catalogSnapshotId": "rp_catalog_52d152eccebddb2a",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_898c291b096e465c86c28cc5fe88e24b",
-            "rp_audit_c61e3d1ceb37452cb3ce2514e11e7ecd",
-            "rp_audit_00ee9ccfe41d433ea731d8957e742708",
-            "rp_audit_800fcd82540f4399a9a9ab694cdef868",
-            "rp_audit_dc04c9b3189c46d2878286a6fe7b13b5",
-            "rp_audit_12412639f480422cbddd69f82f533234",
-            "rp_audit_98387792010145409e511b1dc223dc3b",
-            "rp_audit_c537bf9664404ece9c0c165cd8f53fb7",
-            "rp_audit_470dab73087843ebb30c4b5e2e2b215e"
+            "rp_audit_feda4d99d0b44eb99ce9ab5cc23b747a",
+            "rp_audit_463e308eefd741a8b73faa691d4c9328",
+            "rp_audit_0baf56ab6cce4ec0ae5f585a0af0b305",
+            "rp_audit_eab0f210587f4f45be8427ada82029e1",
+            "rp_audit_40b2f75dd250460694edb7d0f5ce3ca1",
+            "rp_audit_0d18c537c8f540a99dc60d00b467590c",
+            "rp_audit_cc93ae6fca2f421f877a3f1b5d8c0510",
+            "rp_audit_170514da8dad4abfaa5f54a89d2b9793",
+            "rp_audit_f437d6b5d03849d0b23c2a2b421b99c7"
           ],
-          "reportId": "rp_report_37d973ad6a964254b1ac98a0b30827f5",
+          "reportId": "rp_report_dea04e2e48654c4488bb3ea87e41d20d",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -8711,12 +8718,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_898c291b096e465c86c28cc5fe88e24b",
-            "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+            "eventId": "rp_audit_feda4d99d0b44eb99ce9ab5cc23b747a",
+            "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
             "eventType": "session_created",
-            "createdAtUtc": "2026-06-06T15:00:30.4630085+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2258982+00:00",
             "payload": {
-              "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+              "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
               "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
               "metadataOnly": true
             },
@@ -8724,10 +8731,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c61e3d1ceb37452cb3ce2514e11e7ecd",
-            "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+            "eventId": "rp_audit_463e308eefd741a8b73faa691d4c9328",
+            "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-06-06T15:00:30.4630507+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2259431+00:00",
             "payload": {
               "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
               "enabled": true,
@@ -8739,12 +8746,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_00ee9ccfe41d433ea731d8957e742708",
-            "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+            "eventId": "rp_audit_0baf56ab6cce4ec0ae5f585a0af0b305",
+            "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-06-06T15:00:30.4630833+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2259908+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_98bb1bc3d165fde3",
+              "catalogSnapshotId": "rp_catalog_52d152eccebddb2a",
               "handleCount": 2,
               "sourceSummary": {
                 "appConfig": 0,
@@ -8759,10 +8766,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_800fcd82540f4399a9a9ab694cdef868",
-            "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+            "eventId": "rp_audit_eab0f210587f4f45be8427ada82029e1",
+            "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-06-06T15:00:30.463099+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2260151+00:00",
             "payload": {
               "camera": 1,
               "model": 2,
@@ -8774,10 +8781,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_dc04c9b3189c46d2878286a6fe7b13b5",
-            "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+            "eventId": "rp_audit_40b2f75dd250460694edb7d0f5ce3ca1",
+            "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-06-06T15:00:30.4632221+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2261862+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -8788,10 +8795,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_12412639f480422cbddd69f82f533234",
-            "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+            "eventId": "rp_audit_0d18c537c8f540a99dc60d00b467590c",
+            "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-06-06T15:00:30.4633038+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2262777+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -8810,23 +8817,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_98387792010145409e511b1dc223dc3b",
-            "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+            "eventId": "rp_audit_cc93ae6fca2f421f877a3f1b5d8c0510",
+            "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-06-06T15:00:30.4633316+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2263042+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_98bb1bc3d165fde3",
+              "catalogSnapshotId": "rp_catalog_52d152eccebddb2a",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_c537bf9664404ece9c0c165cd8f53fb7",
-            "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+            "eventId": "rp_audit_170514da8dad4abfaa5f54a89d2b9793",
+            "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-06-06T15:00:30.4633443+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.226323+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -8836,12 +8843,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_470dab73087843ebb30c4b5e2e2b215e",
-            "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+            "eventId": "rp_audit_f437d6b5d03849d0b23c2a2b421b99c7",
+            "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-06-06T15:00:30.4633825+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2264315+00:00",
             "payload": {
-              "reportId": "rp_report_37d973ad6a964254b1ac98a0b30827f5",
+              "reportId": "rp_report_dea04e2e48654c4488bb3ea87e41d20d",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -8850,19 +8857,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
+          "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_27376c64b480407587a3d78b170a0642",
+              "status": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_98bb1bc3d165fde3",
+              "status": "rp_catalog_52d152eccebddb2a",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -8972,15 +8979,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_266fbf05cf3f",
+              "artifactId": "rp_artifact_089a633ec7d3",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_27376c64b480407587a3d78b170a0642",
-                "catalogSnapshotId": "rp_catalog_98bb1bc3d165fde3",
+                "sessionId": "rp_session_314ed1dbc9a4469ab1f655ccd8c49205",
+                "catalogSnapshotId": "rp_catalog_52d152eccebddb2a",
                 "handleCount": 2,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -11020,31 +11027,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_7a9d8b89d7064f6e9d9c443bef45e67b",
-        "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
-        "generatedAtUtc": "2026-06-06T15:00:30.46768+00:00",
+        "reportId": "rp_report_8754abb1360d442b8b5ba1c6e32a7c40",
+        "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
+        "generatedAtUtc": "2026-06-06T16:17:28.2347618+00:00",
         "session": {
-          "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+          "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
           "status": "completed",
-          "createdAtUtc": "2026-06-06T15:00:30.4672995+00:00",
-          "updatedAtUtc": "2026-06-06T15:00:30.4677093+00:00",
+          "createdAtUtc": "2026-06-06T16:17:28.2340013+00:00",
+          "updatedAtUtc": "2026-06-06T16:17:28.2347991+00:00",
           "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
           "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
-          "catalogSnapshotId": "rp_catalog_b65f0e35173e0339",
+          "catalogSnapshotId": "rp_catalog_718d23b1938beffa",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_bc1c86c59419478b952633b868fe2ce1",
-            "rp_audit_00d83f2a933346b29c6ac495e4d94676",
-            "rp_audit_9fcb2a82b1f94dba9b37106a97876947",
-            "rp_audit_0a6055170f6e45c6b64c06f39257e6d1",
-            "rp_audit_646024884439443cb6decf0e68e488f4",
-            "rp_audit_100d5b1ff4a748ec8f1f6bff3aad1a8c",
-            "rp_audit_937b2a411c4f466cb06c2839db9e3fc6",
-            "rp_audit_55c093aa7b2c4ed19dba0e41ee030306",
-            "rp_audit_f4155bdc4dee456c8947e713e5d79295"
+            "rp_audit_bcc42c038e6244258675b036a235ac26",
+            "rp_audit_666b3abf6f6a4015a2a2be18ab611e1a",
+            "rp_audit_851f8d7f46a944f4866466d05597ca71",
+            "rp_audit_9f37c125825648ab908743ffa11de454",
+            "rp_audit_60f0d41d480e41e48472077e5b209066",
+            "rp_audit_d30eb26e17cc467a961d65f029384ff7",
+            "rp_audit_b6912e75cbc34b6390d5954df3a44d65",
+            "rp_audit_16c6bb371d764c7db53c40db354d7e64",
+            "rp_audit_d7a9f1a16f4e46ca9ea171c3c1ed566a"
           ],
-          "reportId": "rp_report_7a9d8b89d7064f6e9d9c443bef45e67b",
+          "reportId": "rp_report_8754abb1360d442b8b5ba1c6e32a7c40",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -11159,12 +11166,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_bc1c86c59419478b952633b868fe2ce1",
-            "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+            "eventId": "rp_audit_bcc42c038e6244258675b036a235ac26",
+            "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
             "eventType": "session_created",
-            "createdAtUtc": "2026-06-06T15:00:30.4673497+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.234112+00:00",
             "payload": {
-              "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+              "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
               "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
               "metadataOnly": true
             },
@@ -11172,10 +11179,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_00d83f2a933346b29c6ac495e4d94676",
-            "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+            "eventId": "rp_audit_666b3abf6f6a4015a2a2be18ab611e1a",
+            "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-06-06T15:00:30.4673875+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2341577+00:00",
             "payload": {
               "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
               "enabled": true,
@@ -11187,12 +11194,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_9fcb2a82b1f94dba9b37106a97876947",
-            "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+            "eventId": "rp_audit_851f8d7f46a944f4866466d05597ca71",
+            "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-06-06T15:00:30.4674207+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2343244+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_b65f0e35173e0339",
+              "catalogSnapshotId": "rp_catalog_718d23b1938beffa",
               "handleCount": 2,
               "sourceSummary": {
                 "appConfig": 0,
@@ -11207,10 +11214,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_0a6055170f6e45c6b64c06f39257e6d1",
-            "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+            "eventId": "rp_audit_9f37c125825648ab908743ffa11de454",
+            "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-06-06T15:00:30.4674318+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2343514+00:00",
             "payload": {
               "camera": 1,
               "model": 2,
@@ -11222,10 +11229,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_646024884439443cb6decf0e68e488f4",
-            "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+            "eventId": "rp_audit_60f0d41d480e41e48472077e5b209066",
+            "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-06-06T15:00:30.4675509+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2345884+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -11236,10 +11243,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_100d5b1ff4a748ec8f1f6bff3aad1a8c",
-            "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+            "eventId": "rp_audit_d30eb26e17cc467a961d65f029384ff7",
+            "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-06-06T15:00:30.4676284+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2346853+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -11258,23 +11265,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_937b2a411c4f466cb06c2839db9e3fc6",
-            "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+            "eventId": "rp_audit_b6912e75cbc34b6390d5954df3a44d65",
+            "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-06-06T15:00:30.4676533+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2347232+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_b65f0e35173e0339",
+              "catalogSnapshotId": "rp_catalog_718d23b1938beffa",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_55c093aa7b2c4ed19dba0e41ee030306",
-            "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+            "eventId": "rp_audit_16c6bb371d764c7db53c40db354d7e64",
+            "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-06-06T15:00:30.4676716+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2347479+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -11284,12 +11291,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_f4155bdc4dee456c8947e713e5d79295",
-            "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+            "eventId": "rp_audit_d7a9f1a16f4e46ca9ea171c3c1ed566a",
+            "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-06-06T15:00:30.4677044+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2347956+00:00",
             "payload": {
-              "reportId": "rp_report_7a9d8b89d7064f6e9d9c443bef45e67b",
+              "reportId": "rp_report_8754abb1360d442b8b5ba1c6e32a7c40",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -11298,19 +11305,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
+          "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_835377f0eba14643bc897dccb94e5046",
+              "status": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_b65f0e35173e0339",
+              "status": "rp_catalog_718d23b1938beffa",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -11420,15 +11427,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_0556423f25e8",
+              "artifactId": "rp_artifact_e81fc1fa07aa",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_835377f0eba14643bc897dccb94e5046",
-                "catalogSnapshotId": "rp_catalog_b65f0e35173e0339",
+                "sessionId": "rp_session_a1dcf4e92e1e4ffda84f8d4d9a975cc0",
+                "catalogSnapshotId": "rp_catalog_718d23b1938beffa",
                 "handleCount": 2,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -11793,31 +11800,31 @@
       "actualPrecheckResult": null,
       "actualRuntimePreviewResult": {
         "previewReady": true,
-        "reportId": "rp_report_60a09216e1f9484eadaec5a55b283e67",
-        "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
-        "generatedAtUtc": "2026-06-06T15:00:30.4692295+00:00",
+        "reportId": "rp_report_5ef6ce732a5b43f3aca5ba11844d833b",
+        "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
+        "generatedAtUtc": "2026-06-06T16:17:28.237816+00:00",
         "session": {
-          "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+          "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
           "status": "completed",
-          "createdAtUtc": "2026-06-06T15:00:30.4688406+00:00",
-          "updatedAtUtc": "2026-06-06T15:00:30.4692569+00:00",
+          "createdAtUtc": "2026-06-06T16:17:28.2366938+00:00",
+          "updatedAtUtc": "2026-06-06T16:17:28.2379986+00:00",
           "workflowDraftHash": "021aa6a94ca31a0f2bb0d27630dcad40e677f342a920dceff0086de59e5a0a51",
           "pilotConfigRevision": "b50b43897a96c90e43225d651fa9044f65a08c5b40b02b9451ec02326bcc547b",
-          "catalogSnapshotId": "rp_catalog_a5ec8aa23c9f2793",
+          "catalogSnapshotId": "rp_catalog_a37bf45053588fa7",
           "readinessStatus": "ready",
           "permissionStatus": "allowed",
           "auditEventIds": [
-            "rp_audit_765a4c162f234ca586119001971a54df",
-            "rp_audit_0b194d8dd7e5417da595f9afc6d30a6f",
-            "rp_audit_28f6a47cbc7c424a9dae4365b853f1fe",
-            "rp_audit_d2904928875a4315a7c6a538a0e2c5ef",
-            "rp_audit_aecc33229d6a4d94969f88ec8eb36e3b",
-            "rp_audit_228d43cb8c0b48b3a6a8c1563117a73e",
-            "rp_audit_98a997b9811442078f1f571492df2880",
-            "rp_audit_aa125ceb6a7b4927a3fe93a73488e59e",
-            "rp_audit_defb9a0627fc48e7b3da93ed62dac51f"
+            "rp_audit_a541aa0edb1449a4bb5fade3c6bd0d7c",
+            "rp_audit_d9ede010a804495ebbb256c752daa021",
+            "rp_audit_d1900c77b02c4edc973f9bcbb759d802",
+            "rp_audit_6ce5c4fcc56e4675b51cf582cc1cca65",
+            "rp_audit_0c5fea7475524c4fadd86945f6030d51",
+            "rp_audit_ff954813809e47fd8d94563419f3a046",
+            "rp_audit_4f19c79459254a458326c14d1c06e386",
+            "rp_audit_8a6dfa45d79d4384866542b6b20cc055",
+            "rp_audit_c25a91e91f1a46adbc09a0c46cd3d6cd"
           ],
-          "reportId": "rp_report_60a09216e1f9484eadaec5a55b283e67",
+          "reportId": "rp_report_5ef6ce732a5b43f3aca5ba11844d833b",
           "metadataOnly": true,
           "realResourcesTouched": false
         },
@@ -11932,12 +11939,12 @@
         },
         "auditEvents": [
           {
-            "eventId": "rp_audit_765a4c162f234ca586119001971a54df",
-            "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+            "eventId": "rp_audit_a541aa0edb1449a4bb5fade3c6bd0d7c",
+            "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
             "eventType": "session_created",
-            "createdAtUtc": "2026-06-06T15:00:30.4688888+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2368616+00:00",
             "payload": {
-              "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+              "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
               "workflowDraftHash": "021aa6a94ca31a0f2bb0d27630dcad40e677f342a920dceff0086de59e5a0a51",
               "metadataOnly": true
             },
@@ -11945,10 +11952,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_0b194d8dd7e5417da595f9afc6d30a6f",
-            "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+            "eventId": "rp_audit_d9ede010a804495ebbb256c752daa021",
+            "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
             "eventType": "config_changed",
-            "createdAtUtc": "2026-06-06T15:00:30.4689241+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2369073+00:00",
             "payload": {
               "pilotConfigRevision": "b50b43897a96c90e43225d651fa9044f65a08c5b40b02b9451ec02326bcc547b",
               "enabled": true,
@@ -11960,12 +11967,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_28f6a47cbc7c424a9dae4365b853f1fe",
-            "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+            "eventId": "rp_audit_d1900c77b02c4edc973f9bcbb759d802",
+            "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
             "eventType": "catalog_loaded",
-            "createdAtUtc": "2026-06-06T15:00:30.4689607+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2370234+00:00",
             "payload": {
-              "catalogSnapshotId": "rp_catalog_a5ec8aa23c9f2793",
+              "catalogSnapshotId": "rp_catalog_a37bf45053588fa7",
               "handleCount": 1,
               "sourceSummary": {
                 "appConfig": 0,
@@ -11980,10 +11987,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_d2904928875a4315a7c6a538a0e2c5ef",
-            "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+            "eventId": "rp_audit_6ce5c4fcc56e4675b51cf582cc1cca65",
+            "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
             "eventType": "allowlist_changed",
-            "createdAtUtc": "2026-06-06T15:00:30.4689713+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2370732+00:00",
             "payload": {
               "camera": 1,
               "model": 2,
@@ -11995,10 +12002,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_aecc33229d6a4d94969f88ec8eb36e3b",
-            "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+            "eventId": "rp_audit_0c5fea7475524c4fadd86945f6030d51",
+            "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
             "eventType": "readiness_checked",
-            "createdAtUtc": "2026-06-06T15:00:30.4691101+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2374246+00:00",
             "payload": {
               "status": "ready",
               "canRunMetadataPilot": true,
@@ -12009,10 +12016,10 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_228d43cb8c0b48b3a6a8c1563117a73e",
-            "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+            "eventId": "rp_audit_ff954813809e47fd8d94563419f3a046",
+            "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
             "eventType": "permission_granted",
-            "createdAtUtc": "2026-06-06T15:00:30.4691841+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.237649+00:00",
             "payload": {
               "allowed": true,
               "status": "allowed",
@@ -12031,23 +12038,23 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_98a997b9811442078f1f571492df2880",
-            "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+            "eventId": "rp_audit_4f19c79459254a458326c14d1c06e386",
+            "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
             "eventType": "simulation_started",
-            "createdAtUtc": "2026-06-06T15:00:30.469211+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2377635+00:00",
             "payload": {
               "toolName": "runtime_preview_metadata",
-              "catalogSnapshotId": "rp_catalog_a5ec8aa23c9f2793",
+              "catalogSnapshotId": "rp_catalog_a37bf45053588fa7",
               "metadataOnly": true
             },
             "redacted": true,
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_aa125ceb6a7b4927a3fe93a73488e59e",
-            "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+            "eventId": "rp_audit_8a6dfa45d79d4384866542b6b20cc055",
+            "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
             "eventType": "simulation_completed",
-            "createdAtUtc": "2026-06-06T15:00:30.4692221+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2377986+00:00",
             "payload": {
               "success": true,
               "artifactCount": 1,
@@ -12057,12 +12064,12 @@
             "metadataOnly": true
           },
           {
-            "eventId": "rp_audit_defb9a0627fc48e7b3da93ed62dac51f",
-            "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+            "eventId": "rp_audit_c25a91e91f1a46adbc09a0c46cd3d6cd",
+            "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
             "eventType": "report_generated",
-            "createdAtUtc": "2026-06-06T15:00:30.469255+00:00",
+            "createdAtUtc": "2026-06-06T16:17:28.2379937+00:00",
             "payload": {
-              "reportId": "rp_report_60a09216e1f9484eadaec5a55b283e67",
+              "reportId": "rp_report_5ef6ce732a5b43f3aca5ba11844d833b",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -12071,19 +12078,19 @@
           }
         ],
         "simulation": {
-          "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+          "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
           "success": true,
           "status": "simulated",
           "timeline": [
             {
               "name": "session_created",
-              "status": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
+              "status": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
             {
               "name": "catalog_snapshot",
-              "status": "rp_catalog_a5ec8aa23c9f2793",
+              "status": "rp_catalog_a37bf45053588fa7",
               "metadataOnly": true,
               "realResourcesTouched": false
             },
@@ -12204,15 +12211,15 @@
           },
           "artifacts": [
             {
-              "artifactId": "rp_artifact_7acb971189f9",
+              "artifactId": "rp_artifact_25fe80cdeb67",
               "artifactType": "runtime_preview_session_metadata",
               "sourceTool": "runtime_preview_simulate_metadata_session",
               "metadataOnly": true,
               "binaryIncluded": false,
               "byteLength": 0,
               "metadata": {
-                "sessionId": "rp_session_eb91fe510e73412782df6d1de4bbc41c",
-                "catalogSnapshotId": "rp_catalog_a5ec8aa23c9f2793",
+                "sessionId": "rp_session_c2584c0f7a6740fbadc253f87db877fb",
+                "catalogSnapshotId": "rp_catalog_a37bf45053588fa7",
                 "handleCount": 1,
                 "readinessStatus": "ready",
                 "realResourcesTouched": false
@@ -12421,6 +12428,2978 @@
               "tempId": "op_out",
               "operatorType": "ResultOutput",
               "message": "ResultOutput.PlcAddress is not configured for PLC output."
+            },
+            "requiresUserConfirmation": true
+          }
+        ],
+        "precheckSummary": {
+          "summary": "Draft flow can remain as workflow draft, but deployment is blocked until issues are resolved.",
+          "blockingIssueCount": 0,
+          "warningCount": 4,
+          "missingResourceCount": 1
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-056",
+      "category": "station_compatibility",
+      "taskType": "release_review",
+      "userRequest": "Check that a traditional template flow is compatible with the standard release Station profile.",
+      "expectedBusinessActions": [
+        "station_compatibility.standard_profile",
+        "releaseReviewAllowed.true",
+        "metadataOnly.true"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "status": "simulated_stub_template_match",
+            "produced": "stub_match_result"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 4 operators without real resources.",
+          "executedCount": 4,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": true,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": false,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow passed deployment precheck with static inputs only.",
+          "blockingIssueCount": 0,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-057",
+      "category": "station_compatibility",
+      "taskType": "release_review",
+      "userRequest": "Block a two-camera review when the selected Station profile has only one camera slot.",
+      "expectedBusinessActions": [
+        "station_camera_slots_insufficient",
+        "releaseReviewAllowed.false",
+        "workflowDraftAllowed.true"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": false,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 2,
+        "blockingIssues": [
+          {
+            "code": "entry_operator_required",
+            "message": "Multiple ImageAcquisition operators require entryOperatorTempId.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": false,
+        "executedOperators": [],
+        "skippedOperators": [
+          {
+            "tempId": "op_cam_top",
+            "operatorType": "ImageAcquisition",
+            "reason": "validation_blocked"
+          },
+          {
+            "tempId": "op_cam_side",
+            "operatorType": "ImageAcquisition",
+            "reason": "validation_blocked"
+          },
+          {
+            "tempId": "op_join",
+            "operatorType": "ImageCompose",
+            "reason": "validation_blocked"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "reason": "validation_blocked"
+          }
+        ],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [
+          {
+            "code": "entry_operator_required",
+            "message": "Multiple ImageAcquisition operators require entryOperatorTempId.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Dryrun stopped because validation produced blocking issues.",
+          "executedCount": 0,
+          "skippedCount": 4,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": false,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": true,
+        "blockingIssues": [
+          {
+            "code": "entry_operator_required",
+            "message": "Multiple ImageAcquisition operators require entryOperatorTempId.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "dryrun_failed",
+            "message": "Dryrun summary reports failure.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "entry_operator_required",
+            "message": "Multiple ImageAcquisition operators require entryOperatorTempId.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow can remain as workflow draft, but deployment is blocked until issues are resolved.",
+          "blockingIssueCount": 3,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": false,
+        "dryRunPassed": false,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": false
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-058",
+      "category": "station_compatibility",
+      "taskType": "release_review",
+      "userRequest": "Block DeepLearning metadata on a traditional-only Station profile.",
+      "expectedBusinessActions": [
+        "station_operator_not_supported.DeepLearning",
+        "releaseReviewAllowed.false",
+        "realStationTouched.false"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_detect",
+            "operatorType": "DeepLearning",
+            "status": "simulated_stub_model_inference",
+            "produced": "stub_detection_result"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 4 operators without real resources.",
+          "executedCount": 4,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": true,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": false,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow passed deployment precheck with static inputs only.",
+          "blockingIssueCount": 0,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-059",
+      "category": "station_compatibility",
+      "taskType": "release_review",
+      "userRequest": "Explain runtime version too low before release review.",
+      "expectedBusinessActions": [
+        "station_runtime_version_too_low",
+        "engineerAction.select_runtime_v14",
+        "metadataOnly.true"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_detect",
+            "operatorType": "DeepLearning",
+            "status": "simulated_stub_model_inference",
+            "produced": "stub_detection_result"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 4 operators without real resources.",
+          "executedCount": 4,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": true,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": false,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow passed deployment precheck with static inputs only.",
+          "blockingIssueCount": 0,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-060",
+      "category": "operator_contract_validation",
+      "taskType": "release_review",
+      "userRequest": "Validate ImageAcquisition TemplateMatching and ResultOutput metadata contracts.",
+      "expectedBusinessActions": [
+        "operator_contract.validation",
+        "requiredParameters.satisfied",
+        "forbiddenParameters.none"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "status": "simulated_stub_template_match",
+            "produced": "stub_match_result"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 4 operators without real resources.",
+          "executedCount": 4,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": true,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": false,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow passed deployment precheck with static inputs only.",
+          "blockingIssueCount": 0,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-061",
+      "category": "operator_contract_validation",
+      "taskType": "missing_resource",
+      "userRequest": "Block release review when TemplateMatching lacks TemplateId metadata.",
+      "expectedBusinessActions": [
+        "operator_contract_missing_parameter.TemplateId",
+        "releaseReviewAllowed.false",
+        "workflowDraftAllowed.true"
+      ],
+      "expectedToolCalls": [
+        "get_operator_schema",
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "get_operator_schema",
+          "permission": "ReadOnly",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 3,
+        "connectionCount": 2,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "TemplateMatching.TemplatePath is not configured.",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching"
+          }
+        ],
+        "missingResources": [
+          {
+            "resourceKind": "template_path",
+            "parameterName": "TemplatePath",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "message": "TemplateMatching.TemplatePath is not configured."
+          }
+        ],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "status": "simulated_stub_template_match",
+            "produced": "stub_match_result"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "TemplateMatching.TemplatePath is not configured.",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching"
+          },
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [
+          {
+            "resourceKind": "template_path",
+            "parameterName": "TemplatePath",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "message": "TemplateMatching.TemplatePath is not configured."
+          }
+        ],
+        "dryRunSummary": {
+          "summary": "Simulated 3 operators without real resources.",
+          "executedCount": 3,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": false,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": true,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "TemplateMatching.TemplatePath is not configured.",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching"
+          },
+          {
+            "code": "missing_resource",
+            "message": "TemplateMatching.TemplatePath is not configured.",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching"
+          },
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [
+          {
+            "resourceKind": "template_path",
+            "parameterName": "TemplatePath",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "message": "TemplateMatching.TemplatePath is not configured."
+          }
+        ],
+        "pendingActions": [
+          {
+            "actionType": "provide_missing_resource",
+            "title": "Provide TemplatePath",
+            "summary": "TemplateMatching.TemplatePath is not configured.",
+            "payload": {
+              "resourceKind": "template_path",
+              "parameterName": "TemplatePath",
+              "tempId": "op_match",
+              "operatorType": "TemplateMatching",
+              "message": "TemplateMatching.TemplatePath is not configured."
+            },
+            "requiresUserConfirmation": true
+          }
+        ],
+        "precheckSummary": {
+          "summary": "Draft flow can remain as workflow draft, but deployment is blocked until issues are resolved.",
+          "blockingIssueCount": 0,
+          "warningCount": 4,
+          "missingResourceCount": 1
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-062",
+      "category": "operator_contract_validation",
+      "taskType": "missing_resource",
+      "userRequest": "Block release review when ResultOutput lacks OutputChannelId metadata.",
+      "expectedBusinessActions": [
+        "operator_contract_missing_parameter.OutputChannelId",
+        "releaseReviewAllowed.false",
+        "packageCreated.false"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 3,
+        "connectionCount": 2,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "ResultOutput.Channel is not configured.",
+            "tempId": "op_out",
+            "operatorType": "ResultOutput"
+          }
+        ],
+        "missingResources": [
+          {
+            "resourceKind": "output_channel",
+            "parameterName": "Channel",
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "message": "ResultOutput.Channel is not configured."
+          }
+        ],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "status": "simulated_stub_template_match",
+            "produced": "stub_match_result"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "ResultOutput.Channel is not configured.",
+            "tempId": "op_out",
+            "operatorType": "ResultOutput"
+          },
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [
+          {
+            "resourceKind": "output_channel",
+            "parameterName": "Channel",
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "message": "ResultOutput.Channel is not configured."
+          }
+        ],
+        "dryRunSummary": {
+          "summary": "Simulated 3 operators without real resources.",
+          "executedCount": 3,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": false,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": true,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "ResultOutput.Channel is not configured.",
+            "tempId": "op_out",
+            "operatorType": "ResultOutput"
+          },
+          {
+            "code": "missing_resource",
+            "message": "ResultOutput.Channel is not configured.",
+            "tempId": "op_out",
+            "operatorType": "ResultOutput"
+          },
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [
+          {
+            "resourceKind": "output_channel",
+            "parameterName": "Channel",
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "message": "ResultOutput.Channel is not configured."
+          }
+        ],
+        "pendingActions": [
+          {
+            "actionType": "provide_missing_resource",
+            "title": "Provide Channel",
+            "summary": "ResultOutput.Channel is not configured.",
+            "payload": {
+              "resourceKind": "output_channel",
+              "parameterName": "Channel",
+              "tempId": "op_out",
+              "operatorType": "ResultOutput",
+              "message": "ResultOutput.Channel is not configured."
+            },
+            "requiresUserConfirmation": true
+          }
+        ],
+        "precheckSummary": {
+          "summary": "Draft flow can remain as workflow draft, but deployment is blocked until issues are resolved.",
+          "blockingIssueCount": 0,
+          "warningCount": 4,
+          "missingResourceCount": 1
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-063",
+      "category": "operator_contract_validation",
+      "taskType": "release_review",
+      "userRequest": "Require engineer approval for a DeepLearning operator contract before release review is allowed.",
+      "expectedBusinessActions": [
+        "engineer_approval.deep_learning_release_review",
+        "operatorContractsSatisfied.true",
+        "releaseReviewAllowed.false"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_detect",
+            "operatorType": "DeepLearning",
+            "status": "simulated_stub_model_inference",
+            "produced": "stub_detection_result"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 4 operators without real resources.",
+          "executedCount": 4,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": true,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": false,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow passed deployment precheck with static inputs only.",
+          "blockingIssueCount": 0,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-064",
+      "category": "pre_release_review",
+      "taskType": "release_review",
+      "userRequest": "Run the full metadata-only pre-release review chain for a traditional inspection flow.",
+      "expectedBusinessActions": [
+        "readiness.package.manifest.station.contract.decision",
+        "releaseReviewAllowed.true",
+        "packageCreated.false"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 6,
+        "connectionCount": 6,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_circle_a",
+            "operatorType": "CircleMeasurement",
+            "status": "simulated",
+            "produced": "stub_circle_measurement"
+          },
+          {
+            "tempId": "op_circle_b",
+            "operatorType": "CircleMeasurement",
+            "status": "simulated",
+            "produced": "stub_circle_measurement"
+          },
+          {
+            "tempId": "op_distance",
+            "operatorType": "MeasureDistance",
+            "status": "simulated",
+            "produced": "stub_distance_measurement"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 6 operators without real resources.",
+          "executedCount": 6,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": true,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": false,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow passed deployment precheck with static inputs only.",
+          "blockingIssueCount": 0,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-065",
+      "category": "pre_release_review",
+      "taskType": "missing_resource",
+      "userRequest": "Show workflowDraftAllowed true while releaseReviewAllowed is false for unresolved camera metadata.",
+      "expectedBusinessActions": [
+        "workflowDraftAllowed.true",
+        "releaseReviewAllowed.false",
+        "camera_binding.required"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 3,
+        "connectionCount": 2,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "ImageAcquisition.CameraBindingId is not configured.",
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition"
+          }
+        ],
+        "missingResources": [
+          {
+            "resourceKind": "camera_binding",
+            "parameterName": "CameraBindingId",
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "message": "ImageAcquisition.CameraBindingId is not configured."
+          }
+        ],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "status": "simulated_stub_template_match",
+            "produced": "stub_match_result"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "ImageAcquisition.CameraBindingId is not configured.",
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition"
+          },
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [
+          {
+            "resourceKind": "camera_binding",
+            "parameterName": "CameraBindingId",
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "message": "ImageAcquisition.CameraBindingId is not configured."
+          }
+        ],
+        "dryRunSummary": {
+          "summary": "Simulated 3 operators without real resources.",
+          "executedCount": 3,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": false,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": true,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "ImageAcquisition.CameraBindingId is not configured.",
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition"
+          },
+          {
+            "code": "missing_resource",
+            "message": "ImageAcquisition.CameraBindingId is not configured.",
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition"
+          },
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [
+          {
+            "resourceKind": "camera_binding",
+            "parameterName": "CameraBindingId",
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "message": "ImageAcquisition.CameraBindingId is not configured."
+          }
+        ],
+        "pendingActions": [
+          {
+            "actionType": "provide_missing_resource",
+            "title": "Provide CameraBindingId",
+            "summary": "ImageAcquisition.CameraBindingId is not configured.",
+            "payload": {
+              "resourceKind": "camera_binding",
+              "parameterName": "CameraBindingId",
+              "tempId": "op_cam",
+              "operatorType": "ImageAcquisition",
+              "message": "ImageAcquisition.CameraBindingId is not configured."
+            },
+            "requiresUserConfirmation": true
+          }
+        ],
+        "precheckSummary": {
+          "summary": "Draft flow can remain as workflow draft, but deployment is blocked until issues are resolved.",
+          "blockingIssueCount": 0,
+          "warningCount": 4,
+          "missingResourceCount": 1
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": false,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-066",
+      "category": "pre_release_review",
+      "taskType": "release_review",
+      "userRequest": "Require multi-station engineer approval for a metadata summary output flow.",
+      "expectedBusinessActions": [
+        "engineer_approval.multi_station_review",
+        "requiresEngineerApproval.true",
+        "deploymentExecuted.false"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "status": "simulated_stub_template_match",
+            "produced": "stub_match_result"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 4 operators without real resources.",
+          "executedCount": 4,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": true,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": false,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow passed deployment precheck with static inputs only.",
+          "blockingIssueCount": 0,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-067",
+      "category": "pre_release_review",
+      "taskType": "release_review",
+      "userRequest": "Block release review when the output channel kind is absent on the target Station profile.",
+      "expectedBusinessActions": [
+        "station_output_channel_kind_missing",
+        "engineerAction.remap_output",
+        "releaseReviewAllowed.false"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "status": "simulated_stub_template_match",
+            "produced": "stub_match_result"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 4 operators without real resources.",
+          "executedCount": 4,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": true,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": false,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow passed deployment precheck with static inputs only.",
+          "blockingIssueCount": 0,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-068",
+      "category": "agent_explanation_v3",
+      "taskType": "release_review",
+      "userRequest": "Explain why packageReviewAllowed can be true while releaseReviewAllowed is false due to Station compatibility.",
+      "expectedBusinessActions": [
+        "agent_explanation_v3.workflowDraftVsRelease",
+        "stationCompatibilityExplanation",
+        "nextEngineerAction"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_detect",
+            "operatorType": "DeepLearning",
+            "status": "simulated_stub_model_inference",
+            "produced": "stub_detection_result"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 4 operators without real resources.",
+          "executedCount": 4,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": true,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": false,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [],
+        "pendingActions": [],
+        "precheckSummary": {
+          "summary": "Draft flow passed deployment precheck with static inputs only.",
+          "blockingIssueCount": 0,
+          "warningCount": 2,
+          "missingResourceCount": 0
+        },
+        "deployed": false,
+        "packageCreated": false,
+        "stationTouched": false
+      },
+      "actualRuntimePreviewResult": null,
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": false,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-069",
+      "category": "governance_v4",
+      "taskType": "runtime_preview_session",
+      "userRequest": "Persist release review evidence with reviewId stationProfileId manifestId and caseId lookup keys.",
+      "expectedBusinessActions": [
+        "governance_store.v4",
+        "lookup_by_reviewId",
+        "lookup_by_stationProfileId"
+      ],
+      "expectedToolCalls": [
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_preview_simulate_metadata_session"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_preview_simulate_metadata_session",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 4,
+        "connectionCount": 3,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [],
+        "missingResources": [],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "status": "simulated_stub_template_match",
+            "produced": "stub_match_result"
+          },
+          {
+            "tempId": "op_judge",
+            "operatorType": "ResultJudgment",
+            "status": "simulated",
+            "produced": "stub_judgment"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [],
+        "dryRunSummary": {
+          "summary": "Simulated 4 operators without real resources.",
+          "executedCount": 4,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": null,
+      "actualRuntimePreviewResult": {
+        "previewReady": true,
+        "reportId": "rp_report_fc5bb8c5c38a40ed88e135040d15638c",
+        "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+        "generatedAtUtc": "2026-06-06T16:17:28.2480346+00:00",
+        "session": {
+          "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+          "status": "completed",
+          "createdAtUtc": "2026-06-06T16:17:28.2473251+00:00",
+          "updatedAtUtc": "2026-06-06T16:17:28.2481166+00:00",
+          "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
+          "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
+          "catalogSnapshotId": "rp_catalog_27a25c5326034d4e",
+          "readinessStatus": "ready",
+          "permissionStatus": "allowed",
+          "auditEventIds": [
+            "rp_audit_3a128076a64f416ca76662755ca42bdd",
+            "rp_audit_6563870bdb164dc19be10b6ff720c9d8",
+            "rp_audit_a464f6bb727f4d91a3e48ebe42a2efb4",
+            "rp_audit_8454655ad3fa4017b6a214401dd719f6",
+            "rp_audit_eef2b5f4ee54495da31bb76b1209e9a7",
+            "rp_audit_71b4632796e84357b16caeed3a6c0352",
+            "rp_audit_595c96b6d1b345aa99d55b63e646545a",
+            "rp_audit_a51da4f5a4404f7193ef9900f4f7d9e2",
+            "rp_audit_d71f6bab96f34fb8943a37407325e5a7"
+          ],
+          "reportId": "rp_report_fc5bb8c5c38a40ed88e135040d15638c",
+          "metadataOnly": true,
+          "realResourcesTouched": false
+        },
+        "resourceHandles": [
+          {
+            "handleId": "rp_handle_camera_fb0f3c9acf23",
+            "resourceType": "camera",
+            "logicalId": "mock-cam-template",
+            "displayName": "camera:mock-cam-template",
+            "source": "workflow_draft",
+            "metadataOnly": true,
+            "safeForPilot": true,
+            "redacted": false,
+            "reasonCode": "runtime_preview_catalog_workflow_metadata"
+          },
+          {
+            "handleId": "rp_handle_template_a7ab47eaffc6",
+            "resourceType": "template",
+            "logicalId": "catalog-template-a",
+            "displayName": "template:catalog-template-a",
+            "source": "workflow_draft",
+            "metadataOnly": true,
+            "safeForPilot": true,
+            "redacted": false,
+            "reasonCode": "runtime_preview_catalog_workflow_metadata"
+          }
+        ],
+        "readiness": {
+          "status": "ready",
+          "canRunMetadataPilot": true,
+          "workflowDraftAllowed": true,
+          "issues": [],
+          "blockingIssues": [],
+          "missingResources": [],
+          "unsafeFindings": [],
+          "allowlistCoverage": {
+            "counts": {
+              "camera": 1,
+              "model": 2,
+              "template": 3,
+              "flow": 0,
+              "resourceRoot": 0
+            },
+            "catalogCounts": {
+              "camera": 1,
+              "template": 1
+            },
+            "allowlistedCatalogItems": 2,
+            "safeCatalogItems": 2,
+            "metadataOnly": true
+          },
+          "resourceTrace": {
+            "allowed": true,
+            "reasonCode": "runtime_preview_resources_allowlisted",
+            "resourceType": "workflow",
+            "resourceId": null,
+            "normalizedKey": "",
+            "missingResources": [],
+            "trace": [
+              {
+                "resourceType": "camera",
+                "resourceId": "op_cam",
+                "reasonCode": "runtime_preview_resource_allowlisted",
+                "allowed": true
+              },
+              {
+                "resourceType": "template",
+                "resourceId": "op_match",
+                "reasonCode": "runtime_preview_resource_allowlisted",
+                "allowed": true
+              },
+              {
+                "resourceType": "ResultJudgment",
+                "resourceId": "op_judge",
+                "reasonCode": "operator_no_external_resource",
+                "allowed": true
+              },
+              {
+                "resourceType": "output",
+                "resourceId": "op_out",
+                "reasonCode": "runtime_preview_output_metadata_only",
+                "allowed": true
+              }
+            ]
+          },
+          "pendingActions": [],
+          "fallback": {
+            "used": false,
+            "fallbackAdapterName": null,
+            "reasonCode": null,
+            "reason": null
+          },
+          "binaryIncluded": false,
+          "capturedRealFrame": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "stationTouched": false
+        },
+        "permissionDecision": {
+          "allowed": true,
+          "status": "allowed",
+          "reasonCode": "runtime_preview_permission_allowed",
+          "reason": "RuntimePreview metadata-only simulation is allowed.",
+          "gate": "runtime_preview_metadata_simulation",
+          "metadataOnly": true,
+          "runtimePreviewConsent": true,
+          "pilotEnabled": true,
+          "developerUi": false,
+          "admin": false,
+          "dangerousDenied": false,
+          "pendingActions": []
+        },
+        "auditEvents": [
+          {
+            "eventId": "rp_audit_3a128076a64f416ca76662755ca42bdd",
+            "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+            "eventType": "session_created",
+            "createdAtUtc": "2026-06-06T16:17:28.2474245+00:00",
+            "payload": {
+              "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+              "workflowDraftHash": "3616f082af94148bdbecb2f668d0fc74a9c06fdaf32a90d649dde91d2ec2bb12",
+              "metadataOnly": true
+            },
+            "redacted": true,
+            "metadataOnly": true
+          },
+          {
+            "eventId": "rp_audit_6563870bdb164dc19be10b6ff720c9d8",
+            "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+            "eventType": "config_changed",
+            "createdAtUtc": "2026-06-06T16:17:28.2475271+00:00",
+            "payload": {
+              "pilotConfigRevision": "28ece8f9d03343dd05291cc5adeb6fdae4574efa5455c46039f13ba02457e3fa",
+              "enabled": true,
+              "mode": "metadata_only",
+              "denyExternalPath": true,
+              "denyImageBytes": true
+            },
+            "redacted": true,
+            "metadataOnly": true
+          },
+          {
+            "eventId": "rp_audit_a464f6bb727f4d91a3e48ebe42a2efb4",
+            "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+            "eventType": "catalog_loaded",
+            "createdAtUtc": "2026-06-06T16:17:28.2475912+00:00",
+            "payload": {
+              "catalogSnapshotId": "rp_catalog_27a25c5326034d4e",
+              "handleCount": 2,
+              "sourceSummary": {
+                "appConfig": 0,
+                "aiConfigStore": 0,
+                "workflowDraft": 2,
+                "fixture": 0,
+                "metadataOnly": true,
+                "realResourcesTouched": false
+              }
+            },
+            "redacted": true,
+            "metadataOnly": true
+          },
+          {
+            "eventId": "rp_audit_8454655ad3fa4017b6a214401dd719f6",
+            "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+            "eventType": "allowlist_changed",
+            "createdAtUtc": "2026-06-06T16:17:28.2476088+00:00",
+            "payload": {
+              "camera": 1,
+              "model": 2,
+              "template": 3,
+              "flow": 0,
+              "resourceRoot": 0
+            },
+            "redacted": true,
+            "metadataOnly": true
+          },
+          {
+            "eventId": "rp_audit_eef2b5f4ee54495da31bb76b1209e9a7",
+            "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+            "eventType": "readiness_checked",
+            "createdAtUtc": "2026-06-06T16:17:28.2477817+00:00",
+            "payload": {
+              "status": "ready",
+              "canRunMetadataPilot": true,
+              "workflowDraftAllowed": true,
+              "reasonCode": "runtime_preview_resources_allowlisted"
+            },
+            "redacted": true,
+            "metadataOnly": true
+          },
+          {
+            "eventId": "rp_audit_71b4632796e84357b16caeed3a6c0352",
+            "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+            "eventType": "permission_granted",
+            "createdAtUtc": "2026-06-06T16:17:28.2478749+00:00",
+            "payload": {
+              "allowed": true,
+              "status": "allowed",
+              "reasonCode": "runtime_preview_permission_allowed",
+              "reason": "RuntimePreview metadata-only simulation is allowed.",
+              "gate": "runtime_preview_metadata_simulation",
+              "metadataOnly": true,
+              "runtimePreviewConsent": true,
+              "pilotEnabled": true,
+              "developerUi": false,
+              "admin": false,
+              "dangerousDenied": false,
+              "pendingActions": []
+            },
+            "redacted": true,
+            "metadataOnly": true
+          },
+          {
+            "eventId": "rp_audit_595c96b6d1b345aa99d55b63e646545a",
+            "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+            "eventType": "simulation_started",
+            "createdAtUtc": "2026-06-06T16:17:28.2479106+00:00",
+            "payload": {
+              "toolName": "runtime_preview_metadata",
+              "catalogSnapshotId": "rp_catalog_27a25c5326034d4e",
+              "metadataOnly": true
+            },
+            "redacted": true,
+            "metadataOnly": true
+          },
+          {
+            "eventId": "rp_audit_a51da4f5a4404f7193ef9900f4f7d9e2",
+            "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+            "eventType": "simulation_completed",
+            "createdAtUtc": "2026-06-06T16:17:28.2479426+00:00",
+            "payload": {
+              "success": true,
+              "artifactCount": 1,
+              "realResourcesTouched": false
+            },
+            "redacted": true,
+            "metadataOnly": true
+          },
+          {
+            "eventId": "rp_audit_d71f6bab96f34fb8943a37407325e5a7",
+            "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+            "eventType": "report_generated",
+            "createdAtUtc": "2026-06-06T16:17:28.2481111+00:00",
+            "payload": {
+              "reportId": "rp_report_fc5bb8c5c38a40ed88e135040d15638c",
+              "metadataOnly": true,
+              "realResourcesTouched": false
+            },
+            "redacted": true,
+            "metadataOnly": true
+          }
+        ],
+        "simulation": {
+          "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+          "success": true,
+          "status": "simulated",
+          "timeline": [
+            {
+              "name": "session_created",
+              "status": "rp_session_8c46987af556447281098419ba25e27e",
+              "metadataOnly": true,
+              "realResourcesTouched": false
+            },
+            {
+              "name": "catalog_snapshot",
+              "status": "rp_catalog_27a25c5326034d4e",
+              "metadataOnly": true,
+              "realResourcesTouched": false
+            },
+            {
+              "name": "readiness",
+              "status": "ready",
+              "metadataOnly": true,
+              "realResourcesTouched": false
+            },
+            {
+              "name": "authorization",
+              "status": "allowed",
+              "metadataOnly": true,
+              "realResourcesTouched": false
+            },
+            {
+              "name": "simulated_preview",
+              "status": "metadata_only",
+              "metadataOnly": true,
+              "realResourcesTouched": false
+            }
+          ],
+          "readiness": {
+            "status": "ready",
+            "canRunMetadataPilot": true,
+            "workflowDraftAllowed": true,
+            "issues": [],
+            "blockingIssues": [],
+            "missingResources": [],
+            "unsafeFindings": [],
+            "allowlistCoverage": {
+              "counts": {
+                "camera": 1,
+                "model": 2,
+                "template": 3,
+                "flow": 0,
+                "resourceRoot": 0
+              },
+              "catalogCounts": {
+                "camera": 1,
+                "template": 1
+              },
+              "allowlistedCatalogItems": 2,
+              "safeCatalogItems": 2,
+              "metadataOnly": true
+            },
+            "resourceTrace": {
+              "allowed": true,
+              "reasonCode": "runtime_preview_resources_allowlisted",
+              "resourceType": "workflow",
+              "resourceId": null,
+              "normalizedKey": "",
+              "missingResources": [],
+              "trace": [
+                {
+                  "resourceType": "camera",
+                  "resourceId": "op_cam",
+                  "reasonCode": "runtime_preview_resource_allowlisted",
+                  "allowed": true
+                },
+                {
+                  "resourceType": "template",
+                  "resourceId": "op_match",
+                  "reasonCode": "runtime_preview_resource_allowlisted",
+                  "allowed": true
+                },
+                {
+                  "resourceType": "ResultJudgment",
+                  "resourceId": "op_judge",
+                  "reasonCode": "operator_no_external_resource",
+                  "allowed": true
+                },
+                {
+                  "resourceType": "output",
+                  "resourceId": "op_out",
+                  "reasonCode": "runtime_preview_output_metadata_only",
+                  "allowed": true
+                }
+              ]
+            },
+            "pendingActions": [],
+            "fallback": {
+              "used": false,
+              "fallbackAdapterName": null,
+              "reasonCode": null,
+              "reason": null
+            },
+            "binaryIncluded": false,
+            "capturedRealFrame": false,
+            "loadedModelFiles": false,
+            "accessedHardware": false,
+            "stationTouched": false
+          },
+          "permissionDecision": {
+            "allowed": true,
+            "status": "allowed",
+            "reasonCode": "runtime_preview_permission_allowed",
+            "reason": "RuntimePreview metadata-only simulation is allowed.",
+            "gate": "runtime_preview_metadata_simulation",
+            "metadataOnly": true,
+            "runtimePreviewConsent": true,
+            "pilotEnabled": true,
+            "developerUi": false,
+            "admin": false,
+            "dangerousDenied": false,
+            "pendingActions": []
+          },
+          "artifacts": [
+            {
+              "artifactId": "rp_artifact_57d9f001dd76",
+              "artifactType": "runtime_preview_session_metadata",
+              "sourceTool": "runtime_preview_simulate_metadata_session",
+              "metadataOnly": true,
+              "binaryIncluded": false,
+              "byteLength": 0,
+              "metadata": {
+                "sessionId": "rp_session_8c46987af556447281098419ba25e27e",
+                "catalogSnapshotId": "rp_catalog_27a25c5326034d4e",
+                "handleCount": 2,
+                "readinessStatus": "ready",
+                "realResourcesTouched": false
+              }
+            }
+          ],
+          "workflowDraftAllowed": true,
+          "metadataOnly": true,
+          "realResourcesTouched": false
+        },
+        "metadataOnly": true,
+        "realResourcesTouched": false
+      },
+      "metrics": {
+        "generationSucceeded": true,
+        "structuralValidationPassed": true,
+        "dryRunPassed": true,
+        "previewReady": true,
+        "parametersComplete": true,
+        "userApplicable": true
+      },
+      "passed": true,
+      "failures": []
+    },
+    {
+      "caseId": "VA-BM-070",
+      "category": "redacted_flow_corpus_v2",
+      "taskType": "manifest_dry_run",
+      "userRequest": "Review the expanded redacted corpus v2 release-blocked operator contract case.",
+      "expectedBusinessActions": [
+        "redacted_flow_corpus_v2.case_32",
+        "operator_contract_missing_parameter",
+        "redactionPass.true"
+      ],
+      "expectedToolCalls": [
+        "get_operator_schema",
+        "validate_flow",
+        "dryrun_flow",
+        "runtime_package_precheck"
+      ],
+      "actualToolCalls": [
+        {
+          "toolName": "get_operator_schema",
+          "permission": "ReadOnly",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "validate_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "dryrun_flow",
+          "permission": "Simulation",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        },
+        {
+          "toolName": "runtime_package_precheck",
+          "permission": "DeploymentPrepare",
+          "success": true,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ],
+      "actualValidationResult": {
+        "source": "simulation_static_flow_validator",
+        "validationMode": "structure_only",
+        "isValid": true,
+        "operatorCount": 3,
+        "connectionCount": 2,
+        "entryOperatorTempId": null,
+        "imageAcquisitionCount": 1,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "TemplateMatching.TemplatePath is not configured.",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching"
+          }
+        ],
+        "missingResources": [
+          {
+            "resourceKind": "template_path",
+            "parameterName": "TemplatePath",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "message": "TemplateMatching.TemplatePath is not configured."
+          }
+        ],
+        "checkedRules": [
+          "operators",
+          "connections",
+          "unique_temp_id",
+          "known_ports",
+          "image_acquisition_entry",
+          "required_resources"
+        ]
+      },
+      "actualDryRunResult": {
+        "source": "simulation_static_flow_dryrun",
+        "dryRunMode": "structure_only_stub",
+        "dryRunSucceeded": true,
+        "executedOperators": [
+          {
+            "tempId": "op_cam",
+            "operatorType": "ImageAcquisition",
+            "status": "simulated_stub_camera_input",
+            "produced": "stub_image_token"
+          },
+          {
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "status": "simulated_stub_template_match",
+            "produced": "stub_match_result"
+          },
+          {
+            "tempId": "op_out",
+            "operatorType": "ResultOutput",
+            "status": "simulated",
+            "produced": "stub_output_payload"
+          }
+        ],
+        "skippedOperators": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "TemplateMatching.TemplatePath is not configured.",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching"
+          },
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "blockingIssues": [],
+        "missingResources": [
+          {
+            "resourceKind": "template_path",
+            "parameterName": "TemplatePath",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "message": "TemplateMatching.TemplatePath is not configured."
+          }
+        ],
+        "dryRunSummary": {
+          "summary": "Simulated 3 operators without real resources.",
+          "executedCount": 3,
+          "skippedCount": 0,
+          "generatedRealImages": false,
+          "loadedModelFiles": false,
+          "accessedHardware": false,
+          "deployed": false
+        }
+      },
+      "actualPrecheckResult": {
+        "source": "deployment_prepare_static_precheck",
+        "readyForDeployment": false,
+        "workflowDraftAllowed": true,
+        "deploymentBlocked": true,
+        "blockingIssues": [],
+        "warnings": [
+          {
+            "code": "missing_resource",
+            "message": "TemplateMatching.TemplatePath is not configured.",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching"
+          },
+          {
+            "code": "missing_resource",
+            "message": "TemplateMatching.TemplatePath is not configured.",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching"
+          },
+          {
+            "code": "stub_dryrun_only",
+            "message": "Dryrun uses structural simulation only and does not execute vision operators.",
+            "tempId": null,
+            "operatorType": null
+          },
+          {
+            "code": "target_station_missing",
+            "message": "targetStationId is not set; workflow draft is still allowed.",
+            "tempId": null,
+            "operatorType": null
+          }
+        ],
+        "missingResources": [
+          {
+            "resourceKind": "template_path",
+            "parameterName": "TemplatePath",
+            "tempId": "op_match",
+            "operatorType": "TemplateMatching",
+            "message": "TemplateMatching.TemplatePath is not configured."
+          }
+        ],
+        "pendingActions": [
+          {
+            "actionType": "provide_missing_resource",
+            "title": "Provide TemplatePath",
+            "summary": "TemplateMatching.TemplatePath is not configured.",
+            "payload": {
+              "resourceKind": "template_path",
+              "parameterName": "TemplatePath",
+              "tempId": "op_match",
+              "operatorType": "TemplateMatching",
+              "message": "TemplateMatching.TemplatePath is not configured."
             },
             "requiresUserConfirmation": true
           }

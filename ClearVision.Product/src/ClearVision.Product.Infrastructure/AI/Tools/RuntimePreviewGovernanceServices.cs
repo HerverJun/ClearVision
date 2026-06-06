@@ -11,8 +11,8 @@ namespace ClearVision.Product.Infrastructure.AI.Tools;
 
 public sealed class RuntimePreviewGovernanceStore
 {
-    public const string SchemaVersion = "2026-06-06.runtime-preview-governance-store.v3";
-    public const string StorageVersion = "jsonl.v3";
+    public const string SchemaVersion = "2026-06-06.runtime-preview-governance-store.v4";
+    public const string StorageVersion = "jsonl.v4";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -126,6 +126,48 @@ public sealed class RuntimePreviewGovernanceStore
             .ToList();
     }
 
+    public void SaveStationCompatibilityReport(RuntimePreviewStationCompatibilityReport report)
+    {
+        Append(StationCompatibilityReportPath, report);
+    }
+
+    public IReadOnlyList<RuntimePreviewStationCompatibilityReport> LoadStationCompatibilityReports()
+    {
+        return ReadJsonLines<RuntimePreviewStationCompatibilityReport>(StationCompatibilityReportPath)
+            .GroupBy(report => report.ReportId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(report => report.GeneratedAtUtc).First())
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
+    public void SaveOperatorContractValidationReport(RuntimePreviewOperatorContractValidationReport report)
+    {
+        Append(OperatorContractValidationReportPath, report);
+    }
+
+    public IReadOnlyList<RuntimePreviewOperatorContractValidationReport> LoadOperatorContractValidationReports()
+    {
+        return ReadJsonLines<RuntimePreviewOperatorContractValidationReport>(OperatorContractValidationReportPath)
+            .GroupBy(report => report.ReportId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(report => report.GeneratedAtUtc).First())
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
+    public void SavePreReleaseReviewReport(RuntimePreviewPreReleaseReviewReport report)
+    {
+        Append(PreReleaseReviewReportPath, report);
+    }
+
+    public IReadOnlyList<RuntimePreviewPreReleaseReviewReport> LoadPreReleaseReviewReports()
+    {
+        return ReadJsonLines<RuntimePreviewPreReleaseReviewReport>(PreReleaseReviewReportPath)
+            .GroupBy(report => report.ReviewId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(report => report.GeneratedAtUtc).First())
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
     public RuntimePreviewGovernanceStorageIndexSummary BuildIndexSummary()
     {
         return new RuntimePreviewGovernanceStorageIndexSummary
@@ -140,7 +182,10 @@ public sealed class RuntimePreviewGovernanceStore
                 "session_report",
                 "deploy_readiness_report",
                 "package_readiness_report",
-                "manifest_dry_run_report"
+                "manifest_dry_run_report",
+                "station_compatibility_report",
+                "operator_contract_validation_report",
+                "pre_release_review_report"
             ],
             SessionCount = LoadSessions().Count,
             AuditEventCount = LoadAuditEvents().Count,
@@ -148,12 +193,18 @@ public sealed class RuntimePreviewGovernanceStore
             DeployReadinessReportCount = LoadDeployReadinessReports().Count,
             PackageReadinessReportCount = LoadPackageReadinessReports().Count,
             ManifestDryRunReportCount = LoadManifestDryRunReports().Count,
+            StationCompatibilityReportCount = LoadStationCompatibilityReports().Count,
+            OperatorContractValidationReportCount = LoadOperatorContractValidationReports().Count,
+            PreReleaseReviewReportCount = LoadPreReleaseReviewReports().Count,
             CorruptLineCount = CountCorruptLines(SessionPath) +
                                CountCorruptLines(AuditPath) +
                                CountCorruptLines(ReportPath) +
                                CountCorruptLines(DeployReadinessReportPath) +
                                CountCorruptLines(PackageReadinessReportPath) +
-                               CountCorruptLines(ManifestDryRunReportPath),
+                               CountCorruptLines(ManifestDryRunReportPath) +
+                               CountCorruptLines(StationCompatibilityReportPath) +
+                               CountCorruptLines(OperatorContractValidationReportPath) +
+                               CountCorruptLines(PreReleaseReviewReportPath),
             RetentionPolicy = "default_30_days_200_sessions",
             MetadataOnly = true,
             RealResourcesTouched = false
@@ -173,6 +224,9 @@ public sealed class RuntimePreviewGovernanceStore
             DeployReadinessReports = LoadDeployReadinessReports(),
             PackageReadinessReports = LoadPackageReadinessReports(),
             ManifestDryRunReports = LoadManifestDryRunReports(),
+            StationCompatibilityReports = LoadStationCompatibilityReports(),
+            OperatorContractValidationReports = LoadOperatorContractValidationReports(),
+            PreReleaseReviewReports = LoadPreReleaseReviewReports(),
             RedactionPass = true,
             MetadataOnly = true,
             RealResourcesTouched = false
@@ -196,6 +250,9 @@ public sealed class RuntimePreviewGovernanceStore
             var deployBefore = LoadDeployReadinessReports();
             var packageBefore = LoadPackageReadinessReports();
             var manifestBefore = LoadManifestDryRunReports();
+            var stationBefore = LoadStationCompatibilityReports();
+            var contractBefore = LoadOperatorContractValidationReports();
+            var reviewBefore = LoadPreReleaseReviewReports();
 
             var sessionsAfter = sessionsBefore
                 .Where(session => session.UpdatedAtUtc >= cutoff)
@@ -220,6 +277,15 @@ public sealed class RuntimePreviewGovernanceStore
             var manifestAfter = manifestBefore
                 .Where(report => sessionIds.Contains(report.SessionId) && report.GeneratedAtUtc >= cutoff)
                 .ToList();
+            var stationAfter = stationBefore
+                .Where(report => sessionIds.Contains(report.SessionId) && report.GeneratedAtUtc >= cutoff)
+                .ToList();
+            var contractAfter = contractBefore
+                .Where(report => sessionIds.Contains(report.SessionId) && report.GeneratedAtUtc >= cutoff)
+                .ToList();
+            var reviewAfter = reviewBefore
+                .Where(report => sessionIds.Contains(report.SessionId) && report.GeneratedAtUtc >= cutoff)
+                .ToList();
 
             Rewrite(SessionPath, sessionsAfter);
             Rewrite(AuditPath, auditAfter);
@@ -227,6 +293,9 @@ public sealed class RuntimePreviewGovernanceStore
             Rewrite(DeployReadinessReportPath, deployAfter);
             Rewrite(PackageReadinessReportPath, packageAfter);
             Rewrite(ManifestDryRunReportPath, manifestAfter);
+            Rewrite(StationCompatibilityReportPath, stationAfter);
+            Rewrite(OperatorContractValidationReportPath, contractAfter);
+            Rewrite(PreReleaseReviewReportPath, reviewAfter);
 
             return new RuntimePreviewRetentionCleanupResult
             {
@@ -236,8 +305,8 @@ public sealed class RuntimePreviewGovernanceStore
                 SessionsAfter = sessionsAfter.Count,
                 AuditEventsBefore = auditBefore.Count,
                 AuditEventsAfter = auditAfter.Count,
-                ReportsBefore = reportsBefore.Count + deployBefore.Count + packageBefore.Count + manifestBefore.Count,
-                ReportsAfter = reportsAfter.Count + deployAfter.Count + packageAfter.Count + manifestAfter.Count,
+                ReportsBefore = reportsBefore.Count + deployBefore.Count + packageBefore.Count + manifestBefore.Count + stationBefore.Count + contractBefore.Count + reviewBefore.Count,
+                ReportsAfter = reportsAfter.Count + deployAfter.Count + packageAfter.Count + manifestAfter.Count + stationAfter.Count + contractAfter.Count + reviewAfter.Count,
                 MetadataOnly = true,
                 RealResourcesTouched = false
             };
@@ -255,6 +324,12 @@ public sealed class RuntimePreviewGovernanceStore
     private string PackageReadinessReportPath => Path.Combine(_directoryPath, "runtime_preview_package_readiness_reports.jsonl");
 
     private string ManifestDryRunReportPath => Path.Combine(_directoryPath, "runtime_package_manifest_dry_run_reports.jsonl");
+
+    private string StationCompatibilityReportPath => Path.Combine(_directoryPath, "runtime_preview_station_compatibility_reports.jsonl");
+
+    private string OperatorContractValidationReportPath => Path.Combine(_directoryPath, "runtime_preview_operator_contract_validation_reports.jsonl");
+
+    private string PreReleaseReviewReportPath => Path.Combine(_directoryPath, "runtime_preview_pre_release_review_reports.jsonl");
 
     private static string GetDefaultDirectory()
     {
@@ -475,6 +550,9 @@ public sealed class RuntimePreviewReportArchive
     private readonly ConcurrentDictionary<string, RuntimePreviewDeployReadinessReport> _deployReadinessReports = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, RuntimePreviewPackageReadinessReport> _packageReadinessReports = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, RuntimePackageManifestDryRunReport> _manifestDryRunReports = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, RuntimePreviewStationCompatibilityReport> _stationCompatibilityReports = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, RuntimePreviewOperatorContractValidationReport> _operatorContractValidationReports = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, RuntimePreviewPreReleaseReviewReport> _preReleaseReviewReports = new(StringComparer.OrdinalIgnoreCase);
     private readonly RuntimePreviewGovernanceStore? _governanceStore;
 
     public RuntimePreviewReportArchive()
@@ -502,6 +580,21 @@ public sealed class RuntimePreviewReportArchive
         foreach (var report in governanceStore.LoadManifestDryRunReports())
         {
             _manifestDryRunReports[report.ManifestId] = report;
+        }
+
+        foreach (var report in governanceStore.LoadStationCompatibilityReports())
+        {
+            _stationCompatibilityReports[report.ReportId] = report;
+        }
+
+        foreach (var report in governanceStore.LoadOperatorContractValidationReports())
+        {
+            _operatorContractValidationReports[report.ReportId] = report;
+        }
+
+        foreach (var report in governanceStore.LoadPreReleaseReviewReports())
+        {
+            _preReleaseReviewReports[report.ReviewId] = report;
         }
     }
 
@@ -618,6 +711,111 @@ public sealed class RuntimePreviewReportArchive
     public IReadOnlyList<RuntimePackageManifestDryRunReport> ListManifestDryRunReports()
     {
         return _manifestDryRunReports.Values
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
+    public RuntimePreviewStationCompatibilityReport SaveStationCompatibilityReport(RuntimePreviewStationCompatibilityReport report)
+    {
+        _stationCompatibilityReports[report.ReportId] = report;
+        _governanceStore?.SaveStationCompatibilityReport(report);
+        return report;
+    }
+
+    public RuntimePreviewStationCompatibilityReport? GetStationCompatibilityReport(string reportId)
+    {
+        return string.IsNullOrWhiteSpace(reportId) ? null : _stationCompatibilityReports.GetValueOrDefault(reportId.Trim());
+    }
+
+    public RuntimePreviewStationCompatibilityReport? GetStationCompatibilityReportBySessionId(string sessionId)
+    {
+        return _stationCompatibilityReports.Values
+            .Where(report => string.Equals(report.SessionId, sessionId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .FirstOrDefault();
+    }
+
+    public IReadOnlyList<RuntimePreviewStationCompatibilityReport> GetStationCompatibilityReportsByStationProfileId(string stationProfileId)
+    {
+        return _stationCompatibilityReports.Values
+            .Where(report => string.Equals(report.StationProfileId, stationProfileId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
+    public IReadOnlyList<RuntimePreviewStationCompatibilityReport> ListStationCompatibilityReports()
+    {
+        return _stationCompatibilityReports.Values
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
+    public RuntimePreviewOperatorContractValidationReport SaveOperatorContractValidationReport(RuntimePreviewOperatorContractValidationReport report)
+    {
+        _operatorContractValidationReports[report.ReportId] = report;
+        _governanceStore?.SaveOperatorContractValidationReport(report);
+        return report;
+    }
+
+    public RuntimePreviewOperatorContractValidationReport? GetOperatorContractValidationReport(string reportId)
+    {
+        return string.IsNullOrWhiteSpace(reportId) ? null : _operatorContractValidationReports.GetValueOrDefault(reportId.Trim());
+    }
+
+    public RuntimePreviewOperatorContractValidationReport? GetOperatorContractValidationReportBySessionId(string sessionId)
+    {
+        return _operatorContractValidationReports.Values
+            .Where(report => string.Equals(report.SessionId, sessionId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .FirstOrDefault();
+    }
+
+    public IReadOnlyList<RuntimePreviewOperatorContractValidationReport> ListOperatorContractValidationReports()
+    {
+        return _operatorContractValidationReports.Values
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
+    public RuntimePreviewPreReleaseReviewReport SavePreReleaseReviewReport(RuntimePreviewPreReleaseReviewReport report)
+    {
+        _preReleaseReviewReports[report.ReviewId] = report;
+        _governanceStore?.SavePreReleaseReviewReport(report);
+        return report;
+    }
+
+    public RuntimePreviewPreReleaseReviewReport? GetPreReleaseReviewReport(string reviewId)
+    {
+        return string.IsNullOrWhiteSpace(reviewId) ? null : _preReleaseReviewReports.GetValueOrDefault(reviewId.Trim());
+    }
+
+    public RuntimePreviewPreReleaseReviewReport? GetPreReleaseReviewReportBySessionId(string sessionId)
+    {
+        return _preReleaseReviewReports.Values
+            .Where(report => string.Equals(report.SessionId, sessionId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .FirstOrDefault();
+    }
+
+    public RuntimePreviewPreReleaseReviewReport? GetPreReleaseReviewReportByManifestId(string manifestId)
+    {
+        return _preReleaseReviewReports.Values
+            .Where(report => string.Equals(report.ManifestId, manifestId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .FirstOrDefault();
+    }
+
+    public IReadOnlyList<RuntimePreviewPreReleaseReviewReport> GetPreReleaseReviewReportsByCaseId(string caseId)
+    {
+        return _preReleaseReviewReports.Values
+            .Where(report => string.Equals(report.CaseId, caseId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(report => report.GeneratedAtUtc)
+            .ToList();
+    }
+
+    public IReadOnlyList<RuntimePreviewPreReleaseReviewReport> ListPreReleaseReviewReports()
+    {
+        return _preReleaseReviewReports.Values
             .OrderByDescending(report => report.GeneratedAtUtc)
             .ToList();
     }
@@ -1943,6 +2141,962 @@ public sealed class RuntimePackageManifestDryRunService
         IReadOnlyList<string> OutputChannels);
 }
 
+internal sealed record RuntimePreviewWorkflowOperator(
+    string TempId,
+    string OperatorType,
+    IReadOnlyDictionary<string, string> Parameters);
+
+internal static class RuntimePreviewWorkflowInspector
+{
+    public static JsonElement? ResolveWorkflowDraft(JsonElement? workflowDraft, JsonElement? arguments)
+    {
+        if (workflowDraft is { ValueKind: JsonValueKind.Object } direct)
+        {
+            return direct.Clone();
+        }
+
+        if (arguments is { ValueKind: JsonValueKind.Object } args)
+        {
+            foreach (var propertyName in new[] { "flow", "workflowDraft", "existingFlowJson" })
+            {
+                if (args.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.Object)
+                {
+                    return value.Clone();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public static IReadOnlyList<RuntimePreviewWorkflowOperator> ExtractOperators(JsonElement? workflowDraft)
+    {
+        if (workflowDraft is not { ValueKind: JsonValueKind.Object } draft ||
+            !draft.TryGetProperty("operators", out var operators) ||
+            operators.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var result = new List<RuntimePreviewWorkflowOperator>();
+        foreach (var op in operators.EnumerateArray())
+        {
+            var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (op.TryGetProperty("parameters", out var p) && p.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var property in p.EnumerateObject())
+                {
+                    parameters[property.Name] = property.Value.ValueKind == JsonValueKind.String
+                        ? RuntimePreviewGovernanceRedactor.RedactScalar(property.Value.GetString())
+                        : RuntimePreviewGovernanceRedactor.RedactScalar(property.Value.GetRawText());
+                }
+            }
+
+            result.Add(new RuntimePreviewWorkflowOperator(
+                ReadString(op, "tempId"),
+                ReadString(op, "operatorType"),
+                parameters));
+        }
+
+        return result;
+    }
+
+    public static string GetParameter(RuntimePreviewWorkflowOperator op, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (op.Parameters.TryGetValue(name, out var value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    public static IReadOnlyList<string> GetParameterValues(IEnumerable<RuntimePreviewWorkflowOperator> operators, params string[] names)
+    {
+        return operators
+            .Select(op => GetParameter(op, names))
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public static bool ContainsDirectPlcOrStationIntent(
+        IEnumerable<RuntimePreviewWorkflowOperator> operators,
+        RuntimePackageManifestDryRunReport manifest)
+    {
+        if (manifest.BlockedReasons.Any(item => item.Contains("plc", StringComparison.OrdinalIgnoreCase) ||
+                                                item.Contains("station", StringComparison.OrdinalIgnoreCase) ||
+                                                item.Contains("deployment", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        foreach (var op in operators)
+        {
+            if (op.OperatorType.Contains("Communication", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(op.OperatorType, "DatabaseWrite", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(op.OperatorType, "HttpRequest", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(op.OperatorType, "MqttPublish", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            foreach (var pair in op.Parameters)
+            {
+                if (pair.Key.Contains("plc", StringComparison.OrdinalIgnoreCase) ||
+                    pair.Key.Contains("station", StringComparison.OrdinalIgnoreCase) ||
+                    pair.Value.Equals("plc", StringComparison.OrdinalIgnoreCase) ||
+                    pair.Value.Contains("station", StringComparison.OrdinalIgnoreCase) ||
+                    pair.Value.Contains("deploy", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public static IReadOnlyList<string> InferModelKinds(
+        IReadOnlyList<RuntimePreviewWorkflowOperator> operators,
+        RuntimePackageManifestDryRunReport manifest)
+    {
+        var explicitKinds = GetParameterValues(operators, "ModelKind", "ModelType", "TaskKind");
+        var inferred = new List<string>(explicitKinds);
+        foreach (var model in manifest.ModelDependencies)
+        {
+            if (model.Contains("segment", StringComparison.OrdinalIgnoreCase))
+            {
+                inferred.Add("segmentation");
+            }
+            else if (model.Contains("class", StringComparison.OrdinalIgnoreCase))
+            {
+                inferred.Add("classification");
+            }
+            else if (!string.IsNullOrWhiteSpace(model))
+            {
+                inferred.Add("detection");
+            }
+        }
+
+        return inferred
+            .Select(RuntimePreviewGovernanceRedactor.RedactScalar)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public static string RequiredRuntimeVersion(RuntimePackageManifestDryRunReport manifest)
+    {
+        if (manifest.OperatorTypes.Any(item => string.Equals(item, "DeepLearning", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "1.4.0";
+        }
+
+        if (manifest.OperatorCount > 10)
+        {
+            return "1.3.0";
+        }
+
+        return "1.2.0";
+    }
+
+    private static string ReadString(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(propertyName, out var value) &&
+               value.ValueKind == JsonValueKind.String
+            ? RuntimePreviewGovernanceRedactor.RedactScalar(value.GetString())
+            : string.Empty;
+    }
+}
+
+public sealed class RuntimePreviewStationProfileCatalog
+{
+    private static readonly IReadOnlyList<string> TraditionalOperators =
+    [
+        "ImageAcquisition",
+        "TemplateMatching",
+        "CircleMeasurement",
+        "MeasureDistance",
+        "LineMeasurement",
+        "GapMeasurement",
+        "ResultOutput",
+        "ResultJudgment",
+        "BlobAnalysis",
+        "BlobLabeling",
+        "Thresholding",
+        "EdgeDetection",
+        "ImageCrop",
+        "ImageResize",
+        "ImageNormalize",
+        "ShapeMatching",
+        "CaliperTool"
+    ];
+
+    public RuntimePreviewStationProfileDocument BuildProfiles()
+    {
+        var profiles = CreateProfiles();
+        return new RuntimePreviewStationProfileDocument
+        {
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            ProfileCount = profiles.Count,
+            Profiles = profiles,
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+    }
+
+    public RuntimePreviewStationProfile GetOrDefault(string? stationProfileId)
+    {
+        var profiles = CreateProfiles();
+        if (!string.IsNullOrWhiteSpace(stationProfileId))
+        {
+            var match = profiles.FirstOrDefault(profile =>
+                string.Equals(profile.StationProfileId, stationProfileId.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return profiles[0];
+    }
+
+    public static IReadOnlyList<RuntimePreviewStationProfile> CreateProfiles()
+    {
+        return
+        [
+            Profile(
+                "sp-release-standard-v14",
+                "standard_vision_ipc",
+                "1.4.0",
+                TraditionalOperators,
+                ["detection", "classification"],
+                ["line-cam", "side-cam"],
+                ["qa-metadata", "metadata-summary", "local-log"],
+                12),
+            Profile(
+                "sp-dl-review-v14",
+                "deep_learning_review_ipc",
+                "1.4.0",
+                TraditionalOperators.Concat(["DeepLearning", "SemanticSegmentation", "SurfaceDefectDetection"]).ToList(),
+                ["detection", "classification"],
+                ["line-cam", "side-cam"],
+                ["qa-metadata", "metadata-summary"],
+                10),
+            Profile(
+                "sp-low-ipc-v12",
+                "low_spec_ipc",
+                "1.2.0",
+                TraditionalOperators.Where(item => !string.Equals(item, "CaliperTool", StringComparison.OrdinalIgnoreCase)).ToList(),
+                [],
+                ["line-cam"],
+                ["qa-metadata"],
+                3),
+            Profile(
+                "sp-output-lite-v14",
+                "output_lite_station",
+                "1.4.0",
+                TraditionalOperators,
+                [],
+                ["line-cam"],
+                ["local-log"],
+                8),
+            Profile(
+                "sp-detection-only-v14",
+                "model_detection_only_station",
+                "1.4.0",
+                TraditionalOperators.Concat(["DeepLearning"]).ToList(),
+                ["detection"],
+                ["line-cam", "side-cam"],
+                ["qa-metadata"],
+                8),
+            Profile(
+                "sp-multi-station-v14",
+                "multi_station_review",
+                "1.4.0",
+                TraditionalOperators.Concat(["DeepLearning"]).ToList(),
+                ["detection", "classification"],
+                ["line-cam", "side-cam", "top-cam"],
+                ["qa-metadata", "metadata-summary"],
+                16)
+        ];
+    }
+
+    private static RuntimePreviewStationProfile Profile(
+        string stationProfileId,
+        string stationType,
+        string runtimeVersion,
+        IEnumerable<string> supportedOperatorTypes,
+        IEnumerable<string> supportedModelKinds,
+        IEnumerable<string> cameraBindingSlots,
+        IEnumerable<string> outputChannelKinds,
+        int maxOperatorCount)
+    {
+        return new RuntimePreviewStationProfile
+        {
+            StationProfileId = stationProfileId,
+            StationType = stationType,
+            RuntimeVersion = runtimeVersion,
+            SupportedOperatorTypes = supportedOperatorTypes.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            SupportedModelKinds = supportedModelKinds.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            CameraBindingSlots = cameraBindingSlots.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            OutputChannelKinds = outputChannelKinds.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            MaxOperatorCount = maxOperatorCount,
+            PlcWriteAllowed = false,
+            ResourcePolicy = new RuntimePreviewStationProfileResourcePolicy
+            {
+                MetadataOnly = true,
+                RealResourceAccessAllowed = false,
+                ImageFileReadAllowed = false,
+                ModelFileLoadAllowed = false,
+                TemplateFileReadAllowed = false,
+                PackageDeploymentAllowed = false
+            },
+            NetworkPolicy = "redacted",
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+    }
+}
+
+public sealed class RuntimePreviewOperatorContractRegistry
+{
+    public const string Version = "operator-contract-registry.v1.metadata-only";
+
+    public RuntimePreviewOperatorContractRegistryDocument BuildRegistry()
+    {
+        var contracts = CreateContracts();
+        return new RuntimePreviewOperatorContractRegistryDocument
+        {
+            OperatorContractVersion = Version,
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            ContractCount = contracts.Count,
+            Contracts = contracts,
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+    }
+
+    public RuntimePreviewOperatorContractValidationReport Validate(
+        RuntimePackageManifestDryRunReport manifestReport,
+        RuntimePreviewPackageReadinessReport packageReport,
+        RuntimePreviewPreReleaseReviewRequest request,
+        RuntimePreviewStationProfile stationProfile,
+        string caseId)
+    {
+        var workflowDraft = RuntimePreviewWorkflowInspector.ResolveWorkflowDraft(request.WorkflowDraft, request.Arguments);
+        var operators = RuntimePreviewWorkflowInspector.ExtractOperators(workflowDraft);
+        var contracts = CreateContracts().ToDictionary(item => item.OperatorType, StringComparer.OrdinalIgnoreCase);
+        var results = operators.Select(op => ValidateOperator(op, contracts, stationProfile)).ToList();
+        if (operators.Count == 0)
+        {
+            results.Add(new RuntimePreviewOperatorContractValidationItem
+            {
+                OperatorTempId = "workflow",
+                OperatorType = "operator_graph",
+                ContractSatisfied = false,
+                BlockedReasons = ["operator_graph_missing"]
+            });
+        }
+
+        var blockedReasons = results
+            .SelectMany(item => item.BlockedReasons)
+            .Concat(packageReport.BlockingIssues.Where(item => item.Contains("contract", StringComparison.OrdinalIgnoreCase)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var riskTags = results
+            .SelectMany(item => item.RiskTags)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var approvals = riskTags
+            .Where(item => item.Contains("approval", StringComparison.OrdinalIgnoreCase) ||
+                           item.Contains("deep_learning", StringComparison.OrdinalIgnoreCase) ||
+                           item.Contains("multi_station", StringComparison.OrdinalIgnoreCase))
+            .Select(item => $"engineer_approval:{item}")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var report = new RuntimePreviewOperatorContractValidationReport
+        {
+            ReportId = $"rp_operator_contract_{Guid.NewGuid():N}",
+            SessionId = packageReport.SessionId,
+            CaseId = caseId,
+            ManifestId = manifestReport.ManifestId,
+            StationProfileId = stationProfile.StationProfileId,
+            WorkflowDraftHash = packageReport.WorkflowDraftHash,
+            OperatorContractVersion = Version,
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            OperatorContractsSatisfied = blockedReasons.Count == 0,
+            ContractResults = results,
+            BlockedReasons = blockedReasons,
+            RiskTags = riskTags,
+            RequiredEngineerApprovals = approvals,
+            MetadataOnly = true,
+            PackageCreated = false,
+            DeploymentExecuted = false,
+            RealResourcesTouched = false
+        };
+        return report;
+    }
+
+    public static IReadOnlyList<RuntimePreviewOperatorContractDefinition> CreateContracts()
+    {
+        return
+        [
+            Contract("ImageAcquisition", [], ["image"], ["SourceType", "CameraBindingId"], ["cameraBinding"], ["ImagePath", "FrameBytes", "RawImageBytes"], ["metadata_runtime"], ["operatorType", "parameters.CameraBindingId"], ["camera slot available"], ["camera_metadata"]),
+            Contract("TemplateMatching", ["image"], ["match"], ["TemplateId"], ["templateMetadata"], ["TemplatePath", "TemplateFile", "ImagePath"], ["traditional_vision_runtime"], ["operatorType", "parameters.TemplateId"], ["template metadata dependency closed"], ["template_dependency"]),
+            Contract("CircleMeasurement", ["image"], ["circle"], ["Roi"], [], ["ImagePath"], ["measurement_runtime"], ["operatorType", "parameters.Roi"], ["traditional measurement supported"], ["measurement"]),
+            Contract("MeasureDistance", ["geometry"], ["distance"], ["Unit"], [], ["ImagePath"], ["measurement_runtime"], ["operatorType", "parameters.Unit"], ["traditional measurement supported"], ["measurement"]),
+            Contract("DeepLearning", ["image"], ["inference"], ["ModelId"], ["modelMetadata"], ["ModelPath", "ModelFile", "WeightsPath", "ImagePath"], ["deep_learning_runtime"], ["operatorType", "parameters.ModelId", "parameters.ModelKind"], ["DeepLearning supported", "model kind supported"], ["deep_learning_review", "engineer_approval_required"]),
+            Contract("ResultOutput", ["result"], ["metadataOutput"], ["OutputChannelId"], ["outputChannel"], ["PlcAddress", "StationAddress", "PackagePath", "CvpkgPath"], ["result_output_runtime"], ["operatorType", "parameters.OutputChannelId"], ["output channel kind supported", "plc write disabled"], ["output_contract"]),
+            Contract("ResultJudgment", ["result"], ["judgment"], ["RuleId"], [], ["ScriptPath"], ["judgment_runtime"], ["operatorType"], ["traditional judgment supported"], ["judgment"]),
+            Contract("BlobAnalysis", ["image"], ["blob"], [], [], ["ImagePath"], ["traditional_vision_runtime"], ["operatorType"], ["traditional vision supported"], ["blob"]),
+            Contract("Thresholding", ["image"], ["binary"], ["Threshold"], [], ["ImagePath"], ["traditional_vision_runtime"], ["operatorType"], ["traditional vision supported"], ["threshold"]),
+            Contract("EdgeDetection", ["image"], ["edges"], [], [], ["ImagePath"], ["traditional_vision_runtime"], ["operatorType"], ["traditional vision supported"], ["edge"]),
+            Contract("LineMeasurement", ["image"], ["line"], ["Roi"], [], ["ImagePath"], ["measurement_runtime"], ["operatorType"], ["traditional measurement supported"], ["measurement"]),
+            Contract("GapMeasurement", ["image"], ["gap"], ["Unit"], [], ["ImagePath"], ["measurement_runtime"], ["operatorType"], ["traditional measurement supported"], ["measurement"]),
+            Contract("CaliperTool", ["image"], ["edgePair"], ["Roi"], [], ["ImagePath"], ["measurement_runtime"], ["operatorType"], ["caliper supported"], ["measurement"]),
+            Contract("ShapeMatching", ["image"], ["pose"], ["TemplateId"], ["templateMetadata"], ["TemplatePath"], ["traditional_vision_runtime"], ["operatorType"], ["shape matching supported"], ["template_dependency"]),
+            Contract("ImageCrop", ["image"], ["image"], ["Roi"], [], ["ImagePath"], ["traditional_vision_runtime"], ["operatorType"], ["traditional vision supported"], ["image_processing"]),
+            Contract("ImageResize", ["image"], ["image"], ["Width", "Height"], [], ["ImagePath"], ["traditional_vision_runtime"], ["operatorType"], ["traditional vision supported"], ["image_processing"]),
+            Contract("ImageNormalize", ["image"], ["image"], [], [], ["ImagePath"], ["traditional_vision_runtime"], ["operatorType"], ["traditional vision supported"], ["image_processing"]),
+            Contract("CodeRecognition", ["image"], ["code"], [], [], ["ImagePath"], ["traditional_vision_runtime"], ["operatorType"], ["traditional vision supported"], ["recognition"]),
+            Contract("OcrRecognition", ["image"], ["text"], [], [], ["ImagePath"], ["traditional_vision_runtime"], ["operatorType"], ["traditional vision supported"], ["recognition"]),
+            Contract("SemanticSegmentation", ["image"], ["mask"], ["ModelId"], ["modelMetadata"], ["ModelPath", "ImagePath"], ["deep_learning_runtime"], ["operatorType"], ["segmentation model kind supported"], ["deep_learning_review", "engineer_approval_required"]),
+            Contract("SurfaceDefectDetection", ["image"], ["defect"], ["ModelId"], ["modelMetadata"], ["ModelPath", "ImagePath"], ["deep_learning_runtime"], ["operatorType"], ["defect model kind supported"], ["deep_learning_review", "engineer_approval_required"]),
+            Contract("ModbusCommunication", ["result"], ["plc"], [], ["plcEndpoint"], ["Address", "PlcAddress", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["plc write forbidden"], ["plc_write_forbidden"]),
+            Contract("SiemensS7Communication", ["result"], ["plc"], [], ["plcEndpoint"], ["Address", "PlcAddress", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["plc write forbidden"], ["plc_write_forbidden"]),
+            Contract("MitsubishiMcCommunication", ["result"], ["plc"], [], ["plcEndpoint"], ["Address", "PlcAddress", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["plc write forbidden"], ["plc_write_forbidden"]),
+            Contract("OmronFinsCommunication", ["result"], ["plc"], [], ["plcEndpoint"], ["Address", "PlcAddress", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["plc write forbidden"], ["plc_write_forbidden"]),
+            Contract("DatabaseWrite", ["result"], ["database"], [], ["databaseEndpoint"], ["ConnectionString", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["external write forbidden"], ["external_write_forbidden"]),
+            Contract("HttpRequest", ["result"], ["http"], [], ["networkEndpoint"], ["Url", "BaseUrl", "Authorization"], ["forbidden_for_preview"], ["operatorType"], ["network access forbidden"], ["network_write_forbidden"]),
+            Contract("MqttPublish", ["result"], ["mqtt"], [], ["networkEndpoint"], ["BrokerUrl", "BaseUrl"], ["forbidden_for_preview"], ["operatorType"], ["network access forbidden"], ["network_write_forbidden"]),
+            Contract("ScriptOperator", ["metadata"], ["metadata"], [], [], ["ScriptPath", "Command", "Shell"], ["forbidden_for_preview"], ["operatorType"], ["system command forbidden"], ["system_command_forbidden"])
+        ];
+    }
+
+    private static RuntimePreviewOperatorContractValidationItem ValidateOperator(
+        RuntimePreviewWorkflowOperator op,
+        IReadOnlyDictionary<string, RuntimePreviewOperatorContractDefinition> contracts,
+        RuntimePreviewStationProfile stationProfile)
+    {
+        var blocked = new List<string>();
+        if (!contracts.TryGetValue(op.OperatorType, out var contract))
+        {
+            contract = Contract(op.OperatorType, [], ["metadata"], [], [], ["ImagePath", "ModelPath", "TemplatePath", "PlcAddress", "StationAddress", "Command"], ["metadata_runtime"], ["operatorType"], ["operator support required"], ["unknown_operator"]);
+        }
+
+        var missingParameters = contract.RequiredParameters
+            .Where(parameter => string.IsNullOrWhiteSpace(RuntimePreviewWorkflowInspector.GetParameter(op, parameter)))
+            .ToList();
+        blocked.AddRange(missingParameters.Select(parameter => $"operator_contract_missing_parameter:{op.OperatorType}:{parameter}"));
+
+        var forbiddenHits = new List<string>();
+        foreach (var forbidden in contract.ForbiddenParameters)
+        {
+            if (op.Parameters.TryGetValue(forbidden, out var value) && !string.IsNullOrWhiteSpace(value))
+            {
+                forbiddenHits.Add($"{op.OperatorType}:{forbidden}");
+            }
+        }
+
+        if (contract.RuntimeDependencies.Contains("forbidden_for_preview", StringComparer.OrdinalIgnoreCase))
+        {
+            forbiddenHits.Add($"{op.OperatorType}:runtime_dependency_forbidden_for_preview");
+        }
+
+        if (string.Equals(op.OperatorType, "ResultOutput", StringComparison.OrdinalIgnoreCase))
+        {
+            var channel = RuntimePreviewWorkflowInspector.GetParameter(op, "Channel", "OutputChannel", "OutputChannelId");
+            if (string.Equals(channel, "plc", StringComparison.OrdinalIgnoreCase) && !stationProfile.PlcWriteAllowed)
+            {
+                forbiddenHits.Add("ResultOutput:plc_write_forbidden");
+            }
+        }
+
+        blocked.AddRange(forbiddenHits.Select(hit => $"operator_contract_forbidden_parameter:{hit}"));
+
+        IReadOnlyList<string> stationBlocks = stationProfile.SupportedOperatorTypes.Contains(op.OperatorType, StringComparer.OrdinalIgnoreCase)
+            ? []
+            : [$"operator_contract_station_requirement_not_met:{op.OperatorType}"];
+        blocked.AddRange(stationBlocks);
+
+        var riskTags = contract.RiskTags
+            .Concat(forbiddenHits.Select(hit => hit.Contains("plc", StringComparison.OrdinalIgnoreCase) ? "plc_write_forbidden" : "operator_contract_violation"))
+            .Concat(stationBlocks.Select(_ => "station_operator_unsupported"))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return new RuntimePreviewOperatorContractValidationItem
+        {
+            OperatorTempId = op.TempId,
+            OperatorType = op.OperatorType,
+            ContractSatisfied = blocked.Count == 0,
+            RequiredInputs = contract.RequiredInputs,
+            RequiredOutputs = contract.RequiredOutputs,
+            RequiredParameters = contract.RequiredParameters,
+            MissingParameters = missingParameters,
+            ResourceDependencies = contract.ResourceDependencies,
+            ForbiddenParameterHits = forbiddenHits,
+            RuntimeDependencies = contract.RuntimeDependencies,
+            ManifestFields = contract.ManifestFields,
+            StationCompatibilityRequirements = contract.StationCompatibilityRequirements,
+            RiskTags = riskTags,
+            BlockedReasons = blocked
+        };
+    }
+
+    private static RuntimePreviewOperatorContractDefinition Contract(
+        string operatorType,
+        IReadOnlyList<string> requiredInputs,
+        IReadOnlyList<string> requiredOutputs,
+        IReadOnlyList<string> requiredParameters,
+        IReadOnlyList<string> resourceDependencies,
+        IReadOnlyList<string> forbiddenParameters,
+        IReadOnlyList<string> runtimeDependencies,
+        IReadOnlyList<string> manifestFields,
+        IReadOnlyList<string> stationCompatibilityRequirements,
+        IReadOnlyList<string> riskTags)
+    {
+        return new RuntimePreviewOperatorContractDefinition
+        {
+            OperatorType = operatorType,
+            RequiredInputs = requiredInputs,
+            RequiredOutputs = requiredOutputs,
+            RequiredParameters = requiredParameters,
+            ResourceDependencies = resourceDependencies,
+            ForbiddenParameters = forbiddenParameters,
+            RuntimeDependencies = runtimeDependencies,
+            ManifestFields = manifestFields,
+            StationCompatibilityRequirements = stationCompatibilityRequirements,
+            RiskTags = riskTags,
+            MetadataOnly = true
+        };
+    }
+}
+
+public sealed class RuntimePreviewStationCompatibilityDryRunService
+{
+    private readonly RuntimePreviewReportArchive _reportArchive;
+    private readonly RuntimePreviewAuditTrail _auditTrail;
+
+    public RuntimePreviewStationCompatibilityDryRunService(
+        RuntimePreviewReportArchive reportArchive,
+        RuntimePreviewAuditTrail auditTrail)
+    {
+        _reportArchive = reportArchive;
+        _auditTrail = auditTrail;
+    }
+
+    public RuntimePreviewStationCompatibilityReport Evaluate(
+        RuntimePackageManifestDryRunReport manifestReport,
+        RuntimePreviewPackageReadinessReport packageReport,
+        RuntimePreviewPreReleaseReviewRequest request,
+        RuntimePreviewStationProfile stationProfile,
+        string caseId)
+    {
+        var workflowDraft = RuntimePreviewWorkflowInspector.ResolveWorkflowDraft(request.WorkflowDraft, request.Arguments);
+        var operators = RuntimePreviewWorkflowInspector.ExtractOperators(workflowDraft);
+        var blockedReasons = new List<string>();
+        var engineerActions = new List<string>();
+        var requiredRuntimeVersion = RuntimePreviewWorkflowInspector.RequiredRuntimeVersion(manifestReport);
+        var runtimeVersionCompatible = CompareVersion(stationProfile.RuntimeVersion, requiredRuntimeVersion) >= 0;
+        if (!runtimeVersionCompatible)
+        {
+            blockedReasons.Add($"station_runtime_version_too_low:required_{requiredRuntimeVersion}");
+            engineerActions.Add("Select a Station profile with the required Runtime version or downgrade unsupported operators.");
+        }
+
+        var unsupportedOperators = manifestReport.OperatorTypes
+            .Where(type => !stationProfile.SupportedOperatorTypes.Contains(type, StringComparer.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var operatorSupportCompatible = unsupportedOperators.Count == 0;
+        if (!operatorSupportCompatible)
+        {
+            blockedReasons.AddRange(unsupportedOperators.Select(type => $"station_operator_not_supported:{type}"));
+            engineerActions.Add("Replace unsupported operators or select a Station profile that supports them.");
+        }
+
+        var cameraSlotsCompatible = manifestReport.CameraBindings.Count <= stationProfile.CameraBindingSlots.Count;
+        if (!cameraSlotsCompatible)
+        {
+            blockedReasons.Add($"station_camera_slots_insufficient:required_{manifestReport.CameraBindings.Count}_available_{stationProfile.CameraBindingSlots.Count}");
+            engineerActions.Add("Reduce camera bindings or choose a Station profile with more camera slots.");
+        }
+
+        var outputChannelsCompatible = manifestReport.OutputChannels.Count == 0 ||
+                                       manifestReport.OutputChannels.All(channel => stationProfile.OutputChannelKinds.Contains(channel, StringComparer.OrdinalIgnoreCase));
+        if (!outputChannelsCompatible)
+        {
+            blockedReasons.Add("station_output_channel_kind_missing");
+            engineerActions.Add("Map ResultOutput to an output channel kind supported by the target Station profile.");
+        }
+
+        var modelKinds = RuntimePreviewWorkflowInspector.InferModelKinds(operators, manifestReport);
+        var modelKindsCompatible = modelKinds.Count == 0 ||
+                                   modelKinds.All(kind => stationProfile.SupportedModelKinds.Contains(kind, StringComparer.OrdinalIgnoreCase));
+        var templateDependenciesCompatible = manifestReport.TemplateDependencies.Count == 0 ||
+                                             !manifestReport.MissingDependencies.Any(item => item.Contains("template", StringComparison.OrdinalIgnoreCase));
+        var modelTemplateDependenciesCompatible = modelKindsCompatible && templateDependenciesCompatible;
+        if (!modelKindsCompatible)
+        {
+            blockedReasons.Add("station_model_kind_not_supported");
+            engineerActions.Add("Use a model kind supported by the Station profile or move the flow to a compatible Station.");
+        }
+
+        if (!templateDependenciesCompatible)
+        {
+            blockedReasons.Add("station_template_dependency_not_closed");
+            engineerActions.Add("Bind TemplateId metadata before release review.");
+        }
+
+        var operatorCountCompatible = manifestReport.OperatorCount <= stationProfile.MaxOperatorCount;
+        if (!operatorCountCompatible)
+        {
+            blockedReasons.Add($"station_operator_count_exceeded:max_{stationProfile.MaxOperatorCount}");
+            engineerActions.Add("Split the flow or target a higher-capacity IPC profile.");
+        }
+
+        var plcStationIntentCompatible = stationProfile.PlcWriteAllowed ||
+                                         !RuntimePreviewWorkflowInspector.ContainsDirectPlcOrStationIntent(operators, manifestReport);
+        if (!plcStationIntentCompatible)
+        {
+            blockedReasons.Add("station_plc_or_direct_station_intent_forbidden");
+            engineerActions.Add("Remove PLC/Station direct intent from the draft; this simulator never writes PLC or deploys.");
+        }
+
+        var manifestRiskCompatible = !string.Equals(manifestReport.RiskLevel, "denied", StringComparison.OrdinalIgnoreCase) &&
+                                     !manifestReport.BlockedReasons.Any(item => item.Contains("dangerous", StringComparison.OrdinalIgnoreCase) ||
+                                                                               item.Contains("denied", StringComparison.OrdinalIgnoreCase));
+        if (!manifestRiskCompatible)
+        {
+            blockedReasons.Add("station_manifest_risk_denied");
+            engineerActions.Add("Clear denied manifest risk before Station compatibility review.");
+        }
+
+        var stationCompatible = runtimeVersionCompatible &&
+                                operatorSupportCompatible &&
+                                cameraSlotsCompatible &&
+                                outputChannelsCompatible &&
+                                modelTemplateDependenciesCompatible &&
+                                operatorCountCompatible &&
+                                plcStationIntentCompatible &&
+                                manifestRiskCompatible;
+        var report = new RuntimePreviewStationCompatibilityReport
+        {
+            ReportId = $"rp_station_compat_{Guid.NewGuid():N}",
+            SessionId = packageReport.SessionId,
+            CaseId = caseId,
+            ManifestId = manifestReport.ManifestId,
+            StationProfileId = stationProfile.StationProfileId,
+            WorkflowDraftHash = packageReport.WorkflowDraftHash,
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            StationProfile = stationProfile,
+            StationCompatible = stationCompatible,
+            RuntimeVersionCompatible = runtimeVersionCompatible,
+            OperatorSupportCompatible = operatorSupportCompatible,
+            CameraSlotsCompatible = cameraSlotsCompatible,
+            OutputChannelsCompatible = outputChannelsCompatible,
+            ModelTemplateDependenciesCompatible = modelTemplateDependenciesCompatible,
+            OperatorCountCompatible = operatorCountCompatible,
+            PlcStationIntentCompatible = plcStationIntentCompatible,
+            ManifestRiskCompatible = manifestRiskCompatible,
+            RequiredRuntimeVersion = requiredRuntimeVersion,
+            BlockedReasons = blockedReasons.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            RiskLevel = ResolveRisk(stationCompatible, manifestReport, blockedReasons),
+            EngineerActions = engineerActions.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            MetadataOnly = true,
+            PackageCreated = false,
+            DeploymentExecuted = false,
+            RealResourcesTouched = false
+        };
+        _reportArchive.SaveStationCompatibilityReport(report);
+        _auditTrail.Append(packageReport.SessionId, RuntimePreviewAuditEventTypes.StationCompatibilityGenerated, new
+        {
+            report.ReportId,
+            report.ManifestId,
+            report.StationProfileId,
+            report.StationCompatible,
+            report.RiskLevel,
+            report.MetadataOnly,
+            report.RealResourcesTouched
+        });
+        return report;
+    }
+
+    private static string ResolveRisk(
+        bool stationCompatible,
+        RuntimePackageManifestDryRunReport manifestReport,
+        IReadOnlyList<string> blockedReasons)
+    {
+        if (!stationCompatible && blockedReasons.Any(item => item.Contains("forbidden", StringComparison.OrdinalIgnoreCase) ||
+                                                             item.Contains("denied", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "denied";
+        }
+
+        if (!stationCompatible)
+        {
+            return "high";
+        }
+
+        return string.Equals(manifestReport.RiskLevel, "medium", StringComparison.OrdinalIgnoreCase) ? "medium" : "low";
+    }
+
+    private static int CompareVersion(string actual, string required)
+    {
+        return ParseVersion(actual).CompareTo(ParseVersion(required));
+    }
+
+    private static Version ParseVersion(string value)
+    {
+        return Version.TryParse(value, out var version) ? version : new Version(0, 0, 0);
+    }
+}
+
+public sealed class RuntimePreviewPreReleaseReviewService
+{
+    private readonly RuntimePreviewPackageReadinessBridge _packageReadinessBridge;
+    private readonly RuntimePreviewReportArchive _reportArchive;
+    private readonly RuntimePreviewAuditTrail _auditTrail;
+    private readonly RuntimePreviewStationProfileCatalog _stationProfileCatalog;
+    private readonly RuntimePreviewStationCompatibilityDryRunService _stationCompatibilityService;
+    private readonly RuntimePreviewOperatorContractRegistry _operatorContractRegistry;
+
+    public RuntimePreviewPreReleaseReviewService(
+        RuntimePreviewPackageReadinessBridge packageReadinessBridge,
+        RuntimePreviewReportArchive reportArchive,
+        RuntimePreviewAuditTrail auditTrail,
+        RuntimePreviewStationProfileCatalog stationProfileCatalog,
+        RuntimePreviewStationCompatibilityDryRunService stationCompatibilityService,
+        RuntimePreviewOperatorContractRegistry operatorContractRegistry)
+    {
+        _packageReadinessBridge = packageReadinessBridge;
+        _reportArchive = reportArchive;
+        _auditTrail = auditTrail;
+        _stationProfileCatalog = stationProfileCatalog;
+        _stationCompatibilityService = stationCompatibilityService;
+        _operatorContractRegistry = operatorContractRegistry;
+    }
+
+    public async Task<RuntimePreviewPreReleaseReviewReport> GenerateAsync(
+        RuntimePreviewPreReleaseReviewRequest request,
+        AppConfig appConfig,
+        AiConfigStore? aiConfigStore,
+        bool isAdmin,
+        bool developerUiRequested,
+        CancellationToken cancellationToken = default)
+    {
+        var packageReport = await _packageReadinessBridge.GenerateAsync(
+            new RuntimePreviewPackageReadinessRequest
+            {
+                Config = request.Config,
+                ToolName = request.ToolName,
+                Arguments = request.Arguments,
+                WorkflowDraft = request.WorkflowDraft,
+                RuntimePreviewConsent = request.RuntimePreviewConsent,
+                RequireReplay = request.RequireReplay
+            },
+            appConfig,
+            aiConfigStore,
+            isAdmin,
+            developerUiRequested,
+            cancellationToken);
+        var manifestReport = string.IsNullOrWhiteSpace(packageReport.ManifestDryRunReportId)
+            ? null
+            : _reportArchive.GetManifestDryRunReport(packageReport.ManifestDryRunReportId);
+        manifestReport ??= new RuntimePackageManifestDryRunReport
+        {
+            ManifestId = $"rp_manifest_missing_{Guid.NewGuid():N}",
+            ReportId = $"rp_manifest_report_missing_{Guid.NewGuid():N}",
+            SessionId = packageReport.SessionId,
+            PackageReadinessReportId = packageReport.ReportId,
+            WorkflowDraftHash = packageReport.WorkflowDraftHash,
+            RiskLevel = "high",
+            BlockedReasons = ["manifest_dry_run_report_missing"],
+            MetadataOnly = true,
+            RealResourcesTouched = false
+        };
+
+        var caseId = string.IsNullOrWhiteSpace(request.CaseId) ? "ad_hoc_pre_release_review" : RuntimePreviewGovernanceRedactor.RedactScalar(request.CaseId);
+        var stationProfile = _stationProfileCatalog.GetOrDefault(request.StationProfileId);
+        var stationReport = _stationCompatibilityService.Evaluate(manifestReport, packageReport, request, stationProfile, caseId);
+        var contractReport = _operatorContractRegistry.Validate(manifestReport, packageReport, request, stationProfile, caseId);
+        _reportArchive.SaveOperatorContractValidationReport(contractReport);
+        _auditTrail.Append(packageReport.SessionId, RuntimePreviewAuditEventTypes.OperatorContractValidationGenerated, new
+        {
+            contractReport.ReportId,
+            contractReport.ManifestId,
+            contractReport.OperatorContractsSatisfied,
+            contractReport.MetadataOnly,
+            contractReport.RealResourcesTouched
+        });
+
+        var blockedReasons = packageReport.BlockingIssues
+            .Concat(manifestReport.BlockedReasons)
+            .Concat(stationReport.BlockedReasons)
+            .Concat(contractReport.BlockedReasons)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(RuntimePreviewGovernanceRedactor.RedactScalar)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var approvals = contractReport.RequiredEngineerApprovals
+            .Concat(ResolveReviewApprovals(manifestReport, stationReport, contractReport, caseId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var requiresEngineerApproval = approvals.Count > 0 && blockedReasons.Count == 0;
+        var releaseReviewAllowed = packageReport.PackageReviewAllowed &&
+                                   stationReport.StationCompatible &&
+                                   contractReport.OperatorContractsSatisfied &&
+                                   !requiresEngineerApproval &&
+                                   blockedReasons.Count == 0;
+        var engineerActions = ResolveEngineerActions(blockedReasons, approvals, stationReport, packageReport, contractReport);
+        var report = new RuntimePreviewPreReleaseReviewReport
+        {
+            ReviewId = $"rp_review_{Guid.NewGuid():N}",
+            CaseId = caseId,
+            SessionId = packageReport.SessionId,
+            WorkflowDraftHash = packageReport.WorkflowDraftHash,
+            ManifestId = manifestReport.ManifestId,
+            StationProfileId = stationProfile.StationProfileId,
+            OperatorContractVersion = RuntimePreviewOperatorContractRegistry.Version,
+            ReadinessStatus = ResolveReadinessStatus(packageReport),
+            PackageReviewAllowed = packageReport.PackageReviewAllowed,
+            StationCompatible = stationReport.StationCompatible,
+            OperatorContractsSatisfied = contractReport.OperatorContractsSatisfied,
+            ReleaseReviewAllowed = releaseReviewAllowed,
+            RequiresEngineerApproval = requiresEngineerApproval,
+            BlockedReasons = blockedReasons,
+            RiskLevel = ResolveReleaseRisk(blockedReasons, approvals, packageReport, manifestReport, stationReport, contractReport),
+            EngineerActions = engineerActions,
+            PackageReadinessReportId = packageReport.ReportId,
+            StationCompatibilityReportId = stationReport.ReportId,
+            OperatorContractValidationReportId = contractReport.ReportId,
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            MetadataOnly = true,
+            PackageCreated = false,
+            DeploymentExecuted = false,
+            RealResourcesTouched = false
+        };
+        _reportArchive.SavePreReleaseReviewReport(report);
+        _auditTrail.Append(packageReport.SessionId, RuntimePreviewAuditEventTypes.PreReleaseReviewGenerated, new
+        {
+            report.ReviewId,
+            report.CaseId,
+            report.ManifestId,
+            report.StationProfileId,
+            report.ReleaseReviewAllowed,
+            report.RequiresEngineerApproval,
+            report.MetadataOnly,
+            report.RealResourcesTouched
+        });
+        return report;
+    }
+
+    private static IReadOnlyList<string> ResolveReviewApprovals(
+        RuntimePackageManifestDryRunReport manifestReport,
+        RuntimePreviewStationCompatibilityReport stationReport,
+        RuntimePreviewOperatorContractValidationReport contractReport,
+        string caseId)
+    {
+        var approvals = new List<string>();
+        if (manifestReport.OperatorTypes.Any(item => string.Equals(item, "DeepLearning", StringComparison.OrdinalIgnoreCase)) &&
+            contractReport.OperatorContractsSatisfied &&
+            stationReport.StationCompatible)
+        {
+            approvals.Add("engineer_approval:deep_learning_release_review");
+        }
+
+        if (string.Equals(manifestReport.RiskLevel, "medium", StringComparison.OrdinalIgnoreCase) &&
+            contractReport.OperatorContractsSatisfied &&
+            stationReport.StationCompatible)
+        {
+            approvals.Add("engineer_approval:medium_manifest_risk");
+        }
+
+        if ((caseId.Contains("MULTI", StringComparison.OrdinalIgnoreCase) ||
+             stationReport.StationProfileId.Contains("multi", StringComparison.OrdinalIgnoreCase) ||
+             stationReport.StationProfile.StationType.Contains("multi", StringComparison.OrdinalIgnoreCase)) &&
+            stationReport.StationCompatible &&
+            contractReport.OperatorContractsSatisfied)
+        {
+            approvals.Add("engineer_approval:multi_station_review");
+        }
+
+        return approvals;
+    }
+
+    private static IReadOnlyList<string> ResolveEngineerActions(
+        IReadOnlyList<string> blockedReasons,
+        IReadOnlyList<string> approvals,
+        RuntimePreviewStationCompatibilityReport stationReport,
+        RuntimePreviewPackageReadinessReport packageReport,
+        RuntimePreviewOperatorContractValidationReport contractReport)
+    {
+        if (blockedReasons.Count > 0)
+        {
+            return stationReport.EngineerActions
+                .Concat(packageReport.PendingActions.Select(item => item.Title))
+                .Concat(contractReport.BlockedReasons.Select(item => $"Fix operator contract: {item}"))
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Select(RuntimePreviewGovernanceRedactor.RedactScalar)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .DefaultIfEmpty("Resolve blocked metadata dependencies, then rerun full pre-release review.")
+                .ToList();
+        }
+
+        if (approvals.Count > 0)
+        {
+            return approvals.Select(item => $"Request {item} before release review can be allowed.").ToList();
+        }
+
+        return ["Release review simulator is allowed; keep real package, deployment, Station, PLC, and hot-load gates disabled."];
+    }
+
+    private static string ResolveReadinessStatus(RuntimePreviewPackageReadinessReport packageReport)
+    {
+        if (packageReport.PackageReviewAllowed)
+        {
+            return RuntimePreviewPilotReadinessStatuses.Ready;
+        }
+
+        return packageReport.BlockingIssues.Any(item => item.Contains("denied", StringComparison.OrdinalIgnoreCase))
+            ? RuntimePreviewPilotReadinessStatuses.Denied
+            : RuntimePreviewPilotReadinessStatuses.NotReady;
+    }
+
+    private static string ResolveReleaseRisk(
+        IReadOnlyList<string> blockedReasons,
+        IReadOnlyList<string> approvals,
+        RuntimePreviewPackageReadinessReport packageReport,
+        RuntimePackageManifestDryRunReport manifestReport,
+        RuntimePreviewStationCompatibilityReport stationReport,
+        RuntimePreviewOperatorContractValidationReport contractReport)
+    {
+        if (blockedReasons.Any(item => item.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
+                                       item.Contains("forbidden", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "denied";
+        }
+
+        if (blockedReasons.Count > 0 ||
+            string.Equals(packageReport.PackageRiskLevel, "high", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(manifestReport.RiskLevel, "high", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(stationReport.RiskLevel, "high", StringComparison.OrdinalIgnoreCase) ||
+            !contractReport.OperatorContractsSatisfied)
+        {
+            return "high";
+        }
+
+        return approvals.Count > 0 ? "medium" : "low";
+    }
+}
+
 public sealed class RuntimePreviewScenarioCorpusService
 {
     public RuntimePreviewScenarioCorpusDocument BuildCorpus()
@@ -2125,25 +3279,37 @@ public sealed class RuntimePreviewRedactedFlowCorpusService
         return
         [
             Case("RP-RF-001", "connector_line", "wire_sequence", "Verify harness wire order before release.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "low", "Review metadata manifest and keep real pilot gate closed.", RuntimePreviewScenarioCorpusService.Flow("line-cam", templateId: "wire-template")),
-            Case("RP-RF-002", "remote_control_station", "remote_control_defect", "Detect missing buttons and label defects on a remote controller.", ["ImageAcquisition", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "low", "Confirm ModelId catalog ownership before real pilot.", RuntimePreviewScenarioCorpusService.ModelFlow("line-cam", "remote-control-model")),
-            Case("RP-RF-003", "fixture_station", "template_measurement_combo", "Locate fixture by template and measure a downstream feature.", ["ImageAcquisition", "TemplateMatching", "CircleMeasurement", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "medium", "Review combined template and measurement operator contract.", RuntimePreviewScenarioCorpusService.MultiOperatorFlow()),
+            Case("RP-RF-002", "remote_control_station", "remote_control_defect", "Detect missing buttons and label defects on a remote controller.", ["ImageAcquisition", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "medium", "Request engineer approval for DeepLearning metadata release review.", RuntimePreviewScenarioCorpusService.ModelFlow("line-cam", "remote-control-model"), stationProfileId: "sp-dl-review-v14", releaseDecision: "requires_engineer_approval", requiredApprovals: ["deep_learning_release_review"]),
+            Case("RP-RF-003", "fixture_station", "template_measurement_combo", "Locate fixture by template and measure a downstream feature.", ["ImageAcquisition", "TemplateMatching", "CircleMeasurement", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "medium", "Review combined template, measurement, and DeepLearning operator contracts.", RuntimePreviewScenarioCorpusService.MultiOperatorFlow(), stationProfileId: "sp-dl-review-v14", releaseDecision: "requires_engineer_approval", requiredApprovals: ["deep_learning_release_review", "medium_manifest_risk"]),
             Case("RP-RF-004", "measurement_station", "hole_distance", "Measure distance between two holes for dimensional inspection.", ["ImageAcquisition", "CircleMeasurement", "MeasureDistance", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "low", "Confirm measurement unit and tolerance source.", RuntimePreviewScenarioCorpusService.HoleDistanceFlow()),
             Case("RP-RF-005", "terminal_station", "terminal_color_order", "Check terminal color sequence with a catalog template.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "low", "Confirm template ownership and output channel mapping.", RuntimePreviewScenarioCorpusService.Flow("line-cam", templateId: "terminal-color-template")),
             Case("RP-RF-006", "line_station", "missing_camera", "Workflow references a camera binding not in the pilot catalog.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_camera_binding", "Bind an allowlisted metadata camera before package review.", RuntimePreviewScenarioCorpusService.Flow("missing-cam", templateId: "wire-template")),
             Case("RP-RF-007", "fixture_station", "missing_template", "TemplateMatching has no TemplateId metadata handle.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_template", "Assign an allowlisted TemplateId; do not use file paths.", RuntimePreviewScenarioCorpusService.Flow("line-cam")),
             Case("RP-RF-008", "remote_control_station", "missing_model", "DeepLearning operator has unresolved model metadata.", ["ImageAcquisition", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_model", "Bind ModelId from catalog; do not load a model file.", RuntimePreviewScenarioCorpusService.ModelFlow("line-cam", "<pending-model>")),
             Case("RP-RF-009", "output_station", "missing_output_channel", "ResultOutput is missing a safe output channel metadata id.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_output_channel", "Choose OutputChannelId before package review.", MissingOutputFlow()),
-            Case("RP-RF-010", "station_release", "plc_station_deny", "User intent includes PLC or Station release action.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Denied, RuntimePreviewScenarioEvidenceStatuses.Denied, "plc_station_denied", "Remove PLC/Station intent; this console cannot write or deploy.", RuntimePreviewScenarioCorpusService.PlcFlow()),
+            Case("RP-RF-010", "station_release", "plc_station_deny", "User intent includes PLC or Station release action.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Denied, RuntimePreviewScenarioEvidenceStatuses.Denied, "plc_station_denied", "Remove PLC/Station intent; this console cannot write or deploy.", RuntimePreviewScenarioCorpusService.PlcFlow(), stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.Denied, blockedReasons: ["plc_station_denied", "station_plc_or_direct_station_intent_forbidden"]),
             Case("RP-RF-011", "template_station", "dangerous_path", "Template dependency tries to point at an external path.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Denied, RuntimePreviewScenarioEvidenceStatuses.Denied, "dangerous_resource", "Replace path-like metadata with a catalog TemplateId.", RuntimePreviewScenarioCorpusService.Flow("line-cam", templatePath: "external:/blocked-template")),
             Case("RP-RF-012", "line_station", "allowlist_mismatch", "Workflow camera handle is valid-looking but not allowlisted for pilot.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "allowlist_mismatch", "Review allowlist diff and confirm the catalog handle.", RuntimePreviewScenarioCorpusService.Flow("camera-not-allowlisted", templateId: "wire-template")),
-            Case("RP-RF-013", "dual_camera_station", "multi_camera_flow", "Two camera metadata handles feed one inspection decision.", ["ImageAcquisition", "ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "multi_camera_review", "Confirm both camera bindings are catalog allowlisted.", MultiCameraFlow()),
-            Case("RP-RF-014", "ai_station", "multi_model_flow", "Two model metadata handles are required for final judgment.", ["ImageAcquisition", "DeepLearning", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "multi_model_review", "Confirm all ModelIds and output aggregation before package review.", MultiModelFlow()),
-            Case("RP-RF-015", "parameter_review_station", "parameter_missing", "A key operator parameter is missing even though the draft can be edited.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_parameter", "Complete required operator parameters and rerun readiness.", RuntimePreviewScenarioCorpusService.MissingParameterFlow()),
+            Case("RP-RF-013", "dual_camera_station", "multi_camera_flow", "Two camera metadata handles feed one inspection decision.", ["ImageAcquisition", "ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "multi_camera_review", "Confirm both camera bindings are catalog allowlisted.", MultiCameraFlow(), stationProfileId: "sp-low-ipc-v12", stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.NotReady, blockedReasons: ["multi_camera_review", "station_camera_slots_insufficient"]),
+            Case("RP-RF-014", "ai_station", "multi_model_flow", "Two model metadata handles are required for final judgment.", ["ImageAcquisition", "DeepLearning", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "multi_model_review", "Confirm all ModelIds and output aggregation before package review.", MultiModelFlow(), stationProfileId: "sp-dl-review-v14", requiredApprovals: ["deep_learning_release_review"]),
+            Case("RP-RF-015", "parameter_review_station", "parameter_missing", "A key operator parameter is missing even though the draft can be edited.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "missing_parameter", "Complete required operator parameters and rerun readiness.", RuntimePreviewScenarioCorpusService.MissingParameterFlow(), contractExpectations: ["TemplateMatching.TemplateId required"]),
             Case("RP-RF-016", "release_review", "package_manifest_blocked", "Manifest dry-run blocks package review because dependencies are incomplete.", ["ImageAcquisition", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "manifest_dependency_blocked", "Resolve manifest dependencies; no package may be created.", RuntimePreviewScenarioCorpusService.ModelFlow("line-cam", "<pending-model>")),
             Case("RP-RF-017", "draft_review", "workflow_editable_package_blocked", "Engineer can edit the workflow draft but package review is not allowed.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "draft_allowed_package_blocked", "Keep editing the workflow; do not start release review yet.", RuntimePreviewScenarioCorpusService.Flow("missing-cam", templateId: "fixture-template")),
             Case("RP-RF-018", "precheck_station", "runtime_package_precheck_blocked", "Runtime package precheck risk blocks release.", ["ImageAcquisition", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "precheck_not_ready", "Rerun readiness after model metadata is resolved.", RuntimePreviewScenarioCorpusService.ModelFlow("line-cam", "<pending-model>")),
-            Case("RP-RF-019", "template_measurement_station", "template_plus_hole_distance", "Template positioning and hole distance measurement share one camera.", ["ImageAcquisition", "TemplateMatching", "CircleMeasurement", "MeasureDistance", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "medium", "Review dependency trace before a real pilot is requested.", RuntimePreviewScenarioCorpusService.MultiOperatorFlow()),
-            Case("RP-RF-020", "release_blocked_station", "direct_deploy_request_denied", "User asks to release to Station directly from preview.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Denied, RuntimePreviewScenarioEvidenceStatuses.Denied, "deployment_intent_denied", "Use only metadata review; direct deployment remains forbidden.", RuntimePreviewScenarioCorpusService.PlcFlow())
+            Case("RP-RF-019", "template_measurement_station", "template_plus_hole_distance", "Template positioning and hole distance measurement share one camera.", ["ImageAcquisition", "TemplateMatching", "CircleMeasurement", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "medium", "Request engineer approval for medium-risk measurement release review.", RuntimePreviewScenarioCorpusService.MultiOperatorFlow(), stationProfileId: "sp-dl-review-v14", releaseDecision: "requires_engineer_approval", requiredApprovals: ["medium_manifest_risk", "deep_learning_release_review"]),
+            Case("RP-RF-020", "release_blocked_station", "direct_deploy_request_denied", "User asks to release to Station directly from preview.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Denied, RuntimePreviewScenarioEvidenceStatuses.Denied, "deployment_intent_denied", "Use only metadata review; direct deployment remains forbidden.", RuntimePreviewScenarioCorpusService.PlcFlow(), stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.Denied, blockedReasons: ["deployment_intent_denied", "station_plc_or_direct_station_intent_forbidden"]),
+            Case("RP-RF-021", "low_spec_ipc", "low_ipc_operator_count_exceeded", "Traditional flow exceeds low-spec IPC operator limit.", ["ImageAcquisition", "TemplateMatching", "CircleMeasurement", "MeasureDistance", "LineMeasurement", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "high", "Split the workflow or target a higher-capacity IPC profile.", LowSpecOperatorCountFlow(), stationProfileId: "sp-low-ipc-v12", stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.NotReady, releaseDecision: "release_blocked", blockedReasons: ["station_operator_count_exceeded"]),
+            Case("RP-RF-022", "dual_camera_station", "multi_camera_slot_shortage", "Two-camera fixture flow targets a one-slot station profile.", ["ImageAcquisition", "ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "high", "Choose a Station profile with enough camera binding slots.", MultiCameraFlow(allowlistedSecondCamera: true), stationProfileId: "sp-low-ipc-v12", stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.NotReady, releaseDecision: "release_blocked", blockedReasons: ["station_camera_slots_insufficient"]),
+            Case("RP-RF-023", "traditional_station", "unsupported_deep_learning", "DeepLearning flow targets a traditional-only Station profile.", ["ImageAcquisition", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "high", "Move the flow to a DeepLearning-capable Station profile.", ModelKindFlow("remote-control-model", "detection"), stationProfileId: "sp-release-standard-v14", stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.NotReady, releaseDecision: "release_blocked", blockedReasons: ["station_operator_not_supported:DeepLearning"]),
+            Case("RP-RF-024", "output_lite_station", "output_channel_kind_missing", "ResultOutput maps to a channel kind absent on the target Station.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "high", "Remap ResultOutput to a Station-supported output channel kind.", RuntimePreviewScenarioCorpusService.Flow("line-cam", templateId: "wire-template"), stationProfileId: "sp-output-lite-v14", stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.NotReady, releaseDecision: "release_blocked", blockedReasons: ["station_output_channel_kind_missing"]),
+            Case("RP-RF-025", "plc_guard_station", "plc_write_forbidden", "ResultOutput attempts PLC-style output while Station profile forbids PLC writes.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Denied, RuntimePreviewScenarioEvidenceStatuses.Denied, "plc_write_forbidden", "Remove PLC write intent and keep output metadata-only.", RuntimePreviewScenarioCorpusService.PlcFlow(), stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.Denied, releaseDecision: "release_blocked", blockedReasons: ["plc_write_forbidden", "station_plc_or_direct_station_intent_forbidden"], contractExpectations: ["ResultOutput forbids PlcAddress"]),
+            Case("RP-RF-026", "legacy_runtime_station", "runtime_version_too_low", "DeepLearning requires Runtime 1.4.0 but target profile is Runtime 1.2.0.", ["ImageAcquisition", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "high", "Select a Runtime 1.4.0 Station profile before release review.", ModelKindFlow("remote-control-model", "detection"), stationProfileId: "sp-low-ipc-v12", stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.NotReady, releaseDecision: "release_blocked", blockedReasons: ["station_runtime_version_too_low"]),
+            Case("RP-RF-027", "model_station", "model_type_incompatible", "Segmentation model metadata targets a detection-only Station profile.", ["ImageAcquisition", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "high", "Use a supported detection model or target a segmentation-capable Station profile.", ModelKindFlow("segmentation-model", "segmentation"), stationProfileId: "sp-detection-only-v14", stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.NotReady, releaseDecision: "release_blocked", blockedReasons: ["station_model_kind_not_supported"]),
+            Case("RP-RF-028", "template_station", "template_dependency_missing", "TemplateMatching dependency is not closed in manifest metadata.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "template_dependency_missing", "Bind TemplateId metadata and rerun manifest dry-run.", RuntimePreviewScenarioCorpusService.Flow("line-cam"), stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.NotReady, releaseDecision: "release_blocked", blockedReasons: ["template_dependency_missing"], contractExpectations: ["TemplateMatching.TemplateId required"]),
+            Case("RP-RF-029", "traditional_release_station", "traditional_vision_release_allowed", "Traditional template and measurement flow passes full release review simulation.", ["ImageAcquisition", "TemplateMatching", "CircleMeasurement", "MeasureDistance", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "low", "Release review simulator can allow this metadata-only traditional flow.", TraditionalVisionPassFlow(), stationProfileId: "sp-release-standard-v14", releaseDecision: "release_allowed"),
+            Case("RP-RF-030", "dl_review_station", "deep_learning_requires_engineer_approval", "DeepLearning metadata is compatible but requires engineer approval before release review.", ["ImageAcquisition", "DeepLearning", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "medium", "Obtain DeepLearning release approval before allowing release review.", ModelKindFlow("remote-control-model", "detection"), stationProfileId: "sp-dl-review-v14", releaseDecision: "requires_engineer_approval", requiredApprovals: ["deep_learning_release_review"]),
+            Case("RP-RF-031", "multi_station_review", "multi_station_requires_engineer_approval", "A multi-station review case is compatible but requires engineer approval.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.Passed, RuntimePreviewScenarioEvidenceStatuses.Passed, "medium", "Obtain multi-station release approval before allowing release review.", MultiStationReviewFlow(), stationProfileId: "sp-multi-station-v14", releaseDecision: "requires_engineer_approval", requiredApprovals: ["multi_station_review"]),
+            Case("RP-RF-032", "release_decision_station", "release_blocked_operator_contract", "Release review is blocked by a missing TemplateMatching contract parameter.", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], RuntimePreviewScenarioEvidenceStatuses.NotReady, RuntimePreviewScenarioEvidenceStatuses.NotReady, "operator_contract_missing_parameter", "Fix TemplateMatching TemplateId before rerunning release review.", RuntimePreviewScenarioCorpusService.MissingParameterFlow(), stationCompatibility: RuntimePreviewScenarioEvidenceStatuses.NotReady, releaseDecision: "release_blocked", blockedReasons: ["operator_contract_missing_parameter"], contractExpectations: ["TemplateMatching.TemplateId required"])
         ];
     }
 
@@ -2157,9 +3323,28 @@ public sealed class RuntimePreviewRedactedFlowCorpusService
         string packageReadiness,
         string manifestRisk,
         string engineerAction,
-        object workflowDraft)
+        object workflowDraft,
+        string stationProfileId = "sp-release-standard-v14",
+        string? stationCompatibility = null,
+        string? releaseDecision = null,
+        IReadOnlyList<string>? requiredApprovals = null,
+        IReadOnlyList<string>? blockedReasons = null,
+        IReadOnlyList<string>? contractExpectations = null)
     {
         var workflow = RuntimePreviewGovernanceRedactor.ToRedactedElement(workflowDraft);
+        var effectiveStationCompatibility = string.IsNullOrWhiteSpace(stationCompatibility)
+            ? packageReadiness
+            : stationCompatibility;
+        var effectiveReleaseDecision = string.IsNullOrWhiteSpace(releaseDecision)
+            ? string.Equals(packageReadiness, RuntimePreviewScenarioEvidenceStatuses.Passed, StringComparison.OrdinalIgnoreCase)
+                ? "release_allowed"
+                : "release_blocked"
+            : releaseDecision;
+        var effectiveBlockedReasons = blockedReasons ??
+                                      (string.Equals(effectiveReleaseDecision, "release_allowed", StringComparison.OrdinalIgnoreCase) ||
+                                       string.Equals(effectiveReleaseDecision, "requires_engineer_approval", StringComparison.OrdinalIgnoreCase)
+                                          ? []
+                                          : [manifestRisk]);
         return new RuntimePreviewRedactedFlowCorpusCase
         {
             CaseId = caseId,
@@ -2167,9 +3352,16 @@ public sealed class RuntimePreviewRedactedFlowCorpusService
             WorkflowKind = workflowKind,
             BusinessPurpose = purpose,
             WorkflowDraftHash = RuntimePreviewGovernanceHashes.HashJsonElement(workflow),
+            StationProfileId = stationProfileId,
             OperatorSummary = operators.Select(RuntimePreviewGovernanceRedactor.RedactScalar).ToList(),
+            OperatorContractExpectations = contractExpectations ??
+                                           operators.Select(item => $"{item}:metadata_contract").Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             ExpectedReadiness = readiness,
             ExpectedPackageReadiness = packageReadiness,
+            ExpectedStationCompatibility = effectiveStationCompatibility,
+            ExpectedReleaseReviewDecision = effectiveReleaseDecision,
+            RequiredEngineerApprovals = requiredApprovals ?? [],
+            ExpectedBlockedReasons = effectiveBlockedReasons,
             ExpectedManifestRisk = manifestRisk,
             ExpectedEngineerAction = engineerAction,
             RedactionStatus = "redacted_metadata_only",
@@ -2193,14 +3385,14 @@ public sealed class RuntimePreviewRedactedFlowCorpusService
         };
     }
 
-    private static object MultiCameraFlow()
+    private static object MultiCameraFlow(bool allowlistedSecondCamera = false)
     {
         return new
         {
             operators = new object[]
             {
                 new { tempId = "op_cam_a", operatorType = "ImageAcquisition", parameters = new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraBindingId"] = "line-cam" } },
-                new { tempId = "op_cam_b", operatorType = "ImageAcquisition", parameters = new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraBindingId"] = "side-cam-pending" } },
+                new { tempId = "op_cam_b", operatorType = "ImageAcquisition", parameters = new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraBindingId"] = allowlistedSecondCamera ? "side-cam" : "side-cam-pending" } },
                 new { tempId = "op_template", operatorType = "TemplateMatching", parameters = new Dictionary<string, string> { ["TemplateId"] = "fixture-template" } },
                 new { tempId = "op_output", operatorType = "ResultOutput", parameters = new Dictionary<string, string> { ["OutputChannelId"] = "qa-metadata" } }
             },
@@ -2218,6 +3410,67 @@ public sealed class RuntimePreviewRedactedFlowCorpusService
                 new { tempId = "op_model_a", operatorType = "DeepLearning", parameters = new Dictionary<string, string> { ["ModelId"] = "remote-control-model" } },
                 new { tempId = "op_model_b", operatorType = "DeepLearning", parameters = new Dictionary<string, string> { ["ModelId"] = "<pending-model>" } },
                 new { tempId = "op_output", operatorType = "ResultOutput", parameters = new Dictionary<string, string> { ["OutputChannelId"] = "qa-metadata" } }
+            },
+            connections = Array.Empty<object>()
+        };
+    }
+
+    private static object LowSpecOperatorCountFlow()
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                new { tempId = "op_cam", operatorType = "ImageAcquisition", parameters = new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraBindingId"] = "line-cam" } },
+                new { tempId = "op_template", operatorType = "TemplateMatching", parameters = new Dictionary<string, string> { ["TemplateId"] = "fixture-template" } },
+                new { tempId = "op_circle", operatorType = "CircleMeasurement", parameters = new Dictionary<string, string> { ["Roi"] = "feature-a" } },
+                new { tempId = "op_distance", operatorType = "MeasureDistance", parameters = new Dictionary<string, string> { ["Unit"] = "mm" } },
+                new { tempId = "op_line", operatorType = "LineMeasurement", parameters = new Dictionary<string, string> { ["Roi"] = "edge-a" } },
+                new { tempId = "op_output", operatorType = "ResultOutput", parameters = new Dictionary<string, string> { ["OutputChannelId"] = "qa-metadata" } }
+            },
+            connections = Array.Empty<object>()
+        };
+    }
+
+    private static object ModelKindFlow(string modelId, string modelKind)
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                new { tempId = "op_cam", operatorType = "ImageAcquisition", parameters = new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraBindingId"] = "line-cam" } },
+                new { tempId = "op_model", operatorType = "DeepLearning", parameters = new Dictionary<string, string> { ["ModelId"] = modelId, ["ModelKind"] = modelKind } },
+                new { tempId = "op_output", operatorType = "ResultOutput", parameters = new Dictionary<string, string> { ["OutputChannelId"] = "qa-metadata" } }
+            },
+            connections = Array.Empty<object>()
+        };
+    }
+
+    private static object TraditionalVisionPassFlow()
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                new { tempId = "op_cam", operatorType = "ImageAcquisition", parameters = new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraBindingId"] = "line-cam" } },
+                new { tempId = "op_template", operatorType = "TemplateMatching", parameters = new Dictionary<string, string> { ["TemplateId"] = "fixture-template" } },
+                new { tempId = "op_circle", operatorType = "CircleMeasurement", parameters = new Dictionary<string, string> { ["Roi"] = "feature-a" } },
+                new { tempId = "op_distance", operatorType = "MeasureDistance", parameters = new Dictionary<string, string> { ["Unit"] = "mm" } },
+                new { tempId = "op_output", operatorType = "ResultOutput", parameters = new Dictionary<string, string> { ["OutputChannelId"] = "qa-metadata" } }
+            },
+            connections = Array.Empty<object>()
+        };
+    }
+
+    private static object MultiStationReviewFlow()
+    {
+        return new
+        {
+            operators = new object[]
+            {
+                new { tempId = "op_cam", operatorType = "ImageAcquisition", parameters = new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraBindingId"] = "line-cam" } },
+                new { tempId = "op_template", operatorType = "TemplateMatching", parameters = new Dictionary<string, string> { ["TemplateId"] = "fixture-template" } },
+                new { tempId = "op_output", operatorType = "ResultOutput", parameters = new Dictionary<string, string> { ["OutputChannelId"] = "metadata-summary" } }
             },
             connections = Array.Empty<object>()
         };
@@ -2295,6 +3548,23 @@ public sealed class RuntimePreviewAgentExplanationService
             WorkflowDraftAllowed = true,
             PackageBlocked = packageBlocked,
             PackageReviewAllowed = !packageBlocked,
+            ReleaseReviewAllowed = !packageBlocked,
+            RequiresEngineerApproval = false,
+            StationCompatible = !packageBlocked,
+            OperatorContractsSatisfied = !packageBlocked,
+            OperatorContractExplanation = packageBlocked
+                ? $"At least one metadata-only operator contract is incomplete for {item.Scenario}."
+                : "Operator contracts are metadata-only and satisfied for this scenario.",
+            StationCompatibilityExplanation = packageBlocked
+                ? "Target Station compatibility cannot be considered complete until readiness and metadata dependencies pass."
+                : "The synthetic Station target is compatible in metadata dry-run.",
+            ReleaseDecisionExplanation = packageBlocked
+                ? "Release review is blocked because readiness/package evidence is incomplete."
+                : "Release review simulator can allow the metadata-only case; no package or deployment is created.",
+            WorkflowDraftVsReleaseExplanation = packageBlocked
+                ? "workflowDraftAllowed=true means engineers may keep editing; releaseReviewAllowed=false means no release review may proceed yet."
+                : "workflowDraftAllowed=true and releaseReviewAllowed=true both hold because metadata checks are clean.",
+            ResourceDependencyExplanation = missingText,
             Passed = passed,
             MetadataOnly = true,
             RealResourcesTouched = false
@@ -2304,6 +3574,12 @@ public sealed class RuntimePreviewAgentExplanationService
     private static RuntimePreviewAgentExplanationResult ExplainRedacted(RuntimePreviewRedactedFlowCorpusCase item)
     {
         var packageBlocked = !string.Equals(item.ExpectedPackageReadiness, RuntimePreviewScenarioEvidenceStatuses.Passed, StringComparison.OrdinalIgnoreCase);
+        var releaseAllowed = string.Equals(item.ExpectedReleaseReviewDecision, "release_allowed", StringComparison.OrdinalIgnoreCase);
+        var requiresApproval = string.Equals(item.ExpectedReleaseReviewDecision, "requires_engineer_approval", StringComparison.OrdinalIgnoreCase);
+        var stationCompatible = string.Equals(item.ExpectedStationCompatibility, RuntimePreviewScenarioEvidenceStatuses.Passed, StringComparison.OrdinalIgnoreCase);
+        var operatorContractsSatisfied = !item.ExpectedBlockedReasons.Any(reason => reason.Contains("operator_contract", StringComparison.OrdinalIgnoreCase)) &&
+                                         !item.OperatorContractExpectations.Any(expectation => expectation.Contains("required", StringComparison.OrdinalIgnoreCase) &&
+                                                                                              item.ExpectedReleaseReviewDecision == "release_blocked");
         var readyText = packageBlocked
             ? $"{item.WorkflowKind} is {item.ExpectedReadiness}; the workflow draft can be edited, but package review is blocked."
             : $"{item.WorkflowKind} is metadata-ready for manifest dry-run and package review.";
@@ -2312,12 +3588,32 @@ public sealed class RuntimePreviewAgentExplanationService
             : "No unresolved metadata dependency is expected for this redacted flow case.";
         var riskText = packageBlocked
             ? $"Risk: {item.ExpectedManifestRisk}. Do not create a package or send to Station until the dependency trace is clean."
-            : $"Risk: {item.ExpectedManifestRisk}. Manifest dry-run is allowed, but real package creation remains disabled.";
-        var blockedReasons = packageBlocked ? [item.ExpectedManifestRisk, item.ExpectedEngineerAction] : Array.Empty<string>();
+            : requiresApproval
+                ? $"Risk: {item.ExpectedManifestRisk}. Release review requires engineer approval before it can be allowed."
+                : $"Risk: {item.ExpectedManifestRisk}. Manifest dry-run is allowed, but real package creation remains disabled.";
+        var blockedReasons = item.ExpectedBlockedReasons.Count > 0
+            ? item.ExpectedBlockedReasons
+            : packageBlocked ? [item.ExpectedManifestRisk, item.ExpectedEngineerAction] : [];
+        var stationText = stationCompatible
+            ? $"Target Station profile {item.StationProfileId} is compatible in metadata dry-run."
+            : $"Target Station profile {item.StationProfileId} is not compatible because {string.Join(", ", blockedReasons)}.";
+        var contractText = operatorContractsSatisfied
+            ? $"Operator contracts are satisfied: {string.Join(", ", item.OperatorContractExpectations.Take(4))}."
+            : $"Operator contract validation fails first at: {string.Join(", ", blockedReasons.Where(reason => reason.Contains("operator", StringComparison.OrdinalIgnoreCase)).DefaultIfEmpty(item.ExpectedManifestRisk))}.";
+        var releaseText = releaseAllowed
+            ? "Release review simulator allows the case because readiness, package, manifest, Station, and operator contracts are clean."
+            : requiresApproval
+                ? $"Release review requires engineer approval: {string.Join(", ", item.RequiredEngineerApprovals)}."
+                : $"Release review is blocked: {string.Join(", ", blockedReasons)}.";
+        var workflowVsRelease = !releaseAllowed
+            ? "workflowDraftAllowed=true only keeps the draft editable; releaseReviewAllowed=false until the listed contract, dependency, Station, or approval item is resolved."
+            : "workflowDraftAllowed=true and releaseReviewAllowed=true because this remains a metadata-only release review simulator path.";
         var passed = readyText.Length > 20 &&
                      missingText.Length > 20 &&
                      riskText.Contains("Risk:", StringComparison.OrdinalIgnoreCase) &&
                      item.ExpectedEngineerAction.Length > 20 &&
+                     !string.IsNullOrWhiteSpace(item.ExpectedReadiness) &&
+                     !string.Equals(item.ExpectedReadiness, "None", StringComparison.OrdinalIgnoreCase) &&
                      !readyText.Contains("AI", StringComparison.OrdinalIgnoreCase);
         return new RuntimePreviewAgentExplanationResult
         {
@@ -2334,6 +3630,15 @@ public sealed class RuntimePreviewAgentExplanationService
             WorkflowDraftAllowed = true,
             PackageBlocked = packageBlocked,
             PackageReviewAllowed = !packageBlocked,
+            ReleaseReviewAllowed = releaseAllowed,
+            RequiresEngineerApproval = requiresApproval,
+            StationCompatible = stationCompatible,
+            OperatorContractsSatisfied = operatorContractsSatisfied,
+            OperatorContractExplanation = contractText,
+            StationCompatibilityExplanation = stationText,
+            ReleaseDecisionExplanation = releaseText,
+            WorkflowDraftVsReleaseExplanation = workflowVsRelease,
+            ResourceDependencyExplanation = missingText,
             Passed = passed,
             MetadataOnly = true,
             RealResourcesTouched = false

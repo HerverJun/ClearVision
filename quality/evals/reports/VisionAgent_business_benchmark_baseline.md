@@ -1,12 +1,12 @@
 ﻿# Vision Agent Executable Business Benchmark
 
 - Benchmark: `vision_agent_executable_business_benchmark`
-- Generated UTC: `2026-06-06T15:00:30.4738419+00:00`
+- Generated UTC: `2026-06-06T16:17:28.2557886+00:00`
 - Commit SHA: `local`
 - Branch: `local`
 - Workflow run: `local` attempt `local`
 - Mode: `offline_metadata_only`
-- Cases: 55
+- Cases: 70
 - Accepted: True
 - JSON: `quality/evals/reports/VisionAgent_business_benchmark_baseline.json`
 
@@ -22,11 +22,11 @@
 | Metric | Actual | Minimum | Passed |
 | --- | ---: | ---: | --- |
 | generationSuccessRate | 100.00% | 95.00% | True |
-| structuralValidationPassRate | 98.18% | 90.00% | True |
-| dryRunPassRate | 96.36% | 85.00% | True |
-| previewReadyRate | 91.67% | 70.00% | True |
-| parameterCompletionRate | 74.55% | 70.00% | True |
-| userApplicableRate | 98.18% | 90.00% | True |
+| structuralValidationPassRate | 97.14% | 90.00% | True |
+| dryRunPassRate | 95.71% | 85.00% | True |
+| previewReadyRate | 92.31% | 70.00% | True |
+| parameterCompletionRate | 74.29% | 70.00% | True |
+| userApplicableRate | 97.14% | 90.00% | True |
 
 ## Task Set
 
@@ -87,6 +87,21 @@
 | VA-BM-053 | manifest_dry_run | missing_resource | missing_model.dependency_trace, packageReviewAllowed.false, workflowDraftAllowed.true | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
 | VA-BM-054 | governance_v3 | runtime_preview_session | governance_store.v3, lookup_by_manifestId, session_replay.metadata_only | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
 | VA-BM-055 | agent_explanation_v2 | missing_resource | agent_explanation_v2.status, manifestRisk.high, plcWriteAttempted.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-056 | station_compatibility | release_review | station_compatibility.standard_profile, releaseReviewAllowed.true, metadataOnly.true | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-057 | station_compatibility | release_review | station_camera_slots_insufficient, releaseReviewAllowed.false, workflowDraftAllowed.true | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-058 | station_compatibility | release_review | station_operator_not_supported.DeepLearning, releaseReviewAllowed.false, realStationTouched.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-059 | station_compatibility | release_review | station_runtime_version_too_low, engineerAction.select_runtime_v14, metadataOnly.true | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-060 | operator_contract_validation | release_review | operator_contract.validation, requiredParameters.satisfied, forbiddenParameters.none | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-061 | operator_contract_validation | missing_resource | operator_contract_missing_parameter.TemplateId, releaseReviewAllowed.false, workflowDraftAllowed.true | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-062 | operator_contract_validation | missing_resource | operator_contract_missing_parameter.OutputChannelId, releaseReviewAllowed.false, packageCreated.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-063 | operator_contract_validation | release_review | engineer_approval.deep_learning_release_review, operatorContractsSatisfied.true, releaseReviewAllowed.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-064 | pre_release_review | release_review | readiness.package.manifest.station.contract.decision, releaseReviewAllowed.true, packageCreated.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-065 | pre_release_review | missing_resource | workflowDraftAllowed.true, releaseReviewAllowed.false, camera_binding.required | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-066 | pre_release_review | release_review | engineer_approval.multi_station_review, requiresEngineerApproval.true, deploymentExecuted.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-067 | pre_release_review | release_review | station_output_channel_kind_missing, engineerAction.remap_output, releaseReviewAllowed.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-068 | agent_explanation_v3 | release_review | agent_explanation_v3.workflowDraftVsRelease, stationCompatibilityExplanation, nextEngineerAction | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-069 | governance_v4 | runtime_preview_session | governance_store.v4, lookup_by_reviewId, lookup_by_stationProfileId | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
+| VA-BM-070 | redacted_flow_corpus_v2 | manifest_dry_run | redacted_flow_corpus_v2.case_32, operator_contract_missing_parameter, redactionPass.true | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | True |
 
 ## Field Contract
 

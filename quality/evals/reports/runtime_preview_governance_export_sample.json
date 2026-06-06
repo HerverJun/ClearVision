@@ -1,29 +1,35 @@
 {
-  "schemaVersion": "2026-06-06.runtime-preview-governance-export.v3",
+  "schemaVersion": "2026-06-06.runtime-preview-governance-export.v4",
   "benchmarkId": "runtime_preview_governance_export_sample",
   "workflowRun": {
     "commitSha": "local",
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T15:00:30.583603+00:00"
+    "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
   },
   "summary": {
-    "storageVersion": "jsonl.v3",
+    "storageVersion": "jsonl.v4",
     "recordTypes": [
       "session",
       "audit",
       "session_report",
       "deploy_readiness_report",
       "package_readiness_report",
-      "manifest_dry_run_report"
+      "manifest_dry_run_report",
+      "station_compatibility_report",
+      "operator_contract_validation_report",
+      "pre_release_review_report"
     ],
-    "sessionCount": 20,
-    "auditEventCount": 140,
-    "sessionReportCount": 20,
-    "deployReadinessReportCount": 20,
-    "packageReadinessReportCount": 20,
-    "manifestDryRunReportCount": 20,
+    "sessionCount": 32,
+    "auditEventCount": 320,
+    "sessionReportCount": 32,
+    "deployReadinessReportCount": 32,
+    "packageReadinessReportCount": 32,
+    "manifestDryRunReportCount": 32,
+    "stationCompatibilityReportCount": 32,
+    "operatorContractValidationReportCount": 32,
+    "preReleaseReviewReportCount": 32,
     "corruptLineCount": 1,
     "corruptionRecovered": true,
     "redactionPass": true,
@@ -34,13 +40,15 @@
   "exportManifest": {
     "exportId": "rp_export_sample",
     "storageMode": "jsonl",
-    "storageVersion": "jsonl.v3",
+    "storageVersion": "jsonl.v4",
     "retentionPolicy": "default_30_days_200_sessions",
     "lookupKeys": [
       "sessionId",
       "reportId",
       "caseId",
-      "manifestId"
+      "manifestId",
+      "reviewId",
+      "stationProfileId"
     ]
   },
   "safetyBoundary": {

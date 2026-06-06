@@ -15,20 +15,27 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 TEST_RESULTS_DIR = REPO_ROOT / "test_results" / "agent_engineering_harness"
-SCAN_POLICY_VERSION = "2026-06-06.runtime-preview-v1.3-manifest-dry-run-scan.v3"
+SCAN_POLICY_VERSION = "2026-06-06.runtime-preview-v1.4-release-review-simulator-scan.v4"
 
 JSON_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.json",
     REPORTS_DIR / "planner_autonomy_benchmark.json",
     REPORTS_DIR / "runtime_preview_scenario_corpus.json",
     REPORTS_DIR / "runtime_preview_redacted_flow_corpus.json",
+    REPORTS_DIR / "runtime_preview_redacted_flow_corpus_v2.json",
     REPORTS_DIR / "runtime_preview_scenario_evidence.json",
     REPORTS_DIR / "runtime_preview_deploy_readiness_report.sample.json",
     REPORTS_DIR / "runtime_preview_package_readiness_report.sample.json",
     REPORTS_DIR / "runtime_package_manifest_dry_run.sample.json",
+    REPORTS_DIR / "runtime_preview_station_profiles_sample.json",
+    REPORTS_DIR / "runtime_preview_operator_contract_registry.json",
+    REPORTS_DIR / "runtime_preview_operator_contract_validation_sample.json",
+    REPORTS_DIR / "runtime_preview_station_compatibility_dry_run.sample.json",
+    REPORTS_DIR / "runtime_preview_pre_release_review_report.sample.json",
     REPORTS_DIR / "runtime_preview_governance_audit_sample.json",
     REPORTS_DIR / "runtime_preview_governance_export_sample.json",
     REPORTS_DIR / "runtime_preview_agent_explanation_benchmark.json",
+    REPORTS_DIR / "runtime_preview_agent_explanation_v3.json",
     REPORTS_DIR / "real_llm_planner_shadow_eval.json",
     REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.json",
 ]
@@ -38,13 +45,20 @@ MARKDOWN_REPORTS = [
     REPORTS_DIR / "planner_autonomy_benchmark.md",
     REPORTS_DIR / "runtime_preview_scenario_corpus.md",
     REPORTS_DIR / "runtime_preview_redacted_flow_corpus.md",
+    REPORTS_DIR / "runtime_preview_redacted_flow_corpus_v2.md",
     REPORTS_DIR / "runtime_preview_scenario_evidence.md",
     REPORTS_DIR / "runtime_preview_deploy_readiness_report.sample.md",
     REPORTS_DIR / "runtime_preview_package_readiness_report.sample.md",
     REPORTS_DIR / "runtime_package_manifest_dry_run.sample.md",
+    REPORTS_DIR / "runtime_preview_station_profiles_sample.md",
+    REPORTS_DIR / "runtime_preview_operator_contract_registry.md",
+    REPORTS_DIR / "runtime_preview_operator_contract_validation_sample.md",
+    REPORTS_DIR / "runtime_preview_station_compatibility_dry_run.sample.md",
+    REPORTS_DIR / "runtime_preview_pre_release_review_report.sample.md",
     REPORTS_DIR / "runtime_preview_governance_audit_sample.md",
     REPORTS_DIR / "runtime_preview_governance_export_sample.md",
     REPORTS_DIR / "runtime_preview_agent_explanation_benchmark.md",
+    REPORTS_DIR / "runtime_preview_agent_explanation_v3.md",
     REPORTS_DIR / "real_llm_planner_shadow_eval.md",
     REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.md",
 ]
@@ -55,12 +69,20 @@ TEXT_OUTPUTS = [
 
 SOURCE_SCAN_EXTENSIONS = {
     ".cs",
+    ".audit",
+    ".export",
+    ".manifest",
     ".js",
     ".json",
     ".md",
     ".mjs",
+    ".operator",
     ".ps1",
     ".py",
+    ".report",
+    ".review",
+    ".session",
+    ".station",
     ".txt",
     ".trx",
     ".yaml",
@@ -91,6 +113,9 @@ FORBIDDEN_SECRET_PATTERNS = [
         r'"apiKey"\s*:\s*"[^"]+"',
         r"api_key=[^&\s]+",
         r"access_token=[^&\s]+",
+        r"data:image/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\r\n]{32,}",
+        r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+        r"\bBaseUrl\b\s*[:=]\s*['\"]?(?!<redacted)[^'\"\s,}]+",
         r"\.cvpkg\b",
     ]
 ]
@@ -115,6 +140,10 @@ SOURCE_SECRET_PATTERNS = [
     (
         "credential query parameter",
         re.compile(r"[?&](?:api[_-]?key|access[_-]?token|token|key)=[A-Za-z0-9._~+/=-]{12,}", re.IGNORECASE),
+    ),
+    (
+        "base64 image payload",
+        re.compile(r"data:image/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\r\n]{32,}", re.IGNORECASE),
     ),
     (
         "unredacted CGNAT CPA base URL",
@@ -210,6 +239,35 @@ def validate_shadow_report(path: Path, report: dict[str, Any], errors: list[str]
     ]:
         if field not in summary:
             errors.append(f"{repo_relative(path)} summary missing {field}.")
+
+
+def validate_runtime_preview_case_counts(path: Path, report: dict[str, Any], errors: list[str]) -> None:
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        return
+
+    minimums = {
+        "VisionAgent_business_benchmark_baseline.json": 70,
+        "runtime_preview_redacted_flow_corpus.json": 30,
+        "runtime_preview_redacted_flow_corpus_v2.json": 30,
+        "runtime_package_manifest_dry_run.sample.json": 30,
+        "runtime_preview_station_compatibility_dry_run.sample.json": 30,
+        "runtime_preview_operator_contract_validation_sample.json": 30,
+        "runtime_preview_pre_release_review_report.sample.json": 30,
+        "runtime_preview_agent_explanation_benchmark.json": 30,
+        "runtime_preview_agent_explanation_v3.json": 30,
+    }
+    minimum = minimums.get(path.name)
+    if minimum is None:
+        return
+
+    raw_count = summary.get("caseCount")
+    if raw_count is None and path.name == "VisionAgent_business_benchmark_baseline.json":
+        raw_count = report.get("caseCount")
+    if not isinstance(raw_count, int) or raw_count < minimum:
+        errors.append(f"{repo_relative(path)} must have caseCount >= {minimum}.")
+    if summary.get("accepted") is not True:
+        errors.append(f"{repo_relative(path)} summary.accepted must be true.")
 
 
 def validate_no_secret_leaks(path: Path, text: str, errors: list[str]) -> None:
@@ -344,6 +402,7 @@ def main() -> int:
         workflow_run = validate_workflow_run(path, report, args.require_non_local_workflow_run, errors)
         if path.name in {"real_llm_planner_shadow_eval.json", "real_llm_planner_shadow_eval.holdout.json"}:
             validate_shadow_report(path, report, errors)
+        validate_runtime_preview_case_counts(path, report, errors)
         report_summaries.append(
             {
                 "path": repo_relative(path),

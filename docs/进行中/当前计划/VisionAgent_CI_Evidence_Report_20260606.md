@@ -1,5 +1,32 @@
 # Vision Agent CI Evidence Report 20260606
 
+## Local Pre-Push Evidence - RuntimePreview v1.4 Release Review Simulator
+
+This section records the current local pre-push evidence for RuntimePreview v1.4. Remote GitHub Actions evidence must be refreshed after the v1.4 commit is pushed and the Vision Agent Quality Suite uploads its artifact bundle.
+
+| Field | Value |
+| --- | --- |
+| branchName | codex初稿 |
+| headSha | fabc086a11e3016145a2e296750ab1315aa0f9ed |
+| runId | local-pre-push-20260607-runtime-preview-v1.4 |
+| runAttempt | local |
+| runNumber | local-pre-push |
+| conclusion | local-pass |
+| artifactId | local-vision-agent-quality-artifact-manifest |
+| digest | sha256:cabf7757e8ad75508b98b2fe97b9204cc8832040d3d933f6901d0ee59c1d47d8 |
+
+Local quality evidence:
+
+- Backend Agent harness: `453` passed, `0` failed, minimum `370`.
+- AI endpoint regression: `30` passed, `0` failed, minimum `30`.
+- UI contract: `136` passed, `0` failed, minimum `135`.
+- Business benchmark: `70` cases, `accepted=true`.
+- RuntimePreview v1.4 evidence: `32` metadata-only cases, `realResourcesTouched=false`.
+- Artifact/source scan: `44` artifact files, `20` JSON reports, `6280` source files scanned.
+- Redaction: `forbiddenHitCount=0`, `redactionPass=true`.
+
+RuntimePreview v1.4 adds metadata-only Station Compatibility, Operator Contract validation, PreReleaseReview decisioning, Review Desk v2, Redacted Flow Corpus v2, Agent Explanation v3, and GovernanceStore v4 streams. It does not add real camera SDK access, real Station access, real image/model/template reads, PLC writes, real package creation, packaging, deployment, hot-load, or a Real RuntimePreview adapter.
+
 ## Workflow Run #28 - Latest RuntimePreview v1.3 Manifest Dry-Run Evidence
 
 | Field | Value |

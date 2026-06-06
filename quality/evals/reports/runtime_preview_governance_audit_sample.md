@@ -1,6 +1,6 @@
 # RuntimePreview Governance Audit Sample
 
-- Generated UTC: `2026-06-06T15:00:30.583603+00:00`
+- Generated UTC: `2026-06-06T16:17:44.241304+00:00`
 - Commit: `local`
 - Branch: `local`
 - Run: `local` attempt `local`
@@ -8,25 +8,26 @@
 - Real resources touched: `False`
 - Accepted: `True`
 
-| Event | Redacted | Metadata only |
-| --- | --- | --- |
-| session_created | True | True |
-| config_changed | True | True |
-| catalog_loaded | True | True |
-| allowlist_changed | True | True |
-| scenario_corpus_loaded | True | True |
-| readiness_checked | True | True |
-| permission_denied | True | True |
-| simulation_started | True | True |
-| simulation_completed | True | True |
-| report_generated | True | True |
-| session_replayed | True | True |
-| deploy_readiness_generated | True | True |
-| package_readiness_generated | True | True |
-| manifest_dry_run_generated | True | True |
-| governance_exported | True | True |
-| retention_cleanup | True | True |
-| corruption_recovered | True | True |
-| session_cancelled | True | True |
+| Id | Scenario / Type | Status / Decision | Risk / Notes |
+| --- | --- | --- | --- |
+| session_created | session_created | - | - |
+| config_changed | config_changed | - | - |
+| catalog_loaded | catalog_loaded | - | - |
+| allowlist_changed | allowlist_changed | - | - |
+| readiness_checked | readiness_checked | - | - |
+| permission_denied | permission_denied | - | - |
+| simulation_started | simulation_started | - | - |
+| simulation_completed | simulation_completed | - | - |
+| report_generated | report_generated | - | - |
+| deploy_readiness_generated | deploy_readiness_generated | - | - |
+| package_readiness_generated | package_readiness_generated | - | - |
+| manifest_dry_run_generated | manifest_dry_run_generated | - | - |
+| station_compatibility_generated | station_compatibility_generated | - | - |
+| operator_contract_validation_generated | operator_contract_validation_generated | - | - |
+| pre_release_review_generated | pre_release_review_generated | - | - |
+| governance_exported | governance_exported | - | - |
+| retention_cleanup | retention_cleanup | - | - |
+| corruption_recovered | corruption_recovered | - | - |
+| session_cancelled | session_cancelled | - | - |
 
 Safety boundary: no real camera SDK, Station access, image file read, model file load, PLC write, package creation, deployment, hot-load, or Real RuntimePreview adapter.

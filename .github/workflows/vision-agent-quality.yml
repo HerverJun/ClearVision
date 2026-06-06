@@ -70,6 +70,8 @@ jobs:
             quality/evals/reports/runtime_preview_scenario_corpus.md
             quality/evals/reports/runtime_preview_redacted_flow_corpus.json
             quality/evals/reports/runtime_preview_redacted_flow_corpus.md
+            quality/evals/reports/runtime_preview_redacted_flow_corpus_v2.json
+            quality/evals/reports/runtime_preview_redacted_flow_corpus_v2.md
             quality/evals/reports/runtime_preview_scenario_evidence.json
             quality/evals/reports/runtime_preview_scenario_evidence.md
             quality/evals/reports/runtime_preview_deploy_readiness_report.sample.json
@@ -78,12 +80,24 @@ jobs:
             quality/evals/reports/runtime_preview_package_readiness_report.sample.md
             quality/evals/reports/runtime_package_manifest_dry_run.sample.json
             quality/evals/reports/runtime_package_manifest_dry_run.sample.md
+            quality/evals/reports/runtime_preview_station_profiles_sample.json
+            quality/evals/reports/runtime_preview_station_profiles_sample.md
+            quality/evals/reports/runtime_preview_operator_contract_registry.json
+            quality/evals/reports/runtime_preview_operator_contract_registry.md
+            quality/evals/reports/runtime_preview_operator_contract_validation_sample.json
+            quality/evals/reports/runtime_preview_operator_contract_validation_sample.md
+            quality/evals/reports/runtime_preview_station_compatibility_dry_run.sample.json
+            quality/evals/reports/runtime_preview_station_compatibility_dry_run.sample.md
+            quality/evals/reports/runtime_preview_pre_release_review_report.sample.json
+            quality/evals/reports/runtime_preview_pre_release_review_report.sample.md
             quality/evals/reports/runtime_preview_governance_audit_sample.json
             quality/evals/reports/runtime_preview_governance_audit_sample.md
             quality/evals/reports/runtime_preview_governance_export_sample.json
             quality/evals/reports/runtime_preview_governance_export_sample.md
             quality/evals/reports/runtime_preview_agent_explanation_benchmark.json
             quality/evals/reports/runtime_preview_agent_explanation_benchmark.md
+            quality/evals/reports/runtime_preview_agent_explanation_v3.json
+            quality/evals/reports/runtime_preview_agent_explanation_v3.md
             quality/evals/reports/real_llm_planner_shadow_eval.json
             quality/evals/reports/real_llm_planner_shadow_eval.md
             quality/evals/reports/real_llm_planner_shadow_eval.holdout.json

@@ -1,6 +1,6 @@
 # RuntimePreview Governance Export Sample
 
-- Generated UTC: `2026-06-06T15:00:30.583603+00:00`
+- Generated UTC: `2026-06-06T16:17:44.241304+00:00`
 - Commit: `local`
 - Branch: `local`
 - Run: `local` attempt `local`
@@ -10,14 +10,17 @@
 
 | Field | Value |
 | --- | --- |
-| storageVersion | jsonl.v3 |
-| recordTypes | ['session', 'audit', 'session_report', 'deploy_readiness_report', 'package_readiness_report', 'manifest_dry_run_report'] |
-| sessionCount | 20 |
-| auditEventCount | 140 |
-| sessionReportCount | 20 |
-| deployReadinessReportCount | 20 |
-| packageReadinessReportCount | 20 |
-| manifestDryRunReportCount | 20 |
+| storageVersion | jsonl.v4 |
+| recordTypes | ['session', 'audit', 'session_report', 'deploy_readiness_report', 'package_readiness_report', 'manifest_dry_run_report', 'station_compatibility_report', 'operator_contract_validation_report', 'pre_release_review_report'] |
+| sessionCount | 32 |
+| auditEventCount | 320 |
+| sessionReportCount | 32 |
+| deployReadinessReportCount | 32 |
+| packageReadinessReportCount | 32 |
+| manifestDryRunReportCount | 32 |
+| stationCompatibilityReportCount | 32 |
+| operatorContractValidationReportCount | 32 |
+| preReleaseReviewReportCount | 32 |
 | corruptLineCount | 1 |
 | corruptionRecovered | True |
 | redactionPass | True |
