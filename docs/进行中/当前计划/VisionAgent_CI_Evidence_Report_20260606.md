@@ -1,5 +1,107 @@
 # Vision Agent CI Evidence Report 20260606
 
+## Workflow Run #28 - Latest RuntimePreview v1.3 Manifest Dry-Run Evidence
+
+| Field | Value |
+| --- | --- |
+| workflow | Vision Agent Quality Suite |
+| job | Agent Engineering Harness |
+| branchName | codex初稿 |
+| commitSha | a9c98ea6d4f982c2d6570447b0f010d4ce9cfb6f |
+| headSha | a9c98ea6d4f982c2d6570447b0f010d4ce9cfb6f |
+| runId | 27065707900 |
+| runAttempt | 1 |
+| runNumber | 28 |
+| event | push |
+| status | completed |
+| conclusion | success |
+| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27065707900 |
+| completedAtUtc | 2026-06-06T15:06:42Z |
+
+## Workflow Run #28 Artifact
+
+| Field | Value |
+| --- | --- |
+| artifactName | vision-agent-quality-suite |
+| artifactId | 7455439493 |
+| size | 206 KB |
+| digest | sha256:a924fc679bbebf4c3e48600aa0e6696ae6a52602fe0cd5bdc2fea57e3c4de232 |
+| expired | false |
+
+Run #28 is the latest v1.3 evidence for RuntimePackage Manifest Dry-Run, Redacted Flow Corpus, Package Readiness Bridge v2, Productized Pilot Console, Governance Store v3, and Agent Explanation v2. It supersedes run #26 for RuntimePreview readiness evidence.
+
+Artifact contents include the existing Vision Agent benchmark reports plus the new v1.3 reports:
+
+- `VisionAgent_business_benchmark_baseline.json`
+- `VisionAgent_business_benchmark_baseline.md`
+- `planner_autonomy_benchmark.json`
+- `planner_autonomy_benchmark.md`
+- `runtime_preview_scenario_corpus.json`
+- `runtime_preview_scenario_corpus.md`
+- `runtime_preview_redacted_flow_corpus.json`
+- `runtime_preview_redacted_flow_corpus.md`
+- `runtime_preview_scenario_evidence.json`
+- `runtime_preview_scenario_evidence.md`
+- `runtime_preview_deploy_readiness_report.sample.json`
+- `runtime_preview_deploy_readiness_report.sample.md`
+- `runtime_preview_package_readiness_report.sample.json`
+- `runtime_preview_package_readiness_report.sample.md`
+- `runtime_package_manifest_dry_run.sample.json`
+- `runtime_package_manifest_dry_run.sample.md`
+- `runtime_preview_governance_audit_sample.json`
+- `runtime_preview_governance_audit_sample.md`
+- `runtime_preview_governance_export_sample.json`
+- `runtime_preview_governance_export_sample.md`
+- `runtime_preview_agent_explanation_benchmark.json`
+- `runtime_preview_agent_explanation_benchmark.md`
+- `real_llm_planner_shadow_eval.json`
+- `real_llm_planner_shadow_eval.md`
+- `real_llm_planner_shadow_eval.holdout.json`
+- `real_llm_planner_shadow_eval.holdout.md`
+- `vision_agent_quality_artifact_manifest.json`
+- `vision_agent_quality_artifact_manifest.md`
+- `agent_engineering_harness.trx`
+- `agent_ai_model_config_endpoints.trx`
+- `agent_ui_contract_output.txt`
+
+## Run #28 RuntimePreview v1.3 Summary
+
+| Gate | Result |
+| --- | --- |
+| backend Agent tests | 333 total / 333 passed |
+| AI endpoint regression | 25 total / 25 passed |
+| UI contract tests | 111 total / 111 passed |
+| executable business benchmark | 55 / 55 accepted |
+| planner autonomy + permission negative benchmark | 21 / 21 accepted |
+| RuntimePreview scenario evidence | 20 / 20 accepted |
+| RuntimePreview redacted flow corpus | 20 / 20 accepted |
+| Package readiness bridge v2 sample | 20 cases, 7 ready, 13 blocked, packageCreated=false, deploymentExecuted=false |
+| RuntimePackage manifest dry-run sample | 20 cases, 7 review allowed, 13 blocked, manifestArtifactGenerated=false, packageCreated=false |
+| Agent explanation v2 benchmark | 20 / 20 accepted |
+| artifact/source/report/session/audit/manifest scan | CI assertion passed; local scan scanned 3338 source/report files, forbiddenHitCount=0, redactionPass=true |
+
+Artifact manifest scan policy:
+
+- scanPolicyVersion: `2026-06-06.runtime-preview-v1.3-manifest-dry-run-scan.v3`
+- sourceFilesScanned: `3338` in local pre-push scan
+- reportsScanned: `13`
+- auditReportsScanned: `2`
+- sessionReportsScanned: `14`
+- forbiddenHitCount: `0`
+- redactionPass: `true`
+
+CI artifact report checks:
+
+- business benchmark `workflowRun.commitSha`: `a9c98ea6d4f982c2d6570447b0f010d4ce9cfb6f`
+- business benchmark `workflowRun.runId`: `27065707900`
+- redacted flow corpus `workflowRun.runId`: `27065707900`
+- manifest dry-run `workflowRun.runId`: `27065707900`
+- package readiness `workflowRun.runId`: `27065707900`
+- Agent explanation `workflowRun.runId`: `27065707900`
+- All CI artifact JSON reports are required by `assert_vision_agent_report_artifacts.py --require-non-local-workflow-run`; run #28 succeeded, so `commitSha`, `branchName`, `runId`, and `runAttempt` were non-local in uploaded reports.
+
+RuntimePreview v1.3 adds metadata-only Redacted Flow Corpus, RuntimePackage Manifest Dry-Run, Package Readiness Bridge v2, pre-release review desk UI, Governance Store v3 manifest stream, and Agent Explanation v2. It still does not touch real camera SDKs, Station, image files, model files, PLC, real package files, packaging, deployment, hot-load paths, or a Real RuntimePreview adapter.
+
 ## Workflow Run #26 - Latest RuntimePreview v1.2 Scenario Corpus Evidence
 
 | Field | Value |

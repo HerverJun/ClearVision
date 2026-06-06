@@ -1,6 +1,6 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-06-06T15:02:01.150954+00:00",
+  "generatedAtUtc": "2026-06-06T15:09:56.948788+00:00",
   "artifactName": "vision-agent-quality-suite",
   "scanPolicyVersion": "2026-06-06.runtime-preview-v1.3-manifest-dry-run-scan.v3",
   "sourceFilesScanned": 3338,
