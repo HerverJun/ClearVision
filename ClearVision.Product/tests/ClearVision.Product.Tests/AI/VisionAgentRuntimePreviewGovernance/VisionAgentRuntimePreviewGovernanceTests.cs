@@ -1054,6 +1054,64 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     }
 
     [Fact]
+    public void GovernanceStore_ShouldIncludeAgentRunAuditJsonlInIndexAndExport()
+    {
+        var directory = TempDirectory();
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var eventLine = JsonSerializer.Serialize(new
+            {
+                runId = "ar_governance",
+                sequence = 1,
+                timestamp = DateTimeOffset.UtcNow,
+                eventType = "run.started",
+                stage = "run",
+                title = "Run started",
+                summary = "Metadata-only governance audit event.",
+                status = "running",
+                payload = new { metadataOnly = true, reportId = "agent-report-governance" },
+                metadataOnly = true,
+                redactionPass = true
+            });
+            var summaryLine = JsonSerializer.Serialize(new
+            {
+                runId = "ar_governance",
+                createdAt = DateTimeOffset.UtcNow,
+                updatedAt = DateTimeOffset.UtcNow,
+                status = "completed",
+                title = "Run completed",
+                summary = "Metadata-only governance audit summary.",
+                firstFixRecommendation = "",
+                lastSequence = 1,
+                eventCount = 1,
+                payload = new { storageVersion = "agent-run-events.jsonl.v1" },
+                metadataOnly = true,
+                redactionPass = true
+            });
+            File.WriteAllText(Path.Combine(directory, "agent_run_events.jsonl"), eventLine + Environment.NewLine);
+            File.WriteAllText(Path.Combine(directory, "agent_run_summary.jsonl"), summaryLine + Environment.NewLine);
+
+            var store = new RuntimePreviewGovernanceStore(directory);
+            var summary = store.BuildIndexSummary();
+            var manifest = store.ExportManifest();
+
+            summary.RecordTypes.Should().Contain(["agent_run_event", "agent_run_summary"]);
+            summary.AgentRunEventCount.Should().Be(1);
+            summary.AgentRunSummaryCount.Should().Be(1);
+            summary.AgentRunAuditFileCount.Should().Be(2);
+            manifest.AgentRunAuditFiles.Should().BeEquivalentTo("agent_run_events.jsonl", "agent_run_summary.jsonl");
+            manifest.IndexSummary.AgentRunEventCount.Should().Be(1);
+            manifest.IndexSummary.AgentRunSummaryCount.Should().Be(1);
+            manifest.RedactionPass.Should().BeTrue();
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
     public void GovernanceStore_ShouldExportRedactedManifestWithPackageReports()
     {
         var directory = TempDirectory();

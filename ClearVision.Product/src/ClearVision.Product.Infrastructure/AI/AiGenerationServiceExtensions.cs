@@ -11,6 +11,7 @@ namespace ClearVision.Product.Infrastructure.AI;
 
 using ClearVision.Product.Infrastructure.AI.Connectors;
 using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -55,6 +56,10 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IAiFlowResponseParser, AiFlowResponseParser>();
         services.AddScoped<AutoLayoutService>();
         services.AddScoped<AgentPromptBuilder>();
+        services.AddSingleton<AgentRunEventRedactor>();
+        services.AddSingleton<AgentRunEventStore>();
+        services.AddSingleton<IAgentRunEventStreamService, AgentRunEventStreamService>();
+        services.AddScoped<IAgentRunEventSink, AgentRunEventSink>();
         services.AddScoped<AgentPlannerPromptBuilder>();
         services.AddScoped<AgentPlannerPromptComposer>();
         services.AddScoped<JsonToolCallRepair>();

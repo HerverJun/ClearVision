@@ -7,6 +7,7 @@ public sealed record VisionAgentToolContext
     public string UserDescription { get; init; } = string.Empty;
     public string? AdditionalContext { get; init; }
     public string? SessionId { get; init; }
+    public string? AgentRunId { get; init; }
     public string? ExistingFlowJson { get; init; }
     public bool DebugTrace { get; init; }
     public bool RuntimePreviewConsent { get; init; }

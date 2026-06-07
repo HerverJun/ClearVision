@@ -259,7 +259,9 @@ public sealed class RuntimePreviewGovernanceStore
                 "station_profile_snapshot",
                 "operator_contract_registry_snapshot",
                 "contract_coverage_report",
-                "final_governance_export"
+                "final_governance_export",
+                "agent_run_event",
+                "agent_run_summary"
             ],
             SessionCount = LoadSessions().Count,
             AuditEventCount = LoadAuditEvents().Count,
@@ -275,6 +277,9 @@ public sealed class RuntimePreviewGovernanceStore
             OperatorContractRegistrySnapshotCount = LoadOperatorContractRegistrySnapshots().Count,
             OperatorContractCoverageReportCount = LoadOperatorContractCoverageReports().Count,
             FinalGovernanceExportCount = LoadFinalGovernanceExports().Count,
+            AgentRunEventCount = CountJsonLines(AgentRunEventPath),
+            AgentRunSummaryCount = CountJsonLines(AgentRunSummaryPath),
+            AgentRunAuditFileCount = AgentRunAuditFiles().Count,
             CorruptLineCount = CountCorruptLines(SessionPath) +
                                CountCorruptLines(AuditPath) +
                                CountCorruptLines(ReportPath) +
@@ -288,7 +293,9 @@ public sealed class RuntimePreviewGovernanceStore
                                CountCorruptLines(StationProfileSnapshotPath) +
                                CountCorruptLines(OperatorContractRegistrySnapshotPath) +
                                CountCorruptLines(OperatorContractCoverageReportPath) +
-                               CountCorruptLines(FinalGovernanceExportPath),
+                               CountCorruptLines(FinalGovernanceExportPath) +
+                               CountCorruptLines(AgentRunEventPath) +
+                               CountCorruptLines(AgentRunSummaryPath),
             RetentionPolicy = "default_30_days_200_sessions",
             MetadataOnly = true,
             RealResourcesTouched = false
@@ -316,6 +323,7 @@ public sealed class RuntimePreviewGovernanceStore
             OperatorContractRegistrySnapshots = LoadOperatorContractRegistrySnapshots(),
             OperatorContractCoverageReports = LoadOperatorContractCoverageReports(),
             FinalGovernanceExports = LoadFinalGovernanceExports(),
+            AgentRunAuditFiles = AgentRunAuditFiles(),
             RedactionPass = true,
             MetadataOnly = true,
             RealResourcesTouched = false
@@ -461,6 +469,10 @@ public sealed class RuntimePreviewGovernanceStore
 
     private string FinalGovernanceExportPath => Path.Combine(_directoryPath, "runtime_preview_final_governance_exports.jsonl");
 
+    private string AgentRunEventPath => Path.Combine(_directoryPath, "agent_run_events.jsonl");
+
+    private string AgentRunSummaryPath => Path.Combine(_directoryPath, "agent_run_summary.jsonl");
+
     private static string GetDefaultDirectory()
     {
         var configured = Environment.GetEnvironmentVariable("CV_RUNTIME_PREVIEW_GOVERNANCE_STORE");
@@ -542,6 +554,41 @@ public sealed class RuntimePreviewGovernanceStore
         }
 
         return corrupt;
+    }
+
+    private static int CountJsonLines(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return 0;
+        }
+
+        var count = 0;
+        foreach (var line in File.ReadLines(path, Encoding.UTF8))
+        {
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private IReadOnlyList<string> AgentRunAuditFiles()
+    {
+        var files = new List<string>();
+        if (File.Exists(AgentRunEventPath))
+        {
+            files.Add(Path.GetFileName(AgentRunEventPath));
+        }
+
+        if (File.Exists(AgentRunSummaryPath))
+        {
+            files.Add(Path.GetFileName(AgentRunSummaryPath));
+        }
+
+        return files;
     }
 
     private static void Rewrite<T>(string path, IReadOnlyList<T> items)

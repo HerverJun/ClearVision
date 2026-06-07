@@ -457,6 +457,15 @@ public sealed record RuntimePreviewGovernanceStorageIndexSummary
     [JsonPropertyName("finalGovernanceExportCount")]
     public int FinalGovernanceExportCount { get; init; }
 
+    [JsonPropertyName("agentRunEventCount")]
+    public int AgentRunEventCount { get; init; }
+
+    [JsonPropertyName("agentRunSummaryCount")]
+    public int AgentRunSummaryCount { get; init; }
+
+    [JsonPropertyName("agentRunAuditFileCount")]
+    public int AgentRunAuditFileCount { get; init; }
+
     [JsonPropertyName("corruptLineCount")]
     public int CorruptLineCount { get; init; }
 
@@ -525,6 +534,9 @@ public sealed record RuntimePreviewGovernanceExportManifest
 
     [JsonPropertyName("finalGovernanceExports")]
     public IReadOnlyList<RuntimePreviewGovernanceExportManifest> FinalGovernanceExports { get; init; } = [];
+
+    [JsonPropertyName("agentRunAuditFiles")]
+    public IReadOnlyList<string> AgentRunAuditFiles { get; init; } = [];
 
     [JsonPropertyName("redactionPass")]
     public bool RedactionPass { get; init; } = true;

@@ -13,7 +13,9 @@ function installDom({ search = '', localValues = {} } = {}) {
     __CLEARVISION_AGENT_DEV_UI__: false,
     confirm() {
       return true;
-    }
+    },
+    setTimeout: global.setTimeout.bind(global),
+    clearTimeout: global.clearTimeout.bind(global)
   };
   global.localStorage = {
     getItem(key) {
@@ -80,23 +82,49 @@ class FakeClassList {
 function createFakeElement() {
   let text = '';
   let html = '';
+  let className = '';
+  const children = [];
   const escapeHtml = value => String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+  const hasClass = (element, classSelector) => String(element.className || '')
+    .split(/\s+/)
+    .includes(classSelector.replace(/^\./, ''));
+  const findByClass = (element, classSelector) => {
+    for (const child of element.children || []) {
+      if (hasClass(child, classSelector)) {
+        return child;
+      }
+      const nested = findByClass(child, classSelector);
+      if (nested) {
+        return nested;
+      }
+    }
+    return null;
+  };
 
-  return {
+  const element = {
     hidden: false,
     disabled: false,
     checked: false,
     value: '',
     get innerHTML() {
+      if (!html && !text && children.length > 0) {
+        return children.map(child => child.outerHTML || child.innerHTML).join('');
+      }
       return html || escapeHtml(text);
     },
     set innerHTML(value) {
       html = String(value ?? '');
       text = '';
+      children.splice(0, children.length);
+      for (const match of html.matchAll(/class="([^"]+)"/g)) {
+        const child = createFakeElement();
+        child.className = match[1];
+        children.push(child);
+      }
     },
     get textContent() {
       return text;
@@ -105,7 +133,19 @@ function createFakeElement() {
       text = String(value ?? '');
       html = '';
     },
-    className: '',
+    get outerHTML() {
+      const cls = className ? ` class="${escapeHtml(className)}"` : '';
+      return `<div${cls}>${this.innerHTML}</div>`;
+    },
+    get className() {
+      return className;
+    },
+    set className(value) {
+      className = String(value ?? '');
+      this.classList = new FakeClassList();
+      className.split(/\s+/).filter(Boolean).forEach(token => this.classList.add(token));
+    },
+    children,
     dataset: {},
     classList: new FakeClassList(),
     style: {},
@@ -113,13 +153,45 @@ function createFakeElement() {
     setAttribute(name, value) {
       this.attributes.set(name, String(value));
     },
+    removeAttribute(name) {
+      this.attributes.delete(name);
+    },
     getAttribute(name) {
       return this.attributes.get(name);
     },
     addEventListener() {},
-    querySelector() { return null; },
-    querySelectorAll() { return []; }
+    appendChild(child) {
+      children.push(child);
+      child.parentNode = this;
+      html = '';
+      text = '';
+      return child;
+    },
+    contains(child) {
+      return children.includes(child) || children.some(item => item.contains?.(child));
+    },
+    querySelector(selector) {
+      if (String(selector || '').startsWith('.')) {
+        return findByClass(this, selector);
+      }
+      return null;
+    },
+    querySelectorAll(selector) {
+      const results = [];
+      const visit = node => {
+        for (const child of node.children || []) {
+          if (String(selector || '').startsWith('.') && hasClass(child, selector)) {
+            results.push(child);
+          }
+          visit(child);
+        }
+      };
+      visit(this);
+      return results;
+    }
   };
+
+  return element;
 }
 
 function createContainer(elements, collections = {}) {
@@ -200,6 +272,43 @@ function createPanel(AiPanel, overrides = {}) {
   panel.currentResult = overrides.currentResult || null;
   panel.isGenerating = false;
   panel.flowCanvas = null;
+  panel.requirementMode = 'strict';
+  panel.nextHintDraft = '';
+  panel.nextTemplateSelection = null;
+  panel.activeGenerateRequestId = null;
+  panel.activeGenerateSessionId = null;
+  panel.activeAgentRunId = null;
+  panel.activeAgentRunEventSource = null;
+  panel.activeAgentRunEvents = [];
+  panel.activeAgentRunEventKeys = new Set();
+  panel.agentRunStepMap = new Map();
+  panel.agentRunToolMap = new Map();
+  panel.agentRunArtifactMap = new Map();
+  panel.activeAssistantTurn = null;
+  panel.lastUserPrompt = '';
+  panel.isCancellingGenerate = false;
+  panel._scrollToBottom = () => {};
+  panel._updateScrollBottomBtn = () => {};
+  panel._setResultStatusNote = (text = '', tone = '') => {
+    panel.lastResultStatusNote = { text, tone };
+  };
+  panel._setGeneratingState = busy => {
+    panel.isGenerating = busy;
+  };
+  panel._setWorkbenchState = state => {
+    panel.lastWorkbenchState = state;
+  };
+  panel._renderQueuedHintBanner = () => {
+    panel.queuedHintRendered = true;
+  };
+  panel._addMessage = (role, text) => {
+    panel.messages = panel.messages || [];
+    panel.messages.push({ role, text });
+  };
+  panel._addToHistory = item => {
+    panel.historyItems = panel.historyItems || [];
+    panel.historyItems.push(item);
+  };
   return panel;
 }
 
@@ -264,6 +373,30 @@ function attachValidationPanel(panel) {
     '#ai-result-validation': validation
   });
   return { card, validation };
+}
+
+function attachAgentRunTurn(panel) {
+  const turn = {
+    card: createFakeElement(),
+    statusEl: createFakeElement(),
+    reasoningSection: createFakeElement(),
+    reasoningBody: createFakeElement(),
+    replySection: createFakeElement(),
+    replyBody: createFakeElement(),
+    processSection: createFakeElement(),
+    processBody: createFakeElement(),
+    toolsSection: createFakeElement(),
+    toolsBody: createFakeElement(),
+    artifactsSection: createFakeElement(),
+    artifactsBody: createFakeElement(),
+    failureSection: createFakeElement(),
+    failureBody: createFakeElement(),
+    reasoningCursor: createFakeElement(),
+    replyCursor: createFakeElement()
+  };
+  turn.card.dataset = {};
+  panel.activeAssistantTurn = turn;
+  return turn;
 }
 
 function agentResponse() {
@@ -428,6 +561,338 @@ test('RuntimePreview consent payload is one request only', async () => {
     useVisionAgentGenerateFlow: true,
     agentGenerateFlowMode: 'planner'
   });
+});
+
+test('AgentRun EventSource is used only for developer Agent GenerateFlow mode', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  window.EventSource = function EventSource() {};
+
+  assert.equal(panel._shouldUseAgentRunEventStream(), true);
+  panel.useVisionAgentGenerateFlow = false;
+  assert.equal(panel._shouldUseAgentRunEventStream(), false);
+  panel.useVisionAgentGenerateFlow = true;
+  panel.isVisionAgentDeveloperUiEnabled = false;
+  assert.equal(panel._shouldUseAgentRunEventStream(), false);
+  delete window.EventSource;
+  panel.isVisionAgentDeveloperUiEnabled = true;
+  assert.equal(panel._shouldUseAgentRunEventStream(), false);
+});
+
+test('AgentRun create payload is metadata-only and does not send attachment paths', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'planner' });
+  panel.runtimePreviewConsent = true;
+
+  const payload = panel._buildAgentRunCreatePayload({
+    normalizedDescription: 'detect scratch',
+    normalizedHint: 'safe hint',
+    requestId: 'req-1',
+    resolvedMode: 'modify',
+    flowPayload: { operators: [] },
+    attachmentPaths: ['C:\\factory\\real-image.png'],
+    normalizedTemplateSelection: { mode: 'template_fill', templateId: 'tmpl-1' },
+    agentGenerateFlowPayload: panel._buildAgentGenerateFlowRequestPayload()
+  });
+
+  assert.equal(payload.description, 'detect scratch');
+  assert.equal(payload.additionalContext, 'safe hint');
+  assert.equal(payload.mode, 'modify');
+  assert.equal(payload.useVisionAgentGenerateFlow, true);
+  assert.equal(payload.agentGenerateFlowMode, 'planner');
+  assert.equal(payload.runtimePreviewConsent, false);
+  assert.equal(payload.attachmentCount, 1);
+  assert.deepEqual(payload.attachments, []);
+  assert.equal(payload.existingFlowJson, '{"operators":[]}');
+  assert.deepEqual(payload.templateSelection, { mode: 'template_fill', templateId: 'tmpl-1' });
+});
+
+test('AgentRun EventSource registers required SSE event listeners', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const listeners = new Map();
+  let createdUrl = '';
+  let closed = false;
+  window.EventSource = class MockEventSource {
+    constructor(url) {
+      createdUrl = url;
+    }
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    }
+    close() {
+      closed = true;
+    }
+  };
+
+  const source = panel._startAgentRunEventSource('ar_contract');
+
+  assert.ok(source);
+  assert.match(createdUrl, /\/api\/ai\/agent-runs\/ar_contract\/events$/);
+  for (const type of ['run.started', 'assistant.brief', 'stage.started', 'tool.call.started', 'artifact.created', 'run.completed']) {
+    assert.equal(typeof listeners.get(type), 'function', type);
+  }
+  panel._closeAgentRunEventSource();
+  assert.equal(closed, true);
+});
+
+test('AgentRun assistant brief appends immediate public summary', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_brief';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_brief',
+    sequence: 2,
+    eventType: 'assistant.brief',
+    stage: 'brief',
+    summary: 'I will build a safe workflow draft.',
+    status: 'completed',
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.match(turn.replyBody.textContent, /safe workflow draft/);
+  assert.equal(turn.replySection.hidden, false);
+  assert.equal(turn.statusEl.textContent, '运行中');
+  assert.doesNotMatch(turn.replyBody.textContent, /chain.?of.?thought|hidden reasoning/i);
+});
+
+test('AgentRun stage events render public execution process steps', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_stage';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_stage',
+    sequence: 3,
+    eventType: 'stage.started',
+    stage: 'planner',
+    title: 'Planner started',
+    summary: 'Building a public execution plan.',
+    status: 'running',
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(turn.processSection.hidden, false);
+  assert.equal(turn.processBody.children.length, 1);
+  const copy = turn.processBody.children[0].querySelector('.ai-agent-run-step-copy');
+  assert.match(copy.textContent, /Planner/);
+  assert.match(copy.textContent, /Building a public execution plan/);
+});
+
+test('AgentRun duplicate replay events are ignored by run sequence and type', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_dupe';
+  const evt = {
+    runId: 'ar_dupe',
+    sequence: 4,
+    eventType: 'stage.completed',
+    stage: 'readiness',
+    title: 'Readiness checked',
+    summary: 'Ready.',
+    status: 'completed',
+    metadataOnly: true,
+    redactionPass: true
+  };
+
+  panel._handleAgentRunEvent(evt);
+  panel._handleAgentRunEvent(evt);
+
+  assert.equal(panel.activeAgentRunEvents.length, 1);
+  assert.equal(turn.processBody.children.length, 1);
+});
+
+test('AgentRun tool events render tool name duration report and blocked reasons', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_tool';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool',
+    sequence: 5,
+    eventType: 'tool.call.completed',
+    stage: 'readiness',
+    title: 'Tool completed: validate_flow',
+    summary: 'Tool completed.',
+    status: 'completed',
+    payload: {
+      toolName: 'validate_flow',
+      durationMs: 42,
+      summary: 'Validated draft metadata.',
+      reportId: 'agent-report-42',
+      blockedReasons: ['missing threshold']
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(turn.toolsSection.hidden, false);
+  assert.equal(turn.toolsBody.children.length, 1);
+  assert.match(turn.toolsBody.children[0].innerHTML, /validate_flow/);
+  assert.match(turn.toolsBody.children[0].innerHTML, /42 ms/);
+  assert.match(turn.toolsBody.children[0].innerHTML, /agent-report-42/);
+  assert.match(turn.toolsBody.children[0].innerHTML, /missing threshold/);
+});
+
+test('AgentRun artifact events render report result cards', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_artifact';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_artifact',
+    sequence: 6,
+    eventType: 'release.review.completed',
+    stage: 'release_review',
+    title: 'Release review completed',
+    summary: 'Metadata-only release review passed.',
+    status: 'completed',
+    payload: {
+      reportId: 'release-review-1',
+      blockedReasons: [],
+      firstFixRecommendation: 'No fix required.'
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(turn.artifactsSection.hidden, false);
+  assert.equal(turn.artifactsBody.children.length, 1);
+  assert.match(turn.artifactsBody.children[0].innerHTML, /Release review completed/);
+  assert.match(turn.artifactsBody.children[0].innerHTML, /release-review-1/);
+  assert.match(turn.artifactsBody.children[0].innerHTML, /No fix required/);
+});
+
+test('AgentRun failed tool event displays first fix recommendation', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_tool_fail';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_fail',
+    sequence: 7,
+    eventType: 'tool.call.failed',
+    stage: 'readiness',
+    title: 'Tool failed: manifest_dryrun',
+    summary: 'Manifest dry-run was blocked.',
+    status: 'failed',
+    payload: {
+      toolName: 'manifest_dryrun',
+      durationMs: 9,
+      blockedReasons: ['missing operator contract'],
+      firstFixRecommendation: 'Add the missing operator contract metadata.'
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.match(turn.toolsBody.children[0].innerHTML, /manifest_dryrun/);
+  assert.match(turn.toolsBody.children[0].innerHTML, /missing operator contract/);
+  assert.match(turn.toolsBody.children[0].innerHTML, /Add the missing operator contract metadata/);
+});
+
+test('AgentRun run.failed renders failure diagnosis and first fix only', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_failed';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_failed',
+    sequence: 8,
+    eventType: 'run.failed',
+    stage: 'run',
+    title: 'Run failed',
+    summary: 'Workflow metadata was incomplete.',
+    status: 'failed',
+    payload: {
+      firstFixRecommendation: 'Provide missing model metadata.'
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(turn.failureSection.hidden, false);
+  assert.match(turn.failureBody.innerHTML, /Workflow metadata was incomplete/);
+  assert.match(turn.failureBody.innerHTML, /Provide missing model metadata/);
+  assert.doesNotMatch(turn.failureBody.innerHTML, /chain.?of.?thought|raw prompt|system prompt/i);
+  assert.equal(panel.lastWorkbenchState, 'failed');
+  assert.equal(turn.statusEl.textContent, '生成失败');
+});
+
+test('AgentRun terminal completed event closes source and releases generating state', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  let closed = false;
+  panel.activeAgentRunId = 'ar_done';
+  panel.activeAgentRunEventSource = { close: () => { closed = true; } };
+  panel.isGenerating = true;
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_done',
+    sequence: 9,
+    eventType: 'run.completed',
+    stage: 'run',
+    title: 'Run completed',
+    summary: 'Release review completed.',
+    status: 'completed',
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(closed, true);
+  assert.equal(panel.isGenerating, false);
+  assert.equal(turn.statusEl.textContent, '生成完成');
+  assert.equal(panel.lastResultStatusNote.text, 'Release review completed.');
+});
+
+test('AgentRun cancelled event sets cancelled UI state', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_cancel';
+  panel.isGenerating = true;
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_cancel',
+    sequence: 10,
+    eventType: 'run.cancelled',
+    stage: 'run',
+    title: 'Run cancelled',
+    summary: 'Cancelled by user.',
+    status: 'cancelled',
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(panel.isGenerating, false);
+  assert.equal(turn.statusEl.textContent, '已取消');
+  assert.equal(panel.lastWorkbenchState, 'cancelled');
+});
+
+test('AgentRun source guard registers frontend SSE and cancel endpoints without shell tools', () => {
+  const currentFile = fileURLToPath(import.meta.url);
+  const testProjectRoot = path.resolve(path.dirname(currentFile), '..', '..');
+  const productRoot = path.resolve(testProjectRoot, '..', '..');
+  const agentRunSource = fs.readFileSync(
+    path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai', 'aiPanelAgentRun.js'),
+    'utf8'
+  );
+
+  assert.match(agentRunSource, /new window\.EventSource/);
+  assert.match(agentRunSource, /\/ai\/agent-runs\/\$\{encodeURIComponent\(runId\)\}\/events/);
+  assert.match(agentRunSource, /\/ai\/agent-runs\/\$\{encodeURIComponent\(runId\)\}\/cancel/);
+  assert.doesNotMatch(agentRunSource, /chain.?of.?thought|reasoning_content|\bsystemPrompt\b|\buserPrompt\b|powershell|cmd\.exe|child_process|process\./i);
 });
 
 test('response mapping displays missingResources', async () => {

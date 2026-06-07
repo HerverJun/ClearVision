@@ -4,6 +4,7 @@ using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
     private readonly VisionAgentProtocolParser _protocolParser;
     private readonly AgentWorkflowDraftEditor _draftEditor;
     private readonly IConfigurationService? _configurationService;
+    private readonly IAgentRunEventSink? _eventSink;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -42,7 +44,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         IVisionAgentPlannerService? plannerService = null,
         VisionAgentProtocolParser? protocolParser = null,
         AgentWorkflowDraftEditor? draftEditor = null,
-        IConfigurationService? configurationService = null)
+        IConfigurationService? configurationService = null,
+        IAgentRunEventSink? eventSink = null)
     {
         _loop = loop;
         _logger = logger;
@@ -54,12 +57,38 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         _protocolParser = protocolParser ?? new VisionAgentProtocolParser();
         _draftEditor = draftEditor ?? new AgentWorkflowDraftEditor();
         _configurationService = configurationService;
+        _eventSink = eventSink;
     }
 
     public async Task<AiFlowGenerationResult> GenerateFlowAsync(
         AiFlowGenerationRequest request,
         CancellationToken cancellationToken)
     {
+        var runId = request.AgentRunId;
+        _eventSink?.StageStarted(
+            runId,
+            "requirement_parsing",
+            "Requirement parsing",
+            "Preparing the Vision Agent request as metadata-only context.",
+            new
+            {
+                mode = request.Mode.ToWireValue(),
+                hasExistingFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson),
+                attachmentCount = request.Attachments?.Count ?? 0,
+                usePlanner = ShouldUsePlanner(request),
+                metadataOnly = true
+            });
+        _eventSink?.StageCompleted(
+            runId,
+            "requirement_parsing",
+            "Requirement parsing complete",
+            "The request was normalized for the controlled Vision Agent pipeline.",
+            new
+            {
+                chainOfThoughtVisible = false,
+                metadataOnly = true
+            });
+
         if (ShouldUsePlanner(request))
         {
             var plannerResult = await RunPlannerAsync(request, cancellationToken);
@@ -71,6 +100,16 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             _logger.LogWarning(
                 "Vision Agent planner failed and will fall back to scripted mode. Error={Error}",
                 plannerResult.ErrorMessage);
+            _eventSink?.StageStarted(
+                runId,
+                "planner",
+                "Planner fallback",
+                "Planner mode failed; starting scripted metadata-only fallback.",
+                new
+                {
+                    failure = plannerResult.ErrorMessage,
+                    metadataOnly = true
+                });
             return await RunScriptedAsync(
                 request,
                 "agent_planner_scripted_fallback",
@@ -146,6 +185,16 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         VisionAgentLoopResult loopResult;
         try
         {
+            _eventSink?.StageStarted(
+                request.AgentRunId,
+                "planner",
+                "Vision Agent planner",
+                $"Starting {generationMode} with controlled tool policy.",
+                new
+                {
+                    generationMode,
+                    metadataOnly = true
+                });
             var allowedPermissions = new HashSet<VisionAgentToolPermission>
             {
                 VisionAgentToolPermission.ReadOnly,
@@ -156,6 +205,18 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             {
                 allowedPermissions.Add(VisionAgentToolPermission.RuntimePreview);
             }
+            _eventSink?.StageCompleted(
+                request.AgentRunId,
+                "tool_policy",
+                "Tool policy checked",
+                "Allowed metadata-only tool permissions were resolved before tool execution.",
+                new
+                {
+                    allowedPermissions = allowedPermissions.Select(permission => permission.ToString()).ToList(),
+                    runtimePreviewConsent = request.RuntimePreviewConsent,
+                    deniedPermissions = new[] { nameof(VisionAgentToolPermission.ConfigWrite) },
+                    metadataOnly = true
+                });
 
             loopResult = await _loop.RunAsync(new VisionAgentLoopRequest
             {
@@ -164,6 +225,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                 {
                     UserDescription = request.Description,
                     AdditionalContext = request.AdditionalContext,
+                    AgentRunId = request.AgentRunId,
                     ExistingFlowJson = request.ExistingFlowJson,
                     MaxToolResultChars = _loopOptions.MaxToolResultChars,
                     RuntimePreviewConsent = request.RuntimePreviewConsent,
@@ -175,12 +237,40 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         }
         catch (AgentToolCallPolicyViolationException ex)
         {
+            _eventSink?.Append(request.AgentRunId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.RunFailed,
+                Stage = "tool_policy",
+                Title = "Tool policy denied",
+                Summary = "Vision Agent planner tool policy denied the request.",
+                Status = AgentRunEventStatuses.Failed,
+                Payload = new
+                {
+                    error = ex.Message,
+                    firstFixRecommendation = "Remove the denied tool intent and retry with metadata-only review steps.",
+                    metadataOnly = true
+                }
+            });
             return ControlledFailure(
                 $"Vision Agent planner tool policy denied the request: {ex.Message}",
                 []);
         }
         catch (Exception ex)
         {
+            _eventSink?.Append(request.AgentRunId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.RunFailed,
+                Stage = "planner",
+                Title = "Vision Agent failed",
+                Summary = "Vision Agent GenerateFlow failed before a workflow draft could be mapped.",
+                Status = AgentRunEventStatuses.Failed,
+                Payload = new
+                {
+                    error = ex.Message,
+                    firstFixRecommendation = "Retry the request or switch to legacy GenerateFlow mode if the controlled agent remains unavailable.",
+                    metadataOnly = true
+                }
+            });
             return ControlledFailure(
                 $"Vision Agent GenerateFlow failed: {ex.Message}",
                 []);
@@ -188,6 +278,21 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
 
         if (!loopResult.Success)
         {
+            _eventSink?.Append(request.AgentRunId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.RunFailed,
+                Stage = "planner",
+                Title = "Vision Agent loop failed",
+                Summary = loopResult.ErrorMessage ?? "Vision agent loop failed.",
+                Status = AgentRunEventStatuses.Failed,
+                Payload = new
+                {
+                    failureType = loopResult.FailureType,
+                    toolCalls = loopResult.ToolTrace.Count,
+                    firstFixRecommendation = "Inspect the failed public tool trace, resolve blocked metadata, and retry.",
+                    metadataOnly = true
+                }
+            });
             return ControlledFailure(
                 loopResult.ErrorMessage ?? "Vision agent loop failed.",
                 loopResult.ToolTrace);
@@ -195,6 +300,20 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
 
         if (capture.FlowDraft.ValueKind != JsonValueKind.Object)
         {
+            _eventSink?.Append(request.AgentRunId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.RunFailed,
+                Stage = "workflow_draft",
+                Title = "Workflow draft missing",
+                Summary = "Vision agent did not produce a workflow draft.",
+                Status = AgentRunEventStatuses.Failed,
+                Payload = new
+                {
+                    toolCalls = loopResult.ToolTrace.Count,
+                    firstFixRecommendation = "Ask for a concrete workflow draft or switch to scripted mode with an existing template.",
+                    metadataOnly = true
+                }
+            });
             return ControlledFailure(
                 "Vision agent did not produce a workflow draft.",
                 loopResult.ToolTrace);
@@ -203,6 +322,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         try
         {
             var flow = BuildFlowDto(capture.FlowDraft, request.Description, out var operatorIdMap);
+            EmitWorkflowDraftEvent(request, capture.FlowDraft);
+            EmitAgentCheckEvents(request, capture, loopResult);
             var validationPreview = new
             {
                 structuralValidation = CloneJsonCompatible(capture.ValidationSummary),
@@ -263,6 +384,20 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Controlled Vision Agent GenerateFlow mapping failed.");
+            _eventSink?.Append(request.AgentRunId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.RunFailed,
+                Stage = "artifact",
+                Title = "Artifact mapping failed",
+                Summary = "Controlled Vision Agent GenerateFlow mapping failed.",
+                Status = AgentRunEventStatuses.Failed,
+                Payload = new
+                {
+                    error = ex.Message,
+                    firstFixRecommendation = "Review the workflow draft shape and retry after correcting invalid operator metadata.",
+                    metadataOnly = true
+                }
+            });
             return ControlledFailure(
                 $"Controlled Vision Agent GenerateFlow mapping failed: {ex.Message}",
                 loopResult.ToolTrace);
@@ -630,6 +765,196 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             arguments = trace.Arguments,
             resultSummary = trace.ResultSummary
         };
+    }
+
+    private void EmitWorkflowDraftEvent(AiFlowGenerationRequest request, JsonElement flowDraft)
+    {
+        _eventSink?.Append(request.AgentRunId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.WorkflowDraftUpdated,
+            Stage = "workflow_draft",
+            Title = "Workflow draft updated",
+            Summary = "The controlled Vision Agent produced a workflow draft.",
+            Status = AgentRunEventStatuses.Completed,
+            Payload = new
+            {
+                operatorCount = ReadArray(flowDraft, "operators").Count(),
+                connectionCount = ReadArray(flowDraft, "connections").Count(),
+                operatorTypes = ReadArray(flowDraft, "operators")
+                    .Select(op => ReadString(op, "operatorType"))
+                    .Where(type => !string.IsNullOrWhiteSpace(type))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                metadataOnly = true
+            }
+        });
+    }
+
+    private void EmitAgentCheckEvents(
+        AiFlowGenerationRequest request,
+        AgentToolResultCapture capture,
+        VisionAgentLoopResult loopResult)
+    {
+        _eventSink?.StageCompleted(
+            request.AgentRunId,
+            "planner",
+            "Planner completed",
+            $"Vision Agent completed {loopResult.ToolRounds} tool rounds.",
+            new
+            {
+                toolCalls = loopResult.ToolTrace.Count,
+                failedToolCalls = loopResult.ToolTrace.Count(trace => !trace.Success),
+                generationMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+                metadataOnly = true
+            });
+
+        EmitCheckEvent(
+            request.AgentRunId,
+            AgentRunEventTypes.ReadinessChecked,
+            "readiness",
+            "Readiness checked",
+            "Workflow structural readiness check completed.",
+            capture.ValidationSummary);
+        EmitCheckEvent(
+            request.AgentRunId,
+            AgentRunEventTypes.ManifestDryRunCompleted,
+            "manifest_dry_run",
+            "Manifest dry-run completed",
+            "Metadata-only manifest dry-run completed.",
+            capture.DryRunSummary);
+        EmitCheckEvent(
+            request.AgentRunId,
+            AgentRunEventTypes.PackageReadinessChecked,
+            "package_readiness",
+            "Package readiness checked",
+            "Runtime package metadata readiness check completed.",
+            capture.DeploymentPrecheck);
+        EmitCheckEvent(
+            request.AgentRunId,
+            AgentRunEventTypes.StationCompatibilityCompleted,
+            "station_compatibility",
+            "Station compatibility completed",
+            "Station compatibility was reviewed as metadata only.",
+            capture.DeploymentPrecheck);
+        EmitCheckEvent(
+            request.AgentRunId,
+            AgentRunEventTypes.OperatorContractCompleted,
+            "operator_contract",
+            "Operator contract completed",
+            "Operator contract review completed for the draft.",
+            capture.DeploymentPrecheck);
+        EmitCheckEvent(
+            request.AgentRunId,
+            AgentRunEventTypes.ReleaseReviewCompleted,
+            "release_review",
+            "Release review completed",
+            "Pre-release review completed without real deployment, package creation, PLC write, or hot-load.",
+            capture.DeploymentPrecheck);
+
+        _eventSink?.Append(request.AgentRunId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.ArtifactCreated,
+            Stage = "artifact",
+            Title = "Report artifact created",
+            Summary = "Generated metadata-only workflow report evidence for the AI panel.",
+            Status = AgentRunEventStatuses.Completed,
+            Payload = new
+            {
+                reportId = $"agent-report-{request.AgentRunId ?? "local"}",
+                artifactKind = "workflow_draft_report",
+                toolCalls = loopResult.ToolTrace.Count,
+                metadataOnly = true
+            }
+        });
+    }
+
+    private void EmitCheckEvent(
+        string? runId,
+        string eventType,
+        string stage,
+        string title,
+        string summary,
+        JsonElement data)
+    {
+        var payload = BuildCheckPayload(data);
+        _eventSink?.Append(runId, new AgentRunEventDraft
+        {
+            EventType = eventType,
+            Stage = stage,
+            Title = title,
+            Summary = summary,
+            Status = ReadCheckStatus(data),
+            Payload = payload
+        });
+    }
+
+    private static object BuildCheckPayload(JsonElement data)
+    {
+        if (data.ValueKind == JsonValueKind.Undefined)
+        {
+            return new
+            {
+                available = false,
+                status = AgentRunEventStatuses.Completed,
+                metadataOnly = true
+            };
+        }
+
+        return new
+        {
+            available = true,
+            status = ReadCheckStatus(data),
+            reportId = ReadString(data, "reportId") ??
+                       ReadString(data, "manifestId") ??
+                       ReadString(data, "reviewId"),
+            blockedReasons = ReadStringArray(data, "blockedReasons")
+                .Concat(ReadStringArray(data, "blockingReasons"))
+                .Concat(ReadStringArray(data, "deniedReasons"))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(12)
+                .ToList(),
+            missingResourceCount = ReadArray(data, "missingResources").Count(),
+            diagnosticCount = ReadArray(data, "diagnostics").Count(),
+            firstFixRecommendation = ReadString(data, "firstFixRecommendation") ??
+                                     ReadString(data, "repairTarget") ??
+                                     "Review the public diagnostics and provide missing metadata before retrying.",
+            metadataOnly = true
+        };
+    }
+
+    private static string ReadCheckStatus(JsonElement data)
+    {
+        var raw = ReadString(data, "status") ??
+                  ReadString(data, "decision") ??
+                  ReadString(data, "readiness") ??
+                  string.Empty;
+        if (raw.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("block", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("deny", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("not_ready", StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunEventStatuses.Blocked;
+        }
+
+        return AgentRunEventStatuses.Completed;
+    }
+
+    private static IReadOnlyList<string> ReadStringArray(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object ||
+            !TryGetProperty(element, propertyName, out var value) ||
+            value.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return value
+            .EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetString())
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Cast<string>()
+            .ToList();
     }
 
     private static DraftOperator ReadDraftOperator(JsonElement element)

@@ -100,6 +100,7 @@ SOURCE_SCAN_EXTENSIONS = {
     ".manifest",
     ".js",
     ".json",
+    ".jsonl",
     ".md",
     ".mjs",
     ".operator",
@@ -145,6 +146,11 @@ FORBIDDEN_SECRET_PATTERNS = [
         r"\.cvpkg\b",
     ]
 ]
+
+AGENT_RUN_AUDIT_FILE_NAMES = {
+    "agent_run_events.jsonl",
+    "agent_run_summary.jsonl",
+}
 
 SOURCE_SECRET_PATTERNS = [
     (
@@ -443,6 +449,51 @@ def validate_forbidden_fragments(path: Path, text: str, fragments: list[str], er
             errors.append(f"{repo_relative(path)} leaks configured forbidden fragment.")
 
 
+def collect_optional_agent_run_audit_files() -> list[Path]:
+    candidates: list[Path] = []
+    for env_name in ["CV_AGENT_RUN_EVENT_STORE", "CV_RUNTIME_PREVIEW_GOVERNANCE_STORE"]:
+        value = os.environ.get(env_name, "")
+        if not value:
+            continue
+        directory = Path(value)
+        if not directory.is_absolute():
+            directory = REPO_ROOT / directory
+        for name in AGENT_RUN_AUDIT_FILE_NAMES:
+            path = directory / name
+            if path.exists():
+                candidates.append(path)
+
+    return sorted(set(candidates))
+
+
+def validate_agent_run_jsonl(path: Path, text: str, errors: list[str]) -> None:
+    if path.name not in AGENT_RUN_AUDIT_FILE_NAMES:
+        return
+
+    non_empty_lines = [line for line in text.splitlines() if line.strip()]
+    if not non_empty_lines:
+        errors.append(f"{repo_relative(path)} must contain at least one metadata-only AgentRun record.")
+        return
+
+    for index, line in enumerate(non_empty_lines, start=1):
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError as exc:
+            errors.append(f"{repo_relative(path)} line {index} is not valid JSONL: {exc}")
+            return
+        if item.get("metadataOnly") is not True:
+            errors.append(f"{repo_relative(path)} line {index} must be metadataOnly=true.")
+            return
+        if item.get("redactionPass") is not True:
+            errors.append(f"{repo_relative(path)} line {index} must be redactionPass=true.")
+            return
+        raw_lower = line.lower()
+        for forbidden in ["chain_of_thought", "hidden_thought", "reasoning_content", "raw_prompt"]:
+            if forbidden in raw_lower:
+                errors.append(f"{repo_relative(path)} line {index} leaks hidden reasoning marker {forbidden}.")
+                return
+
+
 def iter_source_scan_files() -> list[Path]:
     files: list[Path] = []
     for root, dirs, names in os.walk(REPO_ROOT):
@@ -541,6 +592,7 @@ def main() -> int:
     env_value = os.environ.get("CV_AGENT_FORBIDDEN_SECRET_FRAGMENTS", "")
     configured_fragments.extend(item.strip() for item in re.split(r"[\r\n;]+", env_value) if item.strip())
     expected_files = JSON_REPORTS + MARKDOWN_REPORTS + TEXT_OUTPUTS
+    expected_files.extend(collect_optional_agent_run_audit_files())
     trx_files = sorted(TEST_RESULTS_DIR.glob("*.trx"))
     if not trx_files:
         errors.append(f"{repo_relative(TEST_RESULTS_DIR)} must contain at least one TRX file.")
@@ -550,10 +602,11 @@ def main() -> int:
         if not path.exists():
             errors.append(f"Missing artifact file: {repo_relative(path)}")
             continue
-        if path.suffix.lower() in {".json", ".md", ".txt", ".trx"}:
+        if path.suffix.lower() in {".json", ".jsonl", ".md", ".txt", ".trx"}:
             text = path.read_text(encoding="utf-8", errors="ignore")
             validate_no_secret_leaks(path, text, errors)
             validate_forbidden_fragments(path, text, configured_fragments, errors)
+            validate_agent_run_jsonl(path, text, errors)
 
     report_summaries: list[dict[str, Any]] = []
     for path in JSON_REPORTS:

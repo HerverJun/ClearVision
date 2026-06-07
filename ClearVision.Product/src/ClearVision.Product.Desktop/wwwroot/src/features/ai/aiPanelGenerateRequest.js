@@ -69,6 +69,25 @@ export const aiPanelGenerateRequestMixin = {
             this._setResultStatusNote('', '');
         }
 
+        if (this._shouldUseAgentRunEventStream?.()) {
+            const agentRunPayload = this._buildAgentRunCreatePayload({
+                normalizedDescription,
+                normalizedHint,
+                requestId,
+                resolvedMode,
+                flowPayload,
+                attachmentPaths: [],
+                normalizedTemplateSelection,
+                agentGenerateFlowPayload
+            });
+
+            this._dispatchAgentRunGenerateRequest(agentRunPayload, { clearInput, input })
+                .catch(err => {
+                    this._handleError(err?.message || String(err || 'AgentRun 创建失败'));
+                });
+            return true;
+        }
+
         try {
             webMessageBridge.sendMessage('GenerateFlow', {
                 payload: {
@@ -518,9 +537,20 @@ export const aiPanelGenerateRequestMixin = {
 
         const requestId = this.activeGenerateRequestId;
         const sessionId = this.activeGenerateSessionId || this.sessionId;
-        if (!requestId) return;
+        if (!requestId && !this.activeAgentRunId) return;
 
         this.isCancellingGenerate = true;
+
+        if (this.activeAgentRunId && this._cancelActiveAgentRun) {
+            this._cancelActiveAgentRun();
+            this._updateProgress({
+                message: '正在取消生成...',
+                phase: 'cancelling'
+            });
+            this._addMessage('system', '已发送 AgentRun 取消请求，正在等待事件流确认。');
+            this._setGeneratingState(this.isGenerating);
+            return;
+        }
 
         webMessageBridge.sendMessage('CancelGenerateFlow', {
             payload: {

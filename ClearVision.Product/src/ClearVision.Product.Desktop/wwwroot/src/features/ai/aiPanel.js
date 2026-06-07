@@ -17,6 +17,7 @@ import { aiPanelAttachmentsMixin } from './aiPanelAttachments.js';
 import { aiPanelSessionHistoryMixin } from './aiPanelSessionHistory.js';
 import { aiPanelApplyPreviewMixin } from './aiPanelApplyPreview.js';
 import { aiPanelTopologySummaryMixin } from './aiPanelTopologySummary.js';
+import { aiPanelAgentRunMixin } from './aiPanelAgentRun.js';
 
 /**
  * AI 智能助手面板
@@ -65,6 +66,13 @@ export class AiPanel {
         this._streamBuffer = { thinking: '', content: '' };
         this._streamFlushPending = false;
         this.activeAssistantTurn = null;
+        this.activeAgentRunId = null;
+        this.activeAgentRunEventSource = null;
+        this.activeAgentRunEvents = [];
+        this.activeAgentRunEventKeys = new Set();
+        this.agentRunStepMap = new Map();
+        this.agentRunToolMap = new Map();
+        this.agentRunArtifactMap = new Map();
         this.pendingManualRetry = null;
         this.requirementMode = this._loadRequirementMode();
 
@@ -160,6 +168,7 @@ export class AiPanel {
         this.activeGenerateRequestId = null;
         this.activeGenerateSessionId = null;
         this.isCancellingGenerate = false;
+        this._resetAgentRunState();
         this.attachments = [];
         this._resetPendingDraftState();
         this._resetCurrentResultSyncState();
@@ -1883,6 +1892,7 @@ export class AiPanel {
     _clearActiveRequestState() {
         this.activeGenerateRequestId = null;
         this.activeGenerateSessionId = null;
+        this._resetAgentRunState?.();
     }
     
     _clearResultPane() {
@@ -2159,6 +2169,7 @@ Object.assign(
     aiPanelChatMixin,
     aiPanelValidationPreviewMixin,
     aiPanelGenerateRequestMixin,
+    aiPanelAgentRunMixin,
     aiPanelRequirementBriefMixin,
     aiPanelAttachmentsMixin,
     aiPanelSessionHistoryMixin,

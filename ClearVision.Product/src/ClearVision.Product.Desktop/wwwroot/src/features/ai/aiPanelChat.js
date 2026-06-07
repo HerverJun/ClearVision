@@ -60,6 +60,18 @@ export const aiPanelChatMixin = {
                         <span class="ai-cursor reply-cursor" hidden></span>
                     </div>
                 </details>
+                <details class="ai-assistant-section ai-assistant-process-section" open hidden>
+                    <summary>执行过程</summary>
+                    <div class="ai-assistant-section-body ai-assistant-process-body"></div>
+                </details>
+                <details class="ai-assistant-section ai-assistant-tools-section" hidden>
+                    <summary>工具调用</summary>
+                    <div class="ai-assistant-section-body ai-assistant-tools-body"></div>
+                </details>
+                <details class="ai-assistant-section ai-assistant-artifacts-section" hidden>
+                    <summary>报告结果</summary>
+                    <div class="ai-assistant-section-body ai-assistant-artifacts-body"></div>
+                </details>
                 <details class="ai-assistant-section ai-assistant-clarification-section" hidden>
                     <summary>需求澄清</summary>
                     <div class="ai-assistant-section-body ai-assistant-clarification-body"></div>
@@ -82,6 +94,12 @@ export const aiPanelChatMixin = {
             replyBody: msg.querySelector('.ai-assistant-reply-body'),
             reasoningCursor: msg.querySelector('.reasoning-cursor'),
             replyCursor: msg.querySelector('.reply-cursor'),
+            processSection: msg.querySelector('.ai-assistant-process-section'),
+            processBody: msg.querySelector('.ai-assistant-process-body'),
+            toolsSection: msg.querySelector('.ai-assistant-tools-section'),
+            toolsBody: msg.querySelector('.ai-assistant-tools-body'),
+            artifactsSection: msg.querySelector('.ai-assistant-artifacts-section'),
+            artifactsBody: msg.querySelector('.ai-assistant-artifacts-body'),
             clarificationSection: msg.querySelector('.ai-assistant-clarification-section'),
             clarificationBody: msg.querySelector('.ai-assistant-clarification-body'),
             failureSection: msg.querySelector('.ai-assistant-failure-section'),
@@ -96,7 +114,42 @@ export const aiPanelChatMixin = {
         return turn;
     },
 
-    _updateThinkingStep(chainId, stepId, text) {},
+    _updateThinkingStep(chainId, stepId, text) {
+        const turn = this.activeAssistantTurn;
+        if (!turn?.processSection || !turn?.processBody) return null;
+
+        const value = String(text || '').trim();
+        if (!value) return null;
+
+        const key = `${String(chainId || 'agent-run').trim()}:${String(stepId || 'step').trim()}`;
+        this.agentRunStepMap = this.agentRunStepMap instanceof Map
+            ? this.agentRunStepMap
+            : new Map();
+
+        turn.processSection.hidden = false;
+        let item = this.agentRunStepMap.get(key);
+        if (!item || !turn.processBody.contains?.(item)) {
+            item = document.createElement('div');
+            item.className = 'ai-agent-run-step is-running';
+            item.dataset.stepKey = key;
+            item.innerHTML = `
+                <span class="ai-agent-run-step-dot"></span>
+                <div class="ai-agent-run-step-copy"></div>
+            `;
+            turn.processBody.appendChild(item);
+            this.agentRunStepMap.set(key, item);
+        }
+
+        const copy = item.querySelector('.ai-agent-run-step-copy');
+        if (copy) {
+            copy.textContent = value;
+        } else {
+            item.textContent = value;
+        }
+
+        this._scrollToBottom();
+        return item;
+    },
 
     _setAssistantTurnStatus(turn, statusText, tone = 'streaming') {
         if (!turn?.statusEl || !turn?.card) return;

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
@@ -12,6 +13,7 @@ public sealed class VisionAgentLoop
     private readonly VisionAgentProtocolParser _protocolParser;
     private readonly AgentPromptBuilder _promptBuilder;
     private readonly VisionAgentLoopOptions _options;
+    private readonly IAgentRunEventSink? _eventSink;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -24,13 +26,15 @@ public sealed class VisionAgentLoop
         IVisionAgentToolRegistry toolRegistry,
         VisionAgentProtocolParser protocolParser,
         AgentPromptBuilder promptBuilder,
-        IOptions<VisionAgentLoopOptions> options)
+        IOptions<VisionAgentLoopOptions> options,
+        IAgentRunEventSink? eventSink = null)
     {
         _toolRegistry = toolRegistry;
         _protocolParser = protocolParser;
         _promptBuilder = promptBuilder;
         _options = options.Value;
         _options.Normalize();
+        _eventSink = eventSink;
     }
 
     public async Task<VisionAgentLoopResult> RunAsync(
@@ -145,6 +149,15 @@ public sealed class VisionAgentLoop
         var knownTool = _toolRegistry.TryGet(call.Name, out var tool);
         var permission = knownTool ? tool.Permission.ToString() : string.Empty;
         VisionAgentToolResult result;
+        _eventSink?.ToolStarted(context.AgentRunId, ResolveToolStage(call.Name), call.Name, new
+        {
+            toolName = call.Name,
+            permission,
+            arguments = context.DebugTrace
+                ? CloneJsonCompatible(call.Arguments)
+                : SummarizeArguments(call.Arguments),
+            metadataOnly = true
+        });
 
         if (!knownTool)
         {
@@ -197,6 +210,7 @@ public sealed class VisionAgentLoop
         }
 
         stopwatch.Stop();
+        var resultSummary = SummarizeResult(result);
         lock (traces)
         {
             traces.Add(new VisionAgentToolTrace
@@ -206,7 +220,7 @@ public sealed class VisionAgentLoop
                     ? CloneJsonCompatible(call.Arguments)
                     : SummarizeArguments(call.Arguments),
                 Success = result.Success,
-                ResultSummary = SummarizeResult(result),
+                ResultSummary = resultSummary,
                 ErrorCode = result.ErrorCode,
                 ErrorMessage = result.ErrorMessage,
                 DurationMs = stopwatch.ElapsedMilliseconds,
@@ -216,6 +230,44 @@ public sealed class VisionAgentLoop
                     : null,
                 AdapterName = ExtractAdapterName(result.Data)
             });
+        }
+
+        var eventPayload = new
+        {
+            toolName = call.Name,
+            status = result.Success
+                ? AgentRunEventStatuses.Completed
+                : AgentRunEventStatuses.Failed,
+            durationMs = stopwatch.ElapsedMilliseconds,
+            permission,
+            summary = resultSummary,
+            errorCode = result.ErrorCode,
+            errorMessage = result.ErrorMessage,
+            reportId = ExtractReportId(result.Data),
+            blockedReasons = ExtractBlockedReasons(result.Data),
+            firstFixRecommendation = result.Success
+                ? null
+                : BuildFirstFixRecommendation(result.ErrorCode, result.ErrorMessage),
+            metadataOnly = true
+        };
+        if (result.Success)
+        {
+            _eventSink?.ToolCompleted(
+                context.AgentRunId,
+                ResolveToolStage(call.Name),
+                call.Name,
+                stopwatch.ElapsedMilliseconds,
+                eventPayload);
+        }
+        else
+        {
+            _eventSink?.ToolFailed(
+                context.AgentRunId,
+                ResolveToolStage(call.Name),
+                call.Name,
+                stopwatch.ElapsedMilliseconds,
+                $"Tool '{call.Name}' failed: {result.ErrorCode ?? "tool_failed"}.",
+                eventPayload);
         }
 
         if (result.PendingActions.Count > 0)
@@ -297,6 +349,165 @@ public sealed class VisionAgentLoop
             charLength = json.Length,
             pendingActionCount = result.PendingActions.Count
         };
+    }
+
+    private static string ResolveToolStage(string toolName)
+    {
+        return toolName.ToLowerInvariant() switch
+        {
+            "list_operator_catalog" or "get_operator_schema" or "get_operator_knowledge" or "match_flow_template" or "inspect_current_flow" => "planner",
+            "get_flow_template_skeleton" => "workflow_draft",
+            "validate_flow" => "readiness",
+            "dryrun_flow" => "manifest_dry_run",
+            "runtime_package_precheck" => "package_readiness",
+            _ => "tool_call"
+        };
+    }
+
+    private static string? ExtractReportId(object? data)
+    {
+        return TryFindString(data, "reportId") ??
+               TryFindString(data, "manifestId") ??
+               TryFindString(data, "reviewId") ??
+               TryFindString(data, "sessionId");
+    }
+
+    private static IReadOnlyList<string> ExtractBlockedReasons(object? data)
+    {
+        return TryFindStringArray(data, "blockedReasons")
+            .Concat(TryFindStringArray(data, "blockingReasons"))
+            .Concat(TryFindStringArray(data, "deniedReasons"))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToList();
+    }
+
+    private static string BuildFirstFixRecommendation(string? errorCode, string? errorMessage)
+    {
+        if (string.Equals(errorCode, "tool_permission_denied", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Remove the blocked tool intent or retry in a mode that only uses metadata-only review tools.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(errorMessage) &&
+            errorMessage.Contains("resource", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Provide the missing metadata resource reference, then rerun the Vision Agent request.";
+        }
+
+        return "Inspect the tool failure summary, adjust the request or required metadata, and retry.";
+    }
+
+    private static string? TryFindString(object? data, string propertyName)
+    {
+        if (data == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(data, JsonOptions));
+            return TryFindString(doc.RootElement, propertyName);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? TryFindString(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase) &&
+                    property.Value.ValueKind == JsonValueKind.String)
+                {
+                    return property.Value.GetString();
+                }
+
+                var nested = TryFindString(property.Value, propertyName);
+                if (!string.IsNullOrWhiteSpace(nested))
+                {
+                    return nested;
+                }
+            }
+        }
+
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                var nested = TryFindString(item, propertyName);
+                if (!string.IsNullOrWhiteSpace(nested))
+                {
+                    return nested;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<string> TryFindStringArray(object? data, string propertyName)
+    {
+        if (data == null)
+        {
+            return [];
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(data, JsonOptions));
+            return TryFindStringArray(doc.RootElement, propertyName);
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static IReadOnlyList<string> TryFindStringArray(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase) &&
+                    property.Value.ValueKind == JsonValueKind.Array)
+                {
+                    return property.Value
+                        .EnumerateArray()
+                        .Where(item => item.ValueKind == JsonValueKind.String)
+                        .Select(item => item.GetString())
+                        .Where(item => !string.IsNullOrWhiteSpace(item))
+                        .Cast<string>()
+                        .ToList();
+                }
+
+                var nested = TryFindStringArray(property.Value, propertyName);
+                if (nested.Count > 0)
+                {
+                    return nested;
+                }
+            }
+        }
+
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                var nested = TryFindStringArray(item, propertyName);
+                if (nested.Count > 0)
+                {
+                    return nested;
+                }
+            }
+        }
+
+        return [];
     }
 
     private static string? ExtractAdapterName(object? data)

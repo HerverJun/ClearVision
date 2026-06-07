@@ -240,6 +240,7 @@ static class Program
             app.MapUserEndpoints();
             app.MapVisionApiEndpoints();
             app.MapSettingsEndpoints();
+            app.MapAgentRunEndpoints();
             app.MapPlcEndpoints();
             app.MapStationCommunicationEndpoints();
             app.MapStationEndpoints();

@@ -27,6 +27,8 @@ public record AiFlowGenerationRequest(
     public string AgentGenerateFlowMode { get; init; } = AiAgentGenerateFlowModes.Scripted;
 
     public bool RuntimePreviewConsent { get; init; }
+
+    public string? AgentRunId { get; init; }
 }
 
 public sealed record RuntimePreviewConsent(
