@@ -139,7 +139,24 @@ Commands/evidence:
 
 ## CI Evidence
 
-Current local pre-push evidence is accepted. Remote GitHub Actions evidence must be refreshed after this final hardening commit is pushed. The workflow is configured to run artifact assertion with non-local workflow metadata before upload, and the CI evidence report must be updated with the successful run id, artifact id, and digest.
+Remote GitHub Actions evidence is accepted for the final hardening commit:
+
+| Field | Value |
+| --- | --- |
+| workflow | Vision Agent Quality Suite |
+| branchName | codex初稿 |
+| headSha | cac7d7519de439bac7283fc4b0f9b6b03f82a07e |
+| runId | 27083878486 |
+| runNumber | 32 |
+| runAttempt | 1 |
+| conclusion | success |
+| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27083878486 |
+| artifactName | vision-agent-quality-suite |
+| artifactId | 7461102803 |
+| artifactDigest | sha256:354ce5f2307ebe93531b32ff6f952a677af9a8fc807726bc2213f387774d91e3 |
+| completedAtUtc | 2026-06-07T05:36:02Z |
+
+The remote workflow ran artifact assertion with non-local workflow metadata before upload.
 
 ## Safety Statement
 

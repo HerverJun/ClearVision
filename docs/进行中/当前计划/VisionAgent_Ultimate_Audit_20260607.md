@@ -23,7 +23,7 @@ The audited path is metadata-only and review-only. It must not use real camera S
 | Agent Explanation Final | Pass | `60` cases, `60` passed, no empty status/decision/risk/action fields. |
 | GovernanceStore Final | Pass | `60` sessions, `600` audit events, JSONL v4 streams, corruption recovery covered. |
 | Artifact/source/redaction scan | Pass | `72` artifact files, `33` reports, `3380` source files scanned, `forbiddenHitCount=0`. |
-| Remote CI evidence | Pending in this working tree | Must be refreshed after this commit is pushed and GitHub Actions uploads a non-local artifact bundle. |
+| Remote CI evidence | Pass | GitHub Actions run #32 completed successfully and uploaded artifact `7461102803` with digest `sha256:354ce5f2307ebe93531b32ff6f952a677af9a8fc807726bc2213f387774d91e3`. |
 
 ## Release Review Call Chain
 
@@ -121,11 +121,32 @@ No unrelated abstraction consolidation is required before pre-pilot because the 
 | Endpoint regression host | Test-only | Uses in-memory test host and redacted config. |
 | Generated quality reports | Evidence artifacts | No secrets, no real images, no package binaries, no real Station data. |
 
+## Remote CI Evidence
+
+| Field | Value |
+| --- | --- |
+| workflow | Vision Agent Quality Suite |
+| branchName | codex初稿 |
+| headSha | cac7d7519de439bac7283fc4b0f9b6b03f82a07e |
+| runId | 27083878486 |
+| runNumber | 32 |
+| runAttempt | 1 |
+| conclusion | success |
+| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27083878486 |
+| jobId | 79934500290 |
+| jobUrl | https://github.com/HerverJun/ClearVision/actions/runs/27083878486/job/79934500290 |
+| artifactName | vision-agent-quality-suite |
+| artifactId | 7461102803 |
+| artifactDigest | sha256:354ce5f2307ebe93531b32ff6f952a677af9a8fc807726bc2213f387774d91e3 |
+| completedAtUtc | 2026-06-07T05:36:02Z |
+
+Run #32 completed `Run Vision Agent Quality Suite`, `Generate Real LLM Shadow Eval Sample`, `Assert Vision Agent Artifact Reports`, and `Upload Vision Agent Quality Reports` successfully.
+
 ## Blockers And Residual Risks
 
 | Item | Status | Mitigation |
 | --- | --- | --- |
-| Remote CI evidence for this exact commit | Pending | Push this work, wait for `Vision Agent Quality Suite`, then update CI evidence report with run id, artifact id, digest, and conclusion. |
+| Evidence closure commit after documenting run #32 | Pending | This documentation-only update should be pushed and verified by a follow-up remote CI run. |
 | Real pilot enablement | Not in scope | Requires separate RFC, manual approvals, hardware lab setup, and a real adapter gate. |
 | Existing build warnings | Non-blocking | Build completes with 0 errors; warning cleanup remains outside this hardening scope. |
 | Artifact workflow metadata in local reports | Expected local state | CI regenerates reports with non-local workflow metadata before upload. |
@@ -147,4 +168,4 @@ No unrelated abstraction consolidation is required before pre-pilot because the 
 
 ## Final Decision
 
-Local pre-push hardening is accepted. The remaining required closure is remote CI evidence for the pushed commit, including a successful GitHub Actions run and uploaded `vision-agent-quality-suite` artifact digest.
+Local pre-push hardening and remote run #32 are accepted. The remaining closure is a documentation-only evidence update commit and follow-up remote CI verification.

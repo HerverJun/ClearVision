@@ -1,8 +1,60 @@
 # Vision Agent CI Evidence Report 20260606
 
-## Local Pre-Push Evidence - RuntimePreview v1.4 Release Review Simulator
+## Workflow Run #32 - RuntimePreview Final Pre-Pilot Evidence
 
-This section records the current local pre-push evidence for RuntimePreview v1.4. Remote GitHub Actions evidence must be refreshed after the v1.4 commit is pushed and the Vision Agent Quality Suite uploads its artifact bundle.
+| Field | Value |
+| --- | --- |
+| workflow | Vision Agent Quality Suite |
+| job | Agent Engineering Harness |
+| branchName | codex初稿 |
+| commitSha | cac7d7519de439bac7283fc4b0f9b6b03f82a07e |
+| headSha | cac7d7519de439bac7283fc4b0f9b6b03f82a07e |
+| runId | 27083878486 |
+| runAttempt | 1 |
+| runNumber | 32 |
+| event | push |
+| status | completed |
+| conclusion | success |
+| runUrl | https://github.com/HerverJun/ClearVision/actions/runs/27083878486 |
+| jobId | 79934500290 |
+| jobUrl | https://github.com/HerverJun/ClearVision/actions/runs/27083878486/job/79934500290 |
+| startedAtUtc | 2026-06-07T05:33:05Z |
+| completedAtUtc | 2026-06-07T05:36:02Z |
+
+## Workflow Run #32 Artifact
+
+| Field | Value |
+| --- | --- |
+| artifactName | vision-agent-quality-suite |
+| artifactId | 7461102803 |
+| size | 467265 bytes |
+| digest | sha256:354ce5f2307ebe93531b32ff6f952a677af9a8fc807726bc2213f387774d91e3 |
+| expired | false |
+| createdAtUtc | 2026-06-07T05:35:53Z |
+| expiresAtUtc | 2026-09-05T05:33:05Z |
+
+Run #32 is the remote CI closure for RuntimePreview Final pre-pilot hardening. It supersedes failed run #31 and the local pre-push v1.4 evidence. The remote job completed the quality suite, generated the real LLM shadow sample, asserted artifact reports with non-local workflow metadata, and uploaded the `vision-agent-quality-suite` artifact.
+
+Remote quality evidence:
+
+- Backend Agent harness: `593` passed, `0` failed, minimum `560`.
+- AI endpoint regression: `42` passed, `0` failed, minimum `42`.
+- UI contract: `194` passed, `0` failed, minimum `190`.
+- Business benchmark: `120` cases, `120` passed, `accepted=true`.
+- Planner autonomy benchmark: `21` cases, `21` passed, `accepted=true`.
+- RuntimePreview Final evidence: `60` metadata-only cases, `realResourcesTouched=false`.
+- Station Profile Final: `12` profiles, `accepted=true`.
+- Operator Contract Registry Final: `16` metadata-only contracts, version `operator-contract-registry.final.metadata-only`.
+- PreRelease Review Final: `60` reports, `14` release allowed, `10` require approval, `36` blocked.
+- GovernanceStore Final: JSONL v4 final export, `60` sessions, `600` audit events.
+- Artifact/source scan: `72` artifact files, `33` reports, `3381` source files scanned.
+- Redaction: `forbiddenHitCount=0`, `redactionPass=true`.
+
+Remote run #32 does not add real camera SDK access, real Station access, real image/model/template reads, PLC writes, real package creation, packaging, deployment, hot-load, Real RuntimePreview adapter activation, shell/system command tool access, or `Acme.Product.*` dependency.
+
+## Historical Local Pre-Push Evidence - RuntimePreview v1.4 Release Review Simulator
+
+This historical section records the earlier local pre-push evidence for RuntimePreview v1.4 before the final hardening gate was raised. It is superseded by Workflow Run #32 above.
 
 | Field | Value |
 | --- | --- |
