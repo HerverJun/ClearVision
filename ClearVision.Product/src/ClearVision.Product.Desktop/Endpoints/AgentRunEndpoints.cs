@@ -1,4 +1,7 @@
+using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
@@ -23,12 +26,14 @@ public static class AgentRunEndpoints
         app.MapPost("/api/ai/agent-runs", HandleCreateRunAsync);
         app.MapGet("/api/ai/agent-runs/{runId}", HandleReplayRun);
         app.MapGet("/api/ai/agent-runs/{runId}/events", HandleRunEventsAsync);
+        app.MapPost("/api/ai/agent-runs/{runId}/stream-token", HandleCreateStreamToken);
         app.MapPost("/api/ai/agent-runs/{runId}/cancel", HandleCancelRun);
         return app;
     }
 
     private static Task<IResult> HandleCreateRunAsync(
         AgentRunCreateRequest request,
+        HttpContext context,
         IAgentRunEventStreamService streamService,
         IServiceScopeFactory scopeFactory,
         ILoggerFactory loggerFactory)
@@ -41,6 +46,7 @@ public static class AgentRunEndpoints
             }));
         }
 
+        var ownerHash = ResolveCurrentOwnerHash(context);
         var createResult = streamService.CreateRun(request.Description, new
         {
             mode = request.Mode ?? "auto",
@@ -48,7 +54,8 @@ public static class AgentRunEndpoints
             agentGenerateFlowMode = request.AgentGenerateFlowMode ?? AiAgentGenerateFlowModes.Scripted,
             attachmentCount = request.AttachmentCount ?? request.Attachments?.Count ?? 0,
             metadataOnly = true
-        });
+        }, ownerHash);
+        var streamToken = streamService.IssueStreamToken(createResult.RunId, ownerHash);
 
         _ = Task.Run(async () =>
         {
@@ -63,33 +70,74 @@ public static class AgentRunEndpoints
         {
             runId = createResult.RunId,
             brief = createResult.Brief,
+            streamToken,
+            streamTokenExpiresInSeconds = 45,
             events = createResult.Events
         }));
     }
 
     private static IResult HandleReplayRun(
         string runId,
+        HttpContext context,
         IAgentRunEventStreamService streamService)
     {
         var replay = streamService.Replay(runId);
-        return replay == null
-            ? Results.NotFound(new { error = "Agent run not found." })
-            : Results.Ok(replay);
+        if (replay == null)
+        {
+            return Results.NotFound(new { error = "Agent run not found." });
+        }
+
+        return streamService.IsRunOwner(runId, ResolveCurrentOwnerHash(context))
+            ? Results.Ok(replay)
+            : Results.StatusCode(StatusCodes.Status403Forbidden);
     }
 
     private static IResult HandleCancelRun(
         string runId,
+        HttpContext context,
         IAgentRunEventStreamService streamService)
     {
+        var replayBeforeCancel = streamService.Replay(runId);
+        if (replayBeforeCancel == null)
+        {
+            return Results.NotFound(new { error = "Agent run not found." });
+        }
+
+        if (!streamService.IsRunOwner(runId, ResolveCurrentOwnerHash(context)))
+        {
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
         var cancelled = streamService.Cancel(runId);
         var replay = streamService.Replay(runId);
-        return replay == null && cancelled == null
-            ? Results.NotFound(new { error = "Agent run not found." })
+        return Results.Ok(new
+        {
+            runId,
+            cancelled = cancelled != null,
+            summary = replay?.Summary
+        });
+    }
+
+    private static IResult HandleCreateStreamToken(
+        string runId,
+        HttpContext context,
+        IAgentRunEventStreamService streamService)
+    {
+        var replay = streamService.Replay(runId);
+        if (replay == null)
+        {
+            return Results.NotFound(new { error = "Agent run not found." });
+        }
+
+        var ownerHash = ResolveCurrentOwnerHash(context);
+        var token = streamService.IssueStreamToken(runId, ownerHash);
+        return string.IsNullOrWhiteSpace(token)
+            ? Results.StatusCode(StatusCodes.Status403Forbidden)
             : Results.Ok(new
             {
                 runId,
-                cancelled = cancelled != null,
-                summary = replay?.Summary
+                streamToken = token,
+                streamTokenExpiresInSeconds = 45
             });
     }
 
@@ -99,6 +147,26 @@ public static class AgentRunEndpoints
         IAgentRunEventStreamService streamService,
         CancellationToken ct)
     {
+        var token = context.Request.Query["streamToken"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            var validation = streamService.ValidateStreamToken(runId, token, consume: true);
+            if (!validation.Authorized)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await context.Response.WriteAsJsonAsync(new { error = "Agent run stream token rejected." }, ct);
+                return;
+            }
+        }
+        else if (!streamService.IsRunOwner(runId, ResolveCurrentOwnerHash(context)))
+        {
+            context.Response.StatusCode = streamService.Replay(runId) == null
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new { error = "Agent run access denied." }, ct);
+            return;
+        }
+
         var afterSequence = ParseLastEventId(context.Request);
         using var subscription = streamService.Subscribe(runId, afterSequence);
         if (subscription == null)
@@ -209,7 +277,31 @@ public static class AgentRunEndpoints
         return request.Headers.TryGetValue("Last-Event-ID", out var lastEventIdHeader) &&
                long.TryParse(lastEventIdHeader.FirstOrDefault(), out var parsedId)
             ? parsedId
+            : TryParseQuerySequence(request);
+    }
+
+    private static long TryParseQuerySequence(HttpRequest request)
+    {
+        if (long.TryParse(request.Query["lastEventId"].FirstOrDefault(), out var lastEventId))
+        {
+            return lastEventId;
+        }
+
+        return long.TryParse(request.Query["afterSequence"].FirstOrDefault(), out var afterSequence)
+            ? afterSequence
             : 0;
+    }
+
+    private static string ResolveCurrentOwnerHash(HttpContext context)
+    {
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            return string.Empty;
+        }
+
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"agent-run-owner:{userId.Trim()}"));
+        return "usr_" + Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private static async Task WriteAgentRunSseAsync(

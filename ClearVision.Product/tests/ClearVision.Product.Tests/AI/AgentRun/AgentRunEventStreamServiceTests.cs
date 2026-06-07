@@ -128,7 +128,7 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
     [Fact(DisplayName = "AgentRun replay restores persisted JSONL after service restart")]
     public void Replay_ShouldRestorePersistedJsonl()
     {
-        var run = _service.CreateRun("restore");
+        var run = _service.CreateRun("restore", ownerHash: "usr_owner_restore");
         _service.Append(run.RunId, Draft(AgentRunEventTypes.ReadinessChecked, "readiness"));
         _service.Complete(run.RunId, "restored");
 
@@ -138,6 +138,61 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         replay.Should().NotBeNull();
         replay!.Events.Select(evt => evt.Sequence).Should().Equal(1, 2, 3, 4);
         replay.Summary.Summary.Should().Be("restored");
+        replay.Summary.OwnerHash.Should().Be("usr_owner_restore");
+        reloaded.IsRunOwner(run.RunId, "usr_owner_restore").Should().BeTrue();
+        reloaded.IsRunOwner(run.RunId, "usr_other").Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "AgentRun stream token validates owner run binding expiry and single use")]
+    public void StreamToken_ShouldValidateOwnerRunExpiryAndSingleUse()
+    {
+        var now = DateTimeOffset.Parse("2026-06-07T00:00:00Z");
+        _service.UtcNowProvider = () => now;
+        var run = _service.CreateRun("token", ownerHash: "usr_owner_a");
+
+        _service.IssueStreamToken(run.RunId, "usr_owner_b").Should().BeNull();
+        var token = _service.IssueStreamToken(run.RunId, "usr_owner_a", TimeSpan.FromSeconds(60));
+        token.Should().NotBeNullOrWhiteSpace();
+
+        _service.ValidateStreamToken("ar_other", token, consume: false)
+            .FailureReason.Should().Be("run_mismatch");
+
+        var preflight = _service.ValidateStreamToken(run.RunId, token, consume: false);
+        preflight.Authorized.Should().BeTrue();
+        preflight.OwnerHash.Should().Be("usr_owner_a");
+
+        _service.ValidateStreamToken(run.RunId, token, consume: true).Authorized.Should().BeTrue();
+        _service.ValidateStreamToken(run.RunId, token, consume: true)
+            .FailureReason.Should().Be("unknown_token");
+
+        var expiring = _service.IssueStreamToken(run.RunId, "usr_owner_a", TimeSpan.FromSeconds(60));
+        now = now.AddSeconds(61);
+        _service.ValidateStreamToken(run.RunId, expiring, consume: false)
+            .FailureReason.Should().Be("expired_token");
+    }
+
+    [Fact(DisplayName = "AgentRun stream token clamps unsafe TTL and rejects missing token")]
+    public void StreamToken_ShouldClampUnsafeTtlAndRejectMissingToken()
+    {
+        var now = DateTimeOffset.Parse("2026-06-07T00:00:00Z");
+        _service.UtcNowProvider = () => now;
+        var run = _service.CreateRun("ttl", ownerHash: "usr_owner_ttl");
+
+        _service.ValidateStreamToken(run.RunId, null, consume: false)
+            .FailureReason.Should().Be("missing_token");
+
+        var longTtlToken = _service.IssueStreamToken(run.RunId, "usr_owner_ttl", TimeSpan.FromMinutes(5));
+        now = now.AddSeconds(46);
+
+        _service.ValidateStreamToken(run.RunId, longTtlToken, consume: false)
+            .FailureReason.Should().Be("expired_token");
+
+        now = DateTimeOffset.Parse("2026-06-07T00:00:00Z");
+        var negativeTtlToken = _service.IssueStreamToken(run.RunId, "usr_owner_ttl", TimeSpan.FromSeconds(-1));
+        now = now.AddSeconds(46);
+
+        _service.ValidateStreamToken(run.RunId, negativeTtlToken, consume: false)
+            .FailureReason.Should().Be("expired_token");
     }
 
     [Fact(DisplayName = "AgentRun append after terminal is ignored")]

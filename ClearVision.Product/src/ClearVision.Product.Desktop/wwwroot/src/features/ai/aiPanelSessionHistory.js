@@ -228,8 +228,7 @@ export const aiPanelSessionHistoryMixin = {
                 parsedFlow?.explanation || parsedFlow?.Explanation ||
                 latestAssistantPayload?.aiExplanation || latestAssistantPayload?.AiExplanation ||
                 latestAssistantPayload?.reply || latestAssistantPayload?.Reply || '--',
-            reasoning: parsedAiFlow?.reasoning || parsedAiFlow?.Reasoning ||
-                latestAssistantPayload?.reasoning || latestAssistantPayload?.Reasoning || '',
+            reasoning: '',
             recommendedTemplate: followupSource?.recommendedTemplate ?? followupSource?.RecommendedTemplate ?? null,
             templateCandidates: followupSource?.templateCandidates ?? followupSource?.TemplateCandidates ??
                 latestAssistantPayload?.templateCandidates ?? latestAssistantPayload?.TemplateCandidates ?? [],

@@ -21,7 +21,7 @@ import { aiPanelAgentRunMixin } from './aiPanelAgentRun.js';
 
 /**
  * AI 智能助手面板
- * 负责管理 AI 交互界面、发送生成请求、显示思考链和结果
+ * 负责管理 AI 交互界面、发送生成请求、显示公开诊断和结果
  */
 export class AiPanel {
     constructor(containerId, flowCanvas, options = {}) {
@@ -610,13 +610,13 @@ export class AiPanel {
             return;
         }
 
-        const chunkType = payload.chunkType; // 'thinking' or 'content'
+        const chunkType = payload.chunkType; // 'content' or legacy hidden thinking
         const content = payload.content || '';
         
         if (!content) return;
 
         if (chunkType === 'thinking') {
-            this._streamBuffer.thinking += content;
+            return;
         } else if (chunkType === 'content') {
             this._streamBuffer.content += content;
         } else {
@@ -631,15 +631,11 @@ export class AiPanel {
 
     _flushStreamBuffer() {
         this._streamFlushPending = false;
-        const thinkingText = this._streamBuffer?.thinking || '';
         const replyText = this._streamBuffer?.content || '';
 
         this._streamBuffer.thinking = '';
         this._streamBuffer.content = '';
 
-        if (thinkingText) {
-            this._appendAssistantStreamText('reasoning', thinkingText);
-        }
         if (replyText) {
             this._appendAssistantStreamText('reply', replyText);
         }
@@ -921,13 +917,7 @@ export class AiPanel {
                 );
             }
 
-            if (!assistantTurn.reasoningBody?.textContent?.trim()) {
-                this._setAssistantSectionText(
-                    assistantTurn,
-                    'reasoning',
-                    data.reasoning || data.Reasoning || ''
-                );
-            }
+            this._renderPublicDiagnosticsSection(assistantTurn, data);
         }
 
         const flow = data?.flow || data?.Flow || null;

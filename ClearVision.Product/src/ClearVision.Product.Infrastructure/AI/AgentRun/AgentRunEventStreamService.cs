@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Channels;
 
@@ -6,7 +7,7 @@ namespace ClearVision.Product.Infrastructure.AI.AgentRun;
 
 public interface IAgentRunEventStreamService
 {
-    AgentRunCreateResult CreateRun(string description, object? payload = null);
+    AgentRunCreateResult CreateRun(string description, object? payload = null, string? ownerHash = null);
     AgentRunEvent? Append(string? runId, AgentRunEventDraft draft);
     AgentRunEvent? Complete(string? runId, string summary, object? payload = null);
     AgentRunEvent? Fail(string? runId, string summary, string firstFixRecommendation, object? payload = null);
@@ -15,6 +16,9 @@ public interface IAgentRunEventStreamService
     AgentRunReplayResult? Replay(string runId);
     CancellationToken GetCancellationToken(string? runId);
     bool TryCancelToken(string runId);
+    bool IsRunOwner(string runId, string? ownerHash);
+    string? IssueStreamToken(string runId, string? ownerHash, TimeSpan? ttl = null);
+    AgentRunStreamTokenValidationResult ValidateStreamToken(string runId, string? token, bool consume = true);
 }
 
 public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
@@ -22,6 +26,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
     private const int MaxRecentEvents = 4096;
 
     private readonly ConcurrentDictionary<string, AgentRunState> _runs = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, AgentRunStreamToken> _streamTokens = new(StringComparer.Ordinal);
     private readonly AgentRunEventStore _store;
     private readonly AgentRunEventRedactor _redactor;
 
@@ -36,10 +41,12 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         _redactor = redactor;
     }
 
-    public AgentRunCreateResult CreateRun(string description, object? payload = null)
+    public Func<DateTimeOffset> UtcNowProvider { get; set; } = static () => DateTimeOffset.UtcNow;
+
+    public AgentRunCreateResult CreateRun(string description, object? payload = null, string? ownerHash = null)
     {
         var runId = $"ar_{Guid.NewGuid():N}";
-        var state = new AgentRunState(runId, DateTimeOffset.UtcNow);
+        var state = new AgentRunState(runId, UtcNowProvider(), ownerHash);
         _runs[runId] = state;
 
         var brief = BuildBrief(description);
@@ -267,6 +274,90 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         }
     }
 
+    public bool IsRunOwner(string runId, string? ownerHash)
+    {
+        if (string.IsNullOrWhiteSpace(runId))
+        {
+            return false;
+        }
+
+        var state = GetOrRestoreState(runId.Trim());
+        if (state == null)
+        {
+            return false;
+        }
+
+        var normalizedOwner = NormalizeOwnerHash(ownerHash);
+        lock (state.Gate)
+        {
+            if (string.IsNullOrWhiteSpace(state.OwnerHash))
+            {
+                return string.IsNullOrWhiteSpace(normalizedOwner);
+            }
+
+            return string.Equals(state.OwnerHash, normalizedOwner, StringComparison.Ordinal);
+        }
+    }
+
+    public string? IssueStreamToken(string runId, string? ownerHash, TimeSpan? ttl = null)
+    {
+        if (!IsRunOwner(runId, ownerHash))
+        {
+            return null;
+        }
+
+        var effectiveTtl = ttl.GetValueOrDefault(TimeSpan.FromSeconds(45));
+        if (effectiveTtl <= TimeSpan.Zero || effectiveTtl > TimeSpan.FromSeconds(60))
+        {
+            effectiveTtl = TimeSpan.FromSeconds(45);
+        }
+
+        var token = CreateOpaqueToken();
+        _streamTokens[token] = new AgentRunStreamToken(
+            runId.Trim(),
+            NormalizeOwnerHash(ownerHash),
+            UtcNowProvider().Add(effectiveTtl));
+        return token;
+    }
+
+    public AgentRunStreamTokenValidationResult ValidateStreamToken(string runId, string? token, bool consume = true)
+    {
+        if (string.IsNullOrWhiteSpace(runId) || string.IsNullOrWhiteSpace(token))
+        {
+            return new AgentRunStreamTokenValidationResult(false, FailureReason: "missing_token");
+        }
+
+        var normalizedRunId = runId.Trim();
+        var normalizedToken = token.Trim();
+        if (!_streamTokens.TryGetValue(normalizedToken, out var record))
+        {
+            return new AgentRunStreamTokenValidationResult(false, FailureReason: "unknown_token");
+        }
+
+        if (record.ExpiresAt <= UtcNowProvider())
+        {
+            _streamTokens.TryRemove(normalizedToken, out _);
+            return new AgentRunStreamTokenValidationResult(false, FailureReason: "expired_token");
+        }
+
+        if (!string.Equals(record.RunId, normalizedRunId, StringComparison.OrdinalIgnoreCase))
+        {
+            return new AgentRunStreamTokenValidationResult(false, FailureReason: "run_mismatch");
+        }
+
+        if (!IsRunOwner(normalizedRunId, record.OwnerHash))
+        {
+            return new AgentRunStreamTokenValidationResult(false, FailureReason: "owner_mismatch");
+        }
+
+        if (consume && !_streamTokens.TryRemove(normalizedToken, out _))
+        {
+            return new AgentRunStreamTokenValidationResult(false, FailureReason: "token_consumed");
+        }
+
+        return new AgentRunStreamTokenValidationResult(true, record.OwnerHash);
+    }
+
     private AgentRunEvent? AppendTerminal(string? runId, AgentRunEventDraft draft)
     {
         if (string.IsNullOrWhiteSpace(runId))
@@ -368,7 +459,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             return null;
         }
 
-        var restored = new AgentRunState(runId, summary?.CreatedAt ?? events.Min(evt => evt.Timestamp))
+        var restored = new AgentRunState(runId, summary?.CreatedAt ?? events.Min(evt => evt.Timestamp), summary?.OwnerHash)
         {
             UpdatedAt = summary?.UpdatedAt ?? events.Max(evt => evt.Timestamp),
             Status = summary?.Status ?? events.LastOrDefault()?.Status ?? AgentRunEventStatuses.Completed,
@@ -429,6 +520,22 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         return string.Equals(status, AgentRunEventStatuses.Completed, StringComparison.OrdinalIgnoreCase) ||
                string.Equals(status, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase) ||
                string.Equals(status, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeOwnerHash(string? ownerHash)
+    {
+        return string.IsNullOrWhiteSpace(ownerHash)
+            ? string.Empty
+            : ownerHash.Trim();
+    }
+
+    private static string CreateOpaqueToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        return Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
     }
 
     private static string BuildBrief(string? description)
@@ -505,15 +612,17 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
     private sealed class AgentRunState
     {
-        public AgentRunState(string runId, DateTimeOffset createdAt)
+        public AgentRunState(string runId, DateTimeOffset createdAt, string? ownerHash)
         {
             RunId = runId;
             CreatedAt = createdAt;
             UpdatedAt = createdAt;
+            OwnerHash = NormalizeOwnerHash(ownerHash);
         }
 
         public object Gate { get; } = new();
         public string RunId { get; }
+        public string OwnerHash { get; }
         public DateTimeOffset CreatedAt { get; }
         public DateTimeOffset UpdatedAt { get; set; }
         public string Status { get; set; } = AgentRunEventStatuses.Running;
@@ -547,6 +656,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                 FirstFixRecommendation = FirstFixRecommendation,
                 LastSequence = LastSequence,
                 EventCount = EventCount,
+                OwnerHash = OwnerHash,
                 MetadataOnly = true,
                 RedactionPass = RedactionPass,
                 Payload = new
@@ -557,6 +667,11 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             };
         }
     }
+
+    private sealed record AgentRunStreamToken(
+        string RunId,
+        string OwnerHash,
+        DateTimeOffset ExpiresAt);
 }
 
 public sealed class AgentRunEventSubscription : IDisposable

@@ -216,6 +216,107 @@ export const aiPanelChatMixin = {
         body.textContent = keepExisting && body.textContent ? `${body.textContent}${value}` : value;
     },
 
+    _renderPublicDiagnosticsSection(turn, payload = {}) {
+        const lines = this._collectPublicDiagnosticLines(payload);
+        this._setAssistantSectionText(turn, 'reasoning', lines.join('\n'));
+    },
+
+    _collectPublicDiagnosticLines(payload = {}) {
+        if (!payload || typeof payload !== 'object') return [];
+
+        const allowedFields = [
+            'publicDiagnostics',
+            'executionTrace',
+            'toolEvents',
+            'stageEvents',
+            'failureDiagnostics'
+        ];
+        const lines = [];
+        allowedFields.forEach(field => {
+            const value = payload[field] ?? payload[this._toPascalCase?.(field) ?? `${field[0].toUpperCase()}${field.slice(1)}`];
+            this._appendPublicDiagnosticLines(lines, field, value, 0);
+        });
+
+        return [...new Set(lines.map(line => this._redactPublicDiagnosticText(line)).filter(Boolean))].slice(0, 24);
+    },
+
+    _appendPublicDiagnosticLines(lines, label, value, depth = 0) {
+        if (value === null || value === undefined || depth > 2) return;
+
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+            const text = String(value).trim();
+            if (text) lines.push(`${this._formatPublicDiagnosticLabel(label)}: ${text}`);
+            return;
+        }
+
+        if (Array.isArray(value)) {
+            value.slice(0, 8).forEach(item => this._appendPublicDiagnosticLines(lines, label, item, depth + 1));
+            return;
+        }
+
+        if (typeof value !== 'object') return;
+
+        const hiddenKeys = new Set([
+            'reasoning',
+            'thinking',
+            'chainOfThought',
+            'chain_of_thought',
+            'rawPrompt',
+            'systemPrompt',
+            'userPrompt',
+            'reasoningContent'
+        ]);
+        const publicParts = [
+            value.stage ?? value.Stage,
+            value.toolName ?? value.ToolName,
+            value.title ?? value.Title,
+            value.status ?? value.Status,
+            value.summary ?? value.Summary,
+            value.message ?? value.Message,
+            value.reportId ?? value.ReportId,
+            value.firstFixRecommendation ?? value.FirstFixRecommendation
+        ]
+            .map(item => String(item ?? '').trim())
+            .filter(Boolean);
+
+        if (publicParts.length > 0) {
+            lines.push(`${this._formatPublicDiagnosticLabel(label)}: ${publicParts.join(' / ')}`);
+        }
+
+        Object.entries(value)
+            .filter(([key]) => !hiddenKeys.has(key))
+            .filter(([key]) => /^(blockedReasons|issues|warnings|errors|diagnostics)$/i.test(key))
+            .forEach(([key, nested]) => this._appendPublicDiagnosticLines(lines, key, nested, depth + 1));
+    },
+
+    _formatPublicDiagnosticLabel(label) {
+        switch (String(label || '').trim()) {
+            case 'publicDiagnostics':
+                return '公开诊断';
+            case 'executionTrace':
+                return '执行过程';
+            case 'toolEvents':
+                return '工具调用';
+            case 'stageEvents':
+                return '阶段事件';
+            case 'failureDiagnostics':
+                return '失败诊断';
+            default:
+                return String(label || '公开诊断');
+        }
+    },
+
+    _redactPublicDiagnosticText(value) {
+        return String(value || '')
+            .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, 'Bearer [redacted]')
+            .replace(/\b(?:authorization|x-api-key|api[-_ ]?key)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '$1: [redacted]')
+            .replace(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g, '[redacted:ip]')
+            .replace(/(?:[a-z]:\\|\\\\)[^\s"'<>|]+/gi, '[redacted:path]')
+            .replace(/(?:\/users\/|\/home\/|\/var\/|\/tmp\/|\/mnt\/|\/data\/|\/models\/|\/artifacts\/)[^\s"'<>|]+/gi, '[redacted:path]')
+            .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\r\n]+/gi, '[redacted:image]')
+            .trim();
+    },
+
     _renderAssistantFailure(turn, payload = {}) {
         if (!turn?.failureSection || !turn?.failureBody) return;
 
@@ -703,9 +804,8 @@ export const aiPanelChatMixin = {
         if (!turn) return null;
 
         const reply = String(payload.reply ?? payload.Reply ?? turnData?.message ?? turnData?.Message ?? '').trim();
-        const reasoning = String(payload.reasoning ?? payload.Reasoning ?? '').trim();
         this._setAssistantSectionText(turn, 'reply', reply);
-        this._setAssistantSectionText(turn, 'reasoning', reasoning);
+        this._renderPublicDiagnosticsSection(turn, payload);
 
         if (this._isClarificationResult(payload)) {
             this._renderAssistantClarification(turn, payload);

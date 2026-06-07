@@ -71,6 +71,7 @@ public sealed record AgentRunSummary
     public string FirstFixRecommendation { get; init; } = string.Empty;
     public long LastSequence { get; init; }
     public int EventCount { get; init; }
+    public string OwnerHash { get; init; } = string.Empty;
     public bool MetadataOnly { get; init; } = true;
     public bool RedactionPass { get; init; } = true;
     public object? Payload { get; init; }
@@ -84,6 +85,11 @@ public sealed record AgentRunCreateResult(
 public sealed record AgentRunReplayResult(
     AgentRunSummary Summary,
     IReadOnlyList<AgentRunEvent> Events);
+
+public sealed record AgentRunStreamTokenValidationResult(
+    bool Authorized,
+    string? OwnerHash = null,
+    string? FailureReason = null);
 
 public static class AgentRunEventJson
 {

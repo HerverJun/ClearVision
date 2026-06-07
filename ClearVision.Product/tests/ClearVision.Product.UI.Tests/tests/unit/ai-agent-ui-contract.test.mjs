@@ -7,17 +7,7 @@ import { execFileSync } from 'node:child_process';
 
 function installDom({ search = '', localValues = {} } = {}) {
   const store = new Map(Object.entries(localValues));
-  global.window = {
-    chrome: null,
-    location: { search },
-    __CLEARVISION_AGENT_DEV_UI__: false,
-    confirm() {
-      return true;
-    },
-    setTimeout: global.setTimeout.bind(global),
-    clearTimeout: global.clearTimeout.bind(global)
-  };
-  global.localStorage = {
+  const storageApi = {
     getItem(key) {
       return store.has(key) ? store.get(key) : null;
     },
@@ -28,6 +18,33 @@ function installDom({ search = '', localValues = {} } = {}) {
       store.delete(key);
     }
   };
+  global.window = {
+    chrome: null,
+    location: {
+      protocol: 'http:',
+      hostname: 'localhost',
+      port: '5000',
+      href: `http://localhost:5000/${search}`,
+      search
+    },
+    __CLEARVISION_AGENT_DEV_UI__: false,
+    confirm() {
+      return true;
+    },
+    setTimeout: global.setTimeout.bind(global),
+    clearTimeout: global.clearTimeout.bind(global),
+    sessionStorage: storageApi,
+    localStorage: storageApi,
+    requestAnimationFrame(callback) {
+      return global.setTimeout(callback, 0);
+    },
+    cancelAnimationFrame(id) {
+      global.clearTimeout(id);
+    }
+  };
+  global.localStorage = storageApi;
+  global.requestAnimationFrame = global.window.requestAnimationFrame;
+  global.cancelAnimationFrame = global.window.cancelAnimationFrame;
   global.document = {
     querySelector() {
       return null;
@@ -279,6 +296,7 @@ function createPanel(AiPanel, overrides = {}) {
   panel.activeGenerateSessionId = null;
   panel.activeAgentRunId = null;
   panel.activeAgentRunEventSource = null;
+  panel.activeAgentRunTransport = null;
   panel.activeAgentRunEvents = [];
   panel.activeAgentRunEventKeys = new Set();
   panel.agentRunStepMap = new Map();
@@ -287,6 +305,8 @@ function createPanel(AiPanel, overrides = {}) {
   panel.activeAssistantTurn = null;
   panel.lastUserPrompt = '';
   panel.isCancellingGenerate = false;
+  panel._streamBuffer = { thinking: '', content: '' };
+  panel._streamFlushPending = false;
   panel._scrollToBottom = () => {};
   panel._updateScrollBottomBtn = () => {};
   panel._setResultStatusNote = (text = '', tone = '') => {
@@ -297,6 +317,10 @@ function createPanel(AiPanel, overrides = {}) {
   };
   panel._setWorkbenchState = state => {
     panel.lastWorkbenchState = state;
+  };
+  panel._clearActiveRequestState = () => {
+    panel.activeGenerateRequestId = null;
+    panel.activeGenerateSessionId = null;
   };
   panel._renderQueuedHintBanner = () => {
     panel.queuedHintRendered = true;
@@ -397,6 +421,88 @@ function attachAgentRunTurn(panel) {
   turn.card.dataset = {};
   panel.activeAssistantTurn = turn;
   return turn;
+}
+
+function collectProcessText(turn) {
+  return (turn?.processBody?.children || [])
+    .map(item => item.querySelector?.('.ai-agent-run-step-copy')?.textContent || item.textContent || item.innerHTML || '')
+    .join('\n');
+}
+
+function encodeSseEvent(event) {
+  return `id: ${event.sequence}\nevent: ${event.eventType}\ndata: ${JSON.stringify(event)}\n\n`;
+}
+
+function flushAsync(ticks = 2) {
+  let chain = Promise.resolve();
+  for (let i = 0; i < ticks; i += 1) {
+    chain = chain.then(() => new Promise(resolve => setTimeout(resolve, 0)));
+  }
+  return chain;
+}
+
+async function waitFor(predicate, message = 'condition', attempts = 20) {
+  for (let i = 0; i < attempts; i += 1) {
+    if (predicate()) {
+      return;
+    }
+    await flushAsync(1);
+  }
+
+  assert.ok(predicate(), message);
+}
+
+function installFetchStream(responses, requests = []) {
+  global.fetch = async (url, options = {}) => {
+    requests.push({ url: String(url), options });
+    const next = responses.shift();
+    if (!next) {
+      throw new Error('Unexpected fetch call');
+    }
+
+    if (next.error) {
+      throw next.error;
+    }
+
+    const status = next.status ?? 200;
+    const ok = next.ok ?? (status >= 200 && status < 300);
+    const headers = new Map(Object.entries(next.headers || { 'content-type': next.body ? 'text/event-stream' : 'application/json' }));
+    return {
+      ok,
+      status,
+      headers: {
+        get(name) {
+          return headers.get(String(name || '').toLowerCase()) || headers.get(name) || null;
+        }
+      },
+      async text() {
+        return typeof next.body === 'string' ? next.body : JSON.stringify(next.json ?? {});
+      },
+      async json() {
+        return next.json ?? JSON.parse(String(next.body || '{}'));
+      },
+      body: next.body
+        ? {
+            getReader() {
+              let consumed = false;
+              return {
+                async read() {
+                  if (consumed) {
+                    return { done: true };
+                  }
+                  consumed = true;
+                  return { done: false, value: new TextEncoder().encode(next.body) };
+                },
+                async cancel() {
+                  consumed = true;
+                }
+              };
+            }
+          }
+        : null
+    };
+  };
+  return requests;
 }
 
 function agentResponse() {
@@ -563,20 +669,24 @@ test('RuntimePreview consent payload is one request only', async () => {
   });
 });
 
-test('AgentRun EventSource is used only for developer Agent GenerateFlow mode', async () => {
+test('AgentRun event stream is used only for developer Agent GenerateFlow mode with fetch support', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
-  window.EventSource = function EventSource() {};
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({ ok: true });
 
+  assert.equal(panel._shouldUseAgentRunEventStream(), true);
+  delete window.EventSource;
   assert.equal(panel._shouldUseAgentRunEventStream(), true);
   panel.useVisionAgentGenerateFlow = false;
   assert.equal(panel._shouldUseAgentRunEventStream(), false);
   panel.useVisionAgentGenerateFlow = true;
   panel.isVisionAgentDeveloperUiEnabled = false;
   assert.equal(panel._shouldUseAgentRunEventStream(), false);
-  delete window.EventSource;
   panel.isVisionAgentDeveloperUiEnabled = true;
+  global.fetch = undefined;
   assert.equal(panel._shouldUseAgentRunEventStream(), false);
+  global.fetch = originalFetch;
 });
 
 test('AgentRun create payload is metadata-only and does not send attachment paths', async () => {
@@ -607,33 +717,167 @@ test('AgentRun create payload is metadata-only and does not send attachment path
   assert.deepEqual(payload.templateSelection, { mode: 'template_fill', templateId: 'tmpl-1' });
 });
 
-test('AgentRun EventSource registers required SSE event listeners', async () => {
+test('AgentRun fetch stream is preferred and sends Authorization header', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
-  const listeners = new Map();
-  let createdUrl = '';
-  let closed = false;
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_fetch';
+  panel.isGenerating = true;
+  window.sessionStorage.setItem('cv_auth_token', 'owner-token');
+  const requests = installFetchStream([
+    {
+      body: [
+        encodeSseEvent({
+          runId: 'ar_fetch',
+          sequence: 3,
+          eventType: 'stage.started',
+          stage: 'planner',
+          title: 'Planner started',
+          summary: 'Fetch streamed before terminal.',
+          status: 'running',
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent({
+          runId: 'ar_fetch',
+          sequence: 4,
+          eventType: 'run.completed',
+          stage: 'run',
+          title: 'Run completed',
+          summary: 'Done.',
+          status: 'completed',
+          metadataOnly: true,
+          redactionPass: true
+        })
+      ].join('')
+    }
+  ]);
+
+  const transport = panel._startAgentRunEventSource('ar_fetch', { lastSequence: 2 });
+  assert.ok(transport);
+  await waitFor(() => panel.activeAgentRunEvents.some(evt => evt.eventType === 'run.completed'), 'terminal event from fetch stream');
+
+  assert.match(requests[0].url, /\/api\/ai\/agent-runs\/ar_fetch\/events\?lastEventId=2$/);
+  assert.equal(requests[0].options.headers.Authorization, 'Bearer owner-token');
+  assert.match(collectProcessText(turn), /Fetch streamed before terminal/);
+  assert.equal(panel.activeAgentRunTransport, null);
+  assert.equal(panel.isGenerating, false);
+});
+
+test('AgentRun fetch stream auth failure replays without duplicate history', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_replay';
+  panel.isGenerating = true;
+  panel._handleAgentRunEvent({
+    runId: 'ar_replay',
+    sequence: 2,
+    eventType: 'stage.started',
+    stage: 'planner',
+    title: 'Planner started',
+    summary: 'Already rendered.',
+    status: 'running',
+    metadataOnly: true,
+    redactionPass: true
+  });
+  installFetchStream([
+    { status: 401, body: '' },
+    {
+      json: {
+        runId: 'ar_replay',
+        events: [
+          {
+            runId: 'ar_replay',
+            sequence: 2,
+            eventType: 'stage.started',
+            stage: 'planner',
+            title: 'Planner started',
+            summary: 'Already rendered.',
+            status: 'running',
+            metadataOnly: true,
+            redactionPass: true
+          },
+          {
+            runId: 'ar_replay',
+            sequence: 3,
+            eventType: 'run.completed',
+            stage: 'run',
+            title: 'Run completed',
+            summary: 'Replay completed.',
+            status: 'completed',
+            metadataOnly: true,
+            redactionPass: true
+          }
+        ]
+      }
+    }
+  ]);
+
+  panel._startAgentRunEventSource('ar_replay', { lastSequence: 2 });
+  await waitFor(() => panel.activeAgentRunEvents.some(evt => evt.eventType === 'run.completed'), 'terminal event from replay');
+
+  assert.equal(panel.activeAgentRunEvents.filter(evt => evt.sequence === 2).length, 1);
+  assert.match(collectProcessText(turn), /已切换备用事件流/);
+  assert.doesNotMatch(collectProcessText(turn), /事件流重连中/);
+  assert.equal(panel.isGenerating, false);
+});
+
+test('AgentRun EventSource exists but failing connection falls back to replay mode', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_eventsource_fail';
+  panel.isGenerating = true;
+  const originalReadableStream = global.ReadableStream;
+  global.ReadableStream = undefined;
+  let eventSourceClosed = false;
+  let eventSourceUrl = '';
   window.EventSource = class MockEventSource {
     constructor(url) {
-      createdUrl = url;
+      eventSourceUrl = url;
+      setTimeout(() => this.onerror?.(new Error('401')), 0);
     }
-    addEventListener(type, handler) {
-      listeners.set(type, handler);
-    }
+    addEventListener() {}
     close() {
-      closed = true;
+      eventSourceClosed = true;
     }
   };
+  installFetchStream([
+    { status: 503, body: 'Replay unavailable' },
+    { json: { streamToken: 'single-use-stream-ticket' } },
+    {
+      json: {
+        runId: 'ar_eventsource_fail',
+        events: [
+          {
+            runId: 'ar_eventsource_fail',
+            sequence: 5,
+            eventType: 'run.completed',
+            stage: 'run',
+            title: 'Run completed',
+            summary: 'Replay mode completed.',
+            status: 'completed',
+            metadataOnly: true,
+            redactionPass: true
+          }
+        ]
+      }
+    }
+  ]);
 
-  const source = panel._startAgentRunEventSource('ar_contract');
+  try {
+    panel._startAgentRunEventSource('ar_eventsource_fail', { lastSequence: 4 });
+    await waitFor(() => panel.activeAgentRunEvents.some(evt => evt.eventType === 'run.completed'), 'terminal event after EventSource failure');
 
-  assert.ok(source);
-  assert.match(createdUrl, /\/api\/ai\/agent-runs\/ar_contract\/events$/);
-  for (const type of ['run.started', 'assistant.brief', 'stage.started', 'tool.call.started', 'artifact.created', 'run.completed']) {
-    assert.equal(typeof listeners.get(type), 'function', type);
+    assert.match(eventSourceUrl, /\/api\/ai\/agent-runs\/ar_eventsource_fail\/events\?/);
+    assert.match(eventSourceUrl, /streamToken=single-use-stream-ticket/);
+    assert.equal(eventSourceClosed, true);
+    assert.match(collectProcessText(turn), /已进入回放模式/);
+    assert.match(collectProcessText(turn), /Replay mode completed/);
+  } finally {
+    global.ReadableStream = originalReadableStream;
   }
-  panel._closeAgentRunEventSource();
-  assert.equal(closed, true);
 });
 
 test('AgentRun assistant brief appends immediate public summary', async () => {
@@ -835,7 +1079,7 @@ test('AgentRun terminal completed event closes source and releases generating st
   const turn = attachAgentRunTurn(panel);
   let closed = false;
   panel.activeAgentRunId = 'ar_done';
-  panel.activeAgentRunEventSource = { close: () => { closed = true; } };
+  panel.activeAgentRunTransport = { close: () => { closed = true; } };
   panel.isGenerating = true;
 
   panel._handleAgentRunEvent({
@@ -851,6 +1095,7 @@ test('AgentRun terminal completed event closes source and releases generating st
   });
 
   assert.equal(closed, true);
+  assert.equal(panel.activeAgentRunTransport, null);
   assert.equal(panel.isGenerating, false);
   assert.equal(turn.statusEl.textContent, '生成完成');
   assert.equal(panel.lastResultStatusNote.text, 'Release review completed.');
@@ -860,7 +1105,9 @@ test('AgentRun cancelled event sets cancelled UI state', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
   const turn = attachAgentRunTurn(panel);
+  let closed = false;
   panel.activeAgentRunId = 'ar_cancel';
+  panel.activeAgentRunTransport = { close: () => { closed = true; } };
   panel.isGenerating = true;
 
   panel._handleAgentRunEvent({
@@ -875,12 +1122,69 @@ test('AgentRun cancelled event sets cancelled UI state', async () => {
     redactionPass: true
   });
 
+  assert.equal(closed, true);
+  assert.equal(panel.activeAgentRunTransport, null);
   assert.equal(panel.isGenerating, false);
   assert.equal(turn.statusEl.textContent, '已取消');
   assert.equal(panel.lastWorkbenchState, 'cancelled');
 });
 
-test('AgentRun source guard registers frontend SSE and cancel endpoints without shell tools', () => {
+test('legacy WebMessage fallback drops hidden thinking and renders only public diagnostics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.isGenerating = true;
+  panel.activeGenerateRequestId = 'req-legacy';
+
+  panel._handleStreamChunk({
+    payload: {
+      requestId: 'req-legacy',
+      chunkType: 'thinking',
+      content: 'SECRET_THINKING_TRACE'
+    }
+  });
+  await flushAsync();
+
+  assert.doesNotMatch(`${turn.reasoningBody.textContent}\n${turn.replyBody.textContent}`, /SECRET_THINKING_TRACE/);
+
+  panel._handleStreamChunk({
+    payload: {
+      requestId: 'req-legacy',
+      chunkType: 'content',
+      content: 'Public reply.'
+    }
+  });
+  await flushAsync();
+
+  assert.match(turn.replyBody.textContent, /Public reply/);
+  assert.doesNotMatch(turn.reasoningBody.textContent, /SECRET_THINKING_TRACE/);
+
+  const chatContainer = createFakeElement();
+  panel.container = createContainer({ '#ai-chat-container': chatContainer });
+  const rendered = panel._renderAssistantTurnFromPayload({
+    payload: {
+      reply: 'Done.',
+      reasoning: 'SECRET_REASONING_TRACE',
+      thinking: 'SECRET_THOUGHT_FIELD',
+      publicDiagnostics: ['Public diagnostic.'],
+      executionTrace: [
+        {
+          stage: 'planner',
+          status: 'completed',
+          summary: 'Public trace.',
+          reasoning: 'SECRET_NESTED_REASONING'
+        }
+      ]
+    }
+  });
+
+  assert.ok(rendered);
+  assert.match(rendered.reasoningBody.textContent, /Public diagnostic/);
+  assert.match(rendered.reasoningBody.textContent, /Public trace/);
+  assert.doesNotMatch(`${rendered.reasoningBody.textContent}\n${rendered.replyBody.textContent}`, /SECRET_/);
+});
+
+test('AgentRun source guard registers frontend stream transports and cancel endpoint without shell tools', () => {
   const currentFile = fileURLToPath(import.meta.url);
   const testProjectRoot = path.resolve(path.dirname(currentFile), '..', '..');
   const productRoot = path.resolve(testProjectRoot, '..', '..');
@@ -889,8 +1193,11 @@ test('AgentRun source guard registers frontend SSE and cancel endpoints without 
     'utf8'
   );
 
+  assert.match(agentRunSource, /fetch\(/);
+  assert.match(agentRunSource, /httpClient\.defaultHeaders/);
+  assert.match(agentRunSource, /\/stream-token/);
   assert.match(agentRunSource, /new window\.EventSource/);
-  assert.match(agentRunSource, /\/ai\/agent-runs\/\$\{encodeURIComponent\(runId\)\}\/events/);
+  assert.match(agentRunSource, /\/ai\/agent-runs\/\$\{encodeURIComponent\(this\.runId\)\}\/events/);
   assert.match(agentRunSource, /\/ai\/agent-runs\/\$\{encodeURIComponent\(runId\)\}\/cancel/);
   assert.doesNotMatch(agentRunSource, /chain.?of.?thought|reasoning_content|\bsystemPrompt\b|\buserPrompt\b|powershell|cmd\.exe|child_process|process\./i);
 });

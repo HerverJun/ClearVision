@@ -3,10 +3,12 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Endpoints;
+using ClearVision.Product.Desktop.Middleware;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
@@ -165,6 +167,186 @@ public sealed class AgentRunEndpointsTests
         body.Should().Contain("event: run.completed");
     }
 
+    [Fact(DisplayName = "GET AgentRun SSE streams live event before terminal")]
+    public async Task Events_ShouldStreamLiveFrameBeforeTerminal()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(async (_, ct) =>
+        {
+            await gate.Task.WaitAsync(ct);
+            return AgentRunEndpointTestHost.SuccessResult();
+        });
+        var runId = await host.CreateRunAsync("live endpoint stream");
+        await host.Generation.WaitForCallAsync();
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/ai/agent-runs/{runId}/events");
+            request.Headers.TryAddWithoutValidation("Last-Event-ID", "1");
+            using var response = await host.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            host.StreamService.Append(runId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.StageStarted,
+                Stage = "planner",
+                Title = "Planner started",
+                Summary = "Live frame before terminal.",
+                Status = AgentRunEventStatuses.Running,
+                Payload = new { metadataOnly = true }
+            });
+
+            var frame = await ReadSseUntilAsync(response, AgentRunEventTypes.StageStarted);
+            frame.Should().Contain("id: 3");
+            frame.Should().Contain("event: stage.started");
+            frame.Should().Contain("Live frame before terminal.");
+            host.StreamService.Replay(runId)!.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+        }
+        finally
+        {
+            gate.TrySetResult();
+        }
+    }
+
+    [Fact(DisplayName = "GET AgentRun SSE receives cancel terminal and closes")]
+    public async Task Events_ShouldReceiveCancelTerminalAndClose()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(async (_, ct) =>
+        {
+            await gate.Task.WaitAsync(ct);
+            return AgentRunEndpointTestHost.SuccessResult();
+        });
+        var runId = await host.CreateRunAsync("cancel stream");
+        await host.Generation.WaitForCallAsync();
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/ai/agent-runs/{runId}/events");
+            request.Headers.TryAddWithoutValidation("Last-Event-ID", "1");
+            using var response = await host.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+            using var cancel = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+            cancel.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var frame = await ReadSseUntilAsync(response, AgentRunEventTypes.RunCancelled);
+            frame.Should().Contain("event: run.cancelled");
+            frame.Should().Contain("id: 3");
+        }
+        finally
+        {
+            gate.TrySetResult();
+        }
+    }
+
+    [Fact(DisplayName = "GET AgentRun replay cursor fills missed history after reconnect")]
+    public async Task Events_ShouldReplayMissedHistoryAfterReconnect()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(async (_, ct) =>
+        {
+            await gate.Task.WaitAsync(ct);
+            return AgentRunEndpointTestHost.SuccessResult();
+        });
+        var runId = await host.CreateRunAsync("reconnect replay");
+        await host.Generation.WaitForCallAsync();
+        host.StreamService.Append(runId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.ToolCallCompleted,
+            Stage = "readiness",
+            Title = "Tool completed: validate_flow",
+            Summary = "Replay should include this missed event.",
+            Status = AgentRunEventStatuses.Completed,
+            Payload = new { toolName = "validate_flow", metadataOnly = true }
+        });
+        gate.SetResult();
+        await host.WaitForTerminalAsync(runId);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/ai/agent-runs/{runId}/events");
+        request.Headers.TryAddWithoutValidation("Last-Event-ID", "2");
+        using var response = await host.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        var body = await response.Content.ReadAsStringAsync();
+
+        body.Should().Contain("event: tool.call.completed");
+        body.Should().Contain("event: run.completed");
+        body.IndexOf("event: tool.call.completed", StringComparison.Ordinal)
+            .Should()
+            .BeLessThan(body.IndexOf("event: run.completed", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "AgentRun events require Authorization for fetch stream")]
+    public async Task AuthenticatedEvents_ShouldRequireAuthorizationAndAllowBearerFetch()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true);
+        host.AuthorizeAs("owner-a-token");
+        var runId = await host.CreateRunAsync("auth stream");
+        await host.WaitForTerminalAsync(runId);
+
+        using var unauthorizedClient = host.CreateAnonymousClient();
+        using var unauthorized = await unauthorizedClient.GetAsync($"/api/ai/agent-runs/{runId}/events", HttpCompletionOption.ResponseHeadersRead);
+        unauthorized.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        using var authorized = await host.Client.GetAsync($"/api/ai/agent-runs/{runId}/events", HttpCompletionOption.ResponseHeadersRead);
+        authorized.StatusCode.Should().Be(HttpStatusCode.OK);
+        authorized.Content.Headers.ContentType!.MediaType.Should().Be("text/event-stream");
+    }
+
+    [Fact(DisplayName = "AgentRun ownership is enforced across replay cancel events and stream token")]
+    public async Task AuthenticatedRuns_ShouldRejectWrongOwner()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(async (_, ct) =>
+        {
+            await gate.Task.WaitAsync(ct);
+            return AgentRunEndpointTestHost.SuccessResult();
+        }, useAuth: true);
+        host.AuthorizeAs("owner-a-token");
+        var runId = await host.CreateRunAsync("owner protected");
+        await host.Generation.WaitForCallAsync();
+
+        try
+        {
+            host.AuthorizeAs("owner-b-token");
+            using var replay = await host.Client.GetAsync($"/api/ai/agent-runs/{runId}");
+            using var cancel = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+            using var token = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/stream-token", content: null);
+
+            replay.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+            cancel.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+            token.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+        finally
+        {
+            host.AuthorizeAs("owner-a-token");
+            gate.TrySetResult();
+        }
+    }
+
+    [Fact(DisplayName = "AgentRun EventSource stream token is single-use run-bound and expires")]
+    public async Task EventSourceStreamToken_ShouldBeSingleUseRunBoundAndExpire()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true, utcNowProvider: () => now);
+        host.AuthorizeAs("owner-a-token");
+        var runId = await host.CreateRunAsync("stream token");
+        await host.WaitForTerminalAsync(runId);
+        var streamToken = await host.CreateStreamTokenAsync(runId);
+
+        using var wrongRun = await host.Client.GetAsync($"/api/ai/agent-runs/ar_wrong/events?streamToken={Uri.EscapeDataString(streamToken)}", HttpCompletionOption.ResponseHeadersRead);
+        wrongRun.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        using var authorized = await host.CreateAnonymousClient().GetAsync($"/api/ai/agent-runs/{runId}/events?streamToken={Uri.EscapeDataString(streamToken)}", HttpCompletionOption.ResponseHeadersRead);
+        authorized.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var reused = await host.CreateAnonymousClient().GetAsync($"/api/ai/agent-runs/{runId}/events?streamToken={Uri.EscapeDataString(streamToken)}", HttpCompletionOption.ResponseHeadersRead);
+        reused.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var expiringToken = await host.CreateStreamTokenAsync(runId);
+        now = now.AddSeconds(61);
+        using var expired = await host.CreateAnonymousClient().GetAsync($"/api/ai/agent-runs/{runId}/events?streamToken={Uri.EscapeDataString(expiringToken)}", HttpCompletionOption.ResponseHeadersRead);
+        expired.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     [Fact(DisplayName = "POST AgentRun cancel emits run.cancelled and cancels background request")]
     public async Task Cancel_ShouldEmitCancelledEvent()
     {
@@ -224,6 +406,39 @@ public sealed class AgentRunEndpointsTests
             .Contain("firstFixRecommendation");
     }
 
+    private static async Task<string> ReadSseUntilAsync(HttpResponseMessage response, string eventType)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var frame = new StringBuilder();
+
+        while (!cts.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(cts.Token);
+            if (line == null)
+            {
+                break;
+            }
+
+            if (line.Length == 0)
+            {
+                var text = frame.ToString();
+                if (text.Contains($"event: {eventType}", StringComparison.Ordinal))
+                {
+                    return text;
+                }
+
+                frame.Clear();
+                continue;
+            }
+
+            frame.AppendLine(line);
+        }
+
+        throw new TimeoutException($"SSE event '{eventType}' was not received.");
+    }
+
     private sealed class AgentRunEndpointTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -249,7 +464,9 @@ public sealed class AgentRunEndpointsTests
         public IAgentRunEventStreamService StreamService { get; }
 
         public static async Task<AgentRunEndpointTestHost> CreateAsync(
-            Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>>? handler = null)
+            Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>>? handler = null,
+            bool useAuth = false,
+            Func<DateTimeOffset>? utcNowProvider = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -262,14 +479,26 @@ public sealed class AgentRunEndpointsTests
             var redactor = new AgentRunEventRedactor();
             var store = new AgentRunEventStore(directory, redactor);
             var streamService = new AgentRunEventStreamService(store, redactor);
+            if (utcNowProvider != null)
+            {
+                streamService.UtcNowProvider = utcNowProvider;
+            }
             var generation = new FakeAiFlowGenerationService(handler ?? ((_, _) => Task.FromResult(SuccessResult())));
 
             builder.Services.AddSingleton(redactor);
             builder.Services.AddSingleton(store);
             builder.Services.AddSingleton<IAgentRunEventStreamService>(streamService);
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);
+            if (useAuth)
+            {
+                builder.Services.AddSingleton<IAuthService, FakeAuthService>();
+            }
 
             var app = builder.Build();
+            if (useAuth)
+            {
+                app.UseMiddleware<AuthMiddleware>();
+            }
             app.MapAgentRunEndpoints();
             await app.StartAsync();
 
@@ -301,6 +530,24 @@ public sealed class AgentRunEndpointsTests
             response.EnsureSuccessStatusCode();
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
             return document.RootElement.GetProperty("runId").GetString()!;
+        }
+
+        public async Task<string> CreateStreamTokenAsync(string runId)
+        {
+            using var response = await Client.PostAsync($"/api/ai/agent-runs/{runId}/stream-token", content: null);
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return document.RootElement.GetProperty("streamToken").GetString()!;
+        }
+
+        public HttpClient CreateAnonymousClient()
+        {
+            return _app.GetTestClient();
+        }
+
+        public void AuthorizeAs(string token)
+        {
+            Client.DefaultRequestHeaders.Authorization = new("Bearer", token);
         }
 
         public async Task WaitForTerminalAsync(string runId)
@@ -363,6 +610,65 @@ public sealed class AgentRunEndpointsTests
         public async Task WaitForCallAsync()
         {
             await _called.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    private sealed class FakeAuthService : IAuthService
+    {
+        public Task<AuthResult> LoginAsync(string username, string password)
+        {
+            return Task.FromResult(AuthResult.Fail("not used"));
+        }
+
+        public Task LogoutAsync(string token)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> ValidateTokenAsync(string token)
+        {
+            return Task.FromResult(IsKnownToken(token));
+        }
+
+        public Task<ClearVision.Product.Application.Services.UserSession?> GetSessionAsync(string token)
+        {
+            if (!IsKnownToken(token))
+            {
+                return Task.FromResult<ClearVision.Product.Application.Services.UserSession?>(null);
+            }
+
+            return Task.FromResult<ClearVision.Product.Application.Services.UserSession?>(new()
+            {
+                UserId = token switch
+                {
+                    "owner-a-token" => "user-owner-a",
+                    "owner-b-token" => "user-owner-b",
+                    _ => "user-default"
+                },
+                Username = token,
+                Role = "Admin",
+                ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+            });
+        }
+
+        public Task<AuthResult> ChangePasswordAsync(string userId, string oldPassword, string newPassword)
+        {
+            return Task.FromResult(AuthResult.Fail("not used"));
+        }
+
+        public Task<InitialAdminSetupStatusResponse> GetInitialAdminSetupStatusAsync()
+        {
+            return Task.FromResult(new InitialAdminSetupStatusResponse());
+        }
+
+        public Task<AuthResult> SetupInitialAdminAsync(InitialAdminSetupRequest request)
+        {
+            return Task.FromResult(AuthResult.Fail("not used"));
+        }
+
+        private static bool IsKnownToken(string token)
+        {
+            return token is "owner-a-token" or "owner-b-token" or "owner-default-token";
         }
     }
 }
