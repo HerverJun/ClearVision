@@ -16,7 +16,7 @@ Still prohibited:
 - Real packaging, deployment, delivery, or hot-load.
 - Real RuntimePreview adapter.
 - Agent shell, cmd, PowerShell, or system-command tool.
-- Acme.Product.* additions.
+- legacy non-ClearVision product namespace additions.
 
 Allowed:
 - Metadata-only manifest dry-run.

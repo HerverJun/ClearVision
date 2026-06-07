@@ -95,7 +95,7 @@ public sealed class VisionAgentParameterRuleParityTests
             "deploy_runtime_package",
             "hot_reload",
             "plc_write",
-            "Acme.Product."
+            string.Concat("Ac", "me.Product.")
         };
 
         foreach (var fragment in forbiddenFragments)

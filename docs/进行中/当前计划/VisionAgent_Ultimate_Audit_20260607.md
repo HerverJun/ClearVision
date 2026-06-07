@@ -4,7 +4,7 @@
 
 This audit covers the final pre-pilot hardening state for Vision Agent, RuntimePreview Pilot, RuntimePreview Release Review Simulator, Review Desk, governance artifacts, and CI quality evidence.
 
-The audited path is metadata-only and review-only. It must not use real camera SDKs, real Stations, image reads, model/template file loads, PLC writes, real `.cvpkg` package creation, package deployment, hot-load, Real RuntimePreview adapters, shell/process/system command tools, or `Acme.Product.*` references.
+The audited path is metadata-only and review-only. It must not use real camera SDKs, real Stations, image reads, model/template file loads, PLC writes, real `.cvpkg` package creation, package deployment, hot-load, Real RuntimePreview adapters, shell/process/system command tools, or legacy non-ClearVision product namespace references.
 
 ## Current Status
 

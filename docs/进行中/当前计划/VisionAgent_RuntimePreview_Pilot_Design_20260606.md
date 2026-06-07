@@ -182,4 +182,4 @@ RuntimePreview Pilot v0.8 intentionally does not add:
 - image bytes/base64 output
 - arbitrary path read
 - Agent shell/cmd/powershell/system command tool
-- `Acme.Product.*`
+- legacy non-ClearVision product namespace

@@ -1,9 +1,9 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-06-07T05:32:05.678497+00:00",
+  "generatedAtUtc": "2026-06-07T06:29:14.913140+00:00",
   "artifactName": "vision-agent-quality-suite",
   "scanPolicyVersion": "2026-06-07.runtime-preview-final-pre-pilot-hardening-scan.v1",
-  "sourceFilesScanned": 3381,
+  "sourceFilesScanned": 3383,
   "reportsScanned": 33,
   "auditReportsScanned": 2,
   "sessionReportsScanned": 55,
@@ -12,7 +12,7 @@
   "files": [
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.json",
-      "sizeBytes": 901154
+      "sizeBytes": 901149
     },
     {
       "path": "quality/evals/reports/planner_autonomy_benchmark.json",
@@ -276,7 +276,7 @@
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
-      "sizeBytes": 35132
+      "sizeBytes": 35306
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx",
@@ -308,7 +308,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.1767064+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.0893669+00:00"
       },
       "summary": {
         "caseCount": 120,
@@ -325,7 +325,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:32.9877471+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:51.7313548+00:00"
       },
       "summary": {
         "plannerCaseCount": 15,
@@ -343,7 +343,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -361,7 +361,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -380,7 +380,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -399,7 +399,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -419,7 +419,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -440,7 +440,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -461,7 +461,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -484,7 +484,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "profileCount": 12,
@@ -503,7 +503,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "operatorContractVersion": "operator-contract-registry.final.metadata-only",
@@ -521,7 +521,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "operatorContractVersion": "operator-contract-registry.final.metadata-only",
@@ -540,7 +540,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -562,7 +562,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -584,7 +584,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -607,7 +607,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "eventCount": 19,
@@ -626,7 +626,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "storageVersion": "jsonl.v4",
@@ -676,7 +676,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -699,7 +699,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -722,7 +722,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -741,7 +741,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "profileCount": 12,
@@ -760,7 +760,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "operatorContractVersion": "operator-contract-registry.final.metadata-only",
@@ -778,7 +778,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -800,7 +800,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -822,7 +822,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -845,7 +845,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -866,7 +866,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -889,7 +889,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -923,7 +923,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "caseCount": 60,
@@ -946,7 +946,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "storageVersion": "jsonl.v4",
@@ -996,7 +996,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+        "generatedAtUtc": "2026-06-07T06:28:49.218682+00:00"
       },
       "summary": {
         "reportCount": 28,

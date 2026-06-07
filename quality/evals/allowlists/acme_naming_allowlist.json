@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "2026-06-07.acme-naming-allowlist.v1",
+  "purpose": "Allow only the legacy Acme naming cleanup evidence files to contain Acme.Product, Acme.OperatorLibrary, or Acme.* strings. Source, project, CI, scripts, README, quality reports, and package outputs are not allowed to keep those names.",
+  "allowedFiles": [
+    {
+      "path": "quality/evals/allowlists/acme_naming_allowlist.json",
+      "reason": "The allowlist must name the deprecated legacy fragments it governs."
+    },
+    {
+      "path": "docs/进行中/当前计划/Naming_Package_Cleanup_Evidence_20260607.md",
+      "reason": "The cleanup scan report records the removed package artifacts and deprecated legacy naming policy."
+    }
+  ],
+  "deprecatedFragments": [
+    "Acme.Product",
+    "Acme.OperatorLibrary",
+    "Acme.*"
+  ],
+  "packageArtifactPolicy": {
+    "trackedNupkgAllowed": false,
+    "trackedSnupkgAllowed": false,
+    "trackedNupkgDirectoryAllowed": false,
+    "trackedPackagesDirectoryAllowed": false,
+    "packagesLockJsonAllowed": true
+  }
+}

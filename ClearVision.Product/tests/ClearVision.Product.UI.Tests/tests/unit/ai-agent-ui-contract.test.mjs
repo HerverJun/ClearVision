@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 function installDom({ search = '', localValues = {} } = {}) {
   const store = new Map(Object.entries(localValues));
@@ -150,6 +151,16 @@ async function loadParameterRules() {
 function getRepoRoot() {
   const currentFile = fileURLToPath(import.meta.url);
   return path.resolve(path.dirname(currentFile), '..', '..', '..', '..', '..');
+}
+
+function getTrackedRepoFiles() {
+  return execFileSync('git', ['ls-files', '-z'], {
+    cwd: getRepoRoot(),
+    encoding: 'utf8'
+  })
+    .split('\0')
+    .filter(Boolean)
+    .map(file => file.replaceAll('\\', '/'));
 }
 
 function loadParameterRuleParitySpec() {
@@ -1290,6 +1301,68 @@ test('CI artifact assertion enforces non-local workflow metadata before upload',
     assert.match(workflow, /agent_ui_contract_output\.txt/);
     assert.match(workflow, /\*\*\/\*\.trx/);
   }
+});
+
+test('repository naming guard blocks legacy package names and NuGet package artifacts', () => {
+  const repoRoot = getRepoRoot();
+  const trackedFiles = getTrackedRepoFiles();
+  const packageArtifacts = trackedFiles.filter(file => /\.(?:nupkg|snupkg)$/i.test(file));
+  const packageOutputFiles = trackedFiles.filter(file => /(^|\/)nupkg\//i.test(file));
+  const packagesDirectoryFiles = trackedFiles.filter(file => /(^|\/)packages\//i.test(file));
+  const allowlistPath = path.resolve(repoRoot, 'quality', 'evals', 'allowlists', 'acme_naming_allowlist.json');
+  const allowlist = JSON.parse(fs.readFileSync(allowlistPath, 'utf8'));
+  const allowedFiles = new Set(allowlist.allowedFiles.map(entry => entry.path));
+  const forbiddenFragments = [
+    ['Ac', 'me.Product'].join(''),
+    ['Ac', 'me.OperatorLibrary'].join(''),
+    ['Ac', 'me.'].join('')
+  ];
+  const textExtensions = new Set([
+    '.cs',
+    '.csproj',
+    '.sln',
+    '.props',
+    '.targets',
+    '.ps1',
+    '.cmd',
+    '.bat',
+    '.sh',
+    '.py',
+    '.js',
+    '.mjs',
+    '.json',
+    '.md',
+    '.txt',
+    '.yml',
+    '.yaml',
+    '.xml',
+    '.config'
+  ]);
+  const legacyHits = [];
+
+  assert.deepEqual(packageArtifacts, []);
+  assert.deepEqual(packageOutputFiles, []);
+  assert.deepEqual(packagesDirectoryFiles, []);
+
+  for (const file of trackedFiles) {
+    if (allowedFiles.has(file)) {
+      continue;
+    }
+
+    const extension = path.extname(file).toLowerCase();
+    if (!textExtensions.has(extension)) {
+      continue;
+    }
+
+    const text = fs.readFileSync(path.resolve(repoRoot, file), 'utf8');
+    for (const fragment of forbiddenFragments) {
+      if (text.includes(fragment)) {
+        legacyHits.push(`${file}: ${fragment}`);
+      }
+    }
+  }
+
+  assert.deepEqual(legacyHits, []);
 });
 
 test('shadow eval source guard confines HttpClient to shadow runner only', () => {

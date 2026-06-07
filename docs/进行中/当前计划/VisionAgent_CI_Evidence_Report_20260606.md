@@ -50,7 +50,7 @@ Remote quality evidence:
 - Artifact/source scan: `72` artifact files, `33` reports, `3381` source files scanned.
 - Redaction: `forbiddenHitCount=0`, `redactionPass=true`.
 
-Remote run #32 does not add real camera SDK access, real Station access, real image/model/template reads, PLC writes, real package creation, packaging, deployment, hot-load, Real RuntimePreview adapter activation, shell/system command tool access, or `Acme.Product.*` dependency.
+Remote run #32 does not add real camera SDK access, real Station access, real image/model/template reads, PLC writes, real package creation, packaging, deployment, hot-load, Real RuntimePreview adapter activation, shell/system command tool access, or legacy non-ClearVision product namespace dependency.
 
 ## Historical Local Pre-Push Evidence - RuntimePreview v1.4 Release Review Simulator
 

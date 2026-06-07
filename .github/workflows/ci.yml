@@ -236,6 +236,7 @@ jobs:
             throw "Could not determine OperatorLibrary VersionPrefix."
           }
           $env:OPERATOR_PACKAGE_VERSION = "$versionPrefix-ci.${{ github.run_number }}.${{ github.run_attempt }}"
+          New-Item -ItemType Directory -Force -Path "${{ env.OPERATOR_PACKAGE_DIR }}" | Out-Null
           dotnet pack ${{ env.OPERATOR_PROJECT }} `
             --configuration Release `
             --no-build `
@@ -451,6 +452,7 @@ jobs:
             throw "Could not determine OperatorLibrary VersionPrefix."
           }
           $packageVersion = "$versionPrefix-industrial.${{ github.run_number }}.${{ github.run_attempt }}"
+          New-Item -ItemType Directory -Force -Path $env:OPERATOR_PACKAGE_DIR | Out-Null
           dotnet pack $env:OPERATOR_PROJECT `
             --configuration Release `
             --no-build `

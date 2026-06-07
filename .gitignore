@@ -59,6 +59,8 @@ run.log
 *.dll
 *.exe
 *.pdb
+*.nupkg
+*.snupkg
 *.aar
 *.dylib
 *.so
@@ -80,6 +82,9 @@ TestResults/
 coverage/
 artifacts/
 publish/
+**/nupkg/
+**/packages/
+!**/packages.lock.json
 
 # Local build snapshots / ad hoc verification output
 /ClearVision.Product/build_check/

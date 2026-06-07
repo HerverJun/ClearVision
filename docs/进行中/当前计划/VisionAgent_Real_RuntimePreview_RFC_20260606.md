@@ -116,4 +116,4 @@ This RFC does not authorize:
 - hot-load
 - Real RuntimePreview adapter implementation
 - Agent shell/cmd/powershell/system command tool
-- `Acme.Product.*`
+- legacy non-ClearVision product namespace

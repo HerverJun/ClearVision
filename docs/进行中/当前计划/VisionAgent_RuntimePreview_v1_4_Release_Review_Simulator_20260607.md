@@ -160,4 +160,4 @@ The remote workflow ran artifact assertion with non-local workflow metadata befo
 
 ## Safety Statement
 
-RuntimePreview v1.4 did not advance any real resource capability. This round does not add real camera SDK access, real Station access, real image reads, real model/template file loads, PLC writes, real package archive creation, real packaging, real deployment, hot-load, Real RuntimePreview adapter activation, shell/system command tool access, or `Acme.Product.*` dependency.
+RuntimePreview v1.4 did not advance any real resource capability. This round does not add real camera SDK access, real Station access, real image reads, real model/template file loads, PLC writes, real package archive creation, real packaging, real deployment, hot-load, Real RuntimePreview adapter activation, shell/system command tool access, or legacy non-ClearVision product namespace dependency.

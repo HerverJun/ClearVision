@@ -54,7 +54,7 @@ The allowlist may cover only explicitly approved logical metadata resources. It 
 - no downlink
 - no configuration write from Agent tools
 - no Agent shell/cmd/powershell/system command tool
-- no `Acme.Product.*` addition
+- no legacy non-ClearVision product namespace addition
 
 ## Failure Behavior
 
