@@ -51,8 +51,8 @@ const settingsApi = {
     loadRuntimePreviewAgentExplanationBenchmark: () => httpClient.get('/settings/runtime-preview-pilot/agent-explanation-benchmark'),
     loadRuntimePreviewGovernanceIndex: () => httpClient.get('/settings/runtime-preview-pilot/governance/index'),
     exportRuntimePreviewGovernance: () => httpClient.get('/settings/runtime-preview-pilot/governance/export'),
-    lookupRuntimePreviewGovernance: ({ sessionId = '', reportId = '', caseId = '', manifestId = '', reviewId = '', stationProfileId = '' } = {}) =>
-        httpClient.get(`/settings/runtime-preview-pilot/governance/lookup?sessionId=${encodeURIComponent(sessionId)}&reportId=${encodeURIComponent(reportId)}&caseId=${encodeURIComponent(caseId)}&manifestId=${encodeURIComponent(manifestId)}&reviewId=${encodeURIComponent(reviewId)}&stationProfileId=${encodeURIComponent(stationProfileId)}`),
+    lookupRuntimePreviewGovernance: ({ sessionId = '', reportId = '', caseId = '', manifestId = '', reviewId = '', stationProfileId = '', operatorType = '' } = {}) =>
+        httpClient.get(`/settings/runtime-preview-pilot/governance/lookup?sessionId=${encodeURIComponent(sessionId)}&reportId=${encodeURIComponent(reportId)}&caseId=${encodeURIComponent(caseId)}&manifestId=${encodeURIComponent(manifestId)}&reviewId=${encodeURIComponent(reviewId)}&stationProfileId=${encodeURIComponent(stationProfileId)}&operatorType=${encodeURIComponent(operatorType)}`),
 
     loadPlcSettings: () => httpClient.get('/plc/settings'),
     savePlcSettings: payload => httpClient.put('/plc/settings', payload),

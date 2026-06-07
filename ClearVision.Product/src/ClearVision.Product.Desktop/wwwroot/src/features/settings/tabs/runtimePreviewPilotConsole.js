@@ -31,6 +31,7 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
             const manifestDryRun = this.runtimePackageManifestDryRunReport || null;
             const stationProfiles = this.runtimePreviewStationProfiles || null;
             const operatorRegistry = this.runtimePreviewOperatorContractRegistry || null;
+            const operatorCoverage = this.runtimePreviewOperatorContractCoverageReport || null;
             const preReleaseReview = this.runtimePreviewPreReleaseReviewReport || null;
             const stationCompatibility = this.runtimePreviewStationCompatibilityReport || null;
             const operatorValidation = this.runtimePreviewOperatorContractValidationReport || null;
@@ -74,6 +75,20 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                     </tr>
                 `).join('')
                 : '<tr><td colspan="7" style="color:#64748b;">Redacted flow corpus has not been loaded.</td></tr>';
+            const releaseDecisionState = preReleaseReview?.releaseReviewAllowed === true
+                ? 'releaseAllowed'
+                : preReleaseReview?.requiresEngineerApproval === true
+                    ? 'approvalRequired'
+                    : preReleaseReview
+                        ? 'blocked'
+                        : 'notRun';
+            const releaseDecisionSummaryHtml = preReleaseReview
+                ? `<div data-rp-release-decision-state="${this.sanitizeRuntimePreviewPilotValue(releaseDecisionState)}" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:8px;">
+                    <div data-rp-release-allowed-state="${preReleaseReview.releaseReviewAllowed === true}" style="padding:8px; border:1px solid #cbd5e1; border-radius:8px; background:${preReleaseReview.releaseReviewAllowed === true ? '#dcfce7' : '#f8fafc'};">releaseAllowed: ${this.sanitizeRuntimePreviewPilotValue(preReleaseReview.releaseReviewAllowed === true)}</div>
+                    <div data-rp-approval-required-state="${preReleaseReview.requiresEngineerApproval === true}" style="padding:8px; border:1px solid #cbd5e1; border-radius:8px; background:${preReleaseReview.requiresEngineerApproval === true ? '#fef3c7' : '#f8fafc'};">approvalRequired: ${this.sanitizeRuntimePreviewPilotValue(preReleaseReview.requiresEngineerApproval === true)}</div>
+                    <div data-rp-blocked-state="${preReleaseReview.releaseReviewAllowed !== true && preReleaseReview.requiresEngineerApproval !== true}" style="padding:8px; border:1px solid #cbd5e1; border-radius:8px; background:${preReleaseReview.releaseReviewAllowed !== true && preReleaseReview.requiresEngineerApproval !== true ? '#fee2e2' : '#f8fafc'};">blocked: ${this.sanitizeRuntimePreviewPilotValue(preReleaseReview.releaseReviewAllowed !== true && preReleaseReview.requiresEngineerApproval !== true)}</div>
+                </div>`
+                : '<div data-rp-release-decision-state="notRun" style="font-size:12px; color:#64748b; margin-bottom:8px;">Release decision has not been generated.</div>';
             const preReleaseHtml = preReleaseReview
                 ? `<pre data-rp-pre-release-review-report="true" style="white-space:pre-wrap; font-size:11px; max-height:210px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
                     reviewId: preReleaseReview.reviewId,
@@ -89,9 +104,13 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                     operatorContractsSatisfied: preReleaseReview.operatorContractsSatisfied,
                     releaseReviewAllowed: preReleaseReview.releaseReviewAllowed,
                     requiresEngineerApproval: preReleaseReview.requiresEngineerApproval,
+                    goNoGoDecision: preReleaseReview.goNoGoDecision,
                     riskLevel: preReleaseReview.riskLevel,
                     blockedReasons: preReleaseReview.blockedReasons || [],
                     engineerActions: preReleaseReview.engineerActions || [],
+                    firstFixRecommendation: preReleaseReview.firstFixRecommendation,
+                    workflowDraftAllowed: preReleaseReview.workflowDraftAllowed,
+                    decisionMatrix: preReleaseReview.decisionMatrix,
                     metadataOnly: preReleaseReview.metadataOnly,
                     packageCreated: preReleaseReview.packageCreated,
                     deploymentExecuted: preReleaseReview.deploymentExecuted,
@@ -197,12 +216,33 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                 ? `<pre data-rp-operator-contract-registry="true" style="white-space:pre-wrap; font-size:11px; max-height:130px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
                     operatorContractVersion: operatorRegistry.operatorContractVersion,
                     contractCount: operatorRegistry.contractCount,
+                    coveragePass: operatorCoverage?.coveragePass,
+                    missingOperatorTypes: operatorCoverage?.missingOperatorTypes || [],
                     contracts: operatorRegistry.contracts || []
                 }, null, 2))}</pre>`
                 : '<div data-rp-operator-contract-registry="true" style="font-size:12px; color:#64748b;">No operator contract registry loaded.</div>';
+            const operatorCoverageHtml = operatorCoverage
+                ? `<pre data-rp-operator-contract-coverage="true" style="white-space:pre-wrap; font-size:11px; max-height:130px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    reportId: operatorCoverage.reportId,
+                    operatorContractVersion: operatorCoverage.operatorContractVersion,
+                    contractCount: operatorCoverage.contractCount,
+                    coveragePass: operatorCoverage.coveragePass,
+                    missingOperatorTypes: operatorCoverage.missingOperatorTypes || [],
+                    coveredOperatorTypes: operatorCoverage.coveredOperatorTypes || []
+                }, null, 2))}</pre>`
+                : '<div data-rp-operator-contract-coverage="true" style="font-size:12px; color:#64748b;">No operator contract coverage report loaded.</div>';
             const governanceIndexHtml = governanceIndex
                 ? `<pre data-rp-governance-index="true" style="white-space:pre-wrap; font-size:11px; max-height:130px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify(governanceIndex, null, 2))}</pre>`
                 : '<div data-rp-governance-index="true" style="font-size:12px; color:#64748b;">No governance index loaded.</div>';
+            const artifactSummaryHtml = governanceExport
+                ? `<pre data-rp-artifact-report-summary="true" style="white-space:pre-wrap; font-size:11px; max-height:130px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
+                    exportId: governanceExport.exportId,
+                    streamCounts: governanceExport.indexSummary || {},
+                    redactionPass: governanceExport.redactionPass,
+                    metadataOnly: governanceExport.metadataOnly,
+                    realResourcesTouched: governanceExport.realResourcesTouched
+                }, null, 2))}</pre>`
+                : '<div data-rp-artifact-report-summary="true" style="font-size:12px; color:#64748b;">No artifact report summary preview loaded.</div>';
             const governanceExportHtml = governanceExport
                 ? `<pre data-rp-governance-export="true" style="white-space:pre-wrap; font-size:11px; max-height:130px; overflow:auto;">${this.sanitizeRuntimePreviewPilotValue(JSON.stringify({
                     exportId: governanceExport.exportId,
@@ -259,9 +299,11 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                             </table>
                             ${stationProfilesHtml}
                             ${operatorRegistryHtml}
+                            ${operatorCoverageHtml}
                         </div>
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-pre-release-review-panel="true">
                             <h4 style="margin:0 0 8px;">Release review decision</h4>
+                            ${releaseDecisionSummaryHtml}
                             ${preReleaseHtml}
                         </div>
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-package-readiness-panel="true">
@@ -288,13 +330,14 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                         </div>
                         <div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;" data-rp-governance-panel="true">
                             <h4 style="margin:0 0 8px;">Governance index, lookup, and export</h4>
-                            <div style="display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px;">
+                            <div style="display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:8px;">
                                 <input class="cv-input" id="cfg-rp-lookup-session-id" placeholder="sessionId">
                                 <input class="cv-input" id="cfg-rp-lookup-report-id" placeholder="reportId">
                                 <input class="cv-input" id="cfg-rp-lookup-case-id" placeholder="caseId">
                                 <input class="cv-input" id="cfg-rp-lookup-manifest-id" placeholder="manifestId">
                                 <input class="cv-input" id="cfg-rp-lookup-review-id" placeholder="reviewId">
                                 <input class="cv-input" id="cfg-rp-lookup-station-profile-id" placeholder="stationProfileId">
+                                <input class="cv-input" id="cfg-rp-lookup-operator-type" placeholder="operatorType">
                             </div>
                             <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
                                 <button class="cv-btn settings-btn-light" id="btn-runtime-preview-pilot-governance-index">Load index</button>
@@ -305,6 +348,7 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                             ${governanceIndexHtml}
                             ${lookupHtml}
                             ${governanceExportHtml}
+                            ${artifactSummaryHtml}
                             ${explanationHtml}
                         </div>
             `;
@@ -402,6 +446,7 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                 } else if (btn.id === 'btn-runtime-preview-pilot-load-operator-contract-registry') {
                     const result = await settingsApi.loadRuntimePreviewOperatorContractRegistry();
                     this.runtimePreviewOperatorContractRegistry = result?.operatorContractRegistry || result;
+                    this.runtimePreviewOperatorContractCoverageReport = result?.operatorContractCoverageReport || this.runtimePreviewOperatorContractCoverageReport;
                 } else if (btn.id === 'btn-runtime-preview-pilot-run-selected-scenario') {
                     await this.ensureRuntimePreviewScenarioCorpusLoaded();
                     const caseId = root.querySelector('#cfg-rp-scenario-case-id')?.value || '';
@@ -452,7 +497,8 @@ export function installRuntimePreviewPilotConsole(SettingsView) {
                         caseId: root.querySelector('#cfg-rp-lookup-case-id')?.value || '',
                         manifestId: root.querySelector('#cfg-rp-lookup-manifest-id')?.value || '',
                         reviewId: root.querySelector('#cfg-rp-lookup-review-id')?.value || '',
-                        stationProfileId: root.querySelector('#cfg-rp-lookup-station-profile-id')?.value || ''
+                        stationProfileId: root.querySelector('#cfg-rp-lookup-station-profile-id')?.value || '',
+                        operatorType: root.querySelector('#cfg-rp-lookup-operator-type')?.value || ''
                     });
                     this.runtimePreviewGovernanceLookup = result?.lookup || result;
                 } else if (btn.id === 'btn-runtime-preview-pilot-agent-explanation') {

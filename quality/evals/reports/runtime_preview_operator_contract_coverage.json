@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "2026-06-07.runtime-preview-operator-contract-coverage.final.v1",
+  "benchmarkId": "runtime_preview_operator_contract_coverage",
+  "workflowRun": {
+    "commitSha": "local",
+    "branchName": "local",
+    "runId": "local",
+    "runAttempt": "local",
+    "generatedAtUtc": "2026-06-06T23:47:15.436775+00:00"
+  },
+  "summary": {
+    "operatorContractVersion": "operator-contract-registry.final.metadata-only",
+    "contractCount": 16,
+    "coveragePass": true,
+    "metadataOnly": true,
+    "realResourcesTouched": false,
+    "accepted": true
+  },
+  "coverageReport": {
+    "reportId": "rp_operator_contract_coverage_final",
+    "coveredOperatorTypes": [
+      "BlobAnalysis",
+      "CircleMeasurement",
+      "DeepLearning",
+      "EdgeDetection",
+      "HttpRequest",
+      "ImageAcquisition",
+      "MeasureDistance",
+      "ModbusCommunication",
+      "ResultJudgment",
+      "ResultOutput",
+      "ScriptOperator",
+      "SemanticSegmentation",
+      "ShapeMatching",
+      "SurfaceDefectDetection",
+      "TemplateMatching",
+      "Thresholding"
+    ],
+    "missingOperatorTypes": [],
+    "contractCount": 16,
+    "coveragePass": true,
+    "metadataOnly": true,
+    "realResourcesTouched": false
+  },
+  "safetyBoundary": {
+    "realCameraSdkTouched": false,
+    "realStationTouched": false,
+    "realImageFilesRead": false,
+    "realModelFilesLoaded": false,
+    "plcWriteAttempted": false,
+    "packageCreated": false,
+    "deploymentExecuted": false,
+    "hotLoadAttempted": false,
+    "realRuntimePreviewAdapterImplemented": false
+  }
+}

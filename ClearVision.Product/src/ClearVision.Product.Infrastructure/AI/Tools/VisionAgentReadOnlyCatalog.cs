@@ -7,12 +7,21 @@ internal static class VisionAgentReadOnlyCatalog
         new("ImageAcquisition", "Image Acquisition", "image", "Provides a camera/file image input node; agent read-only tools never capture frames.", ["image", "camera", "input", "acquisition"]),
         new("RoiManager", "ROI Manager", "roi", "Defines named regions of interest for downstream inspection.", ["roi", "region", "crop"]),
         new("TemplateMatching", "Template Matching", "matching", "Finds a known pattern by template and score.", ["template", "matching", "alignment", "position"]),
+        new("BlobAnalysis", "Blob Analysis", "vision", "Describes connected-component inspection metadata without reading images.", ["blob", "area", "count"]),
+        new("Thresholding", "Thresholding", "vision", "Defines threshold metadata for binary segmentation review.", ["threshold", "binary", "segmentation"]),
+        new("EdgeDetection", "Edge Detection", "vision", "Defines edge extraction metadata for dry-run validation.", ["edge", "gradient", "contour"]),
+        new("ShapeMatching", "Shape Matching", "matching", "Finds a shape by catalog template metadata.", ["shape", "matching", "template"]),
         new("DeepLearning", "Deep Learning", "ai", "Runs model-based detection or classification when a model path is configured.", ["model", "detection", "wire", "defect"]),
+        new("SemanticSegmentation", "Semantic Segmentation", "ai", "Reviews segmentation model metadata without loading model files.", ["segmentation", "model", "mask"]),
+        new("SurfaceDefectDetection", "Surface Defect Detection", "ai", "Reviews defect model metadata without loading model files.", ["defect", "surface", "model"]),
         new("CircleMeasurement", "Circle Measurement", "measurement", "Measures circle center/radius features.", ["circle", "hole", "diameter"]),
         new("MeasureDistance", "Measure Distance", "measurement", "Measures distance between points or features.", ["distance", "spacing", "hole", "measurement"]),
         new("ImageCompose", "Image Compose", "image", "Combines multiple images into one logical image.", ["compose", "multi-camera"]),
         new("ResultJudgment", "Result Judgment", "logic", "Evaluates pass/fail rules and tolerances.", ["judgment", "pass", "fail", "tolerance"]),
-        new("ResultOutput", "Result Output", "output", "Publishes inspection result payloads to the configured output channel.", ["output", "result", "mes", "plc"])
+        new("ResultOutput", "Result Output", "output", "Publishes inspection result payloads to the configured output channel.", ["output", "result", "mes", "plc"]),
+        new("ModbusCommunication", "Modbus Communication", "communication", "Forbidden preview communication metadata; dry-run only.", ["modbus", "plc", "forbidden"]),
+        new("HttpRequest", "HTTP Request", "communication", "Forbidden preview network metadata; dry-run only.", ["http", "network", "forbidden"]),
+        new("ScriptOperator", "Script Operator", "logic", "Forbidden preview script metadata; dry-run only.", ["script", "command", "forbidden"])
     ];
 
     public static IReadOnlyDictionary<string, OperatorSchemaItem> Schemas { get; } =
@@ -36,6 +45,38 @@ internal static class VisionAgentReadOnlyCatalog
                     new("MinScore", "double", false, "Minimum acceptable match score."),
                     new("MaxMatches", "int", false, "Maximum number of matches.")
                 ]),
+            ["BlobAnalysis"] = new(
+                "BlobAnalysis",
+                ["Blobs", "BlobCount", "AreaStatistics"],
+                ["Image"],
+                [
+                    new("MinArea", "double", false, "Minimum blob area metadata."),
+                    new("MaxArea", "double", false, "Maximum blob area metadata.")
+                ]),
+            ["Thresholding"] = new(
+                "Thresholding",
+                ["BinaryImage"],
+                ["Image"],
+                [
+                    new("Threshold", "double", true, "Threshold metadata value."),
+                    new("Mode", "string", false, "Threshold mode metadata.")
+                ]),
+            ["EdgeDetection"] = new(
+                "EdgeDetection",
+                ["Edges"],
+                ["Image"],
+                [
+                    new("Method", "string", false, "Edge detector metadata."),
+                    new("Polarity", "string", false, "Expected edge polarity metadata.")
+                ]),
+            ["ShapeMatching"] = new(
+                "ShapeMatching",
+                ["MatchResult", "Score", "Pose"],
+                ["Image"],
+                [
+                    new("TemplateId", "string", true, "Catalog template metadata id; no template file is loaded."),
+                    new("MinScore", "double", false, "Minimum acceptable shape score.")
+                ]),
             ["DeepLearning"] = new(
                 "DeepLearning",
                 ["Detections", "Classes", "Scores"],
@@ -43,6 +84,22 @@ internal static class VisionAgentReadOnlyCatalog
                 [
                     new("ModelPath", "string", true, "Configured model artifact path; not loaded by read-only agent tools."),
                     new("ConfidenceThreshold", "double", false, "Detection confidence threshold.")
+                ]),
+            ["SemanticSegmentation"] = new(
+                "SemanticSegmentation",
+                ["Mask", "Classes", "Scores"],
+                ["Image"],
+                [
+                    new("ModelId", "string", true, "Catalog model metadata id; no model file is loaded."),
+                    new("ModelKind", "string", true, "Expected model kind metadata.")
+                ]),
+            ["SurfaceDefectDetection"] = new(
+                "SurfaceDefectDetection",
+                ["Defects", "Classes", "Scores"],
+                ["Image"],
+                [
+                    new("ModelId", "string", true, "Catalog model metadata id; no model file is loaded."),
+                    new("ModelKind", "string", true, "Expected model kind metadata.")
                 ]),
             ["CircleMeasurement"] = new(
                 "CircleMeasurement",
@@ -74,6 +131,27 @@ internal static class VisionAgentReadOnlyCatalog
                 ["Input"],
                 [
                     new("Channel", "string", false, "Output channel name.")
+                ]),
+            ["ModbusCommunication"] = new(
+                "ModbusCommunication",
+                ["MetadataBlocked"],
+                ["Input"],
+                [
+                    new("WriteIntent", "bool", false, "Forbidden in RuntimePreview metadata-only review.")
+                ]),
+            ["HttpRequest"] = new(
+                "HttpRequest",
+                ["MetadataBlocked"],
+                ["Input"],
+                [
+                    new("RequestIntent", "string", false, "Forbidden in RuntimePreview metadata-only review.")
+                ]),
+            ["ScriptOperator"] = new(
+                "ScriptOperator",
+                ["MetadataBlocked"],
+                ["Input"],
+                [
+                    new("ScriptIntent", "string", false, "Forbidden in RuntimePreview metadata-only review.")
                 ]),
             ["RoiManager"] = new(
                 "RoiManager",

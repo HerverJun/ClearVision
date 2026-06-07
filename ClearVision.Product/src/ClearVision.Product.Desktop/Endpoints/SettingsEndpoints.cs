@@ -1082,6 +1082,7 @@ public static class SettingsEndpoints
             return Results.Ok(new
             {
                 operatorContractRegistry = operatorContractRegistry.BuildRegistry(),
+                operatorContractCoverageReport = operatorContractRegistry.BuildCoverageReport(),
                 permissionDecision = endpointDecision,
                 metadataOnly = true,
                 realResourcesTouched = false
@@ -1277,11 +1278,13 @@ public static class SettingsEndpoints
             string? manifestId,
             string? reviewId,
             string? stationProfileId,
+            string? operatorType,
             RuntimePreviewSessionStore sessionStore,
             RuntimePreviewReportArchive reportArchive,
             RuntimePreviewScenarioCorpusService scenarioCorpusService,
             RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
             RuntimePreviewStationProfileCatalog stationProfileCatalog,
+            RuntimePreviewOperatorContractRegistry operatorContractRegistry,
             RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
@@ -1307,8 +1310,11 @@ public static class SettingsEndpoints
             var normalizedManifestId = string.IsNullOrWhiteSpace(manifestId) ? string.Empty : manifestId.Trim();
             var normalizedReviewId = string.IsNullOrWhiteSpace(reviewId) ? string.Empty : reviewId.Trim();
             var normalizedStationProfileId = string.IsNullOrWhiteSpace(stationProfileId) ? string.Empty : stationProfileId.Trim();
+            var normalizedOperatorType = string.IsNullOrWhiteSpace(operatorType) ? string.Empty : operatorType.Trim();
             var redactedCorpus = redactedFlowCorpusService.BuildCorpus();
             var stationProfiles = stationProfileCatalog.BuildProfiles();
+            var registry = operatorContractRegistry.BuildRegistry();
+            var coverage = operatorContractRegistry.BuildCoverageReport();
             var result = new
             {
                 session = string.IsNullOrWhiteSpace(normalizedSessionId) ? null : sessionStore.Get(normalizedSessionId),
@@ -1325,13 +1331,24 @@ public static class SettingsEndpoints
                 manifestReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetManifestDryRunReportByReportId(normalizedReportId),
                 manifest = string.IsNullOrWhiteSpace(normalizedManifestId) ? null : reportArchive.GetManifestDryRunReport(normalizedManifestId),
                 preReleaseReview = string.IsNullOrWhiteSpace(normalizedReviewId) ? null : reportArchive.GetPreReleaseReviewReport(normalizedReviewId),
+                releaseReviewDecision = string.IsNullOrWhiteSpace(normalizedReviewId) ? null : reportArchive.GetReleaseReviewDecision(normalizedReviewId),
                 preReleaseReviewByManifest = string.IsNullOrWhiteSpace(normalizedManifestId) ? null : reportArchive.GetPreReleaseReviewReportByManifestId(normalizedManifestId),
+                releaseReviewDecisionByReport = string.IsNullOrWhiteSpace(normalizedReportId) ? null : reportArchive.GetReleaseReviewDecision(normalizedReportId),
                 stationProfile = string.IsNullOrWhiteSpace(normalizedStationProfileId)
                     ? null
                     : stationProfiles.Profiles.FirstOrDefault(item => string.Equals(item.StationProfileId, normalizedStationProfileId, StringComparison.OrdinalIgnoreCase)),
                 stationProfileReports = string.IsNullOrWhiteSpace(normalizedStationProfileId)
                     ? Array.Empty<RuntimePreviewStationCompatibilityReport>()
                     : reportArchive.GetStationCompatibilityReportsByStationProfileId(normalizedStationProfileId),
+                operatorContract = string.IsNullOrWhiteSpace(normalizedOperatorType)
+                    ? null
+                    : registry.Contracts.FirstOrDefault(item => string.Equals(item.OperatorType, normalizedOperatorType, StringComparison.OrdinalIgnoreCase)),
+                operatorContractCoverageReport = coverage,
+                operatorContractValidationReportsByOperator = string.IsNullOrWhiteSpace(normalizedOperatorType)
+                    ? Array.Empty<RuntimePreviewOperatorContractValidationReport>()
+                    : reportArchive.ListOperatorContractValidationReports()
+                        .Where(item => item.ContractResults.Any(resultItem => string.Equals(resultItem.OperatorType, normalizedOperatorType, StringComparison.OrdinalIgnoreCase)))
+                        .ToArray(),
                 corpusCase = string.IsNullOrWhiteSpace(normalizedCaseId)
                     ? null
                     : corpus.Cases.FirstOrDefault(item => string.Equals(item.CaseId, normalizedCaseId, StringComparison.OrdinalIgnoreCase)),

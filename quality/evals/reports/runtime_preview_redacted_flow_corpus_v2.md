@@ -1,6 +1,6 @@
-# RuntimePreview Redacted Flow Corpus v2
+# RuntimePreview Redacted Flow Corpus Final
 
-- Generated UTC: `2026-06-06T16:17:44.241304+00:00`
+- Generated UTC: `2026-06-06T23:47:15.436775+00:00`
 - Commit: `local`
 - Branch: `local`
 - Run: `local` attempt `local`
@@ -42,5 +42,13 @@
 | RP-RF-030 | deep_learning_requires_engineer_approval | requires_engineer_approval | medium |
 | RP-RF-031 | multi_station_requires_engineer_approval | requires_engineer_approval | medium |
 | RP-RF-032 | release_blocked_operator_contract | release_blocked | operator_contract_missing_parameter |
+| RP-RF-033 | blob_release_allowed | release_allowed | low |
+| RP-RF-034 | threshold_release_allowed | release_allowed | low |
+| RP-RF-035 | edge_release_allowed | release_allowed | low |
+| RP-RF-036 | shape_matching_release_allowed | release_allowed | low |
+| RP-RF-037 | template_only_profile_pass | release_allowed | low |
+| RP-RF-038 | measurement_only_profile_pass | release_allowed | low |
+| RP-RF-039 | semantic_segmentation_requires_approval | requires_engineer_approval | medium |
+| RP-RF-040 | surface_defect_requires_approval | requires_engineer_approval | medium |
 
 Safety boundary: no real camera SDK, Station access, image file read, model file load, PLC write, package creation, deployment, hot-load, or Real RuntimePreview adapter.

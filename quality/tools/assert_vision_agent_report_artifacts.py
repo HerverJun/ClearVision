@@ -15,7 +15,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORTS_DIR = REPO_ROOT / "quality" / "evals" / "reports"
 TEST_RESULTS_DIR = REPO_ROOT / "test_results" / "agent_engineering_harness"
-SCAN_POLICY_VERSION = "2026-06-06.runtime-preview-v1.4-release-review-simulator-scan.v4"
+SCAN_POLICY_VERSION = "2026-06-07.runtime-preview-final-pre-pilot-hardening-scan.v1"
 
 JSON_REPORTS = [
     REPORTS_DIR / "VisionAgent_business_benchmark_baseline.json",
@@ -29,6 +29,7 @@ JSON_REPORTS = [
     REPORTS_DIR / "runtime_package_manifest_dry_run.sample.json",
     REPORTS_DIR / "runtime_preview_station_profiles_sample.json",
     REPORTS_DIR / "runtime_preview_operator_contract_registry.json",
+    REPORTS_DIR / "runtime_preview_operator_contract_coverage.json",
     REPORTS_DIR / "runtime_preview_operator_contract_validation_sample.json",
     REPORTS_DIR / "runtime_preview_station_compatibility_dry_run.sample.json",
     REPORTS_DIR / "runtime_preview_pre_release_review_report.sample.json",
@@ -36,6 +37,18 @@ JSON_REPORTS = [
     REPORTS_DIR / "runtime_preview_governance_export_sample.json",
     REPORTS_DIR / "runtime_preview_agent_explanation_benchmark.json",
     REPORTS_DIR / "runtime_preview_agent_explanation_v3.json",
+    REPORTS_DIR / "runtime_preview_redacted_flow_corpus_final.json",
+    REPORTS_DIR / "runtime_preview_station_profiles_final.json",
+    REPORTS_DIR / "runtime_preview_operator_contract_registry_final.json",
+    REPORTS_DIR / "runtime_preview_operator_contract_validation_final.json",
+    REPORTS_DIR / "runtime_preview_station_compatibility_final.json",
+    REPORTS_DIR / "runtime_package_manifest_dry_run_final.json",
+    REPORTS_DIR / "runtime_preview_package_readiness_final.json",
+    REPORTS_DIR / "runtime_preview_pre_release_review_final.json",
+    REPORTS_DIR / "runtime_preview_release_decision_matrix.json",
+    REPORTS_DIR / "runtime_preview_agent_explanation_final.json",
+    REPORTS_DIR / "runtime_preview_governance_export_final.json",
+    REPORTS_DIR / "runtime_preview_report_readability_gate.json",
     REPORTS_DIR / "real_llm_planner_shadow_eval.json",
     REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.json",
 ]
@@ -52,6 +65,7 @@ MARKDOWN_REPORTS = [
     REPORTS_DIR / "runtime_package_manifest_dry_run.sample.md",
     REPORTS_DIR / "runtime_preview_station_profiles_sample.md",
     REPORTS_DIR / "runtime_preview_operator_contract_registry.md",
+    REPORTS_DIR / "runtime_preview_operator_contract_coverage.md",
     REPORTS_DIR / "runtime_preview_operator_contract_validation_sample.md",
     REPORTS_DIR / "runtime_preview_station_compatibility_dry_run.sample.md",
     REPORTS_DIR / "runtime_preview_pre_release_review_report.sample.md",
@@ -59,6 +73,18 @@ MARKDOWN_REPORTS = [
     REPORTS_DIR / "runtime_preview_governance_export_sample.md",
     REPORTS_DIR / "runtime_preview_agent_explanation_benchmark.md",
     REPORTS_DIR / "runtime_preview_agent_explanation_v3.md",
+    REPORTS_DIR / "runtime_preview_redacted_flow_corpus_final.md",
+    REPORTS_DIR / "runtime_preview_station_profiles_final.md",
+    REPORTS_DIR / "runtime_preview_operator_contract_registry_final.md",
+    REPORTS_DIR / "runtime_preview_operator_contract_validation_final.md",
+    REPORTS_DIR / "runtime_preview_station_compatibility_final.md",
+    REPORTS_DIR / "runtime_package_manifest_dry_run_final.md",
+    REPORTS_DIR / "runtime_preview_package_readiness_final.md",
+    REPORTS_DIR / "runtime_preview_pre_release_review_final.md",
+    REPORTS_DIR / "runtime_preview_release_decision_matrix.md",
+    REPORTS_DIR / "runtime_preview_agent_explanation_final.md",
+    REPORTS_DIR / "runtime_preview_governance_export_final.md",
+    REPORTS_DIR / "runtime_preview_report_readability_gate.md",
     REPORTS_DIR / "real_llm_planner_shadow_eval.md",
     REPORTS_DIR / "real_llm_planner_shadow_eval.holdout.md",
 ]
@@ -247,15 +273,26 @@ def validate_runtime_preview_case_counts(path: Path, report: dict[str, Any], err
         return
 
     minimums = {
-        "VisionAgent_business_benchmark_baseline.json": 70,
-        "runtime_preview_redacted_flow_corpus.json": 30,
-        "runtime_preview_redacted_flow_corpus_v2.json": 30,
-        "runtime_package_manifest_dry_run.sample.json": 30,
-        "runtime_preview_station_compatibility_dry_run.sample.json": 30,
-        "runtime_preview_operator_contract_validation_sample.json": 30,
-        "runtime_preview_pre_release_review_report.sample.json": 30,
-        "runtime_preview_agent_explanation_benchmark.json": 30,
-        "runtime_preview_agent_explanation_v3.json": 30,
+        "VisionAgent_business_benchmark_baseline.json": 120,
+        "runtime_preview_scenario_corpus.json": 60,
+        "runtime_preview_redacted_flow_corpus.json": 60,
+        "runtime_preview_redacted_flow_corpus_v2.json": 60,
+        "runtime_preview_redacted_flow_corpus_final.json": 60,
+        "runtime_preview_scenario_evidence.json": 60,
+        "runtime_preview_package_readiness_report.sample.json": 60,
+        "runtime_preview_package_readiness_final.json": 60,
+        "runtime_package_manifest_dry_run.sample.json": 60,
+        "runtime_package_manifest_dry_run_final.json": 60,
+        "runtime_preview_station_compatibility_dry_run.sample.json": 60,
+        "runtime_preview_station_compatibility_final.json": 60,
+        "runtime_preview_operator_contract_validation_sample.json": 60,
+        "runtime_preview_operator_contract_validation_final.json": 60,
+        "runtime_preview_pre_release_review_report.sample.json": 60,
+        "runtime_preview_pre_release_review_final.json": 60,
+        "runtime_preview_release_decision_matrix.json": 60,
+        "runtime_preview_agent_explanation_benchmark.json": 60,
+        "runtime_preview_agent_explanation_v3.json": 60,
+        "runtime_preview_agent_explanation_final.json": 60,
     }
     minimum = minimums.get(path.name)
     if minimum is None:
@@ -268,6 +305,130 @@ def validate_runtime_preview_case_counts(path: Path, report: dict[str, Any], err
         errors.append(f"{repo_relative(path)} must have caseCount >= {minimum}.")
     if summary.get("accepted") is not True:
         errors.append(f"{repo_relative(path)} summary.accepted must be true.")
+
+
+def validate_runtime_preview_final_contract(path: Path, report: dict[str, Any], errors: list[str]) -> None:
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        errors.append(f"{repo_relative(path)} missing summary object.")
+        return
+
+    if path.name == "runtime_preview_operator_contract_coverage.json":
+        coverage = report.get("coverageReport")
+        if not isinstance(coverage, dict):
+            errors.append(f"{repo_relative(path)} missing coverageReport object.")
+            return
+        if coverage.get("coveragePass") is not True or summary.get("coveragePass") is not True:
+            errors.append(f"{repo_relative(path)} operator contract coverage must pass.")
+        if not isinstance(coverage.get("coveredOperatorTypes"), list) or len(coverage["coveredOperatorTypes"]) < 16:
+            errors.append(f"{repo_relative(path)} must cover at least 16 operator types.")
+        if coverage.get("missingOperatorTypes"):
+            errors.append(f"{repo_relative(path)} missingOperatorTypes must be empty.")
+
+    if path.name in {"runtime_preview_station_profiles_sample.json", "runtime_preview_station_profiles_final.json"}:
+        profiles = report.get("profiles")
+        if not isinstance(profiles, list) or len(profiles) < 12:
+            errors.append(f"{repo_relative(path)} must include at least 12 redacted station profiles.")
+            return
+        for profile in profiles:
+            if profile.get("networkPolicy") != "redacted":
+                errors.append(f"{repo_relative(path)} station profile networkPolicy must be redacted.")
+            if profile.get("plcWriteAllowed") is not False:
+                errors.append(f"{repo_relative(path)} station profile plcWriteAllowed must be false.")
+            if not profile.get("approvalPolicy") or not profile.get("riskPolicy"):
+                errors.append(f"{repo_relative(path)} station profile must include approvalPolicy and riskPolicy.")
+                break
+
+    if path.name in {"runtime_preview_pre_release_review_report.sample.json", "runtime_preview_pre_release_review_final.json"}:
+        reports = report.get("reports")
+        if not isinstance(reports, list) or not reports:
+            errors.append(f"{repo_relative(path)} must include pre-release review reports.")
+            return
+        required_fields = [
+            "reviewId",
+            "caseId",
+            "sessionId",
+            "workflowDraftHash",
+            "manifestId",
+            "stationProfileId",
+            "operatorContractVersion",
+            "readinessStatus",
+            "packageReviewAllowed",
+            "stationCompatible",
+            "operatorContractsSatisfied",
+            "releaseReviewAllowed",
+            "requiresEngineerApproval",
+            "goNoGoDecision",
+            "blockedReasons",
+            "riskLevel",
+            "engineerActions",
+            "firstFixRecommendation",
+            "workflowDraftAllowed",
+            "decisionMatrix",
+            "packageCreated",
+            "deploymentExecuted",
+            "realResourcesTouched",
+        ]
+        for item in reports[:10]:
+            for field in required_fields:
+                if field not in item:
+                    errors.append(f"{repo_relative(path)} pre-release review missing {field}.")
+                    return
+            if item["packageCreated"] is not False or item["deploymentExecuted"] is not False or item["realResourcesTouched"] is not False:
+                errors.append(f"{repo_relative(path)} pre-release review must stay metadata-only and non-deploying.")
+                return
+
+    if path.name == "runtime_preview_release_decision_matrix.json":
+        decision_types = set(summary.get("decisionTypes") or [])
+        required = {
+            "releaseAllowed",
+            "requiresEngineerApproval",
+            "blocked",
+            "forbiddenIntentDenied",
+            "metadataIncomplete",
+            "stationIncompatible",
+            "operatorContractFailed",
+            "manifestRiskBlocked",
+            "packageReviewBlocked",
+        }
+        if decision_types != required:
+            errors.append(f"{repo_relative(path)} decisionTypes must contain the full release readiness matrix.")
+        for item in report.get("reports", [])[:10]:
+            for decision_type in required:
+                decision = item.get(decision_type)
+                if not isinstance(decision, dict) or not decision.get("reason") or not decision.get("nextAction"):
+                    errors.append(f"{repo_relative(path)} {decision_type} must include reason and nextAction.")
+                    return
+
+    if path.name == "runtime_preview_agent_explanation_final.json":
+        for field in ["emptyStatusCount", "emptyDecisionCount", "emptyRiskCount", "emptyActionCount"]:
+            if summary.get(field) != 0:
+                errors.append(f"{repo_relative(path)} {field} must be zero.")
+        for item in report.get("cases", [])[:10]:
+            for field in ["status", "decision", "risk", "action", "firstFixRecommendation"]:
+                if not item.get(field) or item.get(field) == "None":
+                    errors.append(f"{repo_relative(path)} explanation field {field} must be readable.")
+                    return
+
+    if path.name == "runtime_preview_report_readability_gate.json":
+        if summary.get("readabilityPass") is not True or summary.get("accepted") is not True:
+            errors.append(f"{repo_relative(path)} readability gate must pass.")
+
+    if path.name == "runtime_preview_governance_export_final.json":
+        required_counts = [
+            "releaseReviewDecisionCount",
+            "stationProfileSnapshotCount",
+            "operatorContractRegistrySnapshotCount",
+            "operatorContractCoverageReportCount",
+            "finalGovernanceExportCount",
+        ]
+        for field in required_counts:
+            if not isinstance(summary.get(field), int) or summary[field] <= 0:
+                errors.append(f"{repo_relative(path)} summary.{field} must be positive.")
+        lookup_keys = set((report.get("exportManifest") or {}).get("lookupKeys") or [])
+        for key in ["reviewId", "caseId", "manifestId", "stationProfileId", "operatorType", "reportId"]:
+            if key not in lookup_keys:
+                errors.append(f"{repo_relative(path)} exportManifest.lookupKeys missing {key}.")
 
 
 def validate_no_secret_leaks(path: Path, text: str, errors: list[str]) -> None:
@@ -403,6 +564,7 @@ def main() -> int:
         if path.name in {"real_llm_planner_shadow_eval.json", "real_llm_planner_shadow_eval.holdout.json"}:
             validate_shadow_report(path, report, errors)
         validate_runtime_preview_case_counts(path, report, errors)
+        validate_runtime_preview_final_contract(path, report, errors)
         report_summaries.append(
             {
                 "path": repo_relative(path),

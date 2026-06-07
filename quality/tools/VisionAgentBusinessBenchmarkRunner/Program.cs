@@ -599,8 +599,132 @@ internal static class VisionAgentBusinessBenchmark
             Case("VA-BM-067", "pre_release_review", "release_review", "Block release review when the output channel kind is absent on the target Station profile.", ValidTemplateFlow(templateId: "catalog-template-a", outputChannelId: "qa-template"), ["station_output_channel_kind_missing", "engineerAction.remap_output", "releaseReviewAllowed.false"], validateDryrunPrecheck),
             Case("VA-BM-068", "agent_explanation_v3", "release_review", "Explain why packageReviewAllowed can be true while releaseReviewAllowed is false due to Station compatibility.", ValidModelIdFlow(), ["agent_explanation_v3.workflowDraftVsRelease", "stationCompatibilityExplanation", "nextEngineerAction"], validateDryrunPrecheck),
             Case("VA-BM-069", "governance_v4", "runtime_preview_session", "Persist release review evidence with reviewId stationProfileId manifestId and caseId lookup keys.", ValidTemplateFlow(templateId: "catalog-template-a"), ["governance_store.v4", "lookup_by_reviewId", "lookup_by_stationProfileId"], ["validate_flow", "dryrun_flow", RuntimePreviewSimulateMetadataSessionTool.ToolName], cameraBindingId: "mock-cam-template", expectedRuntimePreviewReady: true),
-            Case("VA-BM-070", "redacted_flow_corpus_v2", "manifest_dry_run", "Review the expanded redacted corpus v2 release-blocked operator contract case.", MissingTemplateFlow(), ["redacted_flow_corpus_v2.case_32", "operator_contract_missing_parameter", "redactionPass.true"], ["get_operator_schema", .. validateDryrunPrecheck], schemaOperatorType: "TemplateMatching", expectedPrecheckReady: false)
+            Case("VA-BM-070", "redacted_flow_corpus_v2", "manifest_dry_run", "Review the expanded redacted corpus v2 release-blocked operator contract case.", MissingTemplateFlow(), ["redacted_flow_corpus_v2.case_32", "operator_contract_missing_parameter", "redactionPass.true"], ["get_operator_schema", .. validateDryrunPrecheck], schemaOperatorType: "TemplateMatching", expectedPrecheckReady: false),
+            .. FinalHardeningCases(validateDryrunPrecheck, validateDryrunPreview)
         ];
+    }
+
+    private static IReadOnlyList<BenchmarkCase> FinalHardeningCases(
+        IReadOnlyList<string> validateDryrunPrecheck,
+        IReadOnlyList<string> validateDryrunPreview)
+    {
+        var cases = new List<BenchmarkCase>();
+        for (var number = 71; number <= 120; number++)
+        {
+            var offset = number - 71;
+            var caseId = $"VA-BM-{number:000}";
+            switch (offset % 10)
+            {
+                case 0:
+                    cases.Add(Case(
+                        caseId,
+                        "release_review_final",
+                        "release_review",
+                        "Run Release Review Final for a traditional vision draft and keep all real deployment gates closed.",
+                        ValidTemplateFlow(templateId: "catalog-template-a"),
+                        ["release_decision_matrix.releaseAllowed", "metadataOnly.true", "realResourcesTouched.false"],
+                        validateDryrunPrecheck));
+                    break;
+                case 1:
+                    cases.Add(Case(
+                        caseId,
+                        "station_profile_final",
+                        "release_review",
+                        "Check low-spec Station profile constraints before any package is created.",
+                        ValidHoleFlow(),
+                        ["station_profile.low_spec_ipc", "operator_count.review", "packageCreated.false"],
+                        validateDryrunPrecheck));
+                    break;
+                case 2:
+                    cases.Add(Case(
+                        caseId,
+                        "operator_contract_final",
+                        "release_review",
+                        "Validate final operator contract registry coverage for template matching metadata.",
+                        ValidTemplateFlow(templateId: "catalog-template-a"),
+                        ["operator_contract_coverage.pass", "TemplateMatching.contract", "ResultOutput.contract"],
+                        ["get_operator_schema", .. validateDryrunPrecheck],
+                        schemaOperatorType: "TemplateMatching"));
+                    break;
+                case 3:
+                    cases.Add(Case(
+                        caseId,
+                        "agent_explanation_final",
+                        "release_review",
+                        "Explain why workflowDraftAllowed can stay true while releaseReviewAllowed is false for missing output metadata.",
+                        MissingOutputFlow(),
+                        ["agent_explanation_final.firstFixRecommendation", "workflowDraftAllowed.true", "releaseReviewAllowed.false"],
+                        validateDryrunPrecheck,
+                        expectedPrecheckReady: false));
+                    break;
+                case 4:
+                    cases.Add(Case(
+                        caseId,
+                        "governance_store_final",
+                        "runtime_preview_session",
+                        "Persist final governance export evidence with review and Station lookup keys.",
+                        ValidTemplateFlow(templateId: "catalog-template-a"),
+                        ["governance_export_final.lookupKeys", "release_review_decision.stream", "redactionPass.true"],
+                        ["validate_flow", "dryrun_flow", RuntimePreviewSimulateMetadataSessionTool.ToolName],
+                        cameraBindingId: "mock-cam-template",
+                        expectedRuntimePreviewReady: true));
+                    break;
+                case 5:
+                    cases.Add(Case(
+                        caseId,
+                        "review_desk_final",
+                        "runtime_preview",
+                        "Render Review Desk final decision states without exposing ordinary-user controls.",
+                        ValidWireFlow(outputChannelId: "qa-wire-result"),
+                        ["reviewDesk.releaseAllowed.approvalRequired.blocked", "adminDeveloperGate.required", "domRedacted.true"],
+                        validateDryrunPreview,
+                        expectedRuntimePreviewReady: true));
+                    break;
+                case 6:
+                    cases.Add(Case(
+                        caseId,
+                        "source_guard_final",
+                        "missing_resource",
+                        "Reject package path style metadata before release review and keep package creation disabled.",
+                        MissingPlcOutputFlow(),
+                        ["source_guard.package_path_denied", "plcWriteAttempted.false", "deploymentExecuted.false"],
+                        validateDryrunPrecheck,
+                        expectedPrecheckReady: false));
+                    break;
+                case 7:
+                    cases.Add(Case(
+                        caseId,
+                        "readability_gate_final",
+                        "manifest_dry_run",
+                        "Generate readable reports with non-empty status decision risk and action fields.",
+                        ValidTemplateAndModelFlow(),
+                        ["report_readability_gate.pass", "status.non_empty", "action.non_empty"],
+                        validateDryrunPrecheck));
+                    break;
+                case 8:
+                    cases.Add(Case(
+                        caseId,
+                        "remote_ci_evidence_final",
+                        "manifest_dry_run",
+                        "Attach non-local workflow metadata for final CI artifact assertion.",
+                        ValidModelIdFlow(),
+                        ["workflowRun.runId.non_local", "artifact.digest.recorded", "headSha.current"],
+                        validateDryrunPrecheck));
+                    break;
+                default:
+                    cases.Add(Case(
+                        caseId,
+                        "redacted_corpus_final",
+                        "release_review",
+                        "Run a redacted corpus final case through manifest station contract and decision evidence.",
+                        ValidHoleFlow(tolerance: "0.04mm"),
+                        ["redacted_flow_corpus_final.caseCount60", "station_compatibility_final", "pre_release_review_final"],
+                        validateDryrunPrecheck));
+                    break;
+            }
+        }
+
+        return cases;
     }
 
     private static BenchmarkCase Case(
