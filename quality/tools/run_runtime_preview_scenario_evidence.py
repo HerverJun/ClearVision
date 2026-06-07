@@ -284,7 +284,7 @@ def redacted_flow_cases() -> list[dict[str, Any]]:
         ("RP-RF-055", "plc_guard_station", "plc_direct_intent_denied_final", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], "denied", "denied", "denied", "release_blocked", "plc_write_forbidden", "Remove PLC output intent and use a metadata output channel.", [], ["plc_write_forbidden", "station_plc_or_direct_station_intent_forbidden"], "sp-plc-denied-v14"),
         ("RP-RF-056", "model_guard_station", "model_path_denied_final", ["ImageAcquisition", "DeepLearning", "ResultOutput"], "denied", "denied", "denied", "release_blocked", "dangerous_model_path", "Replace model path metadata with an allowlisted ModelId.", [], ["runtime_preview_external_path_denied", "model_path_denied"], "sp-dl-review-v14"),
         ("RP-RF-057", "template_guard_station", "template_path_denied_final", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], "denied", "denied", "denied", "release_blocked", "dangerous_template_path", "Replace template path metadata with an allowlisted TemplateId.", [], ["runtime_preview_external_path_denied", "template_path_denied"]),
-        ("RP-RF-058", "image_guard_station", "base64_image_denied_final", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], "denied", "denied", "denied", "release_blocked", "base64_image_denied", "Remove image byte payloads and bind a redacted camera metadata handle.", [], ["runtime_preview_image_bytes_denied"]),
+        ("RP-RF-058", "image_guard_station", "image_bytes_denied_final", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], "denied", "denied", "denied", "release_blocked", "image_bytes_denied", "Remove image byte payloads and bind a redacted camera metadata handle.", [], ["runtime_preview_image_bytes_denied"]),
         ("RP-RF-059", "package_guard_station", "package_path_denied_final", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], "denied", "denied", "denied", "release_blocked", "package_path_denied", "Remove package path metadata; this review never creates package files.", [], ["runtime_preview_external_path_denied", "package_path_denied"]),
         ("RP-RF-060", "output_lite_station", "manifest_ready_station_incompatible", ["ImageAcquisition", "TemplateMatching", "ResultOutput"], "passed", "passed", "not_ready", "release_blocked", "high", "Remap output channel first, then rerun Station compatibility review.", [], ["station_output_channel_kind_missing"], "sp-output-lite-v14"),
     ]
@@ -784,7 +784,7 @@ def go_no_go_decision(case: dict[str, Any], blocked: list[str], package_review_a
         return "stationIncompatible"
     if not package_review_allowed and any("missing" in reason or "dependency" in reason for reason in blocked):
         return "metadataIncomplete"
-    if case["expectedManifestRisk"] in {"high", "denied", "dangerous_resource", "dangerous_model_path", "dangerous_template_path", "base64_image_denied", "package_path_denied"}:
+    if case["expectedManifestRisk"] in {"high", "denied", "dangerous_resource", "dangerous_model_path", "dangerous_template_path", "image_bytes_denied", "package_path_denied"}:
         return "manifestRiskBlocked"
     if not package_review_allowed:
         return "packageReviewBlocked"

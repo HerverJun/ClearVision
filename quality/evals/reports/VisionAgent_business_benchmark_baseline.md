@@ -1,12 +1,12 @@
 ﻿# Vision Agent Executable Business Benchmark
 
 - Benchmark: `vision_agent_executable_business_benchmark`
-- Generated UTC: `2026-06-06T16:17:28.2557886+00:00`
+- Generated UTC: `2026-06-07T05:24:30.1767064+00:00`
 - Commit SHA: `local`
 - Branch: `local`
 - Workflow run: `local` attempt `local`
 - Mode: `offline_metadata_only`
-- Cases: 70
+- Cases: 120
 - Accepted: True
 - JSON: `quality/evals/reports/VisionAgent_business_benchmark_baseline.json`
 
@@ -22,11 +22,11 @@
 | Metric | Actual | Minimum | Passed |
 | --- | ---: | ---: | --- |
 | generationSuccessRate | 100.00% | 95.00% | True |
-| structuralValidationPassRate | 97.14% | 90.00% | True |
-| dryRunPassRate | 95.71% | 85.00% | True |
-| previewReadyRate | 92.31% | 70.00% | True |
-| parameterCompletionRate | 74.29% | 70.00% | True |
-| userApplicableRate | 97.14% | 90.00% | True |
+| structuralValidationPassRate | 98.33% | 90.00% | True |
+| dryRunPassRate | 97.50% | 85.00% | True |
+| previewReadyRate | 95.65% | 70.00% | True |
+| parameterCompletionRate | 76.67% | 70.00% | True |
+| userApplicableRate | 98.33% | 90.00% | True |
 
 ## Task Set
 
@@ -102,6 +102,56 @@
 | VA-BM-068 | agent_explanation_v3 | release_review | agent_explanation_v3.workflowDraftVsRelease, stationCompatibilityExplanation, nextEngineerAction | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
 | VA-BM-069 | governance_v4 | runtime_preview_session | governance_store.v4, lookup_by_reviewId, lookup_by_stationProfileId | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
 | VA-BM-070 | redacted_flow_corpus_v2 | manifest_dry_run | redacted_flow_corpus_v2.case_32, operator_contract_missing_parameter, redactionPass.true | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-071 | release_review_final | release_review | release_decision_matrix.releaseAllowed, metadataOnly.true, realResourcesTouched.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-072 | station_profile_final | release_review | station_profile.low_spec_ipc, operator_count.review, packageCreated.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-073 | operator_contract_final | release_review | operator_contract_coverage.pass, TemplateMatching.contract, ResultOutput.contract | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-074 | agent_explanation_final | release_review | agent_explanation_final.firstFixRecommendation, workflowDraftAllowed.true, releaseReviewAllowed.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-075 | governance_store_final | runtime_preview_session | governance_export_final.lookupKeys, release_review_decision.stream, redactionPass.true | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
+| VA-BM-076 | review_desk_final | runtime_preview | reviewDesk.releaseAllowed.approvalRequired.blocked, adminDeveloperGate.required, domRedacted.true | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | True |
+| VA-BM-077 | source_guard_final | missing_resource | source_guard.package_path_denied, plcWriteAttempted.false, deploymentExecuted.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-078 | readability_gate_final | manifest_dry_run | report_readability_gate.pass, status.non_empty, action.non_empty | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-079 | remote_ci_evidence_final | manifest_dry_run | workflowRun.runId.non_local, artifact.digest.recorded, headSha.current | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-080 | redacted_corpus_final | release_review | redacted_flow_corpus_final.caseCount60, station_compatibility_final, pre_release_review_final | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-081 | release_review_final | release_review | release_decision_matrix.releaseAllowed, metadataOnly.true, realResourcesTouched.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-082 | station_profile_final | release_review | station_profile.low_spec_ipc, operator_count.review, packageCreated.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-083 | operator_contract_final | release_review | operator_contract_coverage.pass, TemplateMatching.contract, ResultOutput.contract | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-084 | agent_explanation_final | release_review | agent_explanation_final.firstFixRecommendation, workflowDraftAllowed.true, releaseReviewAllowed.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-085 | governance_store_final | runtime_preview_session | governance_export_final.lookupKeys, release_review_decision.stream, redactionPass.true | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
+| VA-BM-086 | review_desk_final | runtime_preview | reviewDesk.releaseAllowed.approvalRequired.blocked, adminDeveloperGate.required, domRedacted.true | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | True |
+| VA-BM-087 | source_guard_final | missing_resource | source_guard.package_path_denied, plcWriteAttempted.false, deploymentExecuted.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-088 | readability_gate_final | manifest_dry_run | report_readability_gate.pass, status.non_empty, action.non_empty | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-089 | remote_ci_evidence_final | manifest_dry_run | workflowRun.runId.non_local, artifact.digest.recorded, headSha.current | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-090 | redacted_corpus_final | release_review | redacted_flow_corpus_final.caseCount60, station_compatibility_final, pre_release_review_final | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-091 | release_review_final | release_review | release_decision_matrix.releaseAllowed, metadataOnly.true, realResourcesTouched.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-092 | station_profile_final | release_review | station_profile.low_spec_ipc, operator_count.review, packageCreated.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-093 | operator_contract_final | release_review | operator_contract_coverage.pass, TemplateMatching.contract, ResultOutput.contract | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-094 | agent_explanation_final | release_review | agent_explanation_final.firstFixRecommendation, workflowDraftAllowed.true, releaseReviewAllowed.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-095 | governance_store_final | runtime_preview_session | governance_export_final.lookupKeys, release_review_decision.stream, redactionPass.true | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
+| VA-BM-096 | review_desk_final | runtime_preview | reviewDesk.releaseAllowed.approvalRequired.blocked, adminDeveloperGate.required, domRedacted.true | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | True |
+| VA-BM-097 | source_guard_final | missing_resource | source_guard.package_path_denied, plcWriteAttempted.false, deploymentExecuted.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-098 | readability_gate_final | manifest_dry_run | report_readability_gate.pass, status.non_empty, action.non_empty | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-099 | remote_ci_evidence_final | manifest_dry_run | workflowRun.runId.non_local, artifact.digest.recorded, headSha.current | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-100 | redacted_corpus_final | release_review | redacted_flow_corpus_final.caseCount60, station_compatibility_final, pre_release_review_final | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-101 | release_review_final | release_review | release_decision_matrix.releaseAllowed, metadataOnly.true, realResourcesTouched.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-102 | station_profile_final | release_review | station_profile.low_spec_ipc, operator_count.review, packageCreated.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-103 | operator_contract_final | release_review | operator_contract_coverage.pass, TemplateMatching.contract, ResultOutput.contract | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-104 | agent_explanation_final | release_review | agent_explanation_final.firstFixRecommendation, workflowDraftAllowed.true, releaseReviewAllowed.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-105 | governance_store_final | runtime_preview_session | governance_export_final.lookupKeys, release_review_decision.stream, redactionPass.true | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
+| VA-BM-106 | review_desk_final | runtime_preview | reviewDesk.releaseAllowed.approvalRequired.blocked, adminDeveloperGate.required, domRedacted.true | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | True |
+| VA-BM-107 | source_guard_final | missing_resource | source_guard.package_path_denied, plcWriteAttempted.false, deploymentExecuted.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-108 | readability_gate_final | manifest_dry_run | report_readability_gate.pass, status.non_empty, action.non_empty | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-109 | remote_ci_evidence_final | manifest_dry_run | workflowRun.runId.non_local, artifact.digest.recorded, headSha.current | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-110 | redacted_corpus_final | release_review | redacted_flow_corpus_final.caseCount60, station_compatibility_final, pre_release_review_final | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-111 | release_review_final | release_review | release_decision_matrix.releaseAllowed, metadataOnly.true, realResourcesTouched.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-112 | station_profile_final | release_review | station_profile.low_spec_ipc, operator_count.review, packageCreated.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-113 | operator_contract_final | release_review | operator_contract_coverage.pass, TemplateMatching.contract, ResultOutput.contract | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | get_operator_schema, validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-114 | agent_explanation_final | release_review | agent_explanation_final.firstFixRecommendation, workflowDraftAllowed.true, releaseReviewAllowed.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-115 | governance_store_final | runtime_preview_session | governance_export_final.lookupKeys, release_review_decision.stream, redactionPass.true | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | validate_flow, dryrun_flow, runtime_preview_simulate_metadata_session | True |
+| VA-BM-116 | review_desk_final | runtime_preview | reviewDesk.releaseAllowed.approvalRequired.blocked, adminDeveloperGate.required, domRedacted.true | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | validate_flow, dryrun_flow, capture_test_frame, replay_flow_with_frame | True |
+| VA-BM-117 | source_guard_final | missing_resource | source_guard.package_path_denied, plcWriteAttempted.false, deploymentExecuted.false | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-118 | readability_gate_final | manifest_dry_run | report_readability_gate.pass, status.non_empty, action.non_empty | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-119 | remote_ci_evidence_final | manifest_dry_run | workflowRun.runId.non_local, artifact.digest.recorded, headSha.current | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
+| VA-BM-120 | redacted_corpus_final | release_review | redacted_flow_corpus_final.caseCount60, station_compatibility_final, pre_release_review_final | validate_flow, dryrun_flow, runtime_package_precheck | validate_flow, dryrun_flow, runtime_package_precheck | True |
 
 ## Field Contract
 

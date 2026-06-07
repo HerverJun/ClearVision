@@ -1,18 +1,18 @@
 {
   "schemaVersion": "2026-06-05.vision-agent-quality-artifact-manifest.v1",
-  "generatedAtUtc": "2026-06-06T16:58:44.411829+00:00",
+  "generatedAtUtc": "2026-06-07T05:32:05.678497+00:00",
   "artifactName": "vision-agent-quality-suite",
-  "scanPolicyVersion": "2026-06-06.runtime-preview-v1.4-release-review-simulator-scan.v4",
-  "sourceFilesScanned": 6280,
-  "reportsScanned": 20,
+  "scanPolicyVersion": "2026-06-07.runtime-preview-final-pre-pilot-hardening-scan.v1",
+  "sourceFilesScanned": 3381,
+  "reportsScanned": 33,
   "auditReportsScanned": 2,
-  "sessionReportsScanned": 30,
+  "sessionReportsScanned": 55,
   "forbiddenHitCount": 0,
   "redactionPass": true,
   "files": [
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.json",
-      "sizeBytes": 517537
+      "sizeBytes": 901154
     },
     {
       "path": "quality/evals/reports/planner_autonomy_benchmark.json",
@@ -20,67 +20,119 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_scenario_corpus.json",
-      "sizeBytes": 69611
+      "sizeBytes": 126191
     },
     {
       "path": "quality/evals/reports/runtime_preview_redacted_flow_corpus.json",
-      "sizeBytes": 82442
+      "sizeBytes": 158912
     },
     {
       "path": "quality/evals/reports/runtime_preview_redacted_flow_corpus_v2.json",
-      "sizeBytes": 82442
+      "sizeBytes": 158912
     },
     {
       "path": "quality/evals/reports/runtime_preview_scenario_evidence.json",
-      "sizeBytes": 84487
+      "sizeBytes": 154125
     },
     {
       "path": "quality/evals/reports/runtime_preview_deploy_readiness_report.sample.json",
-      "sizeBytes": 16015
+      "sizeBytes": 29085
     },
     {
       "path": "quality/evals/reports/runtime_preview_package_readiness_report.sample.json",
-      "sizeBytes": 47452
+      "sizeBytes": 85568
     },
     {
       "path": "quality/evals/reports/runtime_package_manifest_dry_run.sample.json",
-      "sizeBytes": 63914
+      "sizeBytes": 117604
     },
     {
       "path": "quality/evals/reports/runtime_preview_station_profiles_sample.json",
-      "sizeBytes": 8820
+      "sizeBytes": 17879
     },
     {
       "path": "quality/evals/reports/runtime_preview_operator_contract_registry.json",
-      "sizeBytes": 12211
+      "sizeBytes": 15235
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_operator_contract_coverage.json",
+      "sizeBytes": 1621
     },
     {
       "path": "quality/evals/reports/runtime_preview_operator_contract_validation_sample.json",
-      "sizeBytes": 53342
+      "sizeBytes": 97952
     },
     {
       "path": "quality/evals/reports/runtime_preview_station_compatibility_dry_run.sample.json",
-      "sizeBytes": 47046
+      "sizeBytes": 87573
     },
     {
       "path": "quality/evals/reports/runtime_preview_pre_release_review_report.sample.json",
-      "sizeBytes": 51679
+      "sizeBytes": 453582
     },
     {
       "path": "quality/evals/reports/runtime_preview_governance_audit_sample.json",
-      "sizeBytes": 4664
+      "sizeBytes": 4663
     },
     {
       "path": "quality/evals/reports/runtime_preview_governance_export_sample.json",
-      "sizeBytes": 1893
+      "sizeBytes": 2490
     },
     {
       "path": "quality/evals/reports/runtime_preview_agent_explanation_benchmark.json",
-      "sizeBytes": 56492
+      "sizeBytes": 139962
     },
     {
       "path": "quality/evals/reports/runtime_preview_agent_explanation_v3.json",
-      "sizeBytes": 56492
+      "sizeBytes": 139962
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_redacted_flow_corpus_final.json",
+      "sizeBytes": 158912
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_station_profiles_final.json",
+      "sizeBytes": 17879
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_operator_contract_registry_final.json",
+      "sizeBytes": 15235
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_operator_contract_validation_final.json",
+      "sizeBytes": 97952
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_station_compatibility_final.json",
+      "sizeBytes": 87573
+    },
+    {
+      "path": "quality/evals/reports/runtime_package_manifest_dry_run_final.json",
+      "sizeBytes": 117604
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_package_readiness_final.json",
+      "sizeBytes": 85568
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_pre_release_review_final.json",
+      "sizeBytes": 453582
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_release_decision_matrix.json",
+      "sizeBytes": 329986
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_agent_explanation_final.json",
+      "sizeBytes": 139962
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_governance_export_final.json",
+      "sizeBytes": 2490
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_report_readability_gate.json",
+      "sizeBytes": 14236
     },
     {
       "path": "quality/evals/reports/real_llm_planner_shadow_eval.json",
@@ -92,7 +144,7 @@
     },
     {
       "path": "quality/evals/reports/VisionAgent_business_benchmark_baseline.md",
-      "sizeBytes": 19714
+      "sizeBytes": 33325
     },
     {
       "path": "quality/evals/reports/planner_autonomy_benchmark.md",
@@ -100,67 +152,119 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_scenario_corpus.md",
-      "sizeBytes": 2281
+      "sizeBytes": 3166
     },
     {
       "path": "quality/evals/reports/runtime_preview_redacted_flow_corpus.md",
-      "sizeBytes": 2987
+      "sizeBytes": 3575
     },
     {
       "path": "quality/evals/reports/runtime_preview_redacted_flow_corpus_v2.md",
-      "sizeBytes": 2987
+      "sizeBytes": 3575
     },
     {
       "path": "quality/evals/reports/runtime_preview_scenario_evidence.md",
-      "sizeBytes": 2283
+      "sizeBytes": 3168
     },
     {
       "path": "quality/evals/reports/runtime_preview_deploy_readiness_report.sample.md",
-      "sizeBytes": 2274
+      "sizeBytes": 3215
     },
     {
       "path": "quality/evals/reports/runtime_preview_package_readiness_report.sample.md",
-      "sizeBytes": 2091
+      "sizeBytes": 2753
     },
     {
       "path": "quality/evals/reports/runtime_package_manifest_dry_run.sample.md",
-      "sizeBytes": 2484
+      "sizeBytes": 3071
     },
     {
       "path": "quality/evals/reports/runtime_preview_station_profiles_sample.md",
-      "sizeBytes": 888
+      "sizeBytes": 1312
     },
     {
       "path": "quality/evals/reports/runtime_preview_operator_contract_registry.md",
-      "sizeBytes": 1261
+      "sizeBytes": 1624
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_operator_contract_coverage.md",
+      "sizeBytes": 666
     },
     {
       "path": "quality/evals/reports/runtime_preview_operator_contract_validation_sample.md",
-      "sizeBytes": 1476
+      "sizeBytes": 2499
     },
     {
       "path": "quality/evals/reports/runtime_preview_station_compatibility_dry_run.sample.md",
-      "sizeBytes": 1509
+      "sizeBytes": 2328
     },
     {
       "path": "quality/evals/reports/runtime_preview_pre_release_review_report.sample.md",
-      "sizeBytes": 1677
+      "sizeBytes": 2922
     },
     {
       "path": "quality/evals/reports/runtime_preview_governance_audit_sample.md",
-      "sizeBytes": 1627
+      "sizeBytes": 1741
     },
     {
       "path": "quality/evals/reports/runtime_preview_governance_export_sample.md",
-      "sizeBytes": 1210
+      "sizeBytes": 1561
     },
     {
       "path": "quality/evals/reports/runtime_preview_agent_explanation_benchmark.md",
-      "sizeBytes": 4012
+      "sizeBytes": 2890
     },
     {
       "path": "quality/evals/reports/runtime_preview_agent_explanation_v3.md",
-      "sizeBytes": 4012
+      "sizeBytes": 2890
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_redacted_flow_corpus_final.md",
+      "sizeBytes": 3575
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_station_profiles_final.md",
+      "sizeBytes": 1312
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_operator_contract_registry_final.md",
+      "sizeBytes": 1624
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_operator_contract_validation_final.md",
+      "sizeBytes": 2499
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_station_compatibility_final.md",
+      "sizeBytes": 2328
+    },
+    {
+      "path": "quality/evals/reports/runtime_package_manifest_dry_run_final.md",
+      "sizeBytes": 3071
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_package_readiness_final.md",
+      "sizeBytes": 2753
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_pre_release_review_final.md",
+      "sizeBytes": 2922
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_release_decision_matrix.md",
+      "sizeBytes": 2909
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_agent_explanation_final.md",
+      "sizeBytes": 2890
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_governance_export_final.md",
+      "sizeBytes": 1561
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_report_readability_gate.md",
+      "sizeBytes": 2679
     },
     {
       "path": "quality/evals/reports/real_llm_planner_shadow_eval.md",
@@ -172,19 +276,27 @@
     },
     {
       "path": "test_results/agent_engineering_harness/agent_ui_contract_output.txt",
-      "sizeBytes": 31150
+      "sizeBytes": 35132
+    },
+    {
+      "path": "test_results/agent_engineering_harness/agent_ai_model_config_endpoints.trx",
+      "sizeBytes": 155591
+    },
+    {
+      "path": "test_results/agent_engineering_harness/agent_contracts_skeleton.trx",
+      "sizeBytes": 35964
     },
     {
       "path": "test_results/agent_engineering_harness/agent_engineering_harness.trx",
-      "sizeBytes": 723088
+      "sizeBytes": 978192
     },
     {
-      "path": "test_results/agent_engineering_harness/AiModelEndpointsTests.trx",
-      "sizeBytes": 120881
+      "path": "test_results/agent_engineering_harness/agent_planner_parity_subset.trx",
+      "sizeBytes": 16369
     },
     {
-      "path": "test_results/agent_engineering_harness/VisionAgentRuntimePreviewGovernanceTests.trx",
-      "sizeBytes": 434785
+      "path": "test_results/agent_engineering_harness/runtime_preview_governance_redacted_corpus_fix.trx",
+      "sizeBytes": 3360
     }
   ],
   "reports": [
@@ -196,12 +308,12 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:28.2557886+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.1767064+00:00"
       },
       "summary": {
-        "caseCount": 70,
-        "runtimePreviewCaseCount": 13,
-        "passedCaseCount": 70,
+        "caseCount": 120,
+        "runtimePreviewCaseCount": 23,
+        "passedCaseCount": 120,
         "accepted": true
       }
     },
@@ -213,7 +325,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T15:00:32.9742366+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:32.9877471+00:00"
       },
       "summary": {
         "plannerCaseCount": 15,
@@ -225,17 +337,17 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_scenario_corpus.json",
-      "id": "runtime_preview_scenario_corpus",
+      "id": "runtime_preview_scenario_corpus_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "minimumCases": 30,
+        "caseCount": 60,
+        "minimumCases": 60,
         "accepted": true,
         "metadataOnly": true,
         "realResourcesTouched": false
@@ -243,17 +355,17 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_redacted_flow_corpus.json",
-      "id": "runtime_preview_redacted_flow_corpus_v2",
+      "id": "runtime_preview_redacted_flow_corpus_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "minimumCases": 30,
+        "caseCount": 60,
+        "minimumCases": 60,
         "accepted": true,
         "metadataOnly": true,
         "realResourcesTouched": false,
@@ -262,17 +374,17 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_redacted_flow_corpus_v2.json",
-      "id": "runtime_preview_redacted_flow_corpus_v2",
+      "id": "runtime_preview_redacted_flow_corpus_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "minimumCases": 30,
+        "caseCount": 60,
+        "minimumCases": 60,
         "accepted": true,
         "metadataOnly": true,
         "realResourcesTouched": false,
@@ -287,16 +399,16 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "passedCaseCount": 32,
+        "caseCount": 60,
+        "passedCaseCount": 60,
         "accepted": true,
         "metadataOnly": true,
         "realResourcesTouched": false,
-        "deniedCaseCount": 4,
-        "notReadyCaseCount": 13
+        "deniedCaseCount": 9,
+        "notReadyCaseCount": 14
       }
     },
     {
@@ -307,12 +419,12 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "readyForDeploymentCount": 15,
-        "deploymentBlockedCount": 17,
+        "caseCount": 60,
+        "readyForDeploymentCount": 37,
+        "deploymentBlockedCount": 23,
         "metadataOnly": true,
         "packageCreated": false,
         "deploymentExecuted": false,
@@ -322,18 +434,18 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_package_readiness_report.sample.json",
-      "id": "runtime_preview_package_readiness_report_sample",
+      "id": "runtime_preview_package_readiness_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "readyForPackageCount": 15,
-        "packageBlockedCount": 17,
+        "caseCount": 60,
+        "readyForPackageCount": 37,
+        "packageBlockedCount": 23,
         "metadataOnly": true,
         "packageCreated": false,
         "deploymentExecuted": false,
@@ -343,19 +455,19 @@
     },
     {
       "path": "quality/evals/reports/runtime_package_manifest_dry_run.sample.json",
-      "id": "runtime_package_manifest_dry_run_sample",
+      "id": "runtime_package_manifest_dry_run_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "minimumCases": 30,
-        "packageReviewAllowedCount": 15,
-        "manifestBlockedCount": 17,
+        "caseCount": 60,
+        "minimumCases": 60,
+        "packageReviewAllowedCount": 37,
+        "manifestBlockedCount": 23,
         "metadataOnly": true,
         "manifestArtifactGenerated": false,
         "packageCreated": false,
@@ -366,16 +478,17 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_station_profiles_sample.json",
-      "id": "runtime_preview_station_profiles_sample",
+      "id": "runtime_preview_station_profiles_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "profileCount": 6,
+        "profileCount": 12,
+        "minimumProfiles": 12,
         "metadataOnly": true,
         "realResourcesTouched": false,
         "redactionPass": true,
@@ -390,11 +503,30 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "operatorContractVersion": "operator-contract-registry.v1.metadata-only",
+        "operatorContractVersion": "operator-contract-registry.final.metadata-only",
         "contractCount": 16,
+        "metadataOnly": true,
+        "realResourcesTouched": false,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_operator_contract_coverage.json",
+      "id": "runtime_preview_operator_contract_coverage",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "operatorContractVersion": "operator-contract-registry.final.metadata-only",
+        "contractCount": 16,
+        "coveragePass": true,
         "metadataOnly": true,
         "realResourcesTouched": false,
         "accepted": true
@@ -408,13 +540,13 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "minimumCases": 30,
-        "operatorContractsSatisfiedCount": 30,
-        "blockedCount": 2,
+        "caseCount": 60,
+        "minimumCases": 60,
+        "operatorContractsSatisfiedCount": 54,
+        "blockedCount": 6,
         "metadataOnly": true,
         "packageCreated": false,
         "deploymentExecuted": false,
@@ -430,13 +562,13 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "minimumCases": 30,
-        "stationCompatibleCount": 9,
-        "stationBlockedCount": 23,
+        "caseCount": 60,
+        "minimumCases": 60,
+        "stationCompatibleCount": 25,
+        "stationBlockedCount": 35,
         "metadataOnly": true,
         "packageCreated": false,
         "deploymentExecuted": false,
@@ -446,20 +578,20 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_pre_release_review_report.sample.json",
-      "id": "runtime_preview_pre_release_review_report_sample",
+      "id": "runtime_preview_pre_release_review_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "minimumCases": 30,
-        "releaseAllowedCount": 4,
-        "requiresEngineerApprovalCount": 5,
-        "releaseBlockedCount": 23,
+        "caseCount": 60,
+        "minimumCases": 60,
+        "releaseAllowedCount": 14,
+        "requiresEngineerApprovalCount": 10,
+        "releaseBlockedCount": 36,
         "metadataOnly": true,
         "packageCreated": false,
         "deploymentExecuted": false,
@@ -475,7 +607,7 @@
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
         "eventCount": 19,
@@ -488,13 +620,13 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_governance_export_sample.json",
-      "id": "runtime_preview_governance_export_sample",
+      "id": "runtime_preview_governance_export_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
         "storageVersion": "jsonl.v4",
@@ -507,17 +639,27 @@
           "manifest_dry_run_report",
           "station_compatibility_report",
           "operator_contract_validation_report",
-          "pre_release_review_report"
+          "pre_release_review_report",
+          "release_review_decision",
+          "station_profile_snapshot",
+          "operator_contract_registry_snapshot",
+          "contract_coverage_report",
+          "final_governance_export"
         ],
-        "sessionCount": 32,
-        "auditEventCount": 320,
-        "sessionReportCount": 32,
-        "deployReadinessReportCount": 32,
-        "packageReadinessReportCount": 32,
-        "manifestDryRunReportCount": 32,
-        "stationCompatibilityReportCount": 32,
-        "operatorContractValidationReportCount": 32,
-        "preReleaseReviewReportCount": 32,
+        "sessionCount": 60,
+        "auditEventCount": 600,
+        "sessionReportCount": 60,
+        "deployReadinessReportCount": 60,
+        "packageReadinessReportCount": 60,
+        "manifestDryRunReportCount": 60,
+        "stationCompatibilityReportCount": 60,
+        "operatorContractValidationReportCount": 60,
+        "preReleaseReviewReportCount": 60,
+        "releaseReviewDecisionCount": 60,
+        "stationProfileSnapshotCount": 12,
+        "operatorContractRegistrySnapshotCount": 1,
+        "operatorContractCoverageReportCount": 1,
+        "finalGovernanceExportCount": 1,
         "corruptLineCount": 1,
         "corruptionRecovered": true,
         "redactionPass": true,
@@ -528,18 +670,22 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_agent_explanation_benchmark.json",
-      "id": "runtime_preview_agent_explanation_v3",
+      "id": "runtime_preview_agent_explanation_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "minimumCases": 30,
-        "passedCaseCount": 32,
+        "caseCount": 60,
+        "minimumCases": 60,
+        "passedCaseCount": 60,
+        "emptyStatusCount": 0,
+        "emptyDecisionCount": 0,
+        "emptyRiskCount": 0,
+        "emptyActionCount": 0,
         "accepted": true,
         "metadataOnly": true,
         "realResourcesTouched": false
@@ -547,21 +693,318 @@
     },
     {
       "path": "quality/evals/reports/runtime_preview_agent_explanation_v3.json",
-      "id": "runtime_preview_agent_explanation_v3",
+      "id": "runtime_preview_agent_explanation_final",
       "workflowRun": {
         "commitSha": "local",
         "branchName": "local",
         "runId": "local",
         "runAttempt": "local",
-        "generatedAtUtc": "2026-06-06T16:17:44.241304+00:00"
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
       },
       "summary": {
-        "caseCount": 32,
-        "minimumCases": 30,
-        "passedCaseCount": 32,
+        "caseCount": 60,
+        "minimumCases": 60,
+        "passedCaseCount": 60,
+        "emptyStatusCount": 0,
+        "emptyDecisionCount": 0,
+        "emptyRiskCount": 0,
+        "emptyActionCount": 0,
         "accepted": true,
         "metadataOnly": true,
         "realResourcesTouched": false
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_redacted_flow_corpus_final.json",
+      "id": "runtime_preview_redacted_flow_corpus_final",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "caseCount": 60,
+        "minimumCases": 60,
+        "accepted": true,
+        "metadataOnly": true,
+        "realResourcesTouched": false,
+        "redactionPass": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_station_profiles_final.json",
+      "id": "runtime_preview_station_profiles_final",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "profileCount": 12,
+        "minimumProfiles": 12,
+        "metadataOnly": true,
+        "realResourcesTouched": false,
+        "redactionPass": true,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_operator_contract_registry_final.json",
+      "id": "runtime_preview_operator_contract_registry",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "operatorContractVersion": "operator-contract-registry.final.metadata-only",
+        "contractCount": 16,
+        "metadataOnly": true,
+        "realResourcesTouched": false,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_operator_contract_validation_final.json",
+      "id": "runtime_preview_operator_contract_validation_sample",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "caseCount": 60,
+        "minimumCases": 60,
+        "operatorContractsSatisfiedCount": 54,
+        "blockedCount": 6,
+        "metadataOnly": true,
+        "packageCreated": false,
+        "deploymentExecuted": false,
+        "realResourcesTouched": false,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_station_compatibility_final.json",
+      "id": "runtime_preview_station_compatibility_dry_run_sample",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "caseCount": 60,
+        "minimumCases": 60,
+        "stationCompatibleCount": 25,
+        "stationBlockedCount": 35,
+        "metadataOnly": true,
+        "packageCreated": false,
+        "deploymentExecuted": false,
+        "realResourcesTouched": false,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_package_manifest_dry_run_final.json",
+      "id": "runtime_package_manifest_dry_run_final",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "caseCount": 60,
+        "minimumCases": 60,
+        "packageReviewAllowedCount": 37,
+        "manifestBlockedCount": 23,
+        "metadataOnly": true,
+        "manifestArtifactGenerated": false,
+        "packageCreated": false,
+        "deploymentExecuted": false,
+        "realResourcesTouched": false,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_package_readiness_final.json",
+      "id": "runtime_preview_package_readiness_final",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "caseCount": 60,
+        "readyForPackageCount": 37,
+        "packageBlockedCount": 23,
+        "metadataOnly": true,
+        "packageCreated": false,
+        "deploymentExecuted": false,
+        "realResourcesTouched": false,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_pre_release_review_final.json",
+      "id": "runtime_preview_pre_release_review_final",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "caseCount": 60,
+        "minimumCases": 60,
+        "releaseAllowedCount": 14,
+        "requiresEngineerApprovalCount": 10,
+        "releaseBlockedCount": 36,
+        "metadataOnly": true,
+        "packageCreated": false,
+        "deploymentExecuted": false,
+        "realResourcesTouched": false,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_release_decision_matrix.json",
+      "id": "runtime_preview_release_decision_matrix",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "caseCount": 60,
+        "minimumCases": 60,
+        "releaseAllowedCount": 14,
+        "requiresEngineerApprovalCount": 10,
+        "blockedCount": 36,
+        "decisionTypes": [
+          "releaseAllowed",
+          "requiresEngineerApproval",
+          "blocked",
+          "forbiddenIntentDenied",
+          "metadataIncomplete",
+          "stationIncompatible",
+          "operatorContractFailed",
+          "manifestRiskBlocked",
+          "packageReviewBlocked"
+        ],
+        "metadataOnly": true,
+        "packageCreated": false,
+        "deploymentExecuted": false,
+        "realResourcesTouched": false,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_agent_explanation_final.json",
+      "id": "runtime_preview_agent_explanation_final",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "caseCount": 60,
+        "minimumCases": 60,
+        "passedCaseCount": 60,
+        "emptyStatusCount": 0,
+        "emptyDecisionCount": 0,
+        "emptyRiskCount": 0,
+        "emptyActionCount": 0,
+        "accepted": true,
+        "metadataOnly": true,
+        "realResourcesTouched": false
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_governance_export_final.json",
+      "id": "runtime_preview_governance_export_final",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "storageVersion": "jsonl.v4",
+        "recordTypes": [
+          "session",
+          "audit",
+          "session_report",
+          "deploy_readiness_report",
+          "package_readiness_report",
+          "manifest_dry_run_report",
+          "station_compatibility_report",
+          "operator_contract_validation_report",
+          "pre_release_review_report",
+          "release_review_decision",
+          "station_profile_snapshot",
+          "operator_contract_registry_snapshot",
+          "contract_coverage_report",
+          "final_governance_export"
+        ],
+        "sessionCount": 60,
+        "auditEventCount": 600,
+        "sessionReportCount": 60,
+        "deployReadinessReportCount": 60,
+        "packageReadinessReportCount": 60,
+        "manifestDryRunReportCount": 60,
+        "stationCompatibilityReportCount": 60,
+        "operatorContractValidationReportCount": 60,
+        "preReleaseReviewReportCount": 60,
+        "releaseReviewDecisionCount": 60,
+        "stationProfileSnapshotCount": 12,
+        "operatorContractRegistrySnapshotCount": 1,
+        "operatorContractCoverageReportCount": 1,
+        "finalGovernanceExportCount": 1,
+        "corruptLineCount": 1,
+        "corruptionRecovered": true,
+        "redactionPass": true,
+        "metadataOnly": true,
+        "realResourcesTouched": false,
+        "accepted": true
+      }
+    },
+    {
+      "path": "quality/evals/reports/runtime_preview_report_readability_gate.json",
+      "id": "runtime_preview_report_readability_gate",
+      "workflowRun": {
+        "commitSha": "local",
+        "branchName": "local",
+        "runId": "local",
+        "runAttempt": "local",
+        "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
+      },
+      "summary": {
+        "reportCount": 28,
+        "passedReportCount": 28,
+        "readabilityPass": true,
+        "metadataOnly": true,
+        "realResourcesTouched": false,
+        "accepted": true
       }
     },
     {

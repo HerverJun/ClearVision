@@ -6,7 +6,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T23:47:15.436775+00:00"
+    "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
   },
   "summary": {
     "caseCount": 60,
@@ -3763,11 +3763,11 @@
     },
     {
       "caseId": "RP-SC-058",
-      "scenario": "base64_image_denied_final",
+      "scenario": "image_bytes_denied_final",
       "workflowDraftHash": "820c4d2adc3f9b101a5a97a1238a93c5b17354491b28625edca14c0ec425e5d3",
       "expectedStatus": "denied",
       "actualStatus": "denied",
-      "expectedRisk": "base64_image_denied",
+      "expectedRisk": "image_bytes_denied",
       "expectedPendingActions": [
         "RuntimePreviewPilotReadinessReview"
       ],
@@ -3779,7 +3779,7 @@
       ],
       "missingResources": [
         {
-          "kind": "base64_image_denied",
+          "kind": "image_bytes_denied",
           "handle": "<redacted-metadata-handle>"
         }
       ],
@@ -3787,7 +3787,7 @@
         "RuntimePreviewPilotReadinessReview"
       ],
       "denyReason": "runtime_preview_dangerous_or_denied_metadata",
-      "precheckRisk": "base64_image_denied",
+      "precheckRisk": "image_bytes_denied",
       "workflowDraftAllowed": true,
       "workflowDraft": {
         "operators": [
@@ -4763,7 +4763,7 @@
     },
     {
       "caseId": "RP-SC-058",
-      "scenario": "base64_image_denied_final",
+      "scenario": "image_bytes_denied_final",
       "workflowDraftAllowed": true,
       "readinessStatus": "denied",
       "permissionStatus": "denied",

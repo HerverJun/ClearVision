@@ -6,7 +6,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T23:47:15.436775+00:00"
+    "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
   },
   "summary": {
     "caseCount": 60,
@@ -2446,7 +2446,7 @@
     },
     {
       "caseId": "RP-RF-058",
-      "scenario": "base64_image_denied_final",
+      "scenario": "image_bytes_denied_final",
       "readyForPackage": false,
       "packageReviewAllowed": false,
       "packageBlocked": true,
@@ -2459,11 +2459,11 @@
       "blockedReason": "runtime_preview_image_bytes_denied",
       "missingResources": [
         {
-          "kind": "base64_image_denied",
+          "kind": "image_bytes_denied",
           "handle": "<redacted-metadata-handle>"
         }
       ],
-      "riskSummary": "package blocked: base64_image_denied",
+      "riskSummary": "package blocked: image_bytes_denied",
       "packageRiskLevel": "high",
       "packageReviewExplanation": "Workflow draft remains editable, but package review is blocked by metadata dependency or policy findings.",
       "pendingActions": [
@@ -2480,7 +2480,7 @@
         "realResourcesTouched=false"
       ],
       "dependencyTrace": [
-        "blocked:base64_image_denied"
+        "blocked:image_bytes_denied"
       ],
       "operatorContract": [
         "ImageAcquisition:metadata_contract",

@@ -6,7 +6,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T23:47:15.436775+00:00"
+    "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
   },
   "summary": {
     "caseCount": 60,
@@ -2222,14 +2222,14 @@
     },
     {
       "caseId": "RP-RF-058",
-      "scenario": "base64_image_denied_final",
+      "scenario": "image_bytes_denied_final",
       "status": "denied",
       "decision": "forbiddenIntentDenied",
       "risk": "denied",
       "action": "Resolve the first blocking reason, then rerun full review: runtime_preview_image_bytes_denied.",
-      "readyStateExplanation": "base64_image_denied_final status is denied; workflowDraftAllowed remains true for engineering edits.",
+      "readyStateExplanation": "image_bytes_denied_final status is denied; workflowDraftAllowed remains true for engineering edits.",
       "missingResourceExplanation": "Unclosed metadata dependency or policy item: runtime_preview_image_bytes_denied.",
-      "packageRiskExplanation": "Risk: base64_image_denied. Do not package or deploy.",
+      "packageRiskExplanation": "Risk: image_bytes_denied. Do not package or deploy.",
       "affectedOperators": [
         "ImageAcquisition",
         "TemplateMatching",
@@ -2238,7 +2238,7 @@
       "blockedReasons": [
         "runtime_preview_image_bytes_denied"
       ],
-      "manifestRisk": "base64_image_denied",
+      "manifestRisk": "image_bytes_denied",
       "nextEngineerAction": "Resolve the first blocking reason, then rerun full review: runtime_preview_image_bytes_denied.",
       "firstFixRecommendation": "Resolve the first blocking reason, then rerun full review: runtime_preview_image_bytes_denied.",
       "workflowDraftAllowed": true,

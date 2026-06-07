@@ -966,11 +966,15 @@ public class AiModelEndpointsTests
         using var corpusResponse = await host.Client.GetAsync("/api/settings/runtime-preview-pilot/redacted-flow-corpus");
         corpusResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var corpusJson = await corpusResponse.Content.ReadAsStringAsync();
-        corpusJson.Should().Contain("\"caseCount\":32");
+        using var corpusDocument = JsonDocument.Parse(corpusJson);
+        corpusDocument.RootElement.GetProperty("corpus").GetProperty("caseCount").GetInt32()
+            .Should().BeGreaterThanOrEqualTo(60);
         corpusJson.Should().Contain("remote_control_defect");
+        corpusJson.Should().Contain("image_bytes_denied_final");
         corpusJson.Should().Contain("stationProfileId");
         corpusJson.Should().Contain("expectedReleaseReviewDecision");
         corpusJson.Should().NotContain("redacted-ip-token");
+        corpusJson.Should().NotContain("base64_image_denied");
         corpusJson.Should().NotContain(".cvpkg");
 
         using var manifestResponse = await host.Client.PostAsync(
@@ -1023,7 +1027,7 @@ public class AiModelEndpointsTests
         registryJson.Should().Contain("MeasureDistance");
         registryJson.Should().Contain("DeepLearning");
         registryJson.Should().Contain("ResultOutput");
-        registryJson.Should().Contain("operator-contract-registry.v1.metadata-only");
+        registryJson.Should().Contain("operator-contract-registry.final.metadata-only");
 
         using var reviewResponse = await host.Client.PostAsync(
             "/api/settings/runtime-preview-pilot/sessions/pre-release-review",
@@ -1063,6 +1067,38 @@ public class AiModelEndpointsTests
         lookupJson.Should().Contain("stationProfileReports");
         lookupJson.Should().Contain("RP-RF-ENDPOINT");
         lookupJson.Should().NotContain(".cvpkg");
+    }
+
+    [Theory]
+    [InlineData("/api/settings/runtime-preview-pilot/redacted-flow-corpus", "image_bytes_denied_final")]
+    [InlineData("/api/settings/runtime-preview-pilot/redacted-flow-corpus", "remote_control_defect")]
+    [InlineData("/api/settings/runtime-preview-pilot/station-profiles", "sp-release-standard-v14")]
+    [InlineData("/api/settings/runtime-preview-pilot/station-profiles", "\"plcWriteAllowed\":false")]
+    [InlineData("/api/settings/runtime-preview-pilot/station-profiles", "\"networkPolicy\":\"redacted\"")]
+    [InlineData("/api/settings/runtime-preview-pilot/operator-contract-registry", "operator-contract-registry.final.metadata-only")]
+    [InlineData("/api/settings/runtime-preview-pilot/operator-contract-registry", "TemplateMatching")]
+    [InlineData("/api/settings/runtime-preview-pilot/operator-contract-registry", "DeepLearning")]
+    [InlineData("/api/settings/runtime-preview-pilot/operator-contract-registry", "ResultOutput")]
+    [InlineData("/api/settings/runtime-preview-pilot/agent-explanation-benchmark", "nextEngineerAction")]
+    [InlineData("/api/settings/runtime-preview-pilot/agent-explanation-benchmark", "stationCompatibilityExplanation")]
+    [InlineData("/api/settings/runtime-preview-pilot/agent-explanation-benchmark", "releaseDecisionExplanation")]
+    public async Task RuntimePreviewPilotFinalReadOnlyEndpoints_ShouldExposeMetadataOnlyContracts(
+        string endpoint,
+        string expectedToken)
+    {
+        var appConfig = RuntimePreviewEndpointConfig();
+        await using var host = await AiModelEndpointTestHost.CreateAsync(appConfig: appConfig);
+
+        using var response = await host.Client.GetAsync(endpoint);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var json = await response.Content.ReadAsStringAsync();
+        json.Should().Contain(expectedToken);
+        json.Should().Contain("\"metadataOnly\":true");
+        json.Should().Contain("\"realResourcesTouched\":false");
+        json.Should().NotContain("redacted-ip-token");
+        json.Should().NotContain("base64_image_denied");
+        json.Should().NotContain(".cvpkg");
     }
 
     [Fact]

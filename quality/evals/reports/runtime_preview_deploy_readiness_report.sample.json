@@ -6,7 +6,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T23:47:15.436775+00:00"
+    "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
   },
   "summary": {
     "caseCount": 60,
@@ -819,7 +819,7 @@
     },
     {
       "caseId": "RP-SC-058",
-      "scenario": "base64_image_denied_final",
+      "scenario": "image_bytes_denied_final",
       "workflowDraftAllowed": true,
       "readinessStatus": "denied",
       "permissionStatus": "denied",

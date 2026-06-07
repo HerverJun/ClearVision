@@ -1378,7 +1378,7 @@ test('quality suite tracks raised UI contract minimum', () => {
     .find(entry => entry.id === 'vision_agent_ui_contract_tests');
 
   assert.ok(uiEntry);
-  assert.equal(uiEntry.minimumTests, 135);
+  assert.equal(uiEntry.minimumTests, 190);
 
   const shadowEntry = suite.stages
     .flatMap(stage => stage.entries)
@@ -2374,37 +2374,171 @@ test('RuntimePreview v1.3 DI registers manifest dry-run and redacted corpus serv
   assert.match(source, /AddScoped<RuntimePreviewRedactedFlowCorpusService>/);
 });
 
-test('RuntimePreview v1.4 quality runner writes release review simulator reports', () => {
+test('RuntimePreview Final quality runner writes release review final reports', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'quality', 'tools', 'run_runtime_preview_scenario_evidence.py'),
     'utf8'
   );
 
-  assert.match(source, /RuntimePreview v1\.4/);
+  assert.match(source, /RuntimePreview Release Review Final/);
+  assert.match(source, /MIN_FINAL_CASES = 60/);
   assert.match(source, /runtime_preview_redacted_flow_corpus/);
   assert.match(source, /runtime_preview_redacted_flow_corpus_v2/);
+  assert.match(source, /runtime_preview_redacted_flow_corpus_final/);
   assert.match(source, /runtime_package_manifest_dry_run\.sample/);
+  assert.match(source, /runtime_package_manifest_dry_run_final/);
   assert.match(source, /runtime_preview_station_compatibility_dry_run\.sample/);
+  assert.match(source, /runtime_preview_station_compatibility_final/);
   assert.match(source, /runtime_preview_operator_contract_validation_sample/);
+  assert.match(source, /runtime_preview_operator_contract_validation_final/);
   assert.match(source, /runtime_preview_pre_release_review_report\.sample/);
+  assert.match(source, /runtime_preview_pre_release_review_final/);
+  assert.match(source, /runtime_preview_release_decision_matrix/);
   assert.match(source, /runtime_preview_agent_explanation_v3/);
+  assert.match(source, /runtime_preview_agent_explanation_final/);
 });
 
-test('RuntimePreview v1.4 artifact assertion scans release review reports and package fragments', () => {
+test('RuntimePreview Final artifact assertion scans release review reports and package fragments', () => {
   const source = fs.readFileSync(
     path.resolve(getRepoRoot(), 'quality', 'tools', 'assert_vision_agent_report_artifacts.py'),
     'utf8'
   );
 
-  assert.match(source, /runtime-preview-v1\.4-release-review-simulator-scan/);
+  assert.match(source, /runtime-preview-final-pre-pilot-hardening-scan/);
   assert.match(source, /runtime_preview_redacted_flow_corpus\.json/);
   assert.match(source, /runtime_preview_redacted_flow_corpus_v2\.json/);
+  assert.match(source, /runtime_preview_redacted_flow_corpus_final\.json/);
   assert.match(source, /runtime_package_manifest_dry_run\.sample\.json/);
+  assert.match(source, /runtime_package_manifest_dry_run_final\.json/);
   assert.match(source, /runtime_preview_station_compatibility_dry_run\.sample\.json/);
+  assert.match(source, /runtime_preview_station_compatibility_final\.json/);
   assert.match(source, /runtime_preview_operator_contract_validation_sample\.json/);
+  assert.match(source, /runtime_preview_operator_contract_validation_final\.json/);
   assert.match(source, /runtime_preview_pre_release_review_report\.sample\.json/);
+  assert.match(source, /runtime_preview_pre_release_review_final\.json/);
+  assert.match(source, /runtime_preview_release_decision_matrix\.json/);
   assert.match(source, /\\.cvpkg\\b/);
 });
+
+const runtimePreviewFinalArtifacts = [
+  'quality/evals/reports/runtime_preview_redacted_flow_corpus_final.json',
+  'quality/evals/reports/runtime_preview_redacted_flow_corpus_final.md',
+  'quality/evals/reports/runtime_preview_station_profiles_final.json',
+  'quality/evals/reports/runtime_preview_station_profiles_final.md',
+  'quality/evals/reports/runtime_preview_operator_contract_registry_final.json',
+  'quality/evals/reports/runtime_preview_operator_contract_registry_final.md',
+  'quality/evals/reports/runtime_preview_operator_contract_coverage.json',
+  'quality/evals/reports/runtime_preview_operator_contract_coverage.md',
+  'quality/evals/reports/runtime_preview_operator_contract_validation_final.json',
+  'quality/evals/reports/runtime_preview_operator_contract_validation_final.md',
+  'quality/evals/reports/runtime_preview_station_compatibility_final.json',
+  'quality/evals/reports/runtime_preview_station_compatibility_final.md',
+  'quality/evals/reports/runtime_package_manifest_dry_run_final.json',
+  'quality/evals/reports/runtime_package_manifest_dry_run_final.md',
+  'quality/evals/reports/runtime_preview_package_readiness_final.json',
+  'quality/evals/reports/runtime_preview_package_readiness_final.md',
+  'quality/evals/reports/runtime_preview_pre_release_review_final.json',
+  'quality/evals/reports/runtime_preview_pre_release_review_final.md',
+  'quality/evals/reports/runtime_preview_release_decision_matrix.json',
+  'quality/evals/reports/runtime_preview_release_decision_matrix.md',
+  'quality/evals/reports/runtime_preview_agent_explanation_final.json',
+  'quality/evals/reports/runtime_preview_agent_explanation_final.md',
+  'quality/evals/reports/runtime_preview_governance_export_final.json',
+  'quality/evals/reports/runtime_preview_governance_export_final.md',
+  'quality/evals/reports/runtime_preview_report_readability_gate.json',
+  'quality/evals/reports/runtime_preview_report_readability_gate.md'
+];
+
+for (const artifactPath of runtimePreviewFinalArtifacts) {
+  test(`RuntimePreview Final artifact manifest includes ${path.basename(artifactPath)}`, () => {
+    const manifest = JSON.parse(fs.readFileSync(
+      path.resolve(getRepoRoot(), 'quality', 'evals', 'reports', 'vision_agent_quality_artifact_manifest.json'),
+      'utf8'
+    ));
+    const entry = manifest.files.find(file => file.path === artifactPath);
+
+    assert.ok(entry, artifactPath);
+    assert.ok(entry.sizeBytes > 0, artifactPath);
+  });
+}
+
+const preReleaseFinalFields = [
+  'reviewId',
+  'caseId',
+  'sessionId',
+  'workflowDraftHash',
+  'manifestId',
+  'stationProfileId',
+  'operatorContractVersion',
+  'readinessStatus',
+  'packageReviewAllowed',
+  'stationCompatible',
+  'operatorContractsSatisfied',
+  'releaseReviewAllowed',
+  'requiresEngineerApproval',
+  'goNoGoDecision',
+  'blockedReasons',
+  'riskLevel',
+  'engineerActions',
+  'firstFixRecommendation',
+  'workflowDraftAllowed',
+  'decisionMatrix',
+  'packageCreated',
+  'deploymentExecuted',
+  'realResourcesTouched'
+];
+
+for (const field of preReleaseFinalFields) {
+  test(`PreRelease Review Final report carries ${field}`, () => {
+    const report = JSON.parse(fs.readFileSync(
+      path.resolve(getRepoRoot(), 'quality', 'evals', 'reports', 'runtime_preview_pre_release_review_final.json'),
+      'utf8'
+    ));
+    const first = report.reports[0];
+
+    assert.ok(Object.hasOwn(first, field), field);
+    if (['packageCreated', 'deploymentExecuted', 'realResourcesTouched'].includes(field)) {
+      assert.equal(first[field], false, field);
+    } else if (Array.isArray(first[field])) {
+      assert.ok(first[field].length >= 0, field);
+    } else {
+      assert.notEqual(first[field], '', field);
+      assert.notEqual(first[field], null, field);
+      assert.notEqual(first[field], undefined, field);
+    }
+  });
+}
+
+const releaseDecisionTypes = [
+  'releaseAllowed',
+  'requiresEngineerApproval',
+  'blocked',
+  'forbiddenIntentDenied',
+  'metadataIncomplete',
+  'stationIncompatible',
+  'operatorContractFailed',
+  'manifestRiskBlocked',
+  'packageReviewBlocked'
+];
+
+for (const decisionType of releaseDecisionTypes) {
+  test(`Release decision matrix carries ${decisionType}`, () => {
+    const report = JSON.parse(fs.readFileSync(
+      path.resolve(getRepoRoot(), 'quality', 'evals', 'reports', 'runtime_preview_release_decision_matrix.json'),
+      'utf8'
+    ));
+    const first = report.reports[0];
+    const decision = first[decisionType];
+
+    assert.ok(report.summary.decisionTypes.includes(decisionType), decisionType);
+    assert.ok(decision.reason, decisionType);
+    assert.ok(decision.nextAction, decisionType);
+    assert.equal(typeof decision.engineerApprovalRequired, 'boolean', decisionType);
+    assert.equal(typeof decision.workflowDraftAllowed, 'boolean', decisionType);
+    assert.equal(typeof decision.packageReviewAllowed, 'boolean', decisionType);
+    assert.equal(typeof decision.releaseReviewAllowed, 'boolean', decisionType);
+  });
+}
 
 test('Vision Agent quality workflow uploads v1.4 release review artifacts', () => {
   const source = fs.readFileSync(

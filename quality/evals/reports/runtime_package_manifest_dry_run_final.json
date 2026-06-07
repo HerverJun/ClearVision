@@ -6,7 +6,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T23:47:15.436775+00:00"
+    "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
   },
   "summary": {
     "caseCount": 60,
@@ -3583,7 +3583,7 @@
     },
     {
       "caseId": "RP-RF-058",
-      "scenario": "base64_image_denied_final",
+      "scenario": "image_bytes_denied_final",
       "manifestId": "rp_manifest_dry_run_rp-rf-058",
       "workflowDraftHash": "e2943592522297be8c0c9e216a4627c0b49f2670fb204768d2696e7834b25478",
       "manifestHash": "dbf3a08a7941cb456062443be548275ab43295ef705d370cdd3419aa4fe140dd",
@@ -3610,13 +3610,13 @@
         "qa-metadata"
       ],
       "missingDependencies": [
-        "missing_or_blocked:base64_image_denied"
+        "missing_or_blocked:image_bytes_denied"
       ],
       "blockedReasons": [
         "runtime_preview_image_bytes_denied"
       ],
       "dependencyTrace": [
-        "dependency_blocked:base64_image_denied"
+        "dependency_blocked:image_bytes_denied"
       ],
       "operatorTrace": [
         "ImageAcquisition",
@@ -3627,7 +3627,7 @@
         "realResourcesTouched=false",
         "metadataOnly=true"
       ],
-      "riskLevel": "base64_image_denied",
+      "riskLevel": "image_bytes_denied",
       "packageReviewAllowed": false,
       "workflowDraftAllowed": true,
       "manifestArtifactGenerated": false,

@@ -6,7 +6,7 @@
     "branchName": "local",
     "runId": "local",
     "runAttempt": "local",
-    "generatedAtUtc": "2026-06-06T23:47:15.436775+00:00"
+    "generatedAtUtc": "2026-06-07T05:24:30.303399+00:00"
   },
   "summary": {
     "caseCount": 60,
@@ -4250,8 +4250,8 @@
     {
       "caseId": "RP-RF-058",
       "stationType": "image_guard_station",
-      "workflowKind": "base64_image_denied_final",
-      "businessPurpose": "base64_image_denied_final release review simulator case.",
+      "workflowKind": "image_bytes_denied_final",
+      "businessPurpose": "image_bytes_denied_final release review simulator case.",
       "workflowDraftHash": "e2943592522297be8c0c9e216a4627c0b49f2670fb204768d2696e7834b25478",
       "stationProfileId": "sp-release-standard-v14",
       "operatorSummary": [
@@ -4274,7 +4274,7 @@
       "expectedBlockedReasons": [
         "runtime_preview_image_bytes_denied"
       ],
-      "expectedManifestRisk": "base64_image_denied",
+      "expectedManifestRisk": "image_bytes_denied",
       "expectedEngineerAction": "Remove image byte payloads and bind a redacted camera metadata handle.",
       "redactionStatus": "redacted_metadata_only",
       "workflowDraft": {
