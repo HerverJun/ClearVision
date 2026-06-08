@@ -17,6 +17,20 @@ namespace ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests;
 
 public sealed class VisionAgentBuildOrchestratorTests
 {
+    private static readonly string[] RequiredBuildStages =
+    [
+        "plan_generation",
+        "template_strategy",
+        "operator_pipeline",
+        "parameter_mapping",
+        "workflow_draft",
+        "validate_schema",
+        "metadata_dry_run",
+        "package_readiness",
+        "workflow_diff",
+        "apply_gate"
+    ];
+
     [Fact(DisplayName = "Build orchestrator should resolve through injected Build execution services")]
     public async Task BuildAsync_ShouldResolveThroughInjectedBuildServices()
     {
@@ -51,6 +65,147 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.MissingResources.Should().Contain(item =>
             item.ResourceType == "model_resource" &&
             item.ResourceKey == "op_surface_defect.ModelId");
+    }
+
+    [Fact(DisplayName = "Black-box scenario: metal scratch Build quality")]
+    public async Task BuildAsync_BlackBoxMetalScratch_ShouldProduceDeployBlockedSurfaceDefectDraft()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "BlobAnalysis", "ResultJudgment", "ResultOutput"],
+            "metal surface scratch detection workflow");
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, buildIntent: "modify", currentFlowSnapshot: ExistingFlowSnapshot("existing-metal-context")),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"]);
+        result.BuildResult.MissingResources.Should().Contain(item =>
+            item.ResourceType == "model_resource" &&
+            item.ResourceKey == "op_surface_defect.ModelId");
+        result.BuildResult.FirstFixRecommendation.Should().Contain("model_resource");
+        result.BuildResult.FirstFixRecommendation.Should().Contain("op_surface_defect.ModelId");
+        AssertBuildQuality(result, sink, expectPreserved: true);
+    }
+
+    [Fact(DisplayName = "Black-box scenario: terminal wire sequence Build quality")]
+    public async Task BuildAsync_BlackBoxWireSequence_ShouldProduceDetectionDraftWithRuleAndModelBlockers()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = Plan(
+            "wire_sequence",
+            ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
+            "terminal wire sequence inspection workflow");
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, buildIntent: "modify", currentFlowSnapshot: ExistingFlowSnapshot("existing-wire-context")),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"]);
+        var modelMapping = result.BuildResult.ParameterMapping.Should().ContainSingle(item =>
+            item.OperatorType == "DeepLearning" &&
+            item.ParameterName == "ModelPath").Subject;
+        modelMapping.Pending.Should().BeTrue();
+        modelMapping.ValueSummary.Should().StartWith("<pending");
+        modelMapping.ValueSummary.Should().NotContain(":\\");
+        modelMapping.ValueSummary.Should().NotContain("/");
+        result.BuildResult.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "Rule" &&
+            item.ValueSummary.Contains("wire sequence", StringComparison.OrdinalIgnoreCase));
+        result.BuildResult.MissingResources.Should().Contain(item =>
+            item.ResourceType == "model_resource" &&
+            item.ResourceKey == "op_detect.ModelPath");
+        result.BuildResult.ApplyGate.DeploymentBlockers.Should().Contain("op_detect.ModelPath");
+        AssertBuildQuality(result, sink, expectPreserved: true);
+    }
+
+    [Fact(DisplayName = "Black-box scenario: hole distance measurement Build quality")]
+    public async Task BuildAsync_BlackBoxHoleDistance_ShouldProduceMeasurementDraftWithCalibrationBlockers()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = Plan(
+            "measurement",
+            ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "MeasureDistance", "ResultJudgment", "ResultOutput"],
+            "hole center distance measurement workflow");
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, buildIntent: "modify", currentFlowSnapshot: ExistingFlowSnapshot("existing-measurement-context")),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["ImageAcquisition", "CircleMeasurement", "MeasureDistance", "ResultJudgment", "ResultOutput"]);
+        result.BuildResult.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "MeasureDistance" &&
+            item.ParameterName == "Unit" &&
+            item.Pending &&
+            item.ValueSummary.Contains("calibration", StringComparison.OrdinalIgnoreCase));
+        result.BuildResult.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "MeasureDistance" &&
+            item.ParameterName == "Tolerance" &&
+            item.Pending &&
+            item.ValueSummary.Contains("measurement-threshold", StringComparison.OrdinalIgnoreCase));
+        result.BuildResult.PendingParameters.Should().Contain(item =>
+            item.OperatorId == "op_distance" &&
+            item.ParameterNames.Contains("Unit"));
+        result.BuildResult.MissingResources.Should().Contain(item =>
+            item.ResourceType == "measurement_parameter" &&
+            item.ResourceKey == "op_distance.Unit");
+        AssertBuildQuality(result, sink, expectPreserved: true);
+    }
+
+    [Fact(DisplayName = "Black-box scenario: template positioning Build quality")]
+    public async Task BuildAsync_BlackBoxTemplatePositioning_ShouldUseTemplateSkeletonWithTemplateBlockers()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = Plan(
+            "template_positioning",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"],
+            "template positioning and matching workflow");
+        var templateSelection = new AiTemplateSelectionInfo
+        {
+            Mode = "use_selected_template",
+            TemplateId = "template_matching_alignment",
+            ScenarioKey = "template_matching"
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                buildIntent: "modify",
+                currentFlowSnapshot: ExistingFlowSnapshot("existing-template-context"),
+                templateSelection: templateSelection),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.GenerationMode.Should().Be("template_fill");
+        result.TemplateLockLevel.Should().Be("strict");
+        result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["ImageAcquisition", "TemplateMatching", "ResultJudgment", "ResultOutput"])
+            .And
+            .NotContain("SurfaceDefectDetection");
+        result.BuildResult.MissingResources.Should().Contain(item =>
+            item.ResourceType == "template_artifact" &&
+            item.ResourceKey == "op_match.TemplatePath");
+        result.BuildResult.FirstFixRecommendation.Should().Contain("template_artifact");
+        result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
+            item.Stage == "template_strategy" &&
+            item.ToolName == "get_flow_template_skeleton");
+        AssertBuildQuality(result, sink, expectPreserved: true);
     }
 
     [Fact(DisplayName = "Build orchestrator should produce tool evidence, workflow diff, and apply gates")]
@@ -261,6 +416,84 @@ public sealed class VisionAgentBuildOrchestratorTests
             new BuildResultAssembler(redactor, sink),
             NullLogger<VisionAgentBuildOrchestrator>.Instance,
             sink);
+    }
+
+    private static void AssertBuildQuality(
+        AiFlowGenerationResult result,
+        CapturingAgentRunEventSink sink,
+        bool expectPreserved)
+    {
+        result.BuildResult.Should().NotBeNull();
+        var build = result.BuildResult!;
+        build.ToolEvidenceTimeline.Select(item => item.Stage)
+            .Should()
+            .Contain(RequiredBuildStages);
+        build.WorkflowDiff.AddedNodes.Should().NotBeEmpty();
+        if (expectPreserved)
+        {
+            build.WorkflowDiff.PreservedNodes.Should().NotBeEmpty();
+        }
+
+        build.WorkflowDiff.PendingParameters.Should().NotBeEmpty();
+        build.WorkflowDiff.DeploymentBlockers.Should().NotBeEmpty();
+        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        build.ApplyGate.RuntimeDraftReady.Should().BeTrue();
+        build.ApplyGate.DeploymentReady.Should().BeFalse();
+        build.ApplyGate.Blocked.Should().BeFalse();
+        build.ApplyGate.DeploymentBlockers.Should().NotBeEmpty();
+        if (build.MissingResources.Count > 0 || build.PendingParameters.Count > 0)
+        {
+            build.FirstFixRecommendation.Should().NotBeNullOrWhiteSpace();
+            build.FirstFixRecommendation.Should().NotBe("<pending-parameter>");
+        }
+
+        AssertNoSensitiveLeak(result, sink);
+    }
+
+    private static void AssertNoSensitiveLeak(
+        AiFlowGenerationResult result,
+        CapturingAgentRunEventSink sink)
+    {
+        var publicJson = JsonSerializer.Serialize(new { result.BuildResult, sink.Events }, AgentRunEventJson.Options);
+        publicJson.Should().NotContain("systemPrompt");
+        publicJson.Should().NotContain("rawPrompt");
+        publicJson.Should().NotContain("chainOfThought");
+        publicJson.Should().NotContain("reasoning_content");
+        publicJson.Should().NotContain("C:\\");
+        publicJson.Should().NotContain("D:\\");
+        publicJson.Should().NotContain("sk-");
+        publicJson.Should().NotContain("DB1.DBX");
+        publicJson.Should().NotContain("192.168.");
+        publicJson.Should().NotContain("data:image");
+        publicJson.Should().NotContain(";base64");
+    }
+
+    private static string ExistingFlowSnapshot(string existingNodeName)
+    {
+        return JsonSerializer.Serialize(new OperatorFlowDto
+        {
+            Id = Guid.NewGuid(),
+            Name = "Existing scenario context",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = existingNodeName,
+                    Type = OperatorType.ImageAcquisition,
+                    OutputPorts =
+                    [
+                        new PortDto
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Image",
+                            Direction = PortDirection.Output,
+                            DataType = PortDataType.Image
+                        }
+                    ]
+                }
+            ]
+        });
     }
 
     private static ServiceProvider CreateServiceProvider(CapturingAgentRunEventSink sink)

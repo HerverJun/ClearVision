@@ -91,7 +91,7 @@ public sealed class ParameterMappingService
             };
         }
 
-        var fallback = DefaultParameterValue(op.OperatorType, parameter.Name);
+        var fallback = DefaultParameterValue(op.OperatorType, parameter.Name, load);
         var pending = parameter.Required || fallback.Contains("pending", StringComparison.OrdinalIgnoreCase);
         return new VisionAgentParameterMapping
         {
@@ -107,7 +107,10 @@ public sealed class ParameterMappingService
         };
     }
 
-    private static string DefaultParameterValue(string operatorType, string parameterName)
+    private static string DefaultParameterValue(
+        string operatorType,
+        string parameterName,
+        BuildPlanLoad load)
     {
         if (parameterName.Contains("camera", StringComparison.OrdinalIgnoreCase))
         {
@@ -124,9 +127,17 @@ public sealed class ParameterMappingService
             return "<pending-template-artifact>";
         }
 
+        if (parameterName.Equals("Unit", StringComparison.OrdinalIgnoreCase) &&
+            IsMeasurementScenario(load))
+        {
+            return "<pending-calibration-unit-or-pixel-scale>";
+        }
+
         if (parameterName.Contains("tolerance", StringComparison.OrdinalIgnoreCase))
         {
-            return "<pending-tolerance>";
+            return IsMeasurementScenario(load)
+                ? "<pending-measurement-threshold>"
+                : "<pending-tolerance>";
         }
 
         if (parameterName.Contains("channel", StringComparison.OrdinalIgnoreCase))
@@ -136,6 +147,8 @@ public sealed class ParameterMappingService
 
         return operatorType switch
         {
+            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "Validate detected class order against pending terminal wire sequence rule.",
+            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "OK when measured distance is within pending tolerance threshold.",
             "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) => "OK when inspection score satisfies configured threshold.",
             "Thresholding" when parameterName.Equals("Mode", StringComparison.OrdinalIgnoreCase) => "adaptive_review",
             "TemplateMatching" when parameterName.Equals("MinScore", StringComparison.OrdinalIgnoreCase) => "0.8",
@@ -148,6 +161,25 @@ public sealed class ParameterMappingService
             "RoiManager" when parameterName.Equals("RoiName", StringComparison.OrdinalIgnoreCase) => "inspection_roi",
             _ => "<pending-parameter>"
         };
+    }
+
+    private static bool IsWireSequenceScenario(BuildPlanLoad load)
+    {
+        var text = $"{load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt}";
+        return text.Contains("wire", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("sequence", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("terminal", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("line order", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMeasurementScenario(BuildPlanLoad load)
+    {
+        var text = $"{load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt}";
+        return text.Contains("measurement", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("distance", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("spacing", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("hole", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("circle", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string MissingResourceKind(string operatorType, string parameterName, bool pending)

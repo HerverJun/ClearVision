@@ -184,7 +184,7 @@ public sealed class BuildResultAssembler
             return "Fix workflow structure blockers before applying the draft to the canvas.";
         }
 
-        var firstMissing = missingResources.FirstOrDefault();
+        var firstMissing = PreferredMissingResource(missingResources);
         if (firstMissing != null)
         {
             return $"Bind missing {firstMissing.ResourceType} metadata for {firstMissing.ResourceKey} before deployment.";
@@ -199,6 +199,33 @@ public sealed class BuildResultAssembler
         return gate.DeploymentReady
             ? "Review the draft on canvas, then proceed to runtime packaging when ready."
             : "Review readiness gates and resolve deployment blockers before Station deployment.";
+    }
+
+    private static AiMissingResourceInfo? PreferredMissingResource(IReadOnlyList<AiMissingResourceInfo> missingResources)
+    {
+        if (missingResources.Count == 0)
+        {
+            return null;
+        }
+
+        foreach (var preferredKind in new[]
+                 {
+                     "model_resource",
+                     "template_artifact",
+                     "measurement_parameter",
+                     "camera_binding",
+                     "output_channel"
+                 })
+        {
+            var match = missingResources.FirstOrDefault(item =>
+                string.Equals(item.ResourceType, preferredKind, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        return missingResources.FirstOrDefault();
     }
 
     private static string ToTurnIntent(string buildIntent)
