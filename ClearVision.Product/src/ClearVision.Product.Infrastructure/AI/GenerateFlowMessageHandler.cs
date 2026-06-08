@@ -41,6 +41,7 @@ public class GenerateFlowMessageHandler
         IReadOnlyList<string>? attachments = null,
         string? requirementMode = null,
         AiTemplateSelectionInfo? templateSelection = null,
+        VisionAgentBuildFromPlanRequest? buildFromPlan = null,
         bool useVisionAgentGenerateFlow = false,
         string? agentGenerateFlowMode = null,
         bool runtimePreviewConsent = false,
@@ -74,7 +75,8 @@ public class GenerateFlowMessageHandler
                     RequirementMode = requirementMode ?? AiRequirementModes.Strict,
                     UseVisionAgentGenerateFlow = useVisionAgentGenerateFlow,
                     AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(agentGenerateFlowMode),
-                    RuntimePreviewConsent = runtimePreviewConsent
+                    RuntimePreviewConsent = runtimePreviewConsent,
+                    BuildFromPlan = buildFromPlan
                 },
                 progressMsg => onMessage?.Invoke(
                     "GenerateFlowProgress",

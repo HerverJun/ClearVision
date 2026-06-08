@@ -437,7 +437,8 @@ export const aiPanelAgentRunMixin = {
         flowPayload,
         attachmentPaths,
         normalizedTemplateSelection,
-        agentGenerateFlowPayload
+        agentGenerateFlowPayload,
+        buildFromPlan = null
     }) {
         return {
             description: normalizedDescription,
@@ -449,6 +450,7 @@ export const aiPanelAgentRunMixin = {
             requestId,
             sessionId: this.sessionId,
             existingFlowJson: this._stringifyAgentRunFlowPayload(flowPayload),
+            buildFromPlan,
             attachments: [],
             attachmentCount: Array.isArray(attachmentPaths) ? attachmentPaths.length : 0,
             ...agentGenerateFlowPayload,

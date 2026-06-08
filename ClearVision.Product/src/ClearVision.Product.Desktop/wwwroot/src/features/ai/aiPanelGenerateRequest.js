@@ -10,7 +10,8 @@ export const aiPanelGenerateRequestMixin = {
         explicitMode = '',
         templateSelection = null,
         clearInput = true,
-        skipPlan = false
+        skipPlan = false,
+        buildFromPlan = null
     }) {
         const input = this.container.querySelector('#ai-input');
         const normalizedDescription = String(description || '').trim();
@@ -91,7 +92,8 @@ export const aiPanelGenerateRequestMixin = {
                 flowPayload,
                 attachmentPaths: [],
                 normalizedTemplateSelection,
-                agentGenerateFlowPayload
+                agentGenerateFlowPayload,
+                buildFromPlan
             });
 
             this._dispatchAgentRunGenerateRequest(agentRunPayload, { clearInput, input })
@@ -114,6 +116,7 @@ export const aiPanelGenerateRequestMixin = {
                     sessionId: this.sessionId,
                     existingFlowJson: flowPayload,
                     attachments: attachmentPaths,
+                    buildFromPlan,
                     ...agentGenerateFlowPayload
                 }
             });

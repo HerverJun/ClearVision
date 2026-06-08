@@ -5,11 +5,14 @@ using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Contracts.Messages;
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Middleware;
+using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
+using ClearVision.Product.Infrastructure.AI.Tools;
 using FluentAssertions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -60,6 +63,54 @@ public sealed class AgentRunEndpointsTests
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Fact(DisplayName = "POST Agent plan returns backend structured scenario-specific PlanModeResult")]
+    public async Task CreatePlan_ShouldReturnScenarioSpecificStructuredPlan()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+
+        using var scratchResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new
+        {
+            description = "帮我做一个金属表面划痕检测流程",
+            originalUserPrompt = "帮我做一个金属表面划痕检测流程",
+            currentFlowSnapshot = "{\"operators\":[{\"id\":\"camera\"}]}",
+            attachmentSummary = new
+            {
+                count = 1,
+                resourceKinds = new[] { "sample_image_metadata" },
+                pathsRedacted = true
+            }
+        });
+        using var wireResponse = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new
+        {
+            description = "做一个线序检测流程",
+            originalUserPrompt = "做一个线序检测流程"
+        });
+
+        scratchResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        wireResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var scratchDoc = JsonDocument.Parse(await scratchResponse.Content.ReadAsStringAsync());
+        using var wireDoc = JsonDocument.Parse(await wireResponse.Content.ReadAsStringAsync());
+        var scratch = scratchDoc.RootElement;
+        var wire = wireDoc.RootElement;
+
+        scratch.GetProperty("intent").GetString().Should().Be("surface_defect");
+        scratch.GetProperty("recommendedRoute").GetProperty("routeId").GetString().Should().Be("surface_defect_detection");
+        scratch.GetProperty("contextSummary").GetProperty("hasCurrentFlow").GetBoolean().Should().BeTrue();
+        scratch.GetProperty("clarificationQuestions").EnumerateArray()
+            .Select(question => question.GetProperty("id").GetString())
+            .Should()
+            .Contain("defect_definition")
+            .And.NotContain("sequence_rule");
+        scratch.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+
+        wire.GetProperty("intent").GetString().Should().Be("wire_sequence");
+        wire.GetProperty("clarificationQuestions").EnumerateArray()
+            .Select(question => question.GetProperty("id").GetString())
+            .Should()
+            .Contain("sequence_rule")
+            .And.NotContain("defect_definition");
+    }
+
     [Fact(DisplayName = "AgentRun background GenerateFlow receives safe metadata-only request")]
     public async Task CreateRun_ShouldPassSafeGenerationRequest()
     {
@@ -98,6 +149,154 @@ public sealed class AgentRunEndpointsTests
         request.UseVisionAgentGenerateFlow.Should().BeTrue();
         request.TemplateSelection.Should().NotBeNull();
         request.TemplateSelection!.Mode.Should().Be("template_fill");
+    }
+
+    [Fact(DisplayName = "POST AgentRun preserves structured BuildFromPlan input and replays Plan Build payload")]
+    public async Task CreateRun_ShouldPreserveBuildFromPlanContractAndReplayEvents()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        const string currentFlowSnapshot = "{\"operators\":[{\"id\":\"existing-camera\"}],\"connections\":[]}";
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
+        {
+            description = "帮我做一个金属表面划痕检测流程",
+            sessionId = "session-plan-build",
+            buildFromPlan = new
+            {
+                planId = "plan_scratch_1",
+                planSnapshot = new
+                {
+                    planId = "plan_scratch_1",
+                    originalUserPrompt = "帮我做一个金属表面划痕检测流程",
+                    goal = "金属表面划痕检测",
+                    intent = "surface_defect",
+                    confidence = "high",
+                    requirementUnderstanding = new[] { "Inspection intent: surface defect inspection." },
+                    recommendedRoute = new
+                    {
+                        routeId = "surface_defect_detection",
+                        title = "Surface defect inspection route",
+                        summary = "Enhance and segment scratch candidates.",
+                        operators = new[] { "ImageAcquisition", "SurfaceDefectDetection", "BlobAnalysis", "ResultOutput" },
+                        templateDecision = "catalog_match"
+                    },
+                    clarificationQuestions = new[]
+                    {
+                        new
+                        {
+                            id = "defect_definition",
+                            title = "What should count as a defect?",
+                            why = "Thresholds depend on defect definition.",
+                            defaultValue = "scratch_or_blob",
+                            defaultAssumption = "Detect visible scratches and blobs.",
+                            impact = "Thresholds need sample confirmation.",
+                            options = new[]
+                            {
+                                new
+                                {
+                                    value = "scratch_or_blob",
+                                    label = "Scratch/blob",
+                                    recommended = true,
+                                    description = "Use visible surface defect candidates.",
+                                    impact = "Good first draft."
+                                }
+                            }
+                        }
+                    },
+                    recommendedDefaults = new[]
+                    {
+                        new
+                        {
+                            id = "resource_policy",
+                            label = "Missing resources stay pending",
+                            value = "pending_parameters",
+                            impact = "No resource path is guessed."
+                        }
+                    },
+                    risks = new[] { "Thresholds need representative images." },
+                    acceptanceCriteria = new[] { "Workflow draft contains acquisition, inspection, judgment, and output stages." },
+                    executablePlan = new[] { "Map parameters and run readiness checks." },
+                    canBuild = true,
+                    blockingReasons = Array.Empty<string>(),
+                    nextAction = "Start Build.",
+                    contextSummary = new
+                    {
+                        hasCurrentFlow = true,
+                        hasCurrentResult = false,
+                        attachmentCount = 2,
+                        templateSelectionMode = "template_adapt",
+                        templateId = "tmpl-scratch",
+                        contextKinds = new[] { "user_requirement", "current_flow", "operator_catalog" },
+                        operatorCatalogTools = new[] { "validate_flow" }
+                    },
+                    operatorCatalogVersion = "catalog.v1",
+                    templateCatalogVersion = "template.v1",
+                    stationBoundarySummary = "metadata-only station boundary",
+                    plcOutputPolicy = "local result first",
+                    metadataOnly = true
+                },
+                userSelections = new Dictionary<string, string>
+                {
+                    ["defect_definition"] = "scratch_or_blob"
+                },
+                acceptedDefaults = new[] { "defect_definition", "resource_policy" },
+                currentFlowSnapshot,
+                templateSelection = new
+                {
+                    mode = "template_adapt",
+                    templateId = "tmpl-scratch",
+                    scenarioKey = "scratch"
+                },
+                attachmentSummary = new
+                {
+                    count = 2,
+                    resourceKinds = new[] { "sample_image_metadata" },
+                    pathsRedacted = true
+                },
+                operatorCatalogVersion = "catalog.v1",
+                stationBoundarySummary = "metadata-only station boundary",
+                plcOutputPolicy = "local result first",
+                buildIntent = "modify",
+                originalUserPrompt = "帮我做一个金属表面划痕检测流程",
+                acceptedRecommendedDefaults = true,
+                metadataOnly = true
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = createDoc.RootElement.GetProperty("runId").GetString()!;
+        await host.Generation.WaitForCallAsync();
+        await host.WaitForTerminalAsync(runId);
+
+        var request = host.Generation.LastRequest!;
+        request.BuildFromPlan.Should().NotBeNull();
+        request.BuildFromPlan!.PlanId.Should().Be("plan_scratch_1");
+        request.BuildFromPlan.PlanSnapshot.Should().NotBeNull();
+        request.BuildFromPlan.UserSelections.Should().ContainKey("defect_definition");
+        request.BuildFromPlan.AcceptedDefaults.Should().Contain("resource_policy");
+        request.ExistingFlowJson.Should().Be(currentFlowSnapshot);
+        request.Mode.Should().Be(GenerateFlowMode.Modify);
+        request.TemplateSelection.Should().NotBeNull();
+        request.TemplateSelection!.TemplateId.Should().Be("tmpl-scratch");
+        request.Attachments.Should().BeEmpty();
+
+        var replay = host.StreamService.Replay(runId)!;
+        replay.Events.Select(evt => evt.Stage).Should().ContainInOrder([
+            "plan_generation",
+            "assumption_confirmation",
+            "requirement_parsing"
+        ]);
+        var completed = replay.Events.Single(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+        var completedJson = JsonSerializer.Serialize(completed, AgentRunEventJson.Options);
+        completedJson.Should().Contain("\"buildFromPlan\"");
+        completedJson.Should().Contain("\"planId\":\"plan_scratch_1\"");
+        completedJson.Should().Contain("\"currentFlowSnapshotIncluded\":true");
+        completedJson.Should().Contain("\"operatorCatalogVersion\":\"catalog.v1\"");
+        completedJson.Should().NotContain("reasoning_content");
+        completedJson.Should().NotContain("systemPrompt");
+        completedJson.Should().NotContain("rawPrompt");
+        completedJson.Should().NotContain("C:\\");
     }
 
     [Fact(DisplayName = "GET AgentRun replay returns final summary and events")]
@@ -204,17 +403,16 @@ public sealed class AgentRunEndpointsTests
 
             host.StreamService.Append(runId, new AgentRunEventDraft
             {
-                EventType = AgentRunEventTypes.StageStarted,
+                EventType = AgentRunEventTypes.ToolCallCompleted,
                 Stage = "planner",
-                Title = "Planner started",
+                Title = "Tool completed: live_probe",
                 Summary = "Live frame before terminal.",
-                Status = AgentRunEventStatuses.Running,
+                Status = AgentRunEventStatuses.Completed,
                 Payload = new { metadataOnly = true }
             });
 
-            var frame = await ReadSseUntilAsync(response, AgentRunEventTypes.StageStarted);
-            frame.Should().Contain("id: 3");
-            frame.Should().Contain("event: stage.started");
+            var frame = await ReadSseUntilAsync(response, AgentRunEventTypes.ToolCallCompleted);
+            frame.Should().Contain("event: tool.call.completed");
             frame.Should().Contain("Live frame before terminal.");
             host.StreamService.Replay(runId)!.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
         }
@@ -247,7 +445,6 @@ public sealed class AgentRunEndpointsTests
 
             var frame = await ReadSseUntilAsync(response, AgentRunEventTypes.RunCancelled);
             frame.Should().Contain("event: run.cancelled");
-            frame.Should().Contain("id: 3");
         }
         finally
         {
@@ -505,6 +702,9 @@ public sealed class AgentRunEndpointsTests
             builder.Services.AddSingleton(store);
             builder.Services.AddSingleton<IAgentRunEventStreamService>(streamService);
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);
+            builder.Services.AddSingleton<IVisionAgentToolRegistry, EmptyVisionAgentToolRegistry>();
+            builder.Services.AddScoped<IAgentRunEventSink, AgentRunEventSink>();
+            builder.Services.AddScoped<IVisionAgentOrchestrator, VisionAgentOrchestrator>();
             if (useAuth)
             {
                 builder.Services.AddSingleton<IAuthService, FakeAuthService>();

@@ -382,19 +382,19 @@ export class AiPanel {
                         <div class="ai-result-status-note" id="ai-result-status-note"></div>
                         <div class="ai-build-dashboard">
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Build Timeline</div>
+                                <div class="card-title">Live Build Timeline</div>
                                 <div class="ai-build-event-timeline" id="ai-build-event-timeline"></div>
                             </section>
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Template Match</div>
+                                <div class="card-title">Template Decision</div>
                                 <div class="ai-build-compact" id="ai-build-template-match"></div>
                             </section>
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Operator Chain</div>
+                                <div class="card-title">Operator Pipeline</div>
                                 <div class="ai-build-compact" id="ai-build-operator-chain"></div>
                             </section>
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Parameters</div>
+                                <div class="card-title">Parameter Mapping</div>
                                 <div class="ai-build-compact" id="ai-build-parameters"></div>
                             </section>
                             <section class="result-card ai-build-card ai-build-card-wide">
@@ -402,14 +402,15 @@ export class AiPanel {
                                 <div class="ai-build-checks" id="ai-build-checks"></div>
                             </section>
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Final Draft</div>
+                                <div class="card-title">Workflow Draft</div>
                                 <div class="ai-build-compact" id="ai-build-final-draft"></div>
                             </section>
                         </div>
                         <div class="ai-results-scroll" id="ai-results-scroll">
+                        <div class="ai-workspace-section-title">Apply Readiness Evidence</div>
                         <div class="result-card requirement-brief-card" id="ai-result-requirement-brief-card" hidden>
                             <div class="card-title requirement-brief-titlebar">
-                                <span>需求澄清闭环</span>
+                                <span>Plan Evidence Snapshot</span>
                                 <span class="card-badge ai-requirement-confidence" id="ai-requirement-confidence"></span>
                             </div>
                             <div class="ai-requirement-brief is-empty" id="ai-result-requirement-brief">
@@ -418,52 +419,52 @@ export class AiPanel {
                         </div>
 
                         <div class="result-card overview">
-                            <div class="card-title">方案概览</div>
+                            <div class="card-title">Build Result Summary</div>
                             <div class="ai-explanation" id="ai-result-summary">--</div>
                         </div>
 
                         <div class="result-card stage-timeline-card" id="ai-result-stage-timeline-card" hidden>
                             <div class="card-title stage-timeline-titlebar">
-                                <span>生成流水线</span>
+                                <span>Build Stage Evidence</span>
                                 <span class="card-badge" id="ai-stage-timeline-summary"></span>
                             </div>
                             <div class="ai-stage-timeline" id="ai-result-stage-timeline"></div>
                         </div>
 
                         <div class="result-card ops-list">
-                            <div class="card-title">生成的算子清单</div>
+                            <div class="card-title">Final Draft Operators</div>
                             <div class="generated-ops-list" id="ai-result-ops"></div>
                         </div>
 
                         <div class="result-card validation-card" id="ai-result-validation-card" hidden>
                             <div class="card-title">
-                                <span>校验与预演</span>
+                                <span>Validation / Dry-run Evidence</span>
                             </div>
                             <div class="ai-validation-panel" id="ai-result-validation"></div>
                         </div>
 
                         <div class="result-card followup-card">
-                            <div class="card-title">待补信息</div>
+                            <div class="card-title">Missing Resources / Next Actions</div>
                             <div class="ai-followup-panel is-empty" id="ai-result-followups">
                                 <div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>
                             </div>
                         </div>
 
                         <div class="result-card parameter-editor-card">
-                            <div class="card-title">参数补录与审核</div>
+                            <div class="card-title">Pending Parameters</div>
                             <div class="ai-parameter-editor is-empty" id="ai-result-parameter-editor">
                                 <div class="ai-followup-empty">当前没有待确认参数，暂无需补录。</div>
                             </div>
                         </div>
 
                         <div class="result-card attachment-card" id="ai-result-attachment-card" hidden>
-                            <div class="card-title">附件与模型能力</div>
+                            <div class="card-title">Attachment / Capability Metadata</div>
                             <div class="ai-attachment-panel" id="ai-result-attachments"></div>
                         </div>
 
                         <div class="result-card prompt-trace-card" id="ai-result-prompt-trace-card" hidden>
                             <div class="card-title prompt-trace-titlebar">
-                                <span>调试信息</span>
+                                <span>Public Debug Trace</span>
                                 <button class="ai-trace-toggle-btn" id="ai-trace-toggle" type="button">切换视图</button>
                             </div>
                             <div class="ai-prompt-trace" id="ai-result-prompt-trace"></div>
@@ -475,7 +476,7 @@ export class AiPanel {
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
                                     <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
                                 </svg>
-                                应用到当前流程草稿
+                                Apply to Canvas
                             </button>
                         </div>
                     </div>
@@ -1002,7 +1003,7 @@ export class AiPanel {
                 .filter(Boolean)
         );
         if (clarificationRequired && !flow) {
-            opsContainer.innerHTML = '<div class="ai-followup-empty">当前尚未进入生成阶段，请先完成需求澄清。</div>';
+            opsContainer.innerHTML = '<div class="ai-followup-empty">Build has not started. Accept a Plan or start Build to generate the operator pipeline.</div>';
         } else {
             ops.forEach((op, i) => {
                 const opName = op?.displayName || op?.DisplayName || op?.name || op?.Name || '未命名算子';

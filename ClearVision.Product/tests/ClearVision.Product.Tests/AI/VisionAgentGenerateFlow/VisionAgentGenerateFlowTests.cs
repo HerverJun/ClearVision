@@ -91,14 +91,84 @@ public sealed class VisionAgentGenerateFlowTests
     }
 
     [Fact(DisplayName = "AgentRun events should publish Plan and Build stage boundaries as public metadata")]
-    public async Task AgentGenerateFlow_ShouldPublishPublicPlanBuildStageEvents()
+    public async Task VisionAgentOrchestrator_ShouldPublishPublicPlanBuildStageEvents()
     {
         var sink = new CapturingAgentRunEventSink();
-        var result = await CreateVisionAgentGenerateFlowService(sink).GenerateFlowAsync(
-            AgentRequest("metal surface scratch detection") with { AgentRunId = "ar_test" },
+        AiFlowGenerationRequest? capturedRequest = null;
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        generationService.GenerateFlowAsync(
+                Arg.Do<AiFlowGenerationRequest>(request => capturedRequest = request),
+                Arg.Any<Action<string>?>(),
+                Arg.Any<Action<AiStreamChunk>?>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<GenerateFlowAttachmentReport>?>())
+            .Returns(Task.FromResult(new AiFlowGenerationResult
+            {
+                Success = true,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+                Flow = new OperatorFlowDto()
+            }));
+        var registry = new VisionAgentToolRegistry(
+        [
+            new OperatorCatalogTool(),
+            new FlowTemplateMatchTool(),
+            new FlowValidationTool()
+        ]);
+        var orchestrator = new VisionAgentOrchestrator(registry, generationService, sink);
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "metal surface scratch detection",
+                OriginalUserPrompt = "metal surface scratch detection",
+                CurrentFlowSnapshot = "{\"operators\":[{\"id\":\"camera\"}]}",
+                AttachmentSummary = new VisionAgentAttachmentSummary
+                {
+                    Count = 1,
+                    ResourceKinds = ["sample_image_metadata"],
+                    PathsRedacted = true
+                }
+            },
+            CancellationToken.None);
+        var result = await orchestrator.BuildFromPlanAsync(
+            new AiFlowGenerationRequest("metal surface scratch detection", Mode: GenerateFlowMode.New)
+            {
+                AgentRunId = "ar_test",
+                UseVisionAgentGenerateFlow = true,
+                BuildFromPlan = new VisionAgentBuildFromPlanRequest
+                {
+                    PlanId = plan.PlanId,
+                    PlanSnapshot = plan,
+                    UserSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["defect_definition"] = "scratch_or_blob"
+                    },
+                    AcceptedDefaults = ["defect_definition"],
+                    CurrentFlowSnapshot = "{\"operators\":[{\"id\":\"camera\"}]}",
+                    AttachmentSummary = new VisionAgentAttachmentSummary
+                    {
+                        Count = 1,
+                        ResourceKinds = ["sample_image_metadata"],
+                        PathsRedacted = true
+                    },
+                    OperatorCatalogVersion = plan.OperatorCatalogVersion,
+                    StationBoundarySummary = plan.StationBoundarySummary,
+                    PlcOutputPolicy = plan.PlcOutputPolicy,
+                    BuildIntent = "new",
+                    OriginalUserPrompt = plan.OriginalUserPrompt,
+                    AcceptedRecommendedDefaults = true
+                }
+            },
             CancellationToken.None);
 
         result.Success.Should().BeTrue();
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.BuildFromPlan.Should().NotBeNull();
+        plan.Intent.Should().Be("surface_defect");
+        plan.RecommendedRoute.RouteId.Should().Be("surface_defect_detection");
+        plan.ClarificationQuestions.Select(question => question.Id)
+            .Should()
+            .Contain("defect_definition");
         sink.Events.Select(evt => evt.Stage).Should().ContainInOrder([
             "understand_requirement",
             "understand_requirement",
@@ -106,6 +176,7 @@ public sealed class VisionAgentGenerateFlowTests
             "context_collection",
             "plan_generation",
             "assumption_confirmation",
+            "requirement_parsing",
             "requirement_parsing"
         ]);
         sink.Events.Where(evt => evt.Stage is
@@ -118,10 +189,18 @@ public sealed class VisionAgentGenerateFlowTests
 
         var planEvent = sink.Events.Single(evt => evt.Stage == "plan_generation");
         var planPayload = Json(planEvent.Payload);
-        planPayload.GetProperty("route").GetProperty("routeId").GetString().Should().Be("surface_defect_detection");
-        planPayload.GetProperty("route").GetProperty("operators").EnumerateArray().Should().NotBeEmpty();
-        planPayload.GetProperty("defaultAssumptions").EnumerateArray().Should().NotBeEmpty();
-        planPayload.GetProperty("acceptanceCriteria").EnumerateArray().Should().NotBeEmpty();
+        planPayload.GetProperty("planId").GetString().Should().Be(plan.PlanId);
+        planPayload.GetProperty("planSnapshot").GetProperty("RecommendedRoute")
+            .GetProperty("RouteId")
+            .GetString()
+            .Should()
+            .Be("surface_defect_detection");
+        planPayload.GetProperty("userSelections")
+            .GetProperty("defect_definition")
+            .GetString()
+            .Should()
+            .Be("scratch_or_blob");
+        planPayload.GetProperty("acceptedDefaults").EnumerateArray().Should().NotBeEmpty();
 
         var publicJson = JsonSerializer.Serialize(sink.Events);
         publicJson.Should().NotContain("systemPrompt");

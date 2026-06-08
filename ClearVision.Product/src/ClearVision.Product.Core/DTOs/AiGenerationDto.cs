@@ -29,6 +29,8 @@ public record AiFlowGenerationRequest(
     public bool RuntimePreviewConsent { get; init; }
 
     public string? AgentRunId { get; init; }
+
+    public VisionAgentBuildFromPlanRequest? BuildFromPlan { get; init; }
 }
 
 public sealed record RuntimePreviewConsent(

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -23,12 +24,30 @@ public static class AgentRunEndpoints
 
     public static IEndpointRouteBuilder MapAgentRunEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapPost("/api/ai/agent-plan", HandleCreatePlanAsync);
         app.MapPost("/api/ai/agent-runs", HandleCreateRunAsync);
         app.MapGet("/api/ai/agent-runs/{runId}", HandleReplayRun);
         app.MapGet("/api/ai/agent-runs/{runId}/events", HandleRunEventsAsync);
         app.MapPost("/api/ai/agent-runs/{runId}/stream-token", HandleCreateStreamToken);
         app.MapPost("/api/ai/agent-runs/{runId}/cancel", HandleCancelRun);
         return app;
+    }
+
+    private static async Task<IResult> HandleCreatePlanAsync(
+        VisionAgentPlanModeRequest request,
+        IVisionAgentOrchestrator orchestrator,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Description))
+        {
+            return Results.BadRequest(new
+            {
+                error = "Description is required."
+            });
+        }
+
+        var result = await orchestrator.CreatePlanAsync(request, ct);
+        return Results.Ok(result);
     }
 
     private static Task<IResult> HandleCreateRunAsync(
@@ -47,14 +66,10 @@ public static class AgentRunEndpoints
         }
 
         var ownerHash = ResolveCurrentOwnerHash(context);
-        var createResult = streamService.CreateRun(request.Description, new
-        {
-            mode = request.Mode ?? "auto",
-            useVisionAgentGenerateFlow = request.UseVisionAgentGenerateFlow ?? true,
-            agentGenerateFlowMode = request.AgentGenerateFlowMode ?? AiAgentGenerateFlowModes.Scripted,
-            attachmentCount = request.AttachmentCount ?? request.Attachments?.Count ?? 0,
-            metadataOnly = true
-        }, ownerHash);
+        var createResult = streamService.CreateRun(
+            request.Description,
+            BuildCreatePayload(request),
+            ownerHash);
         _ = Task.Run(async () =>
         {
             await RunGenerateFlowAsync(
@@ -204,14 +219,14 @@ public static class AgentRunEndpoints
     {
         using var scope = scopeFactory.CreateScope();
         var streamService = scope.ServiceProvider.GetRequiredService<IAgentRunEventStreamService>();
-        var generationService = scope.ServiceProvider.GetRequiredService<IAiFlowGenerationService>();
+        var orchestrator = scope.ServiceProvider.GetRequiredService<IVisionAgentOrchestrator>();
         var cancellationToken = streamService.GetCancellationToken(runId);
 
         try
         {
-            var result = await generationService.GenerateFlowAsync(
+            var result = await orchestrator.BuildFromPlanAsync(
                 request.ToGenerationRequest(runId),
-                cancellationToken: cancellationToken);
+                cancellationToken);
 
             if (cancellationToken.IsCancellationRequested ||
                 string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase))
@@ -242,6 +257,9 @@ public static class AgentRunEndpoints
                         turnIntent = result.TurnIntent,
                         interactionState = result.InteractionState,
                         routerConfidence = result.RouterConfidence,
+                        planSnapshot = request.BuildFromPlan?.PlanSnapshot,
+                        buildFromPlan = BuildReplayPayload(request.BuildFromPlan),
+                        buildInputSummary = BuildInputSummary(request),
                         toolTraceCount = result.ToolTrace.Count,
                         pendingParameterCount = result.PendingParameters.Count,
                         missingResourceCount = result.MissingResources.Count,
@@ -282,6 +300,66 @@ public static class AgentRunEndpoints
                     metadataOnly = true
                 });
         }
+    }
+
+    private static object BuildCreatePayload(AgentRunCreateRequest request)
+    {
+        return new
+        {
+            mode = request.Mode ?? request.BuildFromPlan?.BuildIntent ?? "auto",
+            useVisionAgentGenerateFlow = request.UseVisionAgentGenerateFlow ?? true,
+            agentGenerateFlowMode = request.AgentGenerateFlowMode ?? AiAgentGenerateFlowModes.Scripted,
+            attachmentCount = request.BuildFromPlan?.AttachmentSummary.Count ?? request.AttachmentCount ?? request.Attachments?.Count ?? 0,
+            planId = request.BuildFromPlan?.PlanId ?? string.Empty,
+            hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,
+            hasCurrentFlowSnapshot = !string.IsNullOrWhiteSpace(request.BuildFromPlan?.CurrentFlowSnapshot) ||
+                                     !string.IsNullOrWhiteSpace(request.ExistingFlowJson),
+            metadataOnly = true
+        };
+    }
+
+    private static object? BuildReplayPayload(VisionAgentBuildFromPlanRequest? buildFromPlan)
+    {
+        if (buildFromPlan == null)
+        {
+            return null;
+        }
+
+        return new
+        {
+            planId = buildFromPlan.PlanId,
+            planSnapshot = buildFromPlan.PlanSnapshot,
+            userSelections = buildFromPlan.UserSelections,
+            acceptedDefaults = buildFromPlan.AcceptedDefaults,
+            currentFlowSnapshotIncluded = !string.IsNullOrWhiteSpace(buildFromPlan.CurrentFlowSnapshot),
+            templateSelection = buildFromPlan.TemplateSelection,
+            attachmentSummary = buildFromPlan.AttachmentSummary,
+            operatorCatalogVersion = buildFromPlan.OperatorCatalogVersion,
+            stationBoundarySummary = buildFromPlan.StationBoundarySummary,
+            plcOutputPolicy = buildFromPlan.PlcOutputPolicy,
+            buildIntent = buildFromPlan.BuildIntent,
+            originalUserPrompt = buildFromPlan.OriginalUserPrompt,
+            acceptedRecommendedDefaults = buildFromPlan.AcceptedRecommendedDefaults,
+            metadataOnly = true
+        };
+    }
+
+    private static object BuildInputSummary(AgentRunCreateRequest request)
+    {
+        var build = request.BuildFromPlan;
+        return new
+        {
+            planId = build?.PlanId ?? string.Empty,
+            buildIntent = build?.BuildIntent ?? request.Mode ?? "auto",
+            currentFlowSnapshotIncluded = !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot) ||
+                                          !string.IsNullOrWhiteSpace(request.ExistingFlowJson),
+            templateSelectionMode = build?.TemplateSelection?.Mode ?? request.TemplateSelection?.Mode ?? string.Empty,
+            attachmentCount = build?.AttachmentSummary.Count ?? request.AttachmentCount ?? request.Attachments?.Count ?? 0,
+            operatorCatalogVersion = build?.OperatorCatalogVersion ?? string.Empty,
+            stationBoundarySummary = build?.StationBoundarySummary ?? string.Empty,
+            plcOutputPolicy = build?.PlcOutputPolicy ?? string.Empty,
+            metadataOnly = true
+        };
     }
 
     private static long ParseLastEventId(HttpRequest request)
@@ -341,21 +419,30 @@ public sealed record AgentRunCreateRequest
     public bool DebugPrompt { get; init; }
     public string? RequirementMode { get; init; }
     public AiTemplateSelectionInfo? TemplateSelection { get; init; }
+    public VisionAgentBuildFromPlanRequest? BuildFromPlan { get; init; }
     public bool? UseVisionAgentGenerateFlow { get; init; }
     public string? AgentGenerateFlowMode { get; init; }
     public bool RuntimePreviewConsent { get; init; }
 
     public AiFlowGenerationRequest ToGenerationRequest(string runId)
     {
+        var buildIntent = string.IsNullOrWhiteSpace(BuildFromPlan?.BuildIntent)
+            ? Mode
+            : BuildFromPlan!.BuildIntent;
+        var existingFlowJson = !string.IsNullOrWhiteSpace(ExistingFlowJson)
+            ? ExistingFlowJson
+            : BuildFromPlan?.CurrentFlowSnapshot;
+        var templateSelection = TemplateSelection ?? BuildFromPlan?.TemplateSelection;
+
         return new AiFlowGenerationRequest(
             Description,
             AdditionalContext,
             SessionId,
-            ExistingFlowJson,
+            existingFlowJson,
             Array.Empty<string>(),
-            GenerateFlowModeExtensions.ParseOrAuto(Mode),
+            GenerateFlowModeExtensions.ParseOrAuto(buildIntent),
             DebugPrompt,
-            TemplateSelection)
+            templateSelection)
         {
             RequirementMode = string.IsNullOrWhiteSpace(RequirementMode)
                 ? AiRequirementModes.Strict
@@ -363,7 +450,8 @@ public sealed record AgentRunCreateRequest
             UseVisionAgentGenerateFlow = UseVisionAgentGenerateFlow ?? true,
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(AgentGenerateFlowMode),
             RuntimePreviewConsent = false,
-            AgentRunId = runId
+            AgentRunId = runId,
+            BuildFromPlan = BuildFromPlan
         };
     }
 }

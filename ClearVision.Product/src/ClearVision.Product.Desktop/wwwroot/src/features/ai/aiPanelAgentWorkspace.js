@@ -1,3 +1,4 @@
+import httpClient from '../../core/messaging/httpClient.js';
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 
 export const AgentWorkspaceModes = Object.freeze({
@@ -80,30 +81,24 @@ export const aiPanelAgentWorkspaceMixin = {
 
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
-        this.pendingVisionPlan = this._buildVisionEngineeringPlan(normalizedDescription, {
-            hint,
-            attachmentCount: Array.isArray(attachmentPaths) ? attachmentPaths.length : 0,
-            templateSelection
-        });
-        this.planQuestionSelections = Object.fromEntries(
-            this.pendingVisionPlan.questions.map(question => [question.id, question.defaultValue])
-        );
+        this.pendingVisionPlan = null;
+        this.planQuestionSelections = {};
 
         this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
         this._addMessage('user', userMessage || normalizedDescription);
         const turn = this._startAssistantTurn({
             activate: false,
-            statusText: 'Plan ready',
+            statusText: 'Planning',
             statusTone: 'warning',
             openReply: true
         });
         this._setAssistantSectionText(
             turn,
             'reply',
-            'Plan Mode prepared an engineering plan with recommended defaults. Accept the recommendation or adjust the options before Build.'
+            'Plan Mode is collecting public engineering context and asking the backend Agent Orchestrator for a structured plan.'
         );
 
-        this._setResultStatusNote('Plan Mode is waiting for confirmation before Build starts.', 'info');
+        this._setResultStatusNote('Plan Mode is waiting for backend Agent Orchestrator output.', 'info');
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun();
@@ -112,140 +107,222 @@ export const aiPanelAgentWorkspaceMixin = {
             input.style.height = 'auto';
         }
 
+        const planRequest = this._buildPlanModeRequest({
+            description: normalizedDescription,
+            hint,
+            userMessage,
+            attachmentPaths,
+            templateSelection
+        });
+        this._requestBackendVisionPlan(planRequest)
+            .then(result => {
+                this.pendingVisionPlan = this._normalizeBackendPlanResult(result, normalizedDescription);
+                this.planQuestionSelections = Object.fromEntries(
+                    this.pendingVisionPlan.questions.map(question => [question.id, question.defaultValue])
+                );
+                this._setAssistantTurnStatus(turn, 'Plan ready', 'success');
+                this._setAssistantSectionText(
+                    turn,
+                    'reply',
+                    'Plan Mode returned a structured engineering plan. Accept recommended defaults or adjust selected options before Build.'
+                );
+                this._setResultStatusNote('Plan Mode is waiting for confirmation before Build starts.', 'info');
+                this._renderAgentWorkspaceOverview();
+                this._renderPlanWorkspace(this.pendingVisionPlan);
+            })
+            .catch(error => {
+                this.pendingVisionPlan = null;
+                this._setAssistantTurnStatus(turn, 'Plan failed', 'failed');
+                this._setAssistantSectionText(
+                    turn,
+                    'reply',
+                    `Plan Mode failed: ${error?.message || String(error || 'unknown error')}`
+                );
+                this._setResultStatusNote('Plan Mode failed. Retry after checking backend connectivity.', 'warning');
+                this._renderAgentWorkspaceOverview();
+                this._renderPlanWorkspace(null);
+            });
+
         return true;
     },
 
-    _buildVisionEngineeringPlan(description, meta = {}) {
-        const text = String(description || '').trim();
-        const lower = text.toLowerCase();
-        const hasCurrentFlow = this._hasCurrentFlowContext?.() === true;
-        const isScratch = /scratch|划痕|刮伤|金属|metal|surface|表面/.test(lower);
-        const isWire = /wire|terminal|线序|端子|线束/.test(lower);
-        const isBarcode = /barcode|datamatrix|qr|二维码|条码/.test(lower);
-        const isMeasure = /measure|distance|diameter|孔距|测量|尺寸|圆心/.test(lower);
-
-        const route = isWire
-            ? {
-                title: 'Template-first wire sequence inspection',
-                summary: 'Use an existing wire/terminal scenario template, then bind model and output metadata.',
-                operators: ['ImageAcquisition', 'DeepLearning', 'DetectionSequenceJudge', 'ResultOutput']
-            }
-            : isBarcode
-                ? {
-                    title: 'Code recognition route',
-                    summary: 'Acquire the frame, normalize ROI, decode the code, and emit a judgment result.',
-                    operators: ['ImageAcquisition', 'RoiManager', 'CodeRecognition', 'ResultJudgment', 'ResultOutput']
-                }
-                : isMeasure
-                    ? {
-                        title: 'Calibration-backed measurement route',
-                        summary: 'Calibrate pixel scale, find geometry, measure dimensions, and report tolerance.',
-                        operators: ['ImageAcquisition', 'CalibrationLoader', 'CircleMeasurement', 'GeoMeasurement', 'ResultOutput']
-                    }
-                    : {
-                        title: 'Surface defect inspection route',
-                        summary: 'Stabilize illumination, enhance scratches, segment candidate defects, then judge area and contrast.',
-                        operators: ['ImageAcquisition', 'ShadingCorrection', 'Filtering', 'SurfaceDefectDetection', 'BlobAnalysis', 'ResultJudgment', 'ResultOutput']
-                    };
-
-        const questions = [
-            {
-                id: 'input_source',
-                title: 'What image source should Build assume first?',
-                why: 'Source choice controls acquisition parameters, Station compatibility, and dry-run readiness.',
-                defaultValue: 'camera',
-                defaultAssumption: 'Use a Station camera binding and keep file paths as pending metadata.',
-                impact: 'Choosing file input makes offline validation easier; choosing camera keeps the draft closer to production.',
-                options: [
-                    { value: 'camera', label: 'Station camera', recommended: true, description: 'Use camera binding placeholders.', impact: 'Best for production readiness checks.' },
-                    { value: 'file', label: 'Sample images', recommended: false, description: 'Use sample image metadata.', impact: 'Best for lab dry-run before camera setup.' },
-                    { value: 'unknown', label: 'Decide later', recommended: false, description: 'Keep acquisition source pending.', impact: 'Build will surface acquisition as a blocker.' }
-                ]
-            },
-            {
-                id: 'inspection_scope',
-                title: 'How should ROI be handled?',
-                why: 'ROI strategy changes operator chain shape and parameter completeness.',
-                defaultValue: isScratch ? 'surface_roi' : 'full_frame',
-                defaultAssumption: isScratch ? 'Inspect the main visible metal surface ROI.' : 'Start with full-frame inspection.',
-                impact: 'A fixed ROI reduces false positives; full-frame is safer when object position is unknown.',
-                options: [
-                    { value: isScratch ? 'surface_roi' : 'full_frame', label: isScratch ? 'Surface ROI' : 'Full frame', recommended: true, description: 'Use the most likely ROI strategy.', impact: 'Keeps the first draft focused and easy to validate.' },
-                    { value: 'multi_roi', label: 'Multiple ROIs', recommended: false, description: 'Reserve several named regions.', impact: 'More complete but more parameters need review.' },
-                    { value: 'auto_locate', label: 'Auto locate part', recommended: false, description: 'Add matching or detection before inspection.', impact: 'More robust to pose drift but expands Build scope.' }
-                ]
-            },
-            {
-                id: 'output_policy',
-                title: 'What output should the draft target?',
-                why: 'Output target affects PLC/Station policy and release review.',
-                defaultValue: 'local_result',
-                defaultAssumption: 'Output metadata result locally first; PLC write remains disabled until reviewed.',
-                impact: 'Local result output is safest; PLC output requires address and Station policy confirmation.',
-                options: [
-                    { value: 'local_result', label: 'Local result', recommended: true, description: 'Use ResultOutput with a local metadata channel.', impact: 'Fastest path to editable workflow draft.' },
-                    { value: 'plc_pending', label: 'PLC pending', recommended: false, description: 'Prepare PLC output as pending metadata only.', impact: 'Build will add compatibility blockers.' },
-                    { value: 'dashboard', label: 'Dashboard', recommended: false, description: 'Emit result metadata for a station dashboard.', impact: 'Requires output channel confirmation.' }
-                ]
-            }
-        ];
-
-        const assumptions = [
-            'Only public diagnostics, event metadata, and redacted engineering summaries are shown.',
-            'Build may create an editable workflow draft even when deployment readiness is blocked.',
-            'Missing camera/model/template/output metadata will be surfaced as pending parameters instead of guessed.'
-        ];
-        if (meta.attachmentCount > 0) {
-            assumptions.push(`${meta.attachmentCount} attachment(s) are counted, but raw local paths are not sent through AgentRun events.`);
-        }
-        if (hasCurrentFlow) {
-            assumptions.push('The current canvas can be used as context when the Build request is an edit or review.');
-        }
-
+    _buildPlanModeRequest({
+        description,
+        hint = '',
+        userMessage = '',
+        attachmentPaths = [],
+        templateSelection = null
+    }) {
+        const normalizedTemplateSelection = this._normalizeTemplateSelection?.(templateSelection) || null;
+        const currentFlowSnapshot = this._hasCurrentFlowContext?.()
+            ? this._stringifyPlanSnapshot(this._getCurrentFlowJson?.())
+            : null;
         return {
-            id: `plan-${Date.now()}`,
-            mode: AgentWorkspaceModes.PLAN,
-            originalDescription: text,
-            buildPrompt: text,
-            goal: this._summarizePlanGoal(text),
-            confidence: isScratch || isWire || isBarcode || isMeasure ? 'medium-high' : 'medium',
-            blockerCount: 0,
-            nextAction: 'Review the assumptions, then start Build.',
-            executable: true,
-            understanding: [
-                `User goal: ${text}`,
-                hasCurrentFlow ? 'Current canvas context is available.' : 'No existing canvas context is required for the first draft.',
-                `Likely route: ${route.title}.`
-            ],
-            route,
-            questions,
-            assumptions,
-            steps: [
-                'Confirm recommended assumptions.',
-                'Collect operator catalog, template, current flow, and Station metadata boundaries.',
-                'Match template or create operator chain.',
-                'Map parameters and mark unresolved metadata as pending.',
-                'Run schema readiness, dry-run, package readiness, Station compatibility, operator contract, and release review events.',
-                'Return an editable ClearVision workflow draft for Apply.'
-            ],
-            risks: [
-                'Real defect thresholds need sample images or field data before production.',
-                'Camera, model, template, and PLC resources must stay metadata-only until confirmed.',
-                'Station compatibility can block deployment while still allowing canvas editing.'
-            ],
-            acceptanceCriteria: [
-                'Workflow draft contains acquisition, inspection, judgment, and output stages.',
-                'All unresolved resources are listed as pending parameters or missing resources.',
-                'Readiness, dry-run, package, Station, contract, and release review events are replayable.',
-                'Apply button is enabled only when a draft flow is available.'
-            ]
+            description: String(description || '').trim(),
+            originalUserPrompt: String(userMessage || description || '').trim(),
+            additionalContext: String(hint || '').trim() || null,
+            sessionId: this.sessionId || null,
+            mode: 'plan',
+            currentFlowSnapshot,
+            currentResultSnapshot: this._buildCurrentResultPlanSnapshot(),
+            templateSelection: normalizedTemplateSelection,
+            attachmentSummary: this._buildPlanAttachmentSummary(attachmentPaths),
+            historySummary: this._buildPlanHistorySummary()
         };
     },
 
-    _summarizePlanGoal(description) {
-        const text = String(description || '').trim();
-        if (!text) return 'Vision workflow draft';
-        return text.length > 72 ? `${text.slice(0, 72)}...` : text;
+    _buildPlanAttachmentSummary(attachmentPaths = []) {
+        const explicitCount = Array.isArray(attachmentPaths) ? attachmentPaths.length : 0;
+        const attachmentCount = explicitCount > 0
+            ? explicitCount
+            : (Array.isArray(this.attachments) ? this.attachments.length : 0);
+        const resourceKinds = attachmentCount > 0
+            ? ['user_attachment_metadata']
+            : [];
+
+        return {
+            count: attachmentCount,
+            resourceKinds,
+            pathsRedacted: true
+        };
+    },
+
+    _stringifyPlanSnapshot(value) {
+        if (value === null || value === undefined) return null;
+        if (typeof value === 'string') return value.trim() || null;
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return null;
+        }
+    },
+
+    _buildCurrentResultPlanSnapshot() {
+        if (!this.currentResult) return null;
+        const flow = this.currentResult.flow || this.currentResult.Flow || null;
+        const pending = this.currentResult.pendingParameters || this.currentResult.PendingParameters || [];
+        const missing = this.currentResult.missingResources || this.currentResult.MissingResources || [];
+        const snapshot = {
+            hasFlow: Boolean(flow),
+            operatorCount: flow ? this._extractOperators(flow).length : 0,
+            connectionCount: flow ? this._extractConnections(flow).length : 0,
+            pendingParameterCount: Array.isArray(pending) ? pending.length : 0,
+            missingResourceCount: Array.isArray(missing) ? missing.length : 0,
+            generationMode: this.currentResult.generationMode || this.currentResult.GenerationMode || ''
+        };
+        try {
+            return JSON.stringify(snapshot);
+        } catch {
+            return null;
+        }
+    },
+
+    _buildPlanHistorySummary() {
+        const items = Array.isArray(this.history) ? this.history.slice(0, 3) : [];
+        if (!items.length) return null;
+        return items
+            .map(item => String(item.lastMessage || '').trim())
+            .filter(Boolean)
+            .slice(0, 3)
+            .join(' / ') || null;
+    },
+
+    async _requestBackendVisionPlan(request) {
+        return await httpClient.post('/ai/agent-plan', request);
+    },
+
+    _normalizeBackendPlanResult(result, fallbackDescription = '') {
+        const plan = this._asObject?.(result) || result || {};
+        const route = plan.recommendedRoute || plan.RecommendedRoute || {};
+        const questions = plan.clarificationQuestions || plan.ClarificationQuestions || [];
+        const defaults = plan.recommendedDefaults || plan.RecommendedDefaults || [];
+        const contextSummary = plan.contextSummary || plan.ContextSummary || {};
+        const normalizedQuestions = Array.isArray(questions)
+            ? questions.map(question => this._normalizePlanQuestion(question)).filter(Boolean)
+            : [];
+        const normalizedDefaults = Array.isArray(defaults)
+            ? defaults.map(item => this._normalizePlanDefault(item)).filter(Boolean)
+            : [];
+
+        return {
+            id: plan.planId || plan.PlanId || `plan-${Date.now()}`,
+            planId: plan.planId || plan.PlanId || '',
+            mode: AgentWorkspaceModes.PLAN,
+            originalDescription: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
+            buildPrompt: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
+            goal: plan.goal || plan.Goal || fallbackDescription || 'Vision workflow draft',
+            intent: plan.intent || plan.Intent || '',
+            confidence: plan.confidence || plan.Confidence || 'medium',
+            blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
+            nextAction: plan.nextAction || plan.NextAction || 'Review plan, then start Build.',
+            executable: Boolean(plan.canBuild ?? plan.CanBuild ?? true),
+            blockingReasons: this._toArray(plan.blockingReasons || plan.BlockingReasons),
+            understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
+                ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding)
+                : [`User goal: ${fallbackDescription || 'Vision workflow draft'}`],
+            route: {
+                routeId: route.routeId || route.RouteId || '',
+                title: route.title || route.Title || 'Vision route',
+                summary: route.summary || route.Summary || '',
+                operators: this._toArray(route.operators || route.Operators),
+                templateDecision: route.templateDecision || route.TemplateDecision || ''
+            },
+            questions: normalizedQuestions,
+            assumptions: normalizedDefaults.length
+                ? normalizedDefaults.map(item => `${item.label}: ${item.value}${item.impact ? ` (${item.impact})` : ''}`)
+                : ['Public metadata boundaries are preserved; missing resources stay pending until confirmed.'],
+            recommendedDefaults: normalizedDefaults,
+            steps: this._toArray(plan.executablePlan || plan.ExecutablePlan),
+            risks: this._toArray(plan.risks || plan.Risks),
+            acceptanceCriteria: this._toArray(plan.acceptanceCriteria || plan.AcceptanceCriteria),
+            contextSummary,
+            operatorCatalogVersion: plan.operatorCatalogVersion || plan.OperatorCatalogVersion || '',
+            templateCatalogVersion: plan.templateCatalogVersion || plan.TemplateCatalogVersion || '',
+            stationBoundarySummary: plan.stationBoundarySummary || plan.StationBoundarySummary || '',
+            plcOutputPolicy: plan.plcOutputPolicy || plan.PlcOutputPolicy || '',
+            rawPlanSnapshot: plan
+        };
+    },
+
+    _normalizePlanQuestion(question) {
+        if (!question) return null;
+        const options = this._toArray(question.options || question.Options)
+            .map(option => this._normalizePlanOption(option))
+            .filter(Boolean);
+        return {
+            id: question.id || question.Id || '',
+            title: question.title || question.Title || '',
+            why: question.why || question.Why || '',
+            defaultValue: question.defaultValue || question.DefaultValue || options.find(item => item.recommended)?.value || options[0]?.value || '',
+            defaultAssumption: question.defaultAssumption || question.DefaultAssumption || '',
+            impact: question.impact || question.Impact || '',
+            options
+        };
+    },
+
+    _normalizePlanOption(option) {
+        if (!option) return null;
+        return {
+            value: option.value || option.Value || '',
+            label: option.label || option.Label || option.value || option.Value || '',
+            recommended: Boolean(option.recommended ?? option.Recommended),
+            description: option.description || option.Description || '',
+            impact: option.impact || option.Impact || ''
+        };
+    },
+
+    _normalizePlanDefault(item) {
+        if (!item) return null;
+        return {
+            id: item.id || item.Id || '',
+            label: item.label || item.Label || '',
+            value: item.value || item.Value || '',
+            impact: item.impact || item.Impact || ''
+        };
+    },
+
+    _toArray(value) {
+        return Array.isArray(value) ? value : [];
     },
 
     _renderAgentWorkspaceOverview() {
@@ -417,7 +494,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (this.isGenerating || !this.pendingVisionPlan) return false;
 
         const plan = this.pendingVisionPlan;
-        const hint = this._buildPlanBuildHint(plan, { acceptedRecommended });
+        const buildFromPlan = this._buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended });
         this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(plan);
@@ -426,35 +503,99 @@ export const aiPanelAgentWorkspaceMixin = {
 
         return this._dispatchGenerateRequest({
             description: plan.buildPrompt || plan.originalDescription,
-            hint,
+            hint: '',
             userMessage: `Start Build from plan: ${plan.goal}`,
             attachmentPaths: [],
-            existingFlowJson: null,
-            explicitMode: 'new',
-            templateSelection: null,
+            existingFlowJson: buildFromPlan.currentFlowSnapshot || null,
+            explicitMode: buildFromPlan.buildIntent || 'new',
+            templateSelection: buildFromPlan.templateSelection || null,
             clearInput: true,
-            skipPlan: true
+            skipPlan: true,
+            buildFromPlan
         });
     },
 
-    _buildPlanBuildHint(plan, { acceptedRecommended = false } = {}) {
-        const selections = this.planQuestionSelections || {};
-        const selectedLines = plan.questions.map(question => {
-            const value = selections[question.id] || question.defaultValue;
-            const option = question.options.find(item => item.value === value);
-            return `${question.id}: ${option?.label || value}`;
-        });
+    _buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended = false } = {}) {
+        const currentFlowSnapshot = this._hasCurrentFlowContext?.()
+            ? this._stringifyPlanSnapshot(this._getCurrentFlowJson?.())
+            : null;
+        const buildIntent = this._resolvePlanBuildIntent(plan, currentFlowSnapshot);
+        const templateSelection = this._normalizeTemplateSelection?.(this.nextTemplateSelection) ||
+            this._normalizeTemplateSelection?.(plan?.templateSelection) ||
+            this._normalizeTemplateSelection?.(plan?.rawPlanSnapshot?.templateSelection) ||
+            null;
 
-        return [
-            'Plan Mode confirmed build context:',
-            `Goal: ${plan.goal}`,
-            `Route: ${plan.route.title}`,
-            `Accepted recommended defaults: ${acceptedRecommended ? 'yes' : 'no'}`,
-            'Selections:',
-            ...selectedLines,
-            'Acceptance criteria:',
-            ...plan.acceptanceCriteria
-        ].join('\n');
+        return {
+            planId: plan.planId || plan.id || '',
+            planSnapshot: this._buildPlanSnapshotForBuild(plan),
+            userSelections: this._buildPlanSelectionMap(plan),
+            acceptedDefaults: this._collectAcceptedDefaultIds(plan, acceptedRecommended),
+            currentFlowSnapshot,
+            templateSelection,
+            attachmentSummary: this._buildPlanAttachmentSummary([]),
+            operatorCatalogVersion: plan.operatorCatalogVersion || '',
+            stationBoundarySummary: plan.stationBoundarySummary || '',
+            plcOutputPolicy: plan.plcOutputPolicy || '',
+            buildIntent,
+            originalUserPrompt: plan.originalDescription || plan.buildPrompt || '',
+            acceptedRecommendedDefaults: Boolean(acceptedRecommended),
+            metadataOnly: true
+        };
+    },
+
+    _buildPlanSnapshotForBuild(plan) {
+        if (plan?.rawPlanSnapshot) return plan.rawPlanSnapshot;
+        return {
+            planId: plan?.planId || plan?.id || '',
+            originalUserPrompt: plan?.originalDescription || plan?.buildPrompt || '',
+            goal: plan?.goal || '',
+            intent: plan?.intent || '',
+            confidence: plan?.confidence || 'medium',
+            requirementUnderstanding: this._toArray(plan?.understanding),
+            recommendedRoute: plan?.route || {},
+            clarificationQuestions: this._toArray(plan?.questions),
+            recommendedDefaults: this._toArray(plan?.recommendedDefaults),
+            risks: this._toArray(plan?.risks),
+            acceptanceCriteria: this._toArray(plan?.acceptanceCriteria),
+            executablePlan: this._toArray(plan?.steps),
+            canBuild: plan?.executable !== false,
+            blockingReasons: this._toArray(plan?.blockingReasons),
+            nextAction: plan?.nextAction || '',
+            contextSummary: plan?.contextSummary || {},
+            operatorCatalogVersion: plan?.operatorCatalogVersion || '',
+            templateCatalogVersion: plan?.templateCatalogVersion || '',
+            stationBoundarySummary: plan?.stationBoundarySummary || '',
+            plcOutputPolicy: plan?.plcOutputPolicy || '',
+            metadataOnly: true
+        };
+    },
+
+    _buildPlanSelectionMap(plan) {
+        const selections = this.planQuestionSelections || {};
+        return Object.fromEntries(this._toArray(plan?.questions)
+            .map(question => {
+                const value = String(selections[question.id] || question.defaultValue || '').trim();
+                return value ? [question.id, value] : null;
+            })
+            .filter(Boolean));
+    },
+
+    _collectAcceptedDefaultIds(plan, acceptedRecommended = false) {
+        const selected = this._buildPlanSelectionMap(plan);
+        return this._toArray(plan?.questions)
+            .filter(question => {
+                const recommended = question.options?.find(option => option.recommended)?.value || question.defaultValue;
+                return acceptedRecommended || String(selected[question.id] || '') === String(recommended || '');
+            })
+            .map(question => question.id)
+            .filter(Boolean);
+    },
+
+    _resolvePlanBuildIntent(plan, currentFlowSnapshot = null) {
+        const prompt = plan?.originalDescription || plan?.buildPrompt || plan?.goal || '';
+        const hasCurrentFlow = Boolean(currentFlowSnapshot);
+        const resolved = this._resolveGenerateRequestMode?.('', prompt, hasCurrentFlow) || 'auto';
+        return resolved === 'auto' ? 'new' : resolved;
     },
 
     _handleAgentRunWorkspaceEvent(evt) {

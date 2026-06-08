@@ -64,6 +64,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
         WriteIndented = false,
         Converters = { new JsonStringEnumConverter() }
     };
@@ -345,6 +346,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var requirementMode = TryGetMessageString(payload, "requirementMode")
                 ?? TryGetMessageString(doc.RootElement, "requirementMode");
             var templateSelection = TryGetTemplateSelection(payload);
+            var buildFromPlan = TryGetPayloadObject<VisionAgentBuildFromPlanRequest>(payload, "buildFromPlan");
             var useVisionAgentGenerateFlow = TryGetBoolean(payload, "useVisionAgentGenerateFlow") ?? false;
             var agentGenerateFlowMode = TryGetMessageString(payload, "agentGenerateFlowMode")
                 ?? TryGetMessageString(doc.RootElement, "agentGenerateFlowMode");
@@ -376,6 +378,7 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 attachments,
                 requirementMode,
                 templateSelection,
+                buildFromPlan,
                 useVisionAgentGenerateFlow,
                 agentGenerateFlowMode,
                 runtimePreviewConsent,
@@ -485,6 +488,25 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             JsonValueKind.Object or JsonValueKind.Array => flowElement.GetRawText(),
             _ => null
         };
+    }
+
+    private static T? TryGetPayloadObject<T>(JsonElement payload, string propertyName)
+        where T : class
+    {
+        if (payload.ValueKind != JsonValueKind.Object)
+            return null;
+
+        if (!payload.TryGetProperty(propertyName, out var property))
+        {
+            var pascalCase = char.ToUpperInvariant(propertyName[0]) + propertyName[1..];
+            if (!payload.TryGetProperty(pascalCase, out property))
+                return null;
+        }
+
+        if (property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            return null;
+
+        return property.Deserialize<T>(_jsonOptions);
     }
 
     /// <summary>

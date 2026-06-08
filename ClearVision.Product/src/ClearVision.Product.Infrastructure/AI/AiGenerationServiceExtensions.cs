@@ -114,6 +114,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IVisionAgentToolRegistry, VisionAgentToolRegistry>();
         services.AddScoped<IVisionAgentGenerateFlowService, VisionAgentGenerateFlowService>();
         services.AddScoped<IAiFlowGenerationService, AiFlowGenerationService>();
+        services.AddScoped<IVisionAgentOrchestrator, VisionAgentOrchestrator>();
         services.AddScoped<GenerateFlowMessageHandler>();
 
         // Stage A: unified AI runtime pipeline
