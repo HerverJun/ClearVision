@@ -1175,11 +1175,39 @@ export const aiPanelPendingParametersMixin = {
             return;
         }
 
+        if (Array.isArray(operator.Parameters)) {
+            const matched = operator.Parameters.find(item =>
+                String(item?.name ?? item?.Name ?? '').trim().toLowerCase() === String(parameterName).trim().toLowerCase()
+            );
+            if (matched) {
+                if ('Value' in matched || !('value' in matched)) {
+                    matched.Value = value;
+                } else {
+                    matched.value = value;
+                }
+                return;
+            }
+
+            operator.Parameters.push({
+                Name: parameterName,
+                Value: value
+            });
+            return;
+        }
+
         if (operator.parameters && typeof operator.parameters === 'object') {
             const matchedKey = Object.keys(operator.parameters).find(key =>
                 key.toLowerCase() === String(parameterName).trim().toLowerCase()
             );
             operator.parameters[matchedKey || parameterName] = value;
+            return;
+        }
+
+        if (operator.Parameters && typeof operator.Parameters === 'object') {
+            const matchedKey = Object.keys(operator.Parameters).find(key =>
+                key.toLowerCase() === String(parameterName).trim().toLowerCase()
+            );
+            operator.Parameters[matchedKey || parameterName] = value;
             return;
         }
 
@@ -1353,7 +1381,7 @@ export const aiPanelPendingParametersMixin = {
                 }
 
                 return {
-                    operatorId,
+                    operatorId: operatorId || resource.actualOperatorId,
                     actualOperatorId: resource.actualOperatorId,
                     parameterNames: [parameterName]
                 };
@@ -1400,9 +1428,12 @@ export const aiPanelPendingParametersMixin = {
                     ? [...new Set(rawNames.map(name => String(name || '').trim()).filter(Boolean))]
                     : [];
 
+                const actualOperatorId = String(item?.actualOperatorId ?? item?.ActualOperatorId ?? '').trim();
+                const operatorId = String(item?.operatorId ?? item?.OperatorId ?? '').trim() || actualOperatorId;
+
                 return {
-                    operatorId: String(item?.operatorId ?? item?.OperatorId ?? '').trim(),
-                    actualOperatorId: String(item?.actualOperatorId ?? item?.ActualOperatorId ?? '').trim(),
+                    operatorId,
+                    actualOperatorId,
                     parameterNames
                 };
             })
@@ -1415,6 +1446,14 @@ export const aiPanelPendingParametersMixin = {
         return items
             .map(item => {
                 const resourceKey = String(item?.resourceKey ?? item?.ResourceKey ?? '').trim();
+                const actualOperatorId = String(item?.actualOperatorId ?? item?.ActualOperatorId ?? '').trim();
+                const operatorId = String(
+                    item?.operatorId ??
+                    item?.OperatorId ??
+                    item?.tempId ??
+                    item?.TempId ??
+                    ''
+                ).trim() || this._inferPendingOperatorIdFromResourceKey(resourceKey) || actualOperatorId;
                 const parameterName = String(
                     item?.parameterName ??
                     item?.ParameterName ??
@@ -1425,15 +1464,8 @@ export const aiPanelPendingParametersMixin = {
                     resourceType: String(item?.resourceType ?? item?.ResourceType ?? '').trim(),
                     resourceKey,
                     description: String(item?.description ?? item?.Description ?? '').trim(),
-                    operatorId: String(
-                        item?.operatorId ??
-                        item?.OperatorId ??
-                        item?.tempId ??
-                        item?.TempId ??
-                        this._inferPendingOperatorIdFromResourceKey(resourceKey) ??
-                        ''
-                    ).trim(),
-                    actualOperatorId: String(item?.actualOperatorId ?? item?.ActualOperatorId ?? '').trim(),
+                    operatorId,
+                    actualOperatorId,
                     parameterName
                 };
             })

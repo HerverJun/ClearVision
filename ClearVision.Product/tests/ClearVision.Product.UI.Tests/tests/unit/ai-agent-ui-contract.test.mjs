@@ -2439,6 +2439,84 @@ test('resource binding action writes metadata and updates pending, missing, and 
   ].join('\n'));
 });
 
+test('resource binding action updates PascalCase replay payloads by ActualOperatorId', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    options: { getOperators: resourceBindingOperatorMetadata }
+  });
+  const response = {
+    Flow: {
+      Operators: [
+        {
+          TempId: 'op_detect',
+          OperatorType: 'DeepLearning',
+          DisplayName: '缺陷检测',
+          Parameters: { ModelPath: '<pending-model-resource>' }
+        }
+      ],
+      Connections: [],
+      MetadataOnly: true
+    },
+    PendingParameters: [
+      { ActualOperatorId: 'op_detect', ParameterNames: ['ModelPath'] }
+    ],
+    MissingResources: [
+      {
+        ResourceType: 'model_resource',
+        ActualOperatorId: 'op_detect',
+        ParameterName: 'ModelPath',
+        Description: '部署前绑定模型资源元数据。'
+      }
+    ],
+    ApplyGate: {
+      CanvasApplyReady: true,
+      RuntimeDraftReady: true,
+      DeploymentReady: false,
+      Blocked: false,
+      Status: 'canvas_apply_ready',
+      DeploymentBlockers: ['op_detect.ModelPath'],
+      MetadataOnly: true
+    },
+    ValidationPreview: {
+      DeploymentPrecheck: {
+        ReadyForDeployment: false,
+        WorkflowDraftAllowed: true,
+        DeploymentBlocked: true,
+        StationTouched: false
+      }
+    }
+  };
+  panel.currentResult = response;
+  panel.currentResultVersion = 1;
+  panel.container = createContainer({
+    '#ai-result-followups': createFakeElement(),
+    '#ai-result-parameter-editor': createFakeElement(),
+    '#ai-result-validation-card': createFakeElement(),
+    '#ai-result-validation': createFakeElement(),
+    '#ai-btn-apply': createFakeButton()
+  });
+
+  const resource = response.MissingResources[0];
+  const model = panel._getMissingResourceActionModel(resource);
+  const updated = panel._handleMissingResourceAction(resource, model.action, {
+    value: 'model-resource:pascal-v1',
+    data: response,
+    flow: response.Flow
+  });
+
+  assert.equal(updated, true);
+  assert.deepEqual(response.MissingResources, []);
+  assert.deepEqual(response.PendingParameters, []);
+  assert.equal(response.ApplyGate.DeploymentReady, true);
+  assert.equal(response.ApplyGate.Status, 'deployment_metadata_ready');
+  assert.equal(response.ValidationPreview.DeploymentPrecheck.ReadyForDeployment, true);
+  const operator = response.Flow.Operators[0];
+  assert.equal(operator.Parameters.ModelPath, 'model-resource:pascal-v1');
+  assert.equal(Object.prototype.hasOwnProperty.call(operator, 'parameters'), false);
+  assert.equal(panel.pendingResourceDrafts['model_resource:op_detect:ModelPath'].value, 'model-resource:pascal-v1');
+  assert.equal(panel.pendingResourceDrafts['model_resource:op_detect:ModelPath'].actualOperatorId, 'op_detect');
+});
+
 test('resolving all resource tasks updates apply gate without guessing file paths or PLC writes', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, {

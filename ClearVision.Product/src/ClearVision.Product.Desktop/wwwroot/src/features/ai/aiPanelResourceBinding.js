@@ -5,8 +5,9 @@ import {
 
 export const aiPanelResourceBindingMixin = {
     _getMissingResourceActionModel(item = {}) {
-        const resourceType = String(item?.resourceType || '').trim().toLowerCase();
-        const parameterName = String(item?.parameterName || '').trim() || this._inferPendingParameterNameFromMissingResource?.(item) || '';
+        const normalizedItem = this._normalizeMissingResources?.([item])?.[0] || item;
+        const resourceType = String(normalizedItem?.resourceType || '').trim().toLowerCase();
+        const parameterName = String(normalizedItem?.parameterName || '').trim() || this._inferPendingParameterNameFromMissingResource?.(normalizedItem) || '';
         const make = (overrides = {}) => ({
             action: 'bind_resource_metadata',
             primaryLabel: '补齐资源元数据',
@@ -127,12 +128,13 @@ export const aiPanelResourceBindingMixin = {
     },
 
     _getPendingResourceDraftKey(item = {}) {
-        const resourceKey = String(item?.resourceKey || '').trim();
+        const normalizedItem = this._normalizeMissingResources?.([item])?.[0] || item;
+        const resourceKey = String(normalizedItem?.resourceKey || '').trim();
         if (resourceKey) return resourceKey;
         return [
-            item?.resourceType || 'resource',
-            item?.operatorId || item?.actualOperatorId || '',
-            item?.parameterName || ''
+            normalizedItem?.resourceType || 'resource',
+            normalizedItem?.operatorId || normalizedItem?.actualOperatorId || '',
+            normalizedItem?.parameterName || ''
         ].map(value => String(value || '').trim()).filter(Boolean).join(':');
     },
 
@@ -144,27 +146,30 @@ export const aiPanelResourceBindingMixin = {
     _setPendingResourceDraft(item = {}, entry = {}) {
         const key = this._getPendingResourceDraftKey(item);
         if (!key) return;
+        const normalizedItem = this._normalizeMissingResources?.([item])?.[0] || item;
         if (!this.pendingResourceDrafts) {
             this.pendingResourceDrafts = {};
         }
         this.pendingResourceDrafts[key] = {
-            resourceType: String(item?.resourceType || '').trim(),
-            resourceKey: String(item?.resourceKey || '').trim(),
-            operatorId: String(item?.operatorId || '').trim(),
-            parameterName: String(item?.parameterName || '').trim(),
+            resourceType: String(normalizedItem?.resourceType || '').trim(),
+            resourceKey: String(normalizedItem?.resourceKey || '').trim(),
+            operatorId: String(normalizedItem?.operatorId || normalizedItem?.actualOperatorId || '').trim(),
+            actualOperatorId: String(normalizedItem?.actualOperatorId || '').trim(),
+            parameterName: String(normalizedItem?.parameterName || '').trim(),
             metadataOnly: true,
             ...entry
         };
     },
 
     _handleMissingResourceAction(item = {}, action = '', options = {}) {
+        const normalizedItem = this._normalizeMissingResources?.([item])?.[0] || item;
         const normalizedAction = String(action || '').trim();
-        const actionModel = this._getMissingResourceActionModel(item);
+        const actionModel = this._getMissingResourceActionModel(normalizedItem);
         const result = options.data || this.currentResult || null;
         const flow = options.flow || result?.flow || result?.Flow || null;
 
         if (normalizedAction === 'defer_resource') {
-            this._setPendingResourceDraft(item, { status: 'deferred', source: 'user_deferred', value: '' });
+            this._setPendingResourceDraft(normalizedItem, { status: 'deferred', source: 'user_deferred', value: '' });
             this._setResultStatusNote('已标记为稍后处理；画布仍可应用，部署前会继续提示补齐。', 'info');
             this._addMessage('system', '已标记该资源为稍后处理，部署前仍会保留为待补项。');
             this._renderFollowupChecklist(result, flow);
@@ -178,8 +183,13 @@ export const aiPanelResourceBindingMixin = {
         }
 
         const fieldType = actionModel.fieldType || 'text';
-        const parameterName = actionModel.parameterName || item.parameterName || '';
-        const operatorId = String(item.operatorId || this._inferPendingOperatorIdFromResourceKey?.(item.resourceKey) || '').trim();
+        const parameterName = actionModel.parameterName || normalizedItem.parameterName || '';
+        const operatorId = String(
+            normalizedItem.operatorId ||
+            normalizedItem.actualOperatorId ||
+            this._inferPendingOperatorIdFromResourceKey?.(normalizedItem.resourceKey) ||
+            ''
+        ).trim();
         if (fieldType === 'number' && !Number.isFinite(Number(rawValue))) {
             this._setResultStatusNote('标定/像素比例必须是有效数值。', 'warning');
             return false;
@@ -189,7 +199,7 @@ export const aiPanelResourceBindingMixin = {
             this._setPendingDraftConfirmedValue(operatorId, parameterName, rawValue, fieldType, 'resource_binding');
         }
 
-        this._setPendingResourceDraft(item, {
+        this._setPendingResourceDraft(normalizedItem, {
             status: 'resolved',
             source: 'resource_binding',
             action: normalizedAction,
@@ -198,7 +208,7 @@ export const aiPanelResourceBindingMixin = {
             operatorId
         });
 
-        this._applyResourceResolutionToResult(result, item, {
+        this._applyResourceResolutionToResult(result, normalizedItem, {
             parameterName,
             operatorId,
             value: rawValue,
@@ -345,11 +355,17 @@ export const aiPanelResourceBindingMixin = {
     _doesResourceReferenceMatch(value, resource, resolution = {}) {
         const text = String(value || '').trim();
         if (!text) return false;
-        const resourceKey = String(resource?.resourceKey || '').trim();
+        const normalizedResource = this._normalizeMissingResources?.([resource])?.[0] || resource;
+        const resourceKey = String(normalizedResource?.resourceKey || '').trim();
         if (resourceKey && text === resourceKey) return true;
 
-        const operatorId = String(resolution.operatorId || resource?.operatorId || '').trim();
-        const candidates = this._getResolvedParameterCandidates(resource, resolution);
+        const operatorId = String(
+            resolution.operatorId ||
+            normalizedResource?.operatorId ||
+            normalizedResource?.actualOperatorId ||
+            ''
+        ).trim();
+        const candidates = this._getResolvedParameterCandidates(normalizedResource, resolution);
         return [...candidates].some(parameterName => {
             const reference = operatorId ? `${operatorId}.${parameterName}`.toLowerCase() : parameterName;
             return text.toLowerCase() === reference;
