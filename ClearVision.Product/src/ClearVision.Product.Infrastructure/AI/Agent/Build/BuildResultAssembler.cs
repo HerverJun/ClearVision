@@ -95,15 +95,15 @@ public sealed class BuildResultAssembler
             MetadataOnly = true
         };
         result.AiExplanation = string.IsNullOrWhiteSpace(result.AiExplanation)
-            ? "Build Mode executed a metadata-only tool loop under the confirmed Plan and produced an editable workflow draft."
+            ? "构建模式已基于确认计划执行仅元数据工具链，并生成可编辑流程草稿。"
             : _redactor.RedactText(result.AiExplanation);
 
         _eventSink?.Append(input.RunId, new AgentRunEventDraft
         {
             EventType = AgentRunEventTypes.ArtifactCreated,
             Stage = "artifact",
-            Title = "Build artifact ready",
-            Summary = "Replay-safe BuildResult, workflow diff, readiness gates, and editable draft are ready.",
+            Title = "构建产物已就绪",
+            Summary = "可回放 BuildResult、流程差异、就绪门禁和可编辑草稿已就绪。",
             Status = AgentRunEventStatuses.Completed,
             Payload = new
             {
@@ -130,19 +130,19 @@ public sealed class BuildResultAssembler
             Success = false,
             CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
             FailureType = AiFlowGenerationResult.FailureTypeSystemError,
-            ErrorMessage = "Vision Agent Build Mode failed while executing the metadata-only tool loop.",
+            ErrorMessage = "Vision Agent 构建模式在执行仅元数据工具链时失败。",
             BuildResult = new VisionAgentBuildResult
             {
                 BuildId = buildId,
                 ToolEvidenceTimeline = evidence.ToList(),
-                FirstFixRecommendation = "Review public tool evidence and retry Build after fixing the blocked metadata step.",
+                FirstFixRecommendation = "请查看公开工具证据，修复被阻断的元数据步骤后重试构建。",
                 PublicWarnings = publicWarnings.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
                 ApplyGate = new VisionAgentApplyGate
                 {
                     Blocked = true,
                     Status = "blocked",
                     ApplyBlockers = ["build_orchestrator_failed"],
-                    FirstFixRecommendation = "Review public tool evidence and retry Build after fixing the blocked metadata step."
+                    FirstFixRecommendation = "请查看公开工具证据，修复被阻断的元数据步骤后重试构建。"
                 }
             }
         };
@@ -181,24 +181,37 @@ public sealed class BuildResultAssembler
     {
         if (gate.Blocked)
         {
-            return "Fix workflow structure blockers before applying the draft to the canvas.";
+            return "应用草稿到画布前，请先修复流程结构阻断项。";
         }
 
         var firstMissing = PreferredMissingResource(missingResources);
         if (firstMissing != null)
         {
-            return $"Bind missing {firstMissing.ResourceType} metadata for {firstMissing.ResourceKey} before deployment.";
+            return $"部署前请绑定缺失的{DisplayResourceType(firstMissing.ResourceType)}元数据：{firstMissing.ResourceKey}。";
         }
 
         var firstPending = pendingParameters.FirstOrDefault();
         if (firstPending != null)
         {
-            return $"Confirm pending parameter metadata on {firstPending.OperatorId} before release.";
+            return $"发布前请确认 {firstPending.OperatorId} 的待确认参数元数据。";
         }
 
         return gate.DeploymentReady
-            ? "Review the draft on canvas, then proceed to runtime packaging when ready."
-            : "Review readiness gates and resolve deployment blockers before Station deployment.";
+            ? "请在画布上复核草稿，准备好后再进入运行包流程。"
+            : "工站部署前请复核就绪门禁并解决部署阻断项。";
+    }
+
+    private static string DisplayResourceType(string resourceType)
+    {
+        return resourceType switch
+        {
+            "model_resource" => "模型资源",
+            "template_artifact" => "模板资源",
+            "measurement_parameter" => "测量参数",
+            "camera_binding" => "相机绑定",
+            "output_channel" => "输出通道",
+            _ => string.IsNullOrWhiteSpace(resourceType) ? "资源" : resourceType
+        };
     }
 
     private static AiMissingResourceInfo? PreferredMissingResource(IReadOnlyList<AiMissingResourceInfo> missingResources)

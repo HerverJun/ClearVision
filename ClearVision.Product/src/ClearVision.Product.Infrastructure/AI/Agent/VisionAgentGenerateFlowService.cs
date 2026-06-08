@@ -79,8 +79,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             _eventSink?.StageStarted(
                 runId,
                 "planner",
-                "Planner fallback",
-                "Planner mode failed; starting scripted metadata-only fallback.",
+                "规划器已切换兜底",
+                "Planner 模式失败，已启动仅元数据脚本兜底。",
                 new
                 {
                     failure = plannerResult.ErrorMessage,
@@ -89,14 +89,14 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             return await RunScriptedAsync(
                 request,
                 "agent_planner_scripted_fallback",
-                "Vision Agent planner failed; scripted safe fallback generated a workflow draft.",
+                "Vision Agent Planner 失败后，已通过安全脚本兜底生成工作流草稿。",
                 cancellationToken);
         }
 
         return await RunScriptedAsync(
             request,
             "agent_controlled_scripted",
-            "Controlled Vision Agent generated a workflow draft from static engineering tools.",
+            "受控 Vision Agent 已基于静态工程工具生成工作流草稿。",
             cancellationToken);
     }
 
@@ -124,7 +124,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         if (_plannerService == null)
         {
             return Task.FromResult(ControlledFailure(
-                "Vision Agent planner service is not registered.",
+                "Vision Agent Planner 服务未注册。",
                 []));
         }
 
@@ -146,7 +146,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             capture,
             completion.CompleteAsync,
             "agent_planner",
-            "Vision Agent planner generated or edited a workflow draft with static engineering tools.",
+            "Vision Agent Planner 已使用静态工程工具生成或编辑工作流草稿。",
             cancellationToken);
     }
 
@@ -164,8 +164,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             _eventSink?.StageStarted(
                 request.AgentRunId,
                 "planner",
-                "Vision Agent planner",
-                $"Starting {generationMode} with controlled tool policy.",
+                "Vision Agent 规划器",
+                $"正在以受控工具策略启动 {DisplayGenerationMode(generationMode)}。",
                 new
                 {
                     generationMode,
@@ -184,8 +184,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             _eventSink?.StageCompleted(
                 request.AgentRunId,
                 "tool_policy",
-                "Tool policy checked",
-                "Allowed metadata-only tool permissions were resolved before tool execution.",
+                "工具策略已检查",
+                "工具执行前已解析允许的仅元数据权限。",
                 new
                 {
                     allowedPermissions = allowedPermissions.Select(permission => permission.ToString()).ToList(),
@@ -217,18 +217,18 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             {
                 EventType = AgentRunEventTypes.RunFailed,
                 Stage = "tool_policy",
-                Title = "Tool policy denied",
-                Summary = "Vision Agent planner tool policy denied the request.",
+                Title = "工具策略已拒绝",
+                Summary = "Vision Agent Planner 工具策略已拒绝该请求。",
                 Status = AgentRunEventStatuses.Failed,
                 Payload = new
                 {
                     error = ex.Message,
-                    firstFixRecommendation = "Remove the denied tool intent and retry with metadata-only review steps.",
+                    firstFixRecommendation = "请移除被拒绝的工具意图，并改用仅元数据复核步骤重试。",
                     metadataOnly = true
                 }
             });
             return ControlledFailure(
-                $"Vision Agent planner tool policy denied the request: {ex.Message}",
+                $"Vision Agent Planner 工具策略已拒绝该请求：{ex.Message}",
                 []);
         }
         catch (Exception ex)
@@ -237,18 +237,18 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             {
                 EventType = AgentRunEventTypes.RunFailed,
                 Stage = "planner",
-                Title = "Vision Agent failed",
-                Summary = "Vision Agent GenerateFlow failed before a workflow draft could be mapped.",
+                Title = "Vision Agent 执行失败",
+                Summary = "Vision Agent GenerateFlow 在映射工作流草稿前失败。",
                 Status = AgentRunEventStatuses.Failed,
                 Payload = new
                 {
                     error = ex.Message,
-                    firstFixRecommendation = "Retry the request or switch to legacy GenerateFlow mode if the controlled agent remains unavailable.",
+                    firstFixRecommendation = "请重试请求；如果受控 Agent 仍不可用，可切换到旧版 GenerateFlow 模式。",
                     metadataOnly = true
                 }
             });
             return ControlledFailure(
-                $"Vision Agent GenerateFlow failed: {ex.Message}",
+                $"Vision Agent GenerateFlow 失败：{ex.Message}",
                 []);
         }
 
@@ -258,19 +258,19 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             {
                 EventType = AgentRunEventTypes.RunFailed,
                 Stage = "planner",
-                Title = "Vision Agent loop failed",
-                Summary = loopResult.ErrorMessage ?? "Vision agent loop failed.",
+                Title = "Vision Agent 循环失败",
+                Summary = loopResult.ErrorMessage ?? "Vision Agent 循环失败。",
                 Status = AgentRunEventStatuses.Failed,
                 Payload = new
                 {
                     failureType = loopResult.FailureType,
                     toolCalls = loopResult.ToolTrace.Count,
-                    firstFixRecommendation = "Inspect the failed public tool trace, resolve blocked metadata, and retry.",
+                    firstFixRecommendation = "请查看失败的公开工具轨迹，解决被阻断的元数据后重试。",
                     metadataOnly = true
                 }
             });
             return ControlledFailure(
-                loopResult.ErrorMessage ?? "Vision agent loop failed.",
+                loopResult.ErrorMessage ?? "Vision Agent 循环失败。",
                 loopResult.ToolTrace);
         }
 
@@ -280,18 +280,18 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             {
                 EventType = AgentRunEventTypes.RunFailed,
                 Stage = "workflow_draft",
-                Title = "Workflow draft missing",
-                Summary = "Vision agent did not produce a workflow draft.",
+                Title = "缺少工作流草稿",
+                Summary = "Vision Agent 未生成工作流草稿。",
                 Status = AgentRunEventStatuses.Failed,
                 Payload = new
                 {
                     toolCalls = loopResult.ToolTrace.Count,
-                    firstFixRecommendation = "Ask for a concrete workflow draft or switch to scripted mode with an existing template.",
+                    firstFixRecommendation = "请要求生成明确的工作流草稿，或使用已有模板切换到脚本模式。",
                     metadataOnly = true
                 }
             });
             return ControlledFailure(
-                "Vision agent did not produce a workflow draft.",
+                "Vision Agent 未生成工作流草稿。",
                 loopResult.ToolTrace);
         }
 
@@ -343,7 +343,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                     {
                         Stage = generationMode,
                         Status = "completed",
-                        Summary = $"toolCalls={loopResult.ToolTrace.Count}, rounds={loopResult.ToolRounds}",
+                        Summary = $"工具调用 {loopResult.ToolTrace.Count} 次，循环 {loopResult.ToolRounds} 轮。",
                         DurationMs = 0,
                         Metadata = new Dictionary<string, string>
                         {
@@ -364,18 +364,18 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             {
                 EventType = AgentRunEventTypes.RunFailed,
                 Stage = "artifact",
-                Title = "Artifact mapping failed",
-                Summary = "Controlled Vision Agent GenerateFlow mapping failed.",
+                Title = "产物映射失败",
+                Summary = "受控 Vision Agent GenerateFlow 映射失败。",
                 Status = AgentRunEventStatuses.Failed,
                 Payload = new
                 {
                     error = ex.Message,
-                    firstFixRecommendation = "Review the workflow draft shape and retry after correcting invalid operator metadata.",
+                    firstFixRecommendation = "请复核工作流草稿结构，修正非法算子元数据后重试。",
                     metadataOnly = true
                 }
             });
             return ControlledFailure(
-                $"Controlled Vision Agent GenerateFlow mapping failed: {ex.Message}",
+                $"受控 Vision Agent GenerateFlow 映射失败：{ex.Message}",
                 loopResult.ToolTrace);
         }
     }
@@ -389,6 +389,17 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
 
         var requestMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode);
         return string.Equals(requestMode, AiAgentGenerateFlowModes.Planner, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string DisplayGenerationMode(string generationMode)
+    {
+        return generationMode switch
+        {
+            "agent_planner" => "Agent Planner",
+            "agent_planner_scripted_fallback" => "Agent Planner 脚本兜底",
+            "agent_controlled_scripted" => "受控脚本模式",
+            _ => generationMode
+        };
     }
 
     private ClearVision.Product.Core.Entities.RuntimePreviewPilotConfig ResolveRuntimePreviewPilotConfig()
@@ -423,7 +434,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                 Category = "vision_agent",
                 Code = "controlled_agent_generate_flow_failed",
                 Message = errorMessage,
-                RepairTarget = "Retry with legacy GenerateFlow or inspect agent tool trace."
+                RepairTarget = "请改用旧版 GenerateFlow 重试，或检查 Agent 工具轨迹。"
             },
             ToolTrace = traces.Select(MapTrace).ToList(),
             InteractionState = AiInteractionStates.Failed,
@@ -749,8 +760,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         {
             EventType = AgentRunEventTypes.WorkflowDraftUpdated,
             Stage = "workflow_draft",
-            Title = "Workflow draft updated",
-            Summary = "The controlled Vision Agent produced a workflow draft.",
+            Title = "工作流草稿已更新",
+            Summary = "受控 Vision Agent 已生成工作流草稿。",
             Status = AgentRunEventStatuses.Completed,
             Payload = new
             {
@@ -774,8 +785,8 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         _eventSink?.StageCompleted(
             request.AgentRunId,
             "planner",
-            "Planner completed",
-            $"Vision Agent completed {loopResult.ToolRounds} tool rounds.",
+            "规划器已完成",
+            $"Vision Agent 已完成 {loopResult.ToolRounds} 轮工具调用。",
             new
             {
                 toolCalls = loopResult.ToolTrace.Count,
@@ -788,51 +799,51 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             request.AgentRunId,
             AgentRunEventTypes.ReadinessChecked,
             "readiness",
-            "Readiness checked",
-            "Workflow structural readiness check completed.",
+            "就绪检查已完成",
+            "工作流结构就绪检查已完成。",
             capture.ValidationSummary);
         EmitCheckEvent(
             request.AgentRunId,
             AgentRunEventTypes.ManifestDryRunCompleted,
             "manifest_dry_run",
-            "Manifest dry-run completed",
-            "Metadata-only manifest dry-run completed.",
+            "清单试运行已完成",
+            "仅元数据清单试运行已完成。",
             capture.DryRunSummary);
         EmitCheckEvent(
             request.AgentRunId,
             AgentRunEventTypes.PackageReadinessChecked,
             "package_readiness",
-            "Package readiness checked",
-            "Runtime package metadata readiness check completed.",
+            "运行包就绪检查已完成",
+            "运行包元数据就绪检查已完成。",
             capture.DeploymentPrecheck);
         EmitCheckEvent(
             request.AgentRunId,
             AgentRunEventTypes.StationCompatibilityCompleted,
             "station_compatibility",
-            "Station compatibility completed",
-            "Station compatibility was reviewed as metadata only.",
+            "工位兼容性检查已完成",
+            "工位兼容性已按元数据方式完成复核。",
             capture.DeploymentPrecheck);
         EmitCheckEvent(
             request.AgentRunId,
             AgentRunEventTypes.OperatorContractCompleted,
             "operator_contract",
-            "Operator contract completed",
-            "Operator contract review completed for the draft.",
+            "算子契约检查已完成",
+            "草稿的算子契约复核已完成。",
             capture.DeploymentPrecheck);
         EmitCheckEvent(
             request.AgentRunId,
             AgentRunEventTypes.ReleaseReviewCompleted,
             "release_review",
-            "Release review completed",
-            "Pre-release review completed without real deployment, package creation, PLC write, or hot-load.",
+            "发布前复核已完成",
+            "发布前复核已完成，未执行真实部署、打包、PLC 写入或热加载。",
             capture.DeploymentPrecheck);
 
         _eventSink?.Append(request.AgentRunId, new AgentRunEventDraft
         {
             EventType = AgentRunEventTypes.ArtifactCreated,
             Stage = "artifact",
-            Title = "Report artifact created",
-            Summary = "Generated metadata-only workflow report evidence for the AI panel.",
+            Title = "报告证据已生成",
+            Summary = "已为 AI 面板生成仅元数据工作流报告证据。",
             Status = AgentRunEventStatuses.Completed,
             Payload = new
             {
@@ -893,7 +904,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             diagnosticCount = ReadArray(data, "diagnostics").Count(),
             firstFixRecommendation = ReadString(data, "firstFixRecommendation") ??
                                      ReadString(data, "repairTarget") ??
-                                     "Review the public diagnostics and provide missing metadata before retrying.",
+                                     "请查看公开诊断信息，并在重试前补齐缺失元数据。",
             metadataOnly = true
         };
     }
@@ -1274,7 +1285,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                 1 => ToolCall("validate_flow", new { flow = CloneJsonCompatible(_capture.FlowDraft) }),
                 2 => ToolCall("dryrun_flow", new { flow = CloneJsonCompatible(_capture.FlowDraft) }),
                 3 => PrecheckCall(),
-                _ => "Controlled Vision Agent GenerateFlow completed."
+                _ => "受控 Vision Agent GenerateFlow 已完成。"
             };
         }
 
@@ -1287,7 +1298,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
                 2 => ToolCall("validate_flow", new { flow = CloneJsonCompatible(_capture.FlowDraft) }),
                 3 => ToolCall("dryrun_flow", new { flow = CloneJsonCompatible(_capture.FlowDraft) }),
                 4 => PrecheckCall(),
-                _ => "Controlled Vision Agent GenerateFlow completed."
+                _ => "受控 Vision Agent GenerateFlow 已完成。"
             };
         }
 

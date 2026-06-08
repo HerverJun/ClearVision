@@ -49,7 +49,7 @@ public sealed class WorkflowDiffService
         };
         return VisionAgentBuildSupport.StepResult(
             diff,
-            $"Workflow diff: {diff.AddedNodes.Count} added, {diff.PreservedNodes.Count} preserved, {diff.PendingParameters.Count} pending parameter(s).",
+            $"工作流差异已汇总：新增 {diff.AddedNodes.Count} 个节点，保留 {diff.PreservedNodes.Count} 个节点，仍有 {diff.PendingParameters.Count} 个待确认参数。",
             AgentRunEventStatuses.Completed,
             diff,
             warningCode: diff.DeploymentBlockers.Count > 0 ? "deployment_blockers_present" : string.Empty,

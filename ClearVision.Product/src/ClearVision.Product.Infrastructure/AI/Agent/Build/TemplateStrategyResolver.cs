@@ -26,7 +26,7 @@ public sealed class TemplateStrategyResolver
             toolContext,
             "template_strategy",
             "match_flow_template",
-            "Match the request against metadata-only template catalog.",
+            "将请求与仅元数据模板目录进行匹配。",
             new { request = load.OriginalUserPrompt, topN = 3 },
             cancellationToken,
             AgentRunEventTypes.ToolCallCompleted);
@@ -63,7 +63,7 @@ public sealed class TemplateStrategyResolver
                 toolContext,
                 "template_strategy",
                 "get_flow_template_skeleton",
-                "Load selected or matched template skeleton as read-only metadata.",
+                "以只读元数据方式加载已选择或匹配的模板骨架。",
                 new { templateId, scenarioKey },
                 cancellationToken,
                 AgentRunEventTypes.ToolCallCompleted);
@@ -86,7 +86,7 @@ public sealed class TemplateStrategyResolver
 
         return VisionAgentBuildSupport.StepResult(
             resolution,
-            $"Template strategy resolved as {strategy}.",
+            $"模板策略已解析为 {DisplayTemplateStrategy(strategy)}。",
             AgentRunEventStatuses.Completed,
             new
             {
@@ -102,6 +102,19 @@ public sealed class TemplateStrategyResolver
             warningCode: skeleton?.Success == false ? "template_skeleton_unavailable" : string.Empty,
             applyImpact: "editable_draft_allowed",
             deploymentImpact: "template_resource_may_remain_pending");
+    }
+
+    private static string DisplayTemplateStrategy(string strategy)
+    {
+        return strategy switch
+        {
+            "catalog_match" => "目录匹配",
+            "adapt_selected_template" => "适配已选模板",
+            "use_selected_template" => "使用已选模板",
+            "catalog_match_without_skeleton" => "目录匹配但模板骨架不可用",
+            "no_template" => "不使用模板",
+            _ => strategy
+        };
     }
 
     private static TemplateCandidate? FirstTemplateCandidate(object? data)

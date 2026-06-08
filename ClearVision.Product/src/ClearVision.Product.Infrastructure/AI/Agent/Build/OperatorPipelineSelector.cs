@@ -78,8 +78,8 @@ public sealed class OperatorPipelineSelector
         return VisionAgentBuildSupport.StepResult(
             resolution,
             invalid.Count == 0
-                ? $"Selected {repaired.Count} catalog-backed operators."
-                : $"Selected {repaired.Count} catalog-backed operators and removed {invalid.Count} invalid operators.",
+                ? $"已选择 {repaired.Count} 个目录支持的算子。"
+                : $"已选择 {repaired.Count} 个目录支持的算子，并移除 {invalid.Count} 个非法算子。",
             AgentRunEventStatuses.Completed,
             new
             {

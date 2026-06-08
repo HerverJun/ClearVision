@@ -76,14 +76,14 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "plan_generation",
                 "plan_snapshot_loader",
-                "Load PlanSnapshot, planHash, selections, defaults, current flow, template, attachment, and Station boundary metadata.",
+                "加载 PlanSnapshot、planHash、选择项、默认值、当前流程、模板、附件和工站边界元数据。",
                 _ => Task.FromResult(_contextLoader.Load(request, build, plan, publicWarnings)),
                 cancellationToken);
             _eventSink?.StageCompleted(
                 runId,
                 "assumption_confirmation",
-                "Assumptions confirmed",
-                "Build Mode received structured selections and accepted defaults.",
+                "假设已确认",
+                "构建模式已收到结构化选择和已接受默认值。",
                 new
                 {
                     acceptedRecommendedDefaults = loadPlan.Payload.AcceptedRecommendedDefaults,
@@ -98,14 +98,14 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "resolve_build_intent",
                 "build_intent_resolver",
-                "Resolve whether Build is new, modify, explain, complete parameters, or refactor.",
+                "解析本次构建是新建、修改、解释、补全参数还是重构。",
                 _ => Task.FromResult(_intentResolver.Resolve(request, build, loadPlan.Payload)),
                 cancellationToken);
             _eventSink?.StageCompleted(
                 runId,
                 "requirement_parsing",
-                "Requirement parsing complete",
-                "Structured plan, selections, and metadata-only context are ready for Build tools.",
+                "需求解析完成",
+                "结构化计划、选择项和仅元数据上下文已准备好交给构建工具。",
                 new
                 {
                     buildIntent = intent.Payload.BuildIntent,
@@ -132,7 +132,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "operator_pipeline",
                 "operator_pipeline_selector",
-                "Select and repair the operator pipeline from Plan route, template strategy, and operator catalog.",
+                "根据计划路线、模板策略和算子目录选择并修复算子链。",
                 _ => Task.FromResult(_pipelineSelector.Select(loadPlan.Payload, template.Payload, publicWarnings)),
                 cancellationToken);
 
@@ -141,7 +141,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "parameter_mapping",
                 "parameter_mapper",
-                "Map user selections and accepted defaults into operator parameters while keeping unknown resources pending.",
+                "将用户选择和已接受默认值映射到算子参数，并保持未知资源待确认。",
                 _ => Task.FromResult(_parameterMapper.Map(loadPlan.Payload, pipeline.Payload)),
                 cancellationToken);
 
@@ -150,7 +150,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "workflow_draft",
                 "workflow_drafter",
-                "Generate or modify an editable workflow draft under Plan constraints.",
+                "在计划约束下生成或修改可编辑工作流草稿。",
                 async ct => await _workflowDraftBuilder.DraftAsync(
                     request,
                     loadPlan.Payload,
@@ -167,7 +167,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 toolContext,
                 "validate_schema",
                 "validate_flow",
-                "Validate workflow schema, connections, known ports, operator catalog, and missing resource placeholders.",
+                "校验流程结构、连线、已知端口、算子目录和缺失资源占位。",
                 new
                 {
                     flow = draft.Payload.WorkflowDraft,
@@ -184,7 +184,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                     evidence,
                     "repair_loop",
                     "auto_repair_once",
-                    "Attempt one automatic repair for validation, dry-run, or readiness issues that are safe to fix.",
+                    "对可安全修复的校验、预演或就绪问题尝试一次自动修复。",
                     _ => Task.FromResult(_workflowDraftBuilder.Repair(currentDraft, pipeline.Payload, parameterMapping.Payload)),
                     cancellationToken);
                 currentDraft = repair.Payload.Draft;
@@ -196,7 +196,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                     toolContext,
                     "validate_schema",
                     "validate_flow",
-                    "Re-run schema validation after automatic repair.",
+                    "自动修复后重新执行结构校验。",
                     new
                     {
                         flow = currentDraft.WorkflowDraft,
@@ -212,7 +212,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 toolContext,
                 "metadata_dry_run",
                 "dryrun_flow",
-                "Run metadata-only dry-run for topology, IO, parameter completeness, and runtime boundaries.",
+                "对拓扑、IO、参数完整性和运行边界执行仅元数据预演。",
                 new
                 {
                     flow = currentDraft.WorkflowDraft,
@@ -227,7 +227,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 toolContext,
                 "package_readiness",
                 "runtime_package_precheck",
-                "Check runtime package readiness without creating packages, loading files, or touching Station resources.",
+                "在不创建运行包、不加载文件、不触碰工站资源的前提下检查运行包就绪。",
                 new
                 {
                     flow = currentDraft.WorkflowDraft,
@@ -243,7 +243,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "station_compatibility",
                 "station_compatibility_checker",
-                "Check Station/PLC/Camera compatibility as metadata-only boundaries.",
+                "按仅元数据边界检查工站、PLC 和相机兼容性。",
                 _ => Task.FromResult(_readinessReview.BuildStationCompatibility(loadPlan.Payload, packageReadiness.Payload)),
                 cancellationToken,
                 AgentRunEventTypes.StationCompatibilityCompleted);
@@ -253,7 +253,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "operator_contract",
                 "operator_contract_checker",
-                "Check operator catalog contracts and repaired operator choices.",
+                "检查算子目录契约和已修复的算子选择。",
                 _ => Task.FromResult(_readinessReview.BuildOperatorContractReport(pipeline.Payload, validation.Payload)),
                 cancellationToken,
                 AgentRunEventTypes.OperatorContractCompleted);
@@ -263,7 +263,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "release_review",
                 "release_review_gate",
-                "Separate canvas Apply readiness from runtime draft and deployment readiness.",
+                "区分画布应用就绪、运行草稿就绪和部署就绪。",
                 _ => Task.FromResult(_readinessReview.BuildReleaseReview(validation.Payload, dryRun.Payload, packageReadiness.Payload, parameterMapping.Payload)),
                 cancellationToken,
                 AgentRunEventTypes.ReleaseReviewCompleted);
@@ -273,7 +273,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "workflow_diff",
                 "workflow_diff_builder",
-                "Summarize added, modified, preserved, removed, pending, repaired, and deployment-blocked workflow items.",
+                "汇总新增、修改、保留、移除、待确认、已修复和部署阻断的流程项。",
                 _ => Task.FromResult(_workflowDiffService.Build(loadPlan.Payload, currentDraft, parameterMapping.Payload, validation.Payload, packageReadiness.Payload, autoRepairs)),
                 cancellationToken);
 
@@ -282,7 +282,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 evidence,
                 "apply_gate",
                 "apply_gate_resolver",
-                "Resolve Canvas Apply Ready, Runtime Draft Ready, Deployment Ready, or Blocked.",
+                "解析画布可应用、运行草稿就绪、部署就绪或阻断状态。",
                 _ => Task.FromResult(_applyGateResolver.Build(validation.Payload, dryRun.Payload, packageReadiness.Payload, workflowDiff.Payload)),
                 cancellationToken);
 

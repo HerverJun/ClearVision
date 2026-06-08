@@ -105,8 +105,8 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
     {
         var events = new List<VisionAgentPlanPublicEvent>
         {
-            Event("collecting_context", "completed", "Context collected",
-                "Collected public requirement, flow, template, attachment, operator, and Station boundary metadata.",
+            Event("collecting_context", "completed", "上下文收集完成",
+                "已收集公开需求、流程、模板、附件、算子和工站边界元数据。",
                 new()
                 {
                     ["hasCurrentFlow"] = ruleBaseline.ContextSummary.HasCurrentFlow.ToString().ToLowerInvariant(),
@@ -121,7 +121,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                 ruleBaseline,
                 "planner_disabled",
                 events,
-                "Planner completion is disabled; using rule fallback plan.");
+                "Planner 生成未启用，已使用规则兜底方案。");
         }
 
         try
@@ -129,8 +129,8 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
             var prompt = _promptComposer.Compose(request, ruleBaseline, _options);
-            events.Add(Event("planning_with_model", "started", "Planning with model",
-                "Planner model is generating a structured PlanModeResult candidate.",
+            events.Add(Event("planning_with_model", "started", "模型规划已开始",
+                "模型正在生成结构化 PlanModeResult 候选。",
                 new()
                 {
                     ["modelRole"] = _options.ModelRole,
@@ -139,22 +139,22 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             var completion = await _completionSource.CompleteAsync(
                 new VisionAgentPlanCompletionRequest(prompt.SystemPrompt, prompt.Messages, _options.ModelRole),
                 timeout.Token);
-            events.Add(Event("planning_with_model", "completed", "Planner candidate returned",
-                "Planner returned a public structured candidate for validation."));
+            events.Add(Event("planning_with_model", "completed", "模型规划候选已返回",
+                "模型已返回公开结构化候选，等待校验。"));
 
-            events.Add(Event("validating_plan_contract", "started", "Validating plan contract",
-                "Validating JSON shape, question quality, operator catalog, and template constraints."));
+            events.Add(Event("validating_plan_contract", "started", "校验规划契约",
+                "正在校验 JSON 结构、问题质量、算子目录和模板约束。"));
             var candidate = ParseCandidate(completion);
             var repaired = RepairCandidate(candidate, request, ruleBaseline, out var repairNotes, out var warnings);
-            events.Add(Event("validating_plan_contract", "completed", "Plan contract valid",
-                "Planner plan was normalized to the public PlanModeResult contract.",
+            events.Add(Event("validating_plan_contract", "completed", "规划契约已校验",
+                "模型规划已归一到公开 PlanModeResult 契约。",
                 new()
                 {
                     ["repairCount"] = repairNotes.Count.ToString(),
                     ["warningCount"] = warnings.Count.ToString()
                 }));
-            events.Add(Event("applying_safety_constraints", "completed", "Safety constraints applied",
-                "Redaction, metadata-only boundaries, resource placeholders, and PLC safety policy were applied."));
+            events.Add(Event("applying_safety_constraints", "completed", "安全约束已应用",
+                "已应用脱敏、元数据边界、资源占位和 PLC 安全策略。"));
 
             var result = repaired with
             {
@@ -162,8 +162,8 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                 FallbackReason = string.Empty,
                 PlanWarnings = warnings,
                 ContractRepairNotes = repairNotes,
-                PublicEvents = [.. events, Event("plan_ready", "completed", "Plan ready",
-                    "Planner-sourced PlanModeResult is ready for user confirmation.")],
+                PublicEvents = [.. events, Event("plan_ready", "completed", "规划已就绪",
+                    "Planner 规划已就绪，等待用户确认。")],
                 MetadataOnly = true
             };
             return result with
@@ -177,7 +177,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                 ruleBaseline,
                 "planner_timeout",
                 events,
-                "Planner timed out; using rule fallback plan.");
+                "Planner 超时，已使用规则兜底方案。");
         }
         catch (Exception ex)
         {
@@ -188,7 +188,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                 ruleBaseline,
                 "planner_failed",
                 events,
-                "Planner failed contract generation; using rule fallback plan.");
+                "Planner 生成失败，已使用规则兜底方案。");
         }
     }
 
@@ -291,10 +291,10 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             PublicEvents =
             [
                 .. events,
-                Event("rule_fallback_used", "completed", "Rule fallback used", summary,
+                Event("rule_fallback_used", "completed", "已启用规则兜底", summary,
                     new() { ["fallbackReason"] = reason }),
-                Event("plan_ready", "completed", "Fallback plan ready",
-                    "Rule fallback PlanModeResult is ready for user confirmation.")
+                Event("plan_ready", "completed", "兜底规划已就绪",
+                    "规则兜底规划已就绪，等待用户确认。")
             ],
             MetadataOnly = true
         };
@@ -379,11 +379,11 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
         return question with
         {
             Id = SafeIdentifier(question.Id, "clarification"),
-            Title = FallbackText(question.Title, "Clarification question"),
-            Why = FallbackText(question.Why, "This affects operator chain, parameters, or release readiness."),
+            Title = FallbackText(question.Title, "关键澄清问题"),
+            Why = FallbackText(question.Why, "这会影响算子链、参数或发布就绪。"),
             DefaultValue = FallbackText(question.DefaultValue, recommended),
-            DefaultAssumption = FallbackText(question.DefaultAssumption, "Use the recommended option as a metadata-only default."),
-            Impact = FallbackText(question.Impact, "Changing this option changes Build assumptions."),
+            DefaultAssumption = FallbackText(question.DefaultAssumption, "使用推荐选项作为仅元数据默认值。"),
+            Impact = FallbackText(question.Impact, "修改该选项会改变构建假设。"),
             Options = options
         };
     }
@@ -409,9 +409,9 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             defaults.Insert(0, new VisionAgentDefaultAssumption
             {
                 Id = "metadata_only",
-                Label = "Public diagnostics only",
+                Label = "仅公开诊断",
                 Value = "redacted_metadata",
-                Impact = "No raw paths, image bytes, tokens, prompts, or Station network details are exposed."
+                Impact = "不会暴露原始路径、图像字节、令牌、提示词或工站网络细节。"
             });
             repairNotes.Add("metadata_only_default_added");
         }

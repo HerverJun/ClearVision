@@ -35,11 +35,23 @@ public sealed class ApplyGateResolver
         };
         return VisionAgentBuildSupport.StepResult(
             gate,
-            $"Apply gate resolved as {gate.Status}.",
+            $"应用门禁已解析为 {DisplayGateStatus(gate.Status)}。",
             canvasReady ? AgentRunEventStatuses.Completed : AgentRunEventStatuses.Blocked,
             gate,
             warningCode: deploymentReady ? string.Empty : "deployment_not_ready",
             applyImpact: canvasReady ? "editable_draft_allowed" : "blocked",
             deploymentImpact: deploymentReady ? "deployment_ready" : "deployment_blocked");
+    }
+
+    private static string DisplayGateStatus(string status)
+    {
+        return status switch
+        {
+            "blocked" => "已阻断",
+            "deployment_ready" => "部署就绪",
+            "runtime_draft_ready" => "运行草稿就绪",
+            "canvas_apply_ready" => "画布可应用",
+            _ => status
+        };
     }
 }

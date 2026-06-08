@@ -38,7 +38,7 @@ public sealed class BuildIntentResolver
 
         return VisionAgentBuildSupport.StepResult(
             new BuildIntentResolution(candidate),
-            $"Build intent resolved as {candidate}.",
+            $"构建意图已解析为 {DisplayBuildIntent(candidate)}。",
             AgentRunEventStatuses.Completed,
             new
             {
@@ -49,5 +49,18 @@ public sealed class BuildIntentResolver
             },
             applyImpact: "editable_draft_allowed",
             deploymentImpact: "no_deployment_blocker");
+    }
+
+    private static string DisplayBuildIntent(string value)
+    {
+        return value switch
+        {
+            "new" => "新建流程",
+            "modify" => "修改现有流程",
+            "explain" => "解释流程",
+            "review_pending_parameters" => "复核待确认参数",
+            "refactor" => "重构流程",
+            _ => value
+        };
     }
 }

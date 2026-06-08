@@ -48,7 +48,7 @@ public sealed class WorkflowDraftBuilder
             canonical.AddedNodeIds);
         return VisionAgentBuildSupport.StepResult(
             resolution,
-            $"Workflow draft produced with {pipeline.Steps.Count} planned operator(s).",
+            $"工作流草稿已生成，包含 {pipeline.Steps.Count} 个计划算子。",
             generation.Success || canvasFlow.Operators.Count > 0
                 ? AgentRunEventStatuses.Completed
                 : AgentRunEventStatuses.Failed,
@@ -76,7 +76,7 @@ public sealed class WorkflowDraftBuilder
         {
             Stage = "validate_schema",
             RepairReason = "validation_or_dryrun_blocking_issue",
-            DiffSummary = "Rebuilt metadata-only draft connections from the repaired operator pipeline.",
+            DiffSummary = "已根据修复后的算子链重建仅元数据草稿连线。",
             ResultStatus = "repaired",
             MetadataOnly = true
         };
@@ -88,7 +88,7 @@ public sealed class WorkflowDraftBuilder
         };
         return VisionAgentBuildSupport.StepResult(
             new RepairDraftResolution(nextDraft, record),
-            "One automatic repair rebuilt draft connections from the operator pipeline.",
+            "已根据算子链自动重建一次草稿连线。",
             AgentRunEventStatuses.Completed,
             new
             {

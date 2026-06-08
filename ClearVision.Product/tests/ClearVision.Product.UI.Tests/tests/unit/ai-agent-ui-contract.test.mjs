@@ -472,6 +472,8 @@ function backendPlanResult(overrides = {}) {
     goal: overrides.goal || 'detect metal scratches',
     intent: overrides.intent || 'surface_defect',
     confidence: overrides.confidence || 'high',
+    planSource: overrides.planSource || 'rule_fallback',
+    fallbackReason: overrides.fallbackReason || 'planner_failed',
     requirementUnderstanding: ['Inspection intent: surface defect inspection.'],
     recommendedRoute: {
       routeId: 'surface_defect_detection',
@@ -493,8 +495,22 @@ function backendPlanResult(overrides = {}) {
             value: 'scratch_or_blob',
             label: 'Scratch/blob',
             recommended: true,
-            description: 'Use visible surface defect candidates.',
+            description: 'Use general surface defect candidates.',
             impact: 'Good first draft.'
+          },
+          {
+            value: 'crack',
+            label: 'Crack',
+            recommended: false,
+            description: 'Emphasize thin dark/bright crack-like defects.',
+            impact: 'Needs contrast assumptions.'
+          },
+          {
+            value: 'dent_or_stain',
+            label: 'Dent/stain',
+            recommended: false,
+            description: 'Look for dents, stain, or discoloration.',
+            impact: 'Needs lighting/sample confirmation.'
           }
         ]
       }
@@ -512,7 +528,37 @@ function backendPlanResult(overrides = {}) {
     executablePlan: ['Map parameters and run readiness checks.'],
     canBuild: true,
     blockingReasons: [],
-    nextAction: '开始构建。',
+    nextAction: 'Accept recommended defaults, then start Build.',
+    publicEvents: overrides.publicEvents ?? [
+      {
+        stage: 'collecting_context',
+        status: 'completed',
+        title: 'Context collected',
+        summary: 'collecting_context completed',
+        metadataOnly: true
+      },
+      {
+        stage: 'planning_with_model',
+        status: 'started',
+        title: 'Planning with model',
+        summary: 'planning_with_model started',
+        metadataOnly: true
+      },
+      {
+        stage: 'rule_fallback_used',
+        status: 'completed',
+        title: 'Rule fallback used',
+        summary: 'rule_fallback_used completed',
+        metadataOnly: true
+      },
+      {
+        stage: 'plan_ready',
+        status: 'completed',
+        title: 'Plan ready',
+        summary: 'plan_ready completed',
+        metadataOnly: true
+      }
+    ],
     contextSummary: {
       hasCurrentFlow: false,
       hasCurrentResult: false,
@@ -1094,9 +1140,26 @@ test('Plan Mode captures vague inspection request without starting Build', async
     scenarioKey: 'scratch'
   });
   assert.equal(panel.pendingVisionPlan.goal, 'metal scratch inspection workflow');
+  assert.match(overview.innerHTML, /高/);
+  assert.match(overview.innerHTML, /规则兜底/);
   assert.match(plan.innerHTML, /关键问题/);
+  assert.match(plan.innerHTML, /规则兜底/);
+  assert.match(plan.innerHTML, /Planner 生成失败/);
+  assert.match(plan.innerHTML, /上下文收集完成/);
+  assert.match(plan.innerHTML, /模型规划已开始/);
+  assert.match(plan.innerHTML, /规划已就绪/);
+  assert.match(plan.innerHTML, /缺陷判定标准是什么/);
+  assert.match(plan.innerHTML, /划痕\/斑点/);
+  assert.match(plan.innerHTML, /通用表面缺陷候选区域/);
+  assert.match(plan.innerHTML, /裂纹/);
+  assert.match(plan.innerHTML, /凹痕\/污渍/);
+  assert.match(plan.innerHTML, /阈值需要结合样品确认/);
   assert.match(plan.innerHTML, /按推荐方案开始构建/);
   assert.doesNotMatch(plan.innerHTML, /Clarifying Questions|Accept Recommended and Build|Plan Mode/);
+  assert.doesNotMatch([
+    overview.innerHTML,
+    plan.innerHTML
+  ].join('\n'), /Accept recommended defaults|rule_fallback|\bplanner_failed\b|collecting_context completed|What should count as a defect|Defect definition controls|Scratch\/blob|Use general surface defect candidates|Good first draft|>Crack<|Dent\/stain|Thresholds need sample confirmation/);
   assert.doesNotMatch(plan.innerHTML, /setTimeout/);
 });
 
@@ -1225,40 +1288,43 @@ test('BuildResult replay payload renders Build Workspace and apply gate without 
   panel._renderBuildWorkspaceFromAgentRun();
 
   const timelineHtml = elements['#ai-build-event-timeline'].innerHTML;
-  for (const stage of [
-    'plan_generation',
-    'template_strategy',
-    'operator_pipeline',
-    'parameter_mapping',
-    'workflow_draft',
-    'validate_schema',
-    'metadata_dry_run',
-    'package_readiness',
-    'workflow_diff',
-    'apply_gate'
+  for (const label of [
+    '生成计划',
+    '模板策略',
+    '算子链',
+    '参数映射',
+    '流程草稿',
+    '结构校验',
+    '元数据预演',
+    '运行包就绪',
+    '流程差异',
+    '应用门禁'
   ]) {
-    assert.match(timelineHtml, new RegExp(stage));
+    assert.match(timelineHtml, new RegExp(label));
   }
-  assert.match(timelineHtml, /validate_schema_tool/);
-  assert.match(timelineHtml, /deployment_resource_pending/);
+  assert.match(timelineHtml, /结构校验工具/);
+  assert.match(timelineHtml, /部署资源待绑定/);
   assert.match(timelineHtml, /15 ms/);
-  assert.match(elements['#ai-build-operator-chain'].innerHTML, /SurfaceDefectDetection/);
-  assert.match(elements['#ai-build-operator-chain'].innerHTML, /template_skeleton/);
-  assert.match(elements['#ai-build-operator-chain'].innerHTML, /invalid operator was repaired/);
-  assert.match(elements['#ai-build-parameters'].innerHTML, /op_detect\.ModelId/);
-  assert.match(elements['#ai-build-parameters'].innerHTML, /missing_resource \/ pending/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /表面缺陷检测/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /模板骨架/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /非法算子已修复/);
+  assert.match(elements['#ai-build-parameters'].innerHTML, /模型资源/);
+  assert.match(elements['#ai-build-parameters'].innerHTML, /缺失资源 \/ 待确认/);
   assert.match(elements['#ai-build-checks'].innerHTML, /画布：可应用/);
   assert.match(elements['#ai-build-checks'].innerHTML, /运行草稿：就绪/);
   assert.match(elements['#ai-build-checks'].innerHTML, /部署：阻断/);
-  assert.match(elements['#ai-build-checks'].innerHTML, /model_resource metadata/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /模型资源/);
   assert.match(elements['#ai-build-final-draft'].innerHTML, /可编辑草稿已就绪/);
   assert.match(elements['#ai-build-final-draft'].innerHTML, /流程差异/);
   assert.match(elements['#ai-build-final-draft'].innerHTML, /保留节点/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /模型资源/);
   assert.doesNotMatch([
     timelineHtml,
+    elements['#ai-build-operator-chain'].innerHTML,
+    elements['#ai-build-parameters'].innerHTML,
     elements['#ai-build-checks'].innerHTML,
     elements['#ai-build-final-draft'].innerHTML
-  ].join('\n'), /Tool Evidence|Workflow Diff|Apply Gate|Editable draft ready|Canvas: ready|Runtime draft|Deployment: blocked/);
+  ].join('\n'), /Tool Evidence|Workflow Diff|Apply Gate|Editable draft ready|Canvas: ready|Runtime draft|Deployment: blocked|validate_schema_tool|deployment_resource_pending|SurfaceDefectDetection|template_skeleton|invalid operator was repaired|missing_resource \/ pending|model_resource metadata/);
   assertNoSensitiveLeak([
     timelineHtml,
     elements['#ai-build-operator-chain'].innerHTML,

@@ -29,8 +29,8 @@ public sealed class BuildReadinessReviewService
         return VisionAgentBuildSupport.StepResult(
             new StationCompatibilityResolution(report),
             missing > 0 || blocking > 0
-                ? "Station compatibility is metadata-safe for canvas Apply; deployment remains blocked."
-                : "Station compatibility metadata check passed.",
+                ? "工站兼容性对画布应用是仅元数据安全的；部署仍保持阻断。"
+                : "工站兼容性元数据检查通过。",
             AgentRunEventStatuses.Completed,
             report,
             warningCode: missing > 0 || blocking > 0 ? "station_deployment_blocked" : string.Empty,
@@ -56,8 +56,8 @@ public sealed class BuildReadinessReviewService
         return VisionAgentBuildSupport.StepResult(
             new OperatorContractResolution(report),
             invalid.Count == 0
-                ? "Operator contract check used catalog-backed operators."
-                : "Operator contract check removed invalid operators before draft validation.",
+                ? "算子契约检查使用了目录支持的算子。"
+                : "算子契约检查已在草稿校验前移除非法算子。",
             AgentRunEventStatuses.Completed,
             report,
             warningCode: invalid.Count > 0 ? "operator_contract_repaired" : string.Empty,
@@ -90,8 +90,8 @@ public sealed class BuildReadinessReviewService
         return VisionAgentBuildSupport.StepResult(
             new ReleaseReviewResolution(report),
             deploymentReady
-                ? "Release review marks the draft deployment-ready."
-                : "Release review allows canvas Apply but blocks deployment until pending metadata is resolved.",
+                ? "发布复核标记该草稿已部署就绪。"
+                : "发布复核允许画布应用，但会在待确认元数据解决前阻断部署。",
             AgentRunEventStatuses.Completed,
             report,
             warningCode: deploymentReady ? string.Empty : "deployment_not_ready",

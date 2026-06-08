@@ -68,7 +68,7 @@ public sealed class VisionAgentPlanPlannerTests
 
         result.PlanSource.Should().Be("rule_fallback");
         result.FallbackReason.Should().Be("planner_failed");
-        result.PlanWarnings.Should().Contain(item => item.Contains("fallback", StringComparison.OrdinalIgnoreCase));
+        result.PlanWarnings.Should().Contain(item => item.Contains("规则兜底", StringComparison.OrdinalIgnoreCase));
         result.PublicEvents.Should().Contain(evt => evt.Stage == "rule_fallback_used");
         result.MetadataOnly.Should().BeTrue();
     }

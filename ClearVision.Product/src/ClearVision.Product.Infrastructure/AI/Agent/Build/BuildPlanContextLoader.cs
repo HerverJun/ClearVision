@@ -32,8 +32,8 @@ public sealed class BuildPlanContextLoader
             _eventSink?.StageCompleted(
                 request.AgentRunId,
                 "plan_hash_validation",
-                "Plan hash mismatch detected",
-                "Build is continuing with the public plan snapshot; review plan provenance before applying.",
+                "计划哈希不一致",
+                "构建会继续使用公开计划快照；应用前请复核计划来源。",
                 new
                 {
                     warningCode = "plan_hash_mismatch",
@@ -76,8 +76,8 @@ public sealed class BuildPlanContextLoader
         return VisionAgentBuildSupport.StepResult(
             payload,
             hashMismatch
-                ? "Plan loaded with plan_hash_mismatch warning."
-                : "Plan snapshot and structured BuildFromPlan context loaded.",
+                ? "计划已加载，并带有 plan_hash_mismatch 警告。"
+                : "计划快照和结构化 BuildFromPlan 上下文已加载。",
             AgentRunEventStatuses.Completed,
             new
             {

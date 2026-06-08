@@ -58,18 +58,26 @@ const BUILD_STAGE_LABELS = {
     workflow_diff: '流程差异',
     apply_gate: '应用门禁',
     artifact: '结果产物',
-    run: '运行'
+    run: '运行',
+    collecting_context: '收集上下文',
+    planning_with_model: '模型规划',
+    rule_fallback_used: '启用规则兜底',
+    plan_ready: '规划就绪',
+    validating_plan_contract: '校验规划契约',
+    applying_safety_constraints: '应用安全约束'
 };
 
 const AI_DISPLAY_TEXT_MAP = {
     'Accept recommended defaults, then start Build.': '可接受推荐默认值，然后开始构建。',
     'Accept recommended defaults or answer questions, then start Build.': '可接受推荐默认值或回答关键问题，然后开始构建。',
     'Accept recommended defaults and Build.': '接受推荐默认值并开始构建。',
+    'Describe the inspection target before Build can start.': '请先描述检测目标，再开始构建。',
     'Surface defect inspection route': '表面缺陷检测路线',
     'Detect visible scratches and blobs.': '检测可见划痕、斑点等表面缺陷。',
     'Inspection intent: surface defect inspection.': '需求意图：表面缺陷检测。',
     'What should count as a defect?': '缺陷判定标准是什么？',
     'Defect definition controls thresholds and judgment.': '缺陷定义会影响阈值和判定逻辑。',
+    'Thresholds depend on defect definition.': '阈值取决于缺陷定义。',
     'Scratch/blob': '划痕/斑点',
     'Use general surface defect candidates.': '使用通用表面缺陷候选区域。',
     'Good first draft.': '适合作为初始草稿。',
@@ -83,15 +91,47 @@ const AI_DISPLAY_TEXT_MAP = {
     'Thresholds need sample confirmation.': '阈值需要结合样品确认。',
     'Thresholds need representative images.': '阈值需要代表性图像确认。',
     'Detect visible scratches/blobs and judge by area/contrast.': '检测可见划痕/斑点，并按面积和对比度判定。',
+    'Use selected template first.': '优先使用已选模板。',
+    'Missing resources stay pending': '缺失资源保持待确认',
+    'No resource path is guessed.': '不会猜测资源路径。',
+    'Workflow draft contains acquisition, inspection, judgment, and output stages.': '流程草稿包含采集、检测、判定和输出阶段。',
+    'Map parameters and run readiness checks.': '映射参数并运行就绪检查。',
     'Context collected': '已收集工程上下文',
+    'Collected public requirement, flow, template, attachment, operator, and Station boundary metadata.': '已收集公开需求、流程、模板、附件、算子和工站边界元数据。',
+    'collecting_context completed': '上下文收集完成',
+    'planning_with_model started': '模型规划已开始',
+    'rule_fallback_used completed': '已启用规则兜底',
+    'plan_ready completed': '规划已就绪',
     'Rule fallback used': '已启用规则兜底',
+    'Fallback plan ready': '兜底规划已就绪',
+    'Rule fallback PlanModeResult is ready for user confirmation.': '规则兜底规划已就绪，等待用户确认。',
+    'Planner completion is disabled; using rule fallback plan.': 'Planner 生成未启用，已使用规则兜底方案。',
+    'Planner failed contract generation; using rule fallback plan.': 'Planner 生成失败，已使用规则兜底方案。',
+    'Planner timed out; using rule fallback plan.': 'Planner 超时，已使用规则兜底方案。',
     'Plan ready': '规划已就绪',
     'Planner started': '规划器已开始',
+    'Planning with model': '模型规划中',
+    'Planner model is generating a structured PlanModeResult candidate.': '模型正在生成结构化规划候选。',
+    'Planner candidate returned': '模型规划候选已返回',
+    'Planner returned a public structured candidate for validation.': '模型已返回公开结构化候选，等待校验。',
+    'Validating plan contract': '校验规划契约',
+    'Validating JSON shape, question quality, operator catalog, and template constraints.': '正在校验 JSON 结构、问题质量、算子目录和模板约束。',
+    'Plan contract valid': '规划契约已校验',
+    'Planner plan was normalized to the public PlanModeResult contract.': '模型规划已归一到公开 PlanModeResult 契约。',
+    'Safety constraints applied': '安全约束已应用',
+    'Redaction, metadata-only boundaries, resource placeholders, and PLC safety policy were applied.': '已应用脱敏、元数据边界、资源占位和 PLC 安全策略。',
+    'Planner-sourced PlanModeResult is ready for user confirmation.': 'Planner 规划已就绪，等待用户确认。',
     'Run completed': '运行已完成',
     'Build completed.': '构建完成。',
     'Build completed with public metadata.': '已使用公开元数据完成构建。',
     'Validated draft metadata.': '流程草稿元数据已校验。',
     'Tool completed.': '工具执行完成。',
+    'Editable draft ready': '可编辑草稿已就绪',
+    'Deployment blocked': '部署已阻断',
+    'Deployment blocked by missing resources.': '部署因缺失资源被阻断。',
+    'Canvas: ready': '画布：可应用',
+    'Runtime draft': '运行草稿',
+    'Deployment: blocked': '部署：阻断',
     'invalid operator was repaired': '非法算子已修复',
     'NG when scratch candidate exceeds pending threshold.': '当划痕候选超过待确认阈值时判为 NG。',
     'Bind model_resource metadata before deployment.': '部署前绑定模型资源元数据。',
@@ -100,6 +140,7 @@ const AI_DISPLAY_TEXT_MAP = {
 
 const AI_CODE_TEXT_MAP = {
     rule_fallback: '规则兜底',
+    rule_baseline: '规则基线',
     planner: 'Planner 规划',
     model_planner: '模型规划',
     llm_planner: '模型规划',
@@ -119,12 +160,20 @@ const AI_CODE_TEXT_MAP = {
     cancelled: '已取消',
     canceled: '已取消',
     pending: '等待中',
+    file: '文件',
+    camera: '相机',
+    true: '是',
+    false: '否',
     template_skeleton: '模板骨架',
     plan_route: '规划路线',
     catalog_required: '目录必需',
     accepted_default: '已接受默认值',
+    selected: '已选择',
     plan_default: '规划默认值',
     missing_resource: '缺失资源',
+    pending_parameters: '待确认参数',
+    redacted_metadata: '脱敏元数据',
+    allow_editable_draft_when_not_deploy_ready: '部署未就绪时仍允许编辑草稿',
     mapped: '已映射',
     template_fill: '模板填充',
     template_adapt: '模板适配',
@@ -167,6 +216,7 @@ const AI_PARAMETER_LABELS = {
     CameraId: '相机绑定',
     CameraBindingId: '相机绑定',
     OutputChannelId: '输出通道',
+    Channel: '输出通道',
     SourceType: '采集源',
     FilePath: '图像文件'
 };
@@ -513,6 +563,12 @@ export const aiPanelAgentWorkspaceMixin = {
         if (AI_OPERATOR_LABELS[text]) return AI_OPERATOR_LABELS[text];
         if (AI_PARAMETER_LABELS[text]) return AI_PARAMETER_LABELS[text];
 
+        const evidenceMatch = text.match(/^([a-z][a-z0-9_]*) completed with metadata-only public evidence\.$/i);
+        if (evidenceMatch) {
+            const stageLabel = BUILD_STAGE_LABELS[evidenceMatch[1]] || this._localizeDisplayText(evidenceMatch[1]);
+            return `${stageLabel}已完成，已生成公开元数据证据。`;
+        }
+
         return text
             .replace(/\bImageAcquisition\b/g, AI_OPERATOR_LABELS.ImageAcquisition)
             .replace(/\bSurfaceDefectDetection\b/g, AI_OPERATOR_LABELS.SurfaceDefectDetection)
@@ -534,6 +590,8 @@ export const aiPanelAgentWorkspaceMixin = {
             .replace(/\bcamera_binding\b/g, '相机绑定')
             .replace(/\boutput_channel\b/g, '输出通道')
             .replace(/<pending-model-resource>/g, '<待绑定模型资源>')
+            .replace(/<pending-output-channel>/g, '<待绑定输出通道>')
+            .replace(/metadata-only/gi, '仅元数据')
             .replace(/\bpending\b/g, '待确认')
             .replace(/\bcompleted\b/g, '已完成')
             .replace(/\bblocked\b/g, '已阻断');
@@ -553,13 +611,17 @@ export const aiPanelAgentWorkspaceMixin = {
         const stageLabel = BUILD_STAGE_LABELS[stage] || this._localizeDisplayText(stage);
         const statusLabel = this._formatBuildStatus(status);
         const rawSummary = evt.summary || evt.Summary || evt.title || evt.Title || '';
-        const summary = this._localizeDisplayText(rawSummary) || `${stageLabel}${statusLabel}`;
+        const codedSummary = this._localizeDisplayText(`${stage} ${status}`);
+        const summary = codedSummary && codedSummary !== `${stage} ${status}`
+            ? codedSummary
+            : (this._localizeDisplayText(rawSummary) || `${stageLabel}${statusLabel}`);
         return { stageLabel, statusLabel, summary };
     },
 
     _formatToolName(value) {
         const text = String(value || '').trim();
         if (!text) return '工具步骤';
+        const normalized = text.toLowerCase();
         const map = {
             match_flow_template: '模板匹配',
             get_flow_template_skeleton: '获取模板骨架',
@@ -575,7 +637,12 @@ export const aiPanelAgentWorkspaceMixin = {
             workflow_diff: '流程差异',
             apply_gate: '应用门禁'
         };
-        return map[text] || this._localizeDisplayText(text);
+        if (map[normalized]) return map[normalized];
+        if (normalized.endsWith('_tool')) {
+            const stage = normalized.slice(0, -5);
+            return `${BUILD_STAGE_LABELS[stage] || this._localizeDisplayText(stage)}工具`;
+        }
+        return this._localizeDisplayText(text);
     },
 
     _formatOperatorType(value) {
@@ -591,10 +658,26 @@ export const aiPanelAgentWorkspaceMixin = {
     _formatResourceReference(value) {
         const text = String(value || '').trim();
         if (!text) return '';
-        return text
-            .split('.')
-            .map(part => this._formatParameterName(this._localizeDisplayText(part)))
-            .join('.');
+        const parts = text.split('.').filter(Boolean);
+        if (parts.length > 1) {
+            const first = parts[0];
+            const last = parts[parts.length - 1];
+            const parameterLabel = this._formatParameterName(last);
+            if (/^op[_-]/i.test(first)) {
+                return parameterLabel;
+            }
+            return `${this._formatOperatorType(first)}.${parameterLabel}`;
+        }
+        return this._formatParameterName(this._localizeDisplayText(text));
+    },
+
+    _formatWorkflowDiffValue(value, kind = '') {
+        const text = String(value || '').trim();
+        if (!text) return '';
+        if (kind === 'pending' || kind === 'blocker' || text.includes('.')) {
+            return this._formatResourceReference(text);
+        }
+        return this._localizeDisplayText(text);
     },
 
     _renderAgentWorkspaceOverview() {
@@ -713,7 +796,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-plan-route">
                     <strong>${this._escapeHtml(plan.route.title)}</strong>
                     <span>${this._escapeHtml(plan.route.summary)}</span>
-                    <div class="ai-plan-chain">${plan.route.operators.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>
+                    <div class="ai-plan-chain">${plan.route.operators.map(op => `<span title="${this._escapeHtml(this._formatOperatorType(op))}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>
                 </div>
             </section>
             <section class="ai-workspace-section">
@@ -1130,9 +1213,9 @@ export const aiPanelAgentWorkspaceMixin = {
             return `
                 <div class="ai-plan-chain">
                     ${pipeline.map(item => `<span title="${this._escapeHtml([
-                        item.source || item.Source || '',
-                        item.repairNote || item.RepairNote || '',
-                        item.status || item.Status || ''
+                        this._localizeDisplayText(item.source || item.Source || ''),
+                        this._localizeDisplayText(item.repairNote || item.RepairNote || ''),
+                        this._formatBuildStatus(item.status || item.Status || '')
                     ].filter(Boolean).join(' / '))}">${this._escapeHtml(this._formatOperatorType(item.operatorType || item.OperatorType || ''))}</span>`).join('')}
                 </div>
                 ${pipeline.slice(0, 8).map(item => {
@@ -1160,10 +1243,10 @@ export const aiPanelAgentWorkspaceMixin = {
             if (!planOps.length) {
                 return '<div class="ai-followup-empty">流程草稿生成后会显示算子链。</div>';
             }
-            return `<div class="ai-plan-chain">${planOps.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
+            return `<div class="ai-plan-chain">${planOps.map(op => `<span title="${this._escapeHtml(this._formatOperatorType(op))}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
         }
 
-        return `<div class="ai-plan-chain">${operatorTypes.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
+        return `<div class="ai-plan-chain">${operatorTypes.map(op => `<span title="${this._escapeHtml(this._formatOperatorType(op))}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
     },
 
     _renderBuildParameterSummary(events) {
@@ -1180,13 +1263,25 @@ export const aiPanelAgentWorkspaceMixin = {
         const latestPayload = this._asObject?.(latest?.payload) || {};
         const missingCount = Number(latestPayload.missingResourceCount ?? latestPayload.MissingResourceCount ?? effectiveMissing.length);
         const pendingCount = Number(latestPayload.pendingParameterCount ?? latestPayload.PendingParameterCount ?? effectivePending.length);
-        const mappingRows = mappings.slice(0, 8).map(item => `
-            <div class="ai-build-compact-row">
-                <b>${this._escapeHtml(item.tempId || item.TempId || '')}.${this._escapeHtml(item.parameterName || item.ParameterName || '')}</b>
-                <span>${this._escapeHtml(item.valueSummary || item.ValueSummary || '')}</span>
-                <small>${this._escapeHtml(item.source || item.Source || 'mapped')}${item.pending || item.Pending ? ' / pending' : ''}</small>
-            </div>
-        `).join('');
+        const mappingRows = mappings.slice(0, 8).map(item => {
+            const tempId = item.tempId || item.TempId || '';
+            const operatorType = item.operatorType || item.OperatorType || '';
+            const parameterName = item.parameterName || item.ParameterName || item.name || item.Name || '';
+            const valueSummary = item.valueSummary ?? item.ValueSummary ?? item.value ?? item.Value ?? '';
+            const source = item.source || item.Source || 'mapped';
+            const pendingLabel = item.pending || item.Pending ? ' / 待确认' : '';
+            const titleParts = [tempId, operatorType, parameterName, source]
+                .filter(Boolean)
+                .map(value => this._localizeDisplayText(value))
+                .join(' / ');
+            return `
+                <div class="ai-build-compact-row" title="${this._escapeHtml(titleParts)}">
+                    <b>${this._escapeHtml(this._formatResourceReference(`${tempId}.${parameterName}`))}</b>
+                    <span>${this._escapeHtml(this._localizeDisplayText(valueSummary))}</span>
+                    <small>${this._escapeHtml(this._localizeDisplayText(source))}${pendingLabel}</small>
+                </div>
+            `;
+        }).join('');
 
         return `
             <div class="ai-build-metric-row">
@@ -1213,7 +1308,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-build-check is-${blocked ? 'blocked' : 'completed'}">
                     <strong>应用门禁：${this._escapeHtml(this._formatGateStatus(gate.status || gate.Status || 'unknown'))}</strong>
                     <span>画布：${canvasReady ? '可应用' : '阻断'} / 运行草稿：${runtimeReady ? '就绪' : '阻断'} / 部署：${deploymentReady ? '就绪' : '阻断'}</span>
-                    ${firstFix ? `<em>${this._escapeHtml(firstFix)}</em>` : ''}
+                    ${firstFix ? `<em>${this._escapeHtml(this._localizeDisplayText(firstFix))}</em>` : ''}
                 </div>
                 ${readiness ? `<div class="ai-build-note">就绪门禁已写入可回放 BuildResult。</div>` : ''}
             `;
@@ -1238,9 +1333,9 @@ export const aiPanelAgentWorkspaceMixin = {
             const firstFix = payload.firstFixRecommendation || payload.FirstFixRecommendation || '';
             return `
                 <div class="ai-build-check is-${this._escapeHtml(tone)}">
-                    <strong>${this._escapeHtml(evt.title || BUILD_STAGE_LABELS[evt.stage] || evt.stage)}</strong>
-                    <span>${this._escapeHtml(evt.summary || '')}</span>
-                    ${firstFix ? `<em>${this._escapeHtml(firstFix)}</em>` : ''}
+                    <strong>${this._escapeHtml(this._localizeDisplayText(evt.title || BUILD_STAGE_LABELS[evt.stage] || evt.stage))}</strong>
+                    <span>${this._escapeHtml(this._localizeDisplayText(evt.summary || ''))}</span>
+                    ${firstFix ? `<em>${this._escapeHtml(this._localizeDisplayText(firstFix))}</em>` : ''}
                 </div>
             `;
         }).join('');
@@ -1279,7 +1374,12 @@ export const aiPanelAgentWorkspaceMixin = {
         const preserved = this._toArray(item.preservedNodes || item.PreservedNodes);
         const pending = this._toArray(item.pendingParameters || item.PendingParameters);
         const blockers = this._toArray(item.deploymentBlockers || item.DeploymentBlockers);
-        const preview = values => values.slice(0, 4).map(value => `<span>${this._escapeHtml(value)}</span>`).join('');
+        const preview = (values, kind = '') => values.slice(0, 4)
+            .map(value => {
+                const label = this._formatWorkflowDiffValue(value, kind);
+                return `<span title="${this._escapeHtml(label)}">${this._escapeHtml(label)}</span>`;
+            })
+            .join('');
         return `
             <div class="ai-workspace-section-title">流程差异</div>
             <div class="ai-build-metric-row">
@@ -1290,10 +1390,10 @@ export const aiPanelAgentWorkspaceMixin = {
             </div>
             ${(added.length || preserved.length || pending.length || blockers.length) ? `
                 <div class="ai-build-diff-tags">
-                    ${preview(added)}
-                    ${preview(preserved)}
-                    ${preview(pending)}
-                    ${preview(blockers)}
+                    ${preview(added, 'added')}
+                    ${preview(preserved, 'preserved')}
+                    ${preview(pending, 'pending')}
+                    ${preview(blockers, 'blocker')}
                 </div>
             ` : ''}
         `;

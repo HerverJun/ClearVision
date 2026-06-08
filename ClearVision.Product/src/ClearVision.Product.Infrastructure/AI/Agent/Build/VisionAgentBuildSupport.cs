@@ -86,7 +86,7 @@ internal static class VisionAgentBuildSupport
                 Description = FirstNonEmpty(
                     ReadString(item, "description"),
                     ReadString(item, "message"),
-                    "Missing resource metadata.")
+                    "缺少资源元数据。")
             };
         }
     }
@@ -265,21 +265,21 @@ internal static class VisionAgentBuildSupport
     {
         return stage switch
         {
-            "plan_generation" => "Load Plan",
-            "resolve_build_intent" => "Resolve Build intent",
-            "template_strategy" => "Resolve template strategy",
-            "operator_pipeline" => "Select operator pipeline",
-            "parameter_mapping" => "Map parameters",
-            "workflow_draft" => "Draft workflow",
-            "validate_schema" => "Validate schema",
-            "metadata_dry_run" => "Metadata dry-run",
-            "package_readiness" => "Package readiness",
-            "station_compatibility" => "Station compatibility",
-            "operator_contract" => "Operator contract",
-            "release_review" => "Release review",
-            "repair_loop" => "Repair loop",
-            "workflow_diff" => "Workflow diff",
-            "apply_gate" => "Apply gate",
+            "plan_generation" => "加载计划",
+            "resolve_build_intent" => "解析构建意图",
+            "template_strategy" => "解析模板策略",
+            "operator_pipeline" => "选择算子链",
+            "parameter_mapping" => "映射参数",
+            "workflow_draft" => "生成工作流草稿",
+            "validate_schema" => "校验结构",
+            "metadata_dry_run" => "元数据预演",
+            "package_readiness" => "运行包就绪",
+            "station_compatibility" => "工站兼容",
+            "operator_contract" => "算子契约",
+            "release_review" => "发布复核",
+            "repair_loop" => "自动修复",
+            "workflow_diff" => "工作流差异",
+            "apply_gate" => "应用门禁",
             _ => stage
         };
     }

@@ -63,7 +63,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             return BuildRuleFallbackPlan(
                 ruleBaseline,
                 "planner_service_not_registered",
-                "Plan planner service is not registered; using rule fallback plan.");
+                "Planner 服务未注册，已使用规则兜底方案。");
         }
 
         return await _planPlannerService.CreatePlanAsync(
@@ -121,14 +121,14 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             Confidence = scenario == "general_inspection" ? "medium" : "high",
             RequirementUnderstanding =
             [
-                $"Inspection intent: {ToScenarioTitle(scenario)}.",
-                hasFlow ? "Current canvas summary is available for Build." : "Build can start as a new workflow draft.",
+                $"检测意图：{ToScenarioTitle(scenario)}。",
+                hasFlow ? "当前画布摘要可用于构建。" : "可作为新的流程草稿开始构建。",
                 templateSelection != null
-                    ? "A template selection was provided and will be considered first."
-                    : "Template choice will be decided by the Build stage.",
+                    ? "已提供模板选择，构建阶段会优先考虑。"
+                    : "模板选择将在构建阶段根据元数据决定。",
                 attachmentCount > 0
-                    ? $"{attachmentCount} attachment(s) are available as redacted metadata."
-                    : "No attachment metadata was provided."
+                    ? $"已有 {attachmentCount} 个附件作为脱敏元数据可用。"
+                    : "未提供附件元数据。"
             ],
             RecommendedRoute = route,
             ClarificationQuestions = questions,
@@ -137,18 +137,18 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             AcceptanceCriteria = BuildAcceptanceCriteria(scenario),
             ExecutablePlan =
             [
-                "Confirm recommended assumptions or answer only the high-impact questions.",
-                "Prepare Build input with the plan snapshot, user selections, current flow, template, attachment, and Station boundary summaries.",
-                "Choose template strategy and operator pipeline from metadata-only catalogs.",
-                "Map parameters and keep unresolved resources as pending parameters or missing resources.",
-                "Run schema validation, dry-run, runtime package readiness, Station compatibility, operator contract, and release review checks.",
-                "Return an editable workflow draft and first fix recommendation before Apply."
+                "确认推荐假设，或只回答高影响问题。",
+                "用计划快照、用户选择、当前流程、模板、附件和工站边界摘要准备构建输入。",
+                "从仅元数据目录中选择模板策略和算子链。",
+                "映射参数，并把未解决资源保留为待确认参数或缺失资源。",
+                "运行结构校验、预演、运行包就绪、工站兼容、算子契约和发布复核检查。",
+                "应用前返回可编辑流程草稿和首要修复建议。"
             ],
             CanBuild = canBuild,
             BlockingReasons = blockingReasons,
             NextAction = canBuild
-                ? "Accept recommended defaults or answer questions, then start Build."
-                : "Describe the inspection target before Build can start.",
+                ? "可接受推荐默认值或回答关键问题，然后开始构建。"
+                : "请先描述检测目标，再开始构建。",
             ContextSummary = new VisionAgentPlanContextSummary
             {
                 HasCurrentFlow = hasFlow,
@@ -172,10 +172,10 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 ? $"selected-template:{templateId}"
                 : "metadata-template-catalog.v1",
             TemplateSelection = templateSelection,
-            StationBoundarySummary = "metadata-only Station boundary; no camera, PLC, filesystem, or network resource is touched during Plan.",
+            StationBoundarySummary = "仅元数据工站边界；规划阶段不会触碰相机、PLC、文件系统或网络资源。",
             PlcOutputPolicy = scenario == "plc_output"
-                ? "PLC output is planned as pending metadata until OK/NG address, handshake, and fail-safe policy are confirmed."
-                : "Local ResultOutput first; PLC writes remain disabled until Build readiness review.",
+                ? "PLC 输出先作为待确认元数据规划，直到 OK/NG 地址、握手和失效保护策略确认。"
+                : "优先本地结果输出；构建就绪复核前保持 PLC 写入禁用。",
             MetadataOnly = true
         };
 
@@ -202,15 +202,15 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 {
                     Stage = "collecting_context",
                     Status = "completed",
-                    Title = "Context collected",
-                    Summary = "Collected public requirement, flow, template, attachment, operator, and Station boundary metadata.",
+                    Title = "上下文收集完成",
+                    Summary = "已收集公开需求、流程、模板、附件、算子和工站边界元数据。",
                     MetadataOnly = true
                 },
                 new VisionAgentPlanPublicEvent
                 {
                     Stage = "rule_fallback_used",
                     Status = "completed",
-                    Title = "Rule fallback used",
+                    Title = "已启用规则兜底",
                     Summary = warning,
                     Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                     {
@@ -222,8 +222,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 {
                     Stage = "plan_ready",
                     Status = "completed",
-                    Title = "Fallback plan ready",
-                    Summary = "Rule fallback PlanModeResult is ready for user confirmation.",
+                    Title = "兜底规划已就绪",
+                    Summary = "规则兜底规划已就绪，等待用户确认。",
                     MetadataOnly = true
                 }
             ],
@@ -247,8 +247,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _eventSink?.StageStarted(
             runId,
             "understand_requirement",
-            "Understanding requirement",
-            "Reading the user goal and public plan snapshot.",
+            "正在理解需求",
+            "正在读取用户目标和公开计划快照。",
             new
             {
                 mode = request.Mode.ToWireValue(),
@@ -259,8 +259,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _eventSink?.StageCompleted(
             runId,
             "understand_requirement",
-            "Requirement understood",
-            "Public requirement and plan context were normalized.",
+            "需求理解完成",
+            "公开需求和计划上下文已归一化。",
             new
             {
                 goal = plan?.Goal ?? request.Description,
@@ -271,8 +271,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _eventSink?.StageStarted(
             runId,
             "context_collection",
-            "Collecting engineering context",
-            "Collecting current flow, template, attachment, operator catalog, and Station boundary metadata.",
+            "正在收集工程上下文",
+            "正在收集当前流程、模板、附件、算子目录和工站边界元数据。",
             new
             {
                 metadataOnly = true
@@ -280,8 +280,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _eventSink?.StageCompleted(
             runId,
             "context_collection",
-            "Engineering context collected",
-            "Build context was collected as public metadata.",
+            "工程上下文已收集",
+            "构建上下文已作为公开元数据收集。",
             new
             {
                 contextKinds = plan?.ContextSummary.ContextKinds ?? ["user_requirement", "operator_catalog", "station_boundary"],
@@ -295,10 +295,10 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _eventSink?.StageCompleted(
             runId,
             "plan_generation",
-            build == null ? "Plan generated for Build" : "Plan loaded for Build",
+            build == null ? "已为构建生成计划" : "已加载构建计划",
             build == null
-                ? "Build started without a Plan snapshot; a minimal public build plan was inferred."
-                : "Confirmed Plan Mode snapshot and selected options were loaded.",
+                ? "构建在没有计划快照的情况下启动，已推断最小公开构建计划。"
+                : "已加载规划模式快照和已选选项。",
             new
             {
                 planId = build?.PlanId ?? plan?.PlanId ?? string.Empty,
@@ -311,8 +311,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _eventSink?.StageCompleted(
             runId,
             "assumption_confirmation",
-            "Assumptions confirmed",
-            "Build Mode received structured selections and accepted defaults.",
+            "假设已确认",
+            "构建模式已收到结构化选择和已接受默认值。",
             new
             {
                 acceptedRecommendedDefaults = build?.AcceptedRecommendedDefaults ?? false,
@@ -323,8 +323,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _eventSink?.StageStarted(
             runId,
             "requirement_parsing",
-            "Requirement parsing",
-            "Normalizing the structured BuildFromPlan request for controlled tool execution.",
+            "正在解析需求",
+            "正在归一化结构化 BuildFromPlan 请求，以便受控工具执行。",
             new
             {
                 mode = request.Mode.ToWireValue(),
@@ -339,8 +339,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _eventSink?.StageCompleted(
             runId,
             "requirement_parsing",
-            "Requirement parsing complete",
-            "Structured plan, selections, and metadata-only context are ready for Build tools.",
+            "需求解析完成",
+            "结构化计划、选择项和仅元数据上下文已准备好交给构建工具。",
             new
             {
                 buildInputSummary = BuildInputSummary(request),
@@ -526,64 +526,64 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         AiTemplateSelectionInfo? templateSelection)
     {
         var templateDecision = templateSelection == null
-            ? "Build will match templates from metadata and may proceed without a template."
-            : $"Use selected template mode '{templateSelection.Mode}' before adapting parameters.";
+            ? "构建阶段会从元数据中匹配模板；没有模板时也可生成可编辑草稿。"
+            : $"优先使用已选模板模式“{templateSelection.Mode}”，再适配参数。";
 
         return scenario switch
         {
             "wire_sequence" => new VisionAgentRecommendedRoute
             {
                 RouteId = "wire_sequence_template_first",
-                Title = "Template-first wire sequence inspection",
-                Summary = "Use a wire/terminal sequence template, bind model metadata, then judge order and output OK/NG.",
+                Title = "模板优先的线序检测路线",
+                Summary = "使用线束/端子序列模板，绑定模型元数据后判定顺序并输出 OK/NG。",
                 Operators = ["ImageAcquisition", "DeepLearning", "DetectionSequenceJudge", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "code_recognition" => new VisionAgentRecommendedRoute
             {
                 RouteId = "code_recognition",
-                Title = "Code recognition route",
-                Summary = "Acquire image, isolate code ROI, decode QR/DataMatrix/barcode, and publish structured result.",
+                Title = "条码/二维码识别路线",
+                Summary = "采集图像、分离码区 ROI、解码 QR/DataMatrix/条码，并发布结构化结果。",
                 Operators = ["ImageAcquisition", "RoiManager", "CodeRecognition", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "measurement" => new VisionAgentRecommendedRoute
             {
                 RouteId = "measurement_with_calibration",
-                Title = "Calibration-backed measurement route",
-                Summary = "Load calibration, locate geometry, measure dimensions, and compare tolerance.",
+                Title = "带标定的尺寸测量路线",
+                Summary = "加载标定信息、定位几何特征、测量尺寸并比较容差。",
                 Operators = ["ImageAcquisition", "CalibrationLoader", "CircleMeasurement", "GeoMeasurement", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "template_location" => new VisionAgentRecommendedRoute
             {
                 RouteId = "template_location",
-                Title = "Template positioning route",
-                Summary = "Match target template, normalize pose, then pass aligned ROI to downstream inspection.",
+                Title = "模板定位路线",
+                Summary = "匹配目标模板、归一化姿态，再把对齐后的 ROI 交给下游检测。",
                 Operators = ["ImageAcquisition", "TemplateMatching", "AffineTransform", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "button_inspection" => new VisionAgentRecommendedRoute
             {
                 RouteId = "button_inspection",
-                Title = "Remote/keypad button inspection route",
-                Summary = "Locate the panel, segment key positions, classify presence/state, and judge layout.",
+                Title = "遥控器/按键检测路线",
+                Summary = "定位面板、分割按键位置、分类有无/状态，并判定布局。",
                 Operators = ["ImageAcquisition", "TemplateMatching", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "plc_output" => new VisionAgentRecommendedRoute
             {
                 RouteId = "inspection_with_plc_pending",
-                Title = "Inspection with PLC output pending",
-                Summary = "Generate inspection draft and keep PLC OK/NG output as metadata until address policy is confirmed.",
+                Title = "PLC 输出待确认的检测路线",
+                Summary = "生成检测草稿，并在地址策略确认前把 PLC OK/NG 输出保留为元数据。",
                 Operators = ["ImageAcquisition", "InspectionOperator", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             _ => new VisionAgentRecommendedRoute
             {
                 RouteId = "surface_defect_detection",
-                Title = "Surface defect inspection route",
-                Summary = "Normalize illumination, enhance defects, segment candidates, and judge by area/contrast.",
+                Title = "表面缺陷检测路线",
+                Summary = "归一化光照、增强缺陷、分割候选区域，并按面积/对比度判定。",
                 Operators = ["ImageAcquisition", "ShadingCorrection", "SurfaceDefectDetection", "BlobAnalysis", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             }
@@ -596,95 +596,95 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         {
             "wire_sequence" =>
             [
-                Question("sequence_rule", "Which sequence rule should be checked first?", "Sequence order drives model labels and judgment logic.", "left_to_right", "Judge terminals left-to-right using model label order.", "Wrong sequence policy changes OK/NG semantics.",
+                Question("sequence_rule", "优先检查哪种线序规则？", "线序规则会影响模型标签和判定逻辑。", "left_to_right", "按模型标签顺序从左到右判定端子。", "线序策略不同会改变 OK/NG 语义。",
                 [
-                    Option("left_to_right", "Left to right", true, "Read terminal order from left to right.", "Fastest for common harness layouts."),
-                    Option("color_order", "Color order", false, "Judge by expected color/label list.", "Requires explicit expected sequence."),
-                    Option("custom_rule", "Custom rule pending", false, "Keep sequence rule as pending metadata.", "Build can draft but will block readiness.")
+                    Option("left_to_right", "从左到右", true, "从左到右读取端子顺序。", "适合常见线束布局，配置最快。"),
+                    Option("color_order", "颜色顺序", false, "按期望颜色/标签列表判定。", "需要明确期望线序。"),
+                    Option("custom_rule", "自定义规则待确认", false, "把线序规则保留为待确认元数据。", "可生成草稿，但会阻断就绪检查。")
                 ]),
-                Question("model_binding", "What model resource should Build assume?", "Wire sequence inspection usually needs trained labels.", "model_pending", "Create DeepLearning operator with model path pending.", "Without model metadata deployment readiness remains blocked.",
+                Question("model_binding", "构建阶段应假定哪类模型资源？", "线序检测通常需要训练好的标签模型。", "model_pending", "创建深度学习算子，并把模型资源保留为待绑定。", "缺少模型元数据时部署就绪会保持阻断。",
                 [
-                    Option("model_pending", "Model pending", true, "Expose ModelPath as pending parameter.", "Keeps draft editable without inventing paths."),
-                    Option("existing_model", "Existing model", false, "Bind to an existing metadata model handle.", "Requires model handle selection."),
-                    Option("template_only", "Template only", false, "Use template/ROI logic before model binding.", "Less robust for color and terminal variation.")
+                    Option("model_pending", "模型待绑定", true, "把模型资源暴露为待确认参数。", "不会猜测路径，同时保持草稿可编辑。"),
+                    Option("existing_model", "已有模型", false, "绑定到已有模型元数据句柄。", "需要选择模型句柄。"),
+                    Option("template_only", "先用模板", false, "模型绑定前先使用模板/ROI 逻辑。", "对颜色和端子变化的鲁棒性较弱。")
                 ])
             ],
             "measurement" =>
             [
-                Question("measurement_target", "Which dimension is the primary measurement?", "Target type determines geometry operators and tolerance fields.", "hole_distance", "Measure hole or feature distance in calibrated units.", "Wrong target changes operator chain.", [
-                    Option("hole_distance", "Hole distance", true, "Detect circles and measure center distance.", "Best for common fixture checks."),
-                    Option("diameter", "Diameter", false, "Measure circle diameter.", "Requires edge quality and calibration."),
-                    Option("width", "Width", false, "Measure part width or gap.", "Requires line/edge extraction.")
+                Question("measurement_target", "主要测量哪一类尺寸？", "目标类型决定几何算子和容差字段。", "hole_distance", "按标定单位测量孔距或特征距离。", "目标选错会改变算子链。", [
+                    Option("hole_distance", "孔距", true, "检测圆并测量圆心距离。", "最适合常见治具检查。"),
+                    Option("diameter", "直径", false, "测量圆直径。", "需要稳定边缘质量和标定。"),
+                    Option("width", "宽度/间隙", false, "测量零件宽度或间隙。", "需要线/边缘提取。")
                 ]),
-                Question("calibration_policy", "How should pixel-to-mm calibration be handled?", "Measurement must not invent scale.", "calibration_pending", "Keep calibration file or scale as pending metadata.", "Build remains editable but not deploy-ready.", [
-                    Option("calibration_pending", "Calibration pending", true, "Expose calibration as pending parameter.", "Safest metadata-only path."),
-                    Option("known_scale", "Known scale", false, "Use provided scale metadata.", "Requires user-provided scale."),
-                    Option("pixel_only", "Pixel only", false, "Report pixels first.", "Fast but not production measurement.")
+                Question("calibration_policy", "像素到毫米标定如何处理？", "测量场景不能凭空假定比例。", "calibration_pending", "把标定文件或比例保留为待确认元数据。", "草稿可编辑，但部署不会就绪。", [
+                    Option("calibration_pending", "标定待确认", true, "把标定资源暴露为待确认参数。", "最稳妥的仅元数据路径。"),
+                    Option("known_scale", "已知比例", false, "使用已提供的比例元数据。", "需要用户提供比例。"),
+                    Option("pixel_only", "先按像素", false, "先输出像素单位结果。", "速度快，但不适合作为量产测量。")
                 ])
             ],
             "template_location" =>
             [
-                Question("template_asset", "What template asset should be used?", "Template matching cannot deploy without a template handle.", "template_pending", "Create TemplateMatching with template path pending.", "Draft can be edited; readiness blocks until template metadata exists.", [
-                    Option("template_pending", "Template pending", true, "Expose TemplatePath as missing resource.", "Safest without local paths."),
-                    Option("selected_template", "Use selected template", false, "Use templateSelection metadata from the UI.", "Best if a template was selected."),
-                    Option("auto_locate", "No template yet", false, "Use detector or ROI placeholder.", "More flexible but less deterministic.")
+                Question("template_asset", "应使用哪类模板资源？", "模板匹配没有模板句柄时不能部署。", "template_pending", "创建模板匹配算子，并把模板资源保留为待绑定。", "草稿可编辑；模板元数据补齐前就绪检查会阻断。", [
+                    Option("template_pending", "模板待绑定", true, "把模板资源暴露为缺失资源。", "不猜测本地路径，最稳妥。"),
+                    Option("selected_template", "使用已选模板", false, "使用 UI 中的模板选择元数据。", "已选模板时优先采用。"),
+                    Option("auto_locate", "暂不指定模板", false, "使用检测器或 ROI 占位方案。", "更灵活，但确定性较弱。")
                 ]),
-                Question("pose_tolerance", "How much pose drift should be allowed?", "Search range affects speed and false positives.", "moderate", "Use moderate rotation/scale search.", "Wide search slows dry-run and can reduce confidence.", [
-                    Option("moderate", "Moderate", true, "Allow small rotation/translation drift.", "Balanced default."),
-                    Option("fixed_pose", "Fixed pose", false, "Assume stable fixture.", "Fastest but fragile."),
-                    Option("wide_search", "Wide search", false, "Allow larger pose drift.", "Robust but slower.")
+                Question("pose_tolerance", "允许多大的姿态漂移？", "搜索范围会影响速度和误检率。", "moderate", "使用中等旋转/尺度搜索范围。", "过宽搜索会拖慢预演并降低置信度。", [
+                    Option("moderate", "中等范围", true, "允许小幅旋转/平移漂移。", "均衡的默认值。"),
+                    Option("fixed_pose", "固定姿态", false, "假设治具稳定。", "最快，但抗扰动较弱。"),
+                    Option("wide_search", "宽范围搜索", false, "允许更大的姿态漂移。", "更鲁棒，但速度较慢。")
                 ])
             ],
             "button_inspection" =>
             [
-                Question("button_layout", "How should button positions be modeled?", "Button inspection needs stable layout references.", "template_layout", "Use template location plus named ROIs for keys.", "Template or ROI metadata is needed before deployment.", [
-                    Option("template_layout", "Template layout", true, "Locate remote body then inspect key ROIs.", "Best balance for production."),
-                    Option("fixed_grid", "Fixed grid", false, "Use fixed ROI grid.", "Fast when fixture is stable."),
-                    Option("detector", "Detector", false, "Use model-based key detection.", "Requires model resource.")
+                Question("button_layout", "按键位置如何建模？", "按键检测需要稳定的布局参考。", "template_layout", "使用模板定位加命名按键 ROI。", "部署前需要模板或 ROI 元数据。", [
+                    Option("template_layout", "模板布局", true, "先定位遥控器主体，再检测按键 ROI。", "更适合生产默认方案。"),
+                    Option("fixed_grid", "固定网格", false, "使用固定 ROI 网格。", "治具稳定时速度快。"),
+                    Option("detector", "检测模型", false, "使用模型检测按键。", "需要模型资源。")
                 ]),
-                Question("button_defect", "What button issue matters most?", "Different issues require different operators.", "presence_state", "Check presence and visual state.", "Wear/printing checks may need extra training data.", [
-                    Option("presence_state", "Presence/state", true, "Check missing, pressed, or wrong key state.", "Good first draft."),
-                    Option("print_defect", "Print defect", false, "Inspect label/printing quality.", "Needs samples and thresholds."),
-                    Option("color_mismatch", "Color mismatch", false, "Check color or cap mismatch.", "Needs lighting constraints.")
+                Question("button_defect", "最关注哪类按键问题？", "问题类型不同会影响算子选择。", "presence_state", "检查缺失、按下或状态异常。", "磨损/印刷检查可能需要额外训练样本。", [
+                    Option("presence_state", "有无/状态", true, "检查缺失、按下或按键状态错误。", "适合作为初始草稿。"),
+                    Option("print_defect", "印刷缺陷", false, "检查标识或印刷质量。", "需要样品和阈值。"),
+                    Option("color_mismatch", "颜色不一致", false, "检查颜色或键帽不匹配。", "需要光照约束。")
                 ])
             ],
             "code_recognition" =>
             [
-                Question("code_type", "Which code type should be decoded?", "Decoder settings and grading depend on code family.", "auto_code", "Try QR/DataMatrix/barcode metadata decoder settings.", "Auto mode is flexible but may need tightening.", [
-                    Option("auto_code", "Auto code", true, "Keep decoder family flexible.", "Best first draft."),
-                    Option("qr", "QR", false, "Use QR-specific decode parameters.", "Faster and stricter."),
-                    Option("datamatrix", "DataMatrix", false, "Use DataMatrix-specific decode parameters.", "Best for industrial marks.")
+                Question("code_type", "需要解码哪种码制？", "解码器设置和分级逻辑取决于码制。", "auto_code", "先尝试 QR/DataMatrix/条码的元数据解码设置。", "自动模式灵活，但后续可能要收紧。", [
+                    Option("auto_code", "自动码制", true, "保持解码码制灵活。", "适合作为第一版草稿。"),
+                    Option("qr", "QR 码", false, "使用 QR 专用解码参数。", "更快且更严格。"),
+                    Option("datamatrix", "DataMatrix", false, "使用 DataMatrix 专用解码参数。", "适合工业刻印码。")
                 ]),
-                Question("decode_policy", "What should happen on unreadable codes?", "Failure handling affects output and Station policy.", "ng_on_unreadable", "Return NG when decode fails.", "Conservative production default.", [
-                    Option("ng_on_unreadable", "NG on unreadable", true, "Unreadable code becomes NG.", "Safe default."),
-                    Option("retry", "Retry pending", false, "Plan retry or second exposure.", "Needs station timing confirmation."),
-                    Option("manual_review", "Manual review", false, "Flag for review instead of immediate NG.", "Needs operator workflow.")
+                Question("decode_policy", "码不可读时如何处理？", "失败处理会影响输出和工站策略。", "ng_on_unreadable", "解码失败时返回 NG。", "保守的生产默认值。", [
+                    Option("ng_on_unreadable", "不可读判 NG", true, "不可读码直接判为 NG。", "安全默认值。"),
+                    Option("retry", "重试待确认", false, "规划重试或二次曝光。", "需要确认工站节拍。"),
+                    Option("manual_review", "人工复核", false, "标记复核而不是立即 NG。", "需要操作员流程。")
                 ])
             ],
             "plc_output" =>
             [
-                Question("plc_policy", "How should PLC OK/NG output be represented?", "PLC addresses and network details must stay redacted until confirmed.", "metadata_pending", "Create ResultOutput with PLC policy pending.", "Prevents unsafe address guessing.", [
-                    Option("metadata_pending", "PLC pending", true, "Expose PLC address and handshake as pending.", "Safest path."),
-                    Option("local_first", "Local first", false, "Output locally before PLC integration.", "Good for lab validation."),
-                    Option("station_profile", "Station profile", false, "Use selected Station profile metadata.", "Requires profile confirmation.")
+                Question("plc_policy", "PLC OK/NG 输出如何表示？", "PLC 地址和网络细节在确认前必须保持脱敏。", "metadata_pending", "创建 ResultOutput，并把 PLC 策略保留为待确认。", "避免不安全的地址猜测。", [
+                    Option("metadata_pending", "PLC 待确认", true, "把 PLC 地址和握手策略暴露为待确认项。", "最安全的路径。"),
+                    Option("local_first", "先本地输出", false, "PLC 集成前先本地输出。", "适合实验室验证。"),
+                    Option("station_profile", "工站配置", false, "使用已选工站配置元数据。", "需要确认配置。")
                 ]),
-                Question("failsafe", "What fail-safe should apply if output fails?", "Fail-safe policy is part of release readiness.", "ng_on_failure", "Treat output failure as NG/pending intervention.", "Conservative default.", [
-                    Option("ng_on_failure", "NG on failure", true, "Default to NG on failed output.", "Safer production behavior."),
-                    Option("hold_last", "Hold last", false, "Hold previous signal.", "Requires PLC handshake review."),
-                    Option("block_release", "Block release", false, "Block deployment until confirmed.", "Most conservative.")
+                Question("failsafe", "输出失败时采用什么失效保护？", "失效保护策略属于发布就绪条件。", "ng_on_failure", "输出失败时按 NG 或待人工介入处理。", "保守默认值。", [
+                    Option("ng_on_failure", "失败判 NG", true, "输出失败默认判 NG。", "更安全的生产行为。"),
+                    Option("hold_last", "保持上一信号", false, "保持上一次信号。", "需要 PLC 握手复核。"),
+                    Option("block_release", "阻断发布", false, "确认前阻断部署。", "最保守。")
                 ])
             ],
             _ =>
             [
-                Question("defect_definition", "What should count as a defect?", "Defect definition controls thresholds and judgment.", "scratch_or_blob", "Detect visible scratches/blobs and judge by area/contrast.", "Thresholds need sample confirmation.", [
-                    Option("scratch_or_blob", "Scratch/blob", true, "Use general surface defect candidates.", "Good first draft."),
-                    Option("crack", "Crack", false, "Emphasize thin dark/bright crack-like defects.", "Needs contrast assumptions."),
-                    Option("dent_or_stain", "Dent/stain", false, "Look for dents, stains, or discoloration.", "Needs lighting/sample confirmation.")
+                Question("defect_definition", "缺陷判定标准是什么？", "缺陷定义会影响阈值和判定逻辑。", "scratch_or_blob", "检测可见划痕/斑点，并按面积和对比度判定。", "阈值需要结合样品确认。", [
+                    Option("scratch_or_blob", "划痕/斑点", true, "使用通用表面缺陷候选区域。", "适合作为初始草稿。"),
+                    Option("crack", "裂纹", false, "重点检测细长明暗裂纹类缺陷。", "需要确认对比度假设。"),
+                    Option("dent_or_stain", "凹痕/污渍", false, "关注凹痕、污渍或变色。", "需要确认光照和样品条件。")
                 ]),
-                Question("roi_strategy", "Which ROI strategy should be used?", "ROI choice changes false positive rate and parameter completeness.", "main_surface", "Inspect the main visible part surface.", "Keeps draft focused.", [
-                    Option("main_surface", "Main surface", true, "Use one primary ROI placeholder.", "Best default."),
-                    Option("full_frame", "Full frame", false, "Inspect full frame.", "Fewer setup fields but noisier."),
-                    Option("auto_locate", "Auto locate", false, "Locate part before defect inspection.", "More robust but more complex.")
+                Question("roi_strategy", "应使用哪种 ROI 策略？", "ROI 选择会影响误检率和参数完整性。", "main_surface", "检测主要可见表面。", "让草稿更聚焦。", [
+                    Option("main_surface", "主要表面", true, "使用一个主要 ROI 占位。", "最佳默认值。"),
+                    Option("full_frame", "整图检测", false, "检测完整画面。", "设置项更少，但噪声更多。"),
+                    Option("auto_locate", "自动定位", false, "缺陷检测前先定位零件。", "更鲁棒，但更复杂。")
                 ])
             ]
         };
@@ -699,23 +699,23 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             new()
             {
                 Id = "metadata_only",
-                Label = "Public diagnostics only",
+                Label = "仅公开诊断",
                 Value = "redacted_metadata",
-                Impact = "No raw local paths, image bytes, Station network details, tokens, or prompts are exposed."
+                Impact = "不会暴露原始本地路径、图像字节、工站网络细节、令牌或提示词。"
             },
             new()
             {
                 Id = "draft_policy",
-                Label = "Editable workflow draft",
+                Label = "可编辑流程草稿",
                 Value = "allow_editable_draft_when_not_deploy_ready",
-                Impact = "Apply to canvas can remain available while deployment readiness is blocked."
+                Impact = "即使部署就绪被阻断，也可先应用到画布继续编辑。"
             },
             new()
             {
                 Id = "resource_policy",
-                Label = "Missing resources stay pending",
+                Label = "缺失资源保持待确认",
                 Value = "pending_parameters",
-                Impact = "Model, template, camera, calibration, and PLC metadata are surfaced instead of guessed."
+                Impact = "模型、模板、相机、标定和 PLC 元数据会显示为待补项，而不是被猜测。"
             }
         };
 
@@ -724,9 +724,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             defaults.Add(new VisionAgentDefaultAssumption
             {
                 Id = "template_selection",
-                Label = "Respect selected template metadata",
+                Label = "尊重已选模板元数据",
                 Value = request.TemplateSelection.Mode ?? "selected",
-                Impact = "Build will prefer the user-selected template before falling back to catalog matching."
+                Impact = "构建会优先使用用户选择的模板，再回退到目录匹配。"
             });
         }
 
@@ -735,9 +735,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             defaults.Add(new VisionAgentDefaultAssumption
             {
                 Id = "measurement_units",
-                Label = "Metric units require calibration",
+                Label = "物理单位需要标定",
                 Value = "calibration_pending",
-                Impact = "Measurement output is not release-ready until scale or calibration metadata is confirmed."
+                Impact = "比例或标定元数据确认前，测量输出不会达到发布就绪。"
             });
         }
 
@@ -748,17 +748,17 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     {
         var common = new List<string>
         {
-            "Field thresholds need representative images before production.",
-            "Camera, model, template, calibration, and PLC resources remain metadata-only until confirmed.",
-            "Station compatibility can block release while the canvas draft remains editable."
+            "量产前需要代表性图像确认现场阈值。",
+            "相机、模型、模板、标定和 PLC 资源在确认前保持为仅元数据。",
+            "工站兼容性可能阻断发布，但画布草稿仍可编辑。"
         };
         if (scenario == "plc_output")
         {
-            common.Add("PLC OK/NG output must not be enabled without address, handshake, and fail-safe review.");
+            common.Add("PLC OK/NG 输出在地址、握手和失效保护复核前不得启用。");
         }
         if (scenario == "measurement")
         {
-            common.Add("Measurement accuracy depends on calibration and lens distortion control.");
+            common.Add("测量精度依赖标定和镜头畸变控制。");
         }
         return common;
     }
@@ -767,18 +767,18 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     {
         var criteria = new List<string>
         {
-            "Workflow draft contains acquisition, inspection, judgment, and output stages.",
-            "Plan snapshot, user selections, defaults, and Build input summary are replayable from AgentRun.",
-            "Readiness, dry-run, package, Station, contract, and release review events are replayable.",
-            "Pending parameters and missing resources are visible before Apply or deployment."
+            "流程草稿包含采集、检测、判定和输出阶段。",
+            "计划快照、用户选择、默认值和构建输入摘要可从 AgentRun 回放。",
+            "就绪、预演、运行包、工站、契约和发布复核事件可回放。",
+            "应用或部署前可以看到待确认参数和缺失资源。"
         };
         if (scenario == "measurement")
         {
-            criteria.Add("Calibration or scale metadata is pending or confirmed before measurement release.");
+            criteria.Add("测量发布前，标定或比例元数据必须处于待确认或已确认状态。");
         }
         if (scenario == "code_recognition")
         {
-            criteria.Add("Decode failure policy is represented in ResultJudgment or pending output policy.");
+            criteria.Add("解码失败策略必须体现在结果判定或待确认输出策略中。");
         }
         return criteria;
     }
@@ -830,14 +830,14 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     {
         return scenario switch
         {
-            "wire_sequence" => "wire sequence inspection",
-            "code_recognition" => "code recognition",
-            "measurement" => "measurement inspection",
-            "template_location" => "template location",
-            "button_inspection" => "button inspection",
-            "plc_output" => "inspection with PLC output",
-            "surface_defect" => "surface defect inspection",
-            _ => "general visual inspection"
+            "wire_sequence" => "线序检测",
+            "code_recognition" => "条码/二维码识别",
+            "measurement" => "尺寸测量",
+            "template_location" => "模板定位",
+            "button_inspection" => "按键检测",
+            "plc_output" => "带 PLC 输出的检测",
+            "surface_defect" => "表面缺陷检测",
+            _ => "通用视觉检测"
         };
     }
 

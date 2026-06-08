@@ -164,7 +164,7 @@ public sealed class BuildToolRunner
                     result,
                     result.Success
                         ? ToolSummary(toolName, data, hasBlocking)
-                        : $"{toolName} failed: {result.ErrorCode}",
+                        : $"{DisplayToolName(toolName)} 执行失败：{result.ErrorCode}",
                     result.Success && !hasBlocking ? AgentRunEventStatuses.Completed :
                     result.Success ? AgentRunEventStatuses.Blocked : AgentRunEventStatuses.Failed,
                     new
@@ -214,7 +214,7 @@ public sealed class BuildToolRunner
             evidence.Stage,
             evidence.ToolName,
             evidence.InputSummary,
-            OutputSummary = "Unsafe metadata was removed before publishing this tool evidence.",
+            OutputSummary = "发布该工具证据前，已移除不安全元数据。",
             Status = AgentRunEventStatuses.Completed,
             evidence.DurationMs,
             evidence.EvidenceId,
@@ -241,32 +241,46 @@ public sealed class BuildToolRunner
 
     private static string ToolSummary(string toolName, System.Text.Json.JsonElement? data, bool blocking)
     {
+        var displayName = DisplayToolName(toolName);
         if (data == null)
         {
-            return $"{toolName} completed with no public data payload.";
+            return $"{displayName} 已完成，但没有可公开的数据负载。";
         }
 
         if (toolName == "validate_flow")
         {
             return blocking
-                ? "Schema validation found blocking issues."
-                : "Schema validation passed with public metadata.";
+                ? "结构校验发现阻断问题。"
+                : "结构校验已通过，公开元数据可用。";
         }
 
         if (toolName == "dryrun_flow")
         {
             return VisionAgentBuildSupport.ReadBool(data.Value, "dryRunSucceeded") == false
-                ? "Metadata dry-run reported a blocked draft."
-                : "Metadata dry-run completed successfully.";
+                ? "元数据预演报告草稿存在阻断。"
+                : "元数据预演已成功完成。";
         }
 
         if (toolName == "runtime_package_precheck")
         {
             return VisionAgentBuildSupport.ReadBool(data.Value, "readyForDeployment") == true
-                ? "Runtime package readiness passed."
-                : "Runtime package readiness blocks deployment but not canvas Apply.";
+                ? "运行包就绪检查通过。"
+                : "运行包就绪检查会阻断部署，但不阻断画布应用。";
         }
 
-        return $"{toolName} completed.";
+        return $"{displayName} 已完成。";
+    }
+
+    private static string DisplayToolName(string toolName)
+    {
+        return toolName switch
+        {
+            "match_flow_template" => "模板匹配工具",
+            "get_flow_template_skeleton" => "模板骨架工具",
+            "validate_flow" => "流程结构校验工具",
+            "dryrun_flow" => "元数据预演工具",
+            "runtime_package_precheck" => "运行包就绪检查工具",
+            _ => toolName
+        };
     }
 }

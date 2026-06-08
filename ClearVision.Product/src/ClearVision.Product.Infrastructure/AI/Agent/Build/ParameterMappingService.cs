@@ -42,7 +42,7 @@ public sealed class ParameterMappingService
                     {
                         ResourceType = missingKind,
                         ResourceKey = $"{op.TempId}.{parameter.Name}",
-                        Description = $"{op.OperatorType}.{parameter.Name} remains pending metadata and was not guessed."
+                        Description = $"{op.OperatorType}.{parameter.Name} 仍为待绑定元数据，系统未进行猜测。"
                     });
                 }
             }
@@ -54,7 +54,7 @@ public sealed class ParameterMappingService
             VisionAgentBuildSupport.DeduplicateMissing(missing));
         return VisionAgentBuildSupport.StepResult(
             resolution,
-            $"Mapped {mappings.Count} parameter assumptions; {resolution.PendingParameters.Count} pending parameter group(s), {resolution.MissingResources.Count} missing resource(s).",
+            $"已映射 {mappings.Count} 个参数假设；仍有 {resolution.PendingParameters.Count} 组待确认参数、{resolution.MissingResources.Count} 个缺失资源。",
             AgentRunEventStatuses.Completed,
             new
             {
@@ -82,13 +82,13 @@ public sealed class ParameterMappingService
             return new VisionAgentParameterMapping
             {
                 TempId = op.TempId,
-                OperatorType = op.OperatorType,
-                ParameterName = parameter.Name,
-                ValueSummary = VisionAgentBuildSupport.CleanValue(direct),
-                Source = "user_selection",
-                Pending = false,
-                Impact = "User selection mapped into draft parameter metadata."
-            };
+            OperatorType = op.OperatorType,
+            ParameterName = parameter.Name,
+            ValueSummary = VisionAgentBuildSupport.CleanValue(direct),
+            Source = "user_selection",
+            Pending = false,
+            Impact = "用户选择已写入草稿参数元数据。"
+        };
         }
 
         var fallback = DefaultParameterValue(op.OperatorType, parameter.Name, load);
@@ -102,8 +102,8 @@ public sealed class ParameterMappingService
             Source = pending ? "pending_metadata" : "accepted_default",
             Pending = pending,
             Impact = pending
-                ? "Canvas Apply can continue, but deployment readiness remains blocked until this metadata is bound."
-                : "Default metadata keeps the draft editable."
+                ? "画布可继续应用草稿，但部署就绪会保持阻断，直到该元数据完成绑定。"
+                : "默认元数据会让草稿保持可编辑。"
         };
     }
 
@@ -147,9 +147,9 @@ public sealed class ParameterMappingService
 
         return operatorType switch
         {
-            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "Validate detected class order against pending terminal wire sequence rule.",
-            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "OK when measured distance is within pending tolerance threshold.",
-            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) => "OK when inspection score satisfies configured threshold.",
+            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "按待确认端子线序规则校验检测到的类别顺序。",
+            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "当测量距离处于待确认容差阈值内时判定为 OK。",
+            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) => "当检测分数满足配置阈值时判定为 OK。",
             "Thresholding" when parameterName.Equals("Mode", StringComparison.OrdinalIgnoreCase) => "adaptive_review",
             "TemplateMatching" when parameterName.Equals("MinScore", StringComparison.OrdinalIgnoreCase) => "0.8",
             "TemplateMatching" when parameterName.Equals("MaxMatches", StringComparison.OrdinalIgnoreCase) => "1",
