@@ -45,6 +45,7 @@ const BUILD_STAGE_LABELS = {
 
 export const aiPanelAgentWorkspaceMixin = {
     _resetAgentWorkspace({ preservePlan = false } = {}) {
+        this.activePlanRequestId = null;
         if (!preservePlan) {
             this.pendingVisionPlan = null;
             this.planQuestionSelections = {};
@@ -83,6 +84,8 @@ export const aiPanelAgentWorkspaceMixin = {
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
         this.pendingVisionPlan = null;
         this.planQuestionSelections = {};
+        const planRequestId = this._createPlanRequestId();
+        this.activePlanRequestId = planRequestId;
 
         this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
         this._addMessage('user', userMessage || normalizedDescription);
@@ -116,10 +119,12 @@ export const aiPanelAgentWorkspaceMixin = {
         });
         this._requestBackendVisionPlan(planRequest)
             .then(result => {
+                if (!this._isActivePlanRequest(planRequestId)) return;
                 this.pendingVisionPlan = this._normalizeBackendPlanResult(result, normalizedDescription);
                 this.planQuestionSelections = Object.fromEntries(
                     this.pendingVisionPlan.questions.map(question => [question.id, question.defaultValue])
                 );
+                this._clearActivePlanRequest(planRequestId);
                 this._setAssistantTurnStatus(turn, 'Plan ready', 'success');
                 this._setAssistantSectionText(
                     turn,
@@ -131,6 +136,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._renderPlanWorkspace(this.pendingVisionPlan);
             })
             .catch(error => {
+                if (!this._isActivePlanRequest(planRequestId)) return;
+                this._clearActivePlanRequest(planRequestId);
                 this.pendingVisionPlan = null;
                 this._setAssistantTurnStatus(turn, 'Plan failed', 'failed');
                 this._setAssistantSectionText(
@@ -144,6 +151,21 @@ export const aiPanelAgentWorkspaceMixin = {
             });
 
         return true;
+    },
+
+    _createPlanRequestId() {
+        const randomPart = Math.random().toString(36).slice(2, 8);
+        return `plan-${Date.now()}-${randomPart}`;
+    },
+
+    _isActivePlanRequest(requestId) {
+        return Boolean(this.activePlanRequestId) && requestId === this.activePlanRequestId;
+    },
+
+    _clearActivePlanRequest(requestId = null) {
+        if (!requestId || this.activePlanRequestId === requestId) {
+            this.activePlanRequestId = null;
+        }
     },
 
     _buildPlanModeRequest({
@@ -237,6 +259,12 @@ export const aiPanelAgentWorkspaceMixin = {
         const questions = plan.clarificationQuestions || plan.ClarificationQuestions || [];
         const defaults = plan.recommendedDefaults || plan.RecommendedDefaults || [];
         const contextSummary = plan.contextSummary || plan.ContextSummary || {};
+        const templateSelection = this._normalizeTemplateSelection?.(plan.templateSelection || plan.TemplateSelection) ||
+            this._normalizeTemplateSelection?.({
+                mode: contextSummary.templateSelectionMode || contextSummary.TemplateSelectionMode || '',
+                templateId: contextSummary.templateId || contextSummary.TemplateId || ''
+            }) ||
+            null;
         const normalizedQuestions = Array.isArray(questions)
             ? questions.map(question => this._normalizePlanQuestion(question)).filter(Boolean)
             : [];
@@ -247,6 +275,7 @@ export const aiPanelAgentWorkspaceMixin = {
         return {
             id: plan.planId || plan.PlanId || `plan-${Date.now()}`,
             planId: plan.planId || plan.PlanId || '',
+            planHash: String(plan.planHash || plan.PlanHash || '').trim(),
             mode: AgentWorkspaceModes.PLAN,
             originalDescription: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
             buildPrompt: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
@@ -278,6 +307,7 @@ export const aiPanelAgentWorkspaceMixin = {
             contextSummary,
             operatorCatalogVersion: plan.operatorCatalogVersion || plan.OperatorCatalogVersion || '',
             templateCatalogVersion: plan.templateCatalogVersion || plan.TemplateCatalogVersion || '',
+            templateSelection,
             stationBoundarySummary: plan.stationBoundarySummary || plan.StationBoundarySummary || '',
             plcOutputPolicy: plan.plcOutputPolicy || plan.PlcOutputPolicy || '',
             rawPlanSnapshot: plan
@@ -494,6 +524,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (this.isGenerating || !this.pendingVisionPlan) return false;
 
         const plan = this.pendingVisionPlan;
+        this.activePlanRequestId = null;
         const buildFromPlan = this._buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended });
         this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
         this._renderAgentWorkspaceOverview();
@@ -520,13 +551,17 @@ export const aiPanelAgentWorkspaceMixin = {
             ? this._stringifyPlanSnapshot(this._getCurrentFlowJson?.())
             : null;
         const buildIntent = this._resolvePlanBuildIntent(plan, currentFlowSnapshot);
-        const templateSelection = this._normalizeTemplateSelection?.(this.nextTemplateSelection) ||
-            this._normalizeTemplateSelection?.(plan?.templateSelection) ||
-            this._normalizeTemplateSelection?.(plan?.rawPlanSnapshot?.templateSelection) ||
-            null;
+        const templateSelection = this._resolveBuildTemplateSelection(plan);
+        const planHash = String(
+            plan?.planHash ||
+            plan?.rawPlanSnapshot?.planHash ||
+            plan?.rawPlanSnapshot?.PlanHash ||
+            ''
+        ).trim();
 
         return {
             planId: plan.planId || plan.id || '',
+            planHash,
             planSnapshot: this._buildPlanSnapshotForBuild(plan),
             userSelections: this._buildPlanSelectionMap(plan),
             acceptedDefaults: this._collectAcceptedDefaultIds(plan, acceptedRecommended),
@@ -543,10 +578,42 @@ export const aiPanelAgentWorkspaceMixin = {
         };
     },
 
+    _resolveBuildTemplateSelection(plan) {
+        const contextSummary = plan?.contextSummary || plan?.rawPlanSnapshot?.contextSummary || plan?.rawPlanSnapshot?.ContextSummary || {};
+        const contextSelection = {
+            mode: contextSummary.templateSelectionMode || contextSummary.TemplateSelectionMode || '',
+            templateId: contextSummary.templateId || contextSummary.TemplateId || ''
+        };
+        const candidates = [
+            plan?.templateSelection,
+            plan?.rawPlanSnapshot?.templateSelection,
+            plan?.rawPlanSnapshot?.TemplateSelection,
+            this.nextTemplateSelection,
+            contextSelection
+        ];
+
+        for (const candidate of candidates) {
+            const normalized = this._normalizeTemplateSelection?.(candidate);
+            if (normalized) return normalized;
+        }
+
+        return null;
+    },
+
     _buildPlanSnapshotForBuild(plan) {
-        if (plan?.rawPlanSnapshot) return plan.rawPlanSnapshot;
+        if (plan?.rawPlanSnapshot) {
+            const snapshot = { ...plan.rawPlanSnapshot };
+            if (!snapshot.planHash && !snapshot.PlanHash && plan?.planHash) {
+                snapshot.planHash = plan.planHash;
+            }
+            if (!snapshot.templateSelection && !snapshot.TemplateSelection && plan?.templateSelection) {
+                snapshot.templateSelection = plan.templateSelection;
+            }
+            return snapshot;
+        }
         return {
             planId: plan?.planId || plan?.id || '',
+            planHash: plan?.planHash || '',
             originalUserPrompt: plan?.originalDescription || plan?.buildPrompt || '',
             goal: plan?.goal || '',
             intent: plan?.intent || '',
@@ -564,6 +631,7 @@ export const aiPanelAgentWorkspaceMixin = {
             contextSummary: plan?.contextSummary || {},
             operatorCatalogVersion: plan?.operatorCatalogVersion || '',
             templateCatalogVersion: plan?.templateCatalogVersion || '',
+            templateSelection: plan?.templateSelection || null,
             stationBoundarySummary: plan?.stationBoundarySummary || '',
             plcOutputPolicy: plan?.plcOutputPolicy || '',
             metadataOnly: true

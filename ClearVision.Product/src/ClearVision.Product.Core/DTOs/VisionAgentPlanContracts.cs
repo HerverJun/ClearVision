@@ -17,6 +17,7 @@ public sealed record VisionAgentPlanModeRequest
 public sealed record VisionAgentPlanModeResult
 {
     public string PlanId { get; init; } = string.Empty;
+    public string PlanHash { get; init; } = string.Empty;
     public string OriginalUserPrompt { get; init; } = string.Empty;
     public string Goal { get; init; } = string.Empty;
     public string Intent { get; init; } = string.Empty;
@@ -34,6 +35,7 @@ public sealed record VisionAgentPlanModeResult
     public VisionAgentPlanContextSummary ContextSummary { get; init; } = new();
     public string OperatorCatalogVersion { get; init; } = string.Empty;
     public string TemplateCatalogVersion { get; init; } = string.Empty;
+    public AiTemplateSelectionInfo? TemplateSelection { get; init; }
     public string StationBoundarySummary { get; init; } = string.Empty;
     public string PlcOutputPolicy { get; init; } = string.Empty;
     public bool MetadataOnly { get; init; } = true;
@@ -97,6 +99,7 @@ public sealed record VisionAgentAttachmentSummary
 public sealed record VisionAgentBuildFromPlanRequest
 {
     public string PlanId { get; init; } = string.Empty;
+    public string PlanHash { get; init; } = string.Empty;
     public VisionAgentPlanModeResult? PlanSnapshot { get; init; }
     public Dictionary<string, string> UserSelections { get; init; } =
         new(StringComparer.OrdinalIgnoreCase);

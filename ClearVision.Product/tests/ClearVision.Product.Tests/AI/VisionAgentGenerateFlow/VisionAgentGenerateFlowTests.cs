@@ -209,6 +209,65 @@ public sealed class VisionAgentGenerateFlowTests
         publicJson.Should().NotContain("chainOfThought");
     }
 
+    [Fact(DisplayName = "Plan hash mismatch should publish public diagnostic without hidden prompt fields")]
+    public async Task VisionAgentOrchestrator_ShouldPublishPlanHashMismatchDiagnostic()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>?>(),
+                Arg.Any<Action<AiStreamChunk>?>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<GenerateFlowAttachmentReport>?>())
+            .Returns(Task.FromResult(new AiFlowGenerationResult
+            {
+                Success = true,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+                Flow = new OperatorFlowDto()
+            }));
+        var registry = new VisionAgentToolRegistry([new OperatorCatalogTool()]);
+        var orchestrator = new VisionAgentOrchestrator(registry, generationService, sink);
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "wire sequence inspection",
+                OriginalUserPrompt = "SECRET_RAW_PROMPT"
+            },
+            CancellationToken.None);
+
+        var result = await orchestrator.BuildFromPlanAsync(
+            new AiFlowGenerationRequest("wire sequence inspection", Mode: GenerateFlowMode.New)
+            {
+                AgentRunId = "ar_hash_mismatch",
+                UseVisionAgentGenerateFlow = true,
+                BuildFromPlan = new VisionAgentBuildFromPlanRequest
+                {
+                    PlanId = plan.PlanId,
+                    PlanHash = "sha256:mismatched-plan-hash",
+                    PlanSnapshot = plan,
+                    BuildIntent = "new",
+                    OriginalUserPrompt = plan.OriginalUserPrompt,
+                    MetadataOnly = true
+                }
+            },
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var diagnostic = sink.Events.Single(evt => evt.Stage == "plan_hash_validation");
+        diagnostic.Status.Should().Be(AgentRunEventStatuses.Completed);
+        var diagnosticJson = JsonSerializer.Serialize(diagnostic, AgentRunEventJson.Options);
+        diagnosticJson.Should().Contain("plan_hash_mismatch");
+        diagnosticJson.Should().Contain("sha256:mismatched-plan-hash");
+        diagnosticJson.Should().NotContain("SECRET_RAW_PROMPT");
+        diagnosticJson.Should().NotContain("systemPrompt");
+        diagnosticJson.Should().NotContain("rawPrompt");
+        diagnosticJson.Should().NotContain("reasoning_content");
+        diagnosticJson.Should().NotContain("chain-of-thought");
+        diagnosticJson.Should().NotContain("chainOfThought");
+    }
+
     [Fact(DisplayName = "Wire sequence request should generate draft and ModelPath pending action")]
     public async Task AgentGenerateFlow_WireSequence_ShouldReturnModelPathPendingAction()
     {

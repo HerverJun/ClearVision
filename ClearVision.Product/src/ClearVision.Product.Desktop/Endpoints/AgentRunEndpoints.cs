@@ -311,6 +311,7 @@ public static class AgentRunEndpoints
             agentGenerateFlowMode = request.AgentGenerateFlowMode ?? AiAgentGenerateFlowModes.Scripted,
             attachmentCount = request.BuildFromPlan?.AttachmentSummary.Count ?? request.AttachmentCount ?? request.Attachments?.Count ?? 0,
             planId = request.BuildFromPlan?.PlanId ?? string.Empty,
+            planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
             hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,
             hasCurrentFlowSnapshot = !string.IsNullOrWhiteSpace(request.BuildFromPlan?.CurrentFlowSnapshot) ||
                                      !string.IsNullOrWhiteSpace(request.ExistingFlowJson),
@@ -328,11 +329,14 @@ public static class AgentRunEndpoints
         return new
         {
             planId = buildFromPlan.PlanId,
+            planHash = buildFromPlan.PlanHash,
             planSnapshot = buildFromPlan.PlanSnapshot,
             userSelections = buildFromPlan.UserSelections,
             acceptedDefaults = buildFromPlan.AcceptedDefaults,
             currentFlowSnapshotIncluded = !string.IsNullOrWhiteSpace(buildFromPlan.CurrentFlowSnapshot),
             templateSelection = buildFromPlan.TemplateSelection,
+            templateSelectionMode = buildFromPlan.TemplateSelection?.Mode ?? string.Empty,
+            templateId = buildFromPlan.TemplateSelection?.TemplateId ?? string.Empty,
             attachmentSummary = buildFromPlan.AttachmentSummary,
             operatorCatalogVersion = buildFromPlan.OperatorCatalogVersion,
             stationBoundarySummary = buildFromPlan.StationBoundarySummary,
@@ -350,10 +354,12 @@ public static class AgentRunEndpoints
         return new
         {
             planId = build?.PlanId ?? string.Empty,
+            planHash = build?.PlanHash ?? build?.PlanSnapshot?.PlanHash ?? string.Empty,
             buildIntent = build?.BuildIntent ?? request.Mode ?? "auto",
             currentFlowSnapshotIncluded = !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot) ||
                                           !string.IsNullOrWhiteSpace(request.ExistingFlowJson),
             templateSelectionMode = build?.TemplateSelection?.Mode ?? request.TemplateSelection?.Mode ?? string.Empty,
+            templateId = build?.TemplateSelection?.TemplateId ?? request.TemplateSelection?.TemplateId ?? string.Empty,
             attachmentCount = build?.AttachmentSummary.Count ?? request.AttachmentCount ?? request.Attachments?.Count ?? 0,
             operatorCatalogVersion = build?.OperatorCatalogVersion ?? string.Empty,
             stationBoundarySummary = build?.StationBoundarySummary ?? string.Empty,
@@ -432,7 +438,7 @@ public sealed record AgentRunCreateRequest
         var existingFlowJson = !string.IsNullOrWhiteSpace(ExistingFlowJson)
             ? ExistingFlowJson
             : BuildFromPlan?.CurrentFlowSnapshot;
-        var templateSelection = TemplateSelection ?? BuildFromPlan?.TemplateSelection;
+        var templateSelection = BuildFromPlan?.TemplateSelection ?? TemplateSelection;
 
         return new AiFlowGenerationRequest(
             Description,

@@ -293,6 +293,7 @@ function createPanel(AiPanel, overrides = {}) {
   panel.nextHintDraft = '';
   panel.nextTemplateSelection = null;
   panel.activeGenerateRequestId = null;
+  panel.activePlanRequestId = null;
   panel.activeGenerateSessionId = null;
   panel.activeAgentRunId = null;
   panel.activeAgentRunEventSource = null;
@@ -439,6 +440,88 @@ function flushAsync(ticks = 2) {
     chain = chain.then(() => new Promise(resolve => setTimeout(resolve, 0)));
   }
   return chain;
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolveValue, rejectValue) => {
+    resolve = resolveValue;
+    reject = rejectValue;
+  });
+  return { promise, resolve, reject };
+}
+
+function backendPlanResult(overrides = {}) {
+  const templateSelection = overrides.templateSelection ?? {
+    mode: 'template_adapt',
+    templateId: 'tmpl-plan',
+    scenarioKey: 'scratch'
+  };
+  return {
+    planId: overrides.planId || 'plan_backend_1',
+    planHash: overrides.planHash || 'sha256:backend-plan-hash',
+    originalUserPrompt: overrides.originalUserPrompt || overrides.goal || 'detect metal scratches',
+    goal: overrides.goal || 'detect metal scratches',
+    intent: overrides.intent || 'surface_defect',
+    confidence: overrides.confidence || 'high',
+    requirementUnderstanding: ['Inspection intent: surface defect inspection.'],
+    recommendedRoute: {
+      routeId: 'surface_defect_detection',
+      title: 'Surface defect inspection route',
+      summary: 'Detect visible scratches and blobs.',
+      operators: ['ImageAcquisition', 'SurfaceDefectDetection', 'ResultOutput'],
+      templateDecision: 'Use selected template first.'
+    },
+    clarificationQuestions: [
+      {
+        id: 'defect_definition',
+        title: 'What should count as a defect?',
+        why: 'Thresholds depend on defect definition.',
+        defaultValue: 'scratch_or_blob',
+        defaultAssumption: 'Detect visible scratches and blobs.',
+        impact: 'Thresholds need sample confirmation.',
+        options: [
+          {
+            value: 'scratch_or_blob',
+            label: 'Scratch/blob',
+            recommended: true,
+            description: 'Use visible surface defect candidates.',
+            impact: 'Good first draft.'
+          }
+        ]
+      }
+    ],
+    recommendedDefaults: [
+      {
+        id: 'resource_policy',
+        label: 'Missing resources stay pending',
+        value: 'pending_parameters',
+        impact: 'No resource path is guessed.'
+      }
+    ],
+    risks: ['Thresholds need representative images.'],
+    acceptanceCriteria: ['Workflow draft contains acquisition, inspection, judgment, and output stages.'],
+    executablePlan: ['Map parameters and run readiness checks.'],
+    canBuild: true,
+    blockingReasons: [],
+    nextAction: 'Start Build.',
+    contextSummary: {
+      hasCurrentFlow: false,
+      hasCurrentResult: false,
+      attachmentCount: 0,
+      templateSelectionMode: templateSelection?.mode || '',
+      templateId: templateSelection?.templateId || '',
+      contextKinds: ['user_requirement', 'operator_catalog'],
+      operatorCatalogTools: ['validate_flow']
+    },
+    operatorCatalogVersion: 'catalog.v1',
+    templateCatalogVersion: 'template.v1',
+    templateSelection,
+    stationBoundarySummary: 'metadata-only station boundary',
+    plcOutputPolicy: 'local result first',
+    metadataOnly: true
+  };
 }
 
 async function waitFor(predicate, message = 'condition', attempts = 20) {
@@ -736,17 +819,34 @@ test('Plan Mode captures vague inspection request without starting Build', async
     '#ai-build-workspace': build,
     '#ai-result-status-note': createFakeElement()
   });
+  let capturedPlanRequest = null;
+  panel._requestBackendVisionPlan = async request => {
+    capturedPlanRequest = request;
+    return backendPlanResult({
+      goal: 'metal scratch inspection workflow',
+      templateSelection: { mode: 'template_fill', templateId: 'tmpl-scratch', scenarioKey: 'scratch' }
+    });
+  };
 
   const accepted = panel._dispatchGenerateRequest({
     description: '帮我做一个金属表面划痕检测流程',
     userMessage: '帮我做一个金属表面划痕检测流程'
   });
 
+  await flushAsync();
+
   assert.equal(accepted, true);
   assert.equal(panel.isGenerating, false);
   assert.equal(panel.activeAgentRunId, null);
   assert.equal(panel.agentWorkspaceMode, 'plan');
-  assert.match(panel.pendingVisionPlan.goal, /金属表面划痕/);
+  assert.equal(capturedPlanRequest.templateSelection, null);
+  assert.equal(panel.pendingVisionPlan.planHash, 'sha256:backend-plan-hash');
+  assert.deepEqual(panel.pendingVisionPlan.templateSelection, {
+    mode: 'template_fill',
+    templateId: 'tmpl-scratch',
+    scenarioKey: 'scratch'
+  });
+  assert.equal(panel.pendingVisionPlan.goal, 'metal scratch inspection workflow');
   assert.match(plan.innerHTML, /Clarifying Questions/);
   assert.match(plan.innerHTML, /Accept Recommended and Build/);
   assert.doesNotMatch(plan.innerHTML, /setTimeout/);
@@ -761,7 +861,11 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
     '#ai-build-workspace': createFakeElement(),
     '#ai-result-status-note': createFakeElement()
   });
-  panel.pendingVisionPlan = panel._buildVisionEngineeringPlan('detect metal scratches');
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    planId: 'plan_build_1',
+    planHash: 'sha256:plan-build-1',
+    templateSelection: { mode: 'template_adapt', templateId: 'tmpl-plan', scenarioKey: 'scratch' }
+  }));
   panel.planQuestionSelections = Object.fromEntries(
     panel.pendingVisionPlan.questions.map(question => [question.id, question.defaultValue])
   );
@@ -777,8 +881,76 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   assert.equal(panel.agentWorkspaceMode, 'build');
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.explicitMode, 'new');
-  assert.match(captured.hint, /Plan Mode confirmed build context/);
+  assert.equal(captured.hint, '');
   assert.match(captured.userMessage, /Start Build from plan/);
+  assert.equal(captured.buildFromPlan.planHash, 'sha256:plan-build-1');
+  assert.deepEqual(captured.buildFromPlan.templateSelection, {
+    mode: 'template_adapt',
+    templateId: 'tmpl-plan',
+    scenarioKey: 'scratch'
+  });
+  assert.deepEqual(captured.templateSelection, captured.buildFromPlan.templateSelection);
+});
+
+test('Plan Mode ignores stale backend response when a newer Plan request wins', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+
+  const first = deferred();
+  const second = deferred();
+  let calls = 0;
+  panel._requestBackendVisionPlan = () => {
+    calls += 1;
+    return calls === 1 ? first.promise : second.promise;
+  };
+
+  panel._enterPlanModeFromPrompt({ description: 'old plan', userMessage: 'old plan' });
+  panel._enterPlanModeFromPrompt({ description: 'new plan', userMessage: 'new plan' });
+
+  second.resolve(backendPlanResult({ planId: 'plan_new', goal: 'new plan ready' }));
+  await flushAsync();
+  assert.equal(panel.pendingVisionPlan.planId, 'plan_new');
+  assert.equal(panel.pendingVisionPlan.goal, 'new plan ready');
+
+  first.resolve(backendPlanResult({ planId: 'plan_old', goal: 'old plan should not win' }));
+  await flushAsync();
+  assert.equal(panel.pendingVisionPlan.planId, 'plan_new');
+  assert.equal(panel.pendingVisionPlan.goal, 'new plan ready');
+});
+
+test('BuildFromPlan prefers Plan templateSelection over raw snapshot and queued selection', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.nextTemplateSelection = { mode: 'template_fill', templateId: 'tmpl-next', scenarioKey: 'queued' };
+  panel.planQuestionSelections = {};
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    planId: 'plan_template_priority',
+    planHash: 'sha256:priority',
+    templateSelection: { mode: 'template_adapt', templateId: 'tmpl-plan', scenarioKey: 'plan' }
+  }));
+  plan.rawPlanSnapshot = {
+    ...plan.rawPlanSnapshot,
+    templateSelection: { mode: 'template_fill', templateId: 'tmpl-raw', scenarioKey: 'raw' }
+  };
+  plan.templateSelection = { mode: 'template_adapt', templateId: 'tmpl-plan', scenarioKey: 'plan' };
+
+  const buildFromPlan = panel._buildStructuredBuildFromPlanRequest(plan);
+
+  assert.equal(buildFromPlan.planHash, 'sha256:priority');
+  assert.deepEqual(buildFromPlan.templateSelection, {
+    mode: 'template_adapt',
+    templateId: 'tmpl-plan',
+    scenarioKey: 'plan'
+  });
+  assert.equal(buildFromPlan.planSnapshot.templateSelection.templateId, 'tmpl-raw');
 });
 
 test('AgentRun fetch stream is preferred and sends Authorization header', async () => {

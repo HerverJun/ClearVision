@@ -73,6 +73,12 @@ public sealed class AgentRunEndpointsTests
             description = "帮我做一个金属表面划痕检测流程",
             originalUserPrompt = "帮我做一个金属表面划痕检测流程",
             currentFlowSnapshot = "{\"operators\":[{\"id\":\"camera\"}]}",
+            templateSelection = new
+            {
+                mode = "catalog_lock",
+                templateId = "tmpl-scratch",
+                scenarioKey = "scratch"
+            },
             attachmentSummary = new
             {
                 count = 1,
@@ -96,6 +102,10 @@ public sealed class AgentRunEndpointsTests
         scratch.GetProperty("intent").GetString().Should().Be("surface_defect");
         scratch.GetProperty("recommendedRoute").GetProperty("routeId").GetString().Should().Be("surface_defect_detection");
         scratch.GetProperty("contextSummary").GetProperty("hasCurrentFlow").GetBoolean().Should().BeTrue();
+        scratch.GetProperty("planHash").GetString().Should().StartWith("sha256:");
+        scratch.GetProperty("templateSelection").GetProperty("mode").GetString().Should().Be("catalog_lock");
+        scratch.GetProperty("templateSelection").GetProperty("templateId").GetString().Should().Be("tmpl-scratch");
+        scratch.GetProperty("templateSelection").GetProperty("scenarioKey").GetString().Should().Be("scratch");
         scratch.GetProperty("clarificationQuestions").EnumerateArray()
             .Select(question => question.GetProperty("id").GetString())
             .Should()
@@ -161,12 +171,20 @@ public sealed class AgentRunEndpointsTests
         {
             description = "帮我做一个金属表面划痕检测流程",
             sessionId = "session-plan-build",
+            templateSelection = new
+            {
+                mode = "template_fill",
+                templateId = "top-level-template",
+                scenarioKey = "top-level"
+            },
             buildFromPlan = new
             {
                 planId = "plan_scratch_1",
+                planHash = "sha256:build-plan-hash",
                 planSnapshot = new
                 {
                     planId = "plan_scratch_1",
+                    planHash = "sha256:build-plan-hash",
                     originalUserPrompt = "帮我做一个金属表面划痕检测流程",
                     goal = "金属表面划痕检测",
                     intent = "surface_defect",
@@ -231,6 +249,12 @@ public sealed class AgentRunEndpointsTests
                     },
                     operatorCatalogVersion = "catalog.v1",
                     templateCatalogVersion = "template.v1",
+                    templateSelection = new
+                    {
+                        mode = "template_adapt",
+                        templateId = "tmpl-scratch",
+                        scenarioKey = "scratch"
+                    },
                     stationBoundarySummary = "metadata-only station boundary",
                     plcOutputPolicy = "local result first",
                     metadataOnly = true
@@ -272,6 +296,7 @@ public sealed class AgentRunEndpointsTests
         var request = host.Generation.LastRequest!;
         request.BuildFromPlan.Should().NotBeNull();
         request.BuildFromPlan!.PlanId.Should().Be("plan_scratch_1");
+        request.BuildFromPlan.PlanHash.Should().Be("sha256:build-plan-hash");
         request.BuildFromPlan.PlanSnapshot.Should().NotBeNull();
         request.BuildFromPlan.UserSelections.Should().ContainKey("defect_definition");
         request.BuildFromPlan.AcceptedDefaults.Should().Contain("resource_policy");
@@ -291,6 +316,9 @@ public sealed class AgentRunEndpointsTests
         var completedJson = JsonSerializer.Serialize(completed, AgentRunEventJson.Options);
         completedJson.Should().Contain("\"buildFromPlan\"");
         completedJson.Should().Contain("\"planId\":\"plan_scratch_1\"");
+        completedJson.Should().Contain("\"planHash\":\"sha256:build-plan-hash\"");
+        completedJson.Should().Contain("\"templateSelectionMode\":\"template_adapt\"");
+        completedJson.Should().Contain("\"templateId\":\"tmpl-scratch\"");
         completedJson.Should().Contain("\"currentFlowSnapshotIncluded\":true");
         completedJson.Should().Contain("\"operatorCatalogVersion\":\"catalog.v1\"");
         completedJson.Should().NotContain("reasoning_content");

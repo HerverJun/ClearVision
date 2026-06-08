@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
@@ -20,6 +21,12 @@ public interface IVisionAgentOrchestrator
 
 public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 {
+    private static readonly JsonSerializerOptions PlanHashJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false
+    };
+
     private readonly IVisionAgentToolRegistry _toolRegistry;
     private readonly IAiFlowGenerationService _generationService;
     private readonly IAgentRunEventSink? _eventSink;
@@ -55,8 +62,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     {
         var description = Clean(request.Description);
         var originalPrompt = Clean(request.OriginalUserPrompt) ?? description;
-        var scenario = DetectScenario(description, request.TemplateSelection);
-        var route = BuildRoute(scenario, request.TemplateSelection);
+        var templateSelection = RedactTemplateSelection(request.TemplateSelection);
+        var scenario = DetectScenario(description, templateSelection);
+        var route = BuildRoute(scenario, templateSelection);
         var questions = BuildQuestions(scenario);
         var defaults = BuildDefaults(scenario, request);
         var toolNames = _toolRegistry.ListTools()
@@ -74,7 +82,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             ? new List<string>()
             : ["inspection_goal_missing"];
 
-        return new VisionAgentPlanModeResult
+        var result = new VisionAgentPlanModeResult
         {
             PlanId = $"plan_{Guid.NewGuid():N}",
             OriginalUserPrompt = originalPrompt,
@@ -85,7 +93,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             [
                 $"Inspection intent: {ToScenarioTitle(scenario)}.",
                 hasFlow ? "Current canvas summary is available for Build." : "Build can start as a new workflow draft.",
-                request.TemplateSelection != null
+                templateSelection != null
                     ? "A template selection was provided and will be considered first."
                     : "Template choice will be decided by the Build stage.",
                 attachmentCount > 0
@@ -116,28 +124,34 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 HasCurrentFlow = hasFlow,
                 HasCurrentResult = hasResult,
                 AttachmentCount = attachmentCount,
-                TemplateSelectionMode = request.TemplateSelection?.Mode ?? string.Empty,
-                TemplateId = request.TemplateSelection?.TemplateId ?? string.Empty,
+                TemplateSelectionMode = templateSelection?.Mode ?? string.Empty,
+                TemplateId = templateSelection?.TemplateId ?? string.Empty,
                 ContextKinds =
                 [
                     "user_requirement",
                     hasFlow ? "current_flow" : "new_flow",
                     hasResult ? "current_result" : "no_current_result",
-                    request.TemplateSelection != null ? "template_selection" : "template_catalog",
+                    templateSelection != null ? "template_selection" : "template_catalog",
                     "operator_catalog",
                     "station_boundary"
                 ],
                 OperatorCatalogTools = toolNames
             },
             OperatorCatalogVersion = operatorCatalogVersion,
-            TemplateCatalogVersion = request.TemplateSelection?.TemplateId is { Length: > 0 } templateId
+            TemplateCatalogVersion = templateSelection?.TemplateId is { Length: > 0 } templateId
                 ? $"selected-template:{templateId}"
                 : "metadata-template-catalog.v1",
+            TemplateSelection = templateSelection,
             StationBoundarySummary = "metadata-only Station boundary; no camera, PLC, filesystem, or network resource is touched during Plan.",
             PlcOutputPolicy = scenario == "plc_output"
                 ? "PLC output is planned as pending metadata until OK/NG address, handshake, and fail-safe policy are confirmed."
                 : "Local ResultOutput first; PLC writes remain disabled until Build readiness review.",
             MetadataOnly = true
+        };
+
+        return result with
+        {
+            PlanHash = ComputePlanHash(result)
         };
     }
 
@@ -148,6 +162,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var plan = build?.PlanSnapshot;
         var hasExistingFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson) ||
                               !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot);
+        EmitPlanHashDiagnosticIfNeeded(runId, build);
 
         _eventSink?.StageStarted(
             runId,
@@ -193,6 +208,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 hasExistingFlow,
                 attachmentCount = build?.AttachmentSummary.Count ?? request.Attachments?.Count ?? 0,
                 templateSelectionMode = build?.TemplateSelection?.Mode ?? request.TemplateSelection?.Mode ?? string.Empty,
+                templateId = build?.TemplateSelection?.TemplateId ?? request.TemplateSelection?.TemplateId ?? string.Empty,
                 operatorCatalogVersion = build?.OperatorCatalogVersion ?? plan?.OperatorCatalogVersion ?? string.Empty,
                 metadataOnly = true
             });
@@ -206,6 +222,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             new
             {
                 planId = build?.PlanId ?? plan?.PlanId ?? string.Empty,
+                planHash = build?.PlanHash ?? plan?.PlanHash ?? string.Empty,
                 planSnapshot = plan,
                 userSelections = build?.UserSelections ?? new Dictionary<string, string>(),
                 acceptedDefaults = build?.AcceptedDefaults ?? [],
@@ -257,16 +274,128 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         return new
         {
             planId = build?.PlanId ?? string.Empty,
+            planHash = build?.PlanHash ?? build?.PlanSnapshot?.PlanHash ?? string.Empty,
             buildIntent = build?.BuildIntent ?? request.Mode.ToWireValue(),
             currentFlowSnapshotIncluded = !string.IsNullOrWhiteSpace(request.ExistingFlowJson) ||
                                           !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot),
             templateSelectionMode = build?.TemplateSelection?.Mode ?? request.TemplateSelection?.Mode ?? string.Empty,
+            templateId = build?.TemplateSelection?.TemplateId ?? request.TemplateSelection?.TemplateId ?? string.Empty,
             attachmentCount = build?.AttachmentSummary.Count ?? request.Attachments?.Count ?? 0,
             operatorCatalogVersion = build?.OperatorCatalogVersion ?? string.Empty,
             stationBoundarySummary = build?.StationBoundarySummary ?? string.Empty,
             plcOutputPolicy = build?.PlcOutputPolicy ?? string.Empty,
             metadataOnly = true
         };
+    }
+
+    public static string ComputePlanHash(VisionAgentPlanModeResult? plan)
+    {
+        if (plan == null)
+        {
+            return string.Empty;
+        }
+
+        var payload = new
+        {
+            goal = Clean(plan.Goal),
+            intent = Clean(plan.Intent),
+            confidence = Clean(plan.Confidence),
+            requirementUnderstanding = NormalizeList(plan.RequirementUnderstanding),
+            recommendedRoute = new
+            {
+                routeId = Clean(plan.RecommendedRoute.RouteId),
+                title = Clean(plan.RecommendedRoute.Title),
+                summary = Clean(plan.RecommendedRoute.Summary),
+                operators = NormalizeList(plan.RecommendedRoute.Operators),
+                templateDecision = Clean(plan.RecommendedRoute.TemplateDecision)
+            },
+            clarificationQuestions = plan.ClarificationQuestions
+                .Select(question => new
+                {
+                    id = Clean(question.Id),
+                    title = Clean(question.Title),
+                    why = Clean(question.Why),
+                    defaultValue = Clean(question.DefaultValue),
+                    defaultAssumption = Clean(question.DefaultAssumption),
+                    impact = Clean(question.Impact),
+                    options = question.Options.Select(option => new
+                    {
+                        value = Clean(option.Value),
+                        label = Clean(option.Label),
+                        recommended = option.Recommended,
+                        description = Clean(option.Description),
+                        impact = Clean(option.Impact)
+                    }).ToList()
+                })
+                .ToList(),
+            recommendedDefaults = plan.RecommendedDefaults
+                .Select(item => new
+                {
+                    id = Clean(item.Id),
+                    label = Clean(item.Label),
+                    value = Clean(item.Value),
+                    impact = Clean(item.Impact)
+                })
+                .ToList(),
+            risks = NormalizeList(plan.Risks),
+            acceptanceCriteria = NormalizeList(plan.AcceptanceCriteria),
+            executablePlan = NormalizeList(plan.ExecutablePlan),
+            canBuild = plan.CanBuild,
+            blockingReasons = NormalizeList(plan.BlockingReasons),
+            nextAction = Clean(plan.NextAction),
+            contextSummary = new
+            {
+                hasCurrentFlow = plan.ContextSummary.HasCurrentFlow,
+                hasCurrentResult = plan.ContextSummary.HasCurrentResult,
+                attachmentCount = Math.Max(plan.ContextSummary.AttachmentCount, 0),
+                templateSelectionMode = Clean(plan.ContextSummary.TemplateSelectionMode),
+                templateId = Clean(plan.ContextSummary.TemplateId),
+                contextKinds = NormalizeList(plan.ContextSummary.ContextKinds),
+                operatorCatalogTools = NormalizeList(plan.ContextSummary.OperatorCatalogTools)
+            },
+            operatorCatalogVersion = Clean(plan.OperatorCatalogVersion),
+            templateCatalogVersion = Clean(plan.TemplateCatalogVersion),
+            templateSelection = NormalizeTemplateSelectionForHash(plan.TemplateSelection),
+            stationBoundarySummary = Clean(plan.StationBoundarySummary),
+            plcOutputPolicy = Clean(plan.PlcOutputPolicy),
+            metadataOnly = plan.MetadataOnly
+        };
+
+        var json = JsonSerializer.Serialize(payload, PlanHashJsonOptions);
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
+        return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()}";
+    }
+
+    private void EmitPlanHashDiagnosticIfNeeded(
+        string? runId,
+        VisionAgentBuildFromPlanRequest? build)
+    {
+        if (build?.PlanSnapshot == null || string.IsNullOrWhiteSpace(build.PlanHash))
+        {
+            return;
+        }
+
+        var computed = ComputePlanHash(build.PlanSnapshot);
+        if (string.IsNullOrWhiteSpace(computed) ||
+            string.Equals(build.PlanHash, computed, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _eventSink?.StageCompleted(
+            runId,
+            "plan_hash_validation",
+            "Plan hash mismatch detected",
+            "Build is continuing with the public plan snapshot; review plan provenance before applying.",
+            new
+            {
+                warningCode = "plan_hash_mismatch",
+                planId = build.PlanId,
+                providedPlanHash = build.PlanHash,
+                computedPlanHash = computed,
+                publicDiagnosticsOnly = true,
+                metadataOnly = true
+            });
     }
 
     private static string DetectScenario(string description, AiTemplateSelectionInfo? templateSelection)
@@ -637,6 +766,48 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var joined = string.Join("|", toolNames);
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(joined));
         return $"vision-agent-tools:{toolNames.Count}:{Convert.ToHexString(hash)[..12].ToLowerInvariant()}";
+    }
+
+    private static AiTemplateSelectionInfo? RedactTemplateSelection(AiTemplateSelectionInfo? selection)
+    {
+        var mode = Clean(selection?.Mode).ToLowerInvariant();
+        var templateId = Clean(selection?.TemplateId);
+        var scenarioKey = Clean(selection?.ScenarioKey);
+
+        if (string.IsNullOrWhiteSpace(mode) &&
+            string.IsNullOrWhiteSpace(templateId) &&
+            string.IsNullOrWhiteSpace(scenarioKey))
+        {
+            return null;
+        }
+
+        return new AiTemplateSelectionInfo
+        {
+            Mode = mode,
+            TemplateId = string.IsNullOrWhiteSpace(templateId) ? null : templateId,
+            ScenarioKey = string.IsNullOrWhiteSpace(scenarioKey) ? null : scenarioKey
+        };
+    }
+
+    private static object? NormalizeTemplateSelectionForHash(AiTemplateSelectionInfo? selection)
+    {
+        var redacted = RedactTemplateSelection(selection);
+        return redacted == null
+            ? null
+            : new
+            {
+                mode = Clean(redacted.Mode),
+                templateId = Clean(redacted.TemplateId),
+                scenarioKey = Clean(redacted.ScenarioKey)
+            };
+    }
+
+    private static List<string> NormalizeList(IEnumerable<string>? values)
+    {
+        return values?
+            .Select(Clean)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList() ?? [];
     }
 
     private static string Clean(string? value)
