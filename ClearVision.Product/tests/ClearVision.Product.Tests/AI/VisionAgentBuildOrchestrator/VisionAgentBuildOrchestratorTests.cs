@@ -88,7 +88,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.MissingResources.Should().Contain(item =>
             item.ResourceType == "model_resource" &&
             item.ResourceKey == "op_surface_defect.ModelId");
-        result.BuildResult.FirstFixRecommendation.Should().Contain("model_resource");
+        result.BuildResult.FirstFixRecommendation.Should().Contain("模型资源");
         result.BuildResult.FirstFixRecommendation.Should().Contain("op_surface_defect.ModelId");
         AssertBuildQuality(result, sink, expectPreserved: true);
     }
@@ -121,7 +121,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.ParameterMapping.Should().Contain(item =>
             item.OperatorType == "ResultJudgment" &&
             item.ParameterName == "Rule" &&
-            item.ValueSummary.Contains("wire sequence", StringComparison.OrdinalIgnoreCase));
+            item.ValueSummary.Contains("线序", StringComparison.OrdinalIgnoreCase));
         result.BuildResult.MissingResources.Should().Contain(item =>
             item.ResourceType == "model_resource" &&
             item.ResourceKey == "op_detect.ModelPath");
@@ -201,7 +201,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.MissingResources.Should().Contain(item =>
             item.ResourceType == "template_artifact" &&
             item.ResourceKey == "op_match.TemplatePath");
-        result.BuildResult.FirstFixRecommendation.Should().Contain("template_artifact");
+        result.BuildResult.FirstFixRecommendation.Should().Contain("模板资源");
         result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
             item.Stage == "template_strategy" &&
             item.ToolName == "get_flow_template_skeleton");
@@ -280,7 +280,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.WarningCode == "plan_hash_mismatch");
         sink.Events.Should().Contain(evt =>
             evt.Stage == "plan_hash_validation" &&
-            evt.Summary.Contains("review plan provenance", StringComparison.OrdinalIgnoreCase));
+            evt.Summary.Contains("复核计划来源", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact(DisplayName = "Black-box template positioning Build should use template skeleton instead of surface defect route")]
