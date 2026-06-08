@@ -61,6 +61,116 @@ const BUILD_STAGE_LABELS = {
     run: '运行'
 };
 
+const AI_DISPLAY_TEXT_MAP = {
+    'Accept recommended defaults, then start Build.': '可接受推荐默认值，然后开始构建。',
+    'Accept recommended defaults or answer questions, then start Build.': '可接受推荐默认值或回答关键问题，然后开始构建。',
+    'Accept recommended defaults and Build.': '接受推荐默认值并开始构建。',
+    'Surface defect inspection route': '表面缺陷检测路线',
+    'Detect visible scratches and blobs.': '检测可见划痕、斑点等表面缺陷。',
+    'Inspection intent: surface defect inspection.': '需求意图：表面缺陷检测。',
+    'What should count as a defect?': '缺陷判定标准是什么？',
+    'Defect definition controls thresholds and judgment.': '缺陷定义会影响阈值和判定逻辑。',
+    'Scratch/blob': '划痕/斑点',
+    'Use general surface defect candidates.': '使用通用表面缺陷候选区域。',
+    'Good first draft.': '适合作为初始草稿。',
+    'Crack': '裂纹',
+    'Dent/stain': '凹痕/污渍',
+    'Emphasize thin dark/bright crack-like defects.': '重点检测细长明暗裂纹类缺陷。',
+    'Look for dents, stain, or discoloration.': '关注凹痕、污渍或变色。',
+    'Look for dents, stains, or discoloration.': '关注凹痕、污渍或变色。',
+    'Needs contrast assumptions.': '需要确认对比度假设。',
+    'Needs lighting/sample confirmation.': '需要确认光照和样品条件。',
+    'Thresholds need sample confirmation.': '阈值需要结合样品确认。',
+    'Thresholds need representative images.': '阈值需要代表性图像确认。',
+    'Detect visible scratches/blobs and judge by area/contrast.': '检测可见划痕/斑点，并按面积和对比度判定。',
+    'Context collected': '已收集工程上下文',
+    'Rule fallback used': '已启用规则兜底',
+    'Plan ready': '规划已就绪',
+    'Planner started': '规划器已开始',
+    'Run completed': '运行已完成',
+    'Build completed.': '构建完成。',
+    'Build completed with public metadata.': '已使用公开元数据完成构建。',
+    'Validated draft metadata.': '流程草稿元数据已校验。',
+    'Tool completed.': '工具执行完成。',
+    'invalid operator was repaired': '非法算子已修复',
+    'NG when scratch candidate exceeds pending threshold.': '当划痕候选超过待确认阈值时判为 NG。',
+    'Bind model_resource metadata before deployment.': '部署前绑定模型资源元数据。',
+    'Bind missing model_resource metadata for op_detect.ModelId before deployment.': '部署前绑定 op_detect.模型资源 的模型资源元数据。'
+};
+
+const AI_CODE_TEXT_MAP = {
+    rule_fallback: '规则兜底',
+    planner: 'Planner 规划',
+    model_planner: '模型规划',
+    llm_planner: '模型规划',
+    backend_planner: '后端规划',
+    planner_failed: 'Planner 生成失败，已使用规则兜底方案',
+    planner_disabled: 'Planner 未启用，已使用规则兜底方案',
+    planner_timeout: 'Planner 超时，已使用规则兜底方案',
+    contract_repaired: '契约已修复',
+    high: '高',
+    medium: '中',
+    low: '低',
+    started: '已开始',
+    running: '执行中',
+    completed: '已完成',
+    blocked: '已阻断',
+    failed: '失败',
+    cancelled: '已取消',
+    canceled: '已取消',
+    pending: '等待中',
+    template_skeleton: '模板骨架',
+    plan_route: '规划路线',
+    catalog_required: '目录必需',
+    accepted_default: '已接受默认值',
+    plan_default: '规划默认值',
+    missing_resource: '缺失资源',
+    mapped: '已映射',
+    template_fill: '模板填充',
+    template_adapt: '模板适配',
+    catalog_match: '目录匹配',
+    no_template: '不使用模板',
+    deployment_resource_pending: '部署资源待绑定',
+    plan_hash_mismatch: '计划哈希不一致',
+    invalid_operator_repaired: '非法算子已修复',
+    missing_parameter: '参数缺失',
+    schema_validation_warning: '结构校验警告',
+    model_resource: '模型资源',
+    template_artifact: '模板资源',
+    measurement_parameter: '测量参数',
+    camera_binding: '相机绑定',
+    output_channel: '输出通道'
+};
+
+const AI_OPERATOR_LABELS = {
+    ImageAcquisition: '图像采集',
+    SurfaceDefectDetection: '表面缺陷检测',
+    BlobAnalysis: '斑点分析',
+    DeepLearning: '深度学习检测',
+    TemplateMatching: '模板匹配',
+    CircleMeasurement: '圆测量',
+    MeasureDistance: '距离测量',
+    ResultJudgment: '结果判定',
+    ResultOutput: '结果输出'
+};
+
+const AI_PARAMETER_LABELS = {
+    ModelId: '模型资源',
+    ModelPath: '模型资源',
+    ModelCatalogPath: '模型资源',
+    TemplatePath: '模板文件',
+    TemplateId: '模板资源',
+    Unit: '测量单位/像素比例',
+    PixelScale: '像素比例',
+    Tolerance: '容差阈值',
+    Rule: '判定规则',
+    CameraId: '相机绑定',
+    CameraBindingId: '相机绑定',
+    OutputChannelId: '输出通道',
+    SourceType: '采集源',
+    FilePath: '图像文件'
+};
+
 export const aiPanelAgentWorkspaceMixin = {
     _resetAgentWorkspace({ preservePlan = false } = {}) {
         this.activePlanRequestId = null;
@@ -144,7 +254,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 );
                 this._clearActivePlanRequest(planRequestId);
                 const sourceLabel = this.pendingVisionPlan.planSource === 'rule_fallback'
-                    ? `规划已生成（规则兜底：${this.pendingVisionPlan.fallbackReason || 'rule_fallback'}）`
+                    ? `规划已生成（规则兜底：${this.pendingVisionPlan.fallbackReason || '已使用规则兜底方案'}）`
                     : '规划已生成（Planner）';
                 this._setAssistantTurnStatus(turn, '规划完成', 'success');
                 this._setAssistantSectionText(
@@ -300,37 +410,37 @@ export const aiPanelAgentWorkspaceMixin = {
             mode: AgentWorkspaceModes.PLAN,
             originalDescription: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
             buildPrompt: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
-            goal: plan.goal || plan.Goal || fallbackDescription || '视觉流程草稿',
+            goal: this._localizeDisplayText(plan.goal || plan.Goal || fallbackDescription || '视觉流程草稿'),
             intent: plan.intent || plan.Intent || '',
             confidence: plan.confidence || plan.Confidence || 'medium',
             planSource: plan.planSource || plan.PlanSource || '',
-            fallbackReason: plan.fallbackReason || plan.FallbackReason || '',
-            planWarnings: this._toArray(plan.planWarnings || plan.PlanWarnings),
-            contractRepairNotes: this._toArray(plan.contractRepairNotes || plan.ContractRepairNotes),
+            fallbackReason: this._formatPlanFallbackReason(plan.fallbackReason || plan.FallbackReason || ''),
+            planWarnings: this._toArray(plan.planWarnings || plan.PlanWarnings).map(item => this._localizeDisplayText(item)),
+            contractRepairNotes: this._toArray(plan.contractRepairNotes || plan.ContractRepairNotes).map(item => this._localizeDisplayText(item)),
             publicEvents: this._toArray(plan.publicEvents || plan.PublicEvents)
                 .map(evt => this._normalizePlanPublicEvent(evt)),
             blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
-            nextAction: plan.nextAction || plan.NextAction || '复核计划后开始构建。',
+            nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
             executable: Boolean(plan.canBuild ?? plan.CanBuild ?? true),
-            blockingReasons: this._toArray(plan.blockingReasons || plan.BlockingReasons),
+            blockingReasons: this._toArray(plan.blockingReasons || plan.BlockingReasons).map(item => this._localizeDisplayText(item)),
             understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
-                ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding)
+                ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).map(item => this._localizeDisplayText(item))
                 : [`用户目标：${fallbackDescription || '视觉流程草稿'}`],
             route: {
                 routeId: route.routeId || route.RouteId || '',
-                title: route.title || route.Title || '视觉方案路线',
-                summary: route.summary || route.Summary || '',
+                title: this._localizeDisplayText(route.title || route.Title || '视觉方案路线'),
+                summary: this._localizeDisplayText(route.summary || route.Summary || ''),
                 operators: this._toArray(route.operators || route.Operators),
-                templateDecision: route.templateDecision || route.TemplateDecision || ''
+                templateDecision: this._localizeDisplayText(route.templateDecision || route.TemplateDecision || '')
             },
             questions: normalizedQuestions,
             assumptions: normalizedDefaults.length
-                ? normalizedDefaults.map(item => `${item.label}: ${item.value}${item.impact ? ` (${item.impact})` : ''}`)
+                ? normalizedDefaults.map(item => `${item.label}: ${this._localizeDisplayText(item.value)}${item.impact ? `（${item.impact}）` : ''}`)
                 : ['保留公开元数据边界，缺失资源在确认前保持为待补项。'],
             recommendedDefaults: normalizedDefaults,
-            steps: this._toArray(plan.executablePlan || plan.ExecutablePlan),
-            risks: this._toArray(plan.risks || plan.Risks),
-            acceptanceCriteria: this._toArray(plan.acceptanceCriteria || plan.AcceptanceCriteria),
+            steps: this._toArray(plan.executablePlan || plan.ExecutablePlan).map(item => this._localizeDisplayText(item)),
+            risks: this._toArray(plan.risks || plan.Risks).map(item => this._localizeDisplayText(item)),
+            acceptanceCriteria: this._toArray(plan.acceptanceCriteria || plan.AcceptanceCriteria).map(item => this._localizeDisplayText(item)),
             contextSummary,
             operatorCatalogVersion: plan.operatorCatalogVersion || plan.OperatorCatalogVersion || '',
             templateCatalogVersion: plan.templateCatalogVersion || plan.TemplateCatalogVersion || '',
@@ -358,11 +468,11 @@ export const aiPanelAgentWorkspaceMixin = {
             .filter(Boolean);
         return {
             id: question.id || question.Id || '',
-            title: question.title || question.Title || '',
-            why: question.why || question.Why || '',
+            title: this._localizeDisplayText(question.title || question.Title || ''),
+            why: this._localizeDisplayText(question.why || question.Why || ''),
             defaultValue: question.defaultValue || question.DefaultValue || options.find(item => item.recommended)?.value || options[0]?.value || '',
-            defaultAssumption: question.defaultAssumption || question.DefaultAssumption || '',
-            impact: question.impact || question.Impact || '',
+            defaultAssumption: this._localizeDisplayText(question.defaultAssumption || question.DefaultAssumption || ''),
+            impact: this._localizeDisplayText(question.impact || question.Impact || ''),
             options
         };
     },
@@ -371,10 +481,10 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!option) return null;
         return {
             value: option.value || option.Value || '',
-            label: option.label || option.Label || option.value || option.Value || '',
+            label: this._localizeDisplayText(option.label || option.Label || option.value || option.Value || ''),
             recommended: Boolean(option.recommended ?? option.Recommended),
-            description: option.description || option.Description || '',
-            impact: option.impact || option.Impact || ''
+            description: this._localizeDisplayText(option.description || option.Description || ''),
+            impact: this._localizeDisplayText(option.impact || option.Impact || '')
         };
     },
 
@@ -382,14 +492,109 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!item) return null;
         return {
             id: item.id || item.Id || '',
-            label: item.label || item.Label || '',
-            value: item.value || item.Value || '',
-            impact: item.impact || item.Impact || ''
+            label: this._localizeDisplayText(item.label || item.Label || ''),
+            value: this._localizeDisplayText(item.value || item.Value || ''),
+            impact: this._localizeDisplayText(item.impact || item.Impact || '')
         };
     },
 
     _toArray(value) {
         return Array.isArray(value) ? value : [];
+    },
+
+    _localizeDisplayText(value) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        if (AI_DISPLAY_TEXT_MAP[text]) return AI_DISPLAY_TEXT_MAP[text];
+
+        const codeKey = text.toLowerCase();
+        if (AI_CODE_TEXT_MAP[codeKey]) return AI_CODE_TEXT_MAP[codeKey];
+        if (BUILD_STAGE_LABELS[text]) return BUILD_STAGE_LABELS[text];
+        if (AI_OPERATOR_LABELS[text]) return AI_OPERATOR_LABELS[text];
+        if (AI_PARAMETER_LABELS[text]) return AI_PARAMETER_LABELS[text];
+
+        return text
+            .replace(/\bImageAcquisition\b/g, AI_OPERATOR_LABELS.ImageAcquisition)
+            .replace(/\bSurfaceDefectDetection\b/g, AI_OPERATOR_LABELS.SurfaceDefectDetection)
+            .replace(/\bBlobAnalysis\b/g, AI_OPERATOR_LABELS.BlobAnalysis)
+            .replace(/\bDeepLearning\b/g, AI_OPERATOR_LABELS.DeepLearning)
+            .replace(/\bTemplateMatching\b/g, AI_OPERATOR_LABELS.TemplateMatching)
+            .replace(/\bCircleMeasurement\b/g, AI_OPERATOR_LABELS.CircleMeasurement)
+            .replace(/\bMeasureDistance\b/g, AI_OPERATOR_LABELS.MeasureDistance)
+            .replace(/\bResultJudgment\b/g, AI_OPERATOR_LABELS.ResultJudgment)
+            .replace(/\bResultOutput\b/g, AI_OPERATOR_LABELS.ResultOutput)
+            .replace(/\bModelId\b|\bModelPath\b|\bModelCatalogPath\b/g, '模型资源')
+            .replace(/\bTemplatePath\b|\bTemplateId\b/g, '模板资源')
+            .replace(/\bTolerance\b/g, '容差阈值')
+            .replace(/\bRule\b/g, '判定规则')
+            .replace(/\bUnit\b|\bPixelScale\b/g, '测量单位/像素比例')
+            .replace(/\bmodel_resource\b/g, '模型资源')
+            .replace(/\btemplate_artifact\b/g, '模板资源')
+            .replace(/\bmeasurement_parameter\b/g, '测量参数')
+            .replace(/\bcamera_binding\b/g, '相机绑定')
+            .replace(/\boutput_channel\b/g, '输出通道')
+            .replace(/<pending-model-resource>/g, '<待绑定模型资源>')
+            .replace(/\bpending\b/g, '待确认')
+            .replace(/\bcompleted\b/g, '已完成')
+            .replace(/\bblocked\b/g, '已阻断');
+    },
+
+    _formatPlanSource(value) {
+        return this._localizeDisplayText(value || '未设置') || '未设置';
+    },
+
+    _formatPlanFallbackReason(value) {
+        return this._localizeDisplayText(value);
+    },
+
+    _formatPlanEvent(evt = {}) {
+        const stage = evt.stage || evt.Stage || '';
+        const status = evt.status || evt.Status || '';
+        const stageLabel = BUILD_STAGE_LABELS[stage] || this._localizeDisplayText(stage);
+        const statusLabel = this._formatBuildStatus(status);
+        const rawSummary = evt.summary || evt.Summary || evt.title || evt.Title || '';
+        const summary = this._localizeDisplayText(rawSummary) || `${stageLabel}${statusLabel}`;
+        return { stageLabel, statusLabel, summary };
+    },
+
+    _formatToolName(value) {
+        const text = String(value || '').trim();
+        if (!text) return '工具步骤';
+        const map = {
+            match_flow_template: '模板匹配',
+            get_flow_template_skeleton: '获取模板骨架',
+            select_operator_pipeline: '选择算子链',
+            map_parameters: '参数映射',
+            draft_workflow: '生成流程草稿',
+            validate_schema: '结构校验',
+            metadata_dry_run: '元数据预演',
+            package_readiness: '运行包就绪检查',
+            station_compatibility: '工站兼容检查',
+            operator_contract: '算子契约检查',
+            release_review: '发布复核',
+            workflow_diff: '流程差异',
+            apply_gate: '应用门禁'
+        };
+        return map[text] || this._localizeDisplayText(text);
+    },
+
+    _formatOperatorType(value) {
+        const text = String(value || '').trim();
+        return AI_OPERATOR_LABELS[text] || this._localizeDisplayText(text);
+    },
+
+    _formatParameterName(value) {
+        const text = String(value || '').trim();
+        return AI_PARAMETER_LABELS[text] || this._localizeDisplayText(text);
+    },
+
+    _formatResourceReference(value) {
+        const text = String(value || '').trim();
+        if (!text) return '';
+        return text
+            .split('.')
+            .map(part => this._formatParameterName(this._localizeDisplayText(part)))
+            .join('.');
     },
 
     _renderAgentWorkspaceOverview() {
@@ -444,7 +649,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!text || text === 'not set' || text === 'unknown') return '未设置';
         if (text === 'event-backed') return '事件驱动';
         if (text === 'build') return '构建事件';
-        return text;
+        return this._localizeDisplayText(text);
     },
 
     _formatBuildStatus(status) {
@@ -463,7 +668,7 @@ export const aiPanelAgentWorkspaceMixin = {
             case 'pending':
                 return '等待中';
             default:
-                return status || '已记录';
+                return this._localizeDisplayText(status) || '已记录';
         }
     },
 
@@ -478,7 +683,7 @@ export const aiPanelAgentWorkspaceMixin = {
             case 'blocked':
                 return '已阻断';
             default:
-                return status || '未设置';
+                return this._localizeDisplayText(status) || '未设置';
         }
     },
 
@@ -508,20 +713,23 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-plan-route">
                     <strong>${this._escapeHtml(plan.route.title)}</strong>
                     <span>${this._escapeHtml(plan.route.summary)}</span>
-                    <div class="ai-plan-chain">${plan.route.operators.map(op => `<span>${this._escapeHtml(op)}</span>`).join('')}</div>
+                    <div class="ai-plan-chain">${plan.route.operators.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>
                 </div>
             </section>
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">规划诊断</div>
                 <div class="ai-build-compact">
                     <div class="ai-build-compact-row">
-                        <b>${this._escapeHtml(this._formatWorkspaceValue(plan.planSource))}</b>
+                        <b>${this._escapeHtml(this._formatPlanSource(plan.planSource))}</b>
                         <span>${this._escapeHtml(plan.planHash || '计划哈希待生成')}</span>
                     </div>
                     ${plan.fallbackReason ? `<div class="ai-build-note">${this._escapeHtml(plan.fallbackReason)}</div>` : ''}
                     ${plan.planWarnings.length ? `<ul>${plan.planWarnings.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>` : ''}
                     ${plan.contractRepairNotes.length ? `<div class="ai-plan-chain">${plan.contractRepairNotes.map(item => `<span>${this._escapeHtml(item)}</span>`).join('')}</div>` : ''}
-                    ${plan.publicEvents.length ? `<div class="ai-workspace-list">${plan.publicEvents.map(evt => `<div><b>${this._escapeHtml(evt.stage)}</b> ${this._escapeHtml(evt.status)} - ${this._escapeHtml(evt.summary || evt.title)}</div>`).join('')}</div>` : ''}
+                    ${plan.publicEvents.length ? `<div class="ai-workspace-list">${plan.publicEvents.map(evt => {
+                        const event = this._formatPlanEvent(evt);
+                        return `<div><b>${this._escapeHtml(event.stageLabel)}</b> ${this._escapeHtml(event.statusLabel)} - ${this._escapeHtml(event.summary)}</div>`;
+                    }).join('')}</div>` : ''}
                 </div>
             </section>
             <section class="ai-workspace-section">
@@ -841,8 +1049,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-build-timeline-item is-${this._escapeHtml(tone)}">
                     <span class="ai-build-timeline-dot"></span>
                     <div>
-                        <strong>${this._escapeHtml(BUILD_STAGE_LABELS[item.stage] || item.stage)}</strong>
-                        <span>${this._escapeHtml(item.summary || item.title || '')}</span>
+                        <strong>${this._escapeHtml(BUILD_STAGE_LABELS[item.stage] || this._localizeDisplayText(item.stage))}</strong>
+                        <span>${this._escapeHtml(this._localizeDisplayText(item.summary || item.title || ''))}</span>
                     </div>
                 </div>
             `;
@@ -870,11 +1078,14 @@ export const aiPanelAgentWorkspaceMixin = {
                 const duration = item.durationMs ?? item.DurationMs ?? '';
                 const warning = item.warningCode || item.WarningCode || '';
                 const summary = item.outputSummary || item.OutputSummary || '';
+                const stageLabel = BUILD_STAGE_LABELS[stage] || this._localizeDisplayText(stage);
+                const toolLabel = this._formatToolName(toolName);
+                const warningLabel = this._localizeDisplayText(warning);
                 return `
                     <div class="ai-build-compact-row">
-                        <b>${this._escapeHtml(stage)}${toolName ? ` / ${this._escapeHtml(toolName)}` : ''}</b>
-                        <span>${this._escapeHtml(this._formatBuildStatus(status))}${duration !== '' ? ` / ${this._escapeHtml(String(duration))} ms` : ''}${warning ? ` / ${this._escapeHtml(warning)}` : ''}</span>
-                        <small>${this._escapeHtml(summary)}</small>
+                        <b>${this._escapeHtml(stageLabel)}${toolName ? ` / ${this._escapeHtml(toolLabel)}` : ''}</b>
+                        <span>${this._escapeHtml(this._formatBuildStatus(status))}${duration !== '' ? ` / ${this._escapeHtml(String(duration))} ms` : ''}${warning ? ` / ${this._escapeHtml(warningLabel)}` : ''}</span>
+                        <small>${this._escapeHtml(this._localizeDisplayText(summary))}</small>
                     </div>
                 `;
             }).join('')}
@@ -888,8 +1099,8 @@ export const aiPanelAgentWorkspaceMixin = {
         if (templateEvidence.length) {
             return templateEvidence.map(item => `
                 <div class="ai-build-compact-row">
-                    <b>${this._escapeHtml(item.toolName || item.ToolName || 'template_strategy')}</b>
-                    <span>${this._escapeHtml(item.outputSummary || item.OutputSummary || '')}</span>
+                    <b>${this._escapeHtml(this._formatToolName(item.toolName || item.ToolName || 'template_strategy'))}</b>
+                    <span>${this._escapeHtml(this._localizeDisplayText(item.outputSummary || item.OutputSummary || ''))}</span>
                 </div>
             `).join('');
         }
@@ -906,8 +1117,8 @@ export const aiPanelAgentWorkspaceMixin = {
 
         return tools.map(evt => `
             <div class="ai-build-compact-row">
-                <b>${this._escapeHtml(evt.title || '模板事件')}</b>
-                <span>${this._escapeHtml(evt.summary || '')}</span>
+                <b>${this._escapeHtml(this._localizeDisplayText(evt.title || '模板事件'))}</b>
+                <span>${this._escapeHtml(this._localizeDisplayText(evt.summary || ''))}</span>
             </div>
         `).join('');
     },
@@ -922,7 +1133,7 @@ export const aiPanelAgentWorkspaceMixin = {
                         item.source || item.Source || '',
                         item.repairNote || item.RepairNote || '',
                         item.status || item.Status || ''
-                    ].filter(Boolean).join(' / '))}">${this._escapeHtml(item.operatorType || item.OperatorType || '')}</span>`).join('')}
+                    ].filter(Boolean).join(' / '))}">${this._escapeHtml(this._formatOperatorType(item.operatorType || item.OperatorType || ''))}</span>`).join('')}
                 </div>
                 ${pipeline.slice(0, 8).map(item => {
                     const source = item.source || item.Source || 'plan';
@@ -930,9 +1141,9 @@ export const aiPanelAgentWorkspaceMixin = {
                     const status = item.status || item.Status || '';
                     return `
                         <div class="ai-build-compact-row">
-                            <b>${this._escapeHtml(item.tempId || item.TempId || item.operatorType || item.OperatorType || '')}</b>
-                            <span>${this._escapeHtml(source)}${status ? ` / ${this._escapeHtml(status)}` : ''}</span>
-                            ${repair ? `<small>${this._escapeHtml(repair)}</small>` : ''}
+                            <b>${this._escapeHtml(item.tempId || item.TempId || this._formatOperatorType(item.operatorType || item.OperatorType || '') || '')}</b>
+                            <span>${this._escapeHtml(this._localizeDisplayText(source))}${status ? ` / ${this._escapeHtml(this._formatBuildStatus(status))}` : ''}</span>
+                            ${repair ? `<small>${this._escapeHtml(this._localizeDisplayText(repair))}</small>` : ''}
                         </div>
                     `;
                 }).join('')}
@@ -949,10 +1160,10 @@ export const aiPanelAgentWorkspaceMixin = {
             if (!planOps.length) {
                 return '<div class="ai-followup-empty">流程草稿生成后会显示算子链。</div>';
             }
-            return `<div class="ai-plan-chain">${planOps.map(op => `<span>${this._escapeHtml(op)}</span>`).join('')}</div>`;
+            return `<div class="ai-plan-chain">${planOps.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
         }
 
-        return `<div class="ai-plan-chain">${operatorTypes.map(op => `<span>${this._escapeHtml(op)}</span>`).join('')}</div>`;
+        return `<div class="ai-plan-chain">${operatorTypes.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
     },
 
     _renderBuildParameterSummary(events) {
