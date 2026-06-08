@@ -822,7 +822,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 const summary = item.outputSummary || item.OutputSummary || '';
                 return `
                     <div class="ai-build-compact-row">
-                        <b>${this._escapeHtml(toolName || stage)}</b>
+                        <b>${this._escapeHtml(stage)}${toolName ? ` / ${this._escapeHtml(toolName)}` : ''}</b>
                         <span>${this._escapeHtml(status)}${duration !== '' ? ` / ${this._escapeHtml(String(duration))} ms` : ''}${warning ? ` / ${this._escapeHtml(warning)}` : ''}</span>
                         <small>${this._escapeHtml(summary)}</small>
                     </div>
@@ -868,8 +868,24 @@ export const aiPanelAgentWorkspaceMixin = {
         if (pipeline.length) {
             return `
                 <div class="ai-plan-chain">
-                    ${pipeline.map(item => `<span title="${this._escapeHtml(item.status || item.Status || '')}">${this._escapeHtml(item.operatorType || item.OperatorType || '')}</span>`).join('')}
+                    ${pipeline.map(item => `<span title="${this._escapeHtml([
+                        item.source || item.Source || '',
+                        item.repairNote || item.RepairNote || '',
+                        item.status || item.Status || ''
+                    ].filter(Boolean).join(' / '))}">${this._escapeHtml(item.operatorType || item.OperatorType || '')}</span>`).join('')}
                 </div>
+                ${pipeline.slice(0, 8).map(item => {
+                    const source = item.source || item.Source || 'plan';
+                    const repair = item.repairNote || item.RepairNote || '';
+                    const status = item.status || item.Status || '';
+                    return `
+                        <div class="ai-build-compact-row">
+                            <b>${this._escapeHtml(item.tempId || item.TempId || item.operatorType || item.OperatorType || '')}</b>
+                            <span>${this._escapeHtml(source)}${status ? ` / ${this._escapeHtml(status)}` : ''}</span>
+                            ${repair ? `<small>${this._escapeHtml(repair)}</small>` : ''}
+                        </div>
+                    `;
+                }).join('')}
             `;
         }
 
@@ -893,16 +909,21 @@ export const aiPanelAgentWorkspaceMixin = {
         const resultPayload = this._getAgentRunResultPayload(events);
         const buildResult = this._getBuildResult(events);
         const mappings = this._toArray(buildResult?.parameterMapping || buildResult?.ParameterMapping);
-        const pending = resultPayload?.pendingParameters || resultPayload?.PendingParameters || [];
-        const missing = resultPayload?.missingResources || resultPayload?.MissingResources || [];
+        const pending = this._toArray(resultPayload?.pendingParameters || resultPayload?.PendingParameters);
+        const buildPending = this._toArray(buildResult?.pendingParameters || buildResult?.PendingParameters);
+        const missing = this._toArray(resultPayload?.missingResources || resultPayload?.MissingResources);
+        const buildMissing = this._toArray(buildResult?.missingResources || buildResult?.MissingResources);
+        const effectivePending = pending.length ? pending : buildPending;
+        const effectiveMissing = missing.length ? missing : buildMissing;
         const latest = [...events].reverse().find(evt => evt.payload);
         const latestPayload = this._asObject?.(latest?.payload) || {};
-        const missingCount = Number(latestPayload.missingResourceCount ?? latestPayload.MissingResourceCount ?? missing.length);
-        const pendingCount = Number(latestPayload.pendingParameterCount ?? latestPayload.PendingParameterCount ?? pending.length);
+        const missingCount = Number(latestPayload.missingResourceCount ?? latestPayload.MissingResourceCount ?? effectiveMissing.length);
+        const pendingCount = Number(latestPayload.pendingParameterCount ?? latestPayload.PendingParameterCount ?? effectivePending.length);
         const mappingRows = mappings.slice(0, 8).map(item => `
             <div class="ai-build-compact-row">
                 <b>${this._escapeHtml(item.tempId || item.TempId || '')}.${this._escapeHtml(item.parameterName || item.ParameterName || '')}</b>
                 <span>${this._escapeHtml(item.valueSummary || item.ValueSummary || '')}</span>
+                <small>${this._escapeHtml(item.source || item.Source || 'mapped')}${item.pending || item.Pending ? ' / pending' : ''}</small>
             </div>
         `).join('');
 
@@ -912,7 +933,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <span><small>Missing resources</small><b>${this._escapeHtml(String(Number.isFinite(missingCount) ? missingCount : 0))}</b></span>
             </div>
             ${mappingRows ? `<div class="ai-workspace-section-title">Parameter Mapping</div>${mappingRows}` : ''}
-            ${(pending.length || missing.length) ? '<div class="ai-build-note">Details are rendered in the pending parameter and validation sections below.</div>' : '<div class="ai-build-note">No pending parameter details have been published yet.</div>'}
+            ${(effectivePending.length || effectiveMissing.length) ? '<div class="ai-build-note">Details are rendered in the pending parameter and validation sections below.</div>' : '<div class="ai-build-note">No pending parameter details have been published yet.</div>'}
         `;
     },
 
@@ -923,10 +944,14 @@ export const aiPanelAgentWorkspaceMixin = {
         const firstFix = buildResult?.firstFixRecommendation || buildResult?.FirstFixRecommendation || this._getAgentRunResultPayload(events)?.firstFixRecommendation || '';
         if (applyGate) {
             const gate = this._asObject?.(applyGate) || {};
+            const canvasReady = this._readBooleanField(gate, 'canvasApplyReady', 'CanvasApplyReady');
+            const runtimeReady = this._readBooleanField(gate, 'runtimeDraftReady', 'RuntimeDraftReady');
+            const deploymentReady = this._readBooleanField(gate, 'deploymentReady', 'DeploymentReady');
+            const blocked = this._readBooleanField(gate, 'blocked', 'Blocked');
             return `
-                <div class="ai-build-check is-${gate.blocked || gate.Blocked ? 'blocked' : 'completed'}">
+                <div class="ai-build-check is-${blocked ? 'blocked' : 'completed'}">
                     <strong>Apply Gate: ${this._escapeHtml(gate.status || gate.Status || 'unknown')}</strong>
-                    <span>Canvas: ${gate.canvasApplyReady || gate.CanvasApplyReady ? 'ready' : 'blocked'} / Runtime draft: ${gate.runtimeDraftReady || gate.RuntimeDraftReady ? 'ready' : 'blocked'} / Deployment: ${gate.deploymentReady || gate.DeploymentReady ? 'ready' : 'blocked'}</span>
+                    <span>Canvas: ${canvasReady ? 'ready' : 'blocked'} / Runtime draft: ${runtimeReady ? 'ready' : 'blocked'} / Deployment: ${deploymentReady ? 'ready' : 'blocked'}</span>
                     ${firstFix ? `<em>${this._escapeHtml(firstFix)}</em>` : ''}
                 </div>
                 ${readiness ? `<div class="ai-build-note">Readiness gates are available in replay-safe BuildResult.</div>` : ''}
@@ -963,7 +988,9 @@ export const aiPanelAgentWorkspaceMixin = {
     _renderBuildFinalDraft(events) {
         const resultPayload = this._getAgentRunResultPayload(events);
         const buildResult = this._getBuildResult(events);
-        const flow = resultPayload?.flow || resultPayload?.Flow || this.currentResult?.flow || this.currentResult?.Flow || null;
+        const flow = this._getResultFlowForCanvas(resultPayload, { allowMergeFallback: false }) ||
+            this._getResultFlowForCanvas(this.currentResult, { allowMergeFallback: false }) ||
+            null;
         const ops = flow ? this._extractOperators(flow) : [];
         const connections = flow ? this._extractConnections(flow) : [];
         const terminal = events.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
@@ -991,6 +1018,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const preserved = this._toArray(item.preservedNodes || item.PreservedNodes);
         const pending = this._toArray(item.pendingParameters || item.PendingParameters);
         const blockers = this._toArray(item.deploymentBlockers || item.DeploymentBlockers);
+        const preview = values => values.slice(0, 4).map(value => `<span>${this._escapeHtml(value)}</span>`).join('');
         return `
             <div class="ai-workspace-section-title">Workflow Diff</div>
             <div class="ai-build-metric-row">
@@ -999,6 +1027,14 @@ export const aiPanelAgentWorkspaceMixin = {
                 <span><small>Pending</small><b>${this._escapeHtml(String(pending.length))}</b></span>
                 <span><small>Deploy blockers</small><b>${this._escapeHtml(String(blockers.length))}</b></span>
             </div>
+            ${(added.length || preserved.length || pending.length || blockers.length) ? `
+                <div class="ai-build-diff-tags">
+                    ${preview(added)}
+                    ${preview(preserved)}
+                    ${preview(pending)}
+                    ${preview(blockers)}
+                </div>
+            ` : ''}
         `;
     },
 
@@ -1010,13 +1046,18 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _getBuildResult(events = this.activeAgentRunEvents) {
         const payload = this._getAgentRunResultPayload(events);
-        return this._asObject?.(payload.buildResult || payload.BuildResult || this.currentResult?.buildResult || this.currentResult?.BuildResult) || null;
+        return this._getPayloadBuildResult(payload) || this._getPayloadBuildResult(this.currentResult);
     },
 
     _applyAgentRunResultPayload(evt) {
         const payload = this._asObject?.(evt?.payload) || {};
-        const flow = payload.flow || payload.Flow;
-        if (!flow || evt.eventType !== 'run.completed') {
+        if (evt.eventType !== 'run.completed') {
+            return false;
+        }
+
+        const buildResult = this._getPayloadBuildResult(payload);
+        const flow = this._getResultFlowForCanvas(payload);
+        if (!flow) {
             return false;
         }
 
@@ -1025,6 +1066,13 @@ export const aiPanelAgentWorkspaceMixin = {
             completionStatus: 'completed',
             sessionId: payload.sessionId || payload.SessionId || this.sessionId,
             ...payload,
+            buildResult: payload.buildResult || payload.BuildResult || buildResult || null,
+            pendingParameters: this._toArray(payload.pendingParameters || payload.PendingParameters).length
+                ? this._toArray(payload.pendingParameters || payload.PendingParameters)
+                : this._toArray(buildResult?.pendingParameters || buildResult?.PendingParameters),
+            missingResources: this._toArray(payload.missingResources || payload.MissingResources).length
+                ? this._toArray(payload.missingResources || payload.MissingResources)
+                : this._toArray(buildResult?.missingResources || buildResult?.MissingResources),
             flow,
             Flow: flow
         };
@@ -1042,6 +1090,312 @@ export const aiPanelAgentWorkspaceMixin = {
         });
         this._renderBuildWorkspaceFromAgentRun();
         return true;
+    },
+
+    _getPayloadBuildResult(payload = this.currentResult) {
+        const obj = this._asObject?.(payload) || {};
+        const buildResult = obj.buildResult || obj.BuildResult || null;
+        return buildResult ? (this._asObject?.(buildResult) || null) : null;
+    },
+
+    _getPayloadApplyGate(payload = this.currentResult) {
+        const obj = this._asObject?.(payload) || {};
+        const buildResult = this._getPayloadBuildResult(obj);
+        const applyGate =
+            obj.applyGate ||
+            obj.ApplyGate ||
+            buildResult?.applyGate ||
+            buildResult?.ApplyGate ||
+            null;
+        return applyGate ? (this._asObject?.(applyGate) || null) : null;
+    },
+
+    _isCanvasApplyReadyForResult(result = this.currentResult) {
+        const gate = this._getPayloadApplyGate(result);
+        if (!gate) return true;
+        const canvasReady = this._readBooleanField(gate, 'canvasApplyReady', 'CanvasApplyReady');
+        const blocked = this._readBooleanField(gate, 'blocked', 'Blocked');
+        return canvasReady && !blocked;
+    },
+
+    _readBooleanField(obj, camelName, pascalName) {
+        if (!obj || typeof obj !== 'object') return false;
+        const value = obj[camelName] ?? obj[pascalName];
+        return value === true || String(value).toLowerCase() === 'true';
+    },
+
+    _getResultFlowForCanvas(result = this.currentResult, options = {}) {
+        const allowMergeFallback = options.allowMergeFallback !== false;
+        const obj = this._asObject?.(result) || {};
+        const directFlow = this._normalizeWorkflowDraftForCanvas(obj.flow || obj.Flow);
+        if (directFlow && this._extractOperators(directFlow).length > 0) {
+            return directFlow;
+        }
+
+        const buildResult = this._getPayloadBuildResult(obj);
+        if (!buildResult) return null;
+
+        const workflowDraft = buildResult.workflowDraft || buildResult.WorkflowDraft || null;
+        let fallback = this._normalizeWorkflowDraftForCanvas(workflowDraft, buildResult);
+        if (!fallback || this._extractOperators(fallback).length === 0) {
+            fallback = this._buildCanvasFlowFromOperatorPipeline(buildResult);
+        }
+
+        if (!fallback || this._extractOperators(fallback).length === 0) {
+            return null;
+        }
+
+        return allowMergeFallback
+            ? this._mergeBuildFallbackWithCurrentCanvas(fallback, buildResult)
+            : fallback;
+    },
+
+    _normalizeWorkflowDraftForCanvas(flow, buildResult = null) {
+        const source = this._cloneJsonSafe(flow);
+        if (!source || typeof source !== 'object') return null;
+
+        const flowData = source.project?.flow || source.flow || source;
+        const rawOperators = this._toArray(flowData.operators || flowData.Operators || flowData.nodes || flowData.Nodes);
+        if (!rawOperators.length) return null;
+
+        const operators = rawOperators.map((op, index) => this._normalizeDraftOperatorForCanvas(op, index));
+        const rawConnections = this._toArray(flowData.connections || flowData.Connections);
+        const connections = this._normalizeDraftConnectionsForCanvas(rawConnections, operators);
+        return {
+            ...flowData,
+            operators,
+            connections: connections.length ? connections : this._buildLinearCanvasConnections(operators),
+            metadataOnly: Boolean(flowData.metadataOnly ?? flowData.MetadataOnly ?? buildResult?.metadataOnly ?? buildResult?.MetadataOnly ?? true)
+        };
+    },
+
+    _normalizeDraftOperatorForCanvas(operator, index) {
+        const op = this._asObject?.(operator) || {};
+        const id = String(op.id || op.Id || op.tempId || op.TempId || `op_${index + 1}`).trim();
+        const type = String(op.type || op.Type || op.operatorType || op.OperatorType || 'DeepLearning').trim();
+        const name = String(op.name || op.Name || op.displayName || op.DisplayName || op.title || op.Title || id || type).trim();
+        const parameters = this._normalizeDraftParametersForCanvas(op.parameters || op.Parameters);
+        const inputPorts = this._normalizeDraftPortsForCanvas(op.inputPorts || op.InputPorts || op.inputs || op.Inputs, id, type, false);
+        const outputPorts = this._normalizeDraftPortsForCanvas(op.outputPorts || op.OutputPorts || op.outputs || op.Outputs, id, type, true);
+        return {
+            ...op,
+            id,
+            name,
+            type,
+            x: Number(op.x ?? op.X ?? 160 + index * 180),
+            y: Number(op.y ?? op.Y ?? 180),
+            inputPorts,
+            outputPorts,
+            parameters,
+            isEnabled: op.isEnabled ?? op.IsEnabled ?? true
+        };
+    },
+
+    _normalizeDraftParametersForCanvas(parameters) {
+        if (Array.isArray(parameters)) {
+            return parameters.map(item => {
+                const param = this._asObject?.(item) || {};
+                const name = param.name || param.Name || '';
+                const value = param.value ?? param.Value ?? param.defaultValue ?? param.DefaultValue ?? '';
+                return {
+                    ...param,
+                    name,
+                    displayName: param.displayName || param.DisplayName || name,
+                    value,
+                    defaultValue: param.defaultValue ?? param.DefaultValue ?? value,
+                    dataType: param.dataType || param.DataType || param.type || param.Type || 'string',
+                    isRequired: Boolean(param.isRequired ?? param.IsRequired ?? this._isPendingValueSummary(value))
+                };
+            });
+        }
+
+        const obj = this._asObject?.(parameters) || {};
+        return Object.keys(obj).map(name => {
+            const value = obj[name];
+            return {
+                name,
+                displayName: name,
+                value,
+                defaultValue: value,
+                dataType: 'string',
+                isRequired: this._isPendingValueSummary(value)
+            };
+        });
+    },
+
+    _normalizeDraftPortsForCanvas(ports, operatorId, operatorType, isOutput) {
+        const raw = this._toArray(ports);
+        if (raw.length) {
+            return raw.map((port, index) => {
+                const item = this._asObject?.(port) || {};
+                const name = item.name || item.Name || item.portName || item.PortName || (isOutput ? 'Output' : 'Input');
+                return {
+                    ...item,
+                    id: item.id || item.Id || `${operatorId}_${isOutput ? 'out' : 'in'}_${index}`,
+                    name,
+                    displayName: item.displayName || item.DisplayName || name,
+                    dataType: item.dataType || item.DataType || item.type || item.Type || (String(name).toLowerCase().includes('image') ? 'Image' : 'Any'),
+                    direction: item.direction ?? item.Direction ?? (isOutput ? 1 : 0),
+                    isRequired: Boolean(item.isRequired ?? item.IsRequired ?? !isOutput)
+                };
+            });
+        }
+
+        const names = this._defaultPortNamesForOperator(operatorType, isOutput);
+        return names.map((name, index) => ({
+            id: `${operatorId}_${isOutput ? 'out' : 'in'}_${index}`,
+            name,
+            displayName: name,
+            dataType: String(name).toLowerCase().includes('image') ? 'Image' : 'Any',
+            direction: isOutput ? 1 : 0,
+            isRequired: !isOutput
+        }));
+    },
+
+    _defaultPortNamesForOperator(operatorType, isOutput) {
+        const type = String(operatorType || '').toLowerCase();
+        if (isOutput) {
+            if (type === 'resultoutput') return [];
+            if (type === 'imageacquisition') return ['Image'];
+            return ['Result'];
+        }
+
+        if (type === 'imageacquisition') return [];
+        if (type === 'resultoutput') return ['Input'];
+        return ['Image'];
+    },
+
+    _normalizeDraftConnectionsForCanvas(connections, operators) {
+        const operatorById = new Map(operators.map(op => [String(op.id).toLowerCase(), op]));
+        const findOperator = value => operatorById.get(String(value || '').toLowerCase()) || null;
+        return this._toArray(connections).map((connection, index) => {
+            const conn = this._asObject?.(connection) || {};
+            const sourceId = conn.sourceOperatorId || conn.SourceOperatorId || conn.sourceTempId || conn.SourceTempId || conn.source || conn.Source;
+            const targetId = conn.targetOperatorId || conn.TargetOperatorId || conn.targetTempId || conn.TargetTempId || conn.target || conn.Target;
+            const source = findOperator(sourceId);
+            const target = findOperator(targetId);
+            if (!source || !target) return null;
+            const sourcePort = this._findCanvasPort(source.outputPorts || source.OutputPorts, conn.sourcePortName || conn.SourcePortName || conn.sourcePortId || conn.SourcePortId);
+            const targetPort = this._findCanvasPort(target.inputPorts || target.InputPorts, conn.targetPortName || conn.TargetPortName || conn.targetPortId || conn.TargetPortId);
+            return {
+                id: conn.id || conn.Id || `conn_${index + 1}`,
+                sourceOperatorId: source.id,
+                sourcePortId: sourcePort?.id || sourcePort?.Id || '',
+                targetOperatorId: target.id,
+                targetPortId: targetPort?.id || targetPort?.Id || ''
+            };
+        }).filter(conn => conn?.sourceOperatorId && conn?.targetOperatorId);
+    },
+
+    _findCanvasPort(ports, preferred) {
+        const items = this._toArray(ports);
+        const key = String(preferred || '').trim().toLowerCase();
+        return items.find(port =>
+            key &&
+            [port.id, port.Id, port.name, port.Name]
+                .map(value => String(value || '').trim().toLowerCase())
+                .includes(key)) || items[0] || null;
+    },
+
+    _buildLinearCanvasConnections(operators) {
+        const connections = [];
+        for (let index = 0; index < operators.length - 1; index += 1) {
+            const source = operators[index];
+            const target = operators[index + 1];
+            const sourcePort = this._toArray(source.outputPorts || source.OutputPorts)[0];
+            const targetPort = this._toArray(target.inputPorts || target.InputPorts)[0];
+            if (!sourcePort || !targetPort) continue;
+            connections.push({
+                id: `conn_${index + 1}`,
+                sourceOperatorId: source.id,
+                sourcePortId: sourcePort.id || sourcePort.Id || '',
+                targetOperatorId: target.id,
+                targetPortId: targetPort.id || targetPort.Id || ''
+            });
+        }
+        return connections;
+    },
+
+    _buildCanvasFlowFromOperatorPipeline(buildResult) {
+        const pipeline = this._toArray(buildResult?.operatorPipeline || buildResult?.OperatorPipeline);
+        if (!pipeline.length) return null;
+        const mappings = this._toArray(buildResult?.parameterMapping || buildResult?.ParameterMapping);
+        const operators = pipeline.map(step => {
+            const tempId = step.tempId || step.TempId || step.operatorType || step.OperatorType || '';
+            const operatorType = step.operatorType || step.OperatorType || 'DeepLearning';
+            const parameters = Object.fromEntries(mappings
+                .filter(item => String(item.tempId || item.TempId || '').toLowerCase() === String(tempId).toLowerCase())
+                .map(item => [item.parameterName || item.ParameterName || '', item.valueSummary || item.ValueSummary || ''])
+                .filter(([name]) => name));
+            return {
+                tempId,
+                operatorType,
+                displayName: operatorType,
+                parameters
+            };
+        });
+        return this._normalizeWorkflowDraftForCanvas({
+            operators,
+            connections: [],
+            metadataOnly: true
+        }, buildResult);
+    },
+
+    _mergeBuildFallbackWithCurrentCanvas(fallbackFlow, buildResult = null) {
+        const intent = String(buildResult?.buildIntent || buildResult?.BuildIntent || '').toLowerCase();
+        const diff = this._asObject?.(buildResult?.workflowDiff || buildResult?.WorkflowDiff) || {};
+        const preserved = this._toArray(diff.preservedNodes || diff.PreservedNodes);
+        if (!['modify', 'refactor', 'review_pending_parameters'].includes(intent) && preserved.length === 0) {
+            return fallbackFlow;
+        }
+
+        let current = null;
+        try {
+            current = this.flowCanvas?.serialize?.() || null;
+        } catch {
+            current = null;
+        }
+
+        const currentFlow = this._normalizeWorkflowDraftForCanvas(current);
+        if (!currentFlow || this._extractOperators(currentFlow).length === 0) {
+            return fallbackFlow;
+        }
+
+        const currentOps = this._extractOperators(currentFlow);
+        const fallbackOps = this._extractOperators(fallbackFlow);
+        const seen = new Set(currentOps.map(op => String(op.id || op.Id || op.name || op.Name || '').toLowerCase()).filter(Boolean));
+        const addedOps = fallbackOps.filter(op => {
+            const key = String(op.id || op.Id || op.name || op.Name || '').toLowerCase();
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+        return {
+            ...currentFlow,
+            operators: [...currentOps, ...addedOps],
+            connections: [
+                ...this._extractConnections(currentFlow),
+                ...this._extractConnections(fallbackFlow).filter(conn =>
+                    addedOps.some(op => op.id === conn.sourceOperatorId || op.id === conn.targetOperatorId))
+            ],
+            metadataOnly: true
+        };
+    },
+
+    _cloneJsonSafe(value) {
+        if (value === null || value === undefined) return value;
+        try {
+            return typeof structuredClone === 'function'
+                ? structuredClone(value)
+                : JSON.parse(JSON.stringify(value));
+        } catch {
+            return value;
+        }
+    },
+
+    _isPendingValueSummary(value) {
+        const text = String(value ?? '').toLowerCase();
+        return text.includes('<pending') || text.includes('pending-') || text.includes('missing');
     },
 
     _countBuildBlockers(events = this.activeAgentRunEvents) {

@@ -269,15 +269,21 @@ export class AiPanel {
         const button = this.container?.querySelector('#ai-btn-apply');
         if (!button) return;
 
-        const hasFlow = Boolean(this.currentResult?.flow || this.currentResult?.Flow);
+        const flow = this._getResultFlowForCanvas?.(this.currentResult) ||
+            this.currentResult?.flow ||
+            this.currentResult?.Flow ||
+            null;
+        const hasFlow = Boolean(flow && this._extractOperators(flow).length > 0);
+        const canvasApplyAllowed = !this.currentResult ||
+            (this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true);
         const applied = this._isCurrentResultAppliedToCanvas();
-        button.disabled = this.isGenerating || !hasFlow || applied;
+        button.disabled = this.isGenerating || !hasFlow || !canvasApplyAllowed || applied;
         button.classList.toggle('is-disabled', button.disabled);
         button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
         const label = applied
             ? '已应用到流程草稿'
             : hasFlow
-                ? '应用到当前流程草稿'
+                ? (canvasApplyAllowed ? '应用到当前流程草稿' : '当前草稿暂不可应用')
                 : '暂无可应用方案';
         button.innerHTML = `
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">

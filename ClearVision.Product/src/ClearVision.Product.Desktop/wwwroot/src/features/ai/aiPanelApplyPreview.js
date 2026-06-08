@@ -2,6 +2,19 @@ import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 export const aiPanelApplyPreviewMixin = {
     _handleApplyFlow() {
         if (!this.flowCanvas) return;
+        const baseFlow = this._getResultFlowForCanvas?.(this.currentResult) ||
+            this.currentResult?.flow ||
+            this.currentResult?.Flow ||
+            null;
+        if (baseFlow && this.currentResult) {
+            this.currentResult.flow = baseFlow;
+            this.currentResult.Flow = baseFlow;
+            this._hydrateCurrentResultFollowupsFromBuildResult();
+        }
+        if (baseFlow && !(this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true)) {
+            this._addMessage('system', 'Canvas Apply is blocked by the current Apply Gate. Review public blockers before applying.');
+            return;
+        }
         if (!this.currentResult?.flow) {
             this._addMessage('system', '当前会话没有可应用的流程数据。');
             return;
@@ -150,8 +163,19 @@ export const aiPanelApplyPreviewMixin = {
     },
 
     _buildApplyRiskSummary(result = this.currentResult) {
-        const pending = this._resolvePendingParametersForDraft(result);
-        const missing = this._normalizeMissingResources(result?.missingResources ?? result?.MissingResources);
+        const buildResult = this._getPayloadBuildResult?.(result) || null;
+        const pendingSource = (this._toArray?.(result?.pendingParameters ?? result?.PendingParameters) || []).length
+            ? (result?.pendingParameters ?? result?.PendingParameters)
+            : (buildResult?.pendingParameters ?? buildResult?.PendingParameters);
+        const missingSource = (this._toArray?.(result?.missingResources ?? result?.MissingResources) || []).length
+            ? (result?.missingResources ?? result?.MissingResources)
+            : (buildResult?.missingResources ?? buildResult?.MissingResources);
+        const pending = this._resolvePendingParametersForDraft({
+            ...(result || {}),
+            pendingParameters: pendingSource || [],
+            missingResources: missingSource || []
+        });
+        const missing = this._normalizeMissingResources(missingSource);
         const brief = this._normalizeRequirementBrief(result?.requirementBrief ?? result?.RequirementBrief ?? null);
         const nonBlockingFields = this._normalizeRuntimeFieldList(
             result?.nonBlockingMissingFields
@@ -167,6 +191,24 @@ export const aiPanelApplyPreviewMixin = {
             hasWarnings: pending.length > 0 || missing.length > 0 || nonBlockingFields.length > 0,
             totalCount: pending.length + missing.length + nonBlockingFields.length
         };
+    },
+
+    _hydrateCurrentResultFollowupsFromBuildResult() {
+        if (!this.currentResult) return;
+        const buildResult = this._getPayloadBuildResult?.(this.currentResult) || null;
+        if (!buildResult) return;
+
+        if (!(this._toArray?.(this.currentResult.pendingParameters ?? this.currentResult.PendingParameters) || []).length) {
+            const pending = this._toArray?.(buildResult.pendingParameters ?? buildResult.PendingParameters) || [];
+            this.currentResult.pendingParameters = pending;
+            this.currentResult.PendingParameters = pending;
+        }
+
+        if (!(this._toArray?.(this.currentResult.missingResources ?? this.currentResult.MissingResources) || []).length) {
+            const missing = this._toArray?.(buildResult.missingResources ?? buildResult.MissingResources) || [];
+            this.currentResult.missingResources = missing;
+            this.currentResult.MissingResources = missing;
+        }
     },
 
     _formatApplyPendingItem(item) {
@@ -345,11 +387,18 @@ export const aiPanelApplyPreviewMixin = {
             const flowBtn = document.querySelector('.nav-btn[data-view="flow"]');
             if (flowBtn) flowBtn.click();
             this.flowCanvas.deserialize(flow);
+            const appliedFlow = this.flowCanvas.serialize?.() || flow;
+            const appliedOperators = this._extractOperators(appliedFlow);
+            if (appliedOperators.length === 0) {
+                throw new Error('Applied draft did not contain any operators.');
+            }
+            this.currentResult.flow = appliedFlow;
+            this.currentResult.Flow = appliedFlow;
             this._markCurrentResultAppliedToCanvas();
-            this._syncPendingParameterDrafts(this.currentResult, this.currentResult?.flow, { force: true });
-            this._renderFollowupChecklist(this.currentResult, this.currentResult?.flow);
-            this._renderParameterDraftEditor(this.currentResult, this.currentResult?.flow);
-            this.options.onApplied?.(this.flowCanvas.serialize?.() || flow);
+            this._syncPendingParameterDrafts(this.currentResult, appliedFlow, { force: true });
+            this._renderFollowupChecklist(this.currentResult, appliedFlow);
+            this._renderParameterDraftEditor(this.currentResult, appliedFlow);
+            this.options.onApplied?.(appliedFlow);
             this.options.showToast?.('方案已应用到画布', 'success');
             this._setWorkbenchState(AiWorkbenchStates.APPLIED);
 
@@ -362,6 +411,19 @@ export const aiPanelApplyPreviewMixin = {
             const undoBtn = this.container.querySelector('#ai-btn-undo');
             if (undoBtn) {
                 undoBtn.addEventListener('click', () => this._undoApply());
+            }
+            const applyRiskAfterApply = this._buildApplyRiskSummary(this.currentResult);
+            const deploymentNote = applyRiskAfterApply.hasWarnings
+                ? `Draft applied to canvas. ${applyRiskAfterApply.totalCount} deployment item(s) still need binding or confirmation before Station deployment.`
+                : 'Draft applied to canvas. Review readiness before Station deployment.';
+            this._setResultStatusNote(
+                `${this._escapeHtml(deploymentNote)} <button class="ai-undo-btn" id="ai-btn-undo">Undo apply</button>`,
+                'success',
+                true
+            );
+            const updatedUndoBtn = this.container.querySelector('#ai-btn-undo');
+            if (updatedUndoBtn) {
+                updatedUndoBtn.addEventListener('click', () => this._undoApply());
             }
         } catch (err) {
             console.error('应用流程失败:', err);

@@ -675,6 +675,245 @@ function agentResponse() {
   };
 }
 
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function buildResultContractPayload(overrides = {}) {
+  const pascal = overrides.pascal === true;
+  const workflowDraft = {
+    operators: [
+      {
+        tempId: 'op_acq',
+        operatorType: 'ImageAcquisition',
+        displayName: 'Acquire image',
+        parameters: { SourceType: 'Camera' }
+      },
+      {
+        tempId: 'op_detect',
+        operatorType: 'SurfaceDefectDetection',
+        displayName: 'Detect scratch',
+        parameters: { ModelId: '<pending-model-resource>' }
+      },
+      {
+        tempId: 'op_judge',
+        operatorType: 'ResultJudgment',
+        displayName: 'Judge result',
+        parameters: { Rule: 'NG when scratch candidate exceeds pending threshold.' }
+      },
+      {
+        tempId: 'op_output',
+        operatorType: 'ResultOutput',
+        displayName: 'Output result',
+        parameters: { Channel: '<pending-output-channel>' }
+      }
+    ],
+    connections: [
+      { sourceTempId: 'op_acq', sourcePortName: 'Image', targetTempId: 'op_detect', targetPortName: 'Image' },
+      { sourceTempId: 'op_detect', sourcePortName: 'Result', targetTempId: 'op_judge', targetPortName: 'Image' },
+      { sourceTempId: 'op_judge', sourcePortName: 'Result', targetTempId: 'op_output', targetPortName: 'Input' }
+    ],
+    metadataOnly: true
+  };
+  const evidence = [
+    'plan_generation',
+    'template_strategy',
+    'operator_pipeline',
+    'parameter_mapping',
+    'workflow_draft',
+    'validate_schema',
+    'metadata_dry_run',
+    'package_readiness',
+    'workflow_diff',
+    'apply_gate'
+  ].map((stage, index) => ({
+    stage,
+    toolName: `${stage}_tool`,
+    status: 'completed',
+    warningCode: index === 5 ? 'deployment_resource_pending' : '',
+    durationMs: 10 + index,
+    outputSummary: `${stage} completed with metadata-only public evidence.`,
+    metadataOnly: true,
+    redactionPass: true
+  }));
+  const buildResult = {
+    buildId: 'build-contract-1',
+    planId: 'plan-contract-1',
+    planHash: 'sha256:contract',
+    buildIntent: overrides.buildIntent || 'modify',
+    workflowDraft,
+    operatorPipeline: [
+      { tempId: 'op_acq', operatorType: 'ImageAcquisition', source: 'template_skeleton', status: 'selected', repairNote: '' },
+      { tempId: 'op_detect', operatorType: 'SurfaceDefectDetection', source: 'plan_route', status: 'selected', repairNote: 'invalid operator was repaired' },
+      { tempId: 'op_judge', operatorType: 'ResultJudgment', source: 'catalog_required', status: 'selected', repairNote: '' },
+      { tempId: 'op_output', operatorType: 'ResultOutput', source: 'catalog_required', status: 'selected', repairNote: '' }
+    ],
+    parameterMapping: [
+      { tempId: 'op_acq', operatorType: 'ImageAcquisition', parameterName: 'SourceType', valueSummary: 'Camera', source: 'accepted_default', pending: false },
+      { tempId: 'op_detect', operatorType: 'SurfaceDefectDetection', parameterName: 'ModelId', valueSummary: '<pending-model-resource>', source: 'missing_resource', pending: true },
+      { tempId: 'op_judge', operatorType: 'ResultJudgment', parameterName: 'Rule', valueSummary: 'NG when scratch candidate exceeds pending threshold.', source: 'plan_default', pending: true }
+    ],
+    pendingParameters: [
+      { operatorId: 'op_detect', actualOperatorId: 'op_detect', parameterNames: ['ModelId'] }
+    ],
+    missingResources: [
+      {
+        resourceType: 'model_resource',
+        resourceKey: 'op_detect.ModelId',
+        operatorId: 'op_detect',
+        parameterName: 'ModelId',
+        description: 'Bind model_resource metadata before deployment.'
+      }
+    ],
+    workflowDiff: {
+      addedNodes: ['op_acq', 'op_detect', 'op_judge', 'op_output'],
+      preservedNodes: overrides.preservedNodes || ['existing_node'],
+      pendingParameters: ['op_detect.ModelId'],
+      deploymentBlockers: ['op_detect.ModelId'],
+      metadataOnly: true
+    },
+    applyGate: {
+      canvasApplyReady: true,
+      runtimeDraftReady: true,
+      deploymentReady: false,
+      blocked: false,
+      status: 'canvas_apply_ready',
+      deploymentBlockers: ['op_detect.ModelId'],
+      firstFixRecommendation: 'Bind missing model_resource metadata for op_detect.ModelId before deployment.',
+      metadataOnly: true
+    },
+    toolEvidenceTimeline: evidence,
+    firstFixRecommendation: 'Bind missing model_resource metadata for op_detect.ModelId before deployment.',
+    metadataOnly: true,
+    rawPrompt: 'SYSTEM PROMPT C:\\factory\\model.onnx 192.168.0.2 DB1.DBX0.0 data:image/png;base64,abcd sk-secret',
+    chainOfThought: 'hidden reasoning must never render',
+    reasoning_content: 'do not render'
+  };
+  const payload = {
+    runId: 'ar_build_contract',
+    sessionId: 'session-build-contract',
+    success: true,
+    completionStatus: 'completed',
+    buildResult,
+    aiExplanation: 'Build completed with public metadata.',
+    metadataOnly: true
+  };
+
+  if (!pascal) {
+    return payload;
+  }
+
+  return {
+    RunId: payload.runId,
+    SessionId: payload.sessionId,
+    Success: payload.success,
+    CompletionStatus: payload.completionStatus,
+    BuildResult: {
+      BuildId: buildResult.buildId,
+      PlanId: buildResult.planId,
+      PlanHash: buildResult.planHash,
+      BuildIntent: buildResult.buildIntent,
+      WorkflowDraft: workflowDraft,
+      OperatorPipeline: buildResult.operatorPipeline.map(item => ({
+        TempId: item.tempId,
+        OperatorType: item.operatorType,
+        Source: item.source,
+        Status: item.status,
+        RepairNote: item.repairNote
+      })),
+      ParameterMapping: buildResult.parameterMapping.map(item => ({
+        TempId: item.tempId,
+        OperatorType: item.operatorType,
+        ParameterName: item.parameterName,
+        ValueSummary: item.valueSummary,
+        Source: item.source,
+        Pending: item.pending
+      })),
+      PendingParameters: buildResult.pendingParameters,
+      MissingResources: buildResult.missingResources,
+      WorkflowDiff: {
+        AddedNodes: buildResult.workflowDiff.addedNodes,
+        PreservedNodes: buildResult.workflowDiff.preservedNodes,
+        PendingParameters: buildResult.workflowDiff.pendingParameters,
+        DeploymentBlockers: buildResult.workflowDiff.deploymentBlockers,
+        MetadataOnly: true
+      },
+      ApplyGate: {
+        CanvasApplyReady: true,
+        RuntimeDraftReady: true,
+        DeploymentReady: false,
+        Blocked: false,
+        Status: 'canvas_apply_ready',
+        DeploymentBlockers: ['op_detect.ModelId'],
+        FirstFixRecommendation: buildResult.firstFixRecommendation,
+        MetadataOnly: true
+      },
+      ToolEvidenceTimeline: evidence.map(item => ({
+        Stage: item.stage,
+        ToolName: item.toolName,
+        Status: item.status,
+        WarningCode: item.warningCode,
+        DurationMs: item.durationMs,
+        OutputSummary: item.outputSummary,
+        MetadataOnly: true,
+        RedactionPass: true
+      })),
+      FirstFixRecommendation: buildResult.firstFixRecommendation,
+      MetadataOnly: true,
+      SystemPrompt: 'SYSTEM PROMPT C:\\factory\\model.onnx 192.168.0.2 DB1.DBX0.0 data:image/png;base64,abcd sk-secret'
+    },
+    AiExplanation: payload.aiExplanation,
+    MetadataOnly: true
+  };
+}
+
+function createBuildWorkspaceContainer() {
+  const elements = {
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-build-event-timeline': createFakeElement(),
+    '#ai-build-template-match': createFakeElement(),
+    '#ai-build-operator-chain': createFakeElement(),
+    '#ai-build-parameters': createFakeElement(),
+    '#ai-build-checks': createFakeElement(),
+    '#ai-build-final-draft': createFakeElement(),
+    '#ai-btn-apply': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-result-summary': createFakeElement(),
+    '#ai-result-ops': createFakeElement(),
+    '#ai-result-followups': createFakeElement(),
+    '#ai-result-parameter-editor': createFakeElement(),
+    '#ai-result-validation-card': createFakeElement(),
+    '#ai-result-validation': createFakeElement(),
+    '#ai-result-prompt-trace-card': createFakeElement(),
+    '#ai-result-prompt-trace': createFakeElement()
+  };
+  return { elements, container: createContainer(elements) };
+}
+
+function createFakeFlowCanvas(initialFlow = { operators: [], connections: [] }) {
+  let flow = cloneJson(initialFlow);
+  let revision = 0;
+  return {
+    deserialize(nextFlow) {
+      flow = cloneJson(nextFlow);
+      revision += 1;
+    },
+    serialize() {
+      return cloneJson(flow);
+    },
+    getFlowRevision() {
+      return revision;
+    }
+  };
+}
+
+function assertNoSensitiveLeak(text) {
+  assert.doesNotMatch(text, /rawPrompt|systemPrompt|SystemPrompt|chainOfThought|reasoning_content/i);
+  assert.doesNotMatch(text, /C:\\|D:\\|\\.onnx|192\\.168\\.|DB1\\.DBX|base64|data:image|sk-secret|token|key/i);
+}
+
 test('default UI does not render Agent GenerateFlow controls', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel);
@@ -951,6 +1190,223 @@ test('BuildFromPlan prefers Plan templateSelection over raw snapshot and queued 
     scenarioKey: 'plan'
   });
   assert.equal(buildFromPlan.planSnapshot.templateSelection.templateId, 'tmpl-raw');
+});
+
+test('BuildResult replay payload renders Build Workspace and apply gate without leaking private fields', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.agentWorkspaceMode = 'build';
+  panel.activeAgentRunEvents = [
+    {
+      runId: 'ar_build_contract',
+      sequence: 20,
+      eventType: 'run.completed',
+      stage: 'run',
+      title: 'Run completed',
+      summary: 'Build completed.',
+      status: 'completed',
+      payload: buildResultContractPayload({ pascal: true }),
+      metadataOnly: true,
+      redactionPass: true
+    }
+  ];
+
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  const timelineHtml = elements['#ai-build-event-timeline'].innerHTML;
+  for (const stage of [
+    'plan_generation',
+    'template_strategy',
+    'operator_pipeline',
+    'parameter_mapping',
+    'workflow_draft',
+    'validate_schema',
+    'metadata_dry_run',
+    'package_readiness',
+    'workflow_diff',
+    'apply_gate'
+  ]) {
+    assert.match(timelineHtml, new RegExp(stage));
+  }
+  assert.match(timelineHtml, /validate_schema_tool/);
+  assert.match(timelineHtml, /deployment_resource_pending/);
+  assert.match(timelineHtml, /15 ms/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /SurfaceDefectDetection/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /template_skeleton/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /invalid operator was repaired/);
+  assert.match(elements['#ai-build-parameters'].innerHTML, /op_detect\.ModelId/);
+  assert.match(elements['#ai-build-parameters'].innerHTML, /missing_resource \/ pending/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /Canvas: ready/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /Runtime draft: ready/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /Deployment: blocked/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /model_resource metadata/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /Editable draft ready/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /Workflow Diff/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /Preserved/);
+  assertNoSensitiveLeak([
+    timelineHtml,
+    elements['#ai-build-operator-chain'].innerHTML,
+    elements['#ai-build-parameters'].innerHTML,
+    elements['#ai-build-checks'].innerHTML,
+    elements['#ai-build-final-draft'].innerHTML
+  ].join('\n'));
+});
+
+test('Canvas apply remains enabled when deployment is blocked by missing resources', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = buildResultContractPayload();
+  panel.currentResultVersion = 2;
+  panel.appliedResultVersion = 0;
+
+  panel._updateApplyButtonState();
+
+  assert.equal(elements['#ai-btn-apply'].disabled, false);
+  assert.equal(elements['#ai-btn-apply'].getAttribute('aria-disabled'), 'false');
+  assert.match(elements['#ai-btn-apply'].innerHTML, /应用到当前流程草稿/);
+  assert.equal(panel._isCanvasApplyReadyForResult(panel.currentResult), true);
+  const gate = panel._getPayloadApplyGate(panel.currentResult);
+  assert.equal(gate.deploymentReady, false);
+  assert.equal(gate.blocked, false);
+});
+
+test('AgentRun completed payload restores BuildResult fallback flow and keeps Apply state after replay', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.activeAgentRunId = 'ar_build_contract';
+  panel.agentWorkspaceMode = 'build';
+  panel._displayResult = result => {
+    panel.displayedResult = result;
+  };
+  const completedPayload = buildResultContractPayload({ pascal: true });
+  const completedEvent = {
+    runId: 'ar_build_contract',
+    sequence: 30,
+    eventType: 'run.completed',
+    stage: 'run',
+    title: 'Run completed',
+    summary: 'Replay completed.',
+    status: 'completed',
+    payload: completedPayload,
+    metadataOnly: true,
+    redactionPass: true
+  };
+  panel.activeAgentRunEvents = [completedEvent];
+
+  const applied = panel._applyAgentRunResultPayload({
+    eventType: 'run.completed',
+    payload: completedPayload
+  });
+
+  assert.equal(applied, true);
+  assert.ok(panel.currentResult?.flow);
+  assert.equal(panel._extractOperators(panel.currentResult.flow).length, 4);
+  assert.equal(panel._extractOperators(panel.currentResult.flow)[1].type, 'SurfaceDefectDetection');
+  assert.equal(panel.currentResult.missingResources.length, 1);
+  assert.equal(elements['#ai-btn-apply'].disabled, false);
+  panel._renderBuildWorkspaceFromAgentRun();
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /Editable draft ready/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /Deployment: blocked/);
+});
+
+test('Legacy WebMessage fallback does not overwrite AgentRun completed BuildResult draft', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.activeGenerateRequestId = 'req-legacy';
+  panel.activeAgentRunId = 'ar_build_contract';
+  panel.isGenerating = true;
+  panel.agentWorkspaceMode = 'build';
+  panel._displayResult = result => {
+    panel.displayedResult = result;
+  };
+
+  panel._handleAgentRunTerminalEvent({
+    runId: 'ar_build_contract',
+    sequence: 40,
+    eventType: 'run.completed',
+    stage: 'run',
+    title: 'Run completed',
+    summary: 'AgentRun completed.',
+    status: 'completed',
+    payload: buildResultContractPayload(),
+    metadataOnly: true,
+    redactionPass: true
+  });
+  const afterAgentRunTypes = panel._extractOperators(panel.currentResult.flow).map(op => op.type);
+
+  panel._handleResult({
+    payload: {
+      requestId: 'req-legacy',
+      success: true,
+      flow: {
+        operators: [
+          { id: 'legacy_op', type: 'DeepLearning', name: 'Legacy fallback', parameters: [] }
+        ],
+        connections: []
+      },
+      aiExplanation: 'Legacy WebMessage result should be ignored.'
+    }
+  });
+
+  assert.deepEqual(panel._extractOperators(panel.currentResult.flow).map(op => op.type), afterAgentRunTypes);
+  assert.ok(afterAgentRunTypes.includes('SurfaceDefectDetection'));
+  assert.equal(panel._extractOperators(panel.currentResult.flow).some(op => op.id === 'legacy_op'), false);
+});
+
+test('Apply fallback sends editable draft to canvas without dropping node types parameters or modify context', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  const existingFlow = {
+    operators: [
+      {
+        id: 'existing_node',
+        type: 'ImageAcquisition',
+        name: 'Existing acquisition',
+        inputPorts: [],
+        outputPorts: [{ id: 'existing_node_out_0', name: 'Image', dataType: 'Image', direction: 1 }],
+        parameters: [{ name: 'SourceType', value: 'Camera', dataType: 'string' }]
+      }
+    ],
+    connections: []
+  };
+  let appliedFlow = null;
+  panel.container = container;
+  panel.flowCanvas = createFakeFlowCanvas(existingFlow);
+  panel.currentResult = buildResultContractPayload({ buildIntent: 'modify', preservedNodes: ['existing_node'] });
+  panel.currentResultVersion = 3;
+  panel.options.onApplied = flow => {
+    appliedFlow = flow;
+  };
+  panel._showApplyPreview = (diff, flow) => panel._executeApplyFlow(flow);
+  panel._renderFollowupChecklist = () => {};
+  panel._renderParameterDraftEditor = () => {};
+  panel._syncPendingParameterDrafts = () => {};
+
+  panel._handleApplyFlow();
+
+  assert.ok(appliedFlow);
+  const operators = panel._extractOperators(appliedFlow);
+  assert.ok(operators.length > 1);
+  assert.ok(operators.some(op => op.id === 'existing_node'));
+  assert.ok(operators.some(op => op.type === 'SurfaceDefectDetection'));
+  const detect = operators.find(op => op.type === 'SurfaceDefectDetection');
+  assert.ok((detect.parameters || []).some(param => param.name === 'ModelId' && param.value === '<pending-model-resource>'));
+  assert.ok(panel._extractConnections(appliedFlow).length > 0);
+  assert.equal(panel.currentResult.missingResources.length, 1);
+  assert.match(panel.lastResultStatusNote.text, /Draft applied to canvas/);
+  assert.match(panel.lastResultStatusNote.text, /deployment item/);
+  assert.equal(panel.lastWorkbenchState, 'applied');
 });
 
 test('AgentRun fetch stream is preferred and sends Authorization header', async () => {
