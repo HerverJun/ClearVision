@@ -219,6 +219,8 @@ public class AiFlowGenerationResult
 
     public List<object> ToolTrace { get; set; } = new();
 
+    public VisionAgentBuildResult? BuildResult { get; set; }
+
     /// <summary>
     /// 本次失败的结构化摘要（成功时为空）
     /// </summary>

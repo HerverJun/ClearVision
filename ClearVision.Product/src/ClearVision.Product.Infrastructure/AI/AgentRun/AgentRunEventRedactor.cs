@@ -27,8 +27,16 @@ public sealed class AgentRunEventRedactor
         @"(?i)\bbearer\s+[a-z0-9._~+/=-]{8,}",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    private static readonly Regex SecretTokenRegex = new(
+        @"(?i)\bsk-[a-z0-9_\-]{8,}\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly Regex IPv4Regex = new(
         @"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex PlcAddressRegex = new(
+        @"(?i)\b(DB\d+\.DB[XBWD]\d+(?:\.\d+)?|M\d+(?:\.\d+)?|D\d+|plc://[^\s,;""'}]+)\b",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex WindowsPathRegex = new(
@@ -101,7 +109,9 @@ public sealed class AgentRunEventRedactor
 
         if (AuthorizationRegex.IsMatch(text) ||
             BearerRegex.IsMatch(text) ||
+            SecretTokenRegex.IsMatch(text) ||
             IPv4Regex.IsMatch(text) ||
+            PlcAddressRegex.IsMatch(text) ||
             WindowsPathRegex.IsMatch(text) ||
             UnixSensitivePathRegex.IsMatch(text) ||
             DataImageRegex.IsMatch(text) ||
@@ -219,12 +229,14 @@ public sealed class AgentRunEventRedactor
         var result = text;
         result = AuthorizationRegex.Replace(result, "$1: [redacted:secret]");
         result = BearerRegex.Replace(result, "Bearer [redacted:secret]");
+        result = SecretTokenRegex.Replace(result, "[redacted:secret]");
         result = DataImageRegex.Replace(result, "[redacted:image-bytes]");
         result = LongBase64Regex.Replace(result, "[redacted:base64]");
         result = WindowsPathRegex.Replace(result, "[redacted:path]");
         result = UnixSensitivePathRegex.Replace(result, "[redacted:path]");
         result = ArtifactPathRegex.Replace(result, "[redacted:artifact-path]");
         result = IPv4Regex.Replace(result, RedactIPv4);
+        result = PlcAddressRegex.Replace(result, "[redacted:plc-address]");
         return result;
     }
 

@@ -12,14 +12,23 @@ const BUILD_STAGE_ORDER = [
     'plan_generation',
     'assumption_confirmation',
     'requirement_parsing',
+    'resolve_build_intent',
+    'template_strategy',
+    'operator_pipeline',
+    'parameter_mapping',
     'planner',
     'workflow_draft',
+    'validate_schema',
+    'metadata_dry_run',
     'readiness',
     'manifest_dry_run',
     'package_readiness',
     'station_compatibility',
     'operator_contract',
     'release_review',
+    'repair_loop',
+    'workflow_diff',
+    'apply_gate',
     'artifact',
     'run'
 ];
@@ -30,15 +39,24 @@ const BUILD_STAGE_LABELS = {
     plan_generation: 'Plan',
     assumption_confirmation: 'Assumptions',
     requirement_parsing: 'Normalize',
+    resolve_build_intent: 'Intent',
+    template_strategy: 'Template',
+    operator_pipeline: 'Operators',
+    parameter_mapping: 'Parameters',
     planner: 'Template and tools',
     tool_policy: 'Tool policy',
     workflow_draft: 'Flow draft',
+    validate_schema: 'Schema',
+    metadata_dry_run: 'Dry-run',
     readiness: 'Readiness',
     manifest_dry_run: 'Dry-run',
     package_readiness: 'Package',
     station_compatibility: 'Station',
     operator_contract: 'Contracts',
     release_review: 'Release review',
+    repair_loop: 'Repair',
+    workflow_diff: 'Diff',
+    apply_gate: 'Apply gate',
     artifact: 'Artifact',
     run: 'Run'
 };
@@ -778,10 +796,54 @@ export const aiPanelAgentWorkspaceMixin = {
                     </div>
                 </div>
             `;
-        }).join('');
+        }).join('') + this._renderToolEvidenceTimeline(events);
+    },
+
+    _renderToolEvidenceTimeline(events) {
+        const buildResult = this._getBuildResult(events);
+        const evidence = this._toArray(
+            buildResult?.toolEvidenceTimeline ||
+            buildResult?.ToolEvidenceTimeline ||
+            this._getAgentRunResultPayload(events)?.toolEvidenceTimeline ||
+            []
+        );
+        if (!evidence.length) {
+            return '';
+        }
+
+        return `
+            <div class="ai-workspace-section-title">Tool Evidence</div>
+            ${evidence.slice(-16).map(item => {
+                const stage = item.stage || item.Stage || '';
+                const toolName = item.toolName || item.ToolName || '';
+                const status = item.status || item.Status || '';
+                const duration = item.durationMs ?? item.DurationMs ?? '';
+                const warning = item.warningCode || item.WarningCode || '';
+                const summary = item.outputSummary || item.OutputSummary || '';
+                return `
+                    <div class="ai-build-compact-row">
+                        <b>${this._escapeHtml(toolName || stage)}</b>
+                        <span>${this._escapeHtml(status)}${duration !== '' ? ` / ${this._escapeHtml(String(duration))} ms` : ''}${warning ? ` / ${this._escapeHtml(warning)}` : ''}</span>
+                        <small>${this._escapeHtml(summary)}</small>
+                    </div>
+                `;
+            }).join('')}
+        `;
     },
 
     _renderBuildTemplateSummary(events) {
+        const buildResult = this._getBuildResult(events);
+        const evidence = this._toArray(buildResult?.toolEvidenceTimeline || buildResult?.ToolEvidenceTimeline);
+        const templateEvidence = evidence.filter(item => String(item.stage || item.Stage || '').includes('template')).slice(-3);
+        if (templateEvidence.length) {
+            return templateEvidence.map(item => `
+                <div class="ai-build-compact-row">
+                    <b>${this._escapeHtml(item.toolName || item.ToolName || 'template_strategy')}</b>
+                    <span>${this._escapeHtml(item.outputSummary || item.OutputSummary || '')}</span>
+                </div>
+            `).join('');
+        }
+
         const tools = events.filter(evt => {
             const payload = this._asObject?.(evt.payload) || {};
             const name = String(payload.toolName || payload.ToolName || evt.title || '').toLowerCase();
@@ -801,6 +863,16 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _renderBuildOperatorChain(events) {
+        const buildResult = this._getBuildResult(events);
+        const pipeline = this._toArray(buildResult?.operatorPipeline || buildResult?.OperatorPipeline);
+        if (pipeline.length) {
+            return `
+                <div class="ai-plan-chain">
+                    ${pipeline.map(item => `<span title="${this._escapeHtml(item.status || item.Status || '')}">${this._escapeHtml(item.operatorType || item.OperatorType || '')}</span>`).join('')}
+                </div>
+            `;
+        }
+
         const draft = [...events].reverse().find(evt => evt.eventType === 'workflow.draft.updated');
         const payload = this._asObject?.(draft?.payload) || {};
         const operatorTypes = Array.isArray(payload.operatorTypes || payload.OperatorTypes)
@@ -819,23 +891,48 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _renderBuildParameterSummary(events) {
         const resultPayload = this._getAgentRunResultPayload(events);
+        const buildResult = this._getBuildResult(events);
+        const mappings = this._toArray(buildResult?.parameterMapping || buildResult?.ParameterMapping);
         const pending = resultPayload?.pendingParameters || resultPayload?.PendingParameters || [];
         const missing = resultPayload?.missingResources || resultPayload?.MissingResources || [];
         const latest = [...events].reverse().find(evt => evt.payload);
         const latestPayload = this._asObject?.(latest?.payload) || {};
         const missingCount = Number(latestPayload.missingResourceCount ?? latestPayload.MissingResourceCount ?? missing.length);
         const pendingCount = Number(latestPayload.pendingParameterCount ?? latestPayload.PendingParameterCount ?? pending.length);
+        const mappingRows = mappings.slice(0, 8).map(item => `
+            <div class="ai-build-compact-row">
+                <b>${this._escapeHtml(item.tempId || item.TempId || '')}.${this._escapeHtml(item.parameterName || item.ParameterName || '')}</b>
+                <span>${this._escapeHtml(item.valueSummary || item.ValueSummary || '')}</span>
+            </div>
+        `).join('');
 
         return `
             <div class="ai-build-metric-row">
                 <span><small>Pending parameters</small><b>${this._escapeHtml(String(Number.isFinite(pendingCount) ? pendingCount : 0))}</b></span>
                 <span><small>Missing resources</small><b>${this._escapeHtml(String(Number.isFinite(missingCount) ? missingCount : 0))}</b></span>
             </div>
+            ${mappingRows ? `<div class="ai-workspace-section-title">Parameter Mapping</div>${mappingRows}` : ''}
             ${(pending.length || missing.length) ? '<div class="ai-build-note">Details are rendered in the pending parameter and validation sections below.</div>' : '<div class="ai-build-note">No pending parameter details have been published yet.</div>'}
         `;
     },
 
     _renderBuildChecks(events) {
+        const buildResult = this._getBuildResult(events);
+        const applyGate = buildResult?.applyGate || buildResult?.ApplyGate || this._getAgentRunResultPayload(events)?.applyGate;
+        const readiness = buildResult?.readinessReport || buildResult?.ReadinessReport || null;
+        const firstFix = buildResult?.firstFixRecommendation || buildResult?.FirstFixRecommendation || this._getAgentRunResultPayload(events)?.firstFixRecommendation || '';
+        if (applyGate) {
+            const gate = this._asObject?.(applyGate) || {};
+            return `
+                <div class="ai-build-check is-${gate.blocked || gate.Blocked ? 'blocked' : 'completed'}">
+                    <strong>Apply Gate: ${this._escapeHtml(gate.status || gate.Status || 'unknown')}</strong>
+                    <span>Canvas: ${gate.canvasApplyReady || gate.CanvasApplyReady ? 'ready' : 'blocked'} / Runtime draft: ${gate.runtimeDraftReady || gate.RuntimeDraftReady ? 'ready' : 'blocked'} / Deployment: ${gate.deploymentReady || gate.DeploymentReady ? 'ready' : 'blocked'}</span>
+                    ${firstFix ? `<em>${this._escapeHtml(firstFix)}</em>` : ''}
+                </div>
+                ${readiness ? `<div class="ai-build-note">Readiness gates are available in replay-safe BuildResult.</div>` : ''}
+            `;
+        }
+
         const checkTypes = new Set([
             'readiness.checked',
             'manifest.dryrun.completed',
@@ -865,10 +962,12 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _renderBuildFinalDraft(events) {
         const resultPayload = this._getAgentRunResultPayload(events);
+        const buildResult = this._getBuildResult(events);
         const flow = resultPayload?.flow || resultPayload?.Flow || this.currentResult?.flow || this.currentResult?.Flow || null;
         const ops = flow ? this._extractOperators(flow) : [];
         const connections = flow ? this._extractConnections(flow) : [];
         const terminal = events.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
+        const diff = buildResult?.workflowDiff || buildResult?.WorkflowDiff || resultPayload?.workflowDiff || null;
         if (!terminal) {
             return '<div class="ai-followup-empty">Final editable draft will appear when Build completes.</div>';
         }
@@ -882,6 +981,24 @@ export const aiPanelAgentWorkspaceMixin = {
                 <strong>Editable draft ready</strong>
                 <span>${this._escapeHtml(String(ops.length))} operators / ${this._escapeHtml(String(connections.length))} connections</span>
             </div>
+            ${diff ? this._renderWorkflowDiff(diff) : ''}
+        `;
+    },
+
+    _renderWorkflowDiff(diff) {
+        const item = this._asObject?.(diff) || {};
+        const added = this._toArray(item.addedNodes || item.AddedNodes);
+        const preserved = this._toArray(item.preservedNodes || item.PreservedNodes);
+        const pending = this._toArray(item.pendingParameters || item.PendingParameters);
+        const blockers = this._toArray(item.deploymentBlockers || item.DeploymentBlockers);
+        return `
+            <div class="ai-workspace-section-title">Workflow Diff</div>
+            <div class="ai-build-metric-row">
+                <span><small>Added</small><b>${this._escapeHtml(String(added.length))}</b></span>
+                <span><small>Preserved</small><b>${this._escapeHtml(String(preserved.length))}</b></span>
+                <span><small>Pending</small><b>${this._escapeHtml(String(pending.length))}</b></span>
+                <span><small>Deploy blockers</small><b>${this._escapeHtml(String(blockers.length))}</b></span>
+            </div>
         `;
     },
 
@@ -889,6 +1006,11 @@ export const aiPanelAgentWorkspaceMixin = {
         const terminal = [...(events || [])].reverse()
             .find(evt => ['run.completed', 'run.failed'].includes(evt.eventType) && evt.payload);
         return this._asObject?.(terminal?.payload) || {};
+    },
+
+    _getBuildResult(events = this.activeAgentRunEvents) {
+        const payload = this._getAgentRunResultPayload(events);
+        return this._asObject?.(payload.buildResult || payload.BuildResult || this.currentResult?.buildResult || this.currentResult?.BuildResult) || null;
     },
 
     _applyAgentRunResultPayload(evt) {

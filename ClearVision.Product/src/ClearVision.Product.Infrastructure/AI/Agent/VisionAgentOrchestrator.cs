@@ -35,17 +35,20 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private readonly IVisionAgentToolRegistry _toolRegistry;
     private readonly IAiFlowGenerationService _generationService;
     private readonly IVisionAgentPlanPlannerService? _planPlannerService;
+    private readonly IVisionAgentBuildOrchestrator? _buildOrchestrator;
     private readonly IAgentRunEventSink? _eventSink;
 
     public VisionAgentOrchestrator(
         IVisionAgentToolRegistry toolRegistry,
         IAiFlowGenerationService generationService,
         IAgentRunEventSink? eventSink = null,
+        IVisionAgentBuildOrchestrator? buildOrchestrator = null,
         IVisionAgentPlanPlannerService? planPlannerService = null)
     {
         _toolRegistry = toolRegistry;
         _generationService = generationService;
         _planPlannerService = planPlannerService;
+        _buildOrchestrator = buildOrchestrator;
         _eventSink = eventSink;
     }
 
@@ -73,6 +76,11 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         AiFlowGenerationRequest request,
         CancellationToken cancellationToken)
     {
+        if (_buildOrchestrator != null)
+        {
+            return await _buildOrchestrator.BuildAsync(request, cancellationToken);
+        }
+
         EmitBuildPreparationEvents(request);
         return await _generationService.GenerateFlowAsync(request, cancellationToken: cancellationToken);
     }
