@@ -67,6 +67,60 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
         var runId = request.AgentRunId;
         _eventSink?.StageStarted(
             runId,
+            "understand_requirement",
+            "Understanding requirement",
+            "Reading the user goal and preparing public engineering metadata.",
+            new
+            {
+                mode = request.Mode.ToWireValue(),
+                hasExistingFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson),
+                metadataOnly = true
+            });
+        _eventSink?.StageCompleted(
+            runId,
+            "understand_requirement",
+            "Requirement understood",
+            "A public goal summary was prepared as redacted engineering metadata.",
+            BuildPublicPlanPayload(request));
+        _eventSink?.StageStarted(
+            runId,
+            "context_collection",
+            "Collecting engineering context",
+            "Collecting template, operator catalog, current flow, and Station boundary metadata.",
+            new
+            {
+                metadataOnly = true
+            });
+        _eventSink?.StageCompleted(
+            runId,
+            "context_collection",
+            "Engineering context collected",
+            "Context collection completed as public metadata; no real Station resource was touched.",
+            new
+            {
+                contextKinds = new[] { "operator_catalog", "template_catalog", "current_flow", "station_boundary" },
+                hasExistingFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson),
+                metadataOnly = true
+            });
+        _eventSink?.StageCompleted(
+            runId,
+            "plan_generation",
+            "Engineering plan generated",
+            "Build will follow the public Plan Mode route and keep unresolved resources as pending metadata.",
+            BuildPublicPlanPayload(request));
+        _eventSink?.StageCompleted(
+            runId,
+            "assumption_confirmation",
+            "Assumptions confirmed",
+            "Build Mode started from confirmed Plan Mode defaults.",
+            new
+            {
+                confirmedBy = "plan_mode",
+                publicDiagnosticsOnly = true,
+                metadataOnly = true
+            });
+        _eventSink?.StageStarted(
+            runId,
             "requirement_parsing",
             "Requirement parsing",
             "Preparing the Vision Agent request as metadata-only context.",
@@ -85,7 +139,7 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
             "The request was normalized for the controlled Vision Agent pipeline.",
             new
             {
-                chainOfThoughtVisible = false,
+                publicDiagnosticsOnly = true,
                 metadataOnly = true
             });
 
@@ -413,6 +467,67 @@ public sealed class VisionAgentGenerateFlowService : IVisionAgentGenerateFlowSer
 
         var requestMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode);
         return string.Equals(requestMode, AiAgentGenerateFlowModes.Planner, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static object BuildPublicPlanPayload(AiFlowGenerationRequest request)
+    {
+        var description = string.IsNullOrWhiteSpace(request.Description)
+            ? "Vision workflow draft"
+            : request.Description.Trim();
+        var lower = description.ToLowerInvariant();
+        var route = lower.Contains("wire", StringComparison.Ordinal) ||
+                    description.Contains("线序", StringComparison.Ordinal) ||
+                    description.Contains("端子", StringComparison.Ordinal)
+            ? new
+            {
+                routeId = "wire_sequence_template_first",
+                title = "Template-first wire sequence route",
+                operators = new[] { "ImageAcquisition", "DeepLearning", "DetectionSequenceJudge", "ResultOutput" }
+            }
+            : lower.Contains("barcode", StringComparison.Ordinal) ||
+              lower.Contains("datamatrix", StringComparison.Ordinal) ||
+              description.Contains("二维码", StringComparison.Ordinal) ||
+              description.Contains("条码", StringComparison.Ordinal)
+                ? new
+                {
+                    routeId = "code_recognition",
+                    title = "Code recognition route",
+                    operators = new[] { "ImageAcquisition", "RoiManager", "CodeRecognition", "ResultJudgment", "ResultOutput" }
+                }
+                : lower.Contains("measure", StringComparison.Ordinal) ||
+                  description.Contains("测量", StringComparison.Ordinal) ||
+                  description.Contains("孔距", StringComparison.Ordinal)
+                    ? new
+                    {
+                        routeId = "measurement_with_calibration",
+                        title = "Calibration-backed measurement route",
+                        operators = new[] { "ImageAcquisition", "CalibrationLoader", "GeoMeasurement", "ResultOutput" }
+                    }
+                    : new
+                    {
+                        routeId = "surface_defect_detection",
+                        title = "Surface defect inspection route",
+                        operators = new[] { "ImageAcquisition", "ShadingCorrection", "SurfaceDefectDetection", "BlobAnalysis", "ResultJudgment", "ResultOutput" }
+                    };
+
+        return new
+        {
+            goal = description.Length > 160 ? description[..160] : description,
+            route,
+            defaultAssumptions = new[]
+            {
+                "Use metadata placeholders for camera, model, template, output channel, PLC, and Station bindings.",
+                "Keep workflow draft editable when deployment readiness is blocked.",
+                "Publish only public diagnostics and public events."
+            },
+            acceptanceCriteria = new[]
+            {
+                "Workflow draft contains acquisition, inspection, judgment, and output stages.",
+                "Readiness, dry-run, package, Station, contract, and release review events are replayable.",
+                "Missing resources and pending parameters are surfaced before Apply or deployment."
+            },
+            metadataOnly = true
+        };
     }
 
     private ClearVision.Product.Core.Entities.RuntimePreviewPilotConfig ResolveRuntimePreviewPilotConfig()

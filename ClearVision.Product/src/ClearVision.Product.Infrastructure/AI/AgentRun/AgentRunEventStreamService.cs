@@ -70,7 +70,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             Payload = new
             {
                 brief,
-                chainOfThoughtVisible = false,
+                publicDiagnosticsOnly = true,
                 metadataOnly = true
             }
         })!);
@@ -662,7 +662,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                 Payload = new
                 {
                     storageVersion = AgentRunEventStore.StorageVersion,
-                    chainOfThoughtVisible = false
+                    publicDiagnosticsOnly = true
                 }
             };
         }

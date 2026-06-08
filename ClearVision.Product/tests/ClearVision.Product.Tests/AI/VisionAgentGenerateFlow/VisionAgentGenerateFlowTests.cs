@@ -6,6 +6,7 @@ using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.DryRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using ClearVision.Product.Infrastructure.AI.Tools;
@@ -87,6 +88,46 @@ public sealed class VisionAgentGenerateFlowTests
             .Select(item => item.GetProperty("toolName").GetString())
             .Should()
             .Equal("validate_flow", "dryrun_flow", "runtime_package_precheck");
+    }
+
+    [Fact(DisplayName = "AgentRun events should publish Plan and Build stage boundaries as public metadata")]
+    public async Task AgentGenerateFlow_ShouldPublishPublicPlanBuildStageEvents()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var result = await CreateVisionAgentGenerateFlowService(sink).GenerateFlowAsync(
+            AgentRequest("metal surface scratch detection") with { AgentRunId = "ar_test" },
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        sink.Events.Select(evt => evt.Stage).Should().ContainInOrder([
+            "understand_requirement",
+            "understand_requirement",
+            "context_collection",
+            "context_collection",
+            "plan_generation",
+            "assumption_confirmation",
+            "requirement_parsing"
+        ]);
+        sink.Events.Where(evt => evt.Stage is
+                "understand_requirement" or
+                "context_collection" or
+                "plan_generation" or
+                "assumption_confirmation")
+            .Should()
+            .OnlyContain(evt => evt.MetadataOnly);
+
+        var planEvent = sink.Events.Single(evt => evt.Stage == "plan_generation");
+        var planPayload = Json(planEvent.Payload);
+        planPayload.GetProperty("route").GetProperty("routeId").GetString().Should().Be("surface_defect_detection");
+        planPayload.GetProperty("route").GetProperty("operators").EnumerateArray().Should().NotBeEmpty();
+        planPayload.GetProperty("defaultAssumptions").EnumerateArray().Should().NotBeEmpty();
+        planPayload.GetProperty("acceptanceCriteria").EnumerateArray().Should().NotBeEmpty();
+
+        var publicJson = JsonSerializer.Serialize(sink.Events);
+        publicJson.Should().NotContain("systemPrompt");
+        publicJson.Should().NotContain("reasoningContent");
+        publicJson.Should().NotContain("rawPrompt");
+        publicJson.Should().NotContain("chainOfThought");
     }
 
     [Fact(DisplayName = "Wire sequence request should generate draft and ModelPath pending action")]
@@ -322,7 +363,8 @@ public sealed class VisionAgentGenerateFlowTests
         };
     }
 
-    private static VisionAgentGenerateFlowService CreateVisionAgentGenerateFlowService()
+    private static VisionAgentGenerateFlowService CreateVisionAgentGenerateFlowService(
+        IAgentRunEventSink? eventSink = null)
     {
         var loopOptions = new VisionAgentLoopOptions
         {
@@ -351,7 +393,8 @@ public sealed class VisionAgentGenerateFlowTests
         return new VisionAgentGenerateFlowService(
             loop,
             Options.Create(loopOptions),
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentGenerateFlowService>>());
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentGenerateFlowService>>(),
+            eventSink: eventSink);
     }
 
     private static AiFlowGenerationService CreateAiFlowGenerationService(
@@ -516,6 +559,79 @@ public sealed class VisionAgentGenerateFlowTests
         {
             CallCount++;
             return _handler(request);
+        }
+    }
+
+    private sealed class CapturingAgentRunEventSink : IAgentRunEventSink
+    {
+        public List<AgentRunEventDraft> Events { get; } = [];
+
+        public void Append(string? runId, AgentRunEventDraft draft)
+        {
+            Events.Add(draft);
+        }
+
+        public void StageStarted(string? runId, string stage, string title, string summary, object? payload = null)
+        {
+            Append(runId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.StageStarted,
+                Stage = stage,
+                Title = title,
+                Summary = summary,
+                Status = AgentRunEventStatuses.Running,
+                Payload = payload
+            });
+        }
+
+        public void StageCompleted(string? runId, string stage, string title, string summary, object? payload = null)
+        {
+            Append(runId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.StageCompleted,
+                Stage = stage,
+                Title = title,
+                Summary = summary,
+                Status = AgentRunEventStatuses.Completed,
+                Payload = payload
+            });
+        }
+
+        public void ToolStarted(string? runId, string stage, string toolName, object? payload = null)
+        {
+            Append(runId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.ToolCallStarted,
+                Stage = stage,
+                Title = toolName,
+                Status = AgentRunEventStatuses.Running,
+                Payload = payload
+            });
+        }
+
+        public void ToolCompleted(string? runId, string stage, string toolName, long durationMs, object? payload = null)
+        {
+            Append(runId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.ToolCallCompleted,
+                Stage = stage,
+                Title = toolName,
+                Status = AgentRunEventStatuses.Completed,
+                Payload = payload
+            });
+        }
+
+        public void ToolFailed(string? runId, string stage, string toolName, long durationMs, string summary, object? payload = null)
+        {
+            Append(runId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.ToolCallFailed,
+                Stage = stage,
+                Title = toolName,
+                Summary = summary,
+                Status = AgentRunEventStatuses.Failed,
+                Payload = payload
+            });
         }
     }
 }

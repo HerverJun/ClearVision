@@ -606,11 +606,14 @@ test('default UI does not render RuntimePreview consent control', async () => {
   assert.doesNotMatch(panel._renderAgentDeveloperControls(), /RuntimePreview/);
 });
 
-test('default UI payload does not include useVisionAgentGenerateFlow', async () => {
+test('default UI payload uses Agent GenerateFlow for Build Mode', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true, mode: 'planner' });
 
-  assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {});
+  assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
+    useVisionAgentGenerateFlow: true,
+    agentGenerateFlowMode: 'planner'
+  });
 });
 
 test('developer mode payload includes useVisionAgentGenerateFlow=true', async () => {
@@ -669,7 +672,7 @@ test('RuntimePreview consent payload is one request only', async () => {
   });
 });
 
-test('AgentRun event stream is used only for developer Agent GenerateFlow mode with fetch support', async () => {
+test('AgentRun event stream is used for Agent GenerateFlow mode with fetch support', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
   const originalFetch = global.fetch;
@@ -682,7 +685,7 @@ test('AgentRun event stream is used only for developer Agent GenerateFlow mode w
   assert.equal(panel._shouldUseAgentRunEventStream(), false);
   panel.useVisionAgentGenerateFlow = true;
   panel.isVisionAgentDeveloperUiEnabled = false;
-  assert.equal(panel._shouldUseAgentRunEventStream(), false);
+  assert.equal(panel._shouldUseAgentRunEventStream(), true);
   panel.isVisionAgentDeveloperUiEnabled = true;
   global.fetch = undefined;
   assert.equal(panel._shouldUseAgentRunEventStream(), false);
@@ -715,6 +718,67 @@ test('AgentRun create payload is metadata-only and does not send attachment path
   assert.deepEqual(payload.attachments, []);
   assert.equal(payload.existingFlowJson, '{"operators":[]}');
   assert.deepEqual(payload.templateSelection, { mode: 'template_fill', templateId: 'tmpl-1' });
+});
+
+test('Plan Mode captures vague inspection request without starting Build', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const input = createFakeElement();
+  const chat = createFakeElement();
+  const overview = createFakeElement();
+  const plan = createFakeElement();
+  const build = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': input,
+    '#ai-chat-container': chat,
+    '#ai-agent-workspace-overview': overview,
+    '#ai-plan-workspace': plan,
+    '#ai-build-workspace': build,
+    '#ai-result-status-note': createFakeElement()
+  });
+
+  const accepted = panel._dispatchGenerateRequest({
+    description: '帮我做一个金属表面划痕检测流程',
+    userMessage: '帮我做一个金属表面划痕检测流程'
+  });
+
+  assert.equal(accepted, true);
+  assert.equal(panel.isGenerating, false);
+  assert.equal(panel.activeAgentRunId, null);
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.match(panel.pendingVisionPlan.goal, /金属表面划痕/);
+  assert.match(plan.innerHTML, /Clarifying Questions/);
+  assert.match(plan.innerHTML, /Accept Recommended and Build/);
+  assert.doesNotMatch(plan.innerHTML, /setTimeout/);
+});
+
+test('Start Build from Plan enters Build request with skipPlan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.pendingVisionPlan = panel._buildVisionEngineeringPlan('detect metal scratches');
+  panel.planQuestionSelections = Object.fromEntries(
+    panel.pendingVisionPlan.questions.map(question => [question.id, question.defaultValue])
+  );
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
+
+  const started = panel._startBuildFromCurrentPlan({ acceptedRecommended: true });
+
+  assert.equal(started, true);
+  assert.equal(panel.agentWorkspaceMode, 'build');
+  assert.equal(captured.skipPlan, true);
+  assert.equal(captured.explicitMode, 'new');
+  assert.match(captured.hint, /Plan Mode confirmed build context/);
+  assert.match(captured.userMessage, /Start Build from plan/);
 });
 
 test('AgentRun fetch stream is preferred and sends Authorization header', async () => {
@@ -759,6 +823,8 @@ test('AgentRun fetch stream is preferred and sends Authorization header', async 
 
   assert.match(requests[0].url, /\/api\/ai\/agent-runs\/ar_fetch\/events\?lastEventId=2$/);
   assert.equal(requests[0].options.headers.Authorization, 'Bearer owner-token');
+  assert.equal(requests.length, 1);
+  assert.ok(requests.every(request => !request.url.includes('/stream-token')));
   assert.match(collectProcessText(turn), /Fetch streamed before terminal/);
   assert.equal(panel.activeAgentRunTransport, null);
   assert.equal(panel.isGenerating, false);
@@ -899,7 +965,7 @@ test('AgentRun assistant brief appends immediate public summary', async () => {
 
   assert.match(turn.replyBody.textContent, /safe workflow draft/);
   assert.equal(turn.replySection.hidden, false);
-  assert.equal(turn.statusEl.textContent, '运行中');
+  assert.equal(turn.statusEl.textContent, 'Running');
   assert.doesNotMatch(turn.replyBody.textContent, /chain.?of.?thought|hidden reasoning/i);
 });
 
@@ -1070,7 +1136,7 @@ test('AgentRun run.failed renders failure diagnosis and first fix only', async (
   assert.match(turn.failureBody.innerHTML, /Provide missing model metadata/);
   assert.doesNotMatch(turn.failureBody.innerHTML, /chain.?of.?thought|raw prompt|system prompt/i);
   assert.equal(panel.lastWorkbenchState, 'failed');
-  assert.equal(turn.statusEl.textContent, '生成失败');
+  assert.equal(turn.statusEl.textContent, 'Build failed');
 });
 
 test('AgentRun terminal completed event closes source and releases generating state', async () => {
@@ -1097,7 +1163,7 @@ test('AgentRun terminal completed event closes source and releases generating st
   assert.equal(closed, true);
   assert.equal(panel.activeAgentRunTransport, null);
   assert.equal(panel.isGenerating, false);
-  assert.equal(turn.statusEl.textContent, '生成完成');
+  assert.equal(turn.statusEl.textContent, 'Build complete');
   assert.equal(panel.lastResultStatusNote.text, 'Release review completed.');
 });
 
@@ -1125,7 +1191,7 @@ test('AgentRun cancelled event sets cancelled UI state', async () => {
   assert.equal(closed, true);
   assert.equal(panel.activeAgentRunTransport, null);
   assert.equal(panel.isGenerating, false);
-  assert.equal(turn.statusEl.textContent, '已取消');
+  assert.equal(turn.statusEl.textContent, 'Cancelled');
   assert.equal(panel.lastWorkbenchState, 'cancelled');
 });
 

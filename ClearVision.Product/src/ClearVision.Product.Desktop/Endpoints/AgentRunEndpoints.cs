@@ -55,8 +55,6 @@ public static class AgentRunEndpoints
             attachmentCount = request.AttachmentCount ?? request.Attachments?.Count ?? 0,
             metadataOnly = true
         }, ownerHash);
-        var streamToken = streamService.IssueStreamToken(createResult.RunId, ownerHash);
-
         _ = Task.Run(async () =>
         {
             await RunGenerateFlowAsync(
@@ -70,8 +68,6 @@ public static class AgentRunEndpoints
         {
             runId = createResult.RunId,
             brief = createResult.Brief,
-            streamToken,
-            streamTokenExpiresInSeconds = 45,
             events = createResult.Events
         }));
     }
@@ -227,15 +223,31 @@ public static class AgentRunEndpoints
             if (result.Success)
             {
                 streamService.Complete(runId, "Vision Agent completed the metadata-only workflow draft run.", new
-                {
-                    status = result.CompletionStatus,
-                    generationMode = result.GenerationMode,
-                    toolTraceCount = result.ToolTrace.Count,
-                    pendingParameterCount = result.PendingParameters.Count,
-                    missingResourceCount = result.MissingResources.Count,
-                    reportId = $"agent-report-{runId}",
-                    metadataOnly = true
-                });
+                    {
+                        status = result.CompletionStatus,
+                        sessionId = result.SessionId,
+                        generationMode = result.GenerationMode,
+                        templateLockLevel = result.TemplateLockLevel,
+                        recommendedTemplate = result.RecommendedTemplate,
+                        flow = result.Flow,
+                        aiExplanation = result.AiExplanation,
+                        parametersNeedingReview = result.ParametersNeedingReview,
+                        pendingParameters = result.PendingParameters,
+                        missingResources = result.MissingResources,
+                        pendingActions = result.PendingActions,
+                        validationPreview = result.ValidationPreview,
+                        dryRunResult = result.DryRunResult,
+                        toolTrace = result.ToolTrace,
+                        stageTimeline = result.StageTimeline,
+                        turnIntent = result.TurnIntent,
+                        interactionState = result.InteractionState,
+                        routerConfidence = result.RouterConfidence,
+                        toolTraceCount = result.ToolTrace.Count,
+                        pendingParameterCount = result.PendingParameters.Count,
+                        missingResourceCount = result.MissingResources.Count,
+                        reportId = $"agent-report-{runId}",
+                        metadataOnly = true
+                    });
                 return;
             }
 

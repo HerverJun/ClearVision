@@ -15,19 +15,23 @@ const ARTIFACT_EVENT_TYPES = new Set([
 ]);
 
 const STAGE_LABELS = {
-    run: '运行',
-    brief: '任务摘要',
-    requirement_parsing: '需求解析',
+    run: 'Run',
+    brief: 'Brief',
+    understand_requirement: 'Understand',
+    context_collection: 'Context',
+    plan_generation: 'Plan',
+    assumption_confirmation: 'Assumptions',
+    requirement_parsing: 'Normalize',
     planner: 'Planner',
-    tool_policy: '工具策略',
-    workflow_draft: '工作流草稿',
+    tool_policy: 'Tool policy',
+    workflow_draft: 'Workflow draft',
     readiness: 'Readiness',
     manifest_dry_run: 'Manifest dry-run',
     package_readiness: 'Package readiness',
     station_compatibility: 'Station compatibility',
     operator_contract: 'Operator contract',
     release_review: 'Release review',
-    artifact: '报告'
+    artifact: 'Artifact'
 };
 
 const AGENT_RUN_EVENT_TYPES = [
@@ -390,7 +394,6 @@ export class AgentRunEventTransport {
 export const aiPanelAgentRunMixin = {
     _shouldUseAgentRunEventStream() {
         return Boolean(
-            this.isVisionAgentDeveloperUiEnabled &&
             this.useVisionAgentGenerateFlow &&
             typeof window !== 'undefined' &&
             typeof fetch === 'function'
@@ -493,9 +496,8 @@ export const aiPanelAgentRunMixin = {
             }
         }
 
-        const streamToken = createResult?.streamToken || createResult?.StreamToken || '';
         const lastSequence = this._getAgentRunLastSequence();
-        this._startAgentRunEventSource(runId, { streamToken, lastSequence });
+        this._startAgentRunEventSource(runId, { lastSequence });
         this.nextHintDraft = '';
         this.nextTemplateSelection = null;
         this._renderQueuedHintBanner();
@@ -560,6 +562,7 @@ export const aiPanelAgentRunMixin = {
             ? this.activeAgentRunEvents
             : [];
         this.activeAgentRunEvents.push(evt);
+        this._handleAgentRunWorkspaceEvent?.(evt);
 
         if (evt.eventType === 'assistant.brief') {
             this._renderAgentRunBrief(evt);
@@ -642,13 +645,13 @@ export const aiPanelAgentRunMixin = {
     },
 
     _renderAgentRunBrief(evt) {
-        const text = evt.summary || this._payloadString(evt.payload, 'brief') || '已创建 Vision Agent 任务，将实时展示公开执行过程。';
+        const text = evt.summary || this._payloadString(evt.payload, 'brief') || 'Vision Agent run created. Public progress events will stream here.';
         const body = this.activeAssistantTurn?.replyBody;
         if (!body?.textContent?.includes(text)) {
             this._appendAssistantStreamText('reply', `${text}\n`);
         }
 
-        this._setAssistantTurnStatus(this.activeAssistantTurn, '运行中', 'streaming');
+        this._setAssistantTurnStatus(this.activeAssistantTurn, 'Running', 'streaming');
     },
 
     _appendAgentRunProcessLine(evt) {
@@ -660,7 +663,7 @@ export const aiPanelAgentRunMixin = {
         const statusLabel = this._getAgentRunStatusLabel(evt.status);
         const title = evt.title || stageLabel;
         const summary = evt.summary || '';
-        const text = `${stageLabel} · ${statusLabel} · ${title}${summary && summary !== title ? `\n${summary}` : ''}`;
+        const text = `${stageLabel} / ${statusLabel} / ${title}${summary && summary !== title ? `\n${summary}` : ''}`;
         const item = this._updateThinkingStep(evt.runId, stepId, text);
         if (!item) return;
 
@@ -698,7 +701,7 @@ export const aiPanelAgentRunMixin = {
         const resultSummary = this._payloadString(payload, 'summary') ||
             this._payloadString(payload, 'resultSummary') ||
             evt.summary ||
-            '工具调用状态已更新。';
+            'Tool status updated.';
         const tone = this._getAgentRunTone(evt.status, evt.eventType);
         card.className = `ai-agent-run-tool-card is-${tone}`;
         card.innerHTML = `
@@ -712,7 +715,7 @@ export const aiPanelAgentRunMixin = {
                 ${reportId ? `<span>reportId ${this._escapeHtml(reportId)}</span>` : ''}
             </div>
             ${blockedReasons.length > 0 ? `<div class="ai-agent-run-blocked">${blockedReasons.map(reason => `<span>${this._escapeHtml(reason)}</span>`).join('')}</div>` : ''}
-            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>第一修复建议</span>${this._escapeHtml(firstFix)}</div>` : ''}
+            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>First fix</span>${this._escapeHtml(firstFix)}</div>` : ''}
         `;
         this._scrollToBottom();
     },
@@ -748,10 +751,10 @@ export const aiPanelAgentRunMixin = {
                 <span>${this._escapeHtml(evt.title || this._getAgentRunStageLabel(evt.stage))}</span>
                 <span class="ai-agent-run-badge is-${tone}">${this._escapeHtml(this._getAgentRunStatusLabel(evt.status))}</span>
             </div>
-            <div class="ai-agent-run-artifact-summary">${this._escapeHtml(evt.summary || '已生成可回放的 metadata-only 报告事件。')}</div>
+            <div class="ai-agent-run-artifact-summary">${this._escapeHtml(evt.summary || 'Replayable metadata-only report event was published.')}</div>
             ${reportId ? `<div class="ai-agent-run-report-id">reportId ${this._escapeHtml(reportId)}</div>` : ''}
             ${blockedReasons.length > 0 ? `<div class="ai-agent-run-blocked">${blockedReasons.map(reason => `<span>${this._escapeHtml(reason)}</span>`).join('')}</div>` : ''}
-            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>第一修复建议</span>${this._escapeHtml(firstFix)}</div>` : ''}
+            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>First fix</span>${this._escapeHtml(firstFix)}</div>` : ''}
         `;
         this._scrollToBottom();
     },
@@ -759,7 +762,7 @@ export const aiPanelAgentRunMixin = {
     _renderAgentRunFailure(evt) {
         const firstFix = this._payloadString(evt.payload, 'firstFixRecommendation') ||
             this._payloadString(this._asObject(evt.payload)?.diagnostic, 'firstFixRecommendation') ||
-            '请检查公开诊断，补齐缺失元数据后重试。';
+            'Review public diagnostics, provide missing metadata, and retry.';
         this._renderAssistantFailure(this.activeAssistantTurn, {
             errorMessage: evt.summary || 'Vision Agent run failed.',
             failureSummary: {
@@ -777,18 +780,19 @@ export const aiPanelAgentRunMixin = {
         this._setGeneratingState(false);
 
         if (evt.eventType === 'run.completed') {
+            this._applyAgentRunResultPayload?.(evt);
             this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
-            this._setAssistantTurnStatus(this.activeAssistantTurn, '生成完成', 'success');
+            this._setAssistantTurnStatus(this.activeAssistantTurn, 'Build complete', 'success');
             if (evt.summary) {
                 this._setResultStatusNote(evt.summary, 'info');
             }
         } else if (evt.eventType === 'run.cancelled') {
             this._setWorkbenchState(AiWorkbenchStates.CANCELLED);
-            this._setAssistantTurnStatus(this.activeAssistantTurn, '已取消', 'cancelled');
+            this._setAssistantTurnStatus(this.activeAssistantTurn, 'Cancelled', 'cancelled');
             this._setResultStatusNote('', '');
         } else {
             this._setWorkbenchState(AiWorkbenchStates.FAILED);
-            this._setAssistantTurnStatus(this.activeAssistantTurn, '生成失败', 'failed');
+            this._setAssistantTurnStatus(this.activeAssistantTurn, 'Build failed', 'failed');
             if (evt.summary) {
                 this._setResultStatusNote(evt.summary, 'warning');
             }
@@ -811,7 +815,11 @@ export const aiPanelAgentRunMixin = {
     _updateAgentRunWorkbenchState(evt) {
         if (!evt?.stage) return;
 
-        if (evt.stage === 'requirement_parsing') {
+        if (evt.stage === 'understand_requirement' ||
+            evt.stage === 'context_collection' ||
+            evt.stage === 'plan_generation' ||
+            evt.stage === 'assumption_confirmation' ||
+            evt.stage === 'requirement_parsing') {
             this._setWorkbenchState(AiWorkbenchStates.PARSING);
         } else if (evt.stage === 'planner' || evt.stage === 'tool_policy') {
             this._setWorkbenchState(AiWorkbenchStates.GENERATING);
@@ -830,24 +838,24 @@ export const aiPanelAgentRunMixin = {
 
     _getAgentRunStageLabel(stage) {
         const key = String(stage || '').trim();
-        return STAGE_LABELS[key] || key || '运行';
+        return STAGE_LABELS[key] || key || 'Run';
     },
 
     _getAgentRunStatusLabel(status) {
         switch (String(status || '').trim().toLowerCase()) {
             case 'running':
-                return '进行中';
+                return 'running';
             case 'completed':
-                return '完成';
+                return 'completed';
             case 'blocked':
-                return '阻断';
+                return 'blocked';
             case 'failed':
-                return '失败';
+                return 'failed';
             case 'cancelled':
             case 'canceled':
-                return '已取消';
+                return 'cancelled';
             default:
-                return '已记录';
+                return 'recorded';
         }
     },
 

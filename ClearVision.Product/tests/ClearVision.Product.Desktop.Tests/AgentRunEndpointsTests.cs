@@ -39,6 +39,8 @@ public sealed class AgentRunEndpointsTests
         var runId = document.RootElement.GetProperty("runId").GetString();
         runId.Should().StartWith("ar_");
         document.RootElement.GetProperty("brief").GetString().Should().Contain("Detect scratches");
+        document.RootElement.TryGetProperty("streamToken", out _).Should().BeFalse();
+        document.RootElement.TryGetProperty("streamTokenExpiresInSeconds", out _).Should().BeFalse();
         document.RootElement.GetProperty("events").EnumerateArray()
             .Select(evt => evt.GetProperty("eventType").GetString())
             .Should()
@@ -116,6 +118,20 @@ public sealed class AgentRunEndpointsTests
             .Select(evt => evt.GetProperty("eventType").GetString())
             .Should()
             .Contain(AgentRunEventTypes.RunCompleted);
+
+        var completed = document.RootElement.GetProperty("events").EnumerateArray()
+            .Single(evt => evt.GetProperty("eventType").GetString() == AgentRunEventTypes.RunCompleted);
+        completed.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        completed.GetProperty("payload").GetProperty("flow").ValueKind.Should().Be(JsonValueKind.Object);
+        completed.GetProperty("payload").GetProperty("toolTraceCount").GetInt32().Should().Be(1);
+        completed.GetProperty("payload").GetProperty("pendingParameterCount").GetInt32().Should().Be(0);
+        completed.GetProperty("payload").GetProperty("missingResourceCount").GetInt32().Should().Be(0);
+
+        var payloadJson = completed.GetProperty("payload").GetRawText();
+        payloadJson.Should().NotContain("promptTrace");
+        payloadJson.Should().NotContain("reasoningContent");
+        payloadJson.Should().NotContain("systemPrompt");
+        payloadJson.Should().NotContain("rawPrompt");
     }
 
     [Fact(DisplayName = "GET AgentRun missing replay returns 404")]

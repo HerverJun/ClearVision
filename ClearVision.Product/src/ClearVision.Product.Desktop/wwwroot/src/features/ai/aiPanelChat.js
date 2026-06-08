@@ -458,8 +458,8 @@ export const aiPanelChatMixin = {
         }
 
         lines.push(brief.canGenerateDraftNow
-            ? '如果想先看草稿，可以切换到“草稿优先”模式。'
-            : '补齐关键字段后再继续，会更稳。');
+            ? 'Plan Mode can continue with the recommended assumptions and keep unresolved items visible as Build risks.'
+            : 'Plan Mode needs the blocking engineering fields before Build can start safely.');
         return lines.join('\n');
     },
 
@@ -526,7 +526,7 @@ export const aiPanelChatMixin = {
 
         const confidence = Number.isFinite(brief.confidence) ? brief.confidence : 0;
         const confidenceText = `${Math.max(0, Math.min(100, Math.round(confidence * 100)))}%`;
-        const requirementModeLabel = brief.requirementMode === 'draft' ? '草稿优先' : '严格澄清';
+        const requirementModeLabel = brief.requirementMode === 'draft' ? 'Build-ready draft' : 'Plan confirmation';
         const riskLabel = String(brief.draftRiskLevel || 'medium').trim() || 'medium';
         const summary = this._buildClarificationFollowupText(brief);
         const safeHint = this._buildClarificationSafeHint(brief);

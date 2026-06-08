@@ -18,6 +18,10 @@ import { aiPanelSessionHistoryMixin } from './aiPanelSessionHistory.js';
 import { aiPanelApplyPreviewMixin } from './aiPanelApplyPreview.js';
 import { aiPanelTopologySummaryMixin } from './aiPanelTopologySummary.js';
 import { aiPanelAgentRunMixin } from './aiPanelAgentRun.js';
+import {
+    AgentWorkspaceModes,
+    aiPanelAgentWorkspaceMixin
+} from './aiPanelAgentWorkspace.js';
 
 /**
  * AI 智能助手面板
@@ -87,6 +91,9 @@ export class AiPanel {
         this.useVisionAgentGenerateFlow = this._loadAgentGenerateFlowEnabled();
         this.agentGenerateFlowMode = this._loadAgentGenerateFlowMode();
         this.runtimePreviewConsent = false;
+        this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+        this.pendingVisionPlan = null;
+        this.planQuestionSelections = {};
 
         // 应用预览与撤销
         this._preApplySnapshot = null;
@@ -178,6 +185,7 @@ export class AiPanel {
         this._preApplySnapshot = null;
         this._lastAttachmentReport = null;
         this._lastModelSupportsVision = null;
+        this._resetAgentWorkspace();
         this._setWorkbenchState(AiWorkbenchStates.IDLE);
         this._clearResultPane();
         this._renderAttachments();
@@ -285,7 +293,7 @@ export class AiPanel {
                         <span class="pane-icon">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
                         </span>
-                        <span class="pane-title">CO-PILOT 对话</span>
+                        <span class="pane-title">Agent Conversation</span>
                         <span class="status-badge online" id="ai-conn-status"><span class="status-dot connected"></span>在线</span>
                         <div class="ai-pane-actions" role="group" aria-label="AI 对话操作">
                             <button class="icon-btn ai-action-btn" id="ai-btn-new-session" type="button" title="新建对话" aria-label="新建对话">
@@ -325,13 +333,12 @@ export class AiPanel {
                     </div>
                     
                     <div class="ai-input-section">
-                        <div class="ai-requirement-mode-bar">
-                            <div class="ai-requirement-mode-label">需求模式</div>
-                            <div class="ai-requirement-mode-toggle" id="ai-requirement-mode-toggle" role="group" aria-label="需求模式">
-                                <button class="ai-mode-chip" type="button" data-requirement-mode="strict">严格澄清</button>
-                                <button class="ai-mode-chip" type="button" data-requirement-mode="draft">草稿优先</button>
+                        <div class="ai-agent-mode-bar">
+                            <div>
+                                <strong>Plan / Build</strong>
+                                <span>Plan first, then run Build with AgentRun events.</span>
                             </div>
-                            <div class="ai-requirement-mode-tip" id="ai-requirement-mode-tip"></div>
+                            <button class="ai-agent-mode-build-btn" id="ai-btn-start-build-inline" type="button">Start Build</button>
                         </div>
                         ${this._renderAgentDeveloperControls()}
                         <div class="ai-input-box">
@@ -363,10 +370,43 @@ export class AiPanel {
                 </aside>
 
                 <aside class="ai-pane-right" id="ai-result-pane" data-ai-workbench-pane="true">
-                    <div class="ai-agent-runtime" id="ai-agent-runtime" hidden></div>
-                    <div class="ai-workbench-state-bar" id="ai-workbench-state-bar"></div>
-                    <div class="ai-result-status-note" id="ai-result-status-note"></div>
-                    <div class="ai-results-scroll" id="ai-results-scroll">
+                    <div class="ai-pane-header">
+                        <span class="pane-icon ai-badge">AI</span>
+                        <span class="pane-title">Vision Agent Workspace</span>
+                    </div>
+                    <div class="ai-agent-workspace-overview" id="ai-agent-workspace-overview"></div>
+                    <div class="ai-plan-workspace" id="ai-plan-workspace"></div>
+                    <div class="ai-build-workspace" id="ai-build-workspace" hidden>
+                        <div class="ai-agent-runtime" id="ai-agent-runtime" hidden></div>
+                        <div class="ai-workbench-state-bar" id="ai-workbench-state-bar"></div>
+                        <div class="ai-result-status-note" id="ai-result-status-note"></div>
+                        <div class="ai-build-dashboard">
+                            <section class="result-card ai-build-card">
+                                <div class="card-title">Build Timeline</div>
+                                <div class="ai-build-event-timeline" id="ai-build-event-timeline"></div>
+                            </section>
+                            <section class="result-card ai-build-card">
+                                <div class="card-title">Template Match</div>
+                                <div class="ai-build-compact" id="ai-build-template-match"></div>
+                            </section>
+                            <section class="result-card ai-build-card">
+                                <div class="card-title">Operator Chain</div>
+                                <div class="ai-build-compact" id="ai-build-operator-chain"></div>
+                            </section>
+                            <section class="result-card ai-build-card">
+                                <div class="card-title">Parameters</div>
+                                <div class="ai-build-compact" id="ai-build-parameters"></div>
+                            </section>
+                            <section class="result-card ai-build-card ai-build-card-wide">
+                                <div class="card-title">Readiness / Dry-run / Station</div>
+                                <div class="ai-build-checks" id="ai-build-checks"></div>
+                            </section>
+                            <section class="result-card ai-build-card">
+                                <div class="card-title">Final Draft</div>
+                                <div class="ai-build-compact" id="ai-build-final-draft"></div>
+                            </section>
+                        </div>
+                        <div class="ai-results-scroll" id="ai-results-scroll">
                         <div class="result-card requirement-brief-card" id="ai-result-requirement-brief-card" hidden>
                             <div class="card-title requirement-brief-titlebar">
                                 <span>需求澄清闭环</span>
@@ -430,13 +470,14 @@ export class AiPanel {
                         </div>
                     </div>
                      
-                    <div class="apply-container">
-                        <button class="btn-apply-flow" id="ai-btn-apply" disabled>
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
-                                <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-                            </svg>
-                            应用到当前流程草稿
-                        </button>
+                        <div class="apply-container">
+                            <button class="btn-apply-flow" id="ai-btn-apply" disabled>
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
+                                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                                </svg>
+                                应用到当前流程草稿
+                            </button>
+                        </div>
                     </div>
                 </aside>
             </div>
@@ -445,11 +486,13 @@ export class AiPanel {
         // 事件绑定
         const attachBtn = this.container.querySelector('#ai-btn-attach');
         const cancelBtn = this.container.querySelector('#ai-btn-cancel');
+        const inlineBuildBtn = this.container.querySelector('#ai-btn-start-build-inline');
         this.container.querySelector('#ai-btn-gen').addEventListener('click', this._handleGenerate);
         this.container.querySelector('#ai-btn-apply').addEventListener('click', this._handleApplyFlow);
         this._updateApplyButtonState();
         if (attachBtn) attachBtn.addEventListener('click', this._handleAttachmentClick);
         if (cancelBtn) cancelBtn.addEventListener('click', this._handleCancelGenerate);
+        if (inlineBuildBtn) inlineBuildBtn.addEventListener('click', () => this._startBuildFromCurrentPlan());
         const newSessionBtn = this.container.querySelector('#ai-btn-new-session');
         if (newSessionBtn) newSessionBtn.addEventListener('click', this._handleNewConversation);
         const historyBtn = this.container.querySelector('#ai-btn-history');
@@ -497,6 +540,7 @@ export class AiPanel {
         this._renderQueuedHintBanner();
         this._renderRequirementBrief(null);
         this._renderFollowupChecklist(null);
+        this._resetAgentWorkspace({ preservePlan: true });
     }
     
     _checkConnection() {
@@ -1563,6 +1607,9 @@ export class AiPanel {
         this.container.querySelectorAll('[data-brief-action]').forEach(btnEl => {
             btnEl.disabled = busy;
         });
+        this.container.querySelectorAll('.ai-plan-action, .ai-plan-option, #ai-btn-start-build-inline').forEach(btnEl => {
+            btnEl.disabled = busy;
+        });
         this.container.querySelectorAll('.ai-followup-action').forEach(btnEl => {
             btnEl.disabled = busy;
         });
@@ -1882,7 +1929,6 @@ export class AiPanel {
     _clearActiveRequestState() {
         this.activeGenerateRequestId = null;
         this.activeGenerateSessionId = null;
-        this._resetAgentRunState?.();
     }
     
     _clearResultPane() {
@@ -2159,6 +2205,7 @@ Object.assign(
     aiPanelChatMixin,
     aiPanelValidationPreviewMixin,
     aiPanelGenerateRequestMixin,
+    aiPanelAgentWorkspaceMixin,
     aiPanelAgentRunMixin,
     aiPanelRequirementBriefMixin,
     aiPanelAttachmentsMixin,

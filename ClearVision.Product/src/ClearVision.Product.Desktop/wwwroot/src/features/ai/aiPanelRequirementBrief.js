@@ -31,8 +31,8 @@ export const aiPanelRequirementBriefMixin = {
         this._updateRequirementModeUI();
 
         if (!silent) {
-            const label = normalized === 'draft' ? '草稿优先' : '严格澄清';
-            this._addMessage('system', `需求模式已切换为「${label}」。`);
+            const label = normalized === 'draft' ? 'Build-ready draft' : 'Plan confirmation';
+            this._addMessage('system', `Plan state changed to ${label}.`);
         }
     },
 
@@ -49,8 +49,8 @@ export const aiPanelRequirementBriefMixin = {
 
         if (tip) {
             tip.textContent = normalized === 'draft'
-                ? '优先给出可运行初稿，缺项仍会以风险提示标注。'
-                : '先确认关键字段，再进入正式生成。';
+                ? 'Build can continue from current assumptions while unresolved items stay visible as risks.'
+                : 'Plan Mode confirms blocking engineering fields before Build starts.';
         }
     }
 };

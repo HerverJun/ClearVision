@@ -9,7 +9,8 @@ export const aiPanelGenerateRequestMixin = {
         existingFlowJson = null,
         explicitMode = '',
         templateSelection = null,
-        clearInput = true
+        clearInput = true,
+        skipPlan = false
     }) {
         const input = this.container.querySelector('#ai-input');
         const normalizedDescription = String(description || '').trim();
@@ -22,6 +23,18 @@ export const aiPanelGenerateRequestMixin = {
         }
 
         if (this.isGenerating) return false;
+
+        if (this._shouldOpenPlanModeBeforeBuild?.({ explicitMode, skipPlan })) {
+            return this._enterPlanModeFromPrompt({
+                description: normalizedDescription,
+                hint: normalizedHint,
+                userMessage,
+                attachmentPaths,
+                templateSelection,
+                clearInput,
+                input
+            });
+        }
 
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this._setGeneratingState(true);
@@ -328,18 +341,18 @@ export const aiPanelGenerateRequestMixin = {
     },
 
     _loadAgentGenerateFlowEnabled() {
-        if (!this.isVisionAgentDeveloperUiEnabled) {
-            return false;
-        }
-
         if (this.options?.useVisionAgentGenerateFlow === true) {
             return true;
         }
+        if (this.options?.useVisionAgentGenerateFlow === false) {
+            return false;
+        }
 
         try {
-            return this._parseBooleanPreference(localStorage.getItem('cv_ai_use_vision_agent_generate_flow'));
+            const stored = localStorage.getItem('cv_ai_use_vision_agent_generate_flow');
+            return stored === null ? true : this._parseBooleanPreference(stored);
         } catch {
-            return false;
+            return true;
         }
     },
 
@@ -451,7 +464,7 @@ export const aiPanelGenerateRequestMixin = {
     },
 
     _buildAgentGenerateFlowRequestPayload() {
-        if (!this.isVisionAgentDeveloperUiEnabled || !this.useVisionAgentGenerateFlow) {
+        if (!this.useVisionAgentGenerateFlow) {
             this.runtimePreviewConsent = false;
             return {};
         }
@@ -460,7 +473,7 @@ export const aiPanelGenerateRequestMixin = {
             useVisionAgentGenerateFlow: true,
             agentGenerateFlowMode: this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode)
         };
-        if (this.runtimePreviewConsent) {
+        if (this.isVisionAgentDeveloperUiEnabled && this.runtimePreviewConsent) {
             payload.runtimePreviewConsent = true;
             this.runtimePreviewConsent = false;
         }
@@ -528,7 +541,8 @@ export const aiPanelGenerateRequestMixin = {
             existingFlowJson: reviewRequest.existingFlowJson,
             attachmentPaths: [],
             explicitMode: 'review_pending_parameters',
-            clearInput: true
+            clearInput: true,
+            skipPlan: true
         });
     },
 
