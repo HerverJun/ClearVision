@@ -85,6 +85,30 @@ public sealed class VisionAgentFlowContractValidatorTests
             item.GetProperty("parameterName").GetString() == "TemplatePath");
     }
 
+    [Fact(DisplayName = "Flow contract validator should canonicalize parameter casing for runtime readers")]
+    public async Task ValidateFlow_ShouldCanonicalizeParameterCasingForRuntimeReaders()
+    {
+        var payload = await ValidateAsync(new
+        {
+            operators = new[]
+            {
+                Operator("op_note", "Comment", new Dictionary<string, string> { ["text"] = "metadata-only note" })
+            },
+            connections = Array.Empty<object>()
+        });
+
+        Codes(payload, "blockingIssues").Should().NotContain("unknown_parameter");
+        var parameters = payload
+            .GetProperty("canonicalFlow")
+            .GetProperty("operators")
+            .EnumerateArray()
+            .Single()
+            .GetProperty("parameters");
+        parameters.TryGetProperty("Text", out var text).Should().BeTrue();
+        text.GetString().Should().Be("metadata-only note");
+        parameters.TryGetProperty("text", out _).Should().BeFalse();
+    }
+
     [Fact(DisplayName = "Flow contract validator should canonicalize legacy MeasureDistance to Measurement")]
     public async Task ValidateFlow_ShouldCanonicalizeLegacyMeasureDistance()
     {

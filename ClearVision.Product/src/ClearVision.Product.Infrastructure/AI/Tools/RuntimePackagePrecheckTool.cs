@@ -51,12 +51,14 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
                 normalized.ErrorMessage ?? "Flow draft could not be normalized.");
         }
 
+        var contractValidation = VisionAgentFlowDraftValidator.Validate(normalized.Flow);
+        var flow = contractValidation.Flow;
         var blockingIssues = new List<PrecheckIssue>();
         var warnings = new List<PrecheckIssue>();
         var missingResources = new List<PrecheckMissingResource>();
 
-        MergeValidationSummary(arguments, normalized.Flow, blockingIssues, warnings, missingResources);
-        AddDeploymentResourceChecks(normalized.Flow, warnings, missingResources);
+        MergeValidationSummary(arguments, contractValidation, blockingIssues, warnings, missingResources);
+        AddDeploymentResourceChecks(flow, warnings, missingResources);
         CheckDryRun(arguments, blockingIssues, warnings);
         CheckReplay(arguments, blockingIssues);
         await CheckTargetStationAsync(arguments, blockingIssues, warnings, cancellationToken);
@@ -92,7 +94,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
 
     private static void MergeValidationSummary(
         JsonElement arguments,
-        VisionAgentFlowDraft flow,
+        VisionAgentFlowValidation validation,
         List<PrecheckIssue> blockingIssues,
         List<PrecheckIssue> warnings,
         List<PrecheckMissingResource> missingResources)
@@ -106,7 +108,6 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             return;
         }
 
-        var validation = VisionAgentFlowDraftValidator.Validate(flow);
         blockingIssues.AddRange(validation.BlockingIssues.Select(issue => new PrecheckIssue(
             issue.Code,
             issue.Message,

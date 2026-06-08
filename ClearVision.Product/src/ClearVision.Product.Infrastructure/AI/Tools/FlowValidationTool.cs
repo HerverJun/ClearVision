@@ -201,9 +201,47 @@ internal static class VisionAgentFlowDraftValidator
         return flow with
         {
             Operators = flow.Operators
-                .Select(op => op with { OperatorType = contractCatalog.CanonicalizeOperatorType(op.OperatorType) })
+                .Select(op =>
+                {
+                    var operatorType = contractCatalog.CanonicalizeOperatorType(op.OperatorType);
+                    var parameters = contractCatalog.TryGet(operatorType, out var contract)
+                        ? CanonicalizeParameters(op.Parameters, contract)
+                        : CopyParameters(op.Parameters);
+                    return op with
+                    {
+                        OperatorType = operatorType,
+                        Parameters = parameters
+                    };
+                })
                 .ToList()
         };
+    }
+
+    private static IReadOnlyDictionary<string, string?> CanonicalizeParameters(
+        IReadOnlyDictionary<string, string?> parameters,
+        VisionAgentOperatorContract contract)
+    {
+        var knownParameters = contract.Parameters
+            .ToDictionary(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase);
+        var canonical = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in parameters)
+        {
+            var key = knownParameters.TryGetValue(pair.Key, out var contractParameter)
+                ? contractParameter.Name
+                : pair.Key;
+            if (!canonical.ContainsKey(key))
+            {
+                canonical[key] = pair.Value;
+            }
+        }
+
+        return canonical;
+    }
+
+    private static IReadOnlyDictionary<string, string?> CopyParameters(
+        IReadOnlyDictionary<string, string?> parameters)
+    {
+        return new Dictionary<string, string?>(parameters, StringComparer.OrdinalIgnoreCase);
     }
 
     private static void ValidateConnectionEndpoint(
@@ -551,6 +589,7 @@ internal static class FlowValidationPayload
             warnings = validation.Warnings.Select(IssuePayload).ToList(),
             missingResources = validation.MissingResources.Select(ResourcePayload).ToList(),
             pendingParameters = validation.PendingParameters.Select(PendingPayload).ToList(),
+            canonicalFlow = FlowPayload(validation.Flow),
             checkedRules = new[]
             {
                 "operators",
@@ -563,6 +602,29 @@ internal static class FlowValidationPayload
                 "image_acquisition_entry",
                 "required_resources"
             }
+        };
+    }
+
+    private static object FlowPayload(VisionAgentFlowDraft flow)
+    {
+        return new
+        {
+            operators = flow.Operators.Select(op => new
+            {
+                tempId = op.TempId,
+                operatorType = op.OperatorType,
+                parameters = op.Parameters.ToDictionary(
+                    pair => pair.Key,
+                    pair => pair.Value)
+            }).ToList(),
+            connections = flow.Connections.Select(connection => new
+            {
+                sourceTempId = connection.SourceTempId,
+                sourcePortName = connection.SourcePortName,
+                targetTempId = connection.TargetTempId,
+                targetPortName = connection.TargetPortName
+            }).ToList(),
+            entryOperatorTempId = flow.EntryOperatorTempId
         };
     }
 
