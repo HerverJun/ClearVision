@@ -7,7 +7,7 @@ using ClearVision.Product.Infrastructure.AI.Tools;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class WorkflowDraftBuilder
+public sealed class WorkflowDraftBuilder
 {
     private readonly IAiFlowGenerationService _generationService;
 
@@ -16,7 +16,7 @@ internal sealed class WorkflowDraftBuilder
         _generationService = generationService;
     }
 
-    public async Task<BuildStepResult<DraftWorkflowResolution>> DraftAsync(
+    internal async Task<BuildStepResult<DraftWorkflowResolution>> DraftAsync(
         AiFlowGenerationRequest request,
         BuildPlanLoad load,
         BuildIntentResolution intent,
@@ -27,7 +27,7 @@ internal sealed class WorkflowDraftBuilder
         var generationRequest = request with
         {
             ExistingFlowJson = load.CurrentFlowSnapshot,
-            Mode = VisionAgentBuildSupport.ToGenerateFlowMode(intent.BuildIntent),
+            Mode = ToGenerateFlowMode(intent.BuildIntent),
             TemplateSelection = load.TemplateSelection
         };
         var generation = await _generationService.GenerateFlowAsync(
@@ -66,7 +66,7 @@ internal sealed class WorkflowDraftBuilder
             deploymentImpact: "requires_readiness_checks");
     }
 
-    public BuildStepResult<RepairDraftResolution> Repair(
+    internal BuildStepResult<RepairDraftResolution> Repair(
         DraftWorkflowResolution draft,
         OperatorPipelineResolution pipeline,
         ParameterMappingResolution parameters)
@@ -212,7 +212,7 @@ internal sealed class WorkflowDraftBuilder
         {
             Id = id,
             Name = step.TempId,
-            Type = VisionAgentBuildSupport.ToOperatorType(step.OperatorType),
+            Type = ToOperatorType(step.OperatorType),
             X = 160 + index * 180,
             Y = 180,
             InputPorts = inputPorts.Select(name => new PortDto
@@ -272,5 +272,32 @@ internal sealed class WorkflowDraftBuilder
                 TargetPortId = targetPort.Id
             });
         }
+    }
+
+    private static GenerateFlowMode ToGenerateFlowMode(string buildIntent)
+    {
+        return buildIntent switch
+        {
+            "modify" or "refactor" => GenerateFlowMode.Modify,
+            "explain" => GenerateFlowMode.Explain,
+            "review_pending_parameters" => GenerateFlowMode.ReviewPendingParameters,
+            _ => GenerateFlowMode.New
+        };
+    }
+
+    private static OperatorType ToOperatorType(string operatorType)
+    {
+        if (Enum.TryParse<OperatorType>(operatorType, ignoreCase: true, out var parsed))
+        {
+            return parsed;
+        }
+
+        return operatorType switch
+        {
+            "MeasureDistance" => OperatorType.Measurement,
+            "SemanticSegmentation" => OperatorType.DeepLearning,
+            "ImageCompose" => OperatorType.ImageAdd,
+            _ => OperatorType.DeepLearning
+        };
     }
 }

@@ -4,7 +4,7 @@ using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class TemplateStrategyResolver
+public sealed class TemplateStrategyResolver
 {
     private readonly BuildToolRunner _toolRunner;
 
@@ -13,7 +13,7 @@ internal sealed class TemplateStrategyResolver
         _toolRunner = toolRunner;
     }
 
-    public async Task<BuildStepResult<TemplateStrategyResolution>> ResolveAsync(
+    internal async Task<BuildStepResult<TemplateStrategyResolution>> ResolveAsync(
         string? runId,
         List<VisionAgentToolEvidence> evidence,
         BuildPlanLoad load,
@@ -34,7 +34,7 @@ internal sealed class TemplateStrategyResolver
         var selectedTemplateId = VisionAgentBuildSupport.Clean(load.TemplateSelection?.TemplateId);
         var selectedScenario = VisionAgentBuildSupport.Clean(load.TemplateSelection?.ScenarioKey);
         var selectedMode = VisionAgentBuildSupport.Clean(load.TemplateSelection?.Mode);
-        var candidate = VisionAgentBuildSupport.FirstTemplateCandidate(match.Payload.Data);
+        var candidate = FirstTemplateCandidate(match.Payload.Data);
         var strategy = "catalog_match";
         var templateId = selectedTemplateId;
         var scenarioKey = selectedScenario;
@@ -102,5 +102,26 @@ internal sealed class TemplateStrategyResolver
             warningCode: skeleton?.Success == false ? "template_skeleton_unavailable" : string.Empty,
             applyImpact: "editable_draft_allowed",
             deploymentImpact: "template_resource_may_remain_pending");
+    }
+
+    private static TemplateCandidate? FirstTemplateCandidate(object? data)
+    {
+        var root = VisionAgentBuildSupport.ToJsonElementOrNull(data);
+        if (root == null ||
+            !VisionAgentBuildSupport.TryGetProperty(root.Value, "candidates", out var candidates) ||
+            candidates.ValueKind != System.Text.Json.JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        foreach (var item in candidates.EnumerateArray())
+        {
+            return new TemplateCandidate(
+                VisionAgentBuildSupport.ReadString(item, "templateId") ?? string.Empty,
+                VisionAgentBuildSupport.ReadString(item, "scenarioKey") ?? string.Empty,
+                VisionAgentBuildSupport.ReadDouble(item, "score"));
+        }
+
+        return null;
     }
 }

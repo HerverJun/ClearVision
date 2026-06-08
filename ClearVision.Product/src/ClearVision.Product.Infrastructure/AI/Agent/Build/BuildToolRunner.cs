@@ -5,7 +5,7 @@ using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class BuildToolRunner
+public sealed class BuildToolRunner
 {
     private readonly IVisionAgentToolRegistry _toolRegistry;
     private readonly IAgentRunEventSink? _eventSink;
@@ -21,7 +21,7 @@ internal sealed class BuildToolRunner
         _eventSink = eventSink;
     }
 
-    public async Task<BuildStepResult<T>> ExecuteEvidenceStepAsync<T>(
+    internal async Task<BuildStepResult<T>> ExecuteEvidenceStepAsync<T>(
         string? runId,
         List<VisionAgentToolEvidence> evidence,
         string stage,
@@ -127,7 +127,7 @@ internal sealed class BuildToolRunner
         }
     }
 
-    public async Task<BuildStepResult<VisionAgentToolResult>> RunRegisteredToolAsync(
+    internal async Task<BuildStepResult<VisionAgentToolResult>> RunRegisteredToolAsync(
         string? runId,
         List<VisionAgentToolEvidence> evidence,
         VisionAgentToolContext context,
@@ -152,7 +152,7 @@ internal sealed class BuildToolRunner
                     VisionAgentBuildSupport.ToJsonElement(arguments),
                     ct);
                 var data = VisionAgentBuildSupport.ToJsonElementOrNull(result.Data);
-                var hasBlocking = VisionAgentBuildSupport.ToolHasBlockingIssues(new VisionAgentToolResult
+                var hasBlocking = ToolHasBlockingIssues(new VisionAgentToolResult
                 {
                     Success = result.Success,
                     Data = result.Data,
@@ -163,7 +163,7 @@ internal sealed class BuildToolRunner
                 return VisionAgentBuildSupport.StepResult(
                     result,
                     result.Success
-                        ? VisionAgentBuildSupport.ToolSummary(toolName, data, hasBlocking)
+                        ? ToolSummary(toolName, data, hasBlocking)
                         : $"{toolName} failed: {result.ErrorCode}",
                     result.Success && !hasBlocking ? AgentRunEventStatuses.Completed :
                     result.Success ? AgentRunEventStatuses.Blocked : AgentRunEventStatuses.Failed,
@@ -226,5 +226,47 @@ internal sealed class BuildToolRunner
             RedactionPass = true,
             DetailsRedacted = true
         };
+    }
+
+    internal static bool ToolHasBlockingIssues(VisionAgentToolResult result)
+    {
+        if (!result.Success)
+        {
+            return true;
+        }
+
+        return VisionAgentBuildSupport.ReadCount(result.Data, "blockingIssues") > 0 ||
+               VisionAgentBuildSupport.ReadBool(result.Data, "dryRunSucceeded") == false;
+    }
+
+    private static string ToolSummary(string toolName, System.Text.Json.JsonElement? data, bool blocking)
+    {
+        if (data == null)
+        {
+            return $"{toolName} completed with no public data payload.";
+        }
+
+        if (toolName == "validate_flow")
+        {
+            return blocking
+                ? "Schema validation found blocking issues."
+                : "Schema validation passed with public metadata.";
+        }
+
+        if (toolName == "dryrun_flow")
+        {
+            return VisionAgentBuildSupport.ReadBool(data.Value, "dryRunSucceeded") == false
+                ? "Metadata dry-run reported a blocked draft."
+                : "Metadata dry-run completed successfully.";
+        }
+
+        if (toolName == "runtime_package_precheck")
+        {
+            return VisionAgentBuildSupport.ReadBool(data.Value, "readyForDeployment") == true
+                ? "Runtime package readiness passed."
+                : "Runtime package readiness blocks deployment but not canvas Apply.";
+        }
+
+        return $"{toolName} completed.";
     }
 }

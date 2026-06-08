@@ -4,9 +4,9 @@ using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class BuildReadinessReviewService
+public sealed class BuildReadinessReviewService
 {
-    public BuildStepResult<StationCompatibilityResolution> BuildStationCompatibility(
+    internal BuildStepResult<StationCompatibilityResolution> BuildStationCompatibility(
         BuildPlanLoad load,
         VisionAgentToolResult packageReadiness)
     {
@@ -38,7 +38,7 @@ internal sealed class BuildReadinessReviewService
             deploymentImpact: missing > 0 || blocking > 0 ? "deployment_blocked" : "deployment_ready");
     }
 
-    public BuildStepResult<OperatorContractResolution> BuildOperatorContractReport(
+    internal BuildStepResult<OperatorContractResolution> BuildOperatorContractReport(
         OperatorPipelineResolution pipeline,
         VisionAgentToolResult validation)
     {
@@ -66,7 +66,7 @@ internal sealed class BuildReadinessReviewService
             deploymentImpact: invalid.Count > 0 ? "operator_contract_repaired" : "no_deployment_blocker");
     }
 
-    public BuildStepResult<ReleaseReviewResolution> BuildReleaseReview(
+    internal BuildStepResult<ReleaseReviewResolution> BuildReleaseReview(
         VisionAgentToolResult validation,
         VisionAgentToolResult dryRun,
         VisionAgentToolResult packageReadiness,

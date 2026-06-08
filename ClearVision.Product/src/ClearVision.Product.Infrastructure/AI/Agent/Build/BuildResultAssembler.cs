@@ -1,9 +1,10 @@
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class BuildResultAssembler
+public sealed class BuildResultAssembler
 {
     private readonly AgentRunEventRedactor _redactor;
     private readonly IAgentRunEventSink? _eventSink;
@@ -16,16 +17,16 @@ internal sealed class BuildResultAssembler
         _eventSink = eventSink;
     }
 
-    public AiFlowGenerationResult Assemble(BuildResultAssemblyInput input)
+    internal AiFlowGenerationResult Assemble(BuildResultAssemblyInput input)
     {
-        var pendingParameters = VisionAgentBuildSupport.MergePendingParameters(
+        var pendingParameters = MergePendingParameters(
             input.ParameterMapping.PendingParameters,
             input.Request);
-        var missingResources = VisionAgentBuildSupport.MergeMissingResources(
+        var missingResources = MergeMissingResources(
             input.ParameterMapping.MissingResources,
             input.Validation,
             input.PackageReadiness);
-        var firstFix = VisionAgentBuildSupport.FirstFixRecommendation(
+        var firstFix = FirstFixRecommendation(
             input.ApplyGate,
             missingResources,
             pendingParameters);
@@ -47,7 +48,7 @@ internal sealed class BuildResultAssembler
         result.GenerationMode = input.Template.GenerationMode;
         result.TemplateLockLevel = input.Template.TemplateLockLevel;
         result.DetectedIntent = input.Intent.BuildIntent;
-        result.TurnIntent = VisionAgentBuildSupport.ToTurnIntent(input.Intent.BuildIntent);
+        result.TurnIntent = ToTurnIntent(input.Intent.BuildIntent);
         result.InteractionState = AiInteractionStates.Completed;
         result.ToolTrace.AddRange(input.Evidence.Select(item => (object)item));
         result.StageTimeline.AddRange(input.Evidence.Select(item => new AiGenerationStageDiagnostic
@@ -119,7 +120,7 @@ internal sealed class BuildResultAssembler
         return result;
     }
 
-    public AiFlowGenerationResult Failure(
+    internal AiFlowGenerationResult Failure(
         string buildId,
         IReadOnlyList<VisionAgentToolEvidence> evidence,
         IReadOnlyList<string> publicWarnings)
@@ -144,6 +145,70 @@ internal sealed class BuildResultAssembler
                     FirstFixRecommendation = "Review public tool evidence and retry Build after fixing the blocked metadata step."
                 }
             }
+        };
+    }
+
+    private static List<AiPendingParameterInfo> MergePendingParameters(
+        IEnumerable<AiPendingParameterInfo> mapped,
+        AiFlowGenerationRequest request)
+    {
+        return VisionAgentBuildSupport.DeduplicatePending(mapped
+            .Concat(request.BuildFromPlan?.PlanSnapshot?.RecommendedDefaults
+                .Where(item => item.Value.Contains("pending", StringComparison.OrdinalIgnoreCase))
+                .Select(item => new AiPendingParameterInfo
+                {
+                    OperatorId = "plan_default",
+                    ActualOperatorId = "plan_default",
+                    ParameterNames = [item.Id]
+                }) ?? []));
+    }
+
+    private static List<AiMissingResourceInfo> MergeMissingResources(
+        IEnumerable<AiMissingResourceInfo> mapped,
+        VisionAgentToolResult validation,
+        VisionAgentToolResult packageReadiness)
+    {
+        var resources = mapped.ToList();
+        resources.AddRange(VisionAgentBuildSupport.ReadMissingResources(validation.Data));
+        resources.AddRange(VisionAgentBuildSupport.ReadMissingResources(packageReadiness.Data));
+        return VisionAgentBuildSupport.DeduplicateMissing(resources);
+    }
+
+    private static string FirstFixRecommendation(
+        VisionAgentApplyGate gate,
+        IReadOnlyList<AiMissingResourceInfo> missingResources,
+        IReadOnlyList<AiPendingParameterInfo> pendingParameters)
+    {
+        if (gate.Blocked)
+        {
+            return "Fix workflow structure blockers before applying the draft to the canvas.";
+        }
+
+        var firstMissing = missingResources.FirstOrDefault();
+        if (firstMissing != null)
+        {
+            return $"Bind missing {firstMissing.ResourceType} metadata for {firstMissing.ResourceKey} before deployment.";
+        }
+
+        var firstPending = pendingParameters.FirstOrDefault();
+        if (firstPending != null)
+        {
+            return $"Confirm pending parameter metadata on {firstPending.OperatorId} before release.";
+        }
+
+        return gate.DeploymentReady
+            ? "Review the draft on canvas, then proceed to runtime packaging when ready."
+            : "Review readiness gates and resolve deployment blockers before Station deployment.";
+    }
+
+    private static string ToTurnIntent(string buildIntent)
+    {
+        return buildIntent switch
+        {
+            "modify" or "refactor" => AiTurnIntents.ModifyFlow,
+            "explain" => AiTurnIntents.ExplainFlow,
+            "review_pending_parameters" => AiTurnIntents.ReviewPendingParameters,
+            _ => AiTurnIntents.NewFlow
         };
     }
 }

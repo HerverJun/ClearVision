@@ -4,9 +4,9 @@ using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class ApplyGateResolver
+public sealed class ApplyGateResolver
 {
-    public BuildStepResult<VisionAgentApplyGate> Build(
+    internal BuildStepResult<VisionAgentApplyGate> Build(
         VisionAgentToolResult validation,
         VisionAgentToolResult dryRun,
         VisionAgentToolResult packageReadiness,

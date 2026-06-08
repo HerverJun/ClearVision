@@ -4,9 +4,9 @@ using ClearVision.Product.Infrastructure.AI.Tools;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class ParameterMappingService
+public sealed class ParameterMappingService
 {
-    public BuildStepResult<ParameterMappingResolution> Map(
+    internal BuildStepResult<ParameterMappingResolution> Map(
         BuildPlanLoad load,
         OperatorPipelineResolution pipeline)
     {
@@ -35,7 +35,7 @@ internal sealed class ParameterMappingService
                     });
                 }
 
-                var missingKind = VisionAgentBuildSupport.MissingResourceKind(op.OperatorType, parameter.Name, mapped.Pending);
+                var missingKind = MissingResourceKind(op.OperatorType, parameter.Name, mapped.Pending);
                 if (!string.IsNullOrWhiteSpace(missingKind))
                 {
                     missing.Add(new AiMissingResourceInfo
@@ -91,7 +91,7 @@ internal sealed class ParameterMappingService
             };
         }
 
-        var fallback = VisionAgentBuildSupport.DefaultParameterValue(op.OperatorType, parameter.Name);
+        var fallback = DefaultParameterValue(op.OperatorType, parameter.Name);
         var pending = parameter.Required || fallback.Contains("pending", StringComparison.OrdinalIgnoreCase);
         return new VisionAgentParameterMapping
         {
@@ -105,5 +105,84 @@ internal sealed class ParameterMappingService
                 ? "Canvas Apply can continue, but deployment readiness remains blocked until this metadata is bound."
                 : "Default metadata keeps the draft editable."
         };
+    }
+
+    private static string DefaultParameterValue(string operatorType, string parameterName)
+    {
+        if (parameterName.Contains("camera", StringComparison.OrdinalIgnoreCase))
+        {
+            return "<pending-camera-binding>";
+        }
+
+        if (parameterName.Contains("model", StringComparison.OrdinalIgnoreCase))
+        {
+            return "<pending-model-resource>";
+        }
+
+        if (parameterName.Contains("template", StringComparison.OrdinalIgnoreCase))
+        {
+            return "<pending-template-artifact>";
+        }
+
+        if (parameterName.Contains("tolerance", StringComparison.OrdinalIgnoreCase))
+        {
+            return "<pending-tolerance>";
+        }
+
+        if (parameterName.Contains("channel", StringComparison.OrdinalIgnoreCase))
+        {
+            return "<pending-output-channel>";
+        }
+
+        return operatorType switch
+        {
+            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) => "OK when inspection score satisfies configured threshold.",
+            "Thresholding" when parameterName.Equals("Mode", StringComparison.OrdinalIgnoreCase) => "adaptive_review",
+            "TemplateMatching" when parameterName.Equals("MinScore", StringComparison.OrdinalIgnoreCase) => "0.8",
+            "TemplateMatching" when parameterName.Equals("MaxMatches", StringComparison.OrdinalIgnoreCase) => "1",
+            "DeepLearning" when parameterName.Equals("ConfidenceThreshold", StringComparison.OrdinalIgnoreCase) => "0.6",
+            "SurfaceDefectDetection" when parameterName.Equals("ModelKind", StringComparison.OrdinalIgnoreCase) => "surface_defect",
+            "SemanticSegmentation" when parameterName.Equals("ModelKind", StringComparison.OrdinalIgnoreCase) => "segmentation",
+            "BlobAnalysis" when parameterName.Equals("MinArea", StringComparison.OrdinalIgnoreCase) => "20",
+            "BlobAnalysis" when parameterName.Equals("MaxArea", StringComparison.OrdinalIgnoreCase) => "<pending-max-area>",
+            "RoiManager" when parameterName.Equals("RoiName", StringComparison.OrdinalIgnoreCase) => "inspection_roi",
+            _ => "<pending-parameter>"
+        };
+    }
+
+    private static string MissingResourceKind(string operatorType, string parameterName, bool pending)
+    {
+        if (!pending)
+        {
+            return string.Empty;
+        }
+
+        if (parameterName.Contains("camera", StringComparison.OrdinalIgnoreCase))
+        {
+            return "camera_binding";
+        }
+
+        if (parameterName.Contains("model", StringComparison.OrdinalIgnoreCase))
+        {
+            return "model_resource";
+        }
+
+        if (parameterName.Contains("template", StringComparison.OrdinalIgnoreCase))
+        {
+            return "template_artifact";
+        }
+
+        if (parameterName.Contains("channel", StringComparison.OrdinalIgnoreCase))
+        {
+            return "output_channel";
+        }
+
+        if (operatorType.Contains("Measure", StringComparison.OrdinalIgnoreCase) ||
+            parameterName.Contains("tolerance", StringComparison.OrdinalIgnoreCase))
+        {
+            return "measurement_parameter";
+        }
+
+        return string.Empty;
     }
 }

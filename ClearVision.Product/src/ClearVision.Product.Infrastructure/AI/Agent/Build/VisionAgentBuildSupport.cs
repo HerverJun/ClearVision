@@ -1,8 +1,6 @@
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
-using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
-using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
@@ -35,138 +33,6 @@ internal static class VisionAgentBuildSupport
             repairAction,
             applyImpact,
             deploymentImpact);
-    }
-
-    public static VisionAgentToolContext BuildToolContext(
-        AiFlowGenerationRequest request,
-        VisionAgentBuildFromPlanRequest? build,
-        string? currentFlowSnapshot)
-    {
-        return new VisionAgentToolContext
-        {
-            UserDescription = FirstNonEmpty(build?.OriginalUserPrompt, request.Description),
-            AdditionalContext = request.AdditionalContext,
-            SessionId = request.SessionId,
-            AgentRunId = request.AgentRunId,
-            ExistingFlowJson = currentFlowSnapshot,
-            DebugTrace = false,
-            RuntimePreviewConsent = false,
-            AllowedPermissions = new HashSet<VisionAgentToolPermission>
-            {
-                VisionAgentToolPermission.ReadOnly,
-                VisionAgentToolPermission.Simulation,
-                VisionAgentToolPermission.DeploymentPrepare
-            }
-        };
-    }
-
-    public static TemplateCandidate? FirstTemplateCandidate(object? data)
-    {
-        var root = ToJsonElementOrNull(data);
-        if (root == null ||
-            !TryGetProperty(root.Value, "candidates", out var candidates) ||
-            candidates.ValueKind != JsonValueKind.Array)
-        {
-            return null;
-        }
-
-        foreach (var item in candidates.EnumerateArray())
-        {
-            return new TemplateCandidate(
-                ReadString(item, "templateId") ?? string.Empty,
-                ReadString(item, "scenarioKey") ?? string.Empty,
-                ReadDouble(item, "score"));
-        }
-
-        return null;
-    }
-
-    public static IEnumerable<string> ReadOperatorTypes(object? templateSkeleton)
-    {
-        var root = ToJsonElementOrNull(templateSkeleton);
-        if (root == null ||
-            !TryGetProperty(root.Value, "operators", out var operators) ||
-            operators.ValueKind != JsonValueKind.Array)
-        {
-            yield break;
-        }
-
-        foreach (var op in operators.EnumerateArray())
-        {
-            var type = ReadString(op, "operatorType") ?? ReadString(op, "type");
-            if (!string.IsNullOrWhiteSpace(type))
-            {
-                yield return type;
-            }
-        }
-    }
-
-    public static bool ToolHasBlockingIssues(VisionAgentToolResult result)
-    {
-        if (!result.Success)
-        {
-            return true;
-        }
-
-        return ReadCount(result.Data, "blockingIssues") > 0 ||
-               ReadBool(result.Data, "dryRunSucceeded") == false;
-    }
-
-    public static string ToolSummary(string toolName, JsonElement? data, bool blocking)
-    {
-        if (data == null)
-        {
-            return $"{toolName} completed with no public data payload.";
-        }
-
-        if (toolName == "validate_flow")
-        {
-            return blocking
-                ? "Schema validation found blocking issues."
-                : "Schema validation passed with public metadata.";
-        }
-
-        if (toolName == "dryrun_flow")
-        {
-            return ReadBool(data.Value, "dryRunSucceeded") == false
-                ? "Metadata dry-run reported a blocked draft."
-                : "Metadata dry-run completed successfully.";
-        }
-
-        if (toolName == "runtime_package_precheck")
-        {
-            return ReadBool(data.Value, "readyForDeployment") == true
-                ? "Runtime package readiness passed."
-                : "Runtime package readiness blocks deployment but not canvas Apply.";
-        }
-
-        return $"{toolName} completed.";
-    }
-
-    public static List<AiPendingParameterInfo> MergePendingParameters(
-        IEnumerable<AiPendingParameterInfo> mapped,
-        AiFlowGenerationRequest request)
-    {
-        return DeduplicatePending(mapped
-            .Concat(request.BuildFromPlan?.PlanSnapshot?.RecommendedDefaults
-                .Where(item => item.Value.Contains("pending", StringComparison.OrdinalIgnoreCase))
-                .Select(item => new AiPendingParameterInfo
-                {
-                    OperatorId = "plan_default",
-                    ActualOperatorId = "plan_default",
-                    ParameterNames = [item.Id]
-                }) ?? []));
-    }
-
-    public static List<AiMissingResourceInfo> MergeMissingResources(
-        IEnumerable<AiMissingResourceInfo> mapped,
-        VisionAgentToolResult validation,
-        VisionAgentToolResult packageReadiness)
-    {
-        var resources = mapped.ToList();
-        resources.AddRange(ReadMissingResources(validation.Data));
-        resources.AddRange(ReadMissingResources(packageReadiness.Data));
-        return DeduplicateMissing(resources);
     }
 
     public static List<AiPendingParameterInfo> DeduplicatePending(IEnumerable<AiPendingParameterInfo> items)
@@ -223,33 +89,6 @@ internal static class VisionAgentBuildSupport
                     "Missing resource metadata.")
             };
         }
-    }
-
-    public static string FirstFixRecommendation(
-        VisionAgentApplyGate gate,
-        IReadOnlyList<AiMissingResourceInfo> missingResources,
-        IReadOnlyList<AiPendingParameterInfo> pendingParameters)
-    {
-        if (gate.Blocked)
-        {
-            return "Fix workflow structure blockers before applying the draft to the canvas.";
-        }
-
-        var firstMissing = missingResources.FirstOrDefault();
-        if (firstMissing != null)
-        {
-            return $"Bind missing {firstMissing.ResourceType} metadata for {firstMissing.ResourceKey} before deployment.";
-        }
-
-        var firstPending = pendingParameters.FirstOrDefault();
-        if (firstPending != null)
-        {
-            return $"Confirm pending parameter metadata on {firstPending.OperatorId} before release.";
-        }
-
-        return gate.DeploymentReady
-            ? "Review the draft on canvas, then proceed to runtime packaging when ready."
-            : "Review readiness gates and resolve deployment blockers before Station deployment.";
     }
 
     public static object? ToJsonCompatible(object? value)
@@ -407,123 +246,6 @@ internal static class VisionAgentBuildSupport
         }
     }
 
-    public static string DefaultParameterValue(string operatorType, string parameterName)
-    {
-        if (parameterName.Contains("camera", StringComparison.OrdinalIgnoreCase))
-        {
-            return "<pending-camera-binding>";
-        }
-
-        if (parameterName.Contains("model", StringComparison.OrdinalIgnoreCase))
-        {
-            return "<pending-model-resource>";
-        }
-
-        if (parameterName.Contains("template", StringComparison.OrdinalIgnoreCase))
-        {
-            return "<pending-template-artifact>";
-        }
-
-        if (parameterName.Contains("tolerance", StringComparison.OrdinalIgnoreCase))
-        {
-            return "<pending-tolerance>";
-        }
-
-        if (parameterName.Contains("channel", StringComparison.OrdinalIgnoreCase))
-        {
-            return "<pending-output-channel>";
-        }
-
-        return operatorType switch
-        {
-            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) => "OK when inspection score satisfies configured threshold.",
-            "Thresholding" when parameterName.Equals("Mode", StringComparison.OrdinalIgnoreCase) => "adaptive_review",
-            "TemplateMatching" when parameterName.Equals("MinScore", StringComparison.OrdinalIgnoreCase) => "0.8",
-            "TemplateMatching" when parameterName.Equals("MaxMatches", StringComparison.OrdinalIgnoreCase) => "1",
-            "DeepLearning" when parameterName.Equals("ConfidenceThreshold", StringComparison.OrdinalIgnoreCase) => "0.6",
-            "SurfaceDefectDetection" when parameterName.Equals("ModelKind", StringComparison.OrdinalIgnoreCase) => "surface_defect",
-            "SemanticSegmentation" when parameterName.Equals("ModelKind", StringComparison.OrdinalIgnoreCase) => "segmentation",
-            "BlobAnalysis" when parameterName.Equals("MinArea", StringComparison.OrdinalIgnoreCase) => "20",
-            "BlobAnalysis" when parameterName.Equals("MaxArea", StringComparison.OrdinalIgnoreCase) => "<pending-max-area>",
-            "RoiManager" when parameterName.Equals("RoiName", StringComparison.OrdinalIgnoreCase) => "inspection_roi",
-            _ => "<pending-parameter>"
-        };
-    }
-
-    public static string MissingResourceKind(string operatorType, string parameterName, bool pending)
-    {
-        if (!pending)
-        {
-            return string.Empty;
-        }
-
-        if (parameterName.Contains("camera", StringComparison.OrdinalIgnoreCase))
-        {
-            return "camera_binding";
-        }
-
-        if (parameterName.Contains("model", StringComparison.OrdinalIgnoreCase))
-        {
-            return "model_resource";
-        }
-
-        if (parameterName.Contains("template", StringComparison.OrdinalIgnoreCase))
-        {
-            return "template_artifact";
-        }
-
-        if (parameterName.Contains("channel", StringComparison.OrdinalIgnoreCase))
-        {
-            return "output_channel";
-        }
-
-        if (operatorType.Contains("Measure", StringComparison.OrdinalIgnoreCase) ||
-            parameterName.Contains("tolerance", StringComparison.OrdinalIgnoreCase))
-        {
-            return "measurement_parameter";
-        }
-
-        return string.Empty;
-    }
-
-    public static OperatorType ToOperatorType(string operatorType)
-    {
-        if (Enum.TryParse<OperatorType>(operatorType, ignoreCase: true, out var parsed))
-        {
-            return parsed;
-        }
-
-        return operatorType switch
-        {
-            "MeasureDistance" => OperatorType.Measurement,
-            "SemanticSegmentation" => OperatorType.DeepLearning,
-            "ImageCompose" => OperatorType.ImageAdd,
-            _ => OperatorType.DeepLearning
-        };
-    }
-
-    public static GenerateFlowMode ToGenerateFlowMode(string buildIntent)
-    {
-        return buildIntent switch
-        {
-            "modify" or "refactor" => GenerateFlowMode.Modify,
-            "explain" => GenerateFlowMode.Explain,
-            "review_pending_parameters" => GenerateFlowMode.ReviewPendingParameters,
-            _ => GenerateFlowMode.New
-        };
-    }
-
-    public static string ToTurnIntent(string buildIntent)
-    {
-        return buildIntent switch
-        {
-            "modify" or "refactor" => AiTurnIntents.ModifyFlow,
-            "explain" => AiTurnIntents.ExplainFlow,
-            "review_pending_parameters" => AiTurnIntents.ReviewPendingParameters,
-            _ => AiTurnIntents.NewFlow
-        };
-    }
-
     public static int FlowOperatorCount(object? flow)
     {
         if (flow is OperatorFlowDto dto)
@@ -571,26 +293,6 @@ internal static class VisionAgentBuildSupport
             AgentRunEventStatuses.Running
             ? status
             : AgentRunEventStatuses.Completed;
-    }
-
-    public static string TempIdFor(string operatorType, int ordinal)
-    {
-        return operatorType switch
-        {
-            "ImageAcquisition" => "op_cam",
-            "RoiManager" => "op_roi",
-            "SurfaceDefectDetection" => "op_surface_defect",
-            "DeepLearning" => "op_detect",
-            "SemanticSegmentation" => "op_segment",
-            "TemplateMatching" => "op_match",
-            "BlobAnalysis" => "op_blob",
-            "Thresholding" => "op_threshold",
-            "CircleMeasurement" => ordinal <= 2 ? "op_circle_a" : "op_circle_b",
-            "MeasureDistance" => "op_distance",
-            "ResultJudgment" => "op_judge",
-            "ResultOutput" => "op_out",
-            _ => $"op_{new string(operatorType.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray())}_{ordinal}"
-        };
     }
 
     public static string Clean(string? value)

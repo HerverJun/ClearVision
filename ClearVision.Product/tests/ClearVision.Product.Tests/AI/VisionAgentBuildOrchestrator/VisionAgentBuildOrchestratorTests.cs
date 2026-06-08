@@ -10,12 +10,49 @@ using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using ClearVision.Product.Infrastructure.AI.Tools;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests;
 
 public sealed class VisionAgentBuildOrchestratorTests
 {
+    [Fact(DisplayName = "Build orchestrator should resolve through injected Build execution services")]
+    public async Task BuildAsync_ShouldResolveThroughInjectedBuildServices()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        using var provider = CreateServiceProvider(sink);
+        var orchestrator = provider.GetRequiredService<IVisionAgentBuildOrchestrator>();
+        var plan = Plan("surface_defect", ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"]);
+
+        var result = await orchestrator.BuildAsync(Request(plan), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.ToolEvidenceTimeline.Should().Contain(item => item.ToolName == "plan_snapshot_loader");
+    }
+
+    [Fact(DisplayName = "Black-box metal scratch Build should create editable surface defect draft with missing model resource")]
+    public async Task BuildAsync_MetalScratch_ShouldBuildSurfaceDefectDraftWithMissingModelResource()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var plan = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "BlobAnalysis", "ResultJudgment", "ResultOutput"],
+            "帮我做一个金属表面划痕检测流程");
+
+        var result = await orchestrator.BuildAsync(Request(plan), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain("SurfaceDefectDetection");
+        result.BuildResult.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        result.BuildResult.ApplyGate.DeploymentReady.Should().BeFalse();
+        result.BuildResult.MissingResources.Should().Contain(item =>
+            item.ResourceType == "model_resource" &&
+            item.ResourceKey == "op_surface_defect.ModelId");
+    }
+
     [Fact(DisplayName = "Build orchestrator should produce tool evidence, workflow diff, and apply gates")]
     public async Task BuildAsync_ShouldProduceToolEvidenceDiffAndApplyGates()
     {
@@ -91,11 +128,14 @@ public sealed class VisionAgentBuildOrchestratorTests
             evt.Summary.Contains("review plan provenance", StringComparison.OrdinalIgnoreCase));
     }
 
-    [Fact(DisplayName = "Build orchestrator template selection should drive template strategy and pipeline")]
+    [Fact(DisplayName = "Black-box template positioning Build should use template skeleton instead of surface defect route")]
     public async Task BuildAsync_ShouldUseTemplateSelectionForTemplateStrategy()
     {
         var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
-        var plan = Plan("surface_defect", ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"]);
+        var plan = Plan(
+            "template_positioning",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"],
+            "帮我做一个模板定位流程");
         var templateSelection = new AiTemplateSelectionInfo
         {
             Mode = "use_selected_template",
@@ -178,6 +218,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult!.WorkflowDiff.PreservedNodes.Should().NotBeEmpty();
         Flow(result).Operators.Select(item => item.Name).Should().Contain("existing-camera");
         Flow(result).Operators.Count.Should().BeGreaterThan(1);
+        Flow(result).Operators.Count.Should().BeGreaterThanOrEqualTo(existing.Operators.Count + 1);
     }
 
     [Fact(DisplayName = "Build orchestrator replay payload should redact unsafe metadata")]
@@ -204,19 +245,58 @@ public sealed class VisionAgentBuildOrchestratorTests
 
     private static VisionAgentBuildOrchestrator CreateOrchestrator(CapturingAgentRunEventSink sink)
     {
+        var redactor = new AgentRunEventRedactor();
+        var toolRunner = new BuildToolRunner(CreateToolRegistry(), redactor, sink);
         return new VisionAgentBuildOrchestrator(
-            new VisionAgentToolRegistry(
-            [
-                new FlowTemplateMatchTool(),
-                new FlowTemplateSkeletonTool(),
-                new FlowValidationTool(),
-                new DryRunFlowTool(),
-                new RuntimePackagePrecheckTool()
-            ]),
-            new FakeAiFlowGenerationService(),
-            new AgentRunEventRedactor(),
+            new BuildPlanContextLoader(sink),
+            new BuildIntentResolver(),
+            new TemplateStrategyResolver(toolRunner),
+            new OperatorPipelineSelector(),
+            new ParameterMappingService(),
+            new WorkflowDraftBuilder(new FakeAiFlowGenerationService()),
+            toolRunner,
+            new BuildReadinessReviewService(),
+            new WorkflowDiffService(),
+            new ApplyGateResolver(),
+            new BuildResultAssembler(redactor, sink),
             NullLogger<VisionAgentBuildOrchestrator>.Instance,
             sink);
+    }
+
+    private static ServiceProvider CreateServiceProvider(CapturingAgentRunEventSink sink)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IAgentRunEventSink>(sink);
+        services.AddSingleton<AgentRunEventRedactor>();
+        services.AddSingleton<IAiFlowGenerationService, FakeAiFlowGenerationService>();
+        services.AddSingleton<IVisionAgentToolRegistry>(_ => CreateToolRegistry());
+        services.AddSingleton<BuildToolRunner>();
+        services.AddSingleton<BuildPlanContextLoader>();
+        services.AddSingleton<BuildIntentResolver>();
+        services.AddSingleton<TemplateStrategyResolver>();
+        services.AddSingleton<OperatorPipelineSelector>();
+        services.AddSingleton<ParameterMappingService>();
+        services.AddSingleton<WorkflowDraftBuilder>();
+        services.AddSingleton<BuildReadinessReviewService>();
+        services.AddSingleton<WorkflowDiffService>();
+        services.AddSingleton<ApplyGateResolver>();
+        services.AddSingleton<BuildResultAssembler>();
+        services.AddSingleton<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildOrchestrator>>(
+            NullLogger<VisionAgentBuildOrchestrator>.Instance);
+        services.AddSingleton<IVisionAgentBuildOrchestrator, VisionAgentBuildOrchestrator>();
+        return services.BuildServiceProvider();
+    }
+
+    private static VisionAgentToolRegistry CreateToolRegistry()
+    {
+        return new VisionAgentToolRegistry(
+        [
+            new FlowTemplateMatchTool(),
+            new FlowTemplateSkeletonTool(),
+            new FlowValidationTool(),
+            new DryRunFlowTool(),
+            new RuntimePackagePrecheckTool()
+        ]);
     }
 
     private static AiFlowGenerationRequest Request(
@@ -254,13 +334,16 @@ public sealed class VisionAgentBuildOrchestratorTests
         };
     }
 
-    private static VisionAgentPlanModeResult Plan(string intent, List<string> operators)
+    private static VisionAgentPlanModeResult Plan(
+        string intent,
+        List<string> operators,
+        string originalUserPrompt = "metal surface scratch detection")
     {
         var result = new VisionAgentPlanModeResult
         {
             PlanId = "plan_build_test",
-            OriginalUserPrompt = "metal surface scratch detection",
-            Goal = "metal surface scratch detection",
+            OriginalUserPrompt = originalUserPrompt,
+            Goal = originalUserPrompt,
             Intent = intent,
             Confidence = "high",
             RequirementUnderstanding = ["Inspect surface defects with metadata-only Build."],

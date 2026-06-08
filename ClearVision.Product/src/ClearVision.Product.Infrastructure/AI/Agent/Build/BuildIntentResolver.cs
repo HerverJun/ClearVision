@@ -4,9 +4,9 @@ using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class BuildIntentResolver
+public sealed class BuildIntentResolver
 {
-    public BuildStepResult<BuildIntentResolution> Resolve(
+    internal BuildStepResult<BuildIntentResolution> Resolve(
         AiFlowGenerationRequest request,
         VisionAgentBuildFromPlanRequest? build,
         BuildPlanLoad load)

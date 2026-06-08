@@ -4,7 +4,7 @@ using ClearVision.Product.Infrastructure.AI.Tools;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class OperatorPipelineSelector
+public sealed class OperatorPipelineSelector
 {
     private static readonly HashSet<string> ForbiddenOperatorTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -13,13 +13,13 @@ internal sealed class OperatorPipelineSelector
         "ScriptOperator"
     };
 
-    public BuildStepResult<OperatorPipelineResolution> Select(
+    internal BuildStepResult<OperatorPipelineResolution> Select(
         BuildPlanLoad load,
         TemplateStrategyResolution template,
         List<string> publicWarnings)
     {
         var source = "plan";
-        var requested = VisionAgentBuildSupport.ReadOperatorTypes(template.TemplateSkeleton).ToList();
+        var requested = ReadOperatorTypes(template.TemplateSkeleton).ToList();
         if (requested.Count > 0)
         {
             source = "template";
@@ -40,7 +40,7 @@ internal sealed class OperatorPipelineSelector
             {
                 repaired.Add(new VisionAgentOperatorPipelineStep
                 {
-                    TempId = VisionAgentBuildSupport.TempIdFor(type, repaired.Count + 1),
+                    TempId = TempIdFor(type, repaired.Count + 1),
                     OperatorType = type,
                     Source = source,
                     Status = "selected"
@@ -92,5 +92,46 @@ internal sealed class OperatorPipelineSelector
             repairAction: invalid.Count > 0 ? "removed_invalid_operators" : string.Empty,
             applyImpact: "editable_draft_allowed",
             deploymentImpact: invalid.Count > 0 ? "operator_contract_repaired" : "no_deployment_blocker");
+    }
+
+    private static IEnumerable<string> ReadOperatorTypes(object? templateSkeleton)
+    {
+        var root = VisionAgentBuildSupport.ToJsonElementOrNull(templateSkeleton);
+        if (root == null ||
+            !VisionAgentBuildSupport.TryGetProperty(root.Value, "operators", out var operators) ||
+            operators.ValueKind != System.Text.Json.JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var op in operators.EnumerateArray())
+        {
+            var type = VisionAgentBuildSupport.ReadString(op, "operatorType") ??
+                       VisionAgentBuildSupport.ReadString(op, "type");
+            if (!string.IsNullOrWhiteSpace(type))
+            {
+                yield return type;
+            }
+        }
+    }
+
+    private static string TempIdFor(string operatorType, int ordinal)
+    {
+        return operatorType switch
+        {
+            "ImageAcquisition" => "op_cam",
+            "RoiManager" => "op_roi",
+            "SurfaceDefectDetection" => "op_surface_defect",
+            "DeepLearning" => "op_detect",
+            "SemanticSegmentation" => "op_segment",
+            "TemplateMatching" => "op_match",
+            "BlobAnalysis" => "op_blob",
+            "Thresholding" => "op_threshold",
+            "CircleMeasurement" => ordinal <= 2 ? "op_circle_a" : "op_circle_b",
+            "MeasureDistance" => "op_distance",
+            "ResultJudgment" => "op_judge",
+            "ResultOutput" => "op_out",
+            _ => $"op_{new string(operatorType.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray())}_{ordinal}"
+        };
     }
 }

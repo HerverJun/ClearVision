@@ -4,9 +4,9 @@ using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class WorkflowDiffService
+public sealed class WorkflowDiffService
 {
-    public BuildStepResult<VisionAgentWorkflowDiff> Build(
+    internal BuildStepResult<VisionAgentWorkflowDiff> Build(
         BuildPlanLoad load,
         DraftWorkflowResolution draft,
         ParameterMappingResolution parameters,

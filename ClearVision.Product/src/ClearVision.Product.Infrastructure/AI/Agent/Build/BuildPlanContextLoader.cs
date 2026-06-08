@@ -1,10 +1,11 @@
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
-internal sealed class BuildPlanContextLoader
+public sealed class BuildPlanContextLoader
 {
     private readonly IAgentRunEventSink? _eventSink;
 
@@ -13,7 +14,7 @@ internal sealed class BuildPlanContextLoader
         _eventSink = eventSink;
     }
 
-    public BuildStepResult<BuildPlanLoad> Load(
+    internal BuildStepResult<BuildPlanLoad> Load(
         AiFlowGenerationRequest request,
         VisionAgentBuildFromPlanRequest? build,
         VisionAgentPlanModeResult? plan,
@@ -93,5 +94,28 @@ internal sealed class BuildPlanContextLoader
             warningCode: hashMismatch ? "plan_hash_mismatch" : string.Empty,
             applyImpact: "editable_draft_allowed",
             deploymentImpact: hashMismatch ? "requires_plan_provenance_review" : "no_deployment_blocker");
+    }
+
+    internal VisionAgentToolContext BuildToolContext(
+        AiFlowGenerationRequest request,
+        VisionAgentBuildFromPlanRequest? build,
+        string? currentFlowSnapshot)
+    {
+        return new VisionAgentToolContext
+        {
+            UserDescription = VisionAgentBuildSupport.FirstNonEmpty(build?.OriginalUserPrompt, request.Description),
+            AdditionalContext = request.AdditionalContext,
+            SessionId = request.SessionId,
+            AgentRunId = request.AgentRunId,
+            ExistingFlowJson = currentFlowSnapshot,
+            DebugTrace = false,
+            RuntimePreviewConsent = false,
+            AllowedPermissions = new HashSet<VisionAgentToolPermission>
+            {
+                VisionAgentToolPermission.ReadOnly,
+                VisionAgentToolPermission.Simulation,
+                VisionAgentToolPermission.DeploymentPrepare
+            }
+        };
     }
 }

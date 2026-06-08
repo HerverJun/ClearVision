@@ -1,6 +1,4 @@
-using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
-using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
@@ -29,25 +27,33 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
     private readonly BuildResultAssembler _resultAssembler;
 
     public VisionAgentBuildOrchestrator(
-        IVisionAgentToolRegistry toolRegistry,
-        IAiFlowGenerationService generationService,
-        AgentRunEventRedactor redactor,
+        BuildPlanContextLoader contextLoader,
+        BuildIntentResolver intentResolver,
+        TemplateStrategyResolver templateStrategyResolver,
+        OperatorPipelineSelector pipelineSelector,
+        ParameterMappingService parameterMapper,
+        WorkflowDraftBuilder workflowDraftBuilder,
+        BuildToolRunner toolRunner,
+        BuildReadinessReviewService readinessReview,
+        WorkflowDiffService workflowDiffService,
+        ApplyGateResolver applyGateResolver,
+        BuildResultAssembler resultAssembler,
         Microsoft.Extensions.Logging.ILogger<VisionAgentBuildOrchestrator> logger,
         IAgentRunEventSink? eventSink = null)
     {
         _eventSink = eventSink;
         _logger = logger;
-        _toolRunner = new BuildToolRunner(toolRegistry, redactor, eventSink);
-        _contextLoader = new BuildPlanContextLoader(eventSink);
-        _intentResolver = new BuildIntentResolver();
-        _templateStrategyResolver = new TemplateStrategyResolver(_toolRunner);
-        _pipelineSelector = new OperatorPipelineSelector();
-        _parameterMapper = new ParameterMappingService();
-        _workflowDraftBuilder = new WorkflowDraftBuilder(generationService);
-        _readinessReview = new BuildReadinessReviewService();
-        _workflowDiffService = new WorkflowDiffService();
-        _applyGateResolver = new ApplyGateResolver();
-        _resultAssembler = new BuildResultAssembler(redactor, eventSink);
+        _contextLoader = contextLoader;
+        _intentResolver = intentResolver;
+        _templateStrategyResolver = templateStrategyResolver;
+        _pipelineSelector = pipelineSelector;
+        _parameterMapper = parameterMapper;
+        _workflowDraftBuilder = workflowDraftBuilder;
+        _toolRunner = toolRunner;
+        _readinessReview = readinessReview;
+        _workflowDiffService = workflowDiffService;
+        _applyGateResolver = applyGateResolver;
+        _resultAssembler = resultAssembler;
     }
 
     public async Task<AiFlowGenerationResult> BuildAsync(
@@ -110,7 +116,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                     redactionPass = true
                 });
 
-            var toolContext = VisionAgentBuildSupport.BuildToolContext(
+            var toolContext = _contextLoader.BuildToolContext(
                 request,
                 build,
                 loadPlan.Payload.CurrentFlowSnapshot);
@@ -171,7 +177,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 AgentRunEventTypes.ReadinessChecked);
 
             var currentDraft = draft.Payload;
-            if (VisionAgentBuildSupport.ToolHasBlockingIssues(validation.Payload))
+            if (BuildToolRunner.ToolHasBlockingIssues(validation.Payload))
             {
                 var repair = await _toolRunner.ExecuteEvidenceStepAsync(
                     runId,
