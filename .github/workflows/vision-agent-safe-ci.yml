@@ -1,0 +1,109 @@
+name: ClearVision Vision Agent Safe CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - codex初稿
+      - codex-ci-workflow
+      - codex-ci-integrate-safe
+  workflow_dispatch:
+
+env:
+  DESKTOP_PROJECT: ClearVision.Product/src/ClearVision.Product.Desktop/ClearVision.Product.Desktop.csproj
+  PRODUCT_TEST_PROJECT: ClearVision.Product/tests/ClearVision.Product.Tests/ClearVision.Product.Tests.csproj
+  DESKTOP_TEST_PROJECT: ClearVision.Product/tests/ClearVision.Product.Desktop.Tests/ClearVision.Product.Desktop.Tests.csproj
+  UI_TEST_DIR: ClearVision.Product/tests/ClearVision.Product.UI.Tests
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  validate:
+    name: Build and Safe Tests
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-safe-${{ hashFiles('global.json', '**/*.csproj', '**/*.props', '**/*.targets', '**/nuget.config', '**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-safe-
+            ${{ runner.os }}-nuget-
+
+      - name: Restore desktop project
+        shell: pwsh
+        run: dotnet restore $env:DESKTOP_PROJECT
+
+      - name: Build desktop project
+        shell: pwsh
+        run: dotnet build $env:DESKTOP_PROJECT --no-restore --nologo
+
+      - name: Run safe backend tests (product)
+        shell: pwsh
+        run: |
+          & "./scripts/run-dotnet-test-serial.ps1" `
+            -Project $env:PRODUCT_TEST_PROJECT `
+            -Configuration Debug `
+            -Verbosity normal `
+            -ResultsDirectory test-results/ci/product `
+            -LogFileName product-agent.trx `
+            -MinimumTotalTests 70 `
+            -FullyQualifiedName VisionAgentGenerateFlowTests,AgentRunEventStreamServiceTests,VisionAgentPlanPlannerTests,VisionAgentBuildOrchestratorTests
+
+      - name: Run safe backend tests (desktop endpoints)
+        shell: pwsh
+        run: |
+          & "./scripts/run-dotnet-test-serial.ps1" `
+            -Project $env:DESKTOP_TEST_PROJECT `
+            -Configuration Debug `
+            -Verbosity normal `
+            -ResultsDirectory test-results/ci/desktop `
+            -LogFileName desktop-agent-endpoints.trx `
+            -MinimumTotalTests 10 `
+            -FullyQualifiedName AgentRunEndpointsTests
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+
+      - name: Syntax check AI frontend modules
+        shell: pwsh
+        run: |
+          $files = @()
+          $files += Get-ChildItem -Path "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai" -Filter "*.js" -File
+          $files += Get-ChildItem -Path "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai-generation" -Filter "*.js" -File
+          $files += Get-Item -Path "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/unit/ai-agent-ui-contract.test.mjs"
+          $files += Get-Item -Path "ClearVision.Product/tests/ClearVision.Product.UI.Tests/tests/unit/ai-panel-canvas-sync.test.mjs"
+
+          foreach ($file in $files | Sort-Object FullName -Unique) {
+            node --check $file.FullName
+          }
+
+      - name: Install UI test dependencies
+        working-directory: ${{ env.UI_TEST_DIR }}
+        run: npm ci
+
+      - name: Run AI frontend contract tests
+        working-directory: ${{ env.UI_TEST_DIR }}
+        run: npm run test:agent-ui-contract
+
+      - name: Check whitespace
+        run: git diff --check
