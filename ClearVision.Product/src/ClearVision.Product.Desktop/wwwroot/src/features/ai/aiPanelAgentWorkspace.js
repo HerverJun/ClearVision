@@ -125,11 +125,14 @@ export const aiPanelAgentWorkspaceMixin = {
                     this.pendingVisionPlan.questions.map(question => [question.id, question.defaultValue])
                 );
                 this._clearActivePlanRequest(planRequestId);
+                const sourceLabel = this.pendingVisionPlan.planSource === 'rule_fallback'
+                    ? `Plan ready (fallback: ${this.pendingVisionPlan.fallbackReason || 'rule_fallback'})`
+                    : 'Plan ready (planner)';
                 this._setAssistantTurnStatus(turn, 'Plan ready', 'success');
                 this._setAssistantSectionText(
                     turn,
                     'reply',
-                    'Plan Mode returned a structured engineering plan. Accept recommended defaults or adjust selected options before Build.'
+                    `${sourceLabel}. Accept recommended defaults or adjust selected options before Build.`
                 );
                 this._setResultStatusNote('Plan Mode is waiting for confirmation before Build starts.', 'info');
                 this._renderAgentWorkspaceOverview();
@@ -282,6 +285,12 @@ export const aiPanelAgentWorkspaceMixin = {
             goal: plan.goal || plan.Goal || fallbackDescription || 'Vision workflow draft',
             intent: plan.intent || plan.Intent || '',
             confidence: plan.confidence || plan.Confidence || 'medium',
+            planSource: plan.planSource || plan.PlanSource || '',
+            fallbackReason: plan.fallbackReason || plan.FallbackReason || '',
+            planWarnings: this._toArray(plan.planWarnings || plan.PlanWarnings),
+            contractRepairNotes: this._toArray(plan.contractRepairNotes || plan.ContractRepairNotes),
+            publicEvents: this._toArray(plan.publicEvents || plan.PublicEvents)
+                .map(evt => this._normalizePlanPublicEvent(evt)),
             blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
             nextAction: plan.nextAction || plan.NextAction || 'Review plan, then start Build.',
             executable: Boolean(plan.canBuild ?? plan.CanBuild ?? true),
@@ -311,6 +320,16 @@ export const aiPanelAgentWorkspaceMixin = {
             stationBoundarySummary: plan.stationBoundarySummary || plan.StationBoundarySummary || '',
             plcOutputPolicy: plan.plcOutputPolicy || plan.PlcOutputPolicy || '',
             rawPlanSnapshot: plan
+        };
+    },
+
+    _normalizePlanPublicEvent(evt) {
+        const item = this._asObject?.(evt) || evt || {};
+        return {
+            stage: item.stage || item.Stage || '',
+            status: item.status || item.Status || '',
+            title: item.title || item.Title || '',
+            summary: item.summary || item.Summary || ''
         };
     },
 
@@ -362,6 +381,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const plan = this.pendingVisionPlan;
         const mode = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD ? 'Build Mode' : 'Plan Mode';
         const activeEvents = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
+        const planEvents = Array.isArray(plan?.publicEvents) ? plan.publicEvents : [];
         const terminal = activeEvents.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
         const lastEvent = activeEvents[activeEvents.length - 1];
         const blockerCount = this._countBuildBlockers(activeEvents);
@@ -385,8 +405,9 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
                 <div class="ai-agent-overview-metrics">
                     <span><small>Confidence</small><b>${this._escapeHtml(confidence)}</b></span>
+                    <span><small>Source</small><b>${this._escapeHtml(plan?.planSource || (activeEvents.length ? 'build' : 'not set'))}</b></span>
                     <span><small>Blockers</small><b>${this._escapeHtml(String(blockerCount))}</b></span>
-                    <span><small>Events</small><b>${this._escapeHtml(String(activeEvents.length))}</b></span>
+                    <span><small>Events</small><b>${this._escapeHtml(String(activeEvents.length || planEvents.length))}</b></span>
                     <span><small>Executable</small><b>${executable ? 'yes' : 'no'}</b></span>
                 </div>
             </section>
@@ -420,6 +441,19 @@ export const aiPanelAgentWorkspaceMixin = {
                     <strong>${this._escapeHtml(plan.route.title)}</strong>
                     <span>${this._escapeHtml(plan.route.summary)}</span>
                     <div class="ai-plan-chain">${plan.route.operators.map(op => `<span>${this._escapeHtml(op)}</span>`).join('')}</div>
+                </div>
+            </section>
+            <section class="ai-workspace-section">
+                <div class="ai-workspace-section-title">Plan Diagnostics</div>
+                <div class="ai-build-compact">
+                    <div class="ai-build-compact-row">
+                        <b>${this._escapeHtml(plan.planSource || 'unknown')}</b>
+                        <span>${this._escapeHtml(plan.planHash || 'plan hash pending')}</span>
+                    </div>
+                    ${plan.fallbackReason ? `<div class="ai-build-note">${this._escapeHtml(plan.fallbackReason)}</div>` : ''}
+                    ${plan.planWarnings.length ? `<ul>${plan.planWarnings.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+                    ${plan.contractRepairNotes.length ? `<div class="ai-plan-chain">${plan.contractRepairNotes.map(item => `<span>${this._escapeHtml(item)}</span>`).join('')}</div>` : ''}
+                    ${plan.publicEvents.length ? `<div class="ai-workspace-list">${plan.publicEvents.map(evt => `<div><b>${this._escapeHtml(evt.stage)}</b> ${this._escapeHtml(evt.status)} - ${this._escapeHtml(evt.summary || evt.title)}</div>`).join('')}</div>` : ''}
                 </div>
             </section>
             <section class="ai-workspace-section">
@@ -614,6 +648,8 @@ export const aiPanelAgentWorkspaceMixin = {
         return {
             planId: plan?.planId || plan?.id || '',
             planHash: plan?.planHash || '',
+            planSource: plan?.planSource || '',
+            fallbackReason: plan?.fallbackReason || '',
             originalUserPrompt: plan?.originalDescription || plan?.buildPrompt || '',
             goal: plan?.goal || '',
             intent: plan?.intent || '',
@@ -634,6 +670,9 @@ export const aiPanelAgentWorkspaceMixin = {
             templateSelection: plan?.templateSelection || null,
             stationBoundarySummary: plan?.stationBoundarySummary || '',
             plcOutputPolicy: plan?.plcOutputPolicy || '',
+            planWarnings: this._toArray(plan?.planWarnings),
+            contractRepairNotes: this._toArray(plan?.contractRepairNotes),
+            publicEvents: this._toArray(plan?.publicEvents),
             metadataOnly: true
         };
     },

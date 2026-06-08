@@ -18,6 +18,8 @@ public sealed record VisionAgentPlanModeResult
 {
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
+    public string PlanSource { get; init; } = string.Empty;
+    public string FallbackReason { get; init; } = string.Empty;
     public string OriginalUserPrompt { get; init; } = string.Empty;
     public string Goal { get; init; } = string.Empty;
     public string Intent { get; init; } = string.Empty;
@@ -38,6 +40,20 @@ public sealed record VisionAgentPlanModeResult
     public AiTemplateSelectionInfo? TemplateSelection { get; init; }
     public string StationBoundarySummary { get; init; } = string.Empty;
     public string PlcOutputPolicy { get; init; } = string.Empty;
+    public List<string> PlanWarnings { get; init; } = [];
+    public List<string> ContractRepairNotes { get; init; } = [];
+    public List<VisionAgentPlanPublicEvent> PublicEvents { get; init; } = [];
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentPlanPublicEvent
+{
+    public string Stage { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string Summary { get; init; } = string.Empty;
+    public Dictionary<string, string> Metadata { get; init; } =
+        new(StringComparer.OrdinalIgnoreCase);
     public bool MetadataOnly { get; init; } = true;
 }
 

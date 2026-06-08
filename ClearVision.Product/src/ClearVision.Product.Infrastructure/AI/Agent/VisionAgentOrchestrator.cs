@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
@@ -21,6 +22,10 @@ public interface IVisionAgentOrchestrator
 
 public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 {
+    private static readonly Regex UnsafeTemplateMetadataRegex = new(
+        @"(?i)([A-Za-z]:\\|data:image\/|sk-[A-Za-z0-9_\-]{12,}|api[_-]?key\s*[:=]|token\s*[:=]|secret\s*[:=]|\b(?:\d{1,3}\.){3}\d{1,3}\b|\bDB\d+\.DB[XBWD]\d+\b|\bM\d+(?:\.\d+)?\b|\bD\d+\b|plc:\/\/)",
+        RegexOptions.Compiled);
+
     private static readonly JsonSerializerOptions PlanHashJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -29,25 +34,39 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
     private readonly IVisionAgentToolRegistry _toolRegistry;
     private readonly IAiFlowGenerationService _generationService;
+    private readonly IVisionAgentPlanPlannerService? _planPlannerService;
     private readonly IAgentRunEventSink? _eventSink;
 
     public VisionAgentOrchestrator(
         IVisionAgentToolRegistry toolRegistry,
         IAiFlowGenerationService generationService,
-        IAgentRunEventSink? eventSink = null)
+        IAgentRunEventSink? eventSink = null,
+        IVisionAgentPlanPlannerService? planPlannerService = null)
     {
         _toolRegistry = toolRegistry;
         _generationService = generationService;
+        _planPlannerService = planPlannerService;
         _eventSink = eventSink;
     }
 
-    public Task<VisionAgentPlanModeResult> CreatePlanAsync(
+    public async Task<VisionAgentPlanModeResult> CreatePlanAsync(
         VisionAgentPlanModeRequest request,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var result = BuildPlan(request);
-        return Task.FromResult(result);
+        var ruleBaseline = BuildPlan(request);
+        if (_planPlannerService == null)
+        {
+            return BuildRuleFallbackPlan(
+                ruleBaseline,
+                "planner_service_not_registered",
+                "Plan planner service is not registered; using rule fallback plan.");
+        }
+
+        return await _planPlannerService.CreatePlanAsync(
+            request,
+            ruleBaseline,
+            cancellationToken);
     }
 
     public async Task<AiFlowGenerationResult> BuildFromPlanAsync(
@@ -61,7 +80,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private VisionAgentPlanModeResult BuildPlan(VisionAgentPlanModeRequest request)
     {
         var description = Clean(request.Description);
-        var originalPrompt = Clean(request.OriginalUserPrompt) ?? description;
+        var originalPrompt = string.IsNullOrWhiteSpace(request.OriginalUserPrompt)
+            ? description
+            : Clean(request.OriginalUserPrompt);
         var templateSelection = RedactTemplateSelection(request.TemplateSelection);
         var scenario = DetectScenario(description, templateSelection);
         var route = BuildRoute(scenario, templateSelection);
@@ -86,6 +107,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         {
             PlanId = $"plan_{Guid.NewGuid():N}",
             OriginalUserPrompt = originalPrompt,
+            PlanSource = "rule_baseline",
             Goal = description.Length > 160 ? description[..160] : description,
             Intent = scenario,
             Confidence = scenario == "general_inspection" ? "medium" : "high",
@@ -149,6 +171,56 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             MetadataOnly = true
         };
 
+        return result with
+        {
+            PlanHash = ComputePlanHash(result)
+        };
+    }
+
+    private static VisionAgentPlanModeResult BuildRuleFallbackPlan(
+        VisionAgentPlanModeResult baseline,
+        string fallbackReason,
+        string warning)
+    {
+        var result = baseline with
+        {
+            PlanSource = "rule_fallback",
+            FallbackReason = fallbackReason,
+            PlanWarnings = [warning],
+            ContractRepairNotes = [],
+            PublicEvents =
+            [
+                new VisionAgentPlanPublicEvent
+                {
+                    Stage = "collecting_context",
+                    Status = "completed",
+                    Title = "Context collected",
+                    Summary = "Collected public requirement, flow, template, attachment, operator, and Station boundary metadata.",
+                    MetadataOnly = true
+                },
+                new VisionAgentPlanPublicEvent
+                {
+                    Stage = "rule_fallback_used",
+                    Status = "completed",
+                    Title = "Rule fallback used",
+                    Summary = warning,
+                    Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["fallbackReason"] = fallbackReason
+                    },
+                    MetadataOnly = true
+                },
+                new VisionAgentPlanPublicEvent
+                {
+                    Stage = "plan_ready",
+                    Status = "completed",
+                    Title = "Fallback plan ready",
+                    Summary = "Rule fallback PlanModeResult is ready for user confirmation.",
+                    MetadataOnly = true
+                }
+            ],
+            MetadataOnly = true
+        };
         return result with
         {
             PlanHash = ComputePlanHash(result)
@@ -770,9 +842,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
     private static AiTemplateSelectionInfo? RedactTemplateSelection(AiTemplateSelectionInfo? selection)
     {
-        var mode = Clean(selection?.Mode).ToLowerInvariant();
-        var templateId = Clean(selection?.TemplateId);
-        var scenarioKey = Clean(selection?.ScenarioKey);
+        var mode = SafeTemplateToken(selection?.Mode, string.Empty).ToLowerInvariant();
+        var templateId = SafeTemplateToken(selection?.TemplateId, "redacted_template");
+        var scenarioKey = SafeTemplateToken(selection?.ScenarioKey, string.Empty);
 
         if (string.IsNullOrWhiteSpace(mode) &&
             string.IsNullOrWhiteSpace(templateId) &&
@@ -813,5 +885,24 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private static string Clean(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
+    private static string SafeTemplateToken(string? value, string fallback)
+    {
+        var text = Clean(value);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        if (UnsafeTemplateMetadataRegex.IsMatch(text) || text.Length > 160)
+        {
+            return fallback;
+        }
+
+        var safe = new string(text
+            .Where(ch => char.IsLetterOrDigit(ch) || ch is '_' or '-' or '.')
+            .ToArray());
+        return string.IsNullOrWhiteSpace(safe) ? fallback : safe;
     }
 }
