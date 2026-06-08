@@ -97,6 +97,11 @@ public record GenerateFlowResponse
     public List<object> PendingActions { get; init; } = new();
     public object? ValidationPreview { get; init; }
     public List<object> ToolTrace { get; init; } = new();
+    public object? BuildResult { get; init; }
+    public object? WorkflowDiff { get; init; }
+    public object? ApplyGate { get; init; }
+    public object? ToolEvidenceTimeline { get; init; }
+    public string? FirstFixRecommendation { get; init; }
     public GenerateFlowManualRetry? ManualRetry { get; init; }
     public object? PromptTrace { get; init; }
     public List<GenerateFlowStageDiagnostic>? StageTimeline { get; init; }

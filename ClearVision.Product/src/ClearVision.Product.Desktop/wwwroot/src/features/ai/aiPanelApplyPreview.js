@@ -1,4 +1,8 @@
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
+import {
+    getOperatorTypeDisplayName,
+    getParameterDisplayName
+} from '../../shared/operatorDisplayNames.js';
 
 export const aiPanelApplyPreviewMixin = {
     _handleApplyFlow() {
@@ -212,8 +216,30 @@ export const aiPanelApplyPreviewMixin = {
 
     _formatApplyPendingItem(item) {
         const operatorLabel = item.actualOperatorId || item.operatorId || '未定位算子';
-        const names = item.parameterNames?.length > 0 ? item.parameterNames.join('、') : '待确认参数';
+        const names = item.parameterNames?.length > 0
+            ? item.parameterNames.map(name => getParameterDisplayName(name, { fallback: name })).join('、')
+            : '待确认参数';
         return `${operatorLabel}：${names}`;
+    },
+
+    _formatApplyOperatorLabel(op) {
+        const rawType = op?.operatorType || op?.OperatorType || op?.type || op?.Type || '';
+        return op?.displayName || op?.DisplayName || op?.name || op?.Name ||
+            getOperatorTypeDisplayName(rawType, { fallback: '未命名算子' });
+    },
+
+    _formatApplyChangeLabel(name) {
+        const rawName = String(name || '').trim();
+        if (rawName === 'displayName') return '显示名称';
+        if (rawName === 'operatorType') return '算子类型';
+        return getParameterDisplayName(rawName, { fallback: rawName || '参数' });
+    },
+
+    _formatApplyChangeValue(change, value) {
+        if (change?.name === 'operatorType') {
+            return getOperatorTypeDisplayName(value, { fallback: String(value ?? '--') });
+        }
+        return String(value ?? '--');
     },
 
     _renderApplyRiskSummary(applyRisk) {
@@ -320,13 +346,13 @@ export const aiPanelApplyPreviewMixin = {
                     ${diff.added.length > 0 ? `
                         <div class="ai-apply-preview-section">
                             <div class="ai-apply-preview-section-title is-add">新增算子 (${diff.added.length})</div>
-                            ${diff.added.map(op => `<div class="ai-apply-preview-item is-add">+ ${this._escapeHtml(op.displayName || op.DisplayName || op.name || '未命名')}</div>`).join('')}
+                            ${diff.added.map(op => `<div class="ai-apply-preview-item is-add" title="${this._escapeHtml(op.operatorType || op.OperatorType || op.type || op.Type || '')}">+ ${this._escapeHtml(this._formatApplyOperatorLabel(op))}</div>`).join('')}
                         </div>
                     ` : ''}
                     ${diff.removed.length > 0 ? `
                         <div class="ai-apply-preview-section">
                             <div class="ai-apply-preview-section-title is-remove">删除算子 (${diff.removed.length})</div>
-                            ${diff.removed.map(op => `<div class="ai-apply-preview-item is-remove">- ${this._escapeHtml(op.displayName || op.DisplayName || op.name || '未命名')}</div>`).join('')}
+                            ${diff.removed.map(op => `<div class="ai-apply-preview-item is-remove" title="${this._escapeHtml(op.operatorType || op.OperatorType || op.type || op.Type || '')}">- ${this._escapeHtml(this._formatApplyOperatorLabel(op))}</div>`).join('')}
                         </div>
                     ` : ''}
                     ${diff.modified.length > 0 ? `
@@ -334,8 +360,8 @@ export const aiPanelApplyPreviewMixin = {
                             <div class="ai-apply-preview-section-title is-modify">参数变更 (${diff.modified.length})</div>
                             ${diff.modified.map(m => `
                                 <div class="ai-apply-preview-item is-modify">
-                                    ${this._escapeHtml(m.op.displayName || m.op.DisplayName || m.op.name || '未命名')}
-                                    ${m.changes.map(c => `<div class="ai-apply-preview-param">${this._escapeHtml(c.name)}: ${this._escapeHtml(String(c.old ?? '--'))} &rarr; ${this._escapeHtml(String(c.new ?? '--'))}</div>`).join('')}
+                                    ${this._escapeHtml(this._formatApplyOperatorLabel(m.op))}
+                                    ${m.changes.map(c => `<div class="ai-apply-preview-param" title="${this._escapeHtml(`${c.name}: ${String(c.old ?? '--')} -> ${String(c.new ?? '--')}`)}">${this._escapeHtml(this._formatApplyChangeLabel(c.name))}: ${this._escapeHtml(this._formatApplyChangeValue(c, c.old))} &rarr; ${this._escapeHtml(this._formatApplyChangeValue(c, c.new))}</div>`).join('')}
                                 </div>
                             `).join('')}
                         </div>

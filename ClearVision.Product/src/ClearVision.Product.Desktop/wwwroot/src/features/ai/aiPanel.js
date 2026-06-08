@@ -2,7 +2,11 @@
 import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
 import { buildWireSequenceFollowupHint } from '../flow-editor/wireSequenceAssist.js';
-import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
+import {
+    getOperatorTypeDisplayName,
+    getParameterDisplayName,
+    getResourceDisplayName
+} from '../../shared/operatorDisplayNames.js';
 import {
     AiWorkbenchStates,
     STAGE_DIAGNOSTIC_LABELS,
@@ -1011,7 +1015,7 @@ export class AiPanel {
                 .filter(Boolean)
         );
         if (clarificationRequired && !flow) {
-            opsContainer.innerHTML = '<div class="ai-followup-empty">Build has not started. Accept a Plan or start Build to generate the operator pipeline.</div>';
+            opsContainer.innerHTML = '<div class="ai-followup-empty">构建尚未开始。请先确认计划或开始构建，生成算子链后会显示在这里。</div>';
         } else {
             ops.forEach((op, i) => {
                 const opName = op?.displayName || op?.DisplayName || op?.name || op?.Name || '未命名算子';
@@ -1131,7 +1135,7 @@ export class AiPanel {
                 <summary>本次实际发送给模型的上下文</summary>
                 <div class="ai-prompt-trace-grid">
                     <div class="ai-prompt-trace-block">
-                        <div class="ai-prompt-trace-label">Meta</div>
+                        <div class="ai-prompt-trace-label">元信息</div>
                         <pre class="ai-prompt-trace-pre">${this._escapeHtml([
                             `mode=${mode || '--'}`,
                             `provider=${provider || '--'}`,
@@ -1140,23 +1144,23 @@ export class AiPanel {
                         ].join('\n'))}</pre>
                     </div>
                     <div class="ai-prompt-trace-block">
-                        <div class="ai-prompt-trace-label">Capabilities</div>
+                        <div class="ai-prompt-trace-label">模型能力</div>
                         <pre class="ai-prompt-trace-pre">${this._escapeHtml(capabilities)}</pre>
                     </div>
                     <div class="ai-prompt-trace-block">
-                        <div class="ai-prompt-trace-label">Attachment Report</div>
+                        <div class="ai-prompt-trace-label">附件报告</div>
                         <pre class="ai-prompt-trace-pre">${this._escapeHtml(attachmentReport)}</pre>
                     </div>
                     <div class="ai-prompt-trace-block">
-                        <div class="ai-prompt-trace-label">Reference Flow Summary</div>
+                        <div class="ai-prompt-trace-label">参考流程摘要</div>
                         <pre class="ai-prompt-trace-pre">${this._escapeHtml(referenceFlow || '--')}</pre>
                     </div>
                     <div class="ai-prompt-trace-block">
-                        <div class="ai-prompt-trace-label">System Prompt</div>
+                        <div class="ai-prompt-trace-label">系统提示</div>
                         <pre class="ai-prompt-trace-pre">${this._escapeHtml(systemPrompt || '--')}</pre>
                     </div>
                     <div class="ai-prompt-trace-block">
-                        <div class="ai-prompt-trace-label">User Prompt</div>
+                        <div class="ai-prompt-trace-label">用户提示</div>
                         <pre class="ai-prompt-trace-pre">${this._escapeHtml(userPrompt || '--')}</pre>
                     </div>
                 </div>
@@ -1306,7 +1310,7 @@ export class AiPanel {
                             return `
                             <button class="ai-followup-item ai-followup-nav" type="button" data-followup-nav="${this._escapeHtml(group.groupKey)}">
                                 <div class="ai-followup-item-title">${this._escapeHtml(group.label)}</div>
-                                <div class="ai-followup-item-body">需要补充：${this._escapeHtml(group.fields.map(field => field.parameterName).join('、'))}</div>
+                                <div class="ai-followup-item-body">需要补充：${this._escapeHtml(group.fields.map(field => getParameterDisplayName(field.parameterName, { fallback: field.parameterName })).join('、'))}</div>
                             </button>
                         `;
                         }).join('')}
@@ -1322,9 +1326,9 @@ export class AiPanel {
                     <div class="ai-followup-list">
                         ${missing.map(item => `
                             <div class="ai-followup-item">
-                                <div class="ai-followup-item-title">${this._escapeHtml(item.resourceType || '资源')}</div>
+                                <div class="ai-followup-item-title" title="${this._escapeHtml(item.resourceType || '资源')}">${this._escapeHtml(getResourceDisplayName(item.resourceType, { fallback: '资源' }))}</div>
                                 <div class="ai-followup-item-body">${this._escapeHtml(item.description || item.resourceKey || '缺少必要资源')}</div>
-                                ${item.resourceKey ? `<div class="ai-followup-item-meta">${this._escapeHtml(item.resourceKey)}</div>` : ''}
+                                ${item.resourceKey ? `<div class="ai-followup-item-meta" title="${this._escapeHtml(item.resourceKey)}">资源键</div>` : ''}
                             </div>
                         `).join('')}
                     </div>

@@ -1,6 +1,6 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import httpClient from '../../core/messaging/httpClient.js';
-import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
+import { getOperatorTypeDisplayName, getParameterDisplayName } from '../../shared/operatorDisplayNames.js';
 import { shouldIncludePendingParameter } from '../../shared/parameterDependencyRules.js';
 
 export const aiPanelPendingParametersMixin = {
@@ -47,7 +47,7 @@ export const aiPanelPendingParametersMixin = {
                             <div>
                                 <div class="ai-parameter-group-title">${this._escapeHtml(group.label)}</div>
                                 <div class="ai-parameter-group-meta">
-                                    ${group.operatorType ? this._escapeHtml(getOperatorTypeDisplayName(group.operatorType, { includeType: true })) : '未识别算子类型'}
+                                    ${group.operatorType ? `<span title="${this._escapeHtml(group.operatorType)}">${this._escapeHtml(getOperatorTypeDisplayName(group.operatorType))}</span>` : '未识别算子类型'}
                                     ${group.operator ? '' : ' · 当前画布快照中未找到精确算子，提交时将按名称提示 AI 继续审核'}
                                 </div>
                             </div>
@@ -168,7 +168,10 @@ export const aiPanelPendingParametersMixin = {
 
     _renderPendingDraftField(group, field, confirmationState = null) {
         const inputId = this._buildPendingDraftInputId(group.operatorId, field.parameterName);
-        const label = this._escapeHtml(field.displayName || field.parameterName);
+        const labelText = getParameterDisplayName(field.parameterName, {
+            fallback: field.displayName || field.parameterName
+        });
+        const label = this._escapeHtml(labelText);
         const description = field.description
             ? `<div class="ai-parameter-field-desc">${this._escapeHtml(field.description)}</div>`
             : '';
@@ -305,7 +308,7 @@ export const aiPanelPendingParametersMixin = {
             <div class="ai-parameter-field ${field.isPendingPlaceholder ? 'is-placeholder' : ''}" data-pending-placeholder="${field.isPendingPlaceholder ? 'true' : 'false'}">
                 <label class="ai-parameter-field-label" for="${this._escapeHtml(inputId)}">
                     ${label}
-                    <span class="ai-parameter-field-key">${this._escapeHtml(field.parameterName)}</span>
+                    <span class="ai-parameter-field-key" title="${this._escapeHtml(field.parameterName)}">技术键</span>
                 </label>
                 ${controlHtml}
                 ${suggestionHtml}

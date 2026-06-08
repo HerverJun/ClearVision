@@ -6,11 +6,88 @@ export const OPERATOR_DISPLAY_NAMES = Object.freeze({
     MeasureDistance: '距离测量',
     ResultJudgment: '结果判定',
     ResultOutput: '结果输出',
+    SurfaceDefectDetection: '表面缺陷检测',
     ImageCompose: '图像合成',
     RoiManager: 'ROI管理',
     BlobAnalysis: '斑点分析',
     Thresholding: '阈值分割',
     Filtering: '滤波处理'
+});
+
+export const PARAMETER_DISPLAY_NAMES = Object.freeze({
+    ModelId: '模型资源',
+    ModelPath: '模型资源',
+    ModelCatalogPath: '模型资源',
+    TemplateId: '模板资源',
+    TemplatePath: '模板文件',
+    CameraId: '相机绑定',
+    CameraBindingId: '相机绑定',
+    SourceType: '采集源',
+    FilePath: '图像文件',
+    OutputChannelId: '输出通道',
+    Channel: '输出通道',
+    Unit: '测量单位',
+    PixelScale: '像素比例',
+    Tolerance: '容差阈值',
+    KernelSize: '滤波核尺寸',
+    Mode: '处理模式',
+    Rule: '判定规则',
+    Input: '输入端口',
+    Output: '输出端口'
+});
+
+export const RESOURCE_DISPLAY_NAMES = Object.freeze({
+    model: '模型资源',
+    model_resource: '模型资源',
+    ModelId: '模型资源',
+    ModelPath: '模型资源',
+    template: '模板资源',
+    template_artifact: '模板资源',
+    camera: '相机绑定',
+    camera_binding: '相机绑定',
+    output_channel: '输出通道',
+    plc: 'PLC 参数',
+    plc_parameter: 'PLC 参数',
+    missingResources: '缺失资源',
+    pendingActions: '待处理动作',
+    structuralValidation: '结构校验',
+    dryRun: '元数据预演',
+    deploymentPrecheck: '部署预检',
+    runtimePreview: '运行预演',
+    toolTrace: '工具轨迹',
+    operator_result_metadata: '算子结果元数据',
+    frame_metadata: '帧元数据',
+    artifact: '产物'
+});
+
+export const TOOL_DISPLAY_NAMES = Object.freeze({
+    validate_flow: '流程校验工具',
+    dry_run_flow: '元数据预演工具',
+    runtime_package_precheck: '运行包预检工具',
+    replay_flow_with_frame: '运行预演回放工具',
+    capture_test_frame: '测试帧采集工具'
+});
+
+export const STATUS_DISPLAY_NAMES = Object.freeze({
+    allowed: '允许',
+    denied: '拒绝',
+    ready: '就绪',
+    not_ready: '未就绪',
+    enabled: '启用',
+    disabled: '禁用',
+    success: '成功',
+    failed: '失败',
+    ok: '通过',
+    metadata_only: '仅元数据',
+    offline_runtime_preview: '离线元数据适配器',
+    pilot_runtime_preview: '试点预演适配器',
+    runtime_preview_camera_not_allowlisted: '运行预演相机未加入白名单',
+    runtime_preview_external_path_denied: '运行预演外部路径被拒绝',
+    offline_metadata_fallback_retained: '已保留离线元数据兜底',
+    'offline metadata fallback retained': '已保留离线元数据兜底',
+    RuntimePreviewPilotReadinessReview: '运行预演就绪复核',
+    ProvideModelPath: '补齐模型资源',
+    pending: '待处理'
 });
 
 export function getOperatorTypeDisplayName(operatorType, options = {}) {
@@ -25,4 +102,34 @@ export function getOperatorTypeDisplayName(operatorType, options = {}) {
     }
 
     return options.includeType === true ? `${displayName}（${rawType}）` : displayName;
+}
+
+export function getParameterDisplayName(parameterName, options = {}) {
+    return getMappedDisplayName(PARAMETER_DISPLAY_NAMES, parameterName, options);
+}
+
+export function getResourceDisplayName(resourceType, options = {}) {
+    return getMappedDisplayName(RESOURCE_DISPLAY_NAMES, resourceType, options);
+}
+
+export function getToolDisplayName(toolName, options = {}) {
+    return getMappedDisplayName(TOOL_DISPLAY_NAMES, toolName, options);
+}
+
+export function getStatusDisplayName(status, options = {}) {
+    return getMappedDisplayName(STATUS_DISPLAY_NAMES, status, options);
+}
+
+function getMappedDisplayName(map, value, options = {}) {
+    const rawValue = String(value || '').trim();
+    if (!rawValue) {
+        return options.fallback || '';
+    }
+
+    const displayName = map[rawValue] || map[rawValue.toLowerCase()] || '';
+    if (!displayName) {
+        return options.fallback || rawValue;
+    }
+
+    return options.includeType === true ? `${displayName}（${rawValue}）` : displayName;
 }

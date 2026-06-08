@@ -1,6 +1,33 @@
 
 import { renderRuntimePreviewSection } from './aiPanelRuntimePreview.js';
 import { normalizeAgentToolTrace, renderAgentToolTrace } from './aiPanelToolTrace.js';
+import {
+    getParameterDisplayName,
+    getResourceDisplayName,
+    getStatusDisplayName
+} from '../../shared/operatorDisplayNames.js';
+
+const PREVIEW_SECTION_LABELS = Object.freeze({
+    structuralValidation: '结构校验',
+    dryRun: '元数据预演',
+    deploymentPrecheck: '部署预检',
+    runtimePreview: '运行预演'
+});
+
+function formatBoolean(value) {
+    return value ? '是' : '否';
+}
+
+function formatCountLabel({ blocking, warnings, missing, executed, skipped, artifacts }) {
+    return [
+        blocking ? `${blocking} 项阻断` : '',
+        warnings ? `${warnings} 条警告` : '',
+        missing ? `${missing} 项缺失` : '',
+        executed ? `${executed} 个已执行` : '',
+        skipped ? `${skipped} 个已跳过` : '',
+        artifacts ? `${artifacts} 份产物` : ''
+    ].filter(Boolean).join(' · ') || '暂无问题';
+}
 
 export const aiPanelValidationPreviewMixin = {
     _getObjectValue(source, names) {
@@ -118,8 +145,11 @@ export const aiPanelValidationPreviewMixin = {
             <div class="ai-validation-issue ${cls}">
                 <span class="ai-validation-issue-icon">${icon}</span>
                 <div class="ai-validation-issue-body">
-                    <div class="ai-validation-issue-msg">${this._escapeHtml(item.message || item.code || '待处理项')}</div>
-                    ${(item.code || item.operatorId) ? `<div class="ai-validation-issue-meta">${this._escapeHtml([item.code, item.operatorId].filter(Boolean).join(' · '))}</div>` : ''}
+                    <div class="ai-validation-issue-msg">${this._escapeHtml(this._localizeDisplayText?.(item.message || item.code || '待处理项') || item.message || item.code || '待处理项')}</div>
+                    ${(item.code || item.operatorId) ? `<div class="ai-validation-issue-meta" title="${this._escapeHtml([item.code, item.operatorId].filter(Boolean).join(' · '))}">${this._escapeHtml([
+                        this._localizeDisplayText?.(item.code) || item.code,
+                        item.operatorId ? '关联算子' : ''
+                    ].filter(Boolean).join(' · '))}</div>` : ''}
                 </div>
             </div>
         `).join('');
@@ -145,14 +175,14 @@ export const aiPanelValidationPreviewMixin = {
         const stationTouched = this._getBooleanValue(section, ['stationTouched', 'StationTouched']);
         const adapterName = String(this._getObjectValue(section, ['adapterName', 'AdapterName']) ?? '').trim();
         const previewMode = String(this._getObjectValue(section, ['previewMode', 'PreviewMode']) ?? '').trim();
-        const countLabel = [
-            blocking.length ? `${blocking.length} blocking` : '',
-            warnings.length ? `${warnings.length} warning` : '',
-            missing.length ? `${missing.length} missing` : '',
-            executed.length ? `${executed.length} executed` : '',
-            skipped.length ? `${skipped.length} skipped` : '',
-            artifacts.length ? `${artifacts.length} artifact` : ''
-        ].filter(Boolean).join(' · ') || 'no issues';
+        const countLabel = formatCountLabel({
+            blocking: blocking.length,
+            warnings: warnings.length,
+            missing: missing.length,
+            executed: executed.length,
+            skipped: skipped.length,
+            artifacts: artifacts.length
+        });
 
         return `
             <details class="ai-agent-preview-section" data-validation-preview-section="${this._escapeHtml(sectionKey)}">
@@ -164,18 +194,18 @@ export const aiPanelValidationPreviewMixin = {
                 ${summary ? `<div class="ai-agent-preview-summary">${this._escapeHtml(summary)}</div>` : ''}
                 ${(readyForDeployment !== null || workflowDraftAllowed !== null || previewReady !== null || adapterName || previewMode) ? `
                     <div class="ai-agent-preview-state-row">
-                        ${readyForDeployment !== null ? `<span>readyForDeployment=${readyForDeployment ? 'true' : 'false'}</span>` : ''}
-                        ${workflowDraftAllowed !== null ? `<span>workflowDraftAllowed=${workflowDraftAllowed ? 'true' : 'false'}</span>` : ''}
-                        ${previewReady !== null ? `<span>previewReady=${previewReady ? 'true' : 'false'}</span>` : ''}
-                        ${adapterName ? `<span>adapterName=${this._escapeHtml(adapterName)}</span>` : ''}
-                        ${previewMode ? `<span>previewMode=${this._escapeHtml(previewMode)}</span>` : ''}
+                        ${readyForDeployment !== null ? `<span title="readyForDeployment=${readyForDeployment ? 'true' : 'false'}">部署就绪：${formatBoolean(readyForDeployment)}</span>` : ''}
+                        ${workflowDraftAllowed !== null ? `<span title="workflowDraftAllowed=${workflowDraftAllowed ? 'true' : 'false'}">草稿可编辑：${formatBoolean(workflowDraftAllowed)}</span>` : ''}
+                        ${previewReady !== null ? `<span title="previewReady=${previewReady ? 'true' : 'false'}">预演就绪：${formatBoolean(previewReady)}</span>` : ''}
+                        ${adapterName ? `<span title="adapterName=${this._escapeHtml(adapterName)}">适配器：${this._escapeHtml(getStatusDisplayName(adapterName, { fallback: '离线元数据适配器' }))}</span>` : ''}
+                        ${previewMode ? `<span title="previewMode=${this._escapeHtml(previewMode)}">预演模式：${this._escapeHtml(getStatusDisplayName(previewMode, { fallback: '仅元数据' }))}</span>` : ''}
                     </div>
                 ` : ''}
                 ${(deployed !== null || packageCreated !== null || stationTouched !== null) ? `
                     <div class="ai-agent-preview-state-row">
-                        ${deployed !== null ? `<span>deployed=${deployed ? 'true' : 'false'}</span>` : ''}
-                        ${packageCreated !== null ? `<span>packageCreated=${packageCreated ? 'true' : 'false'}</span>` : ''}
-                        ${stationTouched !== null ? `<span>stationTouched=${stationTouched ? 'true' : 'false'}</span>` : ''}
+                        ${deployed !== null ? `<span title="deployed=${deployed ? 'true' : 'false'}">已部署：${formatBoolean(deployed)}</span>` : ''}
+                        ${packageCreated !== null ? `<span title="packageCreated=${packageCreated ? 'true' : 'false'}">运行包：${packageCreated ? '已生成' : '未生成'}</span>` : ''}
+                        ${stationTouched !== null ? `<span title="stationTouched=${stationTouched ? 'true' : 'false'}">工站触达：${formatBoolean(stationTouched)}</span>` : ''}
                     </div>
                 ` : ''}
                 ${this._renderAgentPreviewIssueList(blocking, 'blocking')}
@@ -185,12 +215,12 @@ export const aiPanelValidationPreviewMixin = {
                     <div class="ai-agent-artifact-list">
                         ${artifacts.slice(0, 6).map(item => `
                             <div class="ai-agent-artifact-row">
-                                <span>${this._escapeHtml(String(item?.artifactType ?? item?.ArtifactType ?? 'artifact'))}</span>
-                                <small>${this._escapeHtml([
+                                <span title="${this._escapeHtml(String(item?.artifactType ?? item?.ArtifactType ?? 'artifact'))}">${this._escapeHtml(getResourceDisplayName(item?.artifactType ?? item?.ArtifactType ?? 'artifact'))}</span>
+                                <small title="${this._escapeHtml([
                                     item?.artifactId ?? item?.ArtifactId ?? '',
                                     `metadataOnly=${item?.metadataOnly ?? item?.MetadataOnly ?? true}`,
                                     `binaryIncluded=${item?.binaryIncluded ?? item?.BinaryIncluded ?? false}`
-                                ].filter(Boolean).join(' · '))}</small>
+                                ].filter(Boolean).join(' · '))}">${this._escapeHtml((item?.metadataOnly ?? item?.MetadataOnly ?? true) ? '仅元数据' : '含运行数据')}</small>
                             </div>
                         `).join('')}
                     </div>
@@ -220,19 +250,19 @@ export const aiPanelValidationPreviewMixin = {
                     data-agent-deployment-disabled="${deploymentState.deploymentActionsDisabled ? 'true' : 'false'}"
                     data-agent-workflow-edit-enabled="${deploymentState.workflowEditingAllowed ? 'true' : 'false'}"
                 >
-                    <span>deploymentActions=${deploymentState.deploymentActionsDisabled ? 'disabled' : 'enabled'}</span>
-                    <span>workflowEditing=${deploymentState.workflowEditingAllowed ? 'enabled' : 'disabled'}</span>
+                    <span title="deploymentActions=${deploymentState.deploymentActionsDisabled ? 'disabled' : 'enabled'}">部署操作：${deploymentState.deploymentActionsDisabled ? '禁用' : '启用'}</span>
+                    <span title="workflowEditing=${deploymentState.workflowEditingAllowed ? 'enabled' : 'disabled'}">画布编辑：${deploymentState.workflowEditingAllowed ? '启用' : '禁用'}</span>
                 </div>
-                ${this._renderAgentValidationPreviewSection('structuralValidation', 'structuralValidation', preview?.structuralValidation)}
-                ${this._renderAgentValidationPreviewSection('dryRun', 'dryRun', preview?.dryRun)}
-                ${this._renderAgentValidationPreviewSection('deploymentPrecheck', 'deploymentPrecheck', preview?.deploymentPrecheck)}
+                ${this._renderAgentValidationPreviewSection('structuralValidation', PREVIEW_SECTION_LABELS.structuralValidation, preview?.structuralValidation)}
+                ${this._renderAgentValidationPreviewSection('dryRun', PREVIEW_SECTION_LABELS.dryRun, preview?.dryRun)}
+                ${this._renderAgentValidationPreviewSection('deploymentPrecheck', PREVIEW_SECTION_LABELS.deploymentPrecheck, preview?.deploymentPrecheck)}
                 ${renderRuntimePreviewSection(this, preview?.runtimePreview)}
                 ${missingResources.length > 0 ? `
                     <div class="ai-agent-preview-section" data-agent-artifact="missingResources">
-                        <div class="ai-agent-preview-header"><span>missingResources</span><small>${missingResources.length}</small></div>
+                        <div class="ai-agent-preview-header"><span title="missingResources">缺失资源</span><small>${missingResources.length}</small></div>
                         ${missingResources.slice(0, 6).map(item => `
                             <div class="ai-agent-artifact-row">
-                                <span>${this._escapeHtml(item.resourceKey || item.parameterName || item.resourceType || 'missing')}</span>
+                                <span title="${this._escapeHtml(item.resourceKey || item.parameterName || item.resourceType || 'missing')}">${this._escapeHtml(getParameterDisplayName(item.parameterName, { fallback: getResourceDisplayName(item.resourceType, { fallback: '缺失资源' }) }))}</span>
                                 <small>${this._escapeHtml(item.description || item.operatorId || '')}</small>
                             </div>
                         `).join('')}
@@ -240,10 +270,10 @@ export const aiPanelValidationPreviewMixin = {
                 ` : ''}
                 ${pendingActions.length > 0 ? `
                     <div class="ai-agent-preview-section" data-agent-artifact="pendingActions">
-                        <div class="ai-agent-preview-header"><span>pendingActions</span><small>${pendingActions.length}</small></div>
+                        <div class="ai-agent-preview-header"><span title="pendingActions">待处理动作</span><small>${pendingActions.length}</small></div>
                         ${pendingActions.slice(0, 6).map(item => `
                             <div class="ai-agent-artifact-row">
-                                <span>${this._escapeHtml(item.actionType || 'pending')}</span>
+                                <span title="${this._escapeHtml(item.actionType || 'pending')}">${this._escapeHtml(getStatusDisplayName(item.actionType, { fallback: '待处理动作' }))}</span>
                                 <small>${this._escapeHtml(item.summary || item.resourceKey || [item.operatorId, item.parameterName].filter(Boolean).join('.'))}</small>
                             </div>
                         `).join('')}

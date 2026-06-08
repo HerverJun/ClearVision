@@ -252,7 +252,7 @@ export class AgentRunEventTransport {
             const terminalSeen = await this._replayRecentEvents();
             if (terminalSeen || this.closed) return true;
             if (this.replayFailureCount >= 3) {
-                this.panel._setAgentRunTransportStatus('已降级为 WebMessage', 'warning', '事件流不可用，等待后端最终结果回放。');
+                this.panel._setAgentRunTransportStatus('事件回放等待中', 'warning', '事件流不可用，正在等待后端回放完成。');
             }
             await this._delay(AGENT_RUN_REPLAY_INTERVAL_MS);
         }
@@ -522,7 +522,7 @@ export const aiPanelAgentRunMixin = {
         this.activeAgentRunEventSource = transport;
         transport.start().catch(error => {
             if (this.activeAgentRunTransport === transport && !this._isAgentRunTerminalSeen(runId)) {
-                this._setAgentRunTransportStatus('已降级为 WebMessage', 'warning', error?.message || '事件流不可用。');
+                this._setAgentRunTransportStatus('事件回放等待中', 'warning', error?.message || '事件流不可用，正在等待后端回放完成。');
             }
         });
         return transport;
@@ -663,8 +663,8 @@ export const aiPanelAgentRunMixin = {
         const stepId = this._getAgentRunStepId(evt);
         const stageLabel = this._getAgentRunStageLabel(evt.stage);
         const statusLabel = this._getAgentRunStatusLabel(evt.status);
-        const title = evt.title || stageLabel;
-        const summary = evt.summary || '';
+        const title = this._localizeDisplayText?.(evt.title || stageLabel) || evt.title || stageLabel;
+        const summary = this._localizeDisplayText?.(evt.summary || '') || evt.summary || '';
         const text = `${stageLabel} / ${statusLabel} / ${title}${summary && summary !== title ? `\n${summary}` : ''}`;
         const item = this._updateThinkingStep(evt.runId, stepId, text);
         if (!item) return;
@@ -682,6 +682,10 @@ export const aiPanelAgentRunMixin = {
         const toolName = this._payloadString(payload, 'toolName') ||
             this._payloadString(payload, 'name') ||
             this._deriveToolNameFromTitle(evt.title);
+        const toolLabel = this._formatToolName?.(toolName) ||
+            this._localizeDisplayText?.(toolName) ||
+            toolName ||
+            '视觉智能体工具';
         const toolKey = `${evt.runId}:${toolName || evt.sequence}`;
         this.agentRunToolMap = this.agentRunToolMap instanceof Map
             ? this.agentRunToolMap
@@ -708,16 +712,16 @@ export const aiPanelAgentRunMixin = {
         card.className = `ai-agent-run-tool-card is-${tone}`;
         card.innerHTML = `
             <div class="ai-agent-run-tool-header">
-                <span class="ai-agent-run-tool-name">${this._escapeHtml(toolName || '视觉智能体工具')}</span>
+                <span class="ai-agent-run-tool-name" title="${this._escapeHtml(toolName || '')}">${this._escapeHtml(toolLabel)}</span>
                 <span class="ai-agent-run-badge is-${tone}">${this._escapeHtml(this._getAgentRunStatusLabel(evt.status))}</span>
             </div>
-            <div class="ai-agent-run-tool-summary">${this._escapeHtml(resultSummary)}</div>
+            <div class="ai-agent-run-tool-summary">${this._escapeHtml(this._localizeDisplayText?.(resultSummary) || resultSummary)}</div>
             <div class="ai-agent-run-meta-row">
                 ${durationMs != null ? `<span>${this._escapeHtml(`${durationMs} ms`)}</span>` : ''}
-                ${reportId ? `<span>reportId ${this._escapeHtml(reportId)}</span>` : ''}
+                ${reportId ? `<span>报告 ${this._escapeHtml(reportId)}</span>` : ''}
             </div>
-            ${blockedReasons.length > 0 ? `<div class="ai-agent-run-blocked">${blockedReasons.map(reason => `<span>${this._escapeHtml(reason)}</span>`).join('')}</div>` : ''}
-            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>首要修复</span>${this._escapeHtml(firstFix)}</div>` : ''}
+            ${blockedReasons.length > 0 ? `<div class="ai-agent-run-blocked">${blockedReasons.map(reason => `<span>${this._escapeHtml(this._localizeDisplayText?.(reason) || reason)}</span>`).join('')}</div>` : ''}
+            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>首要修复</span>${this._escapeHtml(this._localizeDisplayText?.(firstFix) || firstFix)}</div>` : ''}
         `;
         this._scrollToBottom();
     },
@@ -750,13 +754,13 @@ export const aiPanelAgentRunMixin = {
         card.className = `ai-agent-run-artifact-card is-${tone}`;
         card.innerHTML = `
             <div class="ai-agent-run-artifact-title">
-                <span>${this._escapeHtml(evt.title || this._getAgentRunStageLabel(evt.stage))}</span>
+                <span>${this._escapeHtml(this._localizeDisplayText?.(evt.title || this._getAgentRunStageLabel(evt.stage)) || evt.title || this._getAgentRunStageLabel(evt.stage))}</span>
                 <span class="ai-agent-run-badge is-${tone}">${this._escapeHtml(this._getAgentRunStatusLabel(evt.status))}</span>
             </div>
-            <div class="ai-agent-run-artifact-summary">${this._escapeHtml(evt.summary || '已发布可回放的元数据报告事件。')}</div>
-            ${reportId ? `<div class="ai-agent-run-report-id">reportId ${this._escapeHtml(reportId)}</div>` : ''}
-            ${blockedReasons.length > 0 ? `<div class="ai-agent-run-blocked">${blockedReasons.map(reason => `<span>${this._escapeHtml(reason)}</span>`).join('')}</div>` : ''}
-            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>首要修复</span>${this._escapeHtml(firstFix)}</div>` : ''}
+            <div class="ai-agent-run-artifact-summary">${this._escapeHtml(this._localizeDisplayText?.(evt.summary || '') || evt.summary || '已发布可回放的元数据报告事件。')}</div>
+            ${reportId ? `<div class="ai-agent-run-report-id">报告 ${this._escapeHtml(reportId)}</div>` : ''}
+            ${blockedReasons.length > 0 ? `<div class="ai-agent-run-blocked">${blockedReasons.map(reason => `<span>${this._escapeHtml(this._localizeDisplayText?.(reason) || reason)}</span>`).join('')}</div>` : ''}
+            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>首要修复</span>${this._escapeHtml(this._localizeDisplayText?.(firstFix) || firstFix)}</div>` : ''}
         `;
         this._scrollToBottom();
     },
@@ -782,11 +786,17 @@ export const aiPanelAgentRunMixin = {
         this._setGeneratingState(false);
 
         if (evt.eventType === 'run.completed') {
-            this._applyAgentRunResultPayload?.(evt);
-            this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
-            this._setAssistantTurnStatus(this.activeAssistantTurn, '构建完成', 'success');
-            if (evt.summary) {
-                this._setResultStatusNote(evt.summary, 'info');
+            const applied = this._applyAgentRunResultPayload?.(evt) === true;
+            if (applied) {
+                this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
+                this._setAssistantTurnStatus(this.activeAssistantTurn, '构建完成', 'success');
+                if (evt.summary) {
+                    this._setResultStatusNote(this._localizeDisplayText?.(evt.summary) || evt.summary, 'info');
+                }
+            } else {
+                this._setWorkbenchState(AiWorkbenchStates.FAILED);
+                this._setAssistantTurnStatus(this.activeAssistantTurn, '构建完成但草稿缺失', 'warning');
+                this._setResultStatusNote('构建已结束，但没有收到可回放流程草稿；请重新构建或查看事件回放。', 'warning');
             }
         } else if (evt.eventType === 'run.cancelled') {
             this._setWorkbenchState(AiWorkbenchStates.CANCELLED);

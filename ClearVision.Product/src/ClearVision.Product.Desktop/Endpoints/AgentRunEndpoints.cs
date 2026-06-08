@@ -237,7 +237,7 @@ public static class AgentRunEndpoints
 
             if (result.Success)
             {
-                streamService.Complete(runId, "Vision Agent completed the metadata-only workflow draft run.", new
+                streamService.Complete(runId, "视觉智能体已完成仅元数据流程草稿构建。", new
                     {
                         status = result.CompletionStatus,
                         sessionId = result.SessionId,
@@ -280,9 +280,9 @@ public static class AgentRunEndpoints
 
             streamService.Fail(
                 runId,
-                result.ErrorMessage ?? result.FailureSummary?.Message ?? "Vision Agent run failed.",
+                result.ErrorMessage ?? result.FailureSummary?.Message ?? "视觉智能体运行失败。",
                 result.FailureSummary?.RepairTarget ??
-                "Review the public diagnostics, fix missing metadata or blocked intent, and retry.",
+                "请查看公开诊断，补齐缺失元数据或处理阻断意图后重试。",
                 new
                 {
                     status = result.CompletionStatus,
@@ -301,8 +301,8 @@ public static class AgentRunEndpoints
             logger.LogWarning(ex, "AgentRun GenerateFlow background task failed. RunId={RunId}", runId);
             streamService.Fail(
                 runId,
-                "Vision Agent run failed before completion.",
-                "Retry the request or inspect backend logs if the background task continues to fail.",
+                "视觉智能体在完成前失败。",
+                "请重试本轮请求；如果后台任务持续失败，再检查后端日志。",
                 new
                 {
                     error = ex.Message,

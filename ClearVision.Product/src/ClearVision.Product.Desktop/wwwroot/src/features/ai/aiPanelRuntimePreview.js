@@ -1,3 +1,8 @@
+import {
+    getResourceDisplayName,
+    getStatusDisplayName
+} from '../../shared/operatorDisplayNames.js';
+
 function readValue(source, names) {
     if (!source || typeof source !== 'object') {
         return undefined;
@@ -61,6 +66,29 @@ function normalizeArtifact(item) {
         binaryIncluded: readBoolean(item, ['binaryIncluded', 'BinaryIncluded']) === true,
         byteLength: Number(readValue(item, ['byteLength', 'ByteLength']) ?? 0) || 0
     };
+}
+
+function formatBool(value) {
+    return value ? '是' : '否';
+}
+
+function formatCountLabel(summary) {
+    return [
+        summary.blockingIssues.length ? `${summary.blockingIssues.length} 项阻断` : '',
+        summary.warnings.length ? `${summary.warnings.length} 条警告` : '',
+        summary.missingResources.length ? `${summary.missingResources.length} 项缺失` : '',
+        summary.pendingActions.length ? `${summary.pendingActions.length} 个动作` : '',
+        summary.readiness?.status ? `就绪：${getStatusDisplayName(summary.readiness.status, { fallback: summary.readiness.status })}` : '',
+        summary.artifacts.length ? `${summary.artifacts.length} 份产物` : ''
+    ].filter(Boolean).join(' / ') || '仅元数据';
+}
+
+function formatAdapterName(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (raw.includes('offline')) return '离线元数据适配器';
+    if (raw.includes('pilot')) return '试点预演适配器';
+    return getStatusDisplayName(raw, { fallback: '元数据适配器' });
 }
 
 function normalizePermissionDecision(item) {
@@ -190,18 +218,10 @@ export function renderRuntimePreviewSection(panel, runtimePreview) {
         return '';
     }
 
-    const countLabel = [
-        summary.blockingIssues.length ? `${summary.blockingIssues.length} blocking` : '',
-        summary.warnings.length ? `${summary.warnings.length} warning` : '',
-        summary.missingResources.length ? `${summary.missingResources.length} missing` : '',
-        summary.pendingActions.length ? `${summary.pendingActions.length} pending` : '',
-        summary.readiness?.status ? `readiness=${summary.readiness.status}` : '',
-        summary.artifacts.length ? `${summary.artifacts.length} artifact` : ''
-    ].filter(Boolean).join(' / ') || 'metadata-only';
-
+    const countLabel = formatCountLabel(summary);
     const permission = summary.permissionDecision.allowed === null
         ? ''
-        : `permission=${summary.permissionDecision.allowed ? 'allowed' : 'denied'}`;
+        : `权限：${summary.permissionDecision.allowed ? '允许' : '拒绝'}`;
     const traceText = [
         summary.resourceTrace.resourceType,
         summary.resourceTrace.reasonCode,
@@ -213,32 +233,32 @@ export function renderRuntimePreviewSection(panel, runtimePreview) {
     return `
         <details class="ai-agent-preview-section" data-validation-preview-section="runtimePreview">
             <summary class="ai-agent-preview-header">
-                <span>runtimePreview</span>
+                <span title="runtimePreview">运行预演</span>
                 <small>${panel._escapeHtml(countLabel)}</small>
             </summary>
             <div class="ai-agent-preview-body">
                 <div class="ai-agent-preview-state-row">
-                    ${summary.previewReady !== null ? `<span>previewReady=${summary.previewReady ? 'true' : 'false'}</span>` : ''}
-                    ${summary.adapterName ? `<span>adapterName=${panel._escapeHtml(summary.adapterName)}</span>` : ''}
-                    ${summary.previewMode ? `<span>previewMode=${panel._escapeHtml(summary.previewMode)}</span>` : ''}
-                    ${permission ? `<span>${panel._escapeHtml(permission)}</span>` : ''}
-                    ${summary.permissionDecision.reasonCode ? `<span>permissionReason=${panel._escapeHtml(summary.permissionDecision.reasonCode)}</span>` : ''}
-                    ${summary.fallback.used ? `<span>fallback=true</span>` : ''}
-                    ${summary.fallback.adapterName ? `<span>fallbackAdapterName=${panel._escapeHtml(summary.fallback.adapterName)}</span>` : ''}
-                    ${summary.fallback.reason ? `<span>fallbackReason=${panel._escapeHtml(summary.fallback.reason)}</span>` : ''}
-                    ${summary.fallback.errorCode ? `<span>errorCode=${panel._escapeHtml(summary.fallback.errorCode)}</span>` : ''}
+                    ${summary.previewReady !== null ? `<span title="previewReady=${summary.previewReady ? 'true' : 'false'}">预演就绪：${formatBool(summary.previewReady)}</span>` : ''}
+                    ${summary.adapterName ? `<span title="adapterName=${panel._escapeHtml(summary.adapterName)}">适配器：${panel._escapeHtml(formatAdapterName(summary.adapterName))}</span>` : ''}
+                    ${summary.previewMode ? `<span title="previewMode=${panel._escapeHtml(summary.previewMode)}">模式：${panel._escapeHtml(getStatusDisplayName(summary.previewMode, { fallback: '仅元数据' }))}</span>` : ''}
+                    ${permission ? `<span title="permission=${summary.permissionDecision.allowed ? 'allowed' : 'denied'}">${panel._escapeHtml(permission)}</span>` : ''}
+                    ${summary.permissionDecision.reasonCode ? `<span title="permissionReason=${panel._escapeHtml(summary.permissionDecision.reasonCode)}">权限原因：${panel._escapeHtml(getStatusDisplayName(summary.permissionDecision.reasonCode, { fallback: '需复核白名单' }))}</span>` : ''}
+                    ${summary.fallback.used ? `<span title="fallback=true">已使用离线兜底</span>` : ''}
+                    ${summary.fallback.adapterName ? `<span title="fallbackAdapterName=${panel._escapeHtml(summary.fallback.adapterName)}">兜底适配器：${panel._escapeHtml(formatAdapterName(summary.fallback.adapterName))}</span>` : ''}
+                    ${summary.fallback.reason ? `<span title="fallbackReason=${panel._escapeHtml(summary.fallback.reason)}">兜底原因：${panel._escapeHtml(getStatusDisplayName(summary.fallback.reason, { fallback: summary.fallback.reason }))}</span>` : ''}
+                    ${summary.fallback.errorCode ? `<span title="errorCode=${panel._escapeHtml(summary.fallback.errorCode)}">错误码：${panel._escapeHtml(getStatusDisplayName(summary.fallback.errorCode, { fallback: '预演权限受限' }))}</span>` : ''}
                 </div>
                 ${summary.readiness ? `
                     <div class="ai-agent-preview-state-row" data-runtime-preview-readiness="true">
-                        ${summary.readiness.status ? `<span>readiness=${panel._escapeHtml(summary.readiness.status)}</span>` : ''}
-                        ${summary.readiness.canRunMetadataPilot !== null ? `<span>canRunMetadataPilot=${summary.readiness.canRunMetadataPilot ? 'true' : 'false'}</span>` : ''}
-                        ${summary.readiness.workflowDraftAllowed !== null ? `<span>workflowDraftAllowed=${summary.readiness.workflowDraftAllowed ? 'true' : 'false'}</span>` : ''}
+                        ${summary.readiness.status ? `<span title="readiness=${panel._escapeHtml(summary.readiness.status)}">就绪状态：${panel._escapeHtml(getStatusDisplayName(summary.readiness.status, { fallback: summary.readiness.status }))}</span>` : ''}
+                        ${summary.readiness.canRunMetadataPilot !== null ? `<span title="canRunMetadataPilot=${summary.readiness.canRunMetadataPilot ? 'true' : 'false'}">元数据试点：${formatBool(summary.readiness.canRunMetadataPilot)}</span>` : ''}
+                        ${summary.readiness.workflowDraftAllowed !== null ? `<span title="workflowDraftAllowed=${summary.readiness.workflowDraftAllowed ? 'true' : 'false'}">草稿可编辑：${formatBool(summary.readiness.workflowDraftAllowed)}</span>` : ''}
                     </div>
                 ` : ''}
                 ${(traceText || summary.resourceTrace.allowed !== null) ? `
                     <div class="ai-agent-preview-state-row" data-runtime-preview-resource-trace="true">
-                        ${summary.resourceTrace.allowed !== null ? `<span>resourceAllowed=${summary.resourceTrace.allowed ? 'true' : 'false'}</span>` : ''}
-                        ${traceText ? `<span>resourceTrace=${panel._escapeHtml(traceText)}</span>` : ''}
+                        ${summary.resourceTrace.allowed !== null ? `<span title="resourceAllowed=${summary.resourceTrace.allowed ? 'true' : 'false'}">资源访问：${summary.resourceTrace.allowed ? '允许' : '拒绝'}</span>` : ''}
+                        ${traceText ? `<span title="resourceTrace=${panel._escapeHtml(traceText)}">资源轨迹：${panel._escapeHtml(getResourceDisplayName(summary.resourceTrace.resourceType, { fallback: '资源复核' }))}</span>` : ''}
                     </div>
                 ` : ''}
                 ${panel._renderAgentPreviewIssueList(summary.blockingIssues, 'blocking')}
@@ -253,7 +273,7 @@ export function renderRuntimePreviewSection(panel, runtimePreview) {
                     <div class="ai-agent-artifact-list" data-runtime-preview-pending-actions="true">
                         ${summary.pendingActions.slice(0, 6).map(item => `
                             <div class="ai-agent-artifact-row">
-                                <span>${panel._escapeHtml(item.actionType || 'pending')}</span>
+                                <span title="${panel._escapeHtml(item.actionType || 'pending')}">${panel._escapeHtml(getStatusDisplayName(item.actionType, { fallback: '待处理动作' }))}</span>
                                 <small>${panel._escapeHtml(item.summary || item.title || '')}</small>
                             </div>
                         `).join('')}
@@ -263,13 +283,13 @@ export function renderRuntimePreviewSection(panel, runtimePreview) {
                     <div class="ai-agent-artifact-list">
                         ${summary.artifacts.slice(0, 6).map(item => `
                             <div class="ai-agent-artifact-row">
-                                <span>${panel._escapeHtml(item.artifactType)}</span>
-                                <small>${panel._escapeHtml([
+                                <span title="${panel._escapeHtml(item.artifactType)}">${panel._escapeHtml(getResourceDisplayName(item.artifactType, { fallback: '元数据产物' }))}</span>
+                                <small title="${panel._escapeHtml([
                                     item.artifactId,
                                     `metadataOnly=${item.metadataOnly}`,
                                     `binaryIncluded=${item.binaryIncluded}`,
                                     `byteLength=${item.byteLength}`
-                                ].filter(Boolean).join(' / '))}</small>
+                                ].filter(Boolean).join(' / '))}">${panel._escapeHtml(item.metadataOnly ? '仅元数据' : '含运行数据')}</small>
                             </div>
                         `).join('')}
                     </div>

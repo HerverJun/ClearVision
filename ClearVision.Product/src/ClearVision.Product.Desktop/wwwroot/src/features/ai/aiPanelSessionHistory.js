@@ -222,6 +222,15 @@ export const aiPanelSessionHistoryMixin = {
             .reverse()
             .find(turn => (turn.role === 'assistant' || turn.role === 'ai') && turn.payload)?.payload ?? null;
         const followupSource = parsedAiFlow || parsedFlow;
+        const restoredBuildResult = latestAssistantPayload?.buildResult ?? latestAssistantPayload?.BuildResult ?? null;
+        const restoredWorkflowDiff = latestAssistantPayload?.workflowDiff ?? latestAssistantPayload?.WorkflowDiff ??
+            restoredBuildResult?.workflowDiff ?? restoredBuildResult?.WorkflowDiff ?? null;
+        const restoredApplyGate = latestAssistantPayload?.applyGate ?? latestAssistantPayload?.ApplyGate ??
+            restoredBuildResult?.applyGate ?? restoredBuildResult?.ApplyGate ?? null;
+        const restoredToolEvidence = latestAssistantPayload?.toolEvidenceTimeline ?? latestAssistantPayload?.ToolEvidenceTimeline ??
+            restoredBuildResult?.toolEvidenceTimeline ?? restoredBuildResult?.ToolEvidenceTimeline ?? [];
+        const restoredFirstFix = latestAssistantPayload?.firstFixRecommendation ?? latestAssistantPayload?.FirstFixRecommendation ??
+            restoredBuildResult?.firstFixRecommendation ?? restoredBuildResult?.FirstFixRecommendation ?? '';
         const restoredResult = {
             flow: canvasFlow || parsedFlow || null,
             aiExplanation: parsedAiFlow?.explanation || parsedAiFlow?.Explanation ||
@@ -244,6 +253,11 @@ export const aiPanelSessionHistoryMixin = {
             routerConfidence: latestAssistantPayload?.routerConfidence ?? latestAssistantPayload?.RouterConfidence ?? '',
             blockingClarificationFields: latestAssistantPayload?.blockingClarificationFields ?? latestAssistantPayload?.BlockingClarificationFields ?? [],
             nonBlockingMissingFields: latestAssistantPayload?.nonBlockingMissingFields ?? latestAssistantPayload?.NonBlockingMissingFields ?? [],
+            buildResult: restoredBuildResult,
+            workflowDiff: restoredWorkflowDiff,
+            applyGate: restoredApplyGate,
+            toolEvidenceTimeline: restoredToolEvidence,
+            firstFixRecommendation: restoredFirstFix,
             clarificationRequired: Boolean(
                 followupSource?.clarificationRequired ??
                 followupSource?.ClarificationRequired ??

@@ -1144,7 +1144,7 @@ test('Plan Mode captures vague inspection request without starting Build', async
   assert.match(overview.innerHTML, /规则兜底/);
   assert.match(plan.innerHTML, /关键问题/);
   assert.match(plan.innerHTML, /规则兜底/);
-  assert.match(plan.innerHTML, /Planner 生成失败/);
+  assert.match(plan.innerHTML, /模型规划失败/);
   assert.match(plan.innerHTML, /上下文收集完成/);
   assert.match(plan.innerHTML, /模型规划已开始/);
   assert.match(plan.innerHTML, /规划已就绪/);
@@ -1306,6 +1306,8 @@ test('BuildResult replay payload renders Build Workspace and apply gate without 
   assert.match(timelineHtml, /部署资源待绑定/);
   assert.match(timelineHtml, /15 ms/);
   assert.match(elements['#ai-build-operator-chain'].innerHTML, /表面缺陷检测/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /title="op_detect \/ SurfaceDefectDetection"/);
+  assert.doesNotMatch(elements['#ai-build-operator-chain'].innerHTML, />SurfaceDefectDetection</);
   assert.match(elements['#ai-build-operator-chain'].innerHTML, /模板骨架/);
   assert.match(elements['#ai-build-operator-chain'].innerHTML, /非法算子已修复/);
   assert.match(elements['#ai-build-parameters'].innerHTML, /模型资源/);
@@ -1324,7 +1326,7 @@ test('BuildResult replay payload renders Build Workspace and apply gate without 
     elements['#ai-build-parameters'].innerHTML,
     elements['#ai-build-checks'].innerHTML,
     elements['#ai-build-final-draft'].innerHTML
-  ].join('\n'), /Tool Evidence|Workflow Diff|Apply Gate|Editable draft ready|Canvas: ready|Runtime draft|Deployment: blocked|validate_schema_tool|deployment_resource_pending|SurfaceDefectDetection|template_skeleton|invalid operator was repaired|missing_resource \/ pending|model_resource metadata/);
+  ].join('\n'), /Tool Evidence|Workflow Diff|Apply Gate|Editable draft ready|Canvas: ready|Runtime draft|Deployment: blocked|validate_schema_tool|deployment_resource_pending|template_skeleton|invalid operator was repaired|missing_resource \/ pending|model_resource metadata|>SurfaceDefectDetection</);
   assertNoSensitiveLeak([
     timelineHtml,
     elements['#ai-build-operator-chain'].innerHTML,
@@ -1517,6 +1519,7 @@ test('AgentRun fetch stream is preferred and sends Authorization header', async 
           title: 'Run completed',
           summary: 'Done.',
           status: 'completed',
+          payload: buildResultContractPayload(),
           metadataOnly: true,
           redactionPass: true
         })
@@ -1532,7 +1535,7 @@ test('AgentRun fetch stream is preferred and sends Authorization header', async 
   assert.equal(requests[0].options.headers.Authorization, 'Bearer owner-token');
   assert.equal(requests.length, 1);
   assert.ok(requests.every(request => !request.url.includes('/stream-token')));
-  assert.match(collectProcessText(turn), /Fetch streamed before terminal/);
+  assert.match(collectProcessText(turn), /事件流已在终态前返回/);
   assert.equal(panel.activeAgentRunTransport, null);
   assert.equal(panel.isGenerating, false);
 });
@@ -1631,6 +1634,7 @@ test('AgentRun EventSource exists but failing connection falls back to replay mo
             title: 'Run completed',
             summary: 'Replay mode completed.',
             status: 'completed',
+            payload: buildResultContractPayload(),
             metadataOnly: true,
             redactionPass: true
           }
@@ -1647,7 +1651,7 @@ test('AgentRun EventSource exists but failing connection falls back to replay mo
     assert.match(eventSourceUrl, /streamToken=single-use-stream-ticket/);
     assert.equal(eventSourceClosed, true);
     assert.match(collectProcessText(turn), /\u5df2\u8fdb\u5165\u56de\u653e\u6a21\u5f0f/);
-    assert.match(collectProcessText(turn), /Replay mode completed/);
+    assert.match(collectProcessText(turn), /回放模式已完成/);
   } finally {
     global.ReadableStream = originalReadableStream;
   }
@@ -1697,8 +1701,8 @@ test('AgentRun stage events render public execution process steps', async () => 
   assert.equal(turn.processSection.hidden, false);
   assert.equal(turn.processBody.children.length, 1);
   const copy = turn.processBody.children[0].querySelector('.ai-agent-run-step-copy');
-  assert.match(copy.textContent, /Planner/);
-  assert.match(copy.textContent, /Building a public execution plan/);
+  assert.match(copy.textContent, /规划器已开始/);
+  assert.match(copy.textContent, /正在生成公开执行计划/);
 });
 
 test('AgentRun duplicate replay events are ignored by run sequence and type', async () => {
@@ -1755,7 +1759,7 @@ test('AgentRun tool events render tool name duration report and blocked reasons'
   assert.match(turn.toolsBody.children[0].innerHTML, /validate_flow/);
   assert.match(turn.toolsBody.children[0].innerHTML, /42 ms/);
   assert.match(turn.toolsBody.children[0].innerHTML, /agent-report-42/);
-  assert.match(turn.toolsBody.children[0].innerHTML, /missing threshold/);
+  assert.match(turn.toolsBody.children[0].innerHTML, /缺少阈值/);
 });
 
 test('AgentRun artifact events render report result cards', async () => {
@@ -1783,9 +1787,9 @@ test('AgentRun artifact events render report result cards', async () => {
 
   assert.equal(turn.artifactsSection.hidden, false);
   assert.equal(turn.artifactsBody.children.length, 1);
-  assert.match(turn.artifactsBody.children[0].innerHTML, /Release review completed/);
+  assert.match(turn.artifactsBody.children[0].innerHTML, /发布复核已完成/);
   assert.match(turn.artifactsBody.children[0].innerHTML, /release-review-1/);
-  assert.match(turn.artifactsBody.children[0].innerHTML, /No fix required/);
+  assert.match(turn.artifactsBody.children[0].innerHTML, /当前无需修复/);
 });
 
 test('AgentRun failed tool event displays first fix recommendation', async () => {
@@ -1854,6 +1858,7 @@ test('AgentRun terminal completed event closes source and releases generating st
   panel.activeAgentRunId = 'ar_done';
   panel.activeAgentRunTransport = { close: () => { closed = true; } };
   panel.isGenerating = true;
+  panel._displayResult = () => {};
 
   panel._handleAgentRunEvent({
     runId: 'ar_done',
@@ -1863,6 +1868,7 @@ test('AgentRun terminal completed event closes source and releases generating st
     title: 'Run completed',
     summary: 'Release review completed.',
     status: 'completed',
+    payload: buildResultContractPayload(),
     metadataOnly: true,
     redactionPass: true
   });
@@ -1871,7 +1877,35 @@ test('AgentRun terminal completed event closes source and releases generating st
   assert.equal(panel.activeAgentRunTransport, null);
   assert.equal(panel.isGenerating, false);
   assert.equal(turn.statusEl.textContent, '构建完成');
-  assert.equal(panel.lastResultStatusNote.text, 'Release review completed.');
+  assert.equal(panel.lastResultStatusNote.text, '发布复核已完成');
+});
+
+test('AgentRun completed without replayable draft does not mark workbench apply-ready', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  let closed = false;
+  panel.activeAgentRunId = 'ar_done_missing_payload';
+  panel.activeAgentRunTransport = { close: () => { closed = true; } };
+  panel.isGenerating = true;
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_done_missing_payload',
+    sequence: 9,
+    eventType: 'run.completed',
+    stage: 'run',
+    title: 'Run completed',
+    summary: 'Done.',
+    status: 'completed',
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(closed, true);
+  assert.equal(panel.isGenerating, false);
+  assert.equal(turn.statusEl.textContent, '构建完成但草稿缺失');
+  assert.equal(panel.lastWorkbenchState, 'failed');
+  assert.match(panel.lastResultStatusNote.text, /没有收到可回放流程草稿/);
 });
 
 test('AgentRun cancelled event sets cancelled UI state', async () => {
@@ -2167,8 +2201,10 @@ test('response mapping displays folded toolTrace summary only', async () => {
 
   assert.match(validation.innerHTML, /<details class="ai-agent-tool-trace"/);
   assert.doesNotMatch(validation.innerHTML, /<details class="ai-agent-tool-trace"[^>]*open/);
-  assert.match(validation.innerHTML, /validate_flow:Simulation:--:ok:12ms/);
-  assert.match(validation.innerHTML, /replay_flow_with_frame:RuntimePreview:offline_runtime_preview:ok:7ms/);
+  assert.match(validation.innerHTML, /工具轨迹/);
+  assert.match(validation.innerHTML, /流程校验工具 已通过 12ms/);
+  assert.match(validation.innerHTML, /运行预演回放工具 已通过 7ms/);
+  assert.doesNotMatch(validation.innerHTML, /validate_flow:Simulation/);
 });
 
 test('pendingParameters can locate operator parameter from missingResources', async () => {
@@ -2481,7 +2517,9 @@ test('AI pending parameter editor displays Chinese operator type metadata', asyn
 
   panel._renderParameterDraftEditor(response, response.flow);
 
-  assert.match(editor.innerHTML, /\u56fe\u50cf\u91c7\u96c6\uff08ImageAcquisition\uff09/);
+  assert.match(editor.innerHTML, /title="ImageAcquisition">\u56fe\u50cf\u91c7\u96c6/);
+  assert.match(editor.innerHTML, /title="FilePath">\u6280\u672f\u952e/);
+  assert.doesNotMatch(editor.innerHTML, /\u56fe\u50cf\u91c7\u96c6\uff08ImageAcquisition\uff09/);
 });
 
 test('PropertyPanel header displays Chinese operator type first', async () => {

@@ -173,22 +173,28 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            events.Add(Event("planning_with_model", "failed", "模型规划超时",
+                "模型规划超时，已使用规则兜底方案。",
+                new() { ["fallbackReason"] = "planner_timeout" }));
             return BuildFallback(
                 ruleBaseline,
                 "planner_timeout",
                 events,
-                "Planner 超时，已使用规则兜底方案。");
+                "模型规划超时，已使用规则兜底方案。");
         }
         catch (Exception ex)
         {
             _logger.LogWarning(
                 "Vision Agent Plan Planner failed; rule fallback will be used. Error={Error}",
                 ex.Message);
+            events.Add(Event("planning_with_model", "failed", "模型规划失败",
+                "模型规划失败，已使用规则兜底方案。",
+                new() { ["fallbackReason"] = "planner_failed" }));
             return BuildFallback(
                 ruleBaseline,
                 "planner_failed",
                 events,
-                "Planner 生成失败，已使用规则兜底方案。");
+                "模型规划失败，已使用规则兜底方案。");
         }
     }
 

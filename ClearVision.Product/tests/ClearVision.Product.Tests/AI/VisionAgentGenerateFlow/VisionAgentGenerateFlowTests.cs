@@ -366,7 +366,7 @@ public sealed class VisionAgentGenerateFlowTests
 
         result.Success.Should().BeFalse();
         result.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeSystemError);
-        result.ErrorMessage.Should().Contain("Vision Agent GenerateFlow failed");
+        result.ErrorMessage.Should().Contain("Vision Agent GenerateFlow 失败");
     }
 
     [Fact(DisplayName = "GenerateFlow response should map toolTrace pendingActions missingResources and validationPreview")]

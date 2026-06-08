@@ -12,7 +12,7 @@ public sealed class VisionAgentPlanPlannerOptions
 
     public bool AllowRuleFallback { get; set; } = true;
 
-    public int TimeoutSeconds { get; set; } = 30;
+    public int TimeoutSeconds { get; set; } = 120;
 
     public int MaxContextChars { get; set; } = 12_000;
 
@@ -21,7 +21,7 @@ public sealed class VisionAgentPlanPlannerOptions
     public VisionAgentPlanPlannerOptions Normalize()
     {
         ModelRole = AiModelConfig.NormalizeRoleName(ModelRole);
-        TimeoutSeconds = Math.Clamp(TimeoutSeconds, 3, 180);
+        TimeoutSeconds = Math.Clamp(TimeoutSeconds, 1, 180);
         MaxContextChars = Math.Clamp(MaxContextChars, 2_000, 48_000);
         MaxCompletionChars = Math.Clamp(MaxCompletionChars, 2_000, 256_000);
         return this;

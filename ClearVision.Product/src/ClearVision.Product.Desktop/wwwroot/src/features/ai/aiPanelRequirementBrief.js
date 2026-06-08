@@ -31,8 +31,8 @@ export const aiPanelRequirementBriefMixin = {
         this._updateRequirementModeUI();
 
         if (!silent) {
-            const label = normalized === 'draft' ? 'Build-ready draft' : 'Plan confirmation';
-            this._addMessage('system', `Plan state changed to ${label}.`);
+            const label = normalized === 'draft' ? '可直接构建草稿' : '先确认计划';
+            this._addMessage('system', `规划状态已切换为：${label}。`);
         }
     },
 
@@ -49,7 +49,7 @@ export const aiPanelRequirementBriefMixin = {
 
         if (tip) {
             tip.textContent = normalized === 'draft'
-                ? 'Build can continue from current assumptions while unresolved items stay visible as risks.'
+                ? '可按当前假设继续构建，未解决项会作为风险持续显示。'
                 : '规划模式会先确认阻断性工程字段，再进入构建。';
         }
     }

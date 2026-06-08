@@ -10,6 +10,14 @@ namespace ClearVision.Product.Tests.AI.VisionAgentPlanPlanner;
 
 public sealed class VisionAgentPlanPlannerTests
 {
+    [Fact(DisplayName = "Plan planner default timeout should align with model timeout budget")]
+    public void Options_ShouldDefaultToOneHundredTwentySeconds()
+    {
+        var options = new VisionAgentPlanPlannerOptions().Normalize();
+
+        options.TimeoutSeconds.Should().Be(120);
+    }
+
     [Theory(DisplayName = "Plan planner should return planner-sourced golden scenario questions")]
     [InlineData("帮我做一个金属表面划痕检测流程", "surface_defect", "defect_morphology", "SurfaceDefectDetection")]
     [InlineData("做一个线序检测流程", "wire_sequence", "sequence_rule", "DeepLearning")]
@@ -68,8 +76,43 @@ public sealed class VisionAgentPlanPlannerTests
 
         result.PlanSource.Should().Be("rule_fallback");
         result.FallbackReason.Should().Be("planner_failed");
-        result.PlanWarnings.Should().Contain(item => item.Contains("规则兜底", StringComparison.OrdinalIgnoreCase));
+        result.PlanWarnings.Should().Contain("模型规划失败，已使用规则兜底方案。");
+        result.PublicEvents.Should().Contain(evt =>
+            evt.Stage == "planning_with_model" &&
+            evt.Status == "failed" &&
+            evt.Summary.Contains("模型规划失败", StringComparison.Ordinal));
         result.PublicEvents.Should().Contain(evt => evt.Stage == "rule_fallback_used");
+        result.MetadataOnly.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Plan planner short timeout should return Chinese timeout fallback")]
+    public async Task CreatePlanAsync_ShouldFallbackWhenPlannerTimesOut()
+    {
+        var service = CreateService(
+            (_, token) => Task.Delay(TimeSpan.FromSeconds(5), token).ContinueWith(
+                _ => PlannerPlanJson(
+                    "surface_defect",
+                    "defect_morphology",
+                    OperatorsFor("surface_defect")),
+                token),
+            new VisionAgentPlanPlannerOptions { Enabled = true, TimeoutSeconds = 1 });
+        var baseline = Baseline("scratch", "surface_defect");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "scratch" },
+            baseline,
+            CancellationToken.None);
+
+        result.PlanSource.Should().Be("rule_fallback");
+        result.FallbackReason.Should().Be("planner_timeout");
+        result.PlanWarnings.Should().Contain("模型规划超时，已使用规则兜底方案。");
+        result.PublicEvents.Should().Contain(evt =>
+            evt.Stage == "planning_with_model" &&
+            evt.Status == "failed" &&
+            evt.Summary.Contains("模型规划超时", StringComparison.Ordinal));
+        result.PublicEvents.Should().Contain(evt =>
+            evt.Stage == "rule_fallback_used" &&
+            evt.Summary.Contains("模型规划超时", StringComparison.Ordinal));
         result.MetadataOnly.Should().BeTrue();
     }
 
@@ -166,10 +209,19 @@ public sealed class VisionAgentPlanPlannerTests
     private static VisionAgentPlanPlannerService CreateService(
         Func<VisionAgentPlanCompletionRequest, string> completion)
     {
+        return CreateService(
+            (request, _) => Task.FromResult(completion(request)),
+            new VisionAgentPlanPlannerOptions { Enabled = true });
+    }
+
+    private static VisionAgentPlanPlannerService CreateService(
+        Func<VisionAgentPlanCompletionRequest, CancellationToken, Task<string>> completion,
+        VisionAgentPlanPlannerOptions options)
+    {
         return new VisionAgentPlanPlannerService(
             new DelegatePlanCompletionSource(completion),
             new VisionAgentPlanPromptComposer(),
-            Options.Create(new VisionAgentPlanPlannerOptions { Enabled = true }),
+            Options.Create(options),
             NullLogger<VisionAgentPlanPlannerService>.Instance);
     }
 
@@ -374,9 +426,10 @@ public sealed class VisionAgentPlanPlannerTests
 
     private sealed class DelegatePlanCompletionSource : IVisionAgentPlanCompletionSource
     {
-        private readonly Func<VisionAgentPlanCompletionRequest, string> _completion;
+        private readonly Func<VisionAgentPlanCompletionRequest, CancellationToken, Task<string>> _completion;
 
-        public DelegatePlanCompletionSource(Func<VisionAgentPlanCompletionRequest, string> completion)
+        public DelegatePlanCompletionSource(
+            Func<VisionAgentPlanCompletionRequest, CancellationToken, Task<string>> completion)
         {
             _completion = completion;
         }
@@ -386,7 +439,7 @@ public sealed class VisionAgentPlanPlannerTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(_completion(request));
+            return _completion(request, cancellationToken);
         }
     }
 }

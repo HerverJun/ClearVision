@@ -44,6 +44,11 @@ public sealed class ConversationTurnPayload
     public AiManualRetryInfo? ManualRetry { get; set; }
     public bool ClarificationRequired { get; set; }
     public AiRequirementBrief? RequirementBrief { get; set; }
+    public object? BuildResult { get; set; }
+    public object? WorkflowDiff { get; set; }
+    public object? ApplyGate { get; set; }
+    public object? ToolEvidenceTimeline { get; set; }
+    public string? FirstFixRecommendation { get; set; }
 }
 
 public sealed class ConversationTurnFailurePayload
@@ -649,8 +654,22 @@ public class ConversationalFlowService : IConversationalFlowService
             Failure = CloneTurnFailurePayload(payload.Failure),
             ManualRetry = CloneManualRetry(payload.ManualRetry),
             ClarificationRequired = payload.ClarificationRequired,
-            RequirementBrief = CloneRequirementBrief(payload.RequirementBrief)
+            RequirementBrief = CloneRequirementBrief(payload.RequirementBrief),
+            BuildResult = CloneJsonObject(payload.BuildResult),
+            WorkflowDiff = CloneJsonObject(payload.WorkflowDiff),
+            ApplyGate = CloneJsonObject(payload.ApplyGate),
+            ToolEvidenceTimeline = CloneJsonObject(payload.ToolEvidenceTimeline),
+            FirstFixRecommendation = payload.FirstFixRecommendation
         };
+    }
+
+    private static object? CloneJsonObject(object? value)
+    {
+        if (value == null)
+            return null;
+
+        var json = JsonSerializer.Serialize(value, _jsonOptions);
+        return JsonSerializer.Deserialize<JsonElement>(json, _jsonOptions);
     }
 
     private static ConversationTurnFailurePayload? CloneTurnFailurePayload(ConversationTurnFailurePayload? failure)

@@ -1,3 +1,5 @@
+import { getOperatorTypeDisplayName } from '../../shared/operatorDisplayNames.js';
+
 export const aiPanelTopologySummaryMixin = {
     _extractTopologySummary(flow) {
         if (!flow) return '';

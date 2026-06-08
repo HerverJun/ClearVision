@@ -105,12 +105,36 @@ const AI_DISPLAY_TEXT_MAP = {
     'Rule fallback used': '已启用规则兜底',
     'Fallback plan ready': '兜底规划已就绪',
     'Rule fallback PlanModeResult is ready for user confirmation.': '规则兜底规划已就绪，等待用户确认。',
-    'Planner completion is disabled; using rule fallback plan.': 'Planner 生成未启用，已使用规则兜底方案。',
-    'Planner failed contract generation; using rule fallback plan.': 'Planner 生成失败，已使用规则兜底方案。',
-    'Planner timed out; using rule fallback plan.': 'Planner 超时，已使用规则兜底方案。',
+    'Planner completion is disabled; using rule fallback plan.': '模型规划未启用，已使用规则兜底方案。',
+    'Planner failed contract generation; using rule fallback plan.': '模型规划失败，已使用规则兜底方案。',
+    'Planner timed out; using rule fallback plan.': '模型规划超时，已使用规则兜底方案。',
+    '模型规划超时，已使用规则兜底方案。': '模型规划超时，已使用规则兜底方案。',
     'Plan ready': '规划已就绪',
     'Planner started': '规划器已开始',
     'Planning with model': '模型规划中',
+    'Building a public execution plan.': '正在生成公开执行计划。',
+    'Fetch streamed before terminal.': '事件流已在终态前返回。',
+    'Replay completed.': '回放已完成。',
+    'Replay mode completed.': '回放模式已完成。',
+    'Already rendered.': '已渲染。',
+    'Done.': '已完成。',
+    'Tool completed: validate_flow': '工具完成：流程校验',
+    'Release review completed': '发布复核已完成',
+    'Release review completed.': '发布复核已完成',
+    'Metadata-only release review passed.': '仅元数据发布复核已通过。',
+    'No fix required.': '当前无需修复。',
+    'missing threshold': '缺少阈值',
+    'Stub dryrun completed.': '元数据预演已完成。',
+    'Review readiness': '复核运行预演就绪条件。',
+    'not allowlisted': '未加入白名单。',
+    'offline metadata fallback retained': '已保留离线元数据兜底。',
+    'RuntimePreviewPilotReadinessReview': '运行预演就绪复核',
+    'ProvideModelPath': '补齐模型资源',
+    'offline_runtime_preview': '离线元数据适配器',
+    'pilot_runtime_preview': '试点预演适配器',
+    'metadata_only': '仅元数据',
+    'runtime_preview_camera_not_allowlisted': '运行预演相机未加入白名单',
+    'runtime_preview_external_path_denied': '运行预演外部路径被拒绝',
     'Planner model is generating a structured PlanModeResult candidate.': '模型正在生成结构化规划候选。',
     'Planner candidate returned': '模型规划候选已返回',
     'Planner returned a public structured candidate for validation.': '模型已返回公开结构化候选，等待校验。',
@@ -120,7 +144,7 @@ const AI_DISPLAY_TEXT_MAP = {
     'Planner plan was normalized to the public PlanModeResult contract.': '模型规划已归一到公开 PlanModeResult 契约。',
     'Safety constraints applied': '安全约束已应用',
     'Redaction, metadata-only boundaries, resource placeholders, and PLC safety policy were applied.': '已应用脱敏、元数据边界、资源占位和 PLC 安全策略。',
-    'Planner-sourced PlanModeResult is ready for user confirmation.': 'Planner 规划已就绪，等待用户确认。',
+    'Planner-sourced PlanModeResult is ready for user confirmation.': '模型规划已就绪，等待用户确认。',
     'Run completed': '运行已完成',
     'Build completed.': '构建完成。',
     'Build completed with public metadata.': '已使用公开元数据完成构建。',
@@ -141,13 +165,13 @@ const AI_DISPLAY_TEXT_MAP = {
 const AI_CODE_TEXT_MAP = {
     rule_fallback: '规则兜底',
     rule_baseline: '规则基线',
-    planner: 'Planner 规划',
+    planner: '模型规划',
     model_planner: '模型规划',
     llm_planner: '模型规划',
     backend_planner: '后端规划',
-    planner_failed: 'Planner 生成失败，已使用规则兜底方案',
-    planner_disabled: 'Planner 未启用，已使用规则兜底方案',
-    planner_timeout: 'Planner 超时，已使用规则兜底方案',
+    planner_failed: '模型规划失败，已使用规则兜底方案',
+    planner_disabled: '模型规划未启用，已使用规则兜底方案',
+    planner_timeout: '模型规划超时，已使用规则兜底方案',
     contract_repaired: '契约已修复',
     high: '高',
     medium: '中',
@@ -305,7 +329,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._clearActivePlanRequest(planRequestId);
                 const sourceLabel = this.pendingVisionPlan.planSource === 'rule_fallback'
                     ? `规划已生成（规则兜底：${this.pendingVisionPlan.fallbackReason || '已使用规则兜底方案'}）`
-                    : '规划已生成（Planner）';
+                    : '规划已生成（模型规划）';
                 this._setAssistantTurnStatus(turn, '规划完成', 'success');
                 this._setAssistantSectionText(
                     turn,
@@ -624,6 +648,8 @@ export const aiPanelAgentWorkspaceMixin = {
         const normalized = text.toLowerCase();
         const map = {
             match_flow_template: '模板匹配',
+            validate_flow: '流程校验',
+            replay_flow_with_frame: '离线回放',
             get_flow_template_skeleton: '获取模板骨架',
             select_operator_pipeline: '选择算子链',
             map_parameters: '参数映射',
@@ -796,7 +822,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-plan-route">
                     <strong>${this._escapeHtml(plan.route.title)}</strong>
                     <span>${this._escapeHtml(plan.route.summary)}</span>
-                    <div class="ai-plan-chain">${plan.route.operators.map(op => `<span title="${this._escapeHtml(this._formatOperatorType(op))}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>
+                    <div class="ai-plan-chain">${plan.route.operators.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>
                 </div>
             </section>
             <section class="ai-workspace-section">
@@ -804,9 +830,9 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-build-compact">
                     <div class="ai-build-compact-row">
                         <b>${this._escapeHtml(this._formatPlanSource(plan.planSource))}</b>
-                        <span>${this._escapeHtml(plan.planHash || '计划哈希待生成')}</span>
+                        <span class="ai-plan-tech-code">${this._escapeHtml(plan.planHash || '计划哈希待生成')}</span>
                     </div>
-                    ${plan.fallbackReason ? `<div class="ai-build-note">${this._escapeHtml(plan.fallbackReason)}</div>` : ''}
+                    ${plan.fallbackReason ? `<div class="ai-build-note"><strong>兜底原因</strong>${this._escapeHtml(plan.fallbackReason)}</div>` : ''}
                     ${plan.planWarnings.length ? `<ul>${plan.planWarnings.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>` : ''}
                     ${plan.contractRepairNotes.length ? `<div class="ai-plan-chain">${plan.contractRepairNotes.map(item => `<span>${this._escapeHtml(item)}</span>`).join('')}</div>` : ''}
                     ${plan.publicEvents.length ? `<div class="ai-workspace-list">${plan.publicEvents.map(evt => {
@@ -1212,21 +1238,27 @@ export const aiPanelAgentWorkspaceMixin = {
         if (pipeline.length) {
             return `
                 <div class="ai-plan-chain">
-                    ${pipeline.map(item => `<span title="${this._escapeHtml([
+                    ${pipeline.map(item => {
+                        const rawType = item.operatorType || item.OperatorType || '';
+                        return `<span title="${this._escapeHtml([
+                        rawType,
                         this._localizeDisplayText(item.source || item.Source || ''),
                         this._localizeDisplayText(item.repairNote || item.RepairNote || ''),
                         this._formatBuildStatus(item.status || item.Status || '')
-                    ].filter(Boolean).join(' / '))}">${this._escapeHtml(this._formatOperatorType(item.operatorType || item.OperatorType || ''))}</span>`).join('')}
+                    ].filter(Boolean).join(' / '))}">${this._escapeHtml(this._formatOperatorType(rawType))}</span>`;
+                    }).join('')}
                 </div>
                 ${pipeline.slice(0, 8).map(item => {
                     const source = item.source || item.Source || 'plan';
                     const repair = item.repairNote || item.RepairNote || '';
                     const status = item.status || item.Status || '';
+                    const rawType = item.operatorType || item.OperatorType || '';
+                    const tempId = item.tempId || item.TempId || '';
                     return `
-                        <div class="ai-build-compact-row">
-                            <b>${this._escapeHtml(item.tempId || item.TempId || this._formatOperatorType(item.operatorType || item.OperatorType || '') || '')}</b>
+                        <div class="ai-build-compact-row" title="${this._escapeHtml([tempId, rawType].filter(Boolean).join(' / '))}">
+                            <b>${this._escapeHtml(this._formatOperatorType(rawType) || '算子')}</b>
                             <span>${this._escapeHtml(this._localizeDisplayText(source))}${status ? ` / ${this._escapeHtml(this._formatBuildStatus(status))}` : ''}</span>
-                            ${repair ? `<small>${this._escapeHtml(this._localizeDisplayText(repair))}</small>` : ''}
+                            ${tempId || repair ? `<small>${this._escapeHtml([tempId ? `节点 ${tempId}` : '', repair ? this._localizeDisplayText(repair) : ''].filter(Boolean).join(' / '))}</small>` : ''}
                         </div>
                     `;
                 }).join('')}
@@ -1243,10 +1275,10 @@ export const aiPanelAgentWorkspaceMixin = {
             if (!planOps.length) {
                 return '<div class="ai-followup-empty">流程草稿生成后会显示算子链。</div>';
             }
-            return `<div class="ai-plan-chain">${planOps.map(op => `<span title="${this._escapeHtml(this._formatOperatorType(op))}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
+            return `<div class="ai-plan-chain">${planOps.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
         }
 
-        return `<div class="ai-plan-chain">${operatorTypes.map(op => `<span title="${this._escapeHtml(this._formatOperatorType(op))}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
+        return `<div class="ai-plan-chain">${operatorTypes.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`;
     },
 
     _renderBuildParameterSummary(events) {
@@ -1407,7 +1439,14 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _getBuildResult(events = this.activeAgentRunEvents) {
         const payload = this._getAgentRunResultPayload(events);
-        return this._getPayloadBuildResult(payload) || this._getPayloadBuildResult(this.currentResult);
+        const buildResult = this._getPayloadBuildResult(payload);
+        if (buildResult) {
+            return buildResult;
+        }
+
+        return Array.isArray(events) && events.length > 0
+            ? null
+            : this._getPayloadBuildResult(this.currentResult);
     },
 
     _applyAgentRunResultPayload(evt) {
@@ -1691,7 +1730,7 @@ export const aiPanelAgentWorkspaceMixin = {
             return {
                 tempId,
                 operatorType,
-                displayName: operatorType,
+                displayName: this._formatOperatorType(operatorType) || operatorType,
                 parameters
             };
         });

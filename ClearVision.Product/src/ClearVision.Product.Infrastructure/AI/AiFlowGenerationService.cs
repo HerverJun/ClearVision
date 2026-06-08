@@ -115,27 +115,28 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         {
             try
             {
-                ReportProgress("Vision Agent controlled GenerateFlow mode is enabled.");
+                ReportProgress("视觉智能体受控构建模式已启用。");
                 if (_agentGenerateFlowService == null)
                 {
-                    throw new InvalidOperationException("Vision Agent GenerateFlow service is not registered.");
+                    throw new InvalidOperationException("视觉智能体 GenerateFlow 服务未注册。");
                 }
 
                 var agentResult = await _agentGenerateFlowService.GenerateFlowAsync(request, cancellationToken);
                 if (agentResult.Success || !_agentGenerateFlowOptions.FallbackToLegacyOnFailure)
                 {
+                    TryPersistAgentGenerateFlowResult(request, agentResult, progressMessages);
                     return agentResult;
                 }
 
                 _logger.LogWarning(
                     "Vision Agent GenerateFlow failed and will fall back to legacy GenerateFlow. Error={Error}",
                     agentResult.ErrorMessage);
-                ReportProgress("Vision Agent controlled mode failed; falling back to legacy GenerateFlow.");
+                ReportProgress("视觉智能体受控模式失败，已切换旧版 GenerateFlow。");
             }
             catch (Exception ex) when (_agentGenerateFlowOptions.FallbackToLegacyOnFailure)
             {
                 _logger.LogWarning(ex, "Vision Agent GenerateFlow failed and will fall back to legacy GenerateFlow.");
-                ReportProgress("Vision Agent controlled mode failed; falling back to legacy GenerateFlow.");
+                ReportProgress("视觉智能体受控模式失败，已切换旧版 GenerateFlow。");
             }
             catch (Exception ex)
             {
@@ -145,13 +146,13 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     Success = false,
                     CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
                     FailureType = AiFlowGenerationResult.FailureTypeSystemError,
-                    ErrorMessage = $"Vision Agent GenerateFlow failed: {ex.Message}",
+                    ErrorMessage = $"Vision Agent GenerateFlow 失败：{ex.Message}",
                     FailureSummary = new AiFailureSummary
                     {
                         Category = "vision_agent",
                         Code = "controlled_agent_generate_flow_failed",
-                        Message = $"Vision Agent GenerateFlow failed: {ex.Message}",
-                        RepairTarget = "Disable Agent mode or retry with legacy GenerateFlow."
+                        Message = $"Vision Agent GenerateFlow 失败：{ex.Message}",
+                        RepairTarget = "请切换旧版 GenerateFlow，或稍后重试。"
                     },
                     InteractionState = AiInteractionStates.Failed,
                     TurnIntent = AiTurnIntents.NewFlow,
@@ -725,7 +726,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                     : AiFlowGenerationResult.CompletionStatusTimedOut;
                 var errorMessage = wasUserCancelled
                     ? "用户已取消本次生成。"
-                    : "AI generation timed out. Please retry.";
+                    : "AI 生成超时，请稍后重试。";
                 var cancelledValidation = new AiValidationResult();
                 cancelledValidation.AddError(
                     errorMessage,
@@ -917,6 +918,73 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     {
         return _agentGenerateFlowOptions.Enabled &&
                request.UseVisionAgentGenerateFlow;
+    }
+
+    private void PersistAgentGenerateFlowResult(
+        AiFlowGenerationRequest request,
+        AiFlowGenerationResult result,
+        IReadOnlyList<string> progressMessages)
+    {
+        var session = _conversationalFlowService.GetOrCreateSession(request.SessionId);
+        result.SessionId = session.SessionId;
+
+        var assistantMessage = result.Success
+            ? result.AiExplanation ?? "视觉智能体已完成仅元数据流程草稿构建。"
+            : result.ErrorMessage ?? result.FailureSummary?.Message ?? "视觉智能体运行失败。";
+        var flowJson = result.Flow == null ? null : JsonSerializer.Serialize(result.Flow, _jsonOptions);
+        var buildResult = result.BuildResult;
+        var payload = new ConversationTurnPayload
+        {
+            Kind = result.Success ? "assistant_agent_result" : "assistant_agent_failure",
+            Status = result.CompletionStatus,
+            InteractionState = result.InteractionState,
+            TurnIntent = result.TurnIntent,
+            RouterConfidence = result.RouterConfidence,
+            Reply = result.Success ? assistantMessage : null,
+            Reasoning = null,
+            Progress = progressMessages.Where(item => !string.IsNullOrWhiteSpace(item)).ToList(),
+            ClarificationRequired = result.ClarificationRequired,
+            RequirementBrief = result.RequirementBrief,
+            BuildResult = buildResult,
+            WorkflowDiff = buildResult?.WorkflowDiff,
+            ApplyGate = buildResult?.ApplyGate,
+            ToolEvidenceTimeline = buildResult?.ToolEvidenceTimeline,
+            FirstFixRecommendation = buildResult?.FirstFixRecommendation,
+            BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
+            NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
+            Failure = result.Success || result.FailureSummary == null
+                ? null
+                : new ConversationTurnFailurePayload
+                {
+                    Summary = assistantMessage,
+                    FailureSummary = CloneFailureSummary(result.FailureSummary),
+                    Diagnostics = result.LastAttemptDiagnostics.Select(CloneAttemptDiagnostic).ToList()
+                }
+        };
+
+        _conversationalFlowService.RecordAssistantResponse(
+            session.SessionId,
+            assistantMessage,
+            flowJson,
+            flowJson,
+            payload);
+    }
+
+    private void TryPersistAgentGenerateFlowResult(
+        AiFlowGenerationRequest request,
+        AiFlowGenerationResult result,
+        IReadOnlyList<string> progressMessages)
+    {
+        try
+        {
+            PersistAgentGenerateFlowResult(request, result, progressMessages);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Vision Agent GenerateFlow result persistence failed; returning agent result without legacy fallback.");
+        }
     }
 
     private static GenerateFlowMode ResolveEffectiveMode(
@@ -3725,6 +3793,19 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             TargetTempId = source.TargetTempId,
             TargetPortName = source.TargetPortName,
             RepairHint = source.RepairHint
+        };
+    }
+
+    private static AiFailureSummary CloneFailureSummary(AiFailureSummary source)
+    {
+        return new AiFailureSummary
+        {
+            Category = source.Category,
+            Code = source.Code,
+            Message = source.Message,
+            RepairTarget = source.RepairTarget,
+            RetryCount = source.RetryCount,
+            LastOutputSummary = source.LastOutputSummary
         };
     }
 

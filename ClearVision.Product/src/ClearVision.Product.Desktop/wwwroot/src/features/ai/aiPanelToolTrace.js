@@ -31,25 +31,29 @@ export function renderAgentToolTrace(panel, toolTrace) {
     }
 
     const toolSummary = toolTrace
-        .map(item => `${item.toolName}:${item.permission || '--'}:${item.adapterName || '--'}:${item.success ? 'ok' : 'failed'}:${item.durationMs}ms${item.errorCode ? `:${item.errorCode}` : ''}${item.permissionReason ? `:${item.permissionReason}` : ''}`)
-        .join(' | ');
+        .map(item => `${getToolDisplayName(item.toolName, { fallback: '工具' })} ${item.success ? '已通过' : '失败'} ${item.durationMs}ms`)
+        .join(' · ');
 
     return `
         <details class="ai-agent-tool-trace" data-agent-artifact="toolTrace">
-            <summary>toolTrace (${toolTrace.length}) ${panel._escapeHtml(toolSummary)}</summary>
+            <summary title="${panel._escapeHtml(toolTrace.map(item => item.toolName).join(' | '))}">工具轨迹（${toolTrace.length}）${panel._escapeHtml(toolSummary ? ` ${toolSummary}` : '')}</summary>
             <div class="ai-agent-tool-trace-list">
                 ${toolTrace.map(item => `
                     <div class="ai-agent-tool-trace-row">
-                        <span>${panel._escapeHtml(item.toolName)}</span>
-                        <span>${panel._escapeHtml(item.permission || '--')}</span>
-                        <span>${panel._escapeHtml(item.adapterName || '--')}</span>
-                        <span>${item.success ? 'success' : 'failed'}</span>
+                        <span title="${panel._escapeHtml(item.toolName)}">${panel._escapeHtml(getToolDisplayName(item.toolName, { fallback: item.toolName }))}</span>
+                        <span title="${panel._escapeHtml(item.permission || '--')}">${panel._escapeHtml(getStatusDisplayName(item.permission, { fallback: item.permission || '--' }))}</span>
+                        <span title="${panel._escapeHtml(item.adapterName || '--')}">${panel._escapeHtml(getStatusDisplayName(item.adapterName, { fallback: item.adapterName ? '元数据适配器' : '--' }))}</span>
+                        <span title="${item.success ? 'success' : 'failed'}">${item.success ? '成功' : '失败'}</span>
                         <span>${panel._escapeHtml(String(item.durationMs))}ms</span>
-                        <span>${panel._escapeHtml(item.errorCode || '--')}</span>
-                        <span>${panel._escapeHtml(item.permissionReason || '--')}</span>
+                        <span title="${panel._escapeHtml(item.errorCode || '--')}">${panel._escapeHtml(item.errorCode ? getStatusDisplayName(item.errorCode, { fallback: '错误码' }) : '--')}</span>
+                        <span title="${panel._escapeHtml(item.permissionReason || '--')}">${panel._escapeHtml(item.permissionReason ? getStatusDisplayName(item.permissionReason, { fallback: '权限原因' }) : '--')}</span>
                     </div>
                 `).join('')}
             </div>
         </details>
     `;
 }
+import {
+    getStatusDisplayName,
+    getToolDisplayName
+} from '../../shared/operatorDisplayNames.js';
