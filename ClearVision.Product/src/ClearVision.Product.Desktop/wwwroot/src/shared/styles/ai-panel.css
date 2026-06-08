@@ -2531,6 +2531,74 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     transform: translateX(3px);
 }
 
+.ai-followup-resource-task {
+    border-color: rgba(231, 76, 60, 0.18);
+    background: rgba(231, 76, 60, 0.07);
+}
+
+.ai-followup-resource-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.ai-followup-resource-input {
+    display: grid;
+    grid-template-columns: minmax(88px, 0.34fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    color: var(--ink-gray);
+    font-size: 11px;
+}
+
+.ai-followup-resource-input input {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    background: rgba(7, 17, 27, 0.46);
+    color: var(--paper-white);
+    font: inherit;
+    padding: 7px 9px;
+}
+
+.ai-followup-resource-input input:focus {
+    outline: none;
+    border-color: rgba(231, 76, 60, 0.42);
+    box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.1);
+}
+
+.ai-followup-resource-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.ai-followup-resource-action {
+    border: 1px solid rgba(231, 76, 60, 0.22);
+    background: rgba(231, 76, 60, 0.12);
+    color: var(--paper-white);
+    border-radius: var(--radius-full);
+    padding: 6px 12px;
+    font-size: 11px;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-ink);
+}
+
+.ai-followup-resource-action.is-secondary {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(15, 36, 53, 0.24);
+    color: var(--paper-dim);
+}
+
+.ai-followup-resource-action:hover {
+    border-color: rgba(231, 76, 60, 0.38);
+    background: rgba(231, 76, 60, 0.18);
+    color: #ffffff;
+}
+
 .ai-followup-actions {
     border-top: 1px dashed rgba(255, 255, 255, 0.08);
     padding-top: 12px;
@@ -2567,6 +2635,8 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 }
 
 .ai-followup-action:disabled,
+.ai-followup-resource-action:disabled,
+.ai-followup-resource-input input:disabled,
 .ai-followup-template-action:disabled,
 .ai-followup-hint-clear:disabled {
     opacity: 0.45;

@@ -450,7 +450,10 @@ export const aiPanelPendingParametersMixin = {
         }
 
         if (pending.length === 0) {
-            this._resetPendingDraftState();
+            this.pendingParameterDrafts = {};
+            this.pendingParameterDraftSignature = '';
+            this.pendingOperatorBindings = {};
+            this._clearPendingParameterConfirmation();
             return;
         }
 
@@ -1032,8 +1035,12 @@ export const aiPanelPendingParametersMixin = {
         const normalized = String(value ?? '').trim().toLowerCase();
         return normalized === '<pending-camera-binding>' ||
             normalized === '<pending-model-path>' ||
+            normalized === '<pending-model-resource>' ||
             normalized === '<pending-template-path>' ||
-            normalized === '<pending-output-channel>';
+            normalized === '<pending-template-artifact>' ||
+            normalized === '<pending-output-channel>' ||
+            normalized === '<pending-pixel-to-world-scale>' ||
+            normalized === '<pending-wire-sequence-labels>';
     },
 
     _buildEnumOptions(options, currentValue) {
@@ -1121,6 +1128,9 @@ export const aiPanelPendingParametersMixin = {
 
             item.parameterNames.forEach(parameterName => {
                 if (!shouldIncludePendingParameter(context.operator, parameterName)) {
+                    return;
+                }
+                if (this._isResourceOnlyDraftParameter?.(context.operatorType, parameterName)) {
                     return;
                 }
                 const confirmedValue = this._getPendingDraftConfirmedValue(item.operatorId, parameterName);
@@ -1454,10 +1464,19 @@ export const aiPanelPendingParametersMixin = {
     _isKnownPendingResourceParameter(parameterName) {
         const normalized = String(parameterName || '').trim().toLowerCase();
         return normalized === 'camerabindingid' ||
+            normalized === 'cameraid' ||
             normalized === 'modelpath' ||
+            normalized === 'modelid' ||
+            normalized === 'modelcatalogpath' ||
+            normalized === 'template' ||
             normalized === 'templatepath' ||
+            normalized === 'templateid' ||
+            normalized === 'scale' ||
+            normalized === 'pixelscale' ||
+            normalized === 'calibrationscale' ||
             normalized === 'outputchannel' ||
             normalized === 'outputchannelid' ||
+            normalized === 'channel' ||
             normalized === 'plcparameters' ||
             normalized === 'plcaddress' ||
             normalized === 'plcaddressparameters';
@@ -1482,7 +1501,10 @@ export const aiPanelPendingParametersMixin = {
             return 'ModelPath';
         }
         if (type.includes('template')) {
-            return 'TemplatePath';
+            return 'Template';
+        }
+        if (type.includes('measurement') || type.includes('calibration')) {
+            return 'Scale';
         }
         if (type.includes('output')) {
             return 'OutputChannel';

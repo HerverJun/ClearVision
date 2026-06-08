@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -6,6 +7,23 @@ namespace ClearVision.Product.Infrastructure.AI.Agent;
 
 public sealed class ParameterMappingService
 {
+    private readonly IVisionAgentOperatorContractCatalog _contractCatalog;
+
+    public ParameterMappingService()
+        : this(new VisionAgentOperatorContractCatalog())
+    {
+    }
+
+    public ParameterMappingService(IOperatorFactory operatorFactory)
+        : this(new VisionAgentOperatorContractCatalog(operatorFactory))
+    {
+    }
+
+    internal ParameterMappingService(IVisionAgentOperatorContractCatalog contractCatalog)
+    {
+        _contractCatalog = contractCatalog;
+    }
+
     internal BuildStepResult<ParameterMappingResolution> Map(
         BuildPlanLoad load,
         OperatorPipelineResolution pipeline)
@@ -16,7 +34,7 @@ public sealed class ParameterMappingService
 
         foreach (var op in pipeline.Steps)
         {
-            if (!VisionAgentReadOnlyCatalog.Schemas.TryGetValue(op.OperatorType, out var schema))
+            if (!_contractCatalog.TryGet(op.OperatorType, out var schema))
             {
                 continue;
             }
@@ -72,7 +90,7 @@ public sealed class ParameterMappingService
 
     private static VisionAgentParameterMapping MapParameterValue(
         VisionAgentOperatorPipelineStep op,
-        OperatorParameterItem parameter,
+        VisionAgentParameterContract parameter,
         BuildPlanLoad load)
     {
         var key = $"{op.OperatorType}.{parameter.Name}";
@@ -91,8 +109,8 @@ public sealed class ParameterMappingService
         };
         }
 
-        var fallback = DefaultParameterValue(op.OperatorType, parameter.Name, load);
-        var pending = parameter.Required || fallback.Contains("pending", StringComparison.OrdinalIgnoreCase);
+        var fallback = DefaultParameterValue(op.OperatorType, parameter, load);
+        var pending = IsPendingParameter(op.OperatorType, parameter, fallback, load);
         return new VisionAgentParameterMapping
         {
             TempId = op.TempId,
@@ -109,15 +127,22 @@ public sealed class ParameterMappingService
 
     private static string DefaultParameterValue(
         string operatorType,
-        string parameterName,
+        VisionAgentParameterContract parameter,
         BuildPlanLoad load)
     {
+        var parameterName = parameter.Name;
+        if (operatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+            parameterName.Equals("SourceType", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Camera";
+        }
+
         if (parameterName.Contains("camera", StringComparison.OrdinalIgnoreCase))
         {
             return "<pending-camera-binding>";
         }
 
-        if (parameterName.Contains("model", StringComparison.OrdinalIgnoreCase))
+        if (IsPreferredModelParameter(parameterName))
         {
             return "<pending-model-resource>";
         }
@@ -133,7 +158,14 @@ public sealed class ParameterMappingService
             return "<pending-calibration-unit-or-pixel-scale>";
         }
 
-        if (parameterName.Contains("tolerance", StringComparison.OrdinalIgnoreCase))
+        if (operatorType.Equals("UnitConvert", StringComparison.OrdinalIgnoreCase) &&
+            parameterName.Equals("Scale", StringComparison.OrdinalIgnoreCase) &&
+            IsMeasurementScenario(load))
+        {
+            return "<pending-pixel-to-world-scale>";
+        }
+
+        if (parameterName.Equals("Tolerance", StringComparison.OrdinalIgnoreCase))
         {
             return IsMeasurementScenario(load)
                 ? "<pending-measurement-threshold>"
@@ -147,20 +179,77 @@ public sealed class ParameterMappingService
 
         return operatorType switch
         {
-            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "按待确认端子线序规则校验检测到的类别顺序。",
-            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "当测量距离处于待确认容差阈值内时判定为 OK。",
-            "ResultJudgment" when parameterName.Equals("Rule", StringComparison.OrdinalIgnoreCase) => "当检测分数满足配置阈值时判定为 OK。",
+            "ResultJudgment" when parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "Value",
+            "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "Equal",
+            "ResultJudgment" when parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "线序待确认",
+            "ResultJudgment" when parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "Value",
+            "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "Range",
+            "ResultJudgment" when parameterName.Equals("ExpectValueMin", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "<pending-measurement-threshold>",
+            "ResultJudgment" when parameterName.Equals("ExpectValueMax", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "<pending-measurement-threshold>",
+            "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) => "GreaterOrEqual",
+            "ResultJudgment" when parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) => "1",
+            "DetectionSequenceJudge" when parameterName.Equals("ExpectedLabels", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "<pending-wire-sequence-labels>",
+            "DetectionSequenceJudge" when parameterName.Equals("Direction", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "LeftToRight",
             "Thresholding" when parameterName.Equals("Mode", StringComparison.OrdinalIgnoreCase) => "adaptive_review",
-            "TemplateMatching" when parameterName.Equals("MinScore", StringComparison.OrdinalIgnoreCase) => "0.8",
+            "TemplateMatching" when parameterName.Equals("Threshold", StringComparison.OrdinalIgnoreCase) => "0.8",
             "TemplateMatching" when parameterName.Equals("MaxMatches", StringComparison.OrdinalIgnoreCase) => "1",
-            "DeepLearning" when parameterName.Equals("ConfidenceThreshold", StringComparison.OrdinalIgnoreCase) => "0.6",
-            "SurfaceDefectDetection" when parameterName.Equals("ModelKind", StringComparison.OrdinalIgnoreCase) => "surface_defect",
-            "SemanticSegmentation" when parameterName.Equals("ModelKind", StringComparison.OrdinalIgnoreCase) => "segmentation",
+            "DeepLearning" when parameterName.Equals("Confidence", StringComparison.OrdinalIgnoreCase) => "0.6",
             "BlobAnalysis" when parameterName.Equals("MinArea", StringComparison.OrdinalIgnoreCase) => "20",
             "BlobAnalysis" when parameterName.Equals("MaxArea", StringComparison.OrdinalIgnoreCase) => "<pending-max-area>",
             "RoiManager" when parameterName.Equals("RoiName", StringComparison.OrdinalIgnoreCase) => "inspection_roi",
-            _ => "<pending-parameter>"
+            _ => parameter.DefaultValue?.ToString() ?? string.Empty
         };
+    }
+
+    private static bool IsPendingParameter(
+        string operatorType,
+        VisionAgentParameterContract parameter,
+        string fallback,
+        BuildPlanLoad load)
+    {
+        if (fallback.Contains("pending", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var resourceKind = VisionAgentResourceClassifier.Classify(operatorType, parameter.Name, parameter.DataType);
+        if (string.IsNullOrWhiteSpace(resourceKind))
+        {
+            return false;
+        }
+
+        if (!IsPreferredResourceParameter(operatorType, parameter.Name, resourceKind))
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(fallback) || IsMeasurementScenario(load);
+    }
+
+    private static bool IsPreferredResourceParameter(
+        string operatorType,
+        string parameterName,
+        string resourceKind)
+    {
+        return resourceKind switch
+        {
+            "camera_binding" => parameterName.Equals("CameraId", StringComparison.OrdinalIgnoreCase) ||
+                                parameterName.Equals("CameraBindingId", StringComparison.OrdinalIgnoreCase),
+            "model_resource" => IsPreferredModelParameter(parameterName),
+            "template_artifact" => parameterName.Equals("TemplateId", StringComparison.OrdinalIgnoreCase),
+            "measurement_parameter" => operatorType.Equals("UnitConvert", StringComparison.OrdinalIgnoreCase) &&
+                                       parameterName.Equals("Scale", StringComparison.OrdinalIgnoreCase),
+            "plc_address" => parameterName.Contains("Address", StringComparison.OrdinalIgnoreCase) ||
+                             parameterName.Contains("PLC", StringComparison.OrdinalIgnoreCase),
+            "output_channel" => parameterName.Contains("Channel", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
+    }
+
+    private static bool IsPreferredModelParameter(string parameterName)
+    {
+        return parameterName.Equals("ModelPath", StringComparison.OrdinalIgnoreCase) ||
+               parameterName.Equals("ModelId", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsWireSequenceScenario(BuildPlanLoad load)
@@ -189,32 +278,9 @@ public sealed class ParameterMappingService
             return string.Empty;
         }
 
-        if (parameterName.Contains("camera", StringComparison.OrdinalIgnoreCase))
-        {
-            return "camera_binding";
-        }
-
-        if (parameterName.Contains("model", StringComparison.OrdinalIgnoreCase))
-        {
-            return "model_resource";
-        }
-
-        if (parameterName.Contains("template", StringComparison.OrdinalIgnoreCase))
-        {
-            return "template_artifact";
-        }
-
-        if (parameterName.Contains("channel", StringComparison.OrdinalIgnoreCase))
-        {
-            return "output_channel";
-        }
-
-        if (operatorType.Contains("Measure", StringComparison.OrdinalIgnoreCase) ||
-            parameterName.Contains("tolerance", StringComparison.OrdinalIgnoreCase))
-        {
-            return "measurement_parameter";
-        }
-
-        return string.Empty;
+        var resourceKind = VisionAgentResourceClassifier.Classify(operatorType, parameterName);
+        return IsPreferredResourceParameter(operatorType, parameterName, resourceKind)
+            ? resourceKind
+            : string.Empty;
     }
 }

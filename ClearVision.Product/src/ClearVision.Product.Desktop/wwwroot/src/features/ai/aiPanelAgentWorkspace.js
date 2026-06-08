@@ -212,7 +212,8 @@ const AI_CODE_TEXT_MAP = {
     template_artifact: '模板资源',
     measurement_parameter: '测量参数',
     camera_binding: '相机绑定',
-    output_channel: '输出通道'
+    output_channel: '输出通道',
+    plc_address: 'PLC 地址'
 };
 
 const AI_OPERATOR_LABELS = {
@@ -222,7 +223,11 @@ const AI_OPERATOR_LABELS = {
     DeepLearning: '深度学习检测',
     TemplateMatching: '模板匹配',
     CircleMeasurement: '圆测量',
+    Measurement: '几何测量',
     MeasureDistance: '距离测量',
+    UnitConvert: '单位换算',
+    DetectionSequenceJudge: '序列判定',
+    ImageAdd: '图像叠加',
     ResultJudgment: '结果判定',
     ResultOutput: '结果输出'
 };
@@ -231,16 +236,28 @@ const AI_PARAMETER_LABELS = {
     ModelId: '模型资源',
     ModelPath: '模型资源',
     ModelCatalogPath: '模型资源',
+    Template: '模板资源',
     TemplatePath: '模板文件',
     TemplateId: '模板资源',
     Unit: '测量单位/像素比例',
     PixelScale: '像素比例',
+    Scale: '像素比例',
+    CalibrationScale: '标定比例',
     Tolerance: '容差阈值',
     Rule: '判定规则',
+    FieldName: '判定字段',
+    Condition: '判定条件',
+    ExpectedLabels: '期望标签',
+    ExpectedCount: '期望数量',
+    Value: '输入值',
+    JudgmentResult: '判定结果',
     CameraId: '相机绑定',
     CameraBindingId: '相机绑定',
     OutputChannelId: '输出通道',
+    OutputChannel: '输出通道',
     Channel: '输出通道',
+    PlcAddress: 'PLC 地址',
+    PLCParameters: 'PLC 参数',
     SourceType: '采集源',
     FilePath: '图像文件'
 };
@@ -600,21 +617,30 @@ export const aiPanelAgentWorkspaceMixin = {
             .replace(/\bDeepLearning\b/g, AI_OPERATOR_LABELS.DeepLearning)
             .replace(/\bTemplateMatching\b/g, AI_OPERATOR_LABELS.TemplateMatching)
             .replace(/\bCircleMeasurement\b/g, AI_OPERATOR_LABELS.CircleMeasurement)
+            .replace(/\bMeasurement\b/g, AI_OPERATOR_LABELS.Measurement)
             .replace(/\bMeasureDistance\b/g, AI_OPERATOR_LABELS.MeasureDistance)
+            .replace(/\bUnitConvert\b/g, AI_OPERATOR_LABELS.UnitConvert)
+            .replace(/\bDetectionSequenceJudge\b/g, AI_OPERATOR_LABELS.DetectionSequenceJudge)
+            .replace(/\bImageAdd\b/g, AI_OPERATOR_LABELS.ImageAdd)
             .replace(/\bResultJudgment\b/g, AI_OPERATOR_LABELS.ResultJudgment)
             .replace(/\bResultOutput\b/g, AI_OPERATOR_LABELS.ResultOutput)
             .replace(/\bModelId\b|\bModelPath\b|\bModelCatalogPath\b/g, '模型资源')
-            .replace(/\bTemplatePath\b|\bTemplateId\b/g, '模板资源')
+            .replace(/\bTemplate\b|\bTemplatePath\b|\bTemplateId\b/g, '模板资源')
             .replace(/\bTolerance\b/g, '容差阈值')
-            .replace(/\bRule\b/g, '判定规则')
-            .replace(/\bUnit\b|\bPixelScale\b/g, '测量单位/像素比例')
+            .replace(/\bRule\b|\bCondition\b/g, '判定规则')
+            .replace(/\bFieldName\b/g, '判定字段')
+            .replace(/\bExpectedLabels\b/g, '期望标签')
+            .replace(/\bUnit\b|\bPixelScale\b|\bScale\b/g, '测量单位/像素比例')
             .replace(/\bmodel_resource\b/g, '模型资源')
             .replace(/\btemplate_artifact\b/g, '模板资源')
             .replace(/\bmeasurement_parameter\b/g, '测量参数')
             .replace(/\bcamera_binding\b/g, '相机绑定')
             .replace(/\boutput_channel\b/g, '输出通道')
+            .replace(/\bplc_address\b/g, 'PLC 地址')
             .replace(/<pending-model-resource>/g, '<待绑定模型资源>')
             .replace(/<pending-output-channel>/g, '<待绑定输出通道>')
+            .replace(/<pending-pixel-to-world-scale>/g, '<待填写像素比例>')
+            .replace(/<pending-wire-sequence-labels>/g, '<待填写线序标签>')
             .replace(/metadata-only/gi, '仅元数据')
             .replace(/\bpending\b/g, '待确认')
             .replace(/\bcompleted\b/g, '已完成')
@@ -789,6 +815,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 return '运行草稿就绪';
             case 'deployment_ready':
                 return '部署就绪';
+            case 'deployment_metadata_ready':
+                return '部署元数据就绪';
             case 'blocked':
                 return '已阻断';
             default:

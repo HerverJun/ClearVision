@@ -74,6 +74,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IVisionAgentPlannerService, VisionAgentPlannerService>();
         services.AddScoped<IVisionAgentPlanCompletionSource, LlmVisionAgentPlanCompletionSource>();
         services.AddScoped<IVisionAgentPlanPlannerService, VisionAgentPlanPlannerService>();
+        services.AddScoped<IVisionAgentOperatorContractCatalog, VisionAgentOperatorContractCatalog>();
         services.AddScoped<BuildToolRunner>();
         services.AddScoped<BuildPlanContextLoader>();
         services.AddScoped<BuildIntentResolver>();

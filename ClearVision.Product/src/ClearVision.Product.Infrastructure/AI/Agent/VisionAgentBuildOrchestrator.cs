@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
@@ -12,6 +13,8 @@ public interface IVisionAgentBuildOrchestrator
 
 public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
 {
+    private const int MaxRepairRounds = 2;
+
     private readonly IAgentRunEventSink? _eventSink;
     private readonly Microsoft.Extensions.Logging.ILogger<VisionAgentBuildOrchestrator> _logger;
     private readonly BuildPlanContextLoader _contextLoader;
@@ -177,15 +180,22 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 AgentRunEventTypes.ReadinessChecked);
 
             var currentDraft = draft.Payload;
-            if (BuildToolRunner.ToolHasBlockingIssues(validation.Payload))
+            for (var repairRound = 1;
+                 repairRound <= MaxRepairRounds && ShouldAttemptRepair(validation.Payload, out var repairIssueCodes);
+                 repairRound++)
             {
                 var repair = await _toolRunner.ExecuteEvidenceStepAsync(
                     runId,
                     evidence,
                     "repair_loop",
-                    "auto_repair_once",
-                    "对可安全修复的校验、预演或就绪问题尝试一次自动修复。",
-                    _ => Task.FromResult(_workflowDraftBuilder.Repair(currentDraft, pipeline.Payload, parameterMapping.Payload)),
+                    $"auto_repair_round_{repairRound}",
+                    $"对可安全修复的校验问题尝试第 {repairRound} 轮自动修复：{string.Join(",", repairIssueCodes)}。",
+                    _ => Task.FromResult(_workflowDraftBuilder.Repair(
+                        currentDraft,
+                        pipeline.Payload,
+                        parameterMapping.Payload,
+                        repairIssueCodes,
+                        repairRound)),
                     cancellationToken);
                 currentDraft = repair.Payload.Draft;
                 autoRepairs.Add(repair.Payload.Record);
@@ -320,5 +330,31 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 ex.Message);
             return _resultAssembler.Failure(buildId, evidence, publicWarnings);
         }
+    }
+
+    private static bool ShouldAttemptRepair(
+        VisionAgentToolResult validation,
+        out IReadOnlyList<string> issueCodes)
+    {
+        issueCodes = VisionAgentBuildSupport.ReadIssueCodes(validation.Data, "blockingIssues");
+        if (!BuildToolRunner.ToolHasBlockingIssues(validation))
+        {
+            return false;
+        }
+
+        var repairable = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "unknown_operator",
+            "unknown_parameter",
+            "missing_required_parameter",
+            "missing_required_input",
+            "missing_port",
+            "invalid_connection",
+            "incompatible_port_type",
+            "missing_model_resource",
+            "missing_template_resource",
+            "missing_calibration_parameter"
+        };
+        return issueCodes.Any(repairable.Contains);
     }
 }

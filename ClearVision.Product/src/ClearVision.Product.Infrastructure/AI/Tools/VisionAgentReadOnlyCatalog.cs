@@ -13,12 +13,14 @@ internal static class VisionAgentReadOnlyCatalog
         new("ShapeMatching", "Shape Matching", "matching", "Finds a shape by catalog template metadata.", ["shape", "matching", "template"]),
         new("DeepLearning", "Deep Learning", "ai", "Runs model-based detection or classification when a model path is configured.", ["model", "detection", "wire", "defect"]),
         new("SemanticSegmentation", "Semantic Segmentation", "ai", "Reviews segmentation model metadata without loading model files.", ["segmentation", "model", "mask"]),
-        new("SurfaceDefectDetection", "Surface Defect Detection", "ai", "Reviews defect model metadata without loading model files.", ["defect", "surface", "model"]),
+        new("SurfaceDefectDetection", "Surface Defect Detection", "ai", "Traditional surface defect metadata without loading model files.", ["defect", "surface", "scratch"]),
         new("CircleMeasurement", "Circle Measurement", "measurement", "Measures circle center/radius features.", ["circle", "hole", "diameter"]),
-        new("MeasureDistance", "Measure Distance", "measurement", "Measures distance between points or features.", ["distance", "spacing", "hole", "measurement"]),
-        new("ImageCompose", "Image Compose", "image", "Combines multiple images into one logical image.", ["compose", "multi-camera"]),
-        new("ResultJudgment", "Result Judgment", "logic", "Evaluates pass/fail rules and tolerances.", ["judgment", "pass", "fail", "tolerance"]),
-        new("ResultOutput", "Result Output", "output", "Publishes inspection result payloads to the configured output channel.", ["output", "result", "mes", "plc"]),
+        new("Measurement", "Measurement", "measurement", "Measures distance between points or features.", ["distance", "spacing", "hole", "measurement"]),
+        new("UnitConvert", "Unit Convert", "measurement", "Converts pixel measurement values to engineering units.", ["calibration", "pixel", "scale", "measurement"]),
+        new("DetectionSequenceJudge", "Detection Sequence Judge", "logic", "Checks detection label order for terminal wire sequence inspection.", ["wire", "sequence", "terminal", "order"]),
+        new("ImageAdd", "Image Add", "image", "Combines images using the real ImageAdd operator.", ["compose", "multi-camera"]),
+        new("ResultJudgment", "Result Judgment", "logic", "Evaluates pass/fail conditions using Value/Confidence inputs.", ["judgment", "pass", "fail", "tolerance"]),
+        new("ResultOutput", "Result Output", "output", "Summarizes inspection result payloads.", ["output", "result", "mes", "plc"]),
         new("ModbusCommunication", "Modbus Communication", "communication", "Forbidden preview communication metadata; dry-run only.", ["modbus", "plc", "forbidden"]),
         new("HttpRequest", "HTTP Request", "communication", "Forbidden preview network metadata; dry-run only.", ["http", "network", "forbidden"]),
         new("ScriptOperator", "Script Operator", "logic", "Forbidden preview script metadata; dry-run only.", ["script", "command", "forbidden"])
@@ -33,16 +35,17 @@ internal static class VisionAgentReadOnlyCatalog
                 [],
                 [
                     new("SourceType", "string", false, "Camera/File/ProvidedFrame; read-only agent tools do not acquire images."),
-                    new("CameraBindingId", "string", false, "Logical camera binding id supplied by engineer."),
+                    new("CameraId", "cameraBinding", false, "Logical camera binding id supplied by engineer."),
                     new("FilePath", "string", false, "Optional offline file source; not read by read-only agent tools.")
                 ]),
             ["TemplateMatching"] = new(
                 "TemplateMatching",
-                ["MatchResult", "Score", "Pose"],
-                ["Image"],
+                ["Image", "Position", "Score", "NormalizedScore", "RawResponse", "SubpixelOffsetX", "SubpixelOffsetY", "PeakCurvature", "Angle", "Scale", "IsMatch", "Matches", "MatchCount"],
+                ["Image", "Template", "Mask"],
                 [
-                    new("TemplatePath", "string", true, "Configured template artifact path; not loaded by read-only agent tools."),
-                    new("MinScore", "double", false, "Minimum acceptable match score."),
+                    new("Method", "enum", false, "Template matching method."),
+                    new("Domain", "enum", false, "Matching domain."),
+                    new("Threshold", "double", false, "Minimum acceptable match score."),
                     new("MaxMatches", "int", false, "Maximum number of matches.")
                 ]),
             ["BlobAnalysis"] = new(
@@ -82,16 +85,19 @@ internal static class VisionAgentReadOnlyCatalog
                 ["Detections", "Classes", "Scores"],
                 ["Image"],
                 [
-                    new("ModelPath", "string", true, "Configured model artifact path; not loaded by read-only agent tools."),
-                    new("ConfidenceThreshold", "double", false, "Detection confidence threshold.")
+                    new("ModelPath", "file", true, "Configured model artifact path; not loaded by read-only agent tools."),
+                    new("Confidence", "double", false, "Detection confidence threshold."),
+                    new("ModelId", "string", false, "Catalog model id metadata.")
                 ]),
             ["SemanticSegmentation"] = new(
                 "SemanticSegmentation",
                 ["Mask", "Classes", "Scores"],
                 ["Image"],
                 [
-                    new("ModelId", "string", true, "Catalog model metadata id; no model file is loaded."),
-                    new("ModelKind", "string", true, "Expected model kind metadata.")
+                    new("Method", "enum", false, "Surface defect method."),
+                    new("Threshold", "double", false, "Defect response threshold."),
+                    new("MinArea", "int", false, "Minimum defect area."),
+                    new("MaxArea", "int", false, "Maximum defect area.")
                 ]),
             ["SurfaceDefectDetection"] = new(
                 "SurfaceDefectDetection",
@@ -109,28 +115,59 @@ internal static class VisionAgentReadOnlyCatalog
                     new("Roi", "string", false, "ROI name for the circle search."),
                     new("EdgePolarity", "string", false, "Expected edge polarity.")
                 ]),
-            ["MeasureDistance"] = new(
-                "MeasureDistance",
+            ["Measurement"] = new(
+                "Measurement",
                 ["Distance"],
-                ["PointA", "PointB"],
+                ["Image", "PointA", "PointB"],
                 [
-                    new("Unit", "string", false, "Measurement unit."),
-                    new("Tolerance", "string", false, "Allowed tolerance expression.")
+                    new("X1", "int", false, "Start point X."),
+                    new("Y1", "int", false, "Start point Y."),
+                    new("X2", "int", false, "End point X."),
+                    new("Y2", "int", false, "End point Y."),
+                    new("MeasureType", "enum", false, "Measurement mode.")
+                ]),
+            ["UnitConvert"] = new(
+                "UnitConvert",
+                ["Result", "Unit"],
+                ["Value", "PixelSize"],
+                [
+                    new("FromUnit", "enum", false, "Source unit."),
+                    new("ToUnit", "enum", false, "Target unit."),
+                    new("Scale", "double", false, "Pixel-to-world scale; kept pending when calibration is unknown."),
+                    new("UseCalibration", "bool", false, "Whether to use PixelSize input.")
+                ]),
+            ["DetectionSequenceJudge"] = new(
+                "DetectionSequenceJudge",
+                ["IsMatch", "ActualOrder", "Count", "MissingLabels", "DuplicateLabels", "SortedDetections", "Assignment", "UnassignedDetections", "SlotDistances", "RowCount", "PerspectiveApplied", "Diagnostics", "Message"],
+                ["Detections", "SlotPoints", "PerspectiveSrcPoints", "PerspectiveDstPoints"],
+                [
+                    new("ExpectedLabels", "string", true, "Comma-separated expected labels in order."),
+                    new("SortBy", "enum", false, "Field used to sort detections."),
+                    new("Direction", "enum", false, "Ordering direction."),
+                    new("ExpectedCount", "int", false, "Expected detection count.")
                 ]),
             ["ResultJudgment"] = new(
                 "ResultJudgment",
-                ["Result"],
-                ["Input"],
+                ["JudgmentResult", "IsOk", "ConditionResult", "JudgmentValue", "Details"],
+                ["Value", "Confidence"],
                 [
-                    new("Rule", "string", false, "Pass/fail rule."),
-                    new("Tolerance", "string", false, "Tolerance expression.")
+                    new("FieldName", "string", false, "Field to read from input payload."),
+                    new("Condition", "enum", false, "Pass/fail condition."),
+                    new("ExpectValue", "string", false, "Expected value."),
+                    new("ExpectValueMin", "string", false, "Expected range minimum."),
+                    new("ExpectValueMax", "string", false, "Expected range maximum."),
+                    new("MinConfidence", "double", false, "Minimum confidence gate."),
+                    new("NumericAbsTolerance", "double", false, "Numeric absolute tolerance."),
+                    new("NumericRelTolerance", "double", false, "Numeric relative tolerance.")
                 ]),
             ["ResultOutput"] = new(
                 "ResultOutput",
-                [],
-                ["Input"],
+                ["Output", "Image", "Result", "Text", "Data", "FilePath"],
+                ["Image", "Result", "Text", "Data"],
                 [
-                    new("Channel", "string", false, "Output channel name.")
+                    new("Format", "enum", false, "Output format."),
+                    new("SaveToFile", "bool", false, "Whether to save output text to a file."),
+                    new("MaxFormattedCollectionItems", "int", false, "Maximum formatted collection items.")
                 ]),
             ["ModbusCommunication"] = new(
                 "ModbusCommunication",
@@ -160,8 +197,8 @@ internal static class VisionAgentReadOnlyCatalog
                 [
                     new("RoiName", "string", false, "Named ROI.")
                 ]),
-            ["ImageCompose"] = new(
-                "ImageCompose",
+            ["ImageAdd"] = new(
+                "ImageAdd",
                 ["Image"],
                 ["ImageA", "ImageB"],
                 [
@@ -176,12 +213,13 @@ internal static class VisionAgentReadOnlyCatalog
             "wire_sequence",
             "Wire sequence inspection",
             ["wire", "sequence", "terminal", "harness"],
-            ["ImageAcquisition", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput"],
+            ["ImageAcquisition", "RoiManager", "DeepLearning", "DetectionSequenceJudge", "ResultJudgment", "ResultOutput"],
             [
                 Link("op_cam", "Image", "op_roi", "Image"),
-                Link("op_roi", "RoiImage", "op_detect", "Image"),
-                Link("op_detect", "Detections", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_roi", "Image", "op_detect", "Image"),
+                Link("op_detect", "DetectionList", "op_sequence", "Detections"),
+                Link("op_sequence", "IsMatch", "op_judge", "Value"),
+                Link("op_judge", "JudgmentResult", "op_out", "Result")
             ]),
         new(
             "template_matching_alignment",
@@ -191,22 +229,23 @@ internal static class VisionAgentReadOnlyCatalog
             ["ImageAcquisition", "TemplateMatching", "ResultJudgment", "ResultOutput"],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
-                Link("op_match", "Score", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_match", "Score", "op_judge", "Value"),
+                Link("op_judge", "JudgmentResult", "op_out", "Result")
             ]),
         new(
             "hole_distance_measurement",
             "measurement",
             "Hole distance measurement",
             ["hole", "distance", "spacing", "measurement"],
-            ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "MeasureDistance", "ResultJudgment", "ResultOutput"],
+            ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"],
             [
                 Link("op_cam", "Image", "op_circle_a", "Image"),
                 Link("op_cam", "Image", "op_circle_b", "Image"),
                 Link("op_circle_a", "Center", "op_distance", "PointA"),
                 Link("op_circle_b", "Center", "op_distance", "PointB"),
-                Link("op_distance", "Distance", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_distance", "Distance", "op_calibration", "Value"),
+                Link("op_calibration", "Result", "op_judge", "Value"),
+                Link("op_judge", "JudgmentResult", "op_out", "Result")
             ])
     ];
 

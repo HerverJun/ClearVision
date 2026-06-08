@@ -91,6 +91,57 @@ internal static class VisionAgentBuildSupport
         }
     }
 
+    public static IEnumerable<AiPendingParameterInfo> ReadPendingParameters(object? data)
+    {
+        var root = ToJsonElementOrNull(data);
+        if (root == null ||
+            !TryGetProperty(root.Value, "pendingParameters", out var pending) ||
+            pending.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (var item in pending.EnumerateArray())
+        {
+            var operatorId = FirstNonEmpty(
+                ReadString(item, "operatorId"),
+                ReadString(item, "actualOperatorId"),
+                ReadString(item, "tempId"));
+            var parameterName = FirstNonEmpty(
+                ReadString(item, "parameterName"),
+                ReadString(item, "name"));
+            var parameterNames = new List<string>();
+            if (TryGetProperty(item, "parameterNames", out var names) &&
+                names.ValueKind == JsonValueKind.Array)
+            {
+                parameterNames.AddRange(names.EnumerateArray()
+                    .Where(name => name.ValueKind == JsonValueKind.String)
+                    .Select(name => name.GetString() ?? string.Empty)
+                    .Where(name => !string.IsNullOrWhiteSpace(name)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(parameterName))
+            {
+                parameterNames.Add(parameterName);
+            }
+
+            if (string.IsNullOrWhiteSpace(operatorId) ||
+                parameterNames.Count == 0)
+            {
+                continue;
+            }
+
+            yield return new AiPendingParameterInfo
+            {
+                OperatorId = operatorId,
+                ActualOperatorId = FirstNonEmpty(ReadString(item, "actualOperatorId"), operatorId),
+                ParameterNames = parameterNames
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            };
+        }
+    }
+
     public static object? ToJsonCompatible(object? value)
     {
         return value == null

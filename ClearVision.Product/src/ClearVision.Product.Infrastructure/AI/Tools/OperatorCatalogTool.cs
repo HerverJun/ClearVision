@@ -1,13 +1,31 @@
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Core.Services;
 
 namespace ClearVision.Product.Infrastructure.AI.Tools;
 
 public sealed class OperatorCatalogTool : VisionAgentToolBase
 {
+    private readonly IVisionAgentOperatorContractCatalog _contractCatalog;
+
+    public OperatorCatalogTool()
+        : this(new VisionAgentOperatorContractCatalog())
+    {
+    }
+
+    public OperatorCatalogTool(IOperatorFactory operatorFactory)
+        : this(new VisionAgentOperatorContractCatalog(operatorFactory))
+    {
+    }
+
+    internal OperatorCatalogTool(IVisionAgentOperatorContractCatalog contractCatalog)
+    {
+        _contractCatalog = contractCatalog;
+    }
+
     public override string Name => "list_operator_catalog";
     public override string DisplayName => "List operator catalog";
-    public override string Description => "Returns a read-only slice of the ClearVision operator catalog.";
+    public override string Description => "Returns a read-only slice of the ClearVision real operator contract catalog.";
     public override string Category => "operator";
     public override JsonElement ParametersSchema { get; } = Schema("""
         {
@@ -27,15 +45,15 @@ public sealed class OperatorCatalogTool : VisionAgentToolBase
         cancellationToken.ThrowIfCancellationRequested();
         var keyword = ReadString(arguments, "keyword");
         var topN = Math.Clamp(ReadInt(arguments, "topN") ?? 20, 1, 50);
-        var operators = VisionAgentReadOnlyCatalog.Operators.AsEnumerable();
+        var operators = _contractCatalog.Operators.AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
             operators = operators.Where(item =>
                 item.OperatorType.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
                 item.DisplayName.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-                item.Summary.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-                item.Keywords.Any(value => value.Contains(keyword, StringComparison.OrdinalIgnoreCase)));
+                item.Description.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                item.Category.Contains(keyword, StringComparison.OrdinalIgnoreCase));
         }
 
         var results = operators
@@ -45,14 +63,16 @@ public sealed class OperatorCatalogTool : VisionAgentToolBase
                 operatorType = item.OperatorType,
                 displayName = item.DisplayName,
                 category = item.Category,
-                summary = item.Summary,
-                keywords = item.Keywords
+                summary = item.Description,
+                inputPortCount = item.InputPorts.Count,
+                outputPortCount = item.OutputPorts.Count,
+                parameterCount = item.Parameters.Count
             })
             .ToList();
 
         return Task.FromResult(VisionAgentToolResult.Ok(new
         {
-            source = "readonly_static_catalog",
+            source = "real_operator_contract_catalog",
             keyword,
             count = results.Count,
             operators = results

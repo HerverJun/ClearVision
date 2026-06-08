@@ -481,14 +481,14 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private static string DetectScenario(string description, AiTemplateSelectionInfo? templateSelection)
     {
         var text = description.ToLowerInvariant();
-        if (ContainsAny(text, "plc", "ok/ng", "ok ng", "ng output", "result output", "plc输出", "结果输出", "输出信号", "握手", "地址"))
-        {
-            return "plc_output";
-        }
-
         if (ContainsAny(text, "wire", "terminal", "harness", "sequence", "线序", "端子", "线束", "排线", "插线"))
         {
             return "wire_sequence";
+        }
+
+        if (ContainsAny(text, "plc", "plc输出", "输出信号", "握手", "地址"))
+        {
+            return "plc_output";
         }
 
         if (ContainsAny(text, "barcode", "qr", "datamatrix", "code", "二维码", "条码", "读码", "扫码"))
@@ -536,7 +536,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 RouteId = "wire_sequence_template_first",
                 Title = "模板优先的线序检测路线",
                 Summary = "使用线束/端子序列模板，绑定模型元数据后判定顺序并输出 OK/NG。",
-                Operators = ["ImageAcquisition", "DeepLearning", "DetectionSequenceJudge", "ResultOutput"],
+                Operators = ["ImageAcquisition", "DeepLearning", "DetectionSequenceJudge", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "code_recognition" => new VisionAgentRecommendedRoute
@@ -552,7 +552,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 RouteId = "measurement_with_calibration",
                 Title = "带标定的尺寸测量路线",
                 Summary = "加载标定信息、定位几何特征、测量尺寸并比较容差。",
-                Operators = ["ImageAcquisition", "CalibrationLoader", "CircleMeasurement", "GeoMeasurement", "ResultOutput"],
+                Operators = ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "template_location" => new VisionAgentRecommendedRoute
@@ -560,7 +560,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 RouteId = "template_location",
                 Title = "模板定位路线",
                 Summary = "匹配目标模板、归一化姿态，再把对齐后的 ROI 交给下游检测。",
-                Operators = ["ImageAcquisition", "TemplateMatching", "AffineTransform", "ResultJudgment", "ResultOutput"],
+                Operators = ["ImageAcquisition", "TemplateMatching", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
             "button_inspection" => new VisionAgentRecommendedRoute
@@ -584,7 +584,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 RouteId = "surface_defect_detection",
                 Title = "表面缺陷检测路线",
                 Summary = "归一化光照、增强缺陷、分割候选区域，并按面积/对比度判定。",
-                Operators = ["ImageAcquisition", "ShadingCorrection", "SurfaceDefectDetection", "BlobAnalysis", "ResultJudgment", "ResultOutput"],
+                Operators = ["ImageAcquisition", "SurfaceDefectDetection", "BlobAnalysis", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             }
         };

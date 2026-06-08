@@ -147,9 +147,11 @@ public sealed class FlowTemplateSkeletonTool : VisionAgentToolBase
                     "ImageAcquisition" => "op_cam" + suffix,
                     "RoiManager" => "op_roi" + suffix,
                     "DeepLearning" => "op_detect" + suffix,
+                    "DetectionSequenceJudge" => "op_sequence" + suffix,
                     "TemplateMatching" => "op_match" + suffix,
                     "CircleMeasurement" => count == 1 ? "op_circle_a" : "op_circle_b",
-                    "MeasureDistance" => "op_distance" + suffix,
+                    "Measurement" => "op_distance" + suffix,
+                    "UnitConvert" => "op_calibration" + suffix,
                     "ResultJudgment" => "op_judge" + suffix,
                     "ResultOutput" => "op_out" + suffix,
                     _ => $"op_{operatorType.ToLowerInvariant()}{suffix}"
@@ -165,11 +167,10 @@ public sealed class FlowTemplateSkeletonTool : VisionAgentToolBase
     {
         return operatorType switch
         {
-            "ImageAcquisition" => new Dictionary<string, string> { ["CameraBindingId"] = "<pending-camera-binding>" },
-            "TemplateMatching" => new Dictionary<string, string> { ["TemplatePath"] = "<pending-template-path>" },
-            "DeepLearning" => new Dictionary<string, string> { ["ModelPath"] = "<pending-model-path>" },
-            "MeasureDistance" => new Dictionary<string, string> { ["Unit"] = "mm", ["Tolerance"] = "<pending-tolerance>" },
-            "ResultOutput" => new Dictionary<string, string> { ["Channel"] = "<pending-output-channel>" },
+            "ImageAcquisition" => new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraId"] = "<pending-camera-binding>" },
+            "DeepLearning" => new Dictionary<string, string> { ["ModelPath"] = "<pending-model-resource>" },
+            "DetectionSequenceJudge" => new Dictionary<string, string> { ["ExpectedLabels"] = "<pending-wire-sequence-labels>" },
+            "UnitConvert" => new Dictionary<string, string> { ["Scale"] = "<pending-pixel-to-world-scale>" },
             _ => new Dictionary<string, string>()
         };
     }

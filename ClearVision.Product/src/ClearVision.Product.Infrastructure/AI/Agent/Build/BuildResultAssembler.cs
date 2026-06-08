@@ -21,6 +21,8 @@ public sealed class BuildResultAssembler
     {
         var pendingParameters = MergePendingParameters(
             input.ParameterMapping.PendingParameters,
+            input.Validation,
+            input.PackageReadiness,
             input.Request);
         var missingResources = MergeMissingResources(
             input.ParameterMapping.MissingResources,
@@ -150,9 +152,13 @@ public sealed class BuildResultAssembler
 
     private static List<AiPendingParameterInfo> MergePendingParameters(
         IEnumerable<AiPendingParameterInfo> mapped,
+        VisionAgentToolResult validation,
+        VisionAgentToolResult packageReadiness,
         AiFlowGenerationRequest request)
     {
         return VisionAgentBuildSupport.DeduplicatePending(mapped
+            .Concat(VisionAgentBuildSupport.ReadPendingParameters(validation.Data))
+            .Concat(VisionAgentBuildSupport.ReadPendingParameters(packageReadiness.Data))
             .Concat(request.BuildFromPlan?.PlanSnapshot?.RecommendedDefaults
                 .Where(item => item.Value.Contains("pending", StringComparison.OrdinalIgnoreCase))
                 .Select(item => new AiPendingParameterInfo
@@ -210,6 +216,7 @@ public sealed class BuildResultAssembler
             "measurement_parameter" => "测量参数",
             "camera_binding" => "相机绑定",
             "output_channel" => "输出通道",
+            "plc_address" => "PLC 地址",
             _ => string.IsNullOrWhiteSpace(resourceType) ? "资源" : resourceType
         };
     }
@@ -227,7 +234,8 @@ public sealed class BuildResultAssembler
                      "template_artifact",
                      "measurement_parameter",
                      "camera_binding",
-                     "output_channel"
+                     "output_channel",
+                     "plc_address"
                  })
         {
             var match = missingResources.FirstOrDefault(item =>

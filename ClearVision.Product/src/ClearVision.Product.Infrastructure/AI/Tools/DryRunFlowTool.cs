@@ -203,7 +203,9 @@ public sealed class DryRunFlowTool : VisionAgentToolBase
             "DeepLearning" => "stub_detection_result",
             "TemplateMatching" => "stub_match_result",
             "CircleMeasurement" => "stub_circle_measurement",
-            "MeasureDistance" => "stub_distance_measurement",
+            "Measurement" => "stub_distance_measurement",
+            "UnitConvert" => "stub_unit_conversion",
+            "DetectionSequenceJudge" => "stub_sequence_judgment",
             "ResultJudgment" => "stub_judgment",
             "ResultOutput" => "stub_output_payload",
             _ => "stub_operator_output"

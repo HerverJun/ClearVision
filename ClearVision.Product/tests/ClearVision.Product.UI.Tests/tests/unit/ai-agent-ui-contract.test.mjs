@@ -286,6 +286,7 @@ function createPanel(AiPanel, overrides = {}) {
   panel.agentGenerateFlowMode = overrides.mode || 'scripted';
   panel.runtimePreviewConsent = overrides.runtimePreviewConsent === true;
   panel.pendingParameterDrafts = {};
+  panel.pendingResourceDrafts = {};
   panel.pendingOperatorBindings = {};
   panel.operatorMetadataCache = new Map();
   panel.operatorMetadataLoading = new Map();
@@ -726,6 +727,124 @@ function agentResponse() {
       }
     ]
   };
+}
+
+function resourceBindingResponse() {
+  return {
+    flow: {
+      operators: [
+        {
+          tempId: 'op_acq',
+          operatorType: 'ImageAcquisition',
+          displayName: '采集',
+          parameters: { SourceType: 'Camera', CameraId: '<pending-camera-binding>' }
+        },
+        {
+          tempId: 'op_detect',
+          operatorType: 'DeepLearning',
+          displayName: '缺陷检测',
+          parameters: { ModelPath: '<pending-model-resource>' }
+        },
+        {
+          tempId: 'op_match',
+          operatorType: 'TemplateMatching',
+          displayName: '模板定位',
+          parameters: { SimilarityThreshold: 0.8 }
+        },
+        {
+          tempId: 'op_calibration',
+          operatorType: 'UnitConvert',
+          displayName: '标定换算',
+          parameters: { Scale: '<pending-pixel-to-world-scale>' }
+        },
+        {
+          tempId: 'op_output',
+          operatorType: 'ResultOutput',
+          displayName: '输出',
+          parameters: {}
+        }
+      ],
+      connections: [],
+      metadataOnly: true
+    },
+    pendingParameters: [
+      { operatorId: 'op_detect', actualOperatorId: 'op_detect', parameterNames: ['ModelPath'] },
+      { operatorId: 'op_acq', actualOperatorId: 'op_acq', parameterNames: ['CameraId'] },
+      { operatorId: 'op_calibration', actualOperatorId: 'op_calibration', parameterNames: ['Scale'] }
+    ],
+    missingResources: [
+      { resourceType: 'model_resource', resourceKey: 'op_detect.ModelPath', operatorId: 'op_detect', parameterName: 'ModelPath', description: '部署前绑定模型资源元数据。' },
+      { resourceType: 'template_artifact', resourceKey: 'op_match.Template', operatorId: 'op_match', parameterName: 'Template', description: '部署前选择模板资源。' },
+      { resourceType: 'measurement_parameter', resourceKey: 'op_calibration.Scale', operatorId: 'op_calibration', parameterName: 'Scale', description: '部署前填写像素比例。' },
+      { resourceType: 'camera_binding', resourceKey: 'op_acq.CameraId', operatorId: 'op_acq', parameterName: 'CameraId', description: '部署前选择相机绑定。' },
+      { resourceType: 'output_channel', resourceKey: 'op_output.OutputChannel', operatorId: 'op_output', parameterName: 'OutputChannel', description: '部署前设置输出通道。' },
+      { resourceType: 'plc_address', resourceKey: 'op_output.PlcAddress', operatorId: 'op_output', parameterName: 'PlcAddress', description: 'PLC 地址仅记录 metadata，不写入 PLC。' }
+    ],
+    applyGate: {
+      canvasApplyReady: true,
+      runtimeDraftReady: true,
+      deploymentReady: false,
+      blocked: false,
+      status: 'canvas_apply_ready',
+      deploymentBlockers: [
+        'op_detect.ModelPath',
+        'op_match.Template',
+        'op_calibration.Scale',
+        'op_acq.CameraId',
+        'op_output.OutputChannel',
+        'op_output.PlcAddress'
+      ],
+      firstFixRecommendation: '先绑定模型资源。',
+      metadataOnly: true
+    },
+    validationPreview: {
+      deploymentPrecheck: {
+        readyForDeployment: false,
+        workflowDraftAllowed: true,
+        deploymentBlocked: true,
+        stationTouched: false
+      }
+    },
+    metadataOnly: true,
+    firstFixRecommendation: '先绑定模型资源。'
+  };
+}
+
+function resourceBindingOperatorMetadata() {
+  return [
+    {
+      type: 'ImageAcquisition',
+      parameters: [
+        { name: 'SourceType', dataType: 'enum' },
+        { name: 'CameraId', dataType: 'text', displayName: '相机绑定' }
+      ]
+    },
+    {
+      type: 'DeepLearning',
+      parameters: [
+        { name: 'ModelPath', dataType: 'text', displayName: '模型资源' }
+      ]
+    },
+    {
+      type: 'TemplateMatching',
+      parameters: [
+        { name: 'SimilarityThreshold', dataType: 'number', displayName: '相似度阈值' }
+      ]
+    },
+    {
+      type: 'UnitConvert',
+      parameters: [
+        { name: 'Scale', dataType: 'number', displayName: '像素比例' }
+      ]
+    },
+    {
+      type: 'ResultOutput',
+      parameters: [
+        { name: 'OutputChannel', dataType: 'text', displayName: '输出通道' },
+        { name: 'PlcAddress', dataType: 'text', displayName: 'PLC 地址' }
+      ]
+    }
+  ];
 }
 
 function cloneJson(value) {
@@ -2252,6 +2371,149 @@ test('readyForDeployment=false disables deployment actions but not workflow edit
 
   assert.match(validation.innerHTML, /data-agent-deployment-disabled="true"/);
   assert.match(validation.innerHTML, /data-agent-workflow-edit-enabled="true"/);
+});
+
+test('AI followup renders actionable resource binding entries in Chinese', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    options: { getOperators: resourceBindingOperatorMetadata }
+  });
+  const followups = createFakeElement();
+  panel.container = createContainer({
+    '#ai-result-followups': followups
+  });
+  const response = resourceBindingResponse();
+
+  panel._renderFollowupChecklist(response, response.flow);
+
+  assert.match(followups.innerHTML, /缺失资源/);
+  for (const label of [
+    '绑定模型资源',
+    '选择模板文件',
+    '填写标定\/像素比例',
+    '选择相机绑定',
+    '设置输出通道',
+    '记录 PLC 元数据',
+    '稍后处理'
+  ]) {
+    assert.match(followups.innerHTML, new RegExp(label));
+  }
+  assert.match(followups.innerHTML, /仅记录 metadata，不触发真实 PLC 写入/);
+  assert.doesNotMatch(followups.innerHTML, /rawPrompt|systemPrompt|chainOfThought|data:image\/png;base64|sk-secret|192\.168\./i);
+});
+
+test('resource binding action writes metadata and updates pending, missing, and apply gate state', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    options: { getOperators: resourceBindingOperatorMetadata }
+  });
+  const response = resourceBindingResponse();
+  panel.currentResult = response;
+  panel.currentResultVersion = 1;
+  panel.container = createContainer({
+    '#ai-result-followups': createFakeElement(),
+    '#ai-result-parameter-editor': createFakeElement(),
+    '#ai-result-validation-card': createFakeElement(),
+    '#ai-result-validation': createFakeElement(),
+    '#ai-btn-apply': createFakeButton()
+  });
+
+  const modelResource = response.missingResources.find(item => item.resourceType === 'model_resource');
+  const updated = panel._handleMissingResourceAction(modelResource, 'bind_model_resource', {
+    value: 'model-resource:scratch-v1',
+    data: response,
+    flow: response.flow
+  });
+
+  assert.equal(updated, true);
+  assert.equal(response.missingResources.some(item => item.resourceKey === 'op_detect.ModelPath'), false);
+  assert.equal(response.pendingParameters.some(item => item.operatorId === 'op_detect'), false);
+  assert.equal(response.applyGate.deploymentReady, false);
+  assert.equal(response.applyGate.deploymentBlockers.includes('op_detect.ModelPath'), false);
+  assert.equal(response.flow.operators.find(op => op.tempId === 'op_detect').parameters.ModelPath, 'model-resource:scratch-v1');
+  assert.equal(panel.pendingResourceDrafts['op_detect.ModelPath'].metadataOnly, true);
+  assert.match(panel.lastResultStatusNote.text, /仍有 9 项部署前待补/);
+  assertNoSensitiveLeak([
+    panel.lastResultStatusNote.text,
+    ...(panel.messages || []).map(item => item.text || '')
+  ].join('\n'));
+});
+
+test('resolving all resource tasks updates apply gate without guessing file paths or PLC writes', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    options: { getOperators: resourceBindingOperatorMetadata }
+  });
+  const response = resourceBindingResponse();
+  panel.currentResult = response;
+  panel.currentResultVersion = 1;
+  panel.container = createContainer({
+    '#ai-result-followups': createFakeElement(),
+    '#ai-result-parameter-editor': createFakeElement(),
+    '#ai-result-validation-card': createFakeElement(),
+    '#ai-result-validation': createFakeElement(),
+    '#ai-btn-apply': createFakeButton()
+  });
+  const resources = [...response.missingResources];
+  const valuesByType = new Map([
+    ['model_resource', 'model-resource:scratch-v1'],
+    ['template_artifact', 'template-artifact:fixture-a'],
+    ['measurement_parameter', '0.024'],
+    ['camera_binding', 'camera-binding:top-01'],
+    ['output_channel', 'output-channel:qa-board'],
+    ['plc_address', 'plc-metadata:db1-dbx0-0']
+  ]);
+
+  for (const resource of resources) {
+    const model = panel._getMissingResourceActionModel(resource);
+    panel._handleMissingResourceAction(resource, model.action, {
+      value: valuesByType.get(resource.resourceType),
+      data: response,
+      flow: response.flow
+    });
+  }
+
+  assert.deepEqual(response.missingResources, []);
+  assert.deepEqual(response.pendingParameters, []);
+  assert.equal(response.applyGate.deploymentReady, true);
+  assert.equal(response.applyGate.status, 'deployment_metadata_ready');
+  assert.equal(response.validationPreview.deploymentPrecheck.readyForDeployment, true);
+  assert.equal(response.validationPreview.deploymentPrecheck.deploymentBlocked, false);
+  assert.equal(response.firstFixRecommendation, '');
+  const output = response.flow.operators.find(op => op.tempId === 'op_output');
+  assert.equal(Object.prototype.hasOwnProperty.call(output.parameters, 'PlcAddress'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(output.parameters, 'OutputChannel'), false);
+  assertNoSensitiveLeak(JSON.stringify(response));
+});
+
+test('template artifact binding stays metadata-only and does not create fake TemplatePath parameter', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    options: { getOperators: resourceBindingOperatorMetadata }
+  });
+  const response = resourceBindingResponse();
+  panel.currentResult = response;
+  panel.currentResultVersion = 1;
+  panel.container = createContainer({
+    '#ai-result-followups': createFakeElement(),
+    '#ai-result-parameter-editor': createFakeElement(),
+    '#ai-result-validation-card': createFakeElement(),
+    '#ai-result-validation': createFakeElement(),
+    '#ai-btn-apply': createFakeButton()
+  });
+  const templateResource = response.missingResources.find(item => item.resourceType === 'template_artifact');
+
+  panel._handleMissingResourceAction(templateResource, 'select_template_artifact', {
+    value: 'template-artifact:fixture-a',
+    data: response,
+    flow: response.flow
+  });
+
+  const templateOperator = response.flow.operators.find(op => op.tempId === 'op_match');
+  assert.equal(response.missingResources.some(item => item.resourceKey === 'op_match.Template'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(templateOperator.parameters, 'TemplatePath'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(templateOperator.parameters, 'Template'), false);
+  assert.equal(panel.pendingResourceDrafts['op_match.Template'].value, 'template-artifact:fixture-a');
 });
 
 test('AI pending draft excludes FilePath when ImageAcquisition SourceType is Camera', async () => {

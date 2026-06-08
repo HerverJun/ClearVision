@@ -2,6 +2,7 @@ using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -10,10 +11,26 @@ namespace ClearVision.Product.Infrastructure.AI.Agent;
 public sealed class WorkflowDraftBuilder
 {
     private readonly IAiFlowGenerationService _generationService;
+    private readonly IVisionAgentOperatorContractCatalog _contractCatalog;
 
     public WorkflowDraftBuilder(IAiFlowGenerationService generationService)
+        : this(generationService, new VisionAgentOperatorContractCatalog())
+    {
+    }
+
+    public WorkflowDraftBuilder(
+        IAiFlowGenerationService generationService,
+        IOperatorFactory operatorFactory)
+        : this(generationService, new VisionAgentOperatorContractCatalog(operatorFactory))
+    {
+    }
+
+    internal WorkflowDraftBuilder(
+        IAiFlowGenerationService generationService,
+        IVisionAgentOperatorContractCatalog contractCatalog)
     {
         _generationService = generationService;
+        _contractCatalog = contractCatalog;
     }
 
     internal async Task<BuildStepResult<DraftWorkflowResolution>> DraftAsync(
@@ -34,10 +51,11 @@ public sealed class WorkflowDraftBuilder
             generationRequest,
             cancellationToken: cancellationToken);
 
-        var canonical = BuildCanonicalDraft(pipeline, parameters);
+        var connectionSpecs = BuildConnectionSpecs(pipeline.Steps);
+        var canonical = BuildCanonicalDraft(pipeline, parameters, connectionSpecs);
         var canvasFlow = VisionAgentBuildSupport.FlowOperatorCount(generation.Flow) > 0
-            ? generation.Flow as OperatorFlowDto ?? BuildCanvasFlow(load, intent, pipeline, parameters)
-            : BuildCanvasFlow(load, intent, pipeline, parameters);
+            ? generation.Flow as OperatorFlowDto ?? BuildCanvasFlow(load, intent, pipeline, parameters, connectionSpecs)
+            : BuildCanvasFlow(load, intent, pipeline, parameters, connectionSpecs);
         generation.Flow ??= canvasFlow;
 
         var resolution = new DraftWorkflowResolution(
@@ -69,14 +87,25 @@ public sealed class WorkflowDraftBuilder
     internal BuildStepResult<RepairDraftResolution> Repair(
         DraftWorkflowResolution draft,
         OperatorPipelineResolution pipeline,
-        ParameterMappingResolution parameters)
+        ParameterMappingResolution parameters,
+        IReadOnlyList<string> issueCodes,
+        int repairRound)
     {
-        var repaired = BuildCanonicalDraft(pipeline, parameters, forceLinearConnections: true);
+        var connectionSpecs = BuildConnectionSpecs(pipeline.Steps, forceBestEffort: true);
+        var repaired = BuildCanonicalDraft(pipeline, parameters, connectionSpecs);
+        var normalizedCodes = issueCodes
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(code => code, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var reason = normalizedCodes.Count == 0
+            ? "validation_or_dryrun_blocking_issue"
+            : string.Join(",", normalizedCodes);
         var record = new VisionAgentBuildRepairRecord
         {
             Stage = "validate_schema",
-            RepairReason = "validation_or_dryrun_blocking_issue",
-            DiffSummary = "已根据修复后的算子链重建仅元数据草稿连线。",
+            RepairReason = reason,
+            DiffSummary = $"第 {repairRound} 轮：按真实算子契约重建元数据草稿参数和兼容连线。",
             ResultStatus = "repaired",
             MetadataOnly = true
         };
@@ -88,35 +117,53 @@ public sealed class WorkflowDraftBuilder
         };
         return VisionAgentBuildSupport.StepResult(
             new RepairDraftResolution(nextDraft, record),
-            "已根据算子链自动重建一次草稿连线。",
+            $"已完成第 {repairRound} 轮自动修复：{record.RepairReason}。",
             AgentRunEventStatuses.Completed,
             new
             {
+                repairRound,
+                issueCodes = normalizedCodes,
                 repairReason = record.RepairReason,
                 diffSummary = record.DiffSummary,
                 resultStatus = record.ResultStatus,
                 metadataOnly = true
             },
-            repairAction: "rebuild_linear_connections",
+            repairAction: $"contract_repair_round_{repairRound}",
             applyImpact: "editable_draft_allowed",
             deploymentImpact: "readiness_recheck_required");
     }
 
-    private static CanonicalDraft BuildCanonicalDraft(
+    private CanonicalDraft BuildCanonicalDraft(
         OperatorPipelineResolution pipeline,
         ParameterMappingResolution parameters,
-        bool forceLinearConnections = false)
+        IReadOnlyList<ConnectionSpec> connectionSpecs)
     {
-        var operators = pipeline.Steps.Select(step => new
+        var operators = pipeline.Steps.Select(step =>
         {
-            tempId = step.TempId,
-            operatorType = step.OperatorType,
-            displayName = step.OperatorType,
-            parameters = parameters.Mappings
+            _contractCatalog.TryGet(step.OperatorType, out var contract);
+            var allowedParameters = contract?.Parameters
+                .Select(parameter => parameter.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+            var mappedParameters = parameters.Mappings
                 .Where(item => string.Equals(item.TempId, step.TempId, StringComparison.OrdinalIgnoreCase))
-                .ToDictionary(item => item.ParameterName, item => item.ValueSummary, StringComparer.OrdinalIgnoreCase)
+                .Where(item => allowedParameters.Contains(item.ParameterName))
+                .ToDictionary(item => item.ParameterName, item => item.ValueSummary, StringComparer.OrdinalIgnoreCase);
+
+            return new
+            {
+                tempId = step.TempId,
+                operatorType = _contractCatalog.CanonicalizeOperatorType(step.OperatorType),
+                displayName = contract?.DisplayName ?? step.OperatorType,
+                parameters = mappedParameters
+            };
         }).ToList<object>();
-        var connections = BuildCanonicalConnections(pipeline.Steps, forceLinearConnections).ToList();
+        var connections = connectionSpecs.Select(spec => new
+        {
+            sourceTempId = spec.SourceTempId,
+            sourcePortName = spec.SourcePortName,
+            targetTempId = spec.TargetTempId,
+            targetPortName = spec.TargetPortName
+        }).ToList<object>();
         var draft = new
         {
             operators,
@@ -131,42 +178,12 @@ public sealed class WorkflowDraftBuilder
             connections.Count);
     }
 
-    private static IEnumerable<object> BuildCanonicalConnections(
-        IReadOnlyList<VisionAgentOperatorPipelineStep> steps,
-        bool forceLinearConnections)
-    {
-        for (var index = 0; index < steps.Count - 1; index++)
-        {
-            var source = steps[index];
-            var target = steps[index + 1];
-            VisionAgentReadOnlyCatalog.Schemas.TryGetValue(source.OperatorType, out var sourceSchema);
-            VisionAgentReadOnlyCatalog.Schemas.TryGetValue(target.OperatorType, out var targetSchema);
-            var sourcePort = sourceSchema?.OutputPorts.FirstOrDefault();
-            var targetPort = targetSchema?.InputPorts.FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(sourcePort) ||
-                string.IsNullOrWhiteSpace(targetPort))
-            {
-                if (!forceLinearConnections)
-                {
-                    continue;
-                }
-            }
-
-            yield return new
-            {
-                sourceTempId = source.TempId,
-                sourcePortName = sourcePort ?? "Output",
-                targetTempId = target.TempId,
-                targetPortName = targetPort ?? "Input"
-            };
-        }
-    }
-
-    private static OperatorFlowDto BuildCanvasFlow(
+    private OperatorFlowDto BuildCanvasFlow(
         BuildPlanLoad load,
         BuildIntentResolution intent,
         OperatorPipelineResolution pipeline,
-        ParameterMappingResolution parameters)
+        ParameterMappingResolution parameters,
+        IReadOnlyList<ConnectionSpec> connectionSpecs)
     {
         var flow = intent.BuildIntent != "new"
             ? VisionAgentBuildSupport.TryReadExistingCanvasFlow(load.CurrentFlowSnapshot) ?? new OperatorFlowDto()
@@ -191,74 +208,314 @@ public sealed class WorkflowDraftBuilder
             existingNames.Add(step.TempId);
         }
 
-        if (flow.Connections.Count == 0)
-        {
-            AddCanvasConnections(flow);
-        }
-
+        AddCanvasConnections(flow, connectionSpecs);
         return flow;
     }
 
-    private static OperatorDto BuildCanvasOperator(
+    private OperatorDto BuildCanvasOperator(
         VisionAgentOperatorPipelineStep step,
         ParameterMappingResolution parameters,
         int index)
     {
-        var id = Guid.NewGuid();
-        VisionAgentReadOnlyCatalog.Schemas.TryGetValue(step.OperatorType, out var schema);
-        var inputPorts = schema?.InputPorts ?? Array.Empty<string>();
-        var outputPorts = schema?.OutputPorts ?? Array.Empty<string>();
+        if (!_contractCatalog.TryGet(step.OperatorType, out var contract))
+        {
+            throw new InvalidOperationException($"Unknown operator type '{step.OperatorType}' cannot be added to canvas draft.");
+        }
+
+        var mapped = parameters.Mappings
+            .Where(item => string.Equals(item.TempId, step.TempId, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(item => item.ParameterName, item => item.ValueSummary, StringComparer.OrdinalIgnoreCase);
         return new OperatorDto
         {
-            Id = id,
+            Id = Guid.NewGuid(),
             Name = step.TempId,
             Type = ToOperatorType(step.OperatorType),
             X = 160 + index * 180,
             Y = 180,
-            InputPorts = inputPorts.Select(name => new PortDto
+            InputPorts = contract.InputPorts.Select(port => new PortDto
             {
                 Id = Guid.NewGuid(),
-                Name = name,
+                Name = port.Name,
                 Direction = PortDirection.Input,
-                DataType = PortDataType.Any,
-                IsRequired = true
+                DataType = port.DataType,
+                IsRequired = port.IsRequired
             }).ToList(),
-            OutputPorts = outputPorts.Select(name => new PortDto
+            OutputPorts = contract.OutputPorts.Select(port => new PortDto
             {
                 Id = Guid.NewGuid(),
-                Name = name,
+                Name = port.Name,
                 Direction = PortDirection.Output,
-                DataType = string.Equals(name, "Image", StringComparison.OrdinalIgnoreCase)
-                    ? PortDataType.Image
-                    : PortDataType.Any,
+                DataType = port.DataType,
                 IsRequired = false
             }).ToList(),
-            Parameters = parameters.Mappings
-                .Where(item => string.Equals(item.TempId, step.TempId, StringComparison.OrdinalIgnoreCase))
-                .Select(item => new ParameterDto
+            Parameters = contract.Parameters.Select(parameter =>
+            {
+                mapped.TryGetValue(parameter.Name, out var mappedValue);
+                var value = string.IsNullOrWhiteSpace(mappedValue)
+                    ? parameter.DefaultValue
+                    : mappedValue;
+                return new ParameterDto
                 {
                     Id = Guid.NewGuid(),
-                    Name = item.ParameterName,
-                    DisplayName = item.ParameterName,
-                    DataType = "string",
-                    Value = item.ValueSummary,
-                    DefaultValue = item.ValueSummary,
-                    IsRequired = item.Pending
-                })
-                .ToList(),
+                    Name = parameter.Name,
+                    DisplayName = string.IsNullOrWhiteSpace(parameter.DisplayName) ? parameter.Name : parameter.DisplayName,
+                    Description = parameter.Description,
+                    DataType = parameter.DataType,
+                    Value = value,
+                    DefaultValue = parameter.DefaultValue,
+                    MinValue = parameter.MinValue,
+                    MaxValue = parameter.MaxValue,
+                    IsRequired = parameter.IsRequired,
+                    Options = CloneOptions(parameter.Options)
+                };
+            }).ToList(),
             IsEnabled = true
         };
     }
 
-    private static void AddCanvasConnections(OperatorFlowDto flow)
+    private IReadOnlyList<ConnectionSpec> BuildConnectionSpecs(
+        IReadOnlyList<VisionAgentOperatorPipelineStep> steps,
+        bool forceBestEffort = false)
     {
-        for (var index = 0; index < flow.Operators.Count - 1; index++)
+        var specs = new List<ConnectionSpec>();
+        var targetPorts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void Add(ConnectionSpec? spec)
         {
-            var source = flow.Operators[index];
-            var target = flow.Operators[index + 1];
-            var sourcePort = source.OutputPorts.FirstOrDefault();
-            var targetPort = target.InputPorts.FirstOrDefault();
-            if (sourcePort == null || targetPort == null)
+            if (spec == null)
+            {
+                return;
+            }
+
+            var key = $"{spec.TargetTempId}.{spec.TargetPortName}";
+            if (!targetPorts.Add(key))
+            {
+                return;
+            }
+
+            if (specs.Any(existing =>
+                    string.Equals(existing.SourceTempId, spec.SourceTempId, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(existing.SourcePortName, spec.SourcePortName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(existing.TargetTempId, spec.TargetTempId, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(existing.TargetPortName, spec.TargetPortName, StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            specs.Add(spec);
+        }
+
+        for (var targetIndex = 1; targetIndex < steps.Count; targetIndex++)
+        {
+            var target = steps[targetIndex];
+            if (!_contractCatalog.TryGet(target.OperatorType, out var targetContract))
+            {
+                continue;
+            }
+
+            foreach (var input in targetContract.InputPorts.Where(port => port.IsRequired))
+            {
+                if (!string.IsNullOrWhiteSpace(VisionAgentResourceClassifier.Classify(target.OperatorType, input.Name, input.DataType.ToString())))
+                {
+                    continue;
+                }
+
+                Add(FindLatestCompatibleSource(steps, targetIndex, target, input.Name, PreferredSourcePorts(target.OperatorType, input.Name)));
+            }
+
+            switch (target.OperatorType)
+            {
+                case "RoiManager":
+                case "DeepLearning":
+                case "SurfaceDefectDetection":
+                case "BlobAnalysis":
+                case "TemplateMatching":
+                case "CircleMeasurement":
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Image", ["Image", "DefectMask", "Mask"]));
+                    break;
+                case "DetectionSequenceJudge":
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Detections", ["DetectionList", "Defects", "Objects", "SortedDetections"]));
+                    break;
+                case "Measurement":
+                    AddMeasurementPointConnections(steps, targetIndex, target, Add);
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Image", ["Image"]));
+                    break;
+                case "UnitConvert":
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Value", ["Distance", "Radius", "Diameter", "DefectArea"]));
+                    break;
+                case "ResultJudgment":
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Value",
+                        ["Result", "IsMatch", "BlobCount", "DefectCount", "ObjectCount", "MatchCount", "Score", "Distance", "JudgmentResult"]));
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Confidence", ["Score", "NormalizedScore"]));
+                    break;
+                case "ResultOutput":
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Result",
+                        ["JudgmentResult", "IsOk", "ConditionResult", "Result", "Data", "DefectCount", "BlobCount", "MatchCount"]));
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Image", ["Image"]));
+                    break;
+            }
+
+            if (forceBestEffort)
+            {
+                foreach (var input in targetContract.InputPorts)
+                {
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, input.Name, PreferredSourcePorts(target.OperatorType, input.Name)));
+                }
+            }
+        }
+
+        return specs;
+    }
+
+    private void AddMeasurementPointConnections(
+        IReadOnlyList<VisionAgentOperatorPipelineStep> steps,
+        int targetIndex,
+        VisionAgentOperatorPipelineStep target,
+        Action<ConnectionSpec?> add)
+    {
+        var circleSources = steps
+            .Take(targetIndex)
+            .Where(step => string.Equals(step.OperatorType, "CircleMeasurement", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (circleSources.Count > 0)
+        {
+            add(BuildConnection(circleSources[0], "Center", target, "PointA"));
+        }
+
+        if (circleSources.Count > 1)
+        {
+            add(BuildConnection(circleSources[1], "Center", target, "PointB"));
+        }
+    }
+
+    private ConnectionSpec? FindLatestCompatibleSource(
+        IReadOnlyList<VisionAgentOperatorPipelineStep> steps,
+        int targetIndex,
+        VisionAgentOperatorPipelineStep target,
+        string targetPortName,
+        IReadOnlyList<string> preferredSourcePorts)
+    {
+        if (!_contractCatalog.TryGet(target.OperatorType, out var targetContract))
+        {
+            return null;
+        }
+
+        var targetPort = targetContract.InputPorts.FirstOrDefault(port =>
+            string.Equals(port.Name, targetPortName, StringComparison.OrdinalIgnoreCase));
+        if (targetPort == null)
+        {
+            return null;
+        }
+
+        for (var sourceIndex = targetIndex - 1; sourceIndex >= 0; sourceIndex--)
+        {
+            var source = steps[sourceIndex];
+            if (!_contractCatalog.TryGet(source.OperatorType, out var sourceContract))
+            {
+                continue;
+            }
+
+            foreach (var preferredPort in preferredSourcePorts)
+            {
+                var sourcePort = sourceContract.OutputPorts.FirstOrDefault(port =>
+                    string.Equals(port.Name, preferredPort, StringComparison.OrdinalIgnoreCase));
+                if (sourcePort != null &&
+                    PortDataTypeCompatibility.AreCompatible(sourcePort.DataType, targetPort.DataType))
+                {
+                    return new ConnectionSpec(source.TempId, sourcePort.Name, target.TempId, targetPort.Name);
+                }
+            }
+
+            var compatible = sourceContract.OutputPorts.FirstOrDefault(port =>
+                PortDataTypeCompatibility.AreCompatible(port.DataType, targetPort.DataType));
+            if (compatible != null)
+            {
+                return new ConnectionSpec(source.TempId, compatible.Name, target.TempId, targetPort.Name);
+            }
+        }
+
+        return null;
+    }
+
+    private ConnectionSpec? BuildConnection(
+        VisionAgentOperatorPipelineStep source,
+        string sourcePortName,
+        VisionAgentOperatorPipelineStep target,
+        string targetPortName)
+    {
+        if (!_contractCatalog.TryGet(source.OperatorType, out var sourceContract) ||
+            !_contractCatalog.TryGet(target.OperatorType, out var targetContract))
+        {
+            return null;
+        }
+
+        var sourcePort = sourceContract.OutputPorts.FirstOrDefault(port =>
+            string.Equals(port.Name, sourcePortName, StringComparison.OrdinalIgnoreCase));
+        var targetPort = targetContract.InputPorts.FirstOrDefault(port =>
+            string.Equals(port.Name, targetPortName, StringComparison.OrdinalIgnoreCase));
+        if (sourcePort == null ||
+            targetPort == null ||
+            !PortDataTypeCompatibility.AreCompatible(sourcePort.DataType, targetPort.DataType))
+        {
+            return null;
+        }
+
+        return new ConnectionSpec(source.TempId, sourcePort.Name, target.TempId, targetPort.Name);
+    }
+
+    private static IReadOnlyList<string> PreferredSourcePorts(string operatorType, string targetPortName)
+    {
+        if (targetPortName.Equals("Image", StringComparison.OrdinalIgnoreCase))
+        {
+            return ["Image", "DefectMask", "Mask"];
+        }
+
+        if (targetPortName.Equals("Value", StringComparison.OrdinalIgnoreCase))
+        {
+            return ["Result", "Distance", "DefectCount", "BlobCount", "MatchCount", "Score", "IsMatch"];
+        }
+
+        if (targetPortName.Equals("Result", StringComparison.OrdinalIgnoreCase))
+        {
+            return ["JudgmentResult", "IsOk", "Result", "Data"];
+        }
+
+        return operatorType switch
+        {
+            "DetectionSequenceJudge" => ["DetectionList", "Defects", "Objects"],
+            "UnitConvert" => ["Distance", "Radius", "Diameter"],
+            _ => ["Output", "Result", "Image", "Data"]
+        };
+    }
+
+    private static void AddCanvasConnections(
+        OperatorFlowDto flow,
+        IReadOnlyList<ConnectionSpec> connectionSpecs)
+    {
+        var byName = flow.Operators
+            .Where(op => !string.IsNullOrWhiteSpace(op.Name))
+            .GroupBy(op => op.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var spec in connectionSpecs)
+        {
+            if (!byName.TryGetValue(spec.SourceTempId, out var source) ||
+                !byName.TryGetValue(spec.TargetTempId, out var target))
+            {
+                continue;
+            }
+
+            var sourcePort = source.OutputPorts.FirstOrDefault(port =>
+                string.Equals(port.Name, spec.SourcePortName, StringComparison.OrdinalIgnoreCase));
+            var targetPort = target.InputPorts.FirstOrDefault(port =>
+                string.Equals(port.Name, spec.TargetPortName, StringComparison.OrdinalIgnoreCase));
+            if (sourcePort == null ||
+                targetPort == null ||
+                flow.Connections.Any(connection =>
+                    connection.SourceOperatorId == source.Id &&
+                    connection.SourcePortId == sourcePort.Id &&
+                    connection.TargetOperatorId == target.Id &&
+                    connection.TargetPortId == targetPort.Id))
             {
                 continue;
             }
@@ -285,19 +542,29 @@ public sealed class WorkflowDraftBuilder
         };
     }
 
-    private static OperatorType ToOperatorType(string operatorType)
+    private OperatorType ToOperatorType(string operatorType)
     {
-        if (Enum.TryParse<OperatorType>(operatorType, ignoreCase: true, out var parsed))
+        var canonical = _contractCatalog.CanonicalizeOperatorType(operatorType);
+        if (Enum.TryParse<OperatorType>(canonical, ignoreCase: true, out var parsed))
         {
-            return parsed;
+            return OperatorTypeAliasResolver.Resolve(parsed);
         }
 
-        return operatorType switch
-        {
-            "MeasureDistance" => OperatorType.Measurement,
-            "SemanticSegmentation" => OperatorType.DeepLearning,
-            "ImageCompose" => OperatorType.ImageAdd,
-            _ => OperatorType.DeepLearning
-        };
+        throw new InvalidOperationException($"Operator type '{operatorType}' is not a ClearVision OperatorType.");
     }
+
+    private static List<ParameterOption>? CloneOptions(IReadOnlyList<ParameterOption>? options)
+    {
+        return options?.Select(option => new ParameterOption
+        {
+            Label = option.Label,
+            Value = option.Value
+        }).ToList();
+    }
+
+    private sealed record ConnectionSpec(
+        string SourceTempId,
+        string SourcePortName,
+        string TargetTempId,
+        string TargetPortName);
 }

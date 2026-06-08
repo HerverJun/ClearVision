@@ -13,6 +13,7 @@ import {
     aiPanelWorkbenchMixin
 } from './aiPanelWorkbench.js';
 import { aiPanelPendingParametersMixin } from './aiPanelPendingParameters.js';
+import { aiPanelResourceBindingMixin } from './aiPanelResourceBinding.js';
 import { aiPanelChatMixin } from './aiPanelChat.js';
 import { aiPanelValidationPreviewMixin } from './aiPanelValidationPreview.js';
 import { aiPanelGenerateRequestMixin } from './aiPanelGenerateRequest.js';
@@ -57,6 +58,7 @@ export class AiPanel {
         this.isCancellingGenerate = false;
         this.attachments = [];
         this.pendingParameterDrafts = {};
+        this.pendingResourceDrafts = {};
         this.pendingParameterDraftSignature = '';
         this.operatorMetadataCache = new Map();
         this.operatorMetadataLoading = new Map();
@@ -235,6 +237,7 @@ export class AiPanel {
 
     _resetPendingDraftState() {
         this.pendingParameterDrafts = {};
+        this.pendingResourceDrafts = {};
         this.pendingParameterDraftSignature = '';
         this.pendingOperatorBindings = {};
         this.pendingParameterConfirmedDraftSignature = '';
@@ -1322,15 +1325,22 @@ export class AiPanel {
         const missingHtml = missing.length > 0
             ? `
                 <div class="ai-followup-section">
-                    <div class="ai-followup-section-label">缺失资源</div>
+                    <div class="ai-followup-section-header">
+                        <div class="ai-followup-section-label">缺失资源</div>
+                        <div class="ai-followup-section-tip">填写元数据或选择稍后处理</div>
+                    </div>
                     <div class="ai-followup-list">
-                        ${missing.map(item => `
-                            <div class="ai-followup-item">
+                        ${missing.map((item, index) => {
+                            const actionModel = this._getMissingResourceActionModel(item);
+                            return `
+                            <div class="ai-followup-item ai-followup-resource-task" data-resource-index="${this._escapeHtml(String(index))}">
                                 <div class="ai-followup-item-title" title="${this._escapeHtml(item.resourceType || '资源')}">${this._escapeHtml(getResourceDisplayName(item.resourceType, { fallback: '资源' }))}</div>
                                 <div class="ai-followup-item-body">${this._escapeHtml(item.description || item.resourceKey || '缺少必要资源')}</div>
-                                ${item.resourceKey ? `<div class="ai-followup-item-meta" title="${this._escapeHtml(item.resourceKey)}">资源键</div>` : ''}
+                                ${item.resourceKey ? `<div class="ai-followup-item-meta" title="${this._escapeHtml(item.resourceKey)}">资源键：${this._escapeHtml(item.resourceKey)}</div>` : ''}
+                                ${this._renderMissingResourceActionControls(item, actionModel, index)}
                             </div>
-                        `).join('')}
+                        `;
+                        }).join('')}
                     </div>
                 </div>
             `
@@ -1396,6 +1406,23 @@ export class AiPanel {
                     ? `下一轮将严格沿用模板「${templateName || selection.scenarioKey || '已选模板'}」。`
                     : `下一轮将参考模板「${templateName || selection.scenarioKey || '已选模板'}」并允许改造。`;
                 this._queueTemplateSelection(selection, label);
+            });
+        });
+
+        container.querySelectorAll('[data-resource-action]').forEach(button => {
+            button.disabled = this.isGenerating;
+            button.addEventListener('click', () => {
+                const resourceIndex = Number.parseInt(button.dataset.resourceIndex || '-1', 10);
+                const item = Number.isInteger(resourceIndex) && resourceIndex >= 0 ? missing[resourceIndex] : null;
+                if (!item) return;
+
+                const task = button.closest?.('.ai-followup-resource-task') || null;
+                const inputEl = task?.querySelector?.('[data-resource-input="true"]') || null;
+                this._handleMissingResourceAction(item, button.dataset.resourceAction || '', {
+                    value: inputEl?.value ?? '',
+                    data,
+                    flow
+                });
             });
         });
 
@@ -1626,7 +1653,7 @@ export class AiPanel {
         this.container.querySelectorAll('.ai-followup-action').forEach(btnEl => {
             btnEl.disabled = busy;
         });
-        this.container.querySelectorAll('[data-draft-input="true"], [data-draft-file-pick], [data-followup-nav], [data-draft-adopt]').forEach(el => {
+        this.container.querySelectorAll('[data-draft-input="true"], [data-draft-file-pick], [data-followup-nav], [data-draft-adopt], [data-resource-action], [data-resource-input]').forEach(el => {
             el.disabled = busy;
         });
         const clearHintBtn = this.container.querySelector('#ai-btn-clear-followup-hint');
@@ -2215,6 +2242,7 @@ Object.assign(
     AiPanel.prototype,
     aiPanelWorkbenchMixin,
     aiPanelPendingParametersMixin,
+    aiPanelResourceBindingMixin,
     aiPanelChatMixin,
     aiPanelValidationPreviewMixin,
     aiPanelGenerateRequestMixin,

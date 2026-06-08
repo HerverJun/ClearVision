@@ -52,7 +52,7 @@ public sealed class VisionAgentSimulationToolsTests
         var payload = Json(result.Data);
         payload.GetProperty("isValid").GetBoolean().Should().BeTrue();
         payload.GetProperty("blockingIssues").GetArrayLength().Should().Be(0);
-        payload.GetProperty("operatorCount").GetInt32().Should().Be(5);
+        payload.GetProperty("operatorCount").GetInt32().Should().Be(6);
     }
 
     [Fact(DisplayName = "validate_flow should detect missing operators")]
@@ -76,7 +76,7 @@ public sealed class VisionAgentSimulationToolsTests
             CancellationToken.None);
 
         result.Success.Should().BeTrue();
-        Codes(Json(result.Data), "blockingIssues").Should().Contain("broken_connection_temp_id");
+        Codes(Json(result.Data), "blockingIssues").Should().Contain("invalid_connection");
     }
 
     [Fact(DisplayName = "validate_flow should detect duplicate tempId")]
@@ -105,7 +105,7 @@ public sealed class VisionAgentSimulationToolsTests
         payload.GetProperty("imageAcquisitionCount").GetInt32().Should().Be(2);
     }
 
-    [Fact(DisplayName = "validate_flow should report missing ModelPath TemplatePath and CameraBindingId")]
+    [Fact(DisplayName = "validate_flow should report missing ModelPath Template input and CameraId")]
     public async Task ValidateFlow_ShouldReportMissingResources()
     {
         var result = await new FlowValidationTool().ExecuteAsync(
@@ -120,9 +120,9 @@ public sealed class VisionAgentSimulationToolsTests
             .Select(item => item.GetProperty("parameterName").GetString())
             .ToList();
 
-        missingParameters.Should().Contain("CameraBindingId");
+        missingParameters.Should().Contain("CameraId");
         missingParameters.Should().Contain("ModelPath");
-        missingParameters.Should().Contain("TemplatePath");
+        missingParameters.Should().Contain("Template");
     }
 
     [Fact(DisplayName = "dryrun_flow should return simulated execution summary")]
@@ -356,8 +356,8 @@ public sealed class VisionAgentSimulationToolsTests
         {
             operators = new object[]
             {
-                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
-                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "template://fixture" })
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraId"] = "cam_1" }),
+                Operator("op_match", "TemplateMatching")
             },
             connections = new object[]
             {
@@ -372,8 +372,8 @@ public sealed class VisionAgentSimulationToolsTests
         {
             operators = new object[]
             {
-                Operator("op_dup", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
-                Operator("op_dup", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "template://fixture" })
+                Operator("op_dup", "ImageAcquisition", new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraId"] = "cam_1" }),
+                Operator("op_dup", "TemplateMatching")
             },
             connections = Array.Empty<object>()
         };
@@ -385,14 +385,14 @@ public sealed class VisionAgentSimulationToolsTests
         {
             operators = new object[]
             {
-                Operator("op_cam_a", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_a" }),
-                Operator("op_cam_b", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_b" }),
-                Operator("op_compose", "ImageCompose")
+                Operator("op_cam_a", "ImageAcquisition", new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraId"] = "cam_a" }),
+                Operator("op_cam_b", "ImageAcquisition", new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraId"] = "cam_b" }),
+                Operator("op_compose", "ImageAdd")
             },
             connections = new object[]
             {
-                Connection("op_cam_a", "Image", "op_compose", "ImageA"),
-                Connection("op_cam_b", "Image", "op_compose", "ImageB")
+                Connection("op_cam_a", "Image", "op_compose", "Image1"),
+                Connection("op_cam_b", "Image", "op_compose", "Image2")
             }
         };
     }
@@ -421,16 +421,17 @@ public sealed class VisionAgentSimulationToolsTests
         {
             operators = new object[]
             {
-                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
-                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "template://fixture" }),
+                Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraId"] = "cam_1" }),
+                Operator("op_match", "TemplateMatching"),
                 Operator("op_judge", "ResultJudgment"),
                 Operator("op_out", "ResultOutput")
             },
             connections = new object[]
             {
                 Connection("op_cam", "Image", "op_match", "Image"),
-                Connection("op_match", "Score", "op_judge", "Input"),
-                Connection("op_judge", "Result", "op_out", "Input")
+                Connection("op_cam", "Image", "op_match", "Template"),
+                Connection("op_match", "Score", "op_judge", "Value"),
+                Connection("op_judge", "JudgmentResult", "op_out", "Result")
             }
         };
     }
@@ -439,7 +440,7 @@ public sealed class VisionAgentSimulationToolsTests
     {
         var operators = new List<object>
         {
-            Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" })
+            Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["SourceType"] = "Camera", ["CameraId"] = "cam_1" })
         };
         var connections = new List<object>();
         var previous = "op_cam";
@@ -448,13 +449,13 @@ public sealed class VisionAgentSimulationToolsTests
         {
             var tempId = $"op_judge_{i}";
             operators.Add(Operator(tempId, "ResultJudgment"));
-            connections.Add(Connection(previous, previousPort, tempId, "Input"));
+            connections.Add(Connection(previous, previousPort, tempId, "Value"));
             previous = tempId;
-            previousPort = "Result";
+            previousPort = "JudgmentResult";
         }
 
         operators.Add(Operator("op_out", "ResultOutput"));
-        connections.Add(Connection(previous, previousPort, "op_out", "Input"));
+        connections.Add(Connection(previous, previousPort, "op_out", "Result"));
         return new { operators, connections };
     }
 

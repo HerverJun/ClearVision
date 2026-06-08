@@ -45,8 +45,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult!.ToolEvidenceTimeline.Should().Contain(item => item.ToolName == "plan_snapshot_loader");
     }
 
-    [Fact(DisplayName = "Black-box metal scratch Build should create editable surface defect draft with missing model resource")]
-    public async Task BuildAsync_MetalScratch_ShouldBuildSurfaceDefectDraftWithMissingModelResource()
+    [Fact(DisplayName = "Black-box metal scratch Build should create editable surface defect draft without fake model resource")]
+    public async Task BuildAsync_MetalScratch_ShouldBuildSurfaceDefectDraftWithoutFakeModelResource()
     {
         var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
         var plan = Plan(
@@ -63,7 +63,9 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.ApplyGate.CanvasApplyReady.Should().BeTrue();
         result.BuildResult.ApplyGate.DeploymentReady.Should().BeFalse();
         result.BuildResult.MissingResources.Should().Contain(item =>
-            item.ResourceType == "model_resource" &&
+            item.ResourceType == "camera_binding" &&
+            item.ResourceKey == "op_cam.CameraId");
+        result.BuildResult.MissingResources.Should().NotContain(item =>
             item.ResourceKey == "op_surface_defect.ModelId");
     }
 
@@ -86,10 +88,11 @@ public sealed class VisionAgentBuildOrchestratorTests
             .Should()
             .Contain(["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"]);
         result.BuildResult.MissingResources.Should().Contain(item =>
-            item.ResourceType == "model_resource" &&
+            item.ResourceType == "camera_binding" &&
+            item.ResourceKey == "op_cam.CameraId");
+        result.BuildResult.MissingResources.Should().NotContain(item =>
             item.ResourceKey == "op_surface_defect.ModelId");
-        result.BuildResult.FirstFixRecommendation.Should().Contain("模型资源");
-        result.BuildResult.FirstFixRecommendation.Should().Contain("op_surface_defect.ModelId");
+        result.BuildResult.FirstFixRecommendation.Should().Contain("相机绑定");
         AssertBuildQuality(result, sink, expectPreserved: true);
     }
 
@@ -110,7 +113,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.Success.Should().BeTrue();
         result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
             .Should()
-            .Contain(["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"]);
+            .Contain(["ImageAcquisition", "DeepLearning", "DetectionSequenceJudge", "ResultJudgment", "ResultOutput"]);
         var modelMapping = result.BuildResult.ParameterMapping.Should().ContainSingle(item =>
             item.OperatorType == "DeepLearning" &&
             item.ParameterName == "ModelPath").Subject;
@@ -119,9 +122,9 @@ public sealed class VisionAgentBuildOrchestratorTests
         modelMapping.ValueSummary.Should().NotContain(":\\");
         modelMapping.ValueSummary.Should().NotContain("/");
         result.BuildResult.ParameterMapping.Should().Contain(item =>
-            item.OperatorType == "ResultJudgment" &&
-            item.ParameterName == "Rule" &&
-            item.ValueSummary.Contains("线序", StringComparison.OrdinalIgnoreCase));
+            item.OperatorType == "DetectionSequenceJudge" &&
+            item.ParameterName == "ExpectedLabels" &&
+            item.Pending);
         result.BuildResult.MissingResources.Should().Contain(item =>
             item.ResourceType == "model_resource" &&
             item.ResourceKey == "op_detect.ModelPath");
@@ -136,7 +139,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         var orchestrator = CreateOrchestrator(sink);
         var plan = Plan(
             "measurement",
-            ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "MeasureDistance", "ResultJudgment", "ResultOutput"],
+            ["ImageAcquisition", "CircleMeasurement", "CircleMeasurement", "MeasureDistance", "UnitConvert", "ResultJudgment", "ResultOutput"],
             "hole center distance measurement workflow");
 
         var result = await orchestrator.BuildAsync(
@@ -146,23 +149,18 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.Success.Should().BeTrue();
         result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
             .Should()
-            .Contain(["ImageAcquisition", "CircleMeasurement", "MeasureDistance", "ResultJudgment", "ResultOutput"]);
+            .Contain(["ImageAcquisition", "CircleMeasurement", "Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"]);
         result.BuildResult.ParameterMapping.Should().Contain(item =>
-            item.OperatorType == "MeasureDistance" &&
-            item.ParameterName == "Unit" &&
+            item.OperatorType == "UnitConvert" &&
+            item.ParameterName == "Scale" &&
             item.Pending &&
-            item.ValueSummary.Contains("calibration", StringComparison.OrdinalIgnoreCase));
-        result.BuildResult.ParameterMapping.Should().Contain(item =>
-            item.OperatorType == "MeasureDistance" &&
-            item.ParameterName == "Tolerance" &&
-            item.Pending &&
-            item.ValueSummary.Contains("measurement-threshold", StringComparison.OrdinalIgnoreCase));
+            item.ValueSummary.Contains("pixel-to-world-scale", StringComparison.OrdinalIgnoreCase));
         result.BuildResult.PendingParameters.Should().Contain(item =>
-            item.OperatorId == "op_distance" &&
-            item.ParameterNames.Contains("Unit"));
+            item.OperatorId == "op_calibration" &&
+            item.ParameterNames.Contains("Scale"));
         result.BuildResult.MissingResources.Should().Contain(item =>
             item.ResourceType == "measurement_parameter" &&
-            item.ResourceKey == "op_distance.Unit");
+            item.ResourceKey == "op_calibration.Scale");
         AssertBuildQuality(result, sink, expectPreserved: true);
     }
 
@@ -200,7 +198,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             .NotContain("SurfaceDefectDetection");
         result.BuildResult.MissingResources.Should().Contain(item =>
             item.ResourceType == "template_artifact" &&
-            item.ResourceKey == "op_match.TemplatePath");
+            item.ResourceKey == "op_match.Template");
         result.BuildResult.FirstFixRecommendation.Should().Contain("模板资源");
         result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
             item.Stage == "template_strategy" &&
@@ -323,17 +321,17 @@ public sealed class VisionAgentBuildOrchestratorTests
 
         result.Success.Should().BeTrue();
         result.BuildResult!.ParameterMapping.Should().Contain(item =>
-            item.OperatorType == "SurfaceDefectDetection" &&
-            item.ParameterName == "ModelId" &&
+            item.OperatorType == "ImageAcquisition" &&
+            item.ParameterName == "CameraId" &&
             item.Pending &&
             item.Source == "pending_metadata");
         result.BuildResult.PendingParameters.Should().Contain(item =>
-            item.OperatorId == "op_surface_defect" &&
-            item.ParameterNames.Contains("ModelId"));
+            item.OperatorId == "op_cam" &&
+            item.ParameterNames.Contains("CameraId"));
         result.BuildResult.MissingResources.Should().Contain(item =>
-            item.ResourceType == "model_resource" &&
-            item.ResourceKey == "op_surface_defect.ModelId");
-        result.BuildResult.WorkflowDiff.DeploymentBlockers.Should().Contain("op_surface_defect.ModelId");
+            item.ResourceType == "camera_binding" &&
+            item.ResourceKey == "op_cam.CameraId");
+        result.BuildResult.WorkflowDiff.DeploymentBlockers.Should().Contain("op_cam.CameraId");
     }
 
     [Fact(DisplayName = "Build orchestrator modify intent should preserve existing canvas nodes")]

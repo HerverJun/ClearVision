@@ -17,7 +17,6 @@ internal static class VisionAgentParameterRuleCenter
         foreach (var op in flow.Operators)
         {
             AddImageAcquisitionResources(op, missingResources);
-            AddTemplateMatchingResources(op, missingResources);
             AddDeepLearningResources(op, missingResources);
             AddResultOutputResources(op, missingResources);
             AddPlcResources(op, missingResources);
@@ -46,7 +45,7 @@ internal static class VisionAgentParameterRuleCenter
             AddMissingAtLeastOne(
                 op,
                 missingResources,
-                "image_source",
+                "camera_binding",
                 ["FilePath"],
                 "ImageAcquisition.FilePath is not configured for file source.");
             return;
@@ -56,32 +55,18 @@ internal static class VisionAgentParameterRuleCenter
             op,
             missingResources,
             "camera_binding",
-            ["CameraBindingId", "CameraId"],
-            "ImageAcquisition.CameraBindingId is not configured.");
-    }
-
-    private static void AddTemplateMatchingResources(
-        VisionAgentFlowOperator op,
-        List<VisionAgentMissingResource> missingResources)
-    {
-        if (!IsOperatorType(op, "TemplateMatching"))
-        {
-            return;
-        }
-
-        AddMissingAtLeastOne(
-            op,
-            missingResources,
-            "template_path",
-            ["TemplatePath", "TemplateId"],
-            "TemplateMatching.TemplatePath is not configured.");
+            ["CameraId", "CameraBindingId"],
+            "ImageAcquisition.CameraId is not configured.");
     }
 
     private static void AddDeepLearningResources(
         VisionAgentFlowOperator op,
         List<VisionAgentMissingResource> missingResources)
     {
-        if (!IsOperatorType(op, "DeepLearning"))
+        if (!IsOperatorType(op, "DeepLearning") &&
+            !IsOperatorType(op, "OnnxInference") &&
+            !IsOperatorType(op, "SemanticSegmentation") &&
+            !IsOperatorType(op, "AnomalyDetection"))
         {
             return;
         }
@@ -89,9 +74,9 @@ internal static class VisionAgentParameterRuleCenter
         AddMissingAtLeastOne(
             op,
             missingResources,
-            "model_path",
+            "model_resource",
             ["ModelPath", "ModelId", "ModelCatalogPath"],
-            "DeepLearning.ModelPath is not configured.");
+            $"{op.OperatorType}.ModelPath or ModelId is not configured.");
     }
 
     private static void AddResultOutputResources(
@@ -107,10 +92,10 @@ internal static class VisionAgentParameterRuleCenter
             op,
             missingResources,
             "output_channel",
-            ["Channel", "OutputChannel", "OutputChannelId"],
-            "ResultOutput.Channel is not configured.");
+            ["OutputChannel", "OutputChannelId"],
+            "ResultOutput output channel metadata is not configured.");
 
-        var channel = GetFirstPresentParameter(op.Parameters, "Channel", "OutputChannel");
+        var channel = GetFirstPresentParameter(op.Parameters, "OutputChannel");
         if (string.Equals(channel, "file", StringComparison.OrdinalIgnoreCase))
         {
             AddMissingAtLeastOne(
@@ -126,7 +111,7 @@ internal static class VisionAgentParameterRuleCenter
             AddMissingAtLeastOne(
                 op,
                 missingResources,
-                "plc_parameters",
+                "plc_address",
                 ["PlcAddress", "PLCParameters"],
                 "ResultOutput.PlcAddress is not configured for PLC output.");
         }
@@ -144,7 +129,7 @@ internal static class VisionAgentParameterRuleCenter
         AddMissingAtLeastOne(
             op,
             missingResources,
-            "plc_parameters",
+            "plc_address",
             ["PLCParameters", "PlcAddress"],
             $"{op.OperatorType} PLC parameters are missing or pending.");
     }

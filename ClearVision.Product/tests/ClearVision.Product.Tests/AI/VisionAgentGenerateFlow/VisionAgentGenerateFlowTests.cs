@@ -268,8 +268,8 @@ public sealed class VisionAgentGenerateFlowTests
         diagnosticJson.Should().NotContain("chainOfThought");
     }
 
-    [Fact(DisplayName = "Wire sequence request should generate draft and ModelPath pending action")]
-    public async Task AgentGenerateFlow_WireSequence_ShouldReturnModelPathPendingAction()
+    [Fact(DisplayName = "Wire sequence request should generate draft and model resource pending action")]
+    public async Task AgentGenerateFlow_WireSequence_ShouldReturnModelResourcePendingAction()
     {
         var result = await CreateVisionAgentGenerateFlowService().GenerateFlowAsync(
             AgentRequest("terminal wire sequence inspection"),
@@ -277,12 +277,12 @@ public sealed class VisionAgentGenerateFlowTests
 
         result.Success.Should().BeTrue();
         Flow(result).Operators.Select(op => op.Type).Should().Contain(OperatorType.DeepLearning);
-        result.MissingResources.Select(item => item.ResourceType).Should().Contain("model_path");
+        result.MissingResources.Select(item => item.ResourceType).Should().Contain("model_resource");
         Json(result.PendingActions).GetRawText().Should().Contain("ModelPath");
     }
 
-    [Fact(DisplayName = "Template matching request should generate draft and TemplatePath pending action")]
-    public async Task AgentGenerateFlow_TemplateMatching_ShouldReturnTemplatePathPendingAction()
+    [Fact(DisplayName = "Template matching request should generate draft and template artifact pending action")]
+    public async Task AgentGenerateFlow_TemplateMatching_ShouldReturnTemplateArtifactPendingAction()
     {
         var result = await CreateVisionAgentGenerateFlowService().GenerateFlowAsync(
             AgentRequest("template matching alignment for bracket"),
@@ -290,8 +290,9 @@ public sealed class VisionAgentGenerateFlowTests
 
         result.Success.Should().BeTrue();
         Flow(result).Operators.Select(op => op.Type).Should().Contain(OperatorType.TemplateMatching);
-        result.MissingResources.Select(item => item.ResourceType).Should().Contain("template_path");
-        Json(result.PendingActions).GetRawText().Should().Contain("TemplatePath");
+        result.MissingResources.Select(item => item.ResourceType).Should().Contain("template_artifact");
+        Json(result.PendingActions).GetRawText().Should().Contain("Template");
+        Json(result.PendingActions).GetRawText().Should().NotContain("TemplatePath");
     }
 
     [Fact(DisplayName = "Hole distance measurement request should generate measurement draft")]
@@ -331,7 +332,7 @@ public sealed class VisionAgentGenerateFlowTests
 
         result.Success.Should().BeTrue();
         var structural = ValidationPreview(result).GetProperty("structuralValidation");
-        Codes(structural, "blockingIssues").Should().Contain("broken_connection_temp_id");
+        Codes(structural, "blockingIssues").Should().Contain("invalid_connection");
     }
 
     [Fact(DisplayName = "Deployment precheck should not deploy create package or touch station")]
@@ -385,7 +386,7 @@ public sealed class VisionAgentGenerateFlowTests
                 Success = true,
                 CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
                 Flow = flow,
-                MissingResources = [new AiMissingResourceInfo { ResourceType = "model_path", ResourceKey = "op.ModelPath", Description = "missing" }],
+                MissingResources = [new AiMissingResourceInfo { ResourceType = "model_resource", ResourceKey = "op.ModelPath", Description = "missing" }],
                 PendingActions = [new { actionType = "provide_missing_resource" }],
                 ValidationPreview = new { deploymentPrecheck = new { workflowDraftAllowed = true } },
                 ToolTrace = [new { toolName = "validate_flow", success = true }]
@@ -596,7 +597,7 @@ public sealed class VisionAgentGenerateFlowTests
             operators = new object[]
             {
                 Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "cam_1" }),
-                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "template://fixture" })
+                Operator("op_match", "TemplateMatching", new Dictionary<string, string>())
             },
             connections = new object[]
             {

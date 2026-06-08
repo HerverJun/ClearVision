@@ -17,6 +17,12 @@ public sealed class WorkflowDiffService
         var preserved = load.HasCurrentFlow
             ? VisionAgentBuildSupport.ReadExistingNodeIds(load.CurrentFlowSnapshot)
             : [];
+        var pendingParameters = VisionAgentBuildSupport.DeduplicatePending(parameters.PendingParameters
+            .Concat(VisionAgentBuildSupport.ReadPendingParameters(validation.Data))
+            .Concat(VisionAgentBuildSupport.ReadPendingParameters(packageReadiness.Data)));
+        var missingResources = VisionAgentBuildSupport.DeduplicateMissing(parameters.MissingResources
+            .Concat(VisionAgentBuildSupport.ReadMissingResources(validation.Data))
+            .Concat(VisionAgentBuildSupport.ReadMissingResources(packageReadiness.Data)));
         var diff = new VisionAgentWorkflowDiff
         {
             AddedNodes = draft.AddedNodeIds,
@@ -31,18 +37,18 @@ public sealed class WorkflowDiffService
                 .Select(item => $"{item.TempId}.{item.ParameterName}")
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
-            PendingParameters = parameters.PendingParameters
+            PendingParameters = pendingParameters
                 .SelectMany(item => item.ParameterNames.Select(name => $"{item.OperatorId}.{name}"))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
-            MissingResources = parameters.MissingResources
+            MissingResources = missingResources
                 .Select(item => item.ResourceKey)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
             ValidationFailures = VisionAgentBuildSupport.ReadIssueCodes(validation.Data, "blockingIssues"),
             AutoRepairs = repairs.Select(item => item.DiffSummary).ToList(),
             DeploymentBlockers = VisionAgentBuildSupport.ReadIssueCodes(packageReadiness.Data, "blockingIssues")
-                .Concat(parameters.MissingResources.Select(item => item.ResourceKey))
+                .Concat(missingResources.Select(item => item.ResourceKey))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
             MetadataOnly = true

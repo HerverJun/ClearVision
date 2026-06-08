@@ -1,4 +1,5 @@
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Tools;
 
@@ -6,6 +7,23 @@ namespace ClearVision.Product.Infrastructure.AI.Agent;
 
 public sealed class OperatorPipelineSelector
 {
+    private readonly IVisionAgentOperatorContractCatalog _contractCatalog;
+
+    public OperatorPipelineSelector()
+        : this(new VisionAgentOperatorContractCatalog())
+    {
+    }
+
+    public OperatorPipelineSelector(IOperatorFactory operatorFactory)
+        : this(new VisionAgentOperatorContractCatalog(operatorFactory))
+    {
+    }
+
+    internal OperatorPipelineSelector(IVisionAgentOperatorContractCatalog contractCatalog)
+    {
+        _contractCatalog = contractCatalog;
+    }
+
     private static readonly HashSet<string> ForbiddenOperatorTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "ModbusCommunication",
@@ -29,13 +47,14 @@ public sealed class OperatorPipelineSelector
             requested = load.Plan.RecommendedRoute.Operators;
         }
 
-        var allowed = VisionAgentReadOnlyCatalog.Schemas.Keys
+        var allowed = _contractCatalog.OperatorTypes
             .Where(type => !ForbiddenOperatorTypes.Contains(type))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var repaired = new List<VisionAgentOperatorPipelineStep>();
         var invalid = new List<string>();
-        foreach (var type in requested.Select(VisionAgentBuildSupport.Clean).Where(type => !string.IsNullOrWhiteSpace(type)))
+        foreach (var requestedType in requested.Select(VisionAgentBuildSupport.Clean).Where(type => !string.IsNullOrWhiteSpace(type)))
         {
+            var type = _contractCatalog.CanonicalizeOperatorType(requestedType);
             if (allowed.Contains(type))
             {
                 repaired.Add(new VisionAgentOperatorPipelineStep
@@ -48,7 +67,7 @@ public sealed class OperatorPipelineSelector
             }
             else
             {
-                invalid.Add(type);
+                invalid.Add(requestedType);
             }
         }
 
@@ -128,7 +147,9 @@ public sealed class OperatorPipelineSelector
             "BlobAnalysis" => "op_blob",
             "Thresholding" => "op_threshold",
             "CircleMeasurement" => ordinal <= 2 ? "op_circle_a" : "op_circle_b",
-            "MeasureDistance" => "op_distance",
+            "Measurement" => "op_distance",
+            "UnitConvert" => "op_calibration",
+            "DetectionSequenceJudge" => "op_sequence",
             "ResultJudgment" => "op_judge",
             "ResultOutput" => "op_out",
             _ => $"op_{new string(operatorType.ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray())}_{ordinal}"
