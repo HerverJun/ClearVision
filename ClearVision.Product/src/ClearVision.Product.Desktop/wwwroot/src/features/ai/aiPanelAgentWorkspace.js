@@ -34,31 +34,31 @@ const BUILD_STAGE_ORDER = [
 ];
 
 const BUILD_STAGE_LABELS = {
-    understand_requirement: 'Understand',
-    context_collection: 'Context',
-    plan_generation: 'Plan',
-    assumption_confirmation: 'Assumptions',
-    requirement_parsing: 'Normalize',
-    resolve_build_intent: 'Intent',
-    template_strategy: 'Template',
-    operator_pipeline: 'Operators',
-    parameter_mapping: 'Parameters',
-    planner: 'Template and tools',
-    tool_policy: 'Tool policy',
-    workflow_draft: 'Flow draft',
-    validate_schema: 'Schema',
-    metadata_dry_run: 'Dry-run',
-    readiness: 'Readiness',
-    manifest_dry_run: 'Dry-run',
-    package_readiness: 'Package',
-    station_compatibility: 'Station',
-    operator_contract: 'Contracts',
-    release_review: 'Release review',
-    repair_loop: 'Repair',
-    workflow_diff: 'Diff',
-    apply_gate: 'Apply gate',
-    artifact: 'Artifact',
-    run: 'Run'
+    understand_requirement: '理解需求',
+    context_collection: '收集上下文',
+    plan_generation: '生成计划',
+    assumption_confirmation: '确认假设',
+    requirement_parsing: '需求归一',
+    resolve_build_intent: '构建意图',
+    template_strategy: '模板策略',
+    operator_pipeline: '算子链',
+    parameter_mapping: '参数映射',
+    planner: '规划与工具',
+    tool_policy: '工具策略',
+    workflow_draft: '流程草稿',
+    validate_schema: '结构校验',
+    metadata_dry_run: '元数据预演',
+    readiness: '就绪检查',
+    manifest_dry_run: '运行包预演',
+    package_readiness: '运行包就绪',
+    station_compatibility: '工站兼容',
+    operator_contract: '算子契约',
+    release_review: '发布复核',
+    repair_loop: '自动修复',
+    workflow_diff: '流程差异',
+    apply_gate: '应用门禁',
+    artifact: '结果产物',
+    run: '运行'
 };
 
 export const aiPanelAgentWorkspaceMixin = {
@@ -94,7 +94,7 @@ export const aiPanelAgentWorkspaceMixin = {
     }) {
         const normalizedDescription = String(description || '').trim();
         if (!normalizedDescription) {
-            this._addMessage('system', 'Enter an inspection goal before planning.');
+            this._addMessage('system', '请先输入检测目标，再进入规划模式。');
             return false;
         }
 
@@ -109,17 +109,17 @@ export const aiPanelAgentWorkspaceMixin = {
         this._addMessage('user', userMessage || normalizedDescription);
         const turn = this._startAssistantTurn({
             activate: false,
-            statusText: 'Planning',
+            statusText: '规划中',
             statusTone: 'warning',
             openReply: true
         });
         this._setAssistantSectionText(
             turn,
             'reply',
-            'Plan Mode is collecting public engineering context and asking the backend Agent Orchestrator for a structured plan.'
+            '规划模式正在收集公开工程上下文，并请求后端智能体生成结构化视觉工程计划。'
         );
 
-        this._setResultStatusNote('Plan Mode is waiting for backend Agent Orchestrator output.', 'info');
+        this._setResultStatusNote('规划模式正在等待后端智能体输出。', 'info');
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun();
@@ -144,15 +144,15 @@ export const aiPanelAgentWorkspaceMixin = {
                 );
                 this._clearActivePlanRequest(planRequestId);
                 const sourceLabel = this.pendingVisionPlan.planSource === 'rule_fallback'
-                    ? `Plan ready (fallback: ${this.pendingVisionPlan.fallbackReason || 'rule_fallback'})`
-                    : 'Plan ready (planner)';
-                this._setAssistantTurnStatus(turn, 'Plan ready', 'success');
+                    ? `规划已生成（规则兜底：${this.pendingVisionPlan.fallbackReason || 'rule_fallback'}）`
+                    : '规划已生成（Planner）';
+                this._setAssistantTurnStatus(turn, '规划完成', 'success');
                 this._setAssistantSectionText(
                     turn,
                     'reply',
-                    `${sourceLabel}. Accept recommended defaults or adjust selected options before Build.`
+                    `${sourceLabel}。可以接受推荐默认值，也可以调整选项后再开始构建。`
                 );
-                this._setResultStatusNote('Plan Mode is waiting for confirmation before Build starts.', 'info');
+                this._setResultStatusNote('规划模式等待确认，确认后进入构建模式。', 'info');
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(this.pendingVisionPlan);
             })
@@ -160,13 +160,13 @@ export const aiPanelAgentWorkspaceMixin = {
                 if (!this._isActivePlanRequest(planRequestId)) return;
                 this._clearActivePlanRequest(planRequestId);
                 this.pendingVisionPlan = null;
-                this._setAssistantTurnStatus(turn, 'Plan failed', 'failed');
+                this._setAssistantTurnStatus(turn, '规划失败', 'failed');
                 this._setAssistantSectionText(
                     turn,
                     'reply',
-                    `Plan Mode failed: ${error?.message || String(error || 'unknown error')}`
+                    `规划模式失败：${error?.message || String(error || '未知错误')}`
                 );
-                this._setResultStatusNote('Plan Mode failed. Retry after checking backend connectivity.', 'warning');
+                this._setResultStatusNote('规划模式失败，请检查后端连接后重试。', 'warning');
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(null);
             });
@@ -300,7 +300,7 @@ export const aiPanelAgentWorkspaceMixin = {
             mode: AgentWorkspaceModes.PLAN,
             originalDescription: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
             buildPrompt: plan.originalUserPrompt || plan.OriginalUserPrompt || fallbackDescription,
-            goal: plan.goal || plan.Goal || fallbackDescription || 'Vision workflow draft',
+            goal: plan.goal || plan.Goal || fallbackDescription || '视觉流程草稿',
             intent: plan.intent || plan.Intent || '',
             confidence: plan.confidence || plan.Confidence || 'medium',
             planSource: plan.planSource || plan.PlanSource || '',
@@ -310,15 +310,15 @@ export const aiPanelAgentWorkspaceMixin = {
             publicEvents: this._toArray(plan.publicEvents || plan.PublicEvents)
                 .map(evt => this._normalizePlanPublicEvent(evt)),
             blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
-            nextAction: plan.nextAction || plan.NextAction || 'Review plan, then start Build.',
+            nextAction: plan.nextAction || plan.NextAction || '复核计划后开始构建。',
             executable: Boolean(plan.canBuild ?? plan.CanBuild ?? true),
             blockingReasons: this._toArray(plan.blockingReasons || plan.BlockingReasons),
             understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
                 ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding)
-                : [`User goal: ${fallbackDescription || 'Vision workflow draft'}`],
+                : [`用户目标：${fallbackDescription || '视觉流程草稿'}`],
             route: {
                 routeId: route.routeId || route.RouteId || '',
-                title: route.title || route.Title || 'Vision route',
+                title: route.title || route.Title || '视觉方案路线',
                 summary: route.summary || route.Summary || '',
                 operators: this._toArray(route.operators || route.Operators),
                 templateDecision: route.templateDecision || route.TemplateDecision || ''
@@ -326,7 +326,7 @@ export const aiPanelAgentWorkspaceMixin = {
             questions: normalizedQuestions,
             assumptions: normalizedDefaults.length
                 ? normalizedDefaults.map(item => `${item.label}: ${item.value}${item.impact ? ` (${item.impact})` : ''}`)
-                : ['Public metadata boundaries are preserved; missing resources stay pending until confirmed.'],
+                : ['保留公开元数据边界，缺失资源在确认前保持为待补项。'],
             recommendedDefaults: normalizedDefaults,
             steps: this._toArray(plan.executablePlan || plan.ExecutablePlan),
             risks: this._toArray(plan.risks || plan.Risks),
@@ -397,22 +397,23 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!el) return;
 
         const plan = this.pendingVisionPlan;
-        const mode = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD ? 'Build Mode' : 'Plan Mode';
+        const mode = this._formatWorkspaceModeLabel();
         const activeEvents = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
         const planEvents = Array.isArray(plan?.publicEvents) ? plan.publicEvents : [];
         const terminal = activeEvents.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
         const lastEvent = activeEvents[activeEvents.length - 1];
         const blockerCount = this._countBuildBlockers(activeEvents);
-        const goal = plan?.goal || this.lastUserPrompt || 'Describe a visual inspection goal to start planning.';
-        const confidence = plan?.confidence || (activeEvents.length ? 'event-backed' : 'not set');
+        const goal = plan?.goal || this.lastUserPrompt || '描述视觉检测目标后开始规划。';
+        const confidence = this._formatWorkspaceValue(plan?.confidence || (activeEvents.length ? '事件驱动' : '未设置'));
         const nextAction = terminal
-            ? (terminal.eventType === 'run.completed' ? 'Review the draft and Apply it to the canvas.' : 'Review first fix and retry Build.')
+            ? (terminal.eventType === 'run.completed' ? '复核流程草稿，可应用到画布继续编辑。' : '查看首要修复建议后重试构建。')
             : this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
-                ? (lastEvent?.summary || 'Waiting for the next public AgentRun event.')
-                : (plan?.nextAction || 'Plan Mode will ask only high-value engineering questions.');
+                ? (lastEvent?.summary || '等待下一条后端公开事件。')
+                : (plan?.nextAction || '规划模式只提出高价值工程问题。');
         const executable = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
             ? activeEvents.length > 0
             : Boolean(plan?.executable);
+        const source = this._formatWorkspaceValue(plan?.planSource || (activeEvents.length ? '构建事件' : '未设置'));
 
         el.innerHTML = `
             <section class="ai-agent-overview-card is-${this._escapeHtml(this.agentWorkspaceMode || AgentWorkspaceModes.PLAN)}">
@@ -420,16 +421,65 @@ export const aiPanelAgentWorkspaceMixin = {
                     <span class="ai-agent-overview-kicker">${this._escapeHtml(mode)}</span>
                     <strong>${this._escapeHtml(goal)}</strong>
                     <span>${this._escapeHtml(nextAction)}</span>
+                    <em>可构建：${executable ? '是' : '否'}</em>
                 </div>
                 <div class="ai-agent-overview-metrics">
-                    <span><small>Confidence</small><b>${this._escapeHtml(confidence)}</b></span>
-                    <span><small>Source</small><b>${this._escapeHtml(plan?.planSource || (activeEvents.length ? 'build' : 'not set'))}</b></span>
-                    <span><small>Blockers</small><b>${this._escapeHtml(String(blockerCount))}</b></span>
-                    <span><small>Events</small><b>${this._escapeHtml(String(activeEvents.length || planEvents.length))}</b></span>
-                    <span><small>Executable</small><b>${executable ? 'yes' : 'no'}</b></span>
+                    <span><small>置信度</small><b>${this._escapeHtml(confidence)}</b></span>
+                    <span><small>来源</small><b>${this._escapeHtml(source)}</b></span>
+                    <span><small>阻断项</small><b>${this._escapeHtml(String(blockerCount))}</b></span>
+                    <span><small>事件数</small><b>${this._escapeHtml(String(activeEvents.length || planEvents.length))}</b></span>
                 </div>
             </section>
         `;
+    },
+
+    _formatWorkspaceModeLabel() {
+        if (this.workbenchState === AiWorkbenchStates.APPLIED) return '已应用';
+        if (this.workbenchState === AiWorkbenchStates.READY_TO_APPLY) return '可应用';
+        return this.agentWorkspaceMode === AgentWorkspaceModes.BUILD ? '构建模式' : '规划模式';
+    },
+
+    _formatWorkspaceValue(value) {
+        const text = String(value || '').trim();
+        if (!text || text === 'not set' || text === 'unknown') return '未设置';
+        if (text === 'event-backed') return '事件驱动';
+        if (text === 'build') return '构建事件';
+        return text;
+    },
+
+    _formatBuildStatus(status) {
+        switch (String(status || '').trim().toLowerCase()) {
+            case 'running':
+                return '执行中';
+            case 'completed':
+                return '已完成';
+            case 'blocked':
+                return '已阻断';
+            case 'failed':
+                return '失败';
+            case 'cancelled':
+            case 'canceled':
+                return '已取消';
+            case 'pending':
+                return '等待中';
+            default:
+                return status || '已记录';
+        }
+    },
+
+    _formatGateStatus(status) {
+        switch (String(status || '').trim().toLowerCase()) {
+            case 'canvas_apply_ready':
+                return '画布可应用';
+            case 'runtime_draft_ready':
+                return '运行草稿就绪';
+            case 'deployment_ready':
+                return '部署就绪';
+            case 'blocked':
+                return '已阻断';
+            default:
+                return status || '未设置';
+        }
     },
 
     _renderPlanWorkspace(plan = this.pendingVisionPlan) {
@@ -440,8 +490,8 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!plan) {
             el.innerHTML = `
                 <div class="ai-plan-empty">
-                    <div class="ai-plan-empty-title">Plan Mode</div>
-                    <div class="ai-plan-empty-copy">Describe the inspection target. The Agent will turn it into a visual engineering plan before Build starts.</div>
+                    <div class="ai-plan-empty-title">规划模式</div>
+                    <div class="ai-plan-empty-copy">正在收集工程上下文。请输入检测目标，智能体会先形成视觉工程计划，再进入构建。</div>
                 </div>
             `;
             return;
@@ -450,11 +500,11 @@ export const aiPanelAgentWorkspaceMixin = {
         const selections = this.planQuestionSelections || {};
         el.innerHTML = `
             <section class="ai-workspace-section">
-                <div class="ai-workspace-section-title">Understanding</div>
+                <div class="ai-workspace-section-title">需求理解</div>
                 <div class="ai-workspace-list">${plan.understanding.map(item => `<div>${this._escapeHtml(item)}</div>`).join('')}</div>
             </section>
             <section class="ai-workspace-section">
-                <div class="ai-workspace-section-title">Recommended Route</div>
+                <div class="ai-workspace-section-title">推荐方案</div>
                 <div class="ai-plan-route">
                     <strong>${this._escapeHtml(plan.route.title)}</strong>
                     <span>${this._escapeHtml(plan.route.summary)}</span>
@@ -462,11 +512,11 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
             </section>
             <section class="ai-workspace-section">
-                <div class="ai-workspace-section-title">Plan Diagnostics</div>
+                <div class="ai-workspace-section-title">规划诊断</div>
                 <div class="ai-build-compact">
                     <div class="ai-build-compact-row">
-                        <b>${this._escapeHtml(plan.planSource || 'unknown')}</b>
-                        <span>${this._escapeHtml(plan.planHash || 'plan hash pending')}</span>
+                        <b>${this._escapeHtml(this._formatWorkspaceValue(plan.planSource))}</b>
+                        <span>${this._escapeHtml(plan.planHash || '计划哈希待生成')}</span>
                     </div>
                     ${plan.fallbackReason ? `<div class="ai-build-note">${this._escapeHtml(plan.fallbackReason)}</div>` : ''}
                     ${plan.planWarnings.length ? `<ul>${plan.planWarnings.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>` : ''}
@@ -475,34 +525,34 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
             </section>
             <section class="ai-workspace-section">
-                <div class="ai-workspace-section-title">Clarifying Questions</div>
+                <div class="ai-workspace-section-title">关键问题</div>
                 <div class="ai-plan-question-list">
                     ${plan.questions.map(question => this._renderPlanQuestion(question, selections[question.id])).join('')}
                 </div>
             </section>
             <section class="ai-workspace-section ai-workspace-grid-2">
                 <div>
-                    <div class="ai-workspace-section-title">Default Assumptions</div>
+                    <div class="ai-workspace-section-title">推荐默认值</div>
                     <ul>${plan.assumptions.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>
                 </div>
                 <div>
-                    <div class="ai-workspace-section-title">Risks</div>
+                    <div class="ai-workspace-section-title">风险</div>
                     <ul>${plan.risks.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>
                 </div>
             </section>
             <section class="ai-workspace-section ai-workspace-grid-2">
                 <div>
-                    <div class="ai-workspace-section-title">Executable Plan</div>
+                    <div class="ai-workspace-section-title">可执行计划</div>
                     <ol>${plan.steps.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ol>
                 </div>
                 <div>
-                    <div class="ai-workspace-section-title">Acceptance</div>
+                    <div class="ai-workspace-section-title">验收标准</div>
                     <ol>${plan.acceptanceCriteria.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ol>
                 </div>
             </section>
             <div class="ai-plan-actions">
-                <button class="ai-plan-action is-primary" type="button" id="ai-btn-accept-plan">Accept Recommended and Build</button>
-                <button class="ai-plan-action" type="button" id="ai-btn-start-build">Start Build</button>
+                <button class="ai-plan-action is-primary" type="button" id="ai-btn-accept-plan">按推荐方案开始构建</button>
+                <button class="ai-plan-action" type="button" id="ai-btn-start-build">开始构建</button>
             </div>
         `;
 
@@ -526,7 +576,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <span>${this._escapeHtml(question.why)}</span>
                 </div>
                 <div class="ai-plan-question-default">
-                    <b>Default</b>
+                    <b>默认假设</b>
                     <span>${this._escapeHtml(question.defaultAssumption)}</span>
                 </div>
                 <div class="ai-plan-question-options">
@@ -539,7 +589,7 @@ export const aiPanelAgentWorkspaceMixin = {
                                 data-plan-question="${this._escapeHtml(question.id)}"
                                 data-plan-question-option="${this._escapeHtml(option.value)}"
                                 aria-pressed="${selected ? 'true' : 'false'}">
-                                <span>${this._escapeHtml(option.label)}${option.recommended ? ' (Recommended)' : ''}</span>
+                                <span>${this._escapeHtml(option.label)}${option.recommended ? '（推荐）' : ''}</span>
                                 <small>${this._escapeHtml(option.description)}</small>
                                 <em>${this._escapeHtml(option.impact)}</em>
                             </button>
@@ -582,12 +632,12 @@ export const aiPanelAgentWorkspaceMixin = {
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(plan);
         this._renderBuildWorkspaceFromAgentRun();
-        this._setResultStatusNote('Build Mode started. Progress comes from AgentRun public events.', 'info');
+        this._setResultStatusNote('构建模式已启动，进度来自后端 AgentRun 公开事件。', 'info');
 
         return this._dispatchGenerateRequest({
             description: plan.buildPrompt || plan.originalDescription,
             hint: '',
-            userMessage: `Start Build from plan: ${plan.goal}`,
+            userMessage: `从计划开始构建：${plan.goal}`,
             attachmentPaths: [],
             existingFlowJson: buildFromPlan.currentFlowSnapshot || null,
             explicitMode: buildFromPlan.buildIntent || 'new',
@@ -745,7 +795,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const events = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
         if (!events.length) {
             if (timeline) {
-                timeline.innerHTML = '<div class="ai-followup-empty">Waiting for AgentRun public events.</div>';
+                timeline.innerHTML = '<div class="ai-followup-empty">等待后端 AgentRun 公开事件。</div>';
             }
             return;
         }
@@ -812,7 +862,7 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         return `
-            <div class="ai-workspace-section-title">Tool Evidence</div>
+            <div class="ai-workspace-section-title">工具证据</div>
             ${evidence.slice(-16).map(item => {
                 const stage = item.stage || item.Stage || '';
                 const toolName = item.toolName || item.ToolName || '';
@@ -823,7 +873,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 return `
                     <div class="ai-build-compact-row">
                         <b>${this._escapeHtml(stage)}${toolName ? ` / ${this._escapeHtml(toolName)}` : ''}</b>
-                        <span>${this._escapeHtml(status)}${duration !== '' ? ` / ${this._escapeHtml(String(duration))} ms` : ''}${warning ? ` / ${this._escapeHtml(warning)}` : ''}</span>
+                        <span>${this._escapeHtml(this._formatBuildStatus(status))}${duration !== '' ? ` / ${this._escapeHtml(String(duration))} ms` : ''}${warning ? ` / ${this._escapeHtml(warning)}` : ''}</span>
                         <small>${this._escapeHtml(summary)}</small>
                     </div>
                 `;
@@ -851,12 +901,12 @@ export const aiPanelAgentWorkspaceMixin = {
         }).slice(-4);
 
         if (!tools.length) {
-            return '<div class="ai-followup-empty">Template matching has not reported yet.</div>';
+            return '<div class="ai-followup-empty">模板策略尚未发布。</div>';
         }
 
         return tools.map(evt => `
             <div class="ai-build-compact-row">
-                <b>${this._escapeHtml(evt.title || 'Template event')}</b>
+                <b>${this._escapeHtml(evt.title || '模板事件')}</b>
                 <span>${this._escapeHtml(evt.summary || '')}</span>
             </div>
         `).join('');
@@ -897,7 +947,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!operatorTypes.length) {
             const planOps = this.pendingVisionPlan?.route?.operators || [];
             if (!planOps.length) {
-                return '<div class="ai-followup-empty">Operator chain will appear after workflow draft generation.</div>';
+                return '<div class="ai-followup-empty">流程草稿生成后会显示算子链。</div>';
             }
             return `<div class="ai-plan-chain">${planOps.map(op => `<span>${this._escapeHtml(op)}</span>`).join('')}</div>`;
         }
@@ -929,11 +979,11 @@ export const aiPanelAgentWorkspaceMixin = {
 
         return `
             <div class="ai-build-metric-row">
-                <span><small>Pending parameters</small><b>${this._escapeHtml(String(Number.isFinite(pendingCount) ? pendingCount : 0))}</b></span>
-                <span><small>Missing resources</small><b>${this._escapeHtml(String(Number.isFinite(missingCount) ? missingCount : 0))}</b></span>
+                <span><small>待确认参数</small><b>${this._escapeHtml(String(Number.isFinite(pendingCount) ? pendingCount : 0))}</b></span>
+                <span><small>缺失资源</small><b>${this._escapeHtml(String(Number.isFinite(missingCount) ? missingCount : 0))}</b></span>
             </div>
-            ${mappingRows ? `<div class="ai-workspace-section-title">Parameter Mapping</div>${mappingRows}` : ''}
-            ${(effectivePending.length || effectiveMissing.length) ? '<div class="ai-build-note">Details are rendered in the pending parameter and validation sections below.</div>' : '<div class="ai-build-note">No pending parameter details have been published yet.</div>'}
+            ${mappingRows ? `<div class="ai-workspace-section-title">参数映射</div>${mappingRows}` : ''}
+            ${(effectivePending.length || effectiveMissing.length) ? '<div class="ai-build-note">待补详情会在下方参数与校验区继续显示。</div>' : '<div class="ai-build-note">暂无待确认参数详情。</div>'}
         `;
     },
 
@@ -950,11 +1000,11 @@ export const aiPanelAgentWorkspaceMixin = {
             const blocked = this._readBooleanField(gate, 'blocked', 'Blocked');
             return `
                 <div class="ai-build-check is-${blocked ? 'blocked' : 'completed'}">
-                    <strong>Apply Gate: ${this._escapeHtml(gate.status || gate.Status || 'unknown')}</strong>
-                    <span>Canvas: ${canvasReady ? 'ready' : 'blocked'} / Runtime draft: ${runtimeReady ? 'ready' : 'blocked'} / Deployment: ${deploymentReady ? 'ready' : 'blocked'}</span>
+                    <strong>应用门禁：${this._escapeHtml(this._formatGateStatus(gate.status || gate.Status || 'unknown'))}</strong>
+                    <span>画布：${canvasReady ? '可应用' : '阻断'} / 运行草稿：${runtimeReady ? '就绪' : '阻断'} / 部署：${deploymentReady ? '就绪' : '阻断'}</span>
                     ${firstFix ? `<em>${this._escapeHtml(firstFix)}</em>` : ''}
                 </div>
-                ${readiness ? `<div class="ai-build-note">Readiness gates are available in replay-safe BuildResult.</div>` : ''}
+                ${readiness ? `<div class="ai-build-note">就绪门禁已写入可回放 BuildResult。</div>` : ''}
             `;
         }
 
@@ -968,7 +1018,7 @@ export const aiPanelAgentWorkspaceMixin = {
         ]);
         const checks = events.filter(evt => checkTypes.has(evt.eventType));
         if (!checks.length) {
-            return '<div class="ai-followup-empty">Readiness and dry-run checks have not completed yet.</div>';
+            return '<div class="ai-followup-empty">就绪检查和元数据预演尚未完成。</div>';
         }
 
         return checks.map(evt => {
@@ -996,17 +1046,17 @@ export const aiPanelAgentWorkspaceMixin = {
         const terminal = events.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
         const diff = buildResult?.workflowDiff || buildResult?.WorkflowDiff || resultPayload?.workflowDiff || null;
         if (!terminal) {
-            return '<div class="ai-followup-empty">Final editable draft will appear when Build completes.</div>';
+            return '<div class="ai-followup-empty">构建完成后会显示最终可编辑流程草稿。</div>';
         }
 
         if (!flow) {
-            return `<div class="ai-build-note">${this._escapeHtml(terminal.summary || 'Build completed without a flow payload.')}</div>`;
+            return `<div class="ai-build-note">${this._escapeHtml(terminal.summary || '构建完成，但未收到流程草稿。')}</div>`;
         }
 
         return `
             <div class="ai-build-final-ready">
-                <strong>Editable draft ready</strong>
-                <span>${this._escapeHtml(String(ops.length))} operators / ${this._escapeHtml(String(connections.length))} connections</span>
+                <strong>可编辑草稿已就绪</strong>
+                <span>${this._escapeHtml(String(ops.length))} 个算子 / ${this._escapeHtml(String(connections.length))} 条连线</span>
             </div>
             ${diff ? this._renderWorkflowDiff(diff) : ''}
         `;
@@ -1020,12 +1070,12 @@ export const aiPanelAgentWorkspaceMixin = {
         const blockers = this._toArray(item.deploymentBlockers || item.DeploymentBlockers);
         const preview = values => values.slice(0, 4).map(value => `<span>${this._escapeHtml(value)}</span>`).join('');
         return `
-            <div class="ai-workspace-section-title">Workflow Diff</div>
+            <div class="ai-workspace-section-title">流程差异</div>
             <div class="ai-build-metric-row">
-                <span><small>Added</small><b>${this._escapeHtml(String(added.length))}</b></span>
-                <span><small>Preserved</small><b>${this._escapeHtml(String(preserved.length))}</b></span>
-                <span><small>Pending</small><b>${this._escapeHtml(String(pending.length))}</b></span>
-                <span><small>Deploy blockers</small><b>${this._escapeHtml(String(blockers.length))}</b></span>
+                <span><small>新增节点</small><b>${this._escapeHtml(String(added.length))}</b></span>
+                <span><small>保留节点</small><b>${this._escapeHtml(String(preserved.length))}</b></span>
+                <span><small>待确认</small><b>${this._escapeHtml(String(pending.length))}</b></span>
+                <span><small>部署阻断</small><b>${this._escapeHtml(String(blockers.length))}</b></span>
             </div>
             ${(added.length || preserved.length || pending.length || blockers.length) ? `
                 <div class="ai-build-diff-tags">

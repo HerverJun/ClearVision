@@ -1,4 +1,5 @@
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
+
 export const aiPanelApplyPreviewMixin = {
     _handleApplyFlow() {
         if (!this.flowCanvas) return;
@@ -12,29 +13,28 @@ export const aiPanelApplyPreviewMixin = {
             this._hydrateCurrentResultFollowupsFromBuildResult();
         }
         if (baseFlow && !(this._isCanvasApplyReadyForResult?.(this.currentResult) ?? true)) {
-            this._addMessage('system', 'Canvas Apply is blocked by the current Apply Gate. Review public blockers before applying.');
+            this._addMessage('system', '当前应用门禁阻止应用到画布，请先复核公开阻断项。');
             return;
         }
         if (!this.currentResult?.flow) {
-            this._addMessage('system', '当前会话没有可应用的流程数据。');
+            this._addMessage('system', '当前会话没有可应用到画布的流程草稿。');
             return;
         }
 
         const flow = this._buildFlowWithPendingDrafts(this.currentResult.flow);
         if (!flow) {
-            this._addMessage('system', '当前会话没有可应用的流程数据。');
+            this._addMessage('system', '当前会话没有可应用到画布的流程草稿。');
             return;
         }
 
         this._setWorkbenchState(AiWorkbenchStates.APPLYING);
         const applyRisk = this._buildApplyRiskSummary(this.currentResult);
 
-        // Compute diff and show preview
         let currentFlow = null;
         try {
             currentFlow = this.flowCanvas.serialize();
         } catch {
-            // Canvas may be empty
+            // 画布可能为空，直接进入应用预览或应用。
         }
 
         if (currentFlow) {
@@ -51,7 +51,6 @@ export const aiPanelApplyPreviewMixin = {
             return;
         }
 
-        // No diff or no current flow - apply directly
         this._executeApplyFlow(flow);
     },
 
@@ -237,7 +236,7 @@ export const aiPanelApplyPreviewMixin = {
             <section class="ai-apply-preview-risk">
                 <div class="ai-apply-preview-risk-title">应用前检查</div>
                 <div class="ai-apply-preview-risk-copy">
-                    当前方案仍有 ${this._escapeHtml(String(applyRisk.totalCount))} 项上线前信息需要复核。可以先应用草稿，但运行前应补齐。
+                    当前方案仍有 ${this._escapeHtml(String(applyRisk.totalCount))} 项部署前信息需要复核。可以先应用到画布继续编辑，但运行前应补齐。
                 </div>
                 ${pendingItems ? `
                     <div class="ai-apply-preview-risk-group">
@@ -304,7 +303,6 @@ export const aiPanelApplyPreviewMixin = {
             return;
         }
 
-        // Remove existing preview if any
         const existing = this.container.querySelector('.ai-apply-preview-overlay');
         if (existing) existing.remove();
 
@@ -357,7 +355,7 @@ export const aiPanelApplyPreviewMixin = {
                 </div>
                 <div class="ai-apply-preview-actions">
                     <button class="ai-apply-preview-cancel" type="button">取消</button>
-                    <button class="ai-apply-preview-confirm" type="button">确认应用到流程草稿</button>
+                    <button class="ai-apply-preview-confirm" type="button">确认应用到画布</button>
                 </div>
             </div>
         `;
@@ -379,7 +377,6 @@ export const aiPanelApplyPreviewMixin = {
     _executeApplyFlow(flow) {
         if (!this.flowCanvas) return;
         try {
-            // Snapshot before apply for undo
             this._preApplySnapshot = this.flowCanvas.serialize();
             this._preApplySnapshotVersion += 1;
             this._preApplyCanvasRevision = this.flowCanvas?.getFlowRevision?.() || 0;
@@ -390,7 +387,7 @@ export const aiPanelApplyPreviewMixin = {
             const appliedFlow = this.flowCanvas.serialize?.() || flow;
             const appliedOperators = this._extractOperators(appliedFlow);
             if (appliedOperators.length === 0) {
-                throw new Error('Applied draft did not contain any operators.');
+                throw new Error('应用后的草稿没有算子。');
             }
             this.currentResult.flow = appliedFlow;
             this.currentResult.Flow = appliedFlow;
@@ -399,31 +396,21 @@ export const aiPanelApplyPreviewMixin = {
             this._renderFollowupChecklist(this.currentResult, appliedFlow);
             this._renderParameterDraftEditor(this.currentResult, appliedFlow);
             this.options.onApplied?.(appliedFlow);
-            this.options.showToast?.('方案已应用到画布', 'success');
+            this.options.showToast?.('已应用到画布', 'success');
             this._setWorkbenchState(AiWorkbenchStates.APPLIED);
 
-            // Show undo option in status note
+            const applyRiskAfterApply = this._buildApplyRiskSummary(this.currentResult);
+            const deploymentNote = applyRiskAfterApply.hasWarnings
+                ? `已应用到画布，仍有 ${applyRiskAfterApply.totalCount} 项部署前待绑定或确认。`
+                : '已应用到画布，请在部署前复核就绪状态。';
             this._setResultStatusNote(
-                '方案已应用到画布。<button class="ai-undo-btn" id="ai-btn-undo">撤销应用</button>',
+                `${this._escapeHtml(deploymentNote)} <button class="ai-undo-btn" id="ai-btn-undo">撤销应用</button>`,
                 'success',
                 true
             );
             const undoBtn = this.container.querySelector('#ai-btn-undo');
             if (undoBtn) {
                 undoBtn.addEventListener('click', () => this._undoApply());
-            }
-            const applyRiskAfterApply = this._buildApplyRiskSummary(this.currentResult);
-            const deploymentNote = applyRiskAfterApply.hasWarnings
-                ? `Draft applied to canvas. ${applyRiskAfterApply.totalCount} deployment item(s) still need binding or confirmation before Station deployment.`
-                : 'Draft applied to canvas. Review readiness before Station deployment.';
-            this._setResultStatusNote(
-                `${this._escapeHtml(deploymentNote)} <button class="ai-undo-btn" id="ai-btn-undo">Undo apply</button>`,
-                'success',
-                true
-            );
-            const updatedUndoBtn = this.container.querySelector('#ai-btn-undo');
-            if (updatedUndoBtn) {
-                updatedUndoBtn.addEventListener('click', () => this._undoApply());
             }
         } catch (err) {
             console.error('应用流程失败:', err);
@@ -440,11 +427,10 @@ export const aiPanelApplyPreviewMixin = {
             return;
         }
 
-        // Check if canvas was manually modified after apply
         const currentRevision = this.flowCanvas?.getFlowRevision?.() || 0;
         const revisionAtApply = this._preApplyCanvasRevision || 0;
         if (currentRevision > revisionAtApply + 1) {
-            const confirmed = window.confirm('画布在应用后已被手动修改，撤销将覆盖这些修改。确定要继续吗？');
+            const confirmed = window.confirm('画布在应用后已被手动修改，撤销会覆盖这些修改。确定继续吗？');
             if (!confirmed) return;
         }
 
@@ -466,9 +452,7 @@ export const aiPanelApplyPreviewMixin = {
             this._addMessage('system', '已撤销应用，画布已恢复到应用前状态。');
         } catch (err) {
             console.error('撤销应用失败:', err);
-            this._addMessage('system', '撤销失败: ' + err.message);
+            this._addMessage('system', `撤销失败：${err.message}`);
         }
     }
-
-    // ── 拓扑摘要提取 ─────────────────────────────────────────
 };

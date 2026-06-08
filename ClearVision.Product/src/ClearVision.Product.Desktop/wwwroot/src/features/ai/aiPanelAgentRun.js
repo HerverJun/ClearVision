@@ -15,23 +15,23 @@ const ARTIFACT_EVENT_TYPES = new Set([
 ]);
 
 const STAGE_LABELS = {
-    run: 'Run',
-    brief: 'Brief',
-    understand_requirement: 'Understand',
-    context_collection: 'Context',
-    plan_generation: 'Plan',
-    assumption_confirmation: 'Assumptions',
-    requirement_parsing: 'Normalize',
-    planner: 'Planner',
-    tool_policy: 'Tool policy',
-    workflow_draft: 'Workflow draft',
-    readiness: 'Readiness',
-    manifest_dry_run: 'Manifest dry-run',
-    package_readiness: 'Package readiness',
-    station_compatibility: 'Station compatibility',
-    operator_contract: 'Operator contract',
-    release_review: 'Release review',
-    artifact: 'Artifact'
+    run: '运行',
+    brief: '摘要',
+    understand_requirement: '理解需求',
+    context_collection: '收集上下文',
+    plan_generation: '生成计划',
+    assumption_confirmation: '确认假设',
+    requirement_parsing: '需求归一',
+    planner: '规划器',
+    tool_policy: '工具策略',
+    workflow_draft: '流程草稿',
+    readiness: '就绪检查',
+    manifest_dry_run: '运行包预演',
+    package_readiness: '运行包就绪',
+    station_compatibility: '工站兼容',
+    operator_contract: '算子契约',
+    release_review: '发布复核',
+    artifact: '结果产物'
 };
 
 const AGENT_RUN_EVENT_TYPES = [
@@ -479,7 +479,7 @@ export const aiPanelAgentRunMixin = {
         const createResult = await httpClient.post('/ai/agent-runs', payload);
         const runId = String(createResult?.runId || createResult?.RunId || '').trim();
         if (!runId) {
-            throw new Error('AgentRun create endpoint did not return runId.');
+            throw new Error('AgentRun 创建接口没有返回 runId。');
         }
 
         this.activeAgentRunId = runId;
@@ -647,13 +647,13 @@ export const aiPanelAgentRunMixin = {
     },
 
     _renderAgentRunBrief(evt) {
-        const text = evt.summary || this._payloadString(evt.payload, 'brief') || 'Vision Agent run created. Public progress events will stream here.';
+        const text = evt.summary || this._payloadString(evt.payload, 'brief') || '视觉智能体运行已创建，公开进度事件会在此处显示。';
         const body = this.activeAssistantTurn?.replyBody;
         if (!body?.textContent?.includes(text)) {
             this._appendAssistantStreamText('reply', `${text}\n`);
         }
 
-        this._setAssistantTurnStatus(this.activeAssistantTurn, 'Running', 'streaming');
+        this._setAssistantTurnStatus(this.activeAssistantTurn, '执行中', 'streaming');
     },
 
     _appendAgentRunProcessLine(evt) {
@@ -703,12 +703,12 @@ export const aiPanelAgentRunMixin = {
         const resultSummary = this._payloadString(payload, 'summary') ||
             this._payloadString(payload, 'resultSummary') ||
             evt.summary ||
-            'Tool status updated.';
+            '工具状态已更新。';
         const tone = this._getAgentRunTone(evt.status, evt.eventType);
         card.className = `ai-agent-run-tool-card is-${tone}`;
         card.innerHTML = `
             <div class="ai-agent-run-tool-header">
-                <span class="ai-agent-run-tool-name">${this._escapeHtml(toolName || 'Vision Agent tool')}</span>
+                <span class="ai-agent-run-tool-name">${this._escapeHtml(toolName || '视觉智能体工具')}</span>
                 <span class="ai-agent-run-badge is-${tone}">${this._escapeHtml(this._getAgentRunStatusLabel(evt.status))}</span>
             </div>
             <div class="ai-agent-run-tool-summary">${this._escapeHtml(resultSummary)}</div>
@@ -717,7 +717,7 @@ export const aiPanelAgentRunMixin = {
                 ${reportId ? `<span>reportId ${this._escapeHtml(reportId)}</span>` : ''}
             </div>
             ${blockedReasons.length > 0 ? `<div class="ai-agent-run-blocked">${blockedReasons.map(reason => `<span>${this._escapeHtml(reason)}</span>`).join('')}</div>` : ''}
-            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>First fix</span>${this._escapeHtml(firstFix)}</div>` : ''}
+            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>首要修复</span>${this._escapeHtml(firstFix)}</div>` : ''}
         `;
         this._scrollToBottom();
     },
@@ -753,10 +753,10 @@ export const aiPanelAgentRunMixin = {
                 <span>${this._escapeHtml(evt.title || this._getAgentRunStageLabel(evt.stage))}</span>
                 <span class="ai-agent-run-badge is-${tone}">${this._escapeHtml(this._getAgentRunStatusLabel(evt.status))}</span>
             </div>
-            <div class="ai-agent-run-artifact-summary">${this._escapeHtml(evt.summary || 'Replayable metadata-only report event was published.')}</div>
+            <div class="ai-agent-run-artifact-summary">${this._escapeHtml(evt.summary || '已发布可回放的元数据报告事件。')}</div>
             ${reportId ? `<div class="ai-agent-run-report-id">reportId ${this._escapeHtml(reportId)}</div>` : ''}
             ${blockedReasons.length > 0 ? `<div class="ai-agent-run-blocked">${blockedReasons.map(reason => `<span>${this._escapeHtml(reason)}</span>`).join('')}</div>` : ''}
-            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>First fix</span>${this._escapeHtml(firstFix)}</div>` : ''}
+            ${firstFix ? `<div class="ai-agent-run-first-fix"><span>首要修复</span>${this._escapeHtml(firstFix)}</div>` : ''}
         `;
         this._scrollToBottom();
     },
@@ -764,11 +764,11 @@ export const aiPanelAgentRunMixin = {
     _renderAgentRunFailure(evt) {
         const firstFix = this._payloadString(evt.payload, 'firstFixRecommendation') ||
             this._payloadString(this._asObject(evt.payload)?.diagnostic, 'firstFixRecommendation') ||
-            'Review public diagnostics, provide missing metadata, and retry.';
+            '请复核公开诊断，补齐缺失元数据后重试。';
         this._renderAssistantFailure(this.activeAssistantTurn, {
-            errorMessage: evt.summary || 'Vision Agent run failed.',
+            errorMessage: evt.summary || '视觉智能体运行失败。',
             failureSummary: {
-                message: evt.summary || 'Vision Agent run failed.',
+                message: evt.summary || '视觉智能体运行失败。',
                 repairTarget: firstFix
             },
             manualRetry: null
@@ -784,17 +784,17 @@ export const aiPanelAgentRunMixin = {
         if (evt.eventType === 'run.completed') {
             this._applyAgentRunResultPayload?.(evt);
             this._setWorkbenchState(AiWorkbenchStates.READY_TO_APPLY);
-            this._setAssistantTurnStatus(this.activeAssistantTurn, 'Build complete', 'success');
+            this._setAssistantTurnStatus(this.activeAssistantTurn, '构建完成', 'success');
             if (evt.summary) {
                 this._setResultStatusNote(evt.summary, 'info');
             }
         } else if (evt.eventType === 'run.cancelled') {
             this._setWorkbenchState(AiWorkbenchStates.CANCELLED);
-            this._setAssistantTurnStatus(this.activeAssistantTurn, 'Cancelled', 'cancelled');
+            this._setAssistantTurnStatus(this.activeAssistantTurn, '已取消', 'cancelled');
             this._setResultStatusNote('', '');
         } else {
             this._setWorkbenchState(AiWorkbenchStates.FAILED);
-            this._setAssistantTurnStatus(this.activeAssistantTurn, 'Build failed', 'failed');
+            this._setAssistantTurnStatus(this.activeAssistantTurn, '构建失败', 'failed');
             if (evt.summary) {
                 this._setResultStatusNote(evt.summary, 'warning');
             }
@@ -803,7 +803,7 @@ export const aiPanelAgentRunMixin = {
         if (this.sessionId) {
             this._addToHistory({
                 sessionId: this.sessionId,
-                lastMessage: this.lastUserPrompt || evt.summary || 'Vision Agent run',
+                lastMessage: this.lastUserPrompt || evt.summary || '视觉智能体运行',
                 updatedAtUtc: new Date().toISOString(),
                 turnCount: 0,
                 generationMode: 'agent_run_event_stream',
@@ -840,24 +840,24 @@ export const aiPanelAgentRunMixin = {
 
     _getAgentRunStageLabel(stage) {
         const key = String(stage || '').trim();
-        return STAGE_LABELS[key] || key || 'Run';
+        return STAGE_LABELS[key] || key || '运行';
     },
 
     _getAgentRunStatusLabel(status) {
         switch (String(status || '').trim().toLowerCase()) {
             case 'running':
-                return 'running';
+                return '执行中';
             case 'completed':
-                return 'completed';
+                return '已完成';
             case 'blocked':
-                return 'blocked';
+                return '已阻断';
             case 'failed':
-                return 'failed';
+                return '失败';
             case 'cancelled':
             case 'canceled':
-                return 'cancelled';
+                return '已取消';
             default:
-                return 'recorded';
+                return '已记录';
         }
     },
 

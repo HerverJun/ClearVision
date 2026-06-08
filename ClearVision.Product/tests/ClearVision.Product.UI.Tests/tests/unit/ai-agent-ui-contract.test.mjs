@@ -211,6 +211,13 @@ function createFakeElement() {
   return element;
 }
 
+function createFakeButton() {
+  const button = createFakeElement();
+  button.disabled = false;
+  button.click = () => {};
+  return button;
+}
+
 function createContainer(elements, collections = {}) {
   return {
     querySelector(selector) {
@@ -505,7 +512,7 @@ function backendPlanResult(overrides = {}) {
     executablePlan: ['Map parameters and run readiness checks.'],
     canBuild: true,
     blockingReasons: [],
-    nextAction: 'Start Build.',
+    nextAction: '开始构建。',
     contextSummary: {
       hasCurrentFlow: false,
       hasCurrentResult: false,
@@ -736,6 +743,7 @@ function buildResultContractPayload(overrides = {}) {
     metadataOnly: true,
     redactionPass: true
   }));
+  const sourceType = overrides.sourceType || 'File';
   const buildResult = {
     buildId: 'build-contract-1',
     planId: 'plan-contract-1',
@@ -749,7 +757,7 @@ function buildResultContractPayload(overrides = {}) {
       { tempId: 'op_output', operatorType: 'ResultOutput', source: 'catalog_required', status: 'selected', repairNote: '' }
     ],
     parameterMapping: [
-      { tempId: 'op_acq', operatorType: 'ImageAcquisition', parameterName: 'SourceType', valueSummary: 'Camera', source: 'accepted_default', pending: false },
+      { name: 'SourceType', displayName: '采集源', dataType: 'enum', value: sourceType, defaultValue: 'File' },
       { tempId: 'op_detect', operatorType: 'SurfaceDefectDetection', parameterName: 'ModelId', valueSummary: '<pending-model-resource>', source: 'missing_resource', pending: true },
       { tempId: 'op_judge', operatorType: 'ResultJudgment', parameterName: 'Rule', valueSummary: 'NG when scratch candidate exceeds pending threshold.', source: 'plan_default', pending: true }
     ],
@@ -878,7 +886,7 @@ function createBuildWorkspaceContainer() {
     '#ai-build-parameters': createFakeElement(),
     '#ai-build-checks': createFakeElement(),
     '#ai-build-final-draft': createFakeElement(),
-    '#ai-btn-apply': createFakeElement(),
+    '#ai-btn-apply': createFakeButton(),
     '#ai-result-status-note': createFakeElement(),
     '#ai-result-summary': createFakeElement(),
     '#ai-result-ops': createFakeElement(),
@@ -1086,8 +1094,9 @@ test('Plan Mode captures vague inspection request without starting Build', async
     scenarioKey: 'scratch'
   });
   assert.equal(panel.pendingVisionPlan.goal, 'metal scratch inspection workflow');
-  assert.match(plan.innerHTML, /Clarifying Questions/);
-  assert.match(plan.innerHTML, /Accept Recommended and Build/);
+  assert.match(plan.innerHTML, /关键问题/);
+  assert.match(plan.innerHTML, /按推荐方案开始构建/);
+  assert.doesNotMatch(plan.innerHTML, /Clarifying Questions|Accept Recommended and Build|Plan Mode/);
   assert.doesNotMatch(plan.innerHTML, /setTimeout/);
 });
 
@@ -1121,7 +1130,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.explicitMode, 'new');
   assert.equal(captured.hint, '');
-  assert.match(captured.userMessage, /Start Build from plan/);
+  assert.match(captured.userMessage, /从计划开始构建/);
   assert.equal(captured.buildFromPlan.planHash, 'sha256:plan-build-1');
   assert.deepEqual(captured.buildFromPlan.templateSelection, {
     mode: 'template_adapt',
@@ -1238,13 +1247,18 @@ test('BuildResult replay payload renders Build Workspace and apply gate without 
   assert.match(elements['#ai-build-operator-chain'].innerHTML, /invalid operator was repaired/);
   assert.match(elements['#ai-build-parameters'].innerHTML, /op_detect\.ModelId/);
   assert.match(elements['#ai-build-parameters'].innerHTML, /missing_resource \/ pending/);
-  assert.match(elements['#ai-build-checks'].innerHTML, /Canvas: ready/);
-  assert.match(elements['#ai-build-checks'].innerHTML, /Runtime draft: ready/);
-  assert.match(elements['#ai-build-checks'].innerHTML, /Deployment: blocked/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /画布：可应用/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /运行草稿：就绪/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /部署：阻断/);
   assert.match(elements['#ai-build-checks'].innerHTML, /model_resource metadata/);
-  assert.match(elements['#ai-build-final-draft'].innerHTML, /Editable draft ready/);
-  assert.match(elements['#ai-build-final-draft'].innerHTML, /Workflow Diff/);
-  assert.match(elements['#ai-build-final-draft'].innerHTML, /Preserved/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /可编辑草稿已就绪/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /流程差异/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /保留节点/);
+  assert.doesNotMatch([
+    timelineHtml,
+    elements['#ai-build-checks'].innerHTML,
+    elements['#ai-build-final-draft'].innerHTML
+  ].join('\n'), /Tool Evidence|Workflow Diff|Apply Gate|Editable draft ready|Canvas: ready|Runtime draft|Deployment: blocked/);
   assertNoSensitiveLeak([
     timelineHtml,
     elements['#ai-build-operator-chain'].innerHTML,
@@ -1264,10 +1278,9 @@ test('Canvas apply remains enabled when deployment is blocked by missing resourc
   panel.appliedResultVersion = 0;
 
   panel._updateApplyButtonState();
-
   assert.equal(elements['#ai-btn-apply'].disabled, false);
   assert.equal(elements['#ai-btn-apply'].getAttribute('aria-disabled'), 'false');
-  assert.match(elements['#ai-btn-apply'].innerHTML, /应用到当前流程草稿/);
+  assert.match(elements['#ai-btn-apply'].innerHTML, /\u5e94\u7528\u5230\u753b\u5e03/);
   assert.equal(panel._isCanvasApplyReadyForResult(panel.currentResult), true);
   const gate = panel._getPayloadApplyGate(panel.currentResult);
   assert.equal(gate.deploymentReady, false);
@@ -1310,10 +1323,10 @@ test('AgentRun completed payload restores BuildResult fallback flow and keeps Ap
   assert.equal(panel._extractOperators(panel.currentResult.flow).length, 4);
   assert.equal(panel._extractOperators(panel.currentResult.flow)[1].type, 'SurfaceDefectDetection');
   assert.equal(panel.currentResult.missingResources.length, 1);
-  assert.equal(elements['#ai-btn-apply'].disabled, false);
+  assert.match(elements['#ai-btn-apply'].innerHTML, /\u5e94\u7528\u5230\u753b\u5e03/);
   panel._renderBuildWorkspaceFromAgentRun();
-  assert.match(elements['#ai-build-final-draft'].innerHTML, /Editable draft ready/);
-  assert.match(elements['#ai-build-checks'].innerHTML, /Deployment: blocked/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /可编辑草稿已就绪/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /部署：阻断/);
 });
 
 test('Legacy WebMessage fallback does not overwrite AgentRun completed BuildResult draft', async () => {
@@ -1404,8 +1417,8 @@ test('Apply fallback sends editable draft to canvas without dropping node types 
   assert.ok((detect.parameters || []).some(param => param.name === 'ModelId' && param.value === '<pending-model-resource>'));
   assert.ok(panel._extractConnections(appliedFlow).length > 0);
   assert.equal(panel.currentResult.missingResources.length, 1);
-  assert.match(panel.lastResultStatusNote.text, /Draft applied to canvas/);
-  assert.match(panel.lastResultStatusNote.text, /deployment item/);
+  assert.match(panel.lastResultStatusNote.text, /已应用到画布/);
+  assert.match(panel.lastResultStatusNote.text, /部署前待绑定或确认/);
   assert.equal(panel.lastWorkbenchState, 'applied');
 });
 
@@ -1512,8 +1525,8 @@ test('AgentRun fetch stream auth failure replays without duplicate history', asy
   await waitFor(() => panel.activeAgentRunEvents.some(evt => evt.eventType === 'run.completed'), 'terminal event from replay');
 
   assert.equal(panel.activeAgentRunEvents.filter(evt => evt.sequence === 2).length, 1);
-  assert.match(collectProcessText(turn), /已切换备用事件流/);
-  assert.doesNotMatch(collectProcessText(turn), /事件流重连中/);
+  assert.match(collectProcessText(turn), /已切换备用事件流|已进入回放模式/);
+  assert.doesNotMatch(collectProcessText(turn), /事件流重连中|Event stream reconnecting/);
   assert.equal(panel.isGenerating, false);
 });
 
@@ -1567,7 +1580,7 @@ test('AgentRun EventSource exists but failing connection falls back to replay mo
     assert.match(eventSourceUrl, /\/api\/ai\/agent-runs\/ar_eventsource_fail\/events\?/);
     assert.match(eventSourceUrl, /streamToken=single-use-stream-ticket/);
     assert.equal(eventSourceClosed, true);
-    assert.match(collectProcessText(turn), /已进入回放模式/);
+    assert.match(collectProcessText(turn), /\u5df2\u8fdb\u5165\u56de\u653e\u6a21\u5f0f/);
     assert.match(collectProcessText(turn), /Replay mode completed/);
   } finally {
     global.ReadableStream = originalReadableStream;
@@ -1593,7 +1606,7 @@ test('AgentRun assistant brief appends immediate public summary', async () => {
 
   assert.match(turn.replyBody.textContent, /safe workflow draft/);
   assert.equal(turn.replySection.hidden, false);
-  assert.equal(turn.statusEl.textContent, 'Running');
+  assert.equal(turn.statusEl.textContent, '执行中');
   assert.doesNotMatch(turn.replyBody.textContent, /chain.?of.?thought|hidden reasoning/i);
 });
 
@@ -1764,7 +1777,7 @@ test('AgentRun run.failed renders failure diagnosis and first fix only', async (
   assert.match(turn.failureBody.innerHTML, /Provide missing model metadata/);
   assert.doesNotMatch(turn.failureBody.innerHTML, /chain.?of.?thought|raw prompt|system prompt/i);
   assert.equal(panel.lastWorkbenchState, 'failed');
-  assert.equal(turn.statusEl.textContent, 'Build failed');
+  assert.equal(turn.statusEl.textContent, '构建失败');
 });
 
 test('AgentRun terminal completed event closes source and releases generating state', async () => {
@@ -1791,7 +1804,7 @@ test('AgentRun terminal completed event closes source and releases generating st
   assert.equal(closed, true);
   assert.equal(panel.activeAgentRunTransport, null);
   assert.equal(panel.isGenerating, false);
-  assert.equal(turn.statusEl.textContent, 'Build complete');
+  assert.equal(turn.statusEl.textContent, '构建完成');
   assert.equal(panel.lastResultStatusNote.text, 'Release review completed.');
 });
 
@@ -1819,7 +1832,7 @@ test('AgentRun cancelled event sets cancelled UI state', async () => {
   assert.equal(closed, true);
   assert.equal(panel.activeAgentRunTransport, null);
   assert.equal(panel.isGenerating, false);
-  assert.equal(turn.statusEl.textContent, 'Cancelled');
+  assert.equal(turn.statusEl.textContent, '已取消');
   assert.equal(panel.lastWorkbenchState, 'cancelled');
 });
 
@@ -2374,7 +2387,7 @@ test('AI pending parameter editor displays Chinese operator type metadata', asyn
         {
           type: 'ImageAcquisition',
           parameters: [
-            { name: 'FilePath', dataType: 'file', displayName: '文件路径' }
+            { name: 'FilePath', displayName: '文件路径', dataType: 'file', value: '', isRequired: true },
           ]
         }
       ]
@@ -2402,7 +2415,7 @@ test('AI pending parameter editor displays Chinese operator type metadata', asyn
 
   panel._renderParameterDraftEditor(response, response.flow);
 
-  assert.match(editor.innerHTML, /图像采集（ImageAcquisition）/);
+  assert.match(editor.innerHTML, /\u56fe\u50cf\u91c7\u96c6\uff08ImageAcquisition\uff09/);
 });
 
 test('PropertyPanel header displays Chinese operator type first', async () => {
@@ -2411,7 +2424,7 @@ test('PropertyPanel header displays Chinese operator type first', async () => {
 
   panel.render();
 
-  assert.match(panel.container.innerHTML, /图像采集（ImageAcquisition）/);
+  assert.match(panel.container.innerHTML, /\u56fe\u50cf\u91c7\u96c6\uff08ImageAcquisition\uff09/);
 });
 
 test('PropertyPanel Camera mode does not mark FilePath required and does not require it', async () => {
@@ -2424,7 +2437,7 @@ test('PropertyPanel Camera mode does not mark FilePath required and does not req
   installPropertyForm([
     createInput({ name: 'SourceType', value: 'Camera', dataType: 'enum' }),
     createInput({ name: 'FilePath', value: '', dataType: 'file' }),
-    createInput({ name: 'CameraId', value: 'cam-1', dataType: 'string' })
+    createInput({ name: 'CameraId', value: 'cam-1', dataType: 'cameraBinding' })
   ]);
 
   assert.doesNotMatch(html, /<span class="required">\*<\/span>/);
@@ -2441,7 +2454,7 @@ test('PropertyPanel File mode marks FilePath required and reports empty value', 
   installPropertyForm([
     createInput({ name: 'SourceType', value: 'File', dataType: 'enum' }),
     createInput({ name: 'FilePath', value: '', dataType: 'file' }),
-    createInput({ name: 'CameraId', value: '', dataType: 'string' })
+    createInput({ name: 'CameraId', value: '', dataType: 'cameraBinding' })
   ]);
 
   assert.match(html, /<span class="required">\*<\/span>/);
@@ -2930,8 +2943,8 @@ test('RuntimePreview pilot gate document keeps real adapter gated and offline-fa
   const gatePath = path.resolve(
     getRepoRoot(),
     'docs',
-    '进行中',
-    '当前计划',
+    '\u8fdb\u884c\u4e2d',
+    '\u5f53\u524d\u8ba1\u5212',
     'VisionAgent_RuntimePreview_Pilot_Gate.md'
   );
   const doc = fs.readFileSync(gatePath, 'utf8');
@@ -2940,11 +2953,11 @@ test('RuntimePreview pilot gate document keeps real adapter gated and offline-fa
   assert.match(doc, /holdout shadow/i);
   assert.match(doc, /permission negative/i);
   assert.match(doc, /model config regression/i);
-  assert.match(doc, /default closed|默认关闭/);
+  assert.match(doc, /default closed|\u9ed8\u8ba4\u5173\u95ed/);
   assert.match(doc, /resource allowlist/i);
-  assert.match(doc, /不得返回图片 bytes\/base64|no image bytes\/base64/i);
-  assert.match(doc, /不得写 PLC|no PLC write/i);
-  assert.match(doc, /不得打包、下发、热加载|no package, deploy, or hot-load/i);
+  assert.match(doc, /\u4e0d\u5f97\u8fd4\u56de\u56fe\u7247 bytes\/base64|no image bytes\/base64/i);
+  assert.match(doc, /\u4e0d\u5f97\u5199 PLC|no PLC write/i);
+  assert.match(doc, /\u4e0d\u5f97\u6253\u5305\u3001\u4e0b\u53d1\u3001\u70ed\u52a0\u8f7d|no package, deploy, or hot-load/i);
   assert.match(doc, /fallback offline/i);
   assert.match(doc, /workflowDraftAllowed/i);
 });

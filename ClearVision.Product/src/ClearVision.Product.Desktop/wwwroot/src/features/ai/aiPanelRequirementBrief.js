@@ -50,7 +50,7 @@ export const aiPanelRequirementBriefMixin = {
         if (tip) {
             tip.textContent = normalized === 'draft'
                 ? 'Build can continue from current assumptions while unresolved items stay visible as risks.'
-                : 'Plan Mode confirms blocking engineering fields before Build starts.';
+                : '规划模式会先确认阻断性工程字段，再进入构建。';
         }
     }
 };

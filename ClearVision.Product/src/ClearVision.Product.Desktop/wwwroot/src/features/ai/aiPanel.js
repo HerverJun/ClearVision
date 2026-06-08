@@ -281,9 +281,9 @@ export class AiPanel {
         button.classList.toggle('is-disabled', button.disabled);
         button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
         const label = applied
-            ? '已应用到流程草稿'
+            ? '已应用到画布'
             : hasFlow
-                ? (canvasApplyAllowed ? '应用到当前流程草稿' : '当前草稿暂不可应用')
+                ? (canvasApplyAllowed ? '应用到画布' : '当前草稿暂不可应用')
                 : '暂无可应用方案';
         button.innerHTML = `
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
@@ -301,7 +301,7 @@ export class AiPanel {
                         <span class="pane-icon">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
                         </span>
-                        <span class="pane-title">Agent Conversation</span>
+                        <span class="pane-title">智能体对话</span>
                         <span class="status-badge online" id="ai-conn-status"><span class="status-dot connected"></span>在线</span>
                         <div class="ai-pane-actions" role="group" aria-label="AI 对话操作">
                             <button class="icon-btn ai-action-btn" id="ai-btn-new-session" type="button" title="新建对话" aria-label="新建对话">
@@ -343,10 +343,10 @@ export class AiPanel {
                     <div class="ai-input-section">
                         <div class="ai-agent-mode-bar">
                             <div>
-                                <strong>Plan / Build</strong>
-                                <span>Plan first, then run Build with AgentRun events.</span>
+                                <strong>规划 / 构建</strong>
+                                <span>先形成工程计划，再由后端事件驱动构建。</span>
                             </div>
-                            <button class="ai-agent-mode-build-btn" id="ai-btn-start-build-inline" type="button">Start Build</button>
+                            <button class="ai-agent-mode-build-btn" id="ai-btn-start-build-inline" type="button">开始构建</button>
                         </div>
                         ${this._renderAgentDeveloperControls()}
                         <div class="ai-input-box">
@@ -380,7 +380,7 @@ export class AiPanel {
                 <aside class="ai-pane-right" id="ai-result-pane" data-ai-workbench-pane="true">
                     <div class="ai-pane-header">
                         <span class="pane-icon ai-badge">AI</span>
-                        <span class="pane-title">Vision Agent Workspace</span>
+                        <span class="pane-title">视觉智能体工作台</span>
                     </div>
                     <div class="ai-agent-workspace-overview" id="ai-agent-workspace-overview"></div>
                     <div class="ai-plan-workspace" id="ai-plan-workspace"></div>
@@ -390,35 +390,35 @@ export class AiPanel {
                         <div class="ai-result-status-note" id="ai-result-status-note"></div>
                         <div class="ai-build-dashboard">
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Live Build Timeline</div>
+                                <div class="card-title">构建时间线</div>
                                 <div class="ai-build-event-timeline" id="ai-build-event-timeline"></div>
                             </section>
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Template Decision</div>
+                                <div class="card-title">模板决策</div>
                                 <div class="ai-build-compact" id="ai-build-template-match"></div>
                             </section>
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Operator Pipeline</div>
+                                <div class="card-title">算子链</div>
                                 <div class="ai-build-compact" id="ai-build-operator-chain"></div>
                             </section>
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Parameter Mapping</div>
+                                <div class="card-title">参数映射</div>
                                 <div class="ai-build-compact" id="ai-build-parameters"></div>
                             </section>
                             <section class="result-card ai-build-card ai-build-card-wide">
-                                <div class="card-title">Readiness / Dry-run / Station</div>
+                                <div class="card-title">就绪 / 预演 / 工站</div>
                                 <div class="ai-build-checks" id="ai-build-checks"></div>
                             </section>
                             <section class="result-card ai-build-card">
-                                <div class="card-title">Workflow Draft</div>
+                                <div class="card-title">流程草稿</div>
                                 <div class="ai-build-compact" id="ai-build-final-draft"></div>
                             </section>
                         </div>
                         <div class="ai-results-scroll" id="ai-results-scroll">
-                        <div class="ai-workspace-section-title">Apply Readiness Evidence</div>
+                        <div class="ai-workspace-section-title">应用就绪证据</div>
                         <div class="result-card requirement-brief-card" id="ai-result-requirement-brief-card" hidden>
                             <div class="card-title requirement-brief-titlebar">
-                                <span>Plan Evidence Snapshot</span>
+                                <span>规划证据快照</span>
                                 <span class="card-badge ai-requirement-confidence" id="ai-requirement-confidence"></span>
                             </div>
                             <div class="ai-requirement-brief is-empty" id="ai-result-requirement-brief">
@@ -427,52 +427,52 @@ export class AiPanel {
                         </div>
 
                         <div class="result-card overview">
-                            <div class="card-title">Build Result Summary</div>
+                            <div class="card-title">构建结果摘要</div>
                             <div class="ai-explanation" id="ai-result-summary">--</div>
                         </div>
 
                         <div class="result-card stage-timeline-card" id="ai-result-stage-timeline-card" hidden>
                             <div class="card-title stage-timeline-titlebar">
-                                <span>Build Stage Evidence</span>
+                                <span>构建阶段证据</span>
                                 <span class="card-badge" id="ai-stage-timeline-summary"></span>
                             </div>
                             <div class="ai-stage-timeline" id="ai-result-stage-timeline"></div>
                         </div>
 
                         <div class="result-card ops-list">
-                            <div class="card-title">Final Draft Operators</div>
+                            <div class="card-title">最终草稿算子</div>
                             <div class="generated-ops-list" id="ai-result-ops"></div>
                         </div>
 
                         <div class="result-card validation-card" id="ai-result-validation-card" hidden>
                             <div class="card-title">
-                                <span>Validation / Dry-run Evidence</span>
+                                <span>校验 / 预演证据</span>
                             </div>
                             <div class="ai-validation-panel" id="ai-result-validation"></div>
                         </div>
 
                         <div class="result-card followup-card">
-                            <div class="card-title">Missing Resources / Next Actions</div>
+                            <div class="card-title">缺失资源 / 后续动作</div>
                             <div class="ai-followup-panel is-empty" id="ai-result-followups">
                                 <div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>
                             </div>
                         </div>
 
                         <div class="result-card parameter-editor-card">
-                            <div class="card-title">Pending Parameters</div>
+                            <div class="card-title">待确认参数</div>
                             <div class="ai-parameter-editor is-empty" id="ai-result-parameter-editor">
                                 <div class="ai-followup-empty">当前没有待确认参数，暂无需补录。</div>
                             </div>
                         </div>
 
                         <div class="result-card attachment-card" id="ai-result-attachment-card" hidden>
-                            <div class="card-title">Attachment / Capability Metadata</div>
+                            <div class="card-title">附件 / 能力元数据</div>
                             <div class="ai-attachment-panel" id="ai-result-attachments"></div>
                         </div>
 
                         <div class="result-card prompt-trace-card" id="ai-result-prompt-trace-card" hidden>
                             <div class="card-title prompt-trace-titlebar">
-                                <span>Public Debug Trace</span>
+                                <span>公开调试摘要</span>
                                 <button class="ai-trace-toggle-btn" id="ai-trace-toggle" type="button">切换视图</button>
                             </div>
                             <div class="ai-prompt-trace" id="ai-result-prompt-trace"></div>
@@ -484,7 +484,7 @@ export class AiPanel {
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
                                     <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
                                 </svg>
-                                Apply to Canvas
+                                应用到画布
                             </button>
                         </div>
                     </div>

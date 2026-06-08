@@ -1,4 +1,4 @@
-export const AiWorkbenchStates = Object.freeze({
+﻿export const AiWorkbenchStates = Object.freeze({
     IDLE: 'idle',
     CLARIFYING: 'clarifying',
     MATCHING_TEMPLATE: 'matching_template',
@@ -19,7 +19,7 @@ const WORKBENCH_STAGE_ORDER = [
     { key: 'template_match', label: '模板匹配', states: [AiWorkbenchStates.MATCHING_TEMPLATE] },
     { key: 'generating', label: '生成', states: [AiWorkbenchStates.GENERATING, AiWorkbenchStates.PARSING] },
     { key: 'validating', label: '校验', states: [AiWorkbenchStates.VALIDATING] },
-    { key: 'dryrun', label: 'DryRun', states: [AiWorkbenchStates.DRY_RUNNING] },
+    { key: 'dryrun', label: 'DryRun 预演', states: [AiWorkbenchStates.DRY_RUNNING] },
     { key: 'parameters', label: '待补参数', states: [AiWorkbenchStates.REVIEWING_PARAMETERS] },
     { key: 'apply', label: '可应用', states: [AiWorkbenchStates.READY_TO_APPLY, AiWorkbenchStates.APPLYING, AiWorkbenchStates.APPLIED] }
 ];
@@ -28,9 +28,9 @@ export const STAGE_DIAGNOSTIC_LABELS = {
     conversation: '会话准备',
     turn_router: '回合路由',
     scenario_match: '场景匹配',
-    requirement_brief: '需求提炼',
+    requirement_brief: '需求摘要',
     clarification: '需求澄清',
-    prompt_context: 'Prompt 构建',
+    prompt_context: '上下文构建',
     llm: '模型调用',
     parse: '结果解析',
     validator: '流程校验',
@@ -38,7 +38,6 @@ export const STAGE_DIAGNOSTIC_LABELS = {
     dryrun: 'DryRun 预演',
     layout: '自动布局'
 };
-
 export const aiPanelWorkbenchMixin = {
     _normalizeRuntimeFieldList(value) {
         if (!Array.isArray(value)) return [];
@@ -109,7 +108,7 @@ export const aiPanelWorkbenchMixin = {
         }
 
         if (interactionState === 'modifying' || turnIntent === 'modify_flow') {
-            return '下一步：等待微调完成，系统只改用户指定部分并保留其它算子和连线。';
+            return '下一步：等待微调完成，系统只修改用户指定部分并保留其它算子和连线。';
         }
 
         if (interactionState === 'reviewing_parameters' || turnIntent === 'review_pending_parameters' || pendingCount > 0) {
@@ -136,13 +135,12 @@ export const aiPanelWorkbenchMixin = {
 
         if (hasFlow) {
             return nonBlockingCount > 0 || missingResourceCount > 0
-                ? `下一步：可先应用方案，也可以补齐 ${nonBlockingCount || missingResourceCount} 项非阻断信息后再确认。`
-                : '下一步：确认方案后应用到流程草稿，或继续输入微调需求。';
+                ? `下一步：可先应用方案，也可补齐 ${nonBlockingCount || missingResourceCount} 项非阻断信息后再确认。`
+                : '下一步：确认方案后应用到画布，或继续输入微调需求。';
         }
 
         return '下一步：继续补充需求，系统会保持业务生成链路稳定。';
     },
-
     _renderAgentRuntime(payload = null, { reset = false } = {}) {
         const el = this.container?.querySelector('#ai-agent-runtime');
         if (!el) return;
@@ -213,9 +211,9 @@ export const aiPanelWorkbenchMixin = {
                         ? '普通回复，不进入澄清'
                         : turnIntent === 'unknown'
                             ? '正在判定本轮意图'
-                        : effectiveNonBlockingFields.length > 0
-                            ? `${effectiveNonBlockingFields.length} 项非阻断缺项`
-                            : '业务链路就绪';
+                            : effectiveNonBlockingFields.length > 0
+                                ? `${effectiveNonBlockingFields.length} 项非阻断缺项`
+                                : '业务链路就绪';
         const blockingCount = effectiveBlockingFields.length || questionCount;
         const nextAction = this._buildAgentNextAction({
             turnIntent,

@@ -458,8 +458,8 @@ export const aiPanelChatMixin = {
         }
 
         lines.push(brief.canGenerateDraftNow
-            ? 'Plan Mode can continue with the recommended assumptions and keep unresolved items visible as Build risks.'
-            : 'Plan Mode needs the blocking engineering fields before Build can start safely.');
+            ? '规划模式可按推荐假设继续，并把未解决项保留为构建风险。'
+            : '规划模式需要先补齐阻断性工程字段，才能安全开始构建。');
         return lines.join('\n');
     },
 
@@ -526,7 +526,7 @@ export const aiPanelChatMixin = {
 
         const confidence = Number.isFinite(brief.confidence) ? brief.confidence : 0;
         const confidenceText = `${Math.max(0, Math.min(100, Math.round(confidence * 100)))}%`;
-        const requirementModeLabel = brief.requirementMode === 'draft' ? 'Build-ready draft' : 'Plan confirmation';
+        const requirementModeLabel = brief.requirementMode === 'draft' ? '构建草稿' : '规划确认';
         const riskLabel = String(brief.draftRiskLevel || 'medium').trim() || 'medium';
         const summary = this._buildClarificationFollowupText(brief);
         const safeHint = this._buildClarificationSafeHint(brief);

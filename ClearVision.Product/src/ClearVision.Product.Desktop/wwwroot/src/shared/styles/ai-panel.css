@@ -4949,10 +4949,10 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    padding: 9px 10px;
+    padding: 8px 10px;
     margin-bottom: 10px;
     border: 1px solid var(--ai-border-strong);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--ai-surface-panel);
 }
 
@@ -4977,7 +4977,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-agent-mode-build-btn,
 .ai-plan-action {
     border: 1px solid var(--ai-border-strong);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--ai-surface-pane);
     color: var(--ai-text-main);
     padding: 7px 10px;
@@ -5001,18 +5001,19 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 }
 
 .ai-agent-workspace-overview {
-    padding: 12px 12px 0;
+    padding: 10px 12px 0;
 }
 
 .ai-agent-overview-card {
     display: grid;
-    grid-template-columns: minmax(13rem, 1fr) minmax(22rem, 1.4fr);
-    gap: 12px;
-    padding: 12px;
-    border: 1px solid var(--ai-border-strong);
-    border-radius: 6px;
+    grid-template-columns: minmax(8rem, 0.6fr) minmax(16rem, 1.35fr) minmax(18rem, 1.35fr);
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--ai-border);
+    border-radius: 8px;
     background: var(--ai-surface-panel);
-    box-shadow: inset 4px 0 0 var(--ai-accent);
+    box-shadow: inset 3px 0 0 var(--ai-accent), 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .ai-agent-overview-main {
@@ -5028,9 +5029,16 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 
 .ai-agent-overview-main strong {
     color: var(--ai-text-main);
-    font-size: 20px;
+    font-size: 17px;
     line-height: 1.2;
     overflow-wrap: anywhere;
+}
+
+.ai-agent-overview-main em {
+    color: var(--ai-accent-strong);
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 700;
 }
 
 .ai-agent-overview-main span:last-child {
@@ -5051,10 +5059,10 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     display: grid;
     gap: 3px;
     min-width: 0;
-    min-height: 46px;
-    padding: 7px 8px;
+    min-height: 40px;
+    padding: 6px 8px;
     border: 1px solid var(--ai-border);
-    border-radius: 4px;
+    border-radius: 6px;
     background: var(--ai-surface-pane);
 }
 
@@ -5082,8 +5090,8 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 
 .ai-plan-empty,
 .ai-workspace-section {
-    border: 1px solid var(--ai-border-strong);
-    border-radius: 6px;
+    border: 1px solid var(--ai-border);
+    border-radius: 8px;
     background: var(--ai-surface-pane);
     padding: 12px;
 }
@@ -5136,7 +5144,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     min-height: 24px;
     padding: 4px 8px;
     border: 1px solid var(--ai-border);
-    border-radius: 4px;
+    border-radius: 999px;
     background: var(--ai-surface-panel);
     color: var(--ai-text-main);
     font-size: 11px;
@@ -5147,7 +5155,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     gap: 8px;
     padding: 10px;
     border: 1px solid var(--ai-border);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--ai-surface-panel);
 }
 
@@ -5186,7 +5194,7 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     min-height: 96px;
     padding: 9px;
     border: 1px solid var(--ai-border);
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--ai-surface-pane);
     color: var(--ai-text-main);
     text-align: left;
@@ -5269,14 +5277,14 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 
 .ai-build-timeline-item {
     display: grid;
-    grid-template-columns: 10px minmax(0, 1fr);
+    grid-template-columns: 12px minmax(0, 1fr);
     gap: 8px;
     align-items: start;
 }
 
 .ai-build-timeline-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     margin-top: 6px;
     border-radius: 50%;
     background: var(--ai-accent);
@@ -5320,10 +5328,45 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-build-compact-row,
 .ai-build-check,
 .ai-build-final-ready {
-    padding: 8px;
+    padding: 8px 9px;
     border: 1px solid var(--ai-border);
-    border-radius: 4px;
+    border-radius: 8px;
     background: var(--ai-surface-panel);
+}
+
+.ai-build-check em {
+    margin-top: 6px;
+    padding: 7px 8px;
+    border-left: 3px solid var(--ai-accent-strong);
+    border-radius: 6px;
+    background: rgba(214, 54, 38, 0.06);
+    color: var(--ai-text-main);
+}
+
+.ai-build-diff-tags {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.ai-build-diff-tags span {
+    display: grid;
+    gap: 2px;
+    padding: 6px 8px;
+    border: 1px solid var(--ai-border);
+    border-radius: 6px;
+    background: var(--ai-surface-pane);
+}
+
+.ai-build-diff-tags small {
+    color: var(--ai-text-muted);
+    font-size: 10px;
+}
+
+.ai-build-diff-tags b {
+    color: var(--ai-text-main);
+    font-size: 13px;
 }
 
 .ai-build-check.is-warning {
