@@ -44,7 +44,10 @@ public sealed class VisionAgentBuildOrchestratorTests
             .Contain("SurfaceDefectDetection");
         result.BuildResult.WorkflowDiff.AddedNodes.Should().NotBeEmpty();
         result.BuildResult.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        result.BuildResult.ApplyGate.RuntimeDraftReady.Should().BeTrue();
         result.BuildResult.ApplyGate.DeploymentReady.Should().BeFalse();
+        result.BuildResult.ApplyGate.Blocked.Should().BeFalse();
+        result.BuildResult.ApplyGate.DeploymentBlockers.Should().NotBeEmpty();
         result.BuildResult.FirstFixRecommendation.Should().NotBeNullOrWhiteSpace();
         Flow(result).Operators.Should().NotBeEmpty();
         sink.Events.Should().Contain(evt => evt.EventType == AgentRunEventTypes.WorkflowDraftUpdated);
@@ -67,6 +70,75 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
             item.WarningCode == "invalid_operator_removed" &&
             item.RepairAction == "removed_invalid_operators");
+    }
+
+    [Fact(DisplayName = "Build orchestrator should publish a public warning when plan hash mismatches")]
+    public async Task BuildAsync_ShouldWarnWhenPlanHashMismatches()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = Plan("surface_defect", ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"]);
+
+        var result = await orchestrator.BuildAsync(Request(plan, planHashOverride: "stale_plan_hash"), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.PublicWarnings.Should().Contain("plan_hash_mismatch");
+        result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
+            item.Stage == "plan_generation" &&
+            item.WarningCode == "plan_hash_mismatch");
+        sink.Events.Should().Contain(evt =>
+            evt.Stage == "plan_hash_validation" &&
+            evt.Summary.Contains("review plan provenance", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact(DisplayName = "Build orchestrator template selection should drive template strategy and pipeline")]
+    public async Task BuildAsync_ShouldUseTemplateSelectionForTemplateStrategy()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var plan = Plan("surface_defect", ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"]);
+        var templateSelection = new AiTemplateSelectionInfo
+        {
+            Mode = "use_selected_template",
+            TemplateId = "template_matching_alignment",
+            ScenarioKey = "template_matching"
+        };
+
+        var result = await orchestrator.BuildAsync(Request(plan, templateSelection: templateSelection), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.GenerationMode.Should().Be("template_fill");
+        result.TemplateLockLevel.Should().Be("strict");
+        result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain("TemplateMatching")
+            .And
+            .NotContain("SurfaceDefectDetection");
+        result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
+            item.Stage == "template_strategy" &&
+            item.ToolName == "get_flow_template_skeleton");
+    }
+
+    [Fact(DisplayName = "Build orchestrator parameter mapping should keep unknown resources pending")]
+    public async Task BuildAsync_ShouldMapPendingParametersAndMissingResources()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var plan = Plan("surface_defect", ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"]);
+
+        var result = await orchestrator.BuildAsync(Request(plan), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "SurfaceDefectDetection" &&
+            item.ParameterName == "ModelId" &&
+            item.Pending &&
+            item.Source == "pending_metadata");
+        result.BuildResult.PendingParameters.Should().Contain(item =>
+            item.OperatorId == "op_surface_defect" &&
+            item.ParameterNames.Contains("ModelId"));
+        result.BuildResult.MissingResources.Should().Contain(item =>
+            item.ResourceType == "model_resource" &&
+            item.ResourceKey == "op_surface_defect.ModelId");
+        result.BuildResult.WorkflowDiff.DeploymentBlockers.Should().Contain("op_surface_defect.ModelId");
     }
 
     [Fact(DisplayName = "Build orchestrator modify intent should preserve existing canvas nodes")]
@@ -150,7 +222,10 @@ public sealed class VisionAgentBuildOrchestratorTests
     private static AiFlowGenerationRequest Request(
         VisionAgentPlanModeResult plan,
         string buildIntent = "new",
-        string? currentFlowSnapshot = null)
+        string? currentFlowSnapshot = null,
+        string? planHashOverride = null,
+        AiTemplateSelectionInfo? templateSelection = null,
+        Dictionary<string, string>? userSelections = null)
     {
         return new AiFlowGenerationRequest(plan.OriginalUserPrompt, Mode: GenerateFlowModeExtensions.ParseOrAuto(buildIntent))
         {
@@ -159,14 +234,15 @@ public sealed class VisionAgentBuildOrchestratorTests
             BuildFromPlan = new VisionAgentBuildFromPlanRequest
             {
                 PlanId = plan.PlanId,
-                PlanHash = plan.PlanHash,
+                PlanHash = planHashOverride ?? plan.PlanHash,
                 PlanSnapshot = plan,
-                UserSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                UserSelections = userSelections ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["defect_morphology"] = "scratch"
                 },
                 AcceptedDefaults = ["metadata_only"],
                 CurrentFlowSnapshot = currentFlowSnapshot,
+                TemplateSelection = templateSelection,
                 OperatorCatalogVersion = plan.OperatorCatalogVersion,
                 StationBoundarySummary = plan.StationBoundarySummary,
                 PlcOutputPolicy = plan.PlcOutputPolicy,

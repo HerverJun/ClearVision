@@ -1,0 +1,45 @@
+using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
+
+namespace ClearVision.Product.Infrastructure.AI.Agent;
+
+internal sealed class ApplyGateResolver
+{
+    public BuildStepResult<VisionAgentApplyGate> Build(
+        VisionAgentToolResult validation,
+        VisionAgentToolResult dryRun,
+        VisionAgentToolResult packageReadiness,
+        VisionAgentWorkflowDiff diff)
+    {
+        var validationBlocking = VisionAgentBuildSupport.ReadCount(validation.Data, "blockingIssues");
+        var dryRunSucceeded = VisionAgentBuildSupport.ReadBool(dryRun.Data, "dryRunSucceeded") != false;
+        var deploymentReady = VisionAgentBuildSupport.ReadBool(packageReadiness.Data, "readyForDeployment") == true &&
+                              diff.DeploymentBlockers.Count == 0;
+        var canvasReady = validationBlocking == 0;
+        var runtimeReady = canvasReady && dryRunSucceeded;
+        var gate = new VisionAgentApplyGate
+        {
+            CanvasApplyReady = canvasReady,
+            RuntimeDraftReady = runtimeReady,
+            DeploymentReady = deploymentReady,
+            Blocked = !canvasReady,
+            Status = !canvasReady ? "blocked" :
+                deploymentReady ? "deployment_ready" :
+                runtimeReady ? "runtime_draft_ready" : "canvas_apply_ready",
+            ApplyBlockers = canvasReady ? [] : VisionAgentBuildSupport.ReadIssueCodes(validation.Data, "blockingIssues"),
+            DeploymentBlockers = deploymentReady
+                ? []
+                : diff.DeploymentBlockers.Count > 0 ? diff.DeploymentBlockers : ["deployment_metadata_pending"],
+            MetadataOnly = true
+        };
+        return VisionAgentBuildSupport.StepResult(
+            gate,
+            $"Apply gate resolved as {gate.Status}.",
+            canvasReady ? AgentRunEventStatuses.Completed : AgentRunEventStatuses.Blocked,
+            gate,
+            warningCode: deploymentReady ? string.Empty : "deployment_not_ready",
+            applyImpact: canvasReady ? "editable_draft_allowed" : "blocked",
+            deploymentImpact: deploymentReady ? "deployment_ready" : "deployment_blocked");
+    }
+}
