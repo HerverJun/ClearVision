@@ -357,7 +357,8 @@ export const aiPanelResourceBindingMixin = {
         if (!text) return false;
         const normalizedResource = this._normalizeMissingResources?.([resource])?.[0] || resource;
         const resourceKey = String(normalizedResource?.resourceKey || '').trim();
-        if (resourceKey && text === resourceKey) return true;
+        const textLower = text.toLowerCase();
+        if (resourceKey && textLower.includes(resourceKey.toLowerCase())) return true;
 
         const operatorId = String(
             resolution.operatorId ||
@@ -368,7 +369,7 @@ export const aiPanelResourceBindingMixin = {
         const candidates = this._getResolvedParameterCandidates(normalizedResource, resolution);
         return [...candidates].some(parameterName => {
             const reference = operatorId ? `${operatorId}.${parameterName}`.toLowerCase() : parameterName;
-            return text.toLowerCase() === reference;
+            return operatorId ? textLower.includes(reference) : textLower === reference;
         });
     },
 

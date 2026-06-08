@@ -2408,6 +2408,17 @@ test('resource binding action writes metadata and updates pending, missing, and 
     options: { getOperators: resourceBindingOperatorMetadata }
   });
   const response = resourceBindingResponse();
+  response.workflowDiff = {
+    deploymentBlockers: [
+      'missing_model_resource:op_detect.ModelPath',
+      'missing_camera_binding:op_acq.CameraId'
+    ],
+    pendingParameters: [
+      'provide op_detect.ModelPath before deployment',
+      'provide op_acq.CameraId before deployment'
+    ]
+  };
+  response.applyGate.deploymentBlockers.push('missing_model_resource:op_detect.ModelPath');
   panel.currentResult = response;
   panel.currentResultVersion = 1;
   panel.container = createContainer({
@@ -2430,6 +2441,10 @@ test('resource binding action writes metadata and updates pending, missing, and 
   assert.equal(response.pendingParameters.some(item => item.operatorId === 'op_detect'), false);
   assert.equal(response.applyGate.deploymentReady, false);
   assert.equal(response.applyGate.deploymentBlockers.includes('op_detect.ModelPath'), false);
+  assert.equal(response.applyGate.deploymentBlockers.includes('missing_model_resource:op_detect.ModelPath'), false);
+  assert.equal(response.workflowDiff.deploymentBlockers.includes('missing_model_resource:op_detect.ModelPath'), false);
+  assert.equal(response.workflowDiff.deploymentBlockers.includes('missing_camera_binding:op_acq.CameraId'), true);
+  assert.equal(response.workflowDiff.pendingParameters.includes('provide op_detect.ModelPath before deployment'), false);
   assert.equal(response.flow.operators.find(op => op.tempId === 'op_detect').parameters.ModelPath, 'model-resource:scratch-v1');
   assert.equal(panel.pendingResourceDrafts['op_detect.ModelPath'].metadataOnly, true);
   assert.match(panel.lastResultStatusNote.text, /仍有 9 项部署前待补/);
