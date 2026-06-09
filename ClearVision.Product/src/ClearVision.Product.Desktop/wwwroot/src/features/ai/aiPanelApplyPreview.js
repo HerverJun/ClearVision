@@ -424,13 +424,16 @@ export const aiPanelApplyPreviewMixin = {
             this.options.onApplied?.(appliedFlow);
             this.options.showToast?.('已应用到画布', 'success');
             this._setWorkbenchState(AiWorkbenchStates.APPLIED);
+            this.agentWorkspaceMode = this.agentWorkspaceMode || 'build';
+            this._renderAgentWorkspaceOverview?.();
+            this._renderBuildWorkspaceFromAgentRun?.();
 
             const applyRiskAfterApply = this._buildApplyRiskSummary(this.currentResult);
             const deploymentNote = applyRiskAfterApply.hasWarnings
-                ? `已应用到画布，仍有 ${applyRiskAfterApply.totalCount} 项部署前待绑定或确认。`
+                ? `已应用到画布，仍有 ${applyRiskAfterApply.totalCount} 项部署前待补齐或确认。`
                 : '已应用到画布，请在部署前复核就绪状态。';
             this._setResultStatusNote(
-                `${this._escapeHtml(deploymentNote)} <button class="ai-undo-btn" id="ai-btn-undo">撤销应用</button>`,
+                `${this._escapeHtml(deploymentNote)} 资源补齐在左侧集中完成；可在流程页点击算子进行细节复核与微调。流程页修改不会绕过部署门禁。 <button class="ai-undo-btn" id="ai-btn-undo">撤销应用</button>`,
                 'success',
                 true
             );

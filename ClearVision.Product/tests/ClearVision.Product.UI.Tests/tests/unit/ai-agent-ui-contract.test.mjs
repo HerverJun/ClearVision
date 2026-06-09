@@ -1274,6 +1274,11 @@ test('Plan Mode captures vague inspection request without starting Build', async
   assert.match(plan.innerHTML, /凹痕\/污渍/);
   assert.match(plan.innerHTML, /阈值需要结合样品确认/);
   assert.match(plan.innerHTML, /按推荐方案开始构建/);
+  assert.match(plan.innerHTML, /资源补齐会在开始构建后出现/);
+  assert.match(overview.innerHTML, /Plan 规划/);
+  assert.match(overview.innerHTML, /Build 审计/);
+  assert.match(overview.innerHTML, /Applied 复核/);
+  assert.doesNotMatch(plan.innerHTML, /资源审计任务|人工确认模型资源|人工选择模板资源|仅记录 PLC 元数据/);
   assert.doesNotMatch(plan.innerHTML, /Clarifying Questions|Accept Recommended and Build|Plan Mode/);
   assert.doesNotMatch([
     overview.innerHTML,
@@ -1431,9 +1436,10 @@ test('BuildResult replay payload renders Build Workspace and apply gate without 
   assert.match(elements['#ai-build-operator-chain'].innerHTML, /非法算子已修复/);
   assert.match(elements['#ai-build-parameters'].innerHTML, /模型资源/);
   assert.match(elements['#ai-build-parameters'].innerHTML, /缺失资源 \/ 待确认/);
-  assert.match(elements['#ai-build-checks'].innerHTML, /画布：可应用/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /画布可应用：是/);
   assert.match(elements['#ai-build-checks'].innerHTML, /运行草稿：就绪/);
   assert.match(elements['#ai-build-checks'].innerHTML, /部署：阻断/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /First Fix/);
   assert.match(elements['#ai-build-checks'].innerHTML, /模型资源/);
   assert.match(elements['#ai-build-final-draft'].innerHTML, /可编辑草稿已就绪/);
   assert.match(elements['#ai-build-final-draft'].innerHTML, /流程差异/);
@@ -1605,7 +1611,7 @@ test('Apply fallback sends editable draft to canvas without dropping node types 
   assert.ok(panel._extractConnections(appliedFlow).length > 0);
   assert.equal(panel.currentResult.missingResources.length, 1);
   assert.match(panel.lastResultStatusNote.text, /已应用到画布/);
-  assert.match(panel.lastResultStatusNote.text, /部署前待绑定或确认/);
+  assert.match(panel.lastResultStatusNote.text, /部署前待补齐或确认/);
   assert.equal(panel.lastWorkbenchState, 'applied');
 });
 
@@ -2386,19 +2392,27 @@ test('AI followup renders actionable resource binding entries in Chinese', async
 
   panel._renderFollowupChecklist(response, response.flow);
 
-  assert.match(followups.innerHTML, /缺失资源/);
+  assert.match(followups.innerHTML, /资源审计任务/);
   for (const label of [
-    '绑定模型资源',
-    '选择模板文件',
-    '填写标定\/像素比例',
-    '选择相机绑定',
-    '设置输出通道',
-    '记录 PLC 元数据',
+    '人工确认模型资源',
+    '人工选择模板资源',
+    '人工填写标定参数',
+    '人工选择相机绑定',
+    '人工确认输出通道',
+    '仅记录 PLC 元数据',
     '稍后处理'
   ]) {
     assert.match(followups.innerHTML, new RegExp(label));
   }
+  assert.match(followups.innerHTML, /资源审计任务/);
+  assert.match(followups.innerHTML, /影响算子/);
+  assert.match(followups.innerHTML, /影响参数/);
+  assert.match(followups.innerHTML, /阻断原因/);
+  assert.match(followups.innerHTML, /AI 建议/);
+  assert.match(followups.innerHTML, /人工确认输入区/);
+  assert.match(followups.innerHTML, /查看技术详情/);
   assert.match(followups.innerHTML, /仅记录 metadata，不触发真实 PLC 写入/);
+  assert.doesNotMatch(followups.innerHTML, /自动绑定|自动选择|自动部署|智能自动补齐/);
   assert.doesNotMatch(followups.innerHTML, /rawPrompt|systemPrompt|chainOfThought|data:image\/png;base64|sk-secret|192\.168\./i);
 });
 
@@ -2447,6 +2461,11 @@ test('resource binding action writes metadata and updates pending, missing, and 
   assert.equal(response.workflowDiff.pendingParameters.includes('provide op_detect.ModelPath before deployment'), false);
   assert.equal(response.flow.operators.find(op => op.tempId === 'op_detect').parameters.ModelPath, 'model-resource:scratch-v1');
   assert.equal(panel.pendingResourceDrafts['op_detect.ModelPath'].metadataOnly, true);
+  assert.equal(panel.pendingResourceDrafts['op_detect.ModelPath'].confirmedBy, 'local-user');
+  assert.equal(response.manualResourceConfirmations.length, 1);
+  assert.equal(response.manualResourceConfirmations[0].metadataOnly, true);
+  assert.match(response.manualResourceConfirmations[0].actionLabel, /人工确认模型资源/);
+  assert.match(response.manualResourceConfirmations[0].writebackSummary, /model-resource:scratch-v1/);
   assert.match(panel.lastResultStatusNote.text, /仍有 9 项部署前待补/);
   assertNoSensitiveLeak([
     panel.lastResultStatusNote.text,
@@ -2523,13 +2542,15 @@ test('resource binding action updates PascalCase replay payloads by ActualOperat
   assert.deepEqual(response.MissingResources, []);
   assert.deepEqual(response.PendingParameters, []);
   assert.equal(response.ApplyGate.DeploymentReady, true);
-  assert.equal(response.ApplyGate.Status, 'deployment_metadata_ready');
+  assert.equal(response.ApplyGate.Status, 'deployment_ready');
   assert.equal(response.ValidationPreview.DeploymentPrecheck.ReadyForDeployment, true);
   const operator = response.Flow.Operators[0];
   assert.equal(operator.Parameters.ModelPath, 'model-resource:pascal-v1');
   assert.equal(Object.prototype.hasOwnProperty.call(operator, 'parameters'), false);
   assert.equal(panel.pendingResourceDrafts['model_resource:op_detect:ModelPath'].value, 'model-resource:pascal-v1');
   assert.equal(panel.pendingResourceDrafts['model_resource:op_detect:ModelPath'].actualOperatorId, 'op_detect');
+  assert.equal(response.ManualResourceConfirmations.length, 1);
+  assert.equal(response.ManualResourceConfirmations[0].metadataOnly, true);
 });
 
 test('resolving all resource tasks updates apply gate without guessing file paths or PLC writes', async () => {
@@ -2569,14 +2590,84 @@ test('resolving all resource tasks updates apply gate without guessing file path
   assert.deepEqual(response.missingResources, []);
   assert.deepEqual(response.pendingParameters, []);
   assert.equal(response.applyGate.deploymentReady, true);
-  assert.equal(response.applyGate.status, 'deployment_metadata_ready');
+  assert.equal(response.applyGate.status, 'deployment_ready');
   assert.equal(response.validationPreview.deploymentPrecheck.readyForDeployment, true);
   assert.equal(response.validationPreview.deploymentPrecheck.deploymentBlocked, false);
   assert.equal(response.firstFixRecommendation, '');
+  assert.equal(response.manualResourceConfirmations.length, resources.length);
   const output = response.flow.operators.find(op => op.tempId === 'op_output');
   assert.equal(Object.prototype.hasOwnProperty.call(output.parameters, 'PlcAddress'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(output.parameters, 'OutputChannel'), false);
   assertNoSensitiveLeak(JSON.stringify(response));
+});
+
+test('defer resource keeps DeploymentReady false and leaves the blocker visible', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    options: { getOperators: resourceBindingOperatorMetadata }
+  });
+  const response = resourceBindingResponse();
+  panel.currentResult = response;
+  panel.currentResultVersion = 1;
+  panel.container = createContainer({
+    '#ai-result-followups': createFakeElement(),
+    '#ai-result-parameter-editor': createFakeElement(),
+    '#ai-result-validation-card': createFakeElement(),
+    '#ai-result-validation': createFakeElement(),
+    '#ai-btn-apply': createFakeButton()
+  });
+  const outputResource = response.missingResources.find(item => item.resourceType === 'output_channel');
+
+  const updated = panel._handleMissingResourceAction(outputResource, 'defer_resource', {
+    data: response,
+    flow: response.flow
+  });
+
+  assert.equal(updated, false);
+  assert.equal(response.missingResources.some(item => item.resourceKey === 'op_output.OutputChannel'), true);
+  assert.equal(response.applyGate.deploymentReady, false);
+  assert.equal(panel.pendingResourceDrafts['op_output.OutputChannel'].status, 'deferred');
+  assert.match(panel.lastResultStatusNote.text, /稍后处理/);
+});
+
+test('manual confirmation records render and survive replay payload rendering', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const followups = createFakeElement();
+  panel.container = createContainer({
+    '#ai-result-followups': followups
+  });
+  const response = {
+    flow: { operators: [], connections: [], metadataOnly: true },
+    pendingParameters: [],
+    missingResources: [],
+    manualResourceConfirmations: [
+      {
+        confirmedAtUtc: '2026-06-09T00:00:00Z',
+        actor: 'local-user',
+        resourceType: 'model_resource',
+        affectedOperator: 'op_detect',
+        affectedParameters: ['ModelPath'],
+        resourceKey: 'op_detect.ModelPath',
+        writebackSummary: 'model-resource:scratch-v1',
+        metadataOnly: true,
+        applyGateChange: {
+          from: 'canvas_apply_ready',
+          to: 'deployment_ready',
+          clearedBlockers: ['op_detect.ModelPath']
+        },
+        deploymentBlocked: false
+      }
+    ]
+  };
+
+  panel._renderFollowupChecklist(response, response.flow);
+
+  assert.match(followups.innerHTML, /人工确认记录/);
+  assert.match(followups.innerHTML, /local-user/);
+  assert.match(followups.innerHTML, /metadataOnly=true/);
+  assert.match(followups.innerHTML, /model-resource:scratch-v1/);
+  assert.doesNotMatch(followups.innerHTML, /rawPrompt|systemPrompt|chainOfThought|C:\\|192\.168\.|base64|token|key/i);
 });
 
 test('template artifact binding stays metadata-only and does not create fake TemplatePath parameter', async () => {
@@ -2607,6 +2698,46 @@ test('template artifact binding stays metadata-only and does not create fake Tem
   assert.equal(Object.prototype.hasOwnProperty.call(templateOperator.parameters, 'TemplatePath'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(templateOperator.parameters, 'Template'), false);
   assert.equal(panel.pendingResourceDrafts['op_match.Template'].value, 'template-artifact:fixture-a');
+});
+
+test('applied workspace tells users to review details on the flow page without bypassing deployment gate', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  const payload = buildResultContractPayload();
+  panel.container = container;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.currentResult = {
+    ...payload,
+    flow: panel._getResultFlowForCanvas(payload, { allowMergeFallback: false })
+  };
+  panel.currentResultVersion = 1;
+  panel.agentWorkspaceMode = 'build';
+  panel.activeAgentRunEvents = [
+    {
+      runId: 'ar_build_contract',
+      sequence: 20,
+      eventType: 'run.completed',
+      stage: 'run',
+      title: 'Run completed',
+      summary: 'Build completed.',
+      status: 'completed',
+      payload,
+      metadataOnly: true,
+      redactionPass: true
+    }
+  ];
+
+  panel._executeApplyFlow(panel.currentResult.flow);
+  panel.workbenchState = 'applied';
+  panel._renderAgentWorkspaceOverview();
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  assert.match(panel.lastResultStatusNote.text, /流程页点击算子进行细节复核与微调/);
+  assert.match(panel.lastResultStatusNote.text, /流程页修改不会绕过部署门禁/);
+  assert.match(elements['#ai-agent-workspace-overview'].innerHTML, /Applied 复核/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /已应用到画布/);
+  assert.equal(panel._getPayloadApplyGate(panel.currentResult).deploymentReady, false);
 });
 
 test('AI pending draft excludes FilePath when ImageAcquisition SourceType is Camera', async () => {

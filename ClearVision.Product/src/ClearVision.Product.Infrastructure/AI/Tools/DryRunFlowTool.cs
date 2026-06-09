@@ -6,8 +6,8 @@ namespace ClearVision.Product.Infrastructure.AI.Tools;
 public sealed class DryRunFlowTool : VisionAgentToolBase
 {
     public override string Name => "dryrun_flow";
-    public override string DisplayName => "Dry-run flow";
-    public override string Description => "Runs a structure-only stub dryrun without images, hardware, deployment, or runtime replay.";
+    public override string DisplayName => "结构模拟运行";
+    public override string Description => "仅进行结构级模拟，不读取图像、不访问硬件、不部署、不做运行时回放。";
     public override string Category => "simulation";
     public override VisionAgentToolPermission Permission => VisionAgentToolPermission.Simulation;
     public override JsonElement ParametersSchema { get; } = Schema("""

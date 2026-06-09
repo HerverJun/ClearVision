@@ -18,8 +18,8 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
     }
 
     public override string Name => "runtime_package_precheck";
-    public override string DisplayName => "Runtime package precheck";
-    public override string Description => "Checks whether a draft flow is ready for deployment without packaging, loading, or touching runtime resources.";
+    public override string DisplayName => "运行包预检";
+    public override string Description => "仅用静态草稿检查部署就绪度，不打包、不加载、不触碰运行资源。";
     public override string Category => "deployment";
     public override VisionAgentToolPermission Permission => VisionAgentToolPermission.DeploymentPrepare;
     public override JsonElement ParametersSchema { get; } = Schema("""
@@ -32,7 +32,8 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
             "dryRunSummary": { "type": "object" },
             "targetStationId": { "type": "string" },
             "requireReplay": { "type": "boolean" },
-            "replaySummary": { "type": "object" }
+            "replaySummary": { "type": "object" },
+            "manualResourceConfirmations": { "type": "array" }
           }
         }
         """);
@@ -59,6 +60,7 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
 
         MergeValidationSummary(arguments, contractValidation, blockingIssues, warnings, missingResources);
         AddDeploymentResourceChecks(flow, warnings, missingResources);
+        var manualConfirmationCount = AddManualConfirmationChecks(flow, arguments, warnings, missingResources);
         CheckDryRun(arguments, blockingIssues, warnings);
         CheckReplay(arguments, blockingIssues);
         await CheckTargetStationAsync(arguments, blockingIssues, warnings, cancellationToken);
@@ -82,8 +84,12 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
                     : "Draft flow can remain as workflow draft, but deployment is blocked until issues are resolved.",
                 blockingIssueCount = blockingIssues.Count,
                 warningCount = warnings.Count,
-                missingResourceCount = missingResources.Count
+                missingResourceCount = missingResources.Count,
+                manualConfirmationCount
             },
+            manualConfirmationRequired = true,
+            manualConfirmationCount,
+            metadataOnly = true,
             deployed = false,
             packageCreated = false,
             stationTouched = false
@@ -144,6 +150,238 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
                 resource.OperatorType,
                 resource.Message);
         }
+    }
+
+    private static int AddManualConfirmationChecks(
+        VisionAgentFlowDraft flow,
+        JsonElement arguments,
+        List<PrecheckIssue> warnings,
+        List<PrecheckMissingResource> missingResources)
+    {
+        var confirmations = ReadManualConfirmations(arguments);
+        foreach (var resource in CollectConfiguredDeploymentResources(flow))
+        {
+            if (missingResources.Any(item =>
+                    string.Equals(item.TempId, resource.TempId, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(item.ParameterName, resource.ParameterName, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            if (HasMetadataOnlyManualConfirmation(confirmations, resource))
+            {
+                continue;
+            }
+
+            AddMissingResource(
+                warnings,
+                missingResources,
+                resource.ResourceKind,
+                resource.ParameterName,
+                resource.TempId,
+                resource.OperatorType,
+                $"{resource.OperatorType}.{resource.ParameterName} requires metadata-only manual confirmation before deployment.");
+        }
+
+        return confirmations.Count;
+    }
+
+    private static IReadOnlyList<DeploymentResourceRequirement> CollectConfiguredDeploymentResources(
+        VisionAgentFlowDraft flow)
+    {
+        var resources = new List<DeploymentResourceRequirement>();
+        foreach (var op in flow.Operators)
+        {
+            if (IsOperatorType(op, "ImageAcquisition") && !IsFileSource(ReadParameter(op, "SourceType")))
+            {
+                AddIfConfigured(resources, op, "camera_binding", ["CameraBindingId", "CameraId"]);
+            }
+
+            if (IsOperatorType(op, "DeepLearning") ||
+                IsOperatorType(op, "OnnxInference") ||
+                IsOperatorType(op, "SemanticSegmentation") ||
+                IsOperatorType(op, "AnomalyDetection"))
+            {
+                AddIfConfigured(resources, op, "model_resource", ["ModelPath", "ModelId", "ModelCatalogPath"]);
+            }
+
+            if (IsOperatorType(op, "TemplateMatching"))
+            {
+                AddIfConfigured(resources, op, "template_artifact", ["TemplatePath", "TemplateId", "Template"]);
+            }
+
+            if (IsOperatorType(op, "UnitConvert"))
+            {
+                AddIfConfigured(resources, op, "measurement_parameter", ["Scale", "PixelScale", "CalibrationScale"]);
+            }
+
+            if (IsOperatorType(op, "ResultOutput"))
+            {
+                AddIfConfigured(resources, op, "output_channel", ["OutputChannelId", "OutputChannel", "Channel"]);
+                var outputMode = ReadFirstConfiguredParameter(op, "OutputChannel", "OutputChannelId", "Channel");
+                if (string.Equals(outputMode, "plc", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddIfConfigured(resources, op, "plc_address", ["PlcAddress", "PLCParameters"]);
+                }
+            }
+
+            if (op.OperatorType.Contains("Plc", StringComparison.OrdinalIgnoreCase))
+            {
+                AddIfConfigured(resources, op, "plc_address", ["PlcAddress", "PLCParameters"]);
+            }
+        }
+
+        return resources
+            .GroupBy(item => $"{item.ResourceKind}|{item.TempId}|{item.ParameterName}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+    }
+
+    private static void AddIfConfigured(
+        List<DeploymentResourceRequirement> resources,
+        VisionAgentFlowOperator op,
+        string resourceKind,
+        IReadOnlyList<string> parameterNames)
+    {
+        foreach (var parameterName in parameterNames)
+        {
+            var value = ReadParameter(op, parameterName);
+            if (IsMissingParameterValue(value))
+            {
+                continue;
+            }
+
+            resources.Add(new DeploymentResourceRequirement(
+                resourceKind,
+                parameterName,
+                op.TempId,
+                op.OperatorType));
+            return;
+        }
+    }
+
+    private static IReadOnlyList<ManualResourceConfirmation> ReadManualConfirmations(JsonElement arguments)
+    {
+        var confirmations = new List<ManualResourceConfirmation>();
+        ReadConfirmationArray(arguments, confirmations);
+
+        if (TryGetProperty(arguments, "flow", out var flow))
+        {
+            if (flow.ValueKind == JsonValueKind.Object)
+            {
+                ReadConfirmationArray(flow, confirmations);
+            }
+            else if (flow.ValueKind == JsonValueKind.String &&
+                     !string.IsNullOrWhiteSpace(flow.GetString()))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(flow.GetString()!);
+                    ReadConfirmationArray(doc.RootElement, confirmations);
+                }
+                catch (JsonException)
+                {
+                    // Flow parse errors are handled by the normalizer; confirmation parsing stays best-effort.
+                }
+            }
+        }
+
+        return confirmations;
+    }
+
+    private static void ReadConfirmationArray(
+        JsonElement root,
+        List<ManualResourceConfirmation> confirmations)
+    {
+        foreach (var propertyName in new[]
+                 {
+                     "manualResourceConfirmations",
+                     "manualConfirmations",
+                     "resourceConfirmations"
+                 })
+        {
+            if (!TryGetProperty(root, propertyName, out var value) ||
+                value.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            confirmations.AddRange(value.EnumerateArray()
+                .Where(item => item.ValueKind == JsonValueKind.Object)
+                .Select(item => new ManualResourceConfirmation(
+                    ReadStringProperty(item, "resourceType") ??
+                    ReadStringProperty(item, "resourceKind") ??
+                    string.Empty,
+                    ReadStringProperty(item, "operatorId") ??
+                    ReadStringProperty(item, "actualOperatorId") ??
+                    ReadStringProperty(item, "tempId") ??
+                    string.Empty,
+                    ReadStringProperty(item, "parameterName") ?? string.Empty,
+                    ReadStringProperty(item, "resourceKey") ??
+                    ReadStringProperty(item, "resourceRef") ??
+                    string.Empty,
+                    ReadBool(item, "metadataOnly") == true)));
+        }
+    }
+
+    private static bool HasMetadataOnlyManualConfirmation(
+        IReadOnlyList<ManualResourceConfirmation> confirmations,
+        DeploymentResourceRequirement resource)
+    {
+        var resourceKey = $"{resource.TempId}.{resource.ParameterName}";
+        return confirmations.Any(confirmation =>
+            confirmation.MetadataOnly &&
+            (string.IsNullOrWhiteSpace(confirmation.ResourceType) ||
+             string.Equals(confirmation.ResourceType, resource.ResourceKind, StringComparison.OrdinalIgnoreCase)) &&
+            (string.Equals(confirmation.ResourceKey, resourceKey, StringComparison.OrdinalIgnoreCase) ||
+             (string.Equals(confirmation.OperatorId, resource.TempId, StringComparison.OrdinalIgnoreCase) &&
+              string.Equals(confirmation.ParameterName, resource.ParameterName, StringComparison.OrdinalIgnoreCase))));
+    }
+
+    private static string? ReadParameter(
+        VisionAgentFlowOperator op,
+        string parameterName)
+    {
+        return op.Parameters.TryGetValue(parameterName, out var value) ? value : null;
+    }
+
+    private static string? ReadFirstConfiguredParameter(
+        VisionAgentFlowOperator op,
+        params string[] parameterNames)
+    {
+        foreach (var parameterName in parameterNames)
+        {
+            var value = ReadParameter(op, parameterName);
+            if (!IsMissingParameterValue(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsOperatorType(VisionAgentFlowOperator op, string operatorType)
+    {
+        return string.Equals(op.OperatorType, operatorType, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFileSource(string? sourceType)
+    {
+        return string.Equals(sourceType, "file", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(sourceType, "image", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(sourceType, "path", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMissingParameterValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        return value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("todo", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void CheckDryRun(
@@ -420,4 +658,17 @@ public sealed class RuntimePackagePrecheckTool : VisionAgentToolBase
         string TempId,
         string OperatorType,
         string Message);
+
+    private sealed record DeploymentResourceRequirement(
+        string ResourceKind,
+        string ParameterName,
+        string TempId,
+        string OperatorType);
+
+    private sealed record ManualResourceConfirmation(
+        string ResourceType,
+        string OperatorId,
+        string ParameterName,
+        string ResourceKey,
+        bool MetadataOnly);
 }

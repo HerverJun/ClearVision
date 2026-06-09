@@ -28,7 +28,7 @@ public sealed class VisionAgentDeploymentPrepareTests
         payload.GetProperty("pendingActions").GetArrayLength().Should().BeGreaterThan(0);
     }
 
-    [Fact(DisplayName = "runtime_package_precheck should block deployment for missing CameraBindingId ModelPath and TemplatePath")]
+    [Fact(DisplayName = "runtime_package_precheck should block deployment for missing CameraBindingId ModelPath and Template")]
     public async Task Precheck_ShouldBlockDeploymentForMissingVisionResources()
     {
         var result = await new RuntimePackagePrecheckTool().ExecuteAsync(
@@ -47,7 +47,7 @@ public sealed class VisionAgentDeploymentPrepareTests
 
         missingParameters.Should().Contain("CameraBindingId");
         missingParameters.Should().Contain("ModelPath");
-        missingParameters.Should().Contain("TemplatePath");
+        missingParameters.Should().Contain("Template");
         Json(result.Data).GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
     }
 
@@ -69,7 +69,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             .Select(item => item.GetProperty("resourceKind").GetString())
             .ToList();
 
-        missingKinds.Should().Contain("plc_parameters");
+        missingKinds.Should().Contain("plc_address");
         missingKinds.Should().Contain("output_channel");
         Json(result.Data).GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
     }
@@ -113,7 +113,35 @@ public sealed class VisionAgentDeploymentPrepareTests
             .ToList();
 
         missingParameters.Should().NotContain("Channel");
-        Json(result.Data).GetProperty("readyForDeployment").GetBoolean().Should().BeTrue();
+        Json(result.Data).GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
+        Json(result.Data).GetProperty("missingResources")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("parameterName").GetString())
+            .Should()
+            .Contain(["CameraBindingId", "TemplatePath", "OutputChannelId"]);
+    }
+
+    [Fact(DisplayName = "runtime_package_precheck should keep deployment blocked when resource values lack manual confirmation")]
+    public async Task Precheck_ShouldRequireManualConfirmationForConfiguredResourceValues()
+    {
+        var flow = ValidFlow();
+        var result = await new RuntimePackagePrecheckTool().ExecuteAsync(
+            new VisionAgentToolContext(),
+            Args(
+                ("flow", flow),
+                ("validationSummary", await ValidateAsync(flow)),
+                ("dryRunSummary", await DryRunAsync(flow))),
+            CancellationToken.None);
+
+        var payload = Json(result.Data);
+        payload.GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
+        payload.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
+        var missingParameters = payload.GetProperty("missingResources")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("parameterName").GetString())
+            .ToList();
+        missingParameters.Should().Contain(["CameraBindingId", "TemplatePath", "Channel"]);
+        payload.GetProperty("manualConfirmationRequired").GetBoolean().Should().BeTrue();
     }
 
     [Fact(DisplayName = "runtime_package_precheck should block deployment for structural validation issues")]
@@ -130,11 +158,11 @@ public sealed class VisionAgentDeploymentPrepareTests
 
         var payload = Json(result.Data);
         payload.GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
-        Codes(payload, "blockingIssues").Should().Contain("broken_connection_temp_id");
+        Codes(payload, "blockingIssues").Should().Contain("invalid_connection");
     }
 
-    [Fact(DisplayName = "runtime_package_precheck should mark valid flow ready when validation dryrun and station status are good")]
-    public async Task Precheck_ShouldAllowReadyDeploymentForValidInputs()
+    [Fact(DisplayName = "runtime_package_precheck should mark valid flow ready only after metadata-only manual confirmations")]
+    public async Task Precheck_ShouldAllowReadyDeploymentForValidInputsAfterManualConfirmation()
     {
         var flow = ValidFlow();
         var result = await new RuntimePackagePrecheckTool(new FakeStationStatusReader(true)).ExecuteAsync(
@@ -143,6 +171,7 @@ public sealed class VisionAgentDeploymentPrepareTests
                 ("flow", flow),
                 ("validationSummary", await ValidateAsync(flow)),
                 ("dryRunSummary", await DryRunAsync(flow)),
+                ("manualResourceConfirmations", ValidFlowManualConfirmations()),
                 ("targetStationId", "station_1")),
             CancellationToken.None);
 
@@ -152,6 +181,7 @@ public sealed class VisionAgentDeploymentPrepareTests
         payload.GetProperty("deployed").GetBoolean().Should().BeFalse();
         payload.GetProperty("packageCreated").GetBoolean().Should().BeFalse();
         payload.GetProperty("stationTouched").GetBoolean().Should().BeFalse();
+        payload.GetProperty("manualConfirmationCount").GetInt32().Should().Be(3);
     }
 
     [Fact(DisplayName = "runtime_package_precheck should block deployment but allow draft when dryrun is missing")]
@@ -182,7 +212,12 @@ public sealed class VisionAgentDeploymentPrepareTests
             CancellationToken.None);
 
         var payload = Json(result.Data);
-        payload.GetProperty("readyForDeployment").GetBoolean().Should().BeTrue();
+        payload.GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
+        payload.GetProperty("missingResources")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("parameterName").GetString())
+            .Should()
+            .Contain(["CameraBindingId", "TemplatePath", "Channel"]);
         Codes(payload, "warnings").Should().Contain("target_station_missing");
         Codes(payload, "blockingIssues").Should().NotContain("target_station_missing");
     }
@@ -411,7 +446,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             {
                 Connection("op_cam", "Image", "op_detect", "Image"),
                 Connection("op_cam", "Image", "op_match", "Image"),
-                Connection("op_detect", "Detections", "op_out", "Input")
+                Connection("op_detect", "DetectionList", "op_out", "Data")
             }
         };
     }
@@ -429,7 +464,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             connections = new object[]
             {
                 Connection("op_cam", "Image", "op_plc", "Input"),
-                Connection("op_plc", "Result", "op_out", "Input")
+                Connection("op_plc", "Result", "op_out", "Data")
             }
         };
     }
@@ -449,7 +484,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             {
                 Connection("op_cam", "Image", "op_match", "Image"),
                 Connection("op_cam", "Image", "op_detect", "Image"),
-                Connection("op_match", "Score", "op_out", "Input")
+                Connection("op_match", "Score", "op_out", "Result")
             }
         };
     }
@@ -467,7 +502,7 @@ public sealed class VisionAgentDeploymentPrepareTests
             connections = new object[]
             {
                 Connection("op_cam", "Image", "op_match", "Image"),
-                Connection("op_match", "Score", "op_out", "Input")
+                Connection("op_match", "Score", "op_out", "Result")
             }
         };
     }
@@ -502,9 +537,36 @@ public sealed class VisionAgentDeploymentPrepareTests
             connections = new object[]
             {
                 Connection("op_cam", "Image", "op_match", "Image"),
-                Connection("op_match", "Score", "op_judge", "Input"),
-                Connection("op_judge", "Result", "op_out", "Input")
+                Connection("op_match", "Score", "op_judge", "Value"),
+                Connection("op_judge", "JudgmentResult", "op_out", "Result")
             }
+        };
+    }
+
+    private static object[] ValidFlowManualConfirmations()
+    {
+        return
+        [
+            ManualConfirmation("camera_binding", "op_cam", "CameraBindingId"),
+            ManualConfirmation("template_artifact", "op_match", "TemplatePath"),
+            ManualConfirmation("output_channel", "op_out", "Channel")
+        ];
+    }
+
+    private static object ManualConfirmation(
+        string resourceType,
+        string operatorId,
+        string parameterName)
+    {
+        return new
+        {
+            confirmedAtUtc = "2026-06-09T00:00:00Z",
+            actor = "local-user",
+            resourceType,
+            operatorId,
+            parameterName,
+            resourceKey = $"{operatorId}.{parameterName}",
+            metadataOnly = true
         };
     }
 

@@ -38,8 +38,8 @@
         "TemplatePath": { "effectiveRequired": true, "effectiveDisabled": false },
         "TemplateId": { "effectiveRequired": true, "effectiveDisabled": false }
       },
-      "flowValidationMissingParameters": ["TemplatePath"],
-      "deploymentPrecheckMissingParameters": ["TemplatePath"]
+      "flowValidationMissingParameters": ["Template"],
+      "deploymentPrecheckMissingParameters": ["Template"]
     },
     {
       "caseId": "template_matching_accepts_template_id",

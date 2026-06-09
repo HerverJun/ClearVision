@@ -3,7 +3,8 @@ import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 
 export const AgentWorkspaceModes = Object.freeze({
     PLAN: 'plan',
-    BUILD: 'build'
+    BUILD: 'build',
+    APPLIED: 'applied'
 });
 
 const BUILD_STAGE_ORDER = [
@@ -738,6 +739,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
         const plan = this.pendingVisionPlan;
         const mode = this._formatWorkspaceModeLabel();
+        const phase = this._getAgentWorkspacePhase();
         const activeEvents = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
         const planEvents = Array.isArray(plan?.publicEvents) ? plan.publicEvents : [];
         const terminal = activeEvents.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
@@ -756,7 +758,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const source = this._formatWorkspaceValue(plan?.planSource || (activeEvents.length ? '构建事件' : '未设置'));
 
         el.innerHTML = `
-            <section class="ai-agent-overview-card is-${this._escapeHtml(this.agentWorkspaceMode || AgentWorkspaceModes.PLAN)}">
+            <section class="ai-agent-overview-card is-${this._escapeHtml(phase)}">
                 <div class="ai-agent-overview-main">
                     <span class="ai-agent-overview-kicker">${this._escapeHtml(mode)}</span>
                     <strong>${this._escapeHtml(goal)}</strong>
@@ -769,8 +771,30 @@ export const aiPanelAgentWorkspaceMixin = {
                     <span><small>阻断项</small><b>${this._escapeHtml(String(blockerCount))}</b></span>
                     <span><small>事件数</small><b>${this._escapeHtml(String(activeEvents.length || planEvents.length))}</b></span>
                 </div>
+                <div class="ai-agent-stage-strip" aria-label="Vision Agent 阶段">
+                    ${['plan', 'build', 'applied'].map(key => `
+                        <span class="${key === phase ? 'is-active' : ''} ${this._isWorkspacePhaseCompleted(key, phase) ? 'is-completed' : ''}">
+                            ${key === 'plan' ? 'Plan 规划' : key === 'build' ? 'Build 审计' : 'Applied 复核'}
+                        </span>
+                    `).join('')}
+                </div>
             </section>
         `;
+    },
+
+    _getAgentWorkspacePhase() {
+        if (this.workbenchState === AiWorkbenchStates.APPLIED || this.agentWorkspaceMode === AgentWorkspaceModes.APPLIED) {
+            return AgentWorkspaceModes.APPLIED;
+        }
+
+        return this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
+            ? AgentWorkspaceModes.BUILD
+            : AgentWorkspaceModes.PLAN;
+    },
+
+    _isWorkspacePhaseCompleted(key, activePhase) {
+        const order = [AgentWorkspaceModes.PLAN, AgentWorkspaceModes.BUILD, AgentWorkspaceModes.APPLIED];
+        return order.indexOf(key) >= 0 && order.indexOf(key) < order.indexOf(activePhase);
     },
 
     _formatWorkspaceModeLabel() {
@@ -834,6 +858,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-plan-empty">
                     <div class="ai-plan-empty-title">规划模式</div>
                     <div class="ai-plan-empty-copy">正在收集工程上下文。请输入检测目标，智能体会先形成视觉工程计划，再进入构建。</div>
+                    <div class="ai-plan-empty-copy">资源补齐会在开始构建后出现；Plan 阶段只显示目标、关键问题、推荐默认值和规划诊断。</div>
                 </div>
             `;
             return;
@@ -874,6 +899,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-plan-question-list">
                     ${plan.questions.map(question => this._renderPlanQuestion(question, selections[question.id])).join('')}
                 </div>
+                <div class="ai-build-note">资源补齐会在开始构建后出现。此阶段不会提前显示完整资源补齐卡。</div>
             </section>
             <section class="ai-workspace-section ai-workspace-grid-2">
                 <div>
@@ -1140,8 +1166,12 @@ export const aiPanelAgentWorkspaceMixin = {
         const events = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
         if (!events.length) {
             if (timeline) {
-                timeline.innerHTML = '<div class="ai-followup-empty">等待后端 AgentRun 公开事件。</div>';
+                timeline.innerHTML = '<div class="ai-followup-empty">Build 阶段已进入资源审计中心，等待后端 AgentRun 公开事件。</div>';
             }
+            if (chain) chain.innerHTML = '<div class="ai-followup-empty">算子链会在构建事件返回后显示。</div>';
+            if (parameters) parameters.innerHTML = '<div class="ai-followup-empty">参数映射和资源审计任务会在构建结果返回后显示。</div>';
+            if (checks) checks.innerHTML = '<div class="ai-followup-empty">ApplyGate 会在构建结果返回后显示。</div>';
+            if (finalDraft) finalDraft.innerHTML = '<div class="ai-followup-empty">流程草稿完成后可应用到画布。</div>';
             return;
         }
 
@@ -1349,7 +1379,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <span><small>缺失资源</small><b>${this._escapeHtml(String(Number.isFinite(missingCount) ? missingCount : 0))}</b></span>
             </div>
             ${mappingRows ? `<div class="ai-workspace-section-title">参数映射</div>${mappingRows}` : ''}
-            ${(effectivePending.length || effectiveMissing.length) ? '<div class="ai-build-note">待补详情会在下方参数与校验区继续显示。</div>' : '<div class="ai-build-note">暂无待确认参数详情。</div>'}
+            ${(effectivePending.length || effectiveMissing.length) ? '<div class="ai-build-note">资源审计任务卡会在左侧下方集中显示；流程页只用于应用后的节点级复核和细调。</div>' : '<div class="ai-build-note">暂无待确认参数详情。</div>'}
         `;
     },
 
@@ -1367,8 +1397,8 @@ export const aiPanelAgentWorkspaceMixin = {
             return `
                 <div class="ai-build-check is-${blocked ? 'blocked' : 'completed'}">
                     <strong>应用门禁：${this._escapeHtml(this._formatGateStatus(gate.status || gate.Status || 'unknown'))}</strong>
-                    <span>画布：${canvasReady ? '可应用' : '阻断'} / 运行草稿：${runtimeReady ? '就绪' : '阻断'} / 部署：${deploymentReady ? '就绪' : '阻断'}</span>
-                    ${firstFix ? `<em>${this._escapeHtml(this._localizeDisplayText(firstFix))}</em>` : ''}
+                    <span>画布可应用：${canvasReady ? '是' : '否'} / 运行草稿：${runtimeReady ? '就绪' : '阻断'} / 部署：${deploymentReady ? '就绪' : '阻断'}</span>
+                    ${firstFix ? `<em class="ai-first-fix">First Fix：${this._escapeHtml(this._localizeDisplayText(firstFix))}</em>` : ''}
                 </div>
                 ${readiness ? `<div class="ai-build-note">就绪门禁已写入可回放 BuildResult。</div>` : ''}
             `;
@@ -1424,6 +1454,12 @@ export const aiPanelAgentWorkspaceMixin = {
                 <strong>可编辑草稿已就绪</strong>
                 <span>${this._escapeHtml(String(ops.length))} 个算子 / ${this._escapeHtml(String(connections.length))} 条连线</span>
             </div>
+            ${this.workbenchState === AiWorkbenchStates.APPLIED ? `
+                <div class="ai-build-note">
+                    <strong>已应用到画布</strong>
+                    仍需补齐项和已确认资源会继续保留在左侧审计记录中。应用到画布后，可在流程页点击算子进行细节复核与微调；流程页修改不会绕过部署门禁。
+                </div>
+            ` : ''}
             ${diff ? this._renderWorkflowDiff(diff) : ''}
         `;
     },

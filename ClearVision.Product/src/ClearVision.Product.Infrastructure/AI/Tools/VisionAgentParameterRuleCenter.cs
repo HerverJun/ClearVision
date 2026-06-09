@@ -18,6 +18,7 @@ internal static class VisionAgentParameterRuleCenter
         {
             AddImageAcquisitionResources(op, missingResources);
             AddDeepLearningResources(op, missingResources);
+            AddTemplateMatchingResources(op, missingResources);
             AddResultOutputResources(op, missingResources);
             AddPlcResources(op, missingResources);
 
@@ -55,8 +56,8 @@ internal static class VisionAgentParameterRuleCenter
             op,
             missingResources,
             "camera_binding",
-            ["CameraId", "CameraBindingId"],
-            "ImageAcquisition.CameraId is not configured.");
+            ["CameraBindingId", "CameraId"],
+            "ImageAcquisition.CameraBindingId is not configured.");
     }
 
     private static void AddDeepLearningResources(
@@ -79,6 +80,23 @@ internal static class VisionAgentParameterRuleCenter
             $"{op.OperatorType}.ModelPath or ModelId is not configured.");
     }
 
+    private static void AddTemplateMatchingResources(
+        VisionAgentFlowOperator op,
+        List<VisionAgentMissingResource> missingResources)
+    {
+        if (!IsOperatorType(op, "TemplateMatching"))
+        {
+            return;
+        }
+
+        AddMissingAtLeastOne(
+            op,
+            missingResources,
+            "template_artifact",
+            ["Template", "TemplateId", "TemplatePath"],
+            "TemplateMatching.Template input or TemplateId is not configured.");
+    }
+
     private static void AddResultOutputResources(
         VisionAgentFlowOperator op,
         List<VisionAgentMissingResource> missingResources)
@@ -92,10 +110,10 @@ internal static class VisionAgentParameterRuleCenter
             op,
             missingResources,
             "output_channel",
-            ["OutputChannel", "OutputChannelId"],
+            ["OutputChannelId", "OutputChannel", "Channel"],
             "ResultOutput output channel metadata is not configured.");
 
-        var channel = GetFirstPresentParameter(op.Parameters, "OutputChannel");
+        var channel = GetFirstPresentParameter(op.Parameters, "OutputChannel", "OutputChannelId", "Channel");
         if (string.Equals(channel, "file", StringComparison.OrdinalIgnoreCase))
         {
             AddMissingAtLeastOne(
@@ -130,7 +148,7 @@ internal static class VisionAgentParameterRuleCenter
             op,
             missingResources,
             "plc_address",
-            ["PLCParameters", "PlcAddress"],
+            ["PlcAddress", "PLCParameters"],
             $"{op.OperatorType} PLC parameters are missing or pending.");
     }
 

@@ -1238,8 +1238,9 @@ export class AiPanel {
             parameterNames: group.fields.map(field => field.parameterName)
         }));
         const hasTemplateStrategy = Boolean(recommended || candidates.length > 0 || generationMode || templateLockLevel);
+        const manualRecords = this._getManualResourceConfirmationRecords?.(data) || [];
 
-        if (!hasTemplateStrategy && pendingGroups.length === 0 && missing.length === 0 && nonBlockingFields.length === 0) {
+        if (!hasTemplateStrategy && pendingGroups.length === 0 && missing.length === 0 && nonBlockingFields.length === 0 && manualRecords.length === 0) {
             container.classList.add('is-empty');
             container.innerHTML = '<div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>';
             return;
@@ -1306,14 +1307,26 @@ export class AiPanel {
                 <div class="ai-followup-section">
                     <div class="ai-followup-section-header">
                         <div class="ai-followup-section-label">待确认参数</div>
-                        <div class="ai-followup-section-tip">点击可跳到下方填写区</div>
+                        <div class="ai-followup-section-tip">人工填写后统一确认写回</div>
                     </div>
                     <div class="ai-followup-list">
                         ${pendingGroups.map(group => {
                             return `
-                            <button class="ai-followup-item ai-followup-nav" type="button" data-followup-nav="${this._escapeHtml(group.groupKey)}">
-                                <div class="ai-followup-item-title">${this._escapeHtml(group.label)}</div>
-                                <div class="ai-followup-item-body">需要补充：${this._escapeHtml(group.fields.map(field => getParameterDisplayName(field.parameterName, { fallback: field.parameterName })).join('、'))}</div>
+                            <button class="ai-followup-item ai-followup-nav ai-resource-audit-card is-pending-parameter" type="button" data-followup-nav="${this._escapeHtml(group.groupKey)}">
+                                <div class="ai-resource-audit-card-head">
+                                    <div>
+                                        <div class="ai-followup-item-title">${this._escapeHtml(group.label)}</div>
+                                        <div class="ai-followup-item-body">资源类型：测量参数 / 业务参数；点击定位到下方人工确认输入区。</div>
+                                    </div>
+                                    <span class="ai-resource-audit-badge">人工确认</span>
+                                </div>
+                                <div class="ai-resource-audit-grid">
+                                    <span><small>影响算子</small><b>${this._escapeHtml(group.operatorId || '待识别')}</b></span>
+                                    <span><small>影响参数</small><b>${this._escapeHtml(group.fields.map(field => getParameterDisplayName(field.parameterName, { fallback: field.parameterName })).join('、'))}</b></span>
+                                    <span><small>阻断原因</small><b>部署前参数需要人工确认</b></span>
+                                    <span><small>AI 建议</small><b>下方填写区提供建议值，仅供参考</b></span>
+                                </div>
+                                <div class="ai-resource-audit-manual-title">人工确认输入区在下方“待确认参数”编辑器</div>
                             </button>
                         `;
                         }).join('')}
@@ -1326,20 +1339,13 @@ export class AiPanel {
             ? `
                 <div class="ai-followup-section">
                     <div class="ai-followup-section-header">
-                        <div class="ai-followup-section-label">缺失资源</div>
-                        <div class="ai-followup-section-tip">填写元数据或选择稍后处理</div>
+                        <div class="ai-followup-section-label">资源审计任务</div>
+                        <div class="ai-followup-section-tip">人工确认写回或稍后处理</div>
                     </div>
                     <div class="ai-followup-list">
                         ${missing.map((item, index) => {
                             const actionModel = this._getMissingResourceActionModel(item);
-                            return `
-                            <div class="ai-followup-item ai-followup-resource-task" data-resource-index="${this._escapeHtml(String(index))}">
-                                <div class="ai-followup-item-title" title="${this._escapeHtml(item.resourceType || '资源')}">${this._escapeHtml(getResourceDisplayName(item.resourceType, { fallback: '资源' }))}</div>
-                                <div class="ai-followup-item-body">${this._escapeHtml(item.description || item.resourceKey || '缺少必要资源')}</div>
-                                ${item.resourceKey ? `<div class="ai-followup-item-meta" title="${this._escapeHtml(item.resourceKey)}">资源键：${this._escapeHtml(item.resourceKey)}</div>` : ''}
-                                ${this._renderMissingResourceActionControls(item, actionModel, index)}
-                            </div>
-                        `;
+                            return this._renderResourceAuditTaskCard(item, actionModel, index);
                         }).join('')}
                     </div>
                 </div>
@@ -1366,10 +1372,15 @@ export class AiPanel {
 
         container.classList.remove('is-empty');
         container.innerHTML = `
+            <div class="ai-resource-audit-intro">
+                <strong>资源补齐在此处集中完成，便于审计。</strong>
+                <span>应用到画布后，可在流程页点击算子进行细节复核与微调；流程页修改不会绕过部署门禁。</span>
+            </div>
             ${recommendedHtml}
             ${pendingHtml}
             ${missingHtml}
             ${nonBlockingHtml}
+            ${this._renderManualConfirmationRecords?.(data) || ''}
             <div class="ai-followup-actions">
                 <div class="ai-followup-actions-hint">可复制成下一轮补充文本，也可直接挂到下一次生成的 hint。</div>
                 <div class="ai-followup-action-row">

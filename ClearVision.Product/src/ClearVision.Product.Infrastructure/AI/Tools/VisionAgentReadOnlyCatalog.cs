@@ -17,7 +17,7 @@ internal static class VisionAgentReadOnlyCatalog
         new("CircleMeasurement", "Circle Measurement", "measurement", "Measures circle center/radius features.", ["circle", "hole", "diameter"]),
         new("Measurement", "Measurement", "measurement", "Measures distance between points or features.", ["distance", "spacing", "hole", "measurement"]),
         new("UnitConvert", "Unit Convert", "measurement", "Converts pixel measurement values to engineering units.", ["calibration", "pixel", "scale", "measurement"]),
-        new("DetectionSequenceJudge", "Detection Sequence Judge", "logic", "Checks detection label order for terminal wire sequence inspection.", ["wire", "sequence", "terminal", "order"]),
+        new("DetectionSequenceJudge", "检测顺序判定", "logic", "检查检测标签顺序，适用于端子线序检测。", ["wire", "sequence", "terminal", "order"]),
         new("ImageAdd", "Image Add", "image", "Combines images using the real ImageAdd operator.", ["compose", "multi-camera"]),
         new("ResultJudgment", "Result Judgment", "logic", "Evaluates pass/fail conditions using Value/Confidence inputs.", ["judgment", "pass", "fail", "tolerance"]),
         new("ResultOutput", "Result Output", "output", "Summarizes inspection result payloads.", ["output", "result", "mes", "plc"]),

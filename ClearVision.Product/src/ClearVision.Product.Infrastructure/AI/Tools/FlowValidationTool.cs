@@ -19,8 +19,8 @@ public sealed class FlowValidationTool : VisionAgentToolBase
     }
 
     public override string Name => "validate_flow";
-    public override string DisplayName => "Validate flow";
-    public override string Description => "Runs structure-only validation on a draft flow without executing vision logic.";
+    public override string DisplayName => "流程校验";
+    public override string Description => "仅校验流程草稿结构，不执行视觉逻辑。";
     public override string Category => "simulation";
     public override VisionAgentToolPermission Permission => VisionAgentToolPermission.Simulation;
     public override JsonElement ParametersSchema { get; } = Schema("""
@@ -344,7 +344,8 @@ internal static class VisionAgentFlowDraftValidator
 
         foreach (var parameterName in op.Parameters.Keys)
         {
-            if (!knownParameters.ContainsKey(parameterName))
+            if (!knownParameters.ContainsKey(parameterName) &&
+                !IsRecognizedMetadataParameter(op.OperatorType, parameterName))
             {
                 blockingIssues.Add(new VisionAgentFlowIssue(
                     "unknown_parameter",
@@ -358,6 +359,11 @@ internal static class VisionAgentFlowDraftValidator
         {
             op.Parameters.TryGetValue(parameter.Name, out var value);
             if (!IsRequiredPending(op.OperatorType, parameter, value))
+            {
+                continue;
+            }
+
+            if (IsRuleCenterManagedMetadata(op.OperatorType, parameter.Name))
             {
                 continue;
             }
@@ -414,6 +420,11 @@ internal static class VisionAgentFlowDraftValidator
                     $"{op.OperatorType}.{input.Name} is required but is not connected.",
                     op.TempId,
                     op.OperatorType));
+                continue;
+            }
+
+            if (IsRuleCenterManagedMetadata(op.OperatorType, input.Name))
+            {
                 continue;
             }
 
@@ -498,6 +509,82 @@ internal static class VisionAgentFlowDraftValidator
 
         return value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
                value.Contains("todo", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsRecognizedMetadataParameter(
+        string operatorType,
+        string parameterName)
+    {
+        return GetMetadataParameterGroup(operatorType, parameterName).Count > 0;
+    }
+
+    private static bool IsRuleCenterManagedMetadata(
+        string operatorType,
+        string parameterName)
+    {
+        return GetMetadataParameterGroup(operatorType, parameterName).Count > 0;
+    }
+
+    private static IReadOnlyList<string> GetMetadataParameterGroup(
+        string operatorType,
+        string parameterName)
+    {
+        if (IsOperatorType(operatorType, "ImageAcquisition") &&
+            IsAny(parameterName, "CameraBindingId", "CameraId"))
+        {
+            return ["CameraBindingId", "CameraId"];
+        }
+
+        if (IsDeepLearningOperator(operatorType) &&
+            IsAny(parameterName, "ModelPath", "ModelId", "ModelCatalogPath"))
+        {
+            return ["ModelPath", "ModelId", "ModelCatalogPath"];
+        }
+
+        if (IsOperatorType(operatorType, "TemplateMatching") &&
+            IsAny(parameterName, "Template", "TemplatePath", "TemplateId"))
+        {
+            return ["TemplatePath", "TemplateId", "Template"];
+        }
+
+        if (IsOperatorType(operatorType, "ResultOutput") &&
+            IsAny(parameterName, "OutputChannelId", "OutputChannel", "Channel"))
+        {
+            return ["OutputChannelId", "OutputChannel", "Channel"];
+        }
+
+        if (IsOperatorType(operatorType, "ResultOutput") &&
+            IsAny(parameterName, "FilePath", "OutputPath"))
+        {
+            return ["FilePath", "OutputPath"];
+        }
+
+        if ((IsOperatorType(operatorType, "ResultOutput") ||
+             operatorType.Contains("Plc", StringComparison.OrdinalIgnoreCase)) &&
+            IsAny(parameterName, "PlcAddress", "PLCParameters"))
+        {
+            return ["PlcAddress", "PLCParameters"];
+        }
+
+        return [];
+    }
+
+    private static bool IsDeepLearningOperator(string operatorType)
+    {
+        return IsOperatorType(operatorType, "DeepLearning") ||
+               IsOperatorType(operatorType, "OnnxInference") ||
+               IsOperatorType(operatorType, "SemanticSegmentation") ||
+               IsOperatorType(operatorType, "AnomalyDetection");
+    }
+
+    private static bool IsOperatorType(string operatorType, string expected)
+    {
+        return string.Equals(operatorType, expected, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAny(string value, params string[] candidates)
+    {
+        return candidates.Any(candidate => string.Equals(value, candidate, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void AddMissingResource(

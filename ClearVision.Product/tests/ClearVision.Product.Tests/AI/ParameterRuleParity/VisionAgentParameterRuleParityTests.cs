@@ -51,7 +51,8 @@ public sealed class VisionAgentParameterRuleParityTests
                         dryRunSucceeded = true,
                         warnings = Array.Empty<object>(),
                         blockingIssues = Array.Empty<object>()
-                    })),
+                    }),
+                    ("manualResourceConfirmations", ManualConfirmationsFor(testCase))),
                 CancellationToken.None);
 
             precheck.Success.Should().BeTrue(testCase.CaseId);
@@ -178,6 +179,51 @@ public sealed class VisionAgentParameterRuleParityTests
             },
             connections = Array.Empty<object>()
         };
+    }
+
+    private static object[] ManualConfirmationsFor(ParameterRuleParityCase testCase)
+    {
+        var confirmations = new List<object>();
+        AddIfConfigured(confirmations, testCase, "camera_binding", "CameraId", "CameraBindingId");
+        AddIfConfigured(confirmations, testCase, "model_resource", "ModelPath", "ModelId", "ModelCatalogPath");
+        AddIfConfigured(confirmations, testCase, "template_artifact", "Template", "TemplateId", "TemplatePath");
+        AddIfConfigured(confirmations, testCase, "output_channel", "OutputChannel", "OutputChannelId", "Channel");
+        AddIfConfigured(confirmations, testCase, "plc_address", "PlcAddress", "PLCParameters");
+        return confirmations.ToArray();
+    }
+
+    private static void AddIfConfigured(
+        List<object> confirmations,
+        ParameterRuleParityCase testCase,
+        string resourceType,
+        params string[] parameterNames)
+    {
+        foreach (var parameterName in parameterNames)
+        {
+            if (!testCase.Parameters.TryGetValue(parameterName, out var rawValue))
+            {
+                continue;
+            }
+
+            var value = rawValue.ValueKind == JsonValueKind.String
+                ? rawValue.GetString()
+                : rawValue.GetRawText();
+            if (string.IsNullOrWhiteSpace(value) ||
+                value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            confirmations.Add(new
+            {
+                resourceType,
+                operatorId = "op_under_test",
+                parameterName,
+                resourceKey = $"op_under_test.{parameterName}",
+                metadataOnly = true
+            });
+            return;
+        }
     }
 
     private static IReadOnlyList<string> MissingParameters(JsonElement payload)

@@ -152,33 +152,33 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
 
         yield return new VisionAgentOperatorContract(
             "DetectionSequenceJudge",
-            "Detection Sequence Judge",
-            "AI Inspection",
-            "Sorts detections and compares label order against an expected sequence.",
+            "检测顺序判定",
+            "AI 检测",
+            "对检测结果排序，并与期望标签序列进行比对。",
             [
-                Port("Detections", "Detections", PortDataType.DetectionList, true),
-                Port("SlotPoints", "Slot Points", PortDataType.PointList, false),
-                Port("PerspectiveSrcPoints", "Perspective Source Points", PortDataType.PointList, false),
-                Port("PerspectiveDstPoints", "Perspective Destination Points", PortDataType.PointList, false)
+                Port("Detections", "检测结果", PortDataType.DetectionList, true),
+                Port("SlotPoints", "槽位点", PortDataType.PointList, false),
+                Port("PerspectiveSrcPoints", "透视源点", PortDataType.PointList, false),
+                Port("PerspectiveDstPoints", "透视目标点", PortDataType.PointList, false)
             ],
             [
-                Port("IsMatch", "Is Match", PortDataType.Boolean, false),
-                Port("ActualOrder", "Actual Order", PortDataType.Any, false),
-                Port("Count", "Count", PortDataType.Integer, false),
-                Port("MissingLabels", "Missing Labels", PortDataType.Any, false),
-                Port("DuplicateLabels", "Duplicate Labels", PortDataType.Any, false),
-                Port("SortedDetections", "Sorted Detections", PortDataType.DetectionList, false),
-                Port("Assignment", "Assignment", PortDataType.Any, false),
-                Port("UnassignedDetections", "Unassigned Detections", PortDataType.DetectionList, false),
-                Port("Diagnostics", "Diagnostics", PortDataType.Any, false),
-                Port("Message", "Message", PortDataType.String, false)
+                Port("IsMatch", "是否匹配", PortDataType.Boolean, false),
+                Port("ActualOrder", "实际顺序", PortDataType.Any, false),
+                Port("Count", "数量", PortDataType.Integer, false),
+                Port("MissingLabels", "缺失标签", PortDataType.Any, false),
+                Port("DuplicateLabels", "重复标签", PortDataType.Any, false),
+                Port("SortedDetections", "排序后检测", PortDataType.DetectionList, false),
+                Port("Assignment", "分配结果", PortDataType.Any, false),
+                Port("UnassignedDetections", "未分配检测", PortDataType.DetectionList, false),
+                Port("Diagnostics", "诊断信息", PortDataType.Any, false),
+                Port("Message", "消息", PortDataType.String, false)
             ],
             [
-                Param("ExpectedLabels", "Expected Labels", "string", true, ""),
-                Param("SortBy", "Sort By", "enum", false, "CenterX"),
-                Param("Direction", "Direction", "enum", false, "Ascending"),
-                Param("ExpectedCount", "Expected Count", "int", false, 0, 0, 256),
-                Param("MinConfidence", "Min Confidence", "double", false, 0.0, 0.0, 1.0)
+                Param("ExpectedLabels", "期望标签序列", "string", true, ""),
+                Param("SortBy", "排序字段", "enum", false, "CenterX"),
+                Param("Direction", "排序方向", "enum", false, "Ascending"),
+                Param("ExpectedCount", "期望数量", "int", false, 0, 0, 256),
+                Param("MinConfidence", "最低置信度", "double", false, 0.0, 0.0, 1.0)
             ]);
     }
 
