@@ -578,11 +578,18 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _handleIntentRouterResult(result, context) {
         const route = this._normalizeIntentRouterResult(result);
-        const label = this._formatIntentRouterIntentLabel(route.intent);
         const tone = route.needsClarification ? 'warning' : 'streaming';
-        this._setAssistantTurnStatus(context.turn, `已识别为：${label}`, tone);
+        const visibleStatus = route.needsClarification || route.intent === 'ambiguous_vision_requirement'
+            ? '需要补充信息'
+            : '已理解请求';
+        this._setAssistantTurnStatus(context.turn, visibleStatus, tone);
         this._setAssistantSectionText(context.turn, 'reply', this._formatIntentRouterReply(route));
-        this._updateIntentRouterTimeline(context.routerRequestId, 'intent-router-result', `已识别为：${label}`, 'completed');
+        this._updateIntentRouterTimeline(
+            context.routerRequestId,
+            'intent-router-result',
+            visibleStatus,
+            'completed',
+            route.publicReason);
 
         if (route.shouldOpenPlan || route.intent === 'actionable_vision_plan') {
             return this._enterPlanModeFromPrompt({
@@ -649,8 +656,12 @@ export const aiPanelAgentWorkspaceMixin = {
     _normalizeIntentRouterResult(result) {
         const item = this._asObject?.(result) || result || {};
         const intent = String(item.intent || item.Intent || 'ambiguous_vision_requirement').trim() || 'ambiguous_vision_requirement';
+        const normalizeDisplayText = value => {
+            const localized = this._localizeDisplayText(String(value || '').trim());
+            return this._redactPublicDiagnosticText?.(localized) || localized;
+        };
         const questions = this._toArray(item.clarificationQuestions || item.ClarificationQuestions)
-            .map(question => this._localizeDisplayText(String(question || '').trim()))
+            .map(question => normalizeDisplayText(question))
             .filter(Boolean)
             .slice(0, 5);
         return {
@@ -660,8 +671,8 @@ export const aiPanelAgentWorkspaceMixin = {
             shouldBuildDirectly: Boolean(item.shouldBuildDirectly ?? item.ShouldBuildDirectly),
             canBuild: Boolean(item.canBuild ?? item.CanBuild),
             needsClarification: Boolean(item.needsClarification ?? item.NeedsClarification),
-            publicReason: this._localizeDisplayText(item.publicReason || item.PublicReason || ''),
-            assistantReply: this._localizeDisplayText(item.assistantReply || item.AssistantReply || ''),
+            publicReason: normalizeDisplayText(item.publicReason || item.PublicReason || ''),
+            assistantReply: normalizeDisplayText(item.assistantReply || item.AssistantReply || ''),
             clarificationQuestions: questions,
             fallbackReason: item.fallbackReason || item.FallbackReason || '',
             routerSource: item.routerSource || item.RouterSource || ''
@@ -688,15 +699,10 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _formatIntentRouterReply(route) {
-        const lines = [];
-        if (route.publicReason) {
-            lines.push(route.publicReason);
-        }
-        if (route.assistantReply && route.assistantReply !== route.publicReason) {
-            lines.push(route.assistantReply);
+        if (route.assistantReply) {
+            return route.assistantReply;
         }
         if (route.needsClarification || route.intent === 'ambiguous_vision_requirement') {
-            lines.push('需求不足，暂不可构建。');
             const questions = route.clarificationQuestions.length
                 ? route.clarificationQuestions
                 : [
@@ -704,19 +710,21 @@ export const aiPanelAgentWorkspaceMixin = {
                     '请说明缺陷、测量项或识别内容。',
                     '请说明输入来源和 OK/NG 判定规则。'
                 ];
-            questions.forEach((question, index) => {
-                lines.push(`${index + 1}. ${question}`);
-            });
+            return questions[0] || '请补充检测目标、缺陷类型、输入来源和 OK/NG 规则。';
         }
-        return lines.filter(Boolean).join('\n');
+        return '已理解。';
     },
 
-    _updateIntentRouterTimeline(chainId, stepId, text, status = 'running') {
+    _updateIntentRouterTimeline(chainId, stepId, text, status = 'running', publicReason = '') {
         const node = this._updateThinkingStep(chainId || 'intent-router', stepId || 'intent-router-run', text);
         if (!node) return;
         node.className = `ai-agent-run-step is-${status === 'completed' ? 'success' : 'running'}`;
         node.dataset.stage = 'intent_router';
         node.dataset.eventType = stepId || '';
+        if (publicReason) {
+            node.dataset.publicReason = publicReason;
+            node.title = publicReason;
+        }
     },
 
     _buildLocalIntentRouterFallback(description, error = null) {
@@ -729,6 +737,9 @@ export const aiPanelAgentWorkspaceMixin = {
             normalized === '帮助';
         const isActionable = this._looksLikeStandaloneVisionRequest?.(description) === true ||
             this._looksLikeExplicitNewFlowRequest?.(description) === true;
+        const ambiguousReply = /包装箱|纸箱|箱/.test(String(description || ''))
+            ? '你想检测包装箱的哪一类问题？比如胶带贴歪、条码不可读、Logo 缺失、箱角破损，或外观污渍。'
+            : '你想检测哪一类问题？请补充检测目标、缺陷类型、输入来源，以及 OK/NG 判定规则。';
         const intent = isHelp
             ? 'help'
             : isCasual
@@ -747,12 +758,12 @@ export const aiPanelAgentWorkspaceMixin = {
                 ? '模型路由不可用，已使用安全规则兜底。'
                 : '已使用安全规则兜底判断请求类型。',
             assistantReply: intent === 'casual_chat'
-                ? '我在。你可以描述要做的视觉检测、测量、识别或输出流程。'
+                ? '在的。你可以直接描述检测目标、缺陷类型、测量项或流程修改需求，我会先帮你规划方案。'
                 : intent === 'help'
-                    ? '我可以先帮你梳理视觉检测需求，形成规划；确认推荐方案后再构建可编辑的算子链。'
+                    ? '我可以帮你规划视觉检测流程、选择算子链、整理待确认资源，并在人工确认后生成可应用到画布的草稿。'
                     : intent === 'actionable_vision_plan'
-                        ? '已识别为可规划的视觉需求，将先进入 Plan 规划。'
-                        : '需求不足，暂不可构建。请补充检测目标、缺陷或识别内容、输入来源、OK/NG 规则。',
+                        ? '我先帮你整理规划方案。'
+                        : ambiguousReply,
             clarificationQuestions: intent === 'ambiguous_vision_requirement'
                 ? [
                     '请补充检测目标或产品对象。',

@@ -310,6 +310,7 @@ export const aiPanelChatMixin = {
         return String(value || '')
             .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, 'Bearer [redacted]')
             .replace(/\b(?:authorization|x-api-key|api[-_ ]?key)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '$1: [redacted]')
+            .replace(/\b(?:token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '$1: [redacted]')
             .replace(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g, '[redacted:ip]')
             .replace(/(?:[a-z]:\\|\\\\)[^\s"'<>|]+/gi, '[redacted:path]')
             .replace(/(?:\/users\/|\/home\/|\/var\/|\/tmp\/|\/mnt\/|\/data\/|\/models\/|\/artifacts\/)[^\s"'<>|]+/gi, '[redacted:path]')

@@ -39,6 +39,33 @@ public sealed class VisionAgentIntentRouterTests
         result.RouterSource.Should().Be("model_router");
     }
 
+    [Fact(DisplayName = "Intent Router should polish diagnostic assistant replies into natural chat")]
+    public async Task RouteAsync_ShouldPolishDiagnosticAssistantReplyForCasualChat()
+    {
+        var service = CreateService(_ => Json(new
+        {
+            intent = "casual_chat",
+            confidence = "high",
+            shouldOpenPlan = false,
+            shouldBuildDirectly = false,
+            canBuild = false,
+            needsClarification = false,
+            publicReason = "这是普通寒暄，不需要进入规划。",
+            assistantReply = "这是普通寒暄，不需要进入规划。",
+            clarificationQuestions = Array.Empty<string>(),
+            fallbackAllowed = true
+        }));
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest { Description = "hi" },
+            CancellationToken.None);
+
+        result.AssistantReply.Should().Be("在的。你可以直接描述检测目标、缺陷类型、测量项或流程修改需求，我会先帮你规划方案。");
+        result.AssistantReply.Should().NotContain("普通寒暄");
+        result.AssistantReply.Should().NotContain("不需要进入规划");
+        result.PublicReason.Should().Contain("普通寒暄");
+    }
+
     [Fact(DisplayName = "Intent Router should classify ambiguous vision input as not buildable")]
     public async Task RouteAsync_ShouldKeepAmbiguousVisionRequirementNotBuildable()
     {
@@ -71,6 +98,33 @@ public sealed class VisionAgentIntentRouterTests
         result.CanBuild.Should().BeFalse();
         result.NeedsClarification.Should().BeTrue();
         result.ClarificationQuestions.Should().Contain(question => question.Contains("OK/NG", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "Intent Router should polish ambiguous diagnostic reply into user clarification")]
+    public async Task RouteAsync_ShouldPolishDiagnosticAssistantReplyForAmbiguousVision()
+    {
+        var service = CreateService(_ => Json(new
+        {
+            intent = "ambiguous_vision_requirement",
+            confidence = "medium",
+            shouldOpenPlan = false,
+            shouldBuildDirectly = false,
+            canBuild = false,
+            needsClarification = true,
+            publicReason = "需求信息不足，暂不可构建。",
+            assistantReply = "需求信息不足，暂不可构建。",
+            clarificationQuestions = new[] { "检测目标是什么？" },
+            fallbackAllowed = true
+        }));
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest { Description = "包装箱" },
+            CancellationToken.None);
+
+        result.AssistantReply.Should().Contain("你想检测包装箱的哪一类问题");
+        result.AssistantReply.Should().NotContain("需求信息不足");
+        result.AssistantReply.Should().NotContain("暂不可构建");
+        result.CanBuild.Should().BeFalse();
     }
 
     [Fact(DisplayName = "Intent Router should open Plan for actionable vision requirements")]

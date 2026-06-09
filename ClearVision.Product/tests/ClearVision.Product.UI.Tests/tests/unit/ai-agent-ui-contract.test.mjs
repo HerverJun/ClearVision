@@ -360,7 +360,7 @@ function createPanel(AiPanel, overrides = {}) {
     canBuild: true,
     needsClarification: false,
     publicReason: '已识别为可规划的视觉需求。',
-    assistantReply: '将先进入 Plan 规划。',
+    assistantReply: '我先帮你整理规划方案。',
     clarificationQuestions: [],
     fallbackAllowed: true,
     routerSource: 'test_router',
@@ -1295,7 +1295,7 @@ test('ordinary send runs Intent Router before Plan planner', async () => {
       canBuild: true,
       needsClarification: false,
       publicReason: '已识别为可规划的视觉需求。',
-      assistantReply: '将先进入 Plan 规划。',
+      assistantReply: '我先帮你整理规划方案。',
       clarificationQuestions: [],
       fallbackAllowed: true,
       routerSource: 'model_router',
@@ -1322,7 +1322,8 @@ test('ordinary send runs Intent Router before Plan planner', async () => {
   assert.equal(panel.pendingVisionPlan.goal, 'router then plan');
   assert.equal(panel.isGenerating, false);
   assert.match(collectProcessText(turn), /正在判断请求类型/);
-  assert.match(collectProcessText(turn), /已识别为：可规划视觉需求/);
+  assert.match(collectProcessText(turn), /已理解请求/);
+  assert.doesNotMatch(collectProcessText(turn), /已识别为/);
 });
 
 test('casual Intent Router result replies without opening Plan', async () => {
@@ -1344,7 +1345,7 @@ test('casual Intent Router result replies without opening Plan', async () => {
     canBuild: false,
     needsClarification: false,
     publicReason: '这是普通寒暄，不需要进入规划。',
-    assistantReply: '我在。你可以描述要做的视觉检测、测量、识别或输出流程。',
+    assistantReply: '在的。你可以直接描述检测目标、缺陷类型、测量项或流程修改需求，我会先帮你规划方案。',
     clarificationQuestions: [],
     fallbackAllowed: true,
     routerSource: 'model_router',
@@ -1360,8 +1361,58 @@ test('casual Intent Router result replies without opening Plan', async () => {
 
   assert.equal(panel.pendingVisionPlan, null);
   assert.equal(panel.isGenerating, false);
-  assert.match(turn.replyBody.textContent, /我在/);
+  assert.match(turn.replyBody.textContent, /在的。你可以直接描述检测目标/);
+  assert.doesNotMatch(turn.replyBody.textContent, /普通寒暄/);
+  assert.doesNotMatch(turn.replyBody.textContent, /不需要进入规划/);
+  assert.doesNotMatch(collectProcessText(turn), /普通寒暄/);
+  assert.doesNotMatch(collectProcessText(turn), /已识别为/);
+  const diagnosticNode = Array.from(turn.processBody.children)
+    .find(item => item.dataset?.eventType === 'intent-router-result');
+  assert.equal(diagnosticNode?.dataset?.publicReason, '这是普通寒暄，不需要进入规划。');
+  assert.equal(diagnosticNode?.title, '这是普通寒暄，不需要进入规划。');
   assert.doesNotMatch(collectProcessText(turn), /规划中/);
+});
+
+test('Intent Router public diagnostics are redacted outside the main reply', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._requestBackendIntentRouterRun = async () => ({
+    intent: 'casual_chat',
+    confidence: 'high',
+    shouldOpenPlan: false,
+    shouldBuildDirectly: false,
+    canBuild: false,
+    needsClarification: false,
+    publicReason: '这是普通寒暄，不需要进入规划。 token=abc123 baseUrl=http://10.1.2.3 C:\\factory\\image.png',
+    assistantReply: '在的。你可以直接描述检测目标、缺陷类型、测量项或流程修改需求，我会先帮你规划方案。 token=abc123 192.168.1.8',
+    clarificationQuestions: [],
+    fallbackAllowed: true,
+    routerSource: 'model_router',
+    metadataOnly: true
+  });
+
+  panel._dispatchGenerateRequest({ description: 'hi', userMessage: 'hi' });
+  const turn = panel.activeAssistantTurn;
+  await flushAsync();
+
+  const combined = [
+    turn.replyBody.textContent,
+    collectProcessText(turn),
+    ...Array.from(turn.processBody.children).map(item => `${item.title || ''} ${item.dataset?.publicReason || ''}`)
+  ].join('\n');
+  assert.match(turn.replyBody.textContent, /在的。你可以直接描述检测目标/);
+  assert.doesNotMatch(combined, /token=abc123/);
+  assert.doesNotMatch(combined, /baseUrl=http/);
+  assert.doesNotMatch(combined, /10\.1\.2\.3|192\.168\.1\.8/);
+  assert.doesNotMatch(combined, /C:\\factory/);
 });
 
 test('help Intent Router result replies without opening Plan', async () => {
@@ -1383,7 +1434,7 @@ test('help Intent Router result replies without opening Plan', async () => {
     canBuild: false,
     needsClarification: false,
     publicReason: '这是能力咨询，不需要进入规划。',
-    assistantReply: '我可以先帮你梳理视觉检测需求，形成规划；确认推荐方案后再构建可编辑的算子链。',
+    assistantReply: '我可以帮你规划视觉检测流程、选择算子链、整理待确认资源，并在人工确认后生成可应用到画布的草稿。',
     clarificationQuestions: [],
     fallbackAllowed: true,
     routerSource: 'model_router',
@@ -1399,7 +1450,11 @@ test('help Intent Router result replies without opening Plan', async () => {
 
   assert.equal(panel.pendingVisionPlan, null);
   assert.equal(panel.isGenerating, false);
-  assert.match(turn.replyBody.textContent, /梳理视觉检测需求/);
+  assert.match(turn.replyBody.textContent, /规划视觉检测流程/);
+  assert.doesNotMatch(turn.replyBody.textContent, /能力咨询/);
+  assert.doesNotMatch(turn.replyBody.textContent, /不需要进入规划/);
+  assert.doesNotMatch(collectProcessText(turn), /能力咨询/);
+  assert.doesNotMatch(collectProcessText(turn), /已识别为/);
   assert.doesNotMatch(collectProcessText(turn), /规划中/);
 });
 
@@ -1422,7 +1477,7 @@ test('ambiguous Intent Router result asks clarification and cannot Build', async
     canBuild: false,
     needsClarification: true,
     publicReason: '需求信息不足，暂不可构建。',
-    assistantReply: '请补充检测目标、缺陷、输入来源、OK/NG 规则。',
+    assistantReply: '你想检测包装箱的哪一类问题？比如胶带贴歪、条码不可读、Logo 缺失、箱角破损，或外观污渍。',
     clarificationQuestions: ['检测目标是什么？', '需要判断哪些缺陷？', '输入来源和 OK/NG 规则是什么？'],
     fallbackAllowed: true,
     routerSource: 'model_router',
@@ -1440,8 +1495,11 @@ test('ambiguous Intent Router result asks clarification and cannot Build', async
   assert.equal(panel.isGenerating, false);
   assert.equal(panel.lastResultStatusNote.tone, 'warning');
   assert.match(panel.lastResultStatusNote.text, /需求不足/);
-  assert.match(turn.replyBody.textContent, /暂不可构建/);
-  assert.match(turn.replyBody.textContent, /检测目标是什么/);
+  assert.match(turn.replyBody.textContent, /你想检测包装箱的哪一类问题/);
+  assert.doesNotMatch(turn.replyBody.textContent, /需求信息不足/);
+  assert.doesNotMatch(turn.replyBody.textContent, /暂不可构建/);
+  assert.doesNotMatch(collectProcessText(turn), /需求信息不足/);
+  assert.doesNotMatch(collectProcessText(turn), /已识别为/);
 });
 
 test('Plan Mode captures vague inspection request without starting Build', async () => {

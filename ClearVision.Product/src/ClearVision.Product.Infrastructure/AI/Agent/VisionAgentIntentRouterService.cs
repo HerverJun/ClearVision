@@ -218,9 +218,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             PublicReason = SafeText(string.IsNullOrWhiteSpace(candidate.PublicReason)
                 ? DefaultReason(intent)
                 : candidate.PublicReason),
-            AssistantReply = SafeText(string.IsNullOrWhiteSpace(candidate.AssistantReply)
-                ? DefaultReply(intent)
-                : candidate.AssistantReply),
+            AssistantReply = ResolveAssistantReply(candidate.AssistantReply, candidate.PublicReason, intent, request),
             ClarificationQuestions = questions,
             FallbackAllowed = candidate.FallbackAllowed,
             RouterSource = source,
@@ -255,7 +253,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             PublicReason = reason == "router_unauthorized"
                 ? UnauthorizedReason(intent)
                 : DefaultReason(intent),
-            AssistantReply = DefaultReply(intent),
+            AssistantReply = DefaultReply(intent, request),
             ClarificationQuestions = questions,
             FallbackAllowed = true,
             RouterSource = "rule_fallback",
@@ -310,6 +308,9 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             "Classify the user's latest input into exactly one intent: casual_chat, help, ambiguous_vision_requirement, actionable_vision_plan, modify_existing_flow, build_from_confirmed_plan, direct_build_debug.",
             "Rules: casual/help must not open Plan or Build. ambiguous_vision_requirement must ask concise public clarification questions and canBuild=false. actionable_vision_plan opens Plan only. modify_existing_flow may build directly only when current flow metadata exists. build_from_confirmed_plan may build directly only when a pending confirmed plan exists. direct_build_debug is only valid when developerDirectBuildDebug=true.",
             "Use the model for semantic judgment. Do not rely on keyword matching. Do not include chain-of-thought; publicReason must be short and safe.",
+            "assistantReply must be the natural user-facing assistant message only. Do not put classification labels, intent names, canBuild, shouldOpenPlan, or phrases like 'ordinary greeting', 'no planning needed', or 'recognized as' in assistantReply.",
+            "publicReason is an internal public diagnostic for debug/trace only and must not be written as the main assistant reply.",
+            "Examples: for hi, assistantReply='在的。你可以直接描述检测目标、缺陷类型、测量项或流程修改需求，我会先帮你规划方案。'; for help, assistantReply='我可以帮你规划视觉检测流程、选择算子链、整理待确认资源，并在人工确认后生成可应用到画布的草稿。'; for ambiguous packaging box input, assistantReply='你想检测包装箱的哪一类问题？比如胶带贴歪、条码不可读、Logo 缺失、箱角破损，或外观污渍。'",
             "Safety boundary: never request or expose camera paths, PLC addresses, Station IPs, external URLs, API keys, headers, tokens, baseUrl, rawPrompt, systemPrompt, image bytes/base64, model/template/image/PLC filesystem paths, or deployment/config writes.",
             "Required JSON fields: intent, confidence, shouldOpenPlan, shouldBuildDirectly, canBuild, needsClarification, publicReason, assistantReply, clarificationQuestions, fallbackAllowed."
         ]);
@@ -325,6 +326,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         [
             "Repair the Intent Router output. Return exactly one valid JSON object and no other text.",
             "The object must use only public fields: intent, confidence, shouldOpenPlan, shouldBuildDirectly, canBuild, needsClarification, publicReason, assistantReply, clarificationQuestions, fallbackAllowed.",
+            "assistantReply must be a natural user-facing reply, not a diagnostic explanation. Keep publicReason only as debug/trace diagnostics.",
             "Do not include rawPrompt, systemPrompt, reasoning, chain-of-thought, keys, tokens, baseUrl, paths, IPs, PLC addresses, or base64."
         ]);
         var context = BuildContext(request, options.MaxContextChars);
@@ -459,18 +461,82 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         };
     }
 
-    private static string DefaultReply(string intent)
+    private static string ResolveAssistantReply(
+        string? assistantReply,
+        string? publicReason,
+        string intent,
+        VisionAgentIntentRouterRequest request)
+    {
+        var reply = SafeText(assistantReply);
+        if (string.IsNullOrWhiteSpace(reply) || LooksLikeDiagnosticAssistantReply(reply, publicReason))
+        {
+            return DefaultReply(intent, request);
+        }
+
+        return reply;
+    }
+
+    private static bool LooksLikeDiagnosticAssistantReply(string reply, string? publicReason)
+    {
+        var text = Clean(reply);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(publicReason) &&
+            string.Equals(text, Clean(publicReason), StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return ContainsAny(text,
+        [
+            "普通寒暄",
+            "能力咨询",
+            "不需要进入规划",
+            "无需规划",
+            "已识别为",
+            "识别为",
+            "意图",
+            "intent",
+            "canBuild",
+            "shouldOpenPlan",
+            "shouldBuildDirectly",
+            "actionable_vision_plan",
+            "casual_chat",
+            "ambiguous_vision_requirement",
+            "需求信息不足",
+            "需求不足",
+            "暂不可构建",
+            "将先进入 Plan",
+            "进入 Plan 规划"
+        ]);
+    }
+
+    private static string DefaultReply(string intent, VisionAgentIntentRouterRequest? request = null)
     {
         return intent switch
         {
-            IntentCasualChat => "我在。你可以描述要做的视觉检测、测量、识别或输出流程。",
-            IntentHelp => "我可以先帮你梳理视觉检测需求，形成规划；确认推荐方案后再构建可编辑的算子链。",
-            IntentActionableVisionPlan => "已识别为可规划的视觉需求，将先进入 Plan 规划。",
-            IntentModifyExistingFlow => "已识别为当前流程修改请求，将进入构建审计。",
-            IntentBuildFromConfirmedPlan => "已识别为确认规划后的构建请求，将进入 Build。",
-            IntentDirectBuildDebug => "已启用直接 Build 调试，本轮会跳过 Plan。",
-            _ => "需求不足，暂不可构建。请补充检测目标、缺陷或识别内容、输入来源、OK/NG 规则。"
+            IntentCasualChat => "在的。你可以直接描述检测目标、缺陷类型、测量项或流程修改需求，我会先帮你规划方案。",
+            IntentHelp => "我可以帮你规划视觉检测流程、选择算子链、整理待确认资源，并在人工确认后生成可应用到画布的草稿。",
+            IntentActionableVisionPlan => "我先帮你整理规划方案。",
+            IntentModifyExistingFlow => "我会按当前流程上下文整理修改方案，并进入构建审计。",
+            IntentBuildFromConfirmedPlan => "好的，我会按已确认的规划开始构建。",
+            IntentDirectBuildDebug => "已进入直接 Build 调试入口，本轮会跳过规划，仅用于开发调试。",
+            _ => DefaultAmbiguousReply(request)
         };
+    }
+
+    private static string DefaultAmbiguousReply(VisionAgentIntentRouterRequest? request)
+    {
+        var text = Clean(request?.Description);
+        if (ContainsAny(text, ["包装箱", "纸箱", "箱"]))
+        {
+            return "你想检测包装箱的哪一类问题？比如胶带贴歪、条码不可读、Logo 缺失、箱角破损，或外观污渍。";
+        }
+
+        return "你想检测哪一类问题？请补充检测目标、缺陷类型、输入来源，以及 OK/NG 判定规则。";
     }
 
     private static bool LooksLikeCasual(string text)
