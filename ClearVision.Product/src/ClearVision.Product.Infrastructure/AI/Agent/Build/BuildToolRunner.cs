@@ -138,7 +138,10 @@ public sealed class BuildToolRunner
         string inputSummary,
         object arguments,
         CancellationToken cancellationToken,
-        string completionEventType)
+        string completionEventType,
+        Func<VisionAgentToolResult, bool>? treatFailureAsWarning = null,
+        string? warningSummary = null,
+        string? warningCodeOverride = null)
     {
         return await ExecuteEvidenceStepAsync(
             runId,
@@ -154,9 +157,10 @@ public sealed class BuildToolRunner
                     VisionAgentBuildSupport.ToJsonElement(arguments),
                     ct);
                 var data = VisionAgentBuildSupport.ToJsonElementOrNull(result.Data);
+                var warningFailure = !result.Success && treatFailureAsWarning?.Invoke(result) == true;
                 var hasBlocking = ToolHasBlockingIssues(new VisionAgentToolResult
                 {
-                    Success = result.Success,
+                    Success = warningFailure || result.Success,
                     Data = result.Data,
                     ErrorCode = result.ErrorCode,
                     ErrorMessage = result.ErrorMessage,
@@ -164,9 +168,12 @@ public sealed class BuildToolRunner
                 });
                 return VisionAgentBuildSupport.StepResult(
                     result,
-                    result.Success
+                    warningFailure
+                        ? warningSummary ?? $"{DisplayToolName(toolName)} 未命中，已继续执行非模板路径。"
+                        : result.Success
                         ? ToolSummary(toolName, data, hasBlocking)
                         : $"{DisplayToolName(toolName)} 执行失败：{result.ErrorCode}",
+                    warningFailure ? AgentRunEventStatuses.Warning :
                     result.Success && !hasBlocking ? AgentRunEventStatuses.Completed :
                     result.Success ? AgentRunEventStatuses.Blocked : AgentRunEventStatuses.Failed,
                     new
@@ -179,9 +186,13 @@ public sealed class BuildToolRunner
                         blocking = hasBlocking,
                         metadataOnly = true
                     },
-                    warningCode: hasBlocking ? $"{toolName}_blocked" : string.Empty,
-                    applyImpact: hasBlocking && toolName == "validate_flow" ? "blocked" : "editable_draft_allowed",
-                    deploymentImpact: hasBlocking ? "deployment_blocked" : "no_deployment_blocker");
+                    warningCode: warningFailure ? warningCodeOverride ?? result.ErrorCode ?? "tool_warning" :
+                    !result.Success && !string.IsNullOrWhiteSpace(result.ErrorCode) ? result.ErrorCode :
+                    hasBlocking ? $"{toolName}_blocked" : string.Empty,
+                    applyImpact: warningFailure ? "editable_draft_allowed" :
+                    hasBlocking && toolName == "validate_flow" ? "blocked" : "editable_draft_allowed",
+                    deploymentImpact: warningFailure ? "template_skeleton_optional_fallback" :
+                    hasBlocking ? "deployment_blocked" : "no_deployment_blocker");
             },
             cancellationToken,
             completionEventType);

@@ -25,6 +25,7 @@ public sealed class BuildResultAssembler
             input.PackageReadiness,
             input.Request);
         var missingResources = MergeMissingResources(
+            input.Template,
             input.ParameterMapping.MissingResources,
             input.Validation,
             input.PackageReadiness);
@@ -170,11 +171,24 @@ public sealed class BuildResultAssembler
     }
 
     private static List<AiMissingResourceInfo> MergeMissingResources(
+        TemplateStrategyResolution template,
         IEnumerable<AiMissingResourceInfo> mapped,
         VisionAgentToolResult validation,
         VisionAgentToolResult packageReadiness)
     {
         var resources = mapped.ToList();
+        if (template.RequiredTemplateMissing)
+        {
+            resources.Add(new AiMissingResourceInfo
+            {
+                ResourceType = "template_artifact",
+                ResourceKey = string.IsNullOrWhiteSpace(template.MissingTemplateResourceKey)
+                    ? "template_artifact"
+                    : template.MissingTemplateResourceKey,
+                Description = "未找到用户明确选择的模板骨架，请绑定模板资源或改用算子链生成。"
+            });
+        }
+
         resources.AddRange(VisionAgentBuildSupport.ReadMissingResources(validation.Data));
         resources.AddRange(VisionAgentBuildSupport.ReadMissingResources(packageReadiness.Data));
         return VisionAgentBuildSupport.DeduplicateMissing(resources);

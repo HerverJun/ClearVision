@@ -33,6 +33,8 @@ public static class AgentRunEventTypes
     public const string ToolCallDenied = "tool_call.denied";
     public const string ToolResultAppended = "tool_result.appended";
     public const string ToolLoopFinalized = "tool_loop.finalized";
+    public const string ToolLoopDraftAccepted = "tool_loop.draft.accepted";
+    public const string ToolLoopDraftRejected = "tool_loop.draft.rejected";
     public const string ToolLoopFallback = "tool_loop.fallback";
     public const string ToolLoopFailed = "tool_loop.failed";
     public const string WorkflowDraftUpdated = "workflow.draft.updated";
@@ -56,6 +58,7 @@ public static class AgentRunEventStatuses
     public const string Failed = "failed";
     public const string Cancelled = "cancelled";
     public const string Blocked = "blocked";
+    public const string Warning = "warning";
 }
 
 public sealed record AgentRunEvent

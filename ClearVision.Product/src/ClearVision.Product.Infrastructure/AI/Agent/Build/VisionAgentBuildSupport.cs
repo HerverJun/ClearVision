@@ -341,6 +341,7 @@ internal static class VisionAgentBuildSupport
             AgentRunEventStatuses.Failed or
             AgentRunEventStatuses.Blocked or
             AgentRunEventStatuses.Cancelled or
+            AgentRunEventStatuses.Warning or
             AgentRunEventStatuses.Running
             ? status
             : AgentRunEventStatuses.Completed;

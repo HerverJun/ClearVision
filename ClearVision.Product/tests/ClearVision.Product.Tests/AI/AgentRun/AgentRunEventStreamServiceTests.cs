@@ -255,6 +255,8 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
     [InlineData(AgentRunEventTypes.ToolCallDenied)]
     [InlineData(AgentRunEventTypes.ToolResultAppended)]
     [InlineData(AgentRunEventTypes.ToolLoopFinalized)]
+    [InlineData(AgentRunEventTypes.ToolLoopDraftAccepted)]
+    [InlineData(AgentRunEventTypes.ToolLoopDraftRejected)]
     [InlineData(AgentRunEventTypes.ToolLoopFallback)]
     [InlineData(AgentRunEventTypes.ToolLoopFailed)]
     [InlineData(AgentRunEventTypes.WorkflowDraftUpdated)]

@@ -34,6 +34,9 @@ public sealed class TemplateStrategyResolver
         var selectedTemplateId = VisionAgentBuildSupport.Clean(load.TemplateSelection?.TemplateId);
         var selectedScenario = VisionAgentBuildSupport.Clean(load.TemplateSelection?.ScenarioKey);
         var selectedMode = VisionAgentBuildSupport.Clean(load.TemplateSelection?.Mode);
+        var selectedTemplateRequired = !string.IsNullOrWhiteSpace(selectedTemplateId) ||
+                                       !string.IsNullOrWhiteSpace(selectedScenario) &&
+                                       IsRequiredTemplateMode(selectedMode);
         var candidate = FirstTemplateCandidate(match.Payload.Data);
         var strategy = "catalog_match";
         var templateId = selectedTemplateId;
@@ -66,14 +69,25 @@ public sealed class TemplateStrategyResolver
                 "以只读元数据方式加载已选择或匹配的模板骨架。",
                 new { templateId, scenarioKey },
                 cancellationToken,
-                AgentRunEventTypes.ToolCallCompleted);
+                AgentRunEventTypes.ToolCallCompleted,
+                result => !selectedTemplateRequired && IsTemplateNotFound(result),
+                "未找到匹配模板骨架，已改用算子链生成。",
+                "template_not_found");
             skeleton = skeletonStep.Payload;
             if (!skeleton.Success && strategy != "no_template")
             {
-                strategy = "catalog_match_without_skeleton";
+                strategy = selectedTemplateRequired
+                    ? "required_template_missing"
+                    : "no_template";
             }
         }
 
+        var requiredTemplateMissing = selectedTemplateRequired && skeleton?.Success == false && IsTemplateNotFound(skeleton);
+        var missingTemplateResourceKey = requiredTemplateMissing
+            ? !string.IsNullOrWhiteSpace(templateId)
+                ? templateId
+                : scenarioKey
+            : string.Empty;
         var resolution = new TemplateStrategyResolution(
             strategy,
             templateId,
@@ -82,12 +96,14 @@ public sealed class TemplateStrategyResolver
             strategy == "no_template" ? "free_generate" :
             strategy.Contains("adapt", StringComparison.OrdinalIgnoreCase) ? "template_adapt" : "template_fill",
             strategy == "no_template" ? "none" :
-            strategy.Contains("adapt", StringComparison.OrdinalIgnoreCase) ? "relaxed" : "strict");
+            strategy.Contains("adapt", StringComparison.OrdinalIgnoreCase) ? "relaxed" : "strict",
+            requiredTemplateMissing,
+            missingTemplateResourceKey);
 
         return VisionAgentBuildSupport.StepResult(
             resolution,
             $"模板策略已解析为 {DisplayTemplateStrategy(strategy)}。",
-            AgentRunEventStatuses.Completed,
+            strategy == "no_template" && skeleton?.Success == false ? AgentRunEventStatuses.Warning : AgentRunEventStatuses.Completed,
             new
             {
                 strategy,
@@ -97,11 +113,17 @@ public sealed class TemplateStrategyResolver
                     ? null
                     : new { candidate.TemplateId, candidate.ScenarioKey, candidate.Score },
                 skeletonLoaded = skeleton?.Success == true,
+                templateRequired = selectedTemplateRequired,
+                requiredTemplateMissing,
                 metadataOnly = true
             },
-            warningCode: skeleton?.Success == false ? "template_skeleton_unavailable" : string.Empty,
+            warningCode: skeleton?.Success == false
+                ? requiredTemplateMissing ? "required_template_missing" : "template_not_found"
+                : string.Empty,
             applyImpact: "editable_draft_allowed",
-            deploymentImpact: "template_resource_may_remain_pending");
+            deploymentImpact: requiredTemplateMissing
+                ? "template_resource_pending"
+                : "template_resource_may_remain_pending");
     }
 
     private static string DisplayTemplateStrategy(string strategy)
@@ -112,9 +134,24 @@ public sealed class TemplateStrategyResolver
             "adapt_selected_template" => "适配已选模板",
             "use_selected_template" => "使用已选模板",
             "catalog_match_without_skeleton" => "目录匹配但模板骨架不可用",
+            "required_template_missing" => "必需模板骨架缺失",
             "no_template" => "不使用模板",
             _ => strategy
         };
+    }
+
+    private static bool IsRequiredTemplateMode(string mode)
+    {
+        return mode.Contains("required", StringComparison.OrdinalIgnoreCase) ||
+               mode.Contains("lock", StringComparison.OrdinalIgnoreCase) ||
+               mode.Contains("selected", StringComparison.OrdinalIgnoreCase) ||
+               mode.Contains("fill", StringComparison.OrdinalIgnoreCase) ||
+               mode.Contains("adapt", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTemplateNotFound(VisionAgentToolResult result)
+    {
+        return string.Equals(result.ErrorCode, "template_not_found", StringComparison.OrdinalIgnoreCase);
     }
 
     private static TemplateCandidate? FirstTemplateCandidate(object? data)

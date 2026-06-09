@@ -2,6 +2,13 @@ import httpClient from '../../core/messaging/httpClient.js';
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 
 const TERMINAL_EVENT_TYPES = new Set(['run.completed', 'run.failed', 'run.cancelled']);
+const TOOL_LOOP_SEGMENT_TERMINAL_EVENT_TYPES = new Set([
+    'tool_loop.finalized',
+    'tool_loop.fallback',
+    'tool_loop.failed',
+    'tool_loop.draft.accepted',
+    'tool_loop.draft.rejected'
+]);
 const PLAN_EVENT_TYPES = new Set([
     'plan.created',
     'plan.started',
@@ -74,6 +81,8 @@ const AGENT_RUN_EVENT_TYPES = [
     'tool_call.denied',
     'tool_result.appended',
     'tool_loop.finalized',
+    'tool_loop.draft.accepted',
+    'tool_loop.draft.rejected',
     'tool_loop.fallback',
     'tool_loop.failed',
     'workflow.draft.updated',
@@ -301,6 +310,7 @@ export class AgentRunEventTransport {
         try {
             const replay = await httpClient.get(`/ai/agent-runs/${encodeURIComponent(this.runId)}`);
             const events = replay?.events || replay?.Events || [];
+            const summary = replay?.summary || replay?.Summary || null;
             if (statusText) {
                 this.panel._setAgentRunTransportStatus(statusText, 'warning');
             }
@@ -310,6 +320,12 @@ export class AgentRunEventTransport {
                 .filter(evt => evt.sequence > this.lastSequence)
                 .sort((a, b) => a.sequence - b.sequence)
                 .forEach(evt => this._handleEvent(evt));
+            if (!this.panel._isAgentRunTerminalSeen(this.runId)) {
+                const terminal = this.panel._buildAgentRunTerminalEventFromSummary?.(this.runId, summary);
+                if (terminal) {
+                    this._handleEvent(terminal);
+                }
+            }
             this.replayFailureCount = 0;
             return this.panel._isAgentRunTerminalSeen(this.runId);
         } catch {
@@ -428,9 +444,16 @@ export class AgentRunEventTransport {
 
 export const aiPanelAgentRunMixin = {
     _shouldUseAgentRunEventStream() {
+        const hasWindow = typeof window !== 'undefined';
+        const hasWebMessageBridge = hasWindow && (
+            Boolean(window.chrome?.webview?.postMessage)
+            || typeof window.mockWebViewResponse === 'function'
+        );
+
         return Boolean(
             this.useVisionAgentGenerateFlow &&
-            typeof window !== 'undefined' &&
+            !hasWebMessageBridge &&
+            hasWindow &&
             typeof fetch === 'function'
         );
     },
@@ -617,6 +640,7 @@ export const aiPanelAgentRunMixin = {
 
         if (TOOL_EVENT_TYPES.has(evt.eventType)) {
             this._renderAgentRunToolEvent(evt);
+            this._appendAgentRunProcessLine(evt);
         } else if (ARTIFACT_EVENT_TYPES.has(evt.eventType)) {
             this._renderAgentRunArtifactEvent(evt);
             this._appendAgentRunProcessLine(evt);
@@ -632,6 +656,8 @@ export const aiPanelAgentRunMixin = {
 
         if (TERMINAL_EVENT_TYPES.has(evt.eventType)) {
             this._handleAgentRunTerminalEvent(evt);
+        } else if (TOOL_LOOP_SEGMENT_TERMINAL_EVENT_TYPES.has(evt.eventType)) {
+            this._handleAgentRunSegmentTerminalEvent(evt);
         } else {
             this._updateAgentRunWorkbenchState(evt);
         }
@@ -692,6 +718,35 @@ export const aiPanelAgentRunMixin = {
         };
     },
 
+    _buildAgentRunTerminalEventFromSummary(runId, summary = null) {
+        const data = summary && typeof summary === 'object' ? summary : null;
+        if (!data) return null;
+
+        const status = String(data.status ?? data.Status ?? '').trim().toLowerCase();
+        const eventType = status === 'completed'
+            ? 'run.completed'
+            : status === 'failed'
+                ? 'run.failed'
+                : (status === 'cancelled' || status === 'canceled')
+                    ? 'run.cancelled'
+                    : '';
+        if (!eventType) return null;
+
+        const lastSequence = Number(data.lastSequence ?? data.LastSequence ?? this._getAgentRunLastSequence?.() ?? 0);
+        return {
+            runId,
+            sequence: Number.isFinite(lastSequence) ? lastSequence + 1 : Date.now(),
+            eventType,
+            stage: 'run',
+            title: data.title ?? data.Title ?? '',
+            summary: data.summary ?? data.Summary ?? '',
+            status,
+            payload: data.payload ?? data.Payload ?? null,
+            metadataOnly: Boolean(data.metadataOnly ?? data.MetadataOnly ?? true),
+            redactionPass: Boolean(data.redactionPass ?? data.RedactionPass ?? true)
+        };
+    },
+
     _renderAgentRunBrief(evt) {
         const text = evt.summary || this._payloadString(evt.payload, 'brief') || '视觉智能体运行已创建，公开进度事件会在此处显示。';
         const body = this.activeAssistantTurn?.replyBody;
@@ -711,7 +766,8 @@ export const aiPanelAgentRunMixin = {
         const statusLabel = this._getAgentRunStatusLabel(evt.status);
         const title = this._localizeDisplayText?.(evt.title || stageLabel) || evt.title || stageLabel;
         const summary = this._localizeDisplayText?.(evt.summary || '') || evt.summary || '';
-        const text = `${stageLabel} / ${statusLabel} / ${title}${summary && summary !== title ? `\n${summary}` : ''}`;
+        const text = this._formatAgentRunProcessText?.(evt, { stageLabel, statusLabel, title, summary }) ||
+            `${stageLabel} / ${statusLabel} / ${title}${summary && summary !== title ? `\n${summary}` : ''}`;
         const item = this._updateThinkingStep(evt.runId, stepId, text);
         if (!item) return;
 
@@ -772,6 +828,46 @@ export const aiPanelAgentRunMixin = {
         this._scrollToBottom();
     },
 
+    _formatAgentRunProcessText(evt, fallback = {}) {
+        const payload = this._asObject(evt.payload);
+        const toolName = this._payloadString(payload, 'toolName') ||
+            this._deriveToolNameFromTitle(evt.title);
+        const toolLabel = toolName
+            ? (this._formatToolName?.(toolName) || this._localizeDisplayText?.(toolName) || toolName)
+            : '';
+        const round = this._payloadNumber(payload, 'round');
+        const reason = this._payloadString(payload, evt.eventType === 'tool_loop.draft.rejected' ? 'rejectionReason' : 'fallbackReason');
+        const reasonLabel = reason ? (this._localizeDisplayText?.(reason) || reason) : '';
+        const summary = fallback.summary || '';
+
+        switch (evt.eventType) {
+            case 'tool_loop.started':
+                return `Tool Loop 实验已启动${summary ? `\n${summary}` : ''}`;
+            case 'tool_loop.round.started':
+                return `第 ${round || '?'} 轮工具决策${summary ? `\n${summary}` : ''}`;
+            case 'tool_call.requested':
+                return `请求工具：${toolLabel || '未命名工具'}${summary ? `\n${summary}` : ''}`;
+            case 'tool_call.completed':
+                return `工具完成：${toolLabel || '未命名工具'}${summary ? `\n${summary}` : ''}`;
+            case 'tool_call.denied':
+                return `工具被拒绝：${toolLabel || '未命名工具'}${summary ? `\n${summary}` : ''}`;
+            case 'tool_result.appended':
+                return `工具结果已回填${summary ? `\n${summary}` : ''}`;
+            case 'tool_loop.finalized':
+                return `LLM 已给出 final${summary ? `\n${summary}` : ''}`;
+            case 'tool_loop.draft.accepted':
+                return `实验草稿已通过校验${summary ? `\n${summary}` : ''}`;
+            case 'tool_loop.draft.rejected':
+                return `实验草稿未通过校验${reasonLabel ? `：${reasonLabel}` : ''}${summary ? `\n${summary}` : ''}`;
+            case 'tool_loop.fallback':
+                return `已回退稳定构建链路${reasonLabel ? `：${reasonLabel}` : ''}${summary ? `\n${summary}` : ''}`;
+            case 'tool_loop.failed':
+                return `实验失败${summary ? `\n${summary}` : ''}`;
+            default:
+                return '';
+        }
+    },
+
     _renderAgentRunArtifactEvent(evt) {
         const turn = this.activeAssistantTurn;
         if (!turn?.artifactsSection || !turn?.artifactsBody) return;
@@ -826,10 +922,10 @@ export const aiPanelAgentRunMixin = {
     },
 
     _handleAgentRunTerminalEvent(evt) {
-        this._closeAgentRunEventSource();
-        this.isCancellingGenerate = false;
-        this._clearActiveRequestState();
-        this._setGeneratingState(false);
+        this._finalizeAgentRunUiState('run_terminal', evt, {
+            closeTransports: true,
+            clearActiveRunId: false
+        });
 
         if (evt.eventType === 'run.completed') {
             const applied = this._applyAgentRunResultPayload?.(evt) === true;
@@ -868,6 +964,55 @@ export const aiPanelAgentRunMixin = {
         }
 
         this.activeAssistantTurn = null;
+        if (evt.runId === this.activeAgentRunId) {
+            this.activeAgentRunId = null;
+        }
+    },
+
+    _handleAgentRunSegmentTerminalEvent(evt) {
+        this._finalizeAgentRunUiState('tool_loop_segment_terminal', evt, {
+            closeTransports: false,
+            clearActiveRunId: false
+        });
+
+        if (evt.eventType === 'tool_loop.fallback') {
+            this._setAssistantTurnStatus(this.activeAssistantTurn, '已回退稳定链路', 'warning');
+            this._setResultStatusNote('Tool Loop 实验已回退稳定构建链路，输入框已释放；稳定构建结果返回后会刷新可应用草稿。', 'warning');
+        } else if (evt.eventType === 'tool_loop.draft.rejected') {
+            this._setAssistantTurnStatus(this.activeAssistantTurn, '草稿验收未通过', 'warning');
+            this._setResultStatusNote('Tool Loop 草稿未通过验收，已回退稳定构建链路。', 'warning');
+        } else if (evt.eventType === 'tool_loop.failed') {
+            this._setAssistantTurnStatus(this.activeAssistantTurn, '实验失败', 'failed');
+            this._setResultStatusNote(evt.summary || 'Tool Loop 实验失败，已等待稳定链路或终止事件收尾。', 'warning');
+        } else if (evt.eventType === 'tool_loop.draft.accepted') {
+            this._setAssistantTurnStatus(this.activeAssistantTurn, '草稿验收通过', 'success');
+            this._setResultStatusNote('Tool Loop 草稿已通过验收，稳定构建链路正在补全 BuildResult。', 'info');
+        } else if (evt.eventType === 'tool_loop.finalized') {
+            this._setAssistantTurnStatus(this.activeAssistantTurn, 'LLM final 已返回', 'success');
+        }
+    },
+
+    _finalizeAgentRunUiState(reason = '', payload = null, options = {}) {
+        const closeTransports = options.closeTransports !== false;
+        if (closeTransports) {
+            this._closeAllAgentTransports();
+        }
+
+        this.isCancellingGenerate = false;
+        this._clearActiveRequestState();
+        this._setGeneratingState(false);
+
+        if (options.clearActiveRunId && payload?.runId === this.activeAgentRunId) {
+            this.activeAgentRunId = null;
+        }
+
+        this._renderBuildWorkspaceFromAgentRun?.();
+        this._updateApplyButtonState?.();
+        return reason;
+    },
+
+    _closeAllAgentTransports() {
+        this._closeAgentRunEventSource();
     },
 
     _updateAgentRunWorkbenchState(evt) {
@@ -891,6 +1036,20 @@ export const aiPanelAgentRunMixin = {
             return evt.stage || evt.sequence;
         }
 
+        const payload = this._asObject(evt.payload);
+        if (String(evt.eventType || '').startsWith('tool_call.')) {
+            const toolName = this._payloadString(payload, 'toolName') ||
+                this._payloadString(payload, 'name') ||
+                this._deriveToolNameFromTitle(evt.title);
+            const round = this._payloadNumber(payload, 'round');
+            return `${evt.eventType}:${round || evt.stage || 'round'}:${toolName || evt.sequence}`;
+        }
+
+        if (evt.eventType === 'tool_result.appended' || evt.eventType === 'tool_loop.round.started') {
+            const round = this._payloadNumber(payload, 'round');
+            return `${evt.eventType}:${round || evt.sequence}`;
+        }
+
         return `${evt.eventType}:${evt.stage || evt.sequence}`;
     },
 
@@ -907,6 +1066,8 @@ export const aiPanelAgentRunMixin = {
                 return '已完成';
             case 'blocked':
                 return '已阻断';
+            case 'warning':
+                return '警告';
             case 'failed':
                 return '失败';
             case 'cancelled':
@@ -922,7 +1083,7 @@ export const aiPanelAgentRunMixin = {
         if (normalizedStatus === 'failed' || eventType === 'run.failed' || eventType === 'tool.call.failed' || eventType === 'tool_loop.failed') {
             return 'failed';
         }
-        if (normalizedStatus === 'blocked' || eventType === 'tool_call.denied' || eventType === 'tool_loop.fallback') {
+        if (normalizedStatus === 'blocked' || normalizedStatus === 'warning' || eventType === 'tool_call.denied' || eventType === 'tool_loop.fallback' || eventType === 'tool_loop.draft.rejected') {
             return 'warning';
         }
         if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled' || eventType === 'run.cancelled') {

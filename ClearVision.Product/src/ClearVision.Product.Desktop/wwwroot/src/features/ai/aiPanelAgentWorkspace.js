@@ -231,12 +231,29 @@ const AI_CODE_TEXT_MAP = {
     camera_binding: '相机绑定',
     output_channel: '输出通道',
     plc_address: 'PLC 地址',
-    llm_tool_loop: 'LLM 自主工具',
+    llm_tool_loop: 'LLM 工具循环',
     fixed_build_orchestrator: '固定构建链路',
-    fallback_build_orchestrator: '回退固定链路',
+    fallback_build_orchestrator: '回退构建链路',
     partial_final_requires_stable_completion: 'Tool Loop 草稿不完整，已回退稳定构建链路',
     completion_failed: 'Tool Loop completion 失败，已回退稳定构建链路',
     failed_with_tool_limit: 'Tool Loop 超过最大轮次，已回退稳定构建链路',
+    max_tool_calls_per_round: '单轮工具调用超限，已回退稳定构建链路',
+    duplicate_tool_call: '重复工具调用超限，已回退稳定构建链路',
+    invalid_json: 'final JSON 无效，已回退稳定构建链路',
+    validate_flow_failed: '流程校验未通过，已回退稳定构建链路',
+    dryrun_flow_failed: '元数据预演未通过，已回退稳定构建链路',
+    runtime_package_precheck_failed: '运行包预检查未通过，已回退稳定构建链路',
+    unsafe_final_payload: 'final 草稿含敏感信息，已回退稳定构建链路',
+    draft_edits_require_stable_completion: 'draftEdits 需要稳定链路补全，已回退稳定构建链路',
+    completion_source_missing: 'Tool Loop completion source 未注册，已回退稳定构建链路',
+    mode_mismatch: 'mode 不匹配',
+    not_enabled: '未启用',
+    completion_disabled: 'completion disabled',
+    permission_denied: '权限拒绝',
+    protocol_failed: '协议失败',
+    max_tool_rounds_exceeded: 'MaxToolRounds 超限',
+    template_not_found: '未找到匹配模板骨架，已改用算子链生成',
+    required_template_missing: '必需模板骨架缺失',
     tool_permission_denied: '工具权限被拒绝，已回退稳定构建链路',
     unknown_tool: '未知工具被拒绝，已回退稳定构建链路',
     runtime_preview_consent_required: 'RuntimePreview 需要显式授权，已回退稳定构建链路',
@@ -1188,6 +1205,10 @@ export const aiPanelAgentWorkspaceMixin = {
         const terminal = activeEvents.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
         const lastEvent = activeEvents[activeEvents.length - 1];
         const blockerCount = this._countBuildBlockers(activeEvents);
+        const showBuildExecutionPath = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD || activeEvents.length > 0;
+        const executionPath = showBuildExecutionPath
+            ? this._getBuildExecutionPath(activeEvents)
+            : { modeLabel: '', enteredLabel: '', reasonLabel: '' };
         const goal = plan?.goal || this.lastUserPrompt || '描述视觉检测目标后开始规划。';
         const confidence = this._formatWorkspaceValue(plan?.confidence || (activeEvents.length || planRunEvents.length ? '事件驱动' : '未设置'));
         const nextAction = terminal
@@ -1209,11 +1230,15 @@ export const aiPanelAgentWorkspaceMixin = {
                     <em>可构建：${executable ? '是' : '否'}</em>
                 </div>
                 <div class="ai-agent-overview-metrics">
-                    <span><small>置信度</small><b>${this._escapeHtml(confidence)}</b></span>
-                    <span><small>来源</small><b>${this._escapeHtml(source)}</b></span>
+                    ${showBuildExecutionPath
+                        ? `<span><small>当前模式</small><b>${this._escapeHtml(executionPath.modeLabel || mode)}</b></span>
+                           <span><small>VisionAgentLoop</small><b>${this._escapeHtml(executionPath.enteredLabel)}</b></span>`
+                        : `<span><small>置信度</small><b>${this._escapeHtml(confidence)}</b></span>
+                           <span><small>来源</small><b>${this._escapeHtml(source)}</b></span>`}
                     <span><small>阻断项</small><b>${this._escapeHtml(String(blockerCount))}</b></span>
                     <span><small>事件数</small><b>${this._escapeHtml(String(activeEvents.length || planRunEvents.length || planEvents.length))}</b></span>
                 </div>
+                ${executionPath.reasonLabel ? `<div class="ai-build-note"><strong>路径原因</strong>${this._escapeHtml(executionPath.reasonLabel)}</div>` : ''}
                 <div class="ai-agent-stage-strip" aria-label="Vision Agent 阶段">
                     ${['plan', 'build', 'applied'].map(key => `
                         <span class="${key === phase ? 'is-active' : ''} ${this._isWorkspacePhaseCompleted(key, phase) ? 'is-completed' : ''}">
@@ -1223,6 +1248,66 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
             </section>
         `;
+    },
+
+    _getBuildExecutionPath(events = []) {
+        const list = Array.isArray(events) ? events : [];
+        const started = list.find(evt => evt?.eventType === 'run.started');
+        const startedPayload = this._asObject(started?.payload);
+        const configuredMode = this._payloadString(startedPayload, 'agentGenerateFlowMode') ||
+            this._normalizeAgentGenerateFlowMode?.(this.agentGenerateFlowMode) ||
+            this.agentGenerateFlowMode ||
+            'scripted';
+        const enabledFromPayload = startedPayload.useVisionAgentGenerateFlow ?? startedPayload.UseVisionAgentGenerateFlow;
+        const enabled = typeof enabledFromPayload === 'boolean'
+            ? enabledFromPayload
+            : Boolean(this.useVisionAgentGenerateFlow);
+        const normalizedMode = String(configuredMode || '').trim().toLowerCase();
+        const requestedToolLoop = enabled && normalizedMode === 'tool_loop';
+        const entered = list.some(evt => {
+            const type = String(evt?.eventType || '');
+            return type === 'tool_loop.started' ||
+                type.startsWith('tool_call.') ||
+                type.startsWith('tool_result.') ||
+                (type.startsWith('tool_loop.') && type !== 'tool_loop.fallback');
+        });
+        const reason = this._getBuildExecutionPathReason(list, { enabled, requestedToolLoop, entered, normalizedMode });
+
+        return {
+            modeLabel: requestedToolLoop ? 'Tool Loop 实验' : '稳定构建链路',
+            entered,
+            enteredLabel: entered ? '已进入' : '未进入',
+            reasonLabel: reason ? this._localizeDisplayText(reason) : ''
+        };
+    },
+
+    _getBuildExecutionPathReason(events, state) {
+        const terminal = [...events].reverse().find(evt => {
+            const type = String(evt?.eventType || '');
+            return type === 'tool_loop.fallback' ||
+                type === 'tool_loop.failed' ||
+                type === 'tool_loop.draft.rejected' ||
+                type === 'tool_call.denied';
+        });
+        if (terminal) {
+            const payload = this._asObject(terminal.payload);
+            return this._payloadString(payload, 'fallbackReason') ||
+                this._payloadString(payload, 'rejectionReason') ||
+                this._payloadString(payload, 'failureType') ||
+                this._payloadString(payload, 'reason') ||
+                this._payloadString(payload, 'errorCode') ||
+                terminal.summary ||
+                terminal.title ||
+                '';
+        }
+
+        if (!state.entered) {
+            if (!state.enabled) return 'not_enabled';
+            if (!state.requestedToolLoop) return 'mode_mismatch';
+            return 'completion_disabled';
+        }
+
+        return '';
     },
 
     _getAgentWorkspacePhase() {
@@ -1699,7 +1784,7 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         return `
-            <div class="ai-workspace-section-title">工具证据</div>
+            <div class="ai-workspace-section-title">Build 工具证据</div>
             ${evidence.slice(-16).map(item => {
                 const stage = item.stage || item.Stage || '';
                 const toolName = item.toolName || item.ToolName || '';

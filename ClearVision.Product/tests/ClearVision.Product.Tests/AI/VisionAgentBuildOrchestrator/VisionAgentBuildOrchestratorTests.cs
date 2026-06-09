@@ -311,6 +311,64 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ToolName == "get_flow_template_skeleton");
     }
 
+    [Fact(DisplayName = "Build orchestrator should warn and continue when optional template skeleton is missing")]
+    public async Task BuildAsync_ShouldWarnAndContinueWhenOptionalTemplateSkeletonMissing()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(
+            sink,
+            CreateTemplateNotFoundRegistry("missing_optional_template"));
+        var plan = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"],
+            "metal scratch inspection with optional catalog template");
+
+        var result = await orchestrator.BuildAsync(Request(plan), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        result.BuildResult.MissingResources.Should().NotContain(item => item.ResourceType == "template_artifact");
+        result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
+            item.Stage == "template_strategy" &&
+            item.ToolName == "get_flow_template_skeleton" &&
+            item.Status == AgentRunEventStatuses.Warning &&
+            item.WarningCode == "template_not_found" &&
+            item.OutputSummary.Contains("未找到匹配模板骨架，已改用算子链生成", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "Build orchestrator should keep explicitly required missing template as missing resource")]
+    public async Task BuildAsync_ShouldMarkRequiredMissingTemplateAsResourcePending()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(
+            sink,
+            CreateTemplateNotFoundRegistry("missing_required_template"));
+        var plan = Plan(
+            "template_positioning",
+            ["ImageAcquisition", "TemplateMatching", "ResultOutput"],
+            "template positioning with selected missing skeleton");
+        var templateSelection = new AiTemplateSelectionInfo
+        {
+            Mode = "use_selected_template",
+            TemplateId = "missing_required_template",
+            ScenarioKey = "template_matching"
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, templateSelection: templateSelection),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.MissingResources.Should().Contain(item =>
+            item.ResourceType == "template_artifact" &&
+            item.ResourceKey == "missing_required_template");
+        result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
+            item.Stage == "template_strategy" &&
+            item.ToolName == "get_flow_template_skeleton" &&
+            item.Status == AgentRunEventStatuses.Failed &&
+            item.WarningCode == "template_not_found");
+    }
+
     [Fact(DisplayName = "Build orchestrator parameter mapping should keep unknown resources pending")]
     public async Task BuildAsync_ShouldMapPendingParametersAndMissingResources()
     {
@@ -396,10 +454,12 @@ public sealed class VisionAgentBuildOrchestratorTests
         publicJson.Should().NotContain("chainOfThought");
     }
 
-    private static VisionAgentBuildOrchestrator CreateOrchestrator(CapturingAgentRunEventSink sink)
+    private static VisionAgentBuildOrchestrator CreateOrchestrator(
+        CapturingAgentRunEventSink sink,
+        IVisionAgentToolRegistry? registry = null)
     {
         var redactor = new AgentRunEventRedactor();
-        var toolRunner = new BuildToolRunner(CreateToolRegistry(), redactor, sink);
+        var toolRunner = new BuildToolRunner(registry ?? CreateToolRegistry(), redactor, sink);
         return new VisionAgentBuildOrchestrator(
             new BuildPlanContextLoader(sink),
             new BuildIntentResolver(),
@@ -530,6 +590,68 @@ public sealed class VisionAgentBuildOrchestratorTests
         ]);
     }
 
+    private static VisionAgentToolRegistry CreateTemplateNotFoundRegistry(string templateId)
+    {
+        return new VisionAgentToolRegistry(
+        [
+            new FakeVisionAgentTool(
+                "match_flow_template",
+                VisionAgentToolPermission.ReadOnly,
+                (_, _) => VisionAgentToolResult.Ok(new
+                {
+                    candidates = new[]
+                    {
+                        new
+                        {
+                            templateId,
+                            scenarioKey = "surface_defect",
+                            score = 0.92,
+                            metadataOnly = true
+                        }
+                    },
+                    metadataOnly = true
+                })),
+            new FakeVisionAgentTool(
+                "get_flow_template_skeleton",
+                VisionAgentToolPermission.ReadOnly,
+                (_, _) => VisionAgentToolResult.Fail(
+                    "template_not_found",
+                    "Template skeleton was not found in the metadata catalog.")),
+            new FakeVisionAgentTool(
+                "validate_flow",
+                VisionAgentToolPermission.Simulation,
+                (_, _) => VisionAgentToolResult.Ok(new
+                {
+                    blockingIssues = Array.Empty<object>(),
+                    warnings = Array.Empty<object>(),
+                    missingResources = Array.Empty<object>(),
+                    pendingParameters = Array.Empty<object>(),
+                    metadataOnly = true
+                })),
+            new FakeVisionAgentTool(
+                "dryrun_flow",
+                VisionAgentToolPermission.Simulation,
+                (_, _) => VisionAgentToolResult.Ok(new
+                {
+                    dryRunSucceeded = true,
+                    blockingIssues = Array.Empty<object>(),
+                    missingResources = Array.Empty<object>(),
+                    metadataOnly = true
+                })),
+            new FakeVisionAgentTool(
+                "runtime_package_precheck",
+                VisionAgentToolPermission.DeploymentPrepare,
+                (_, _) => VisionAgentToolResult.Ok(new
+                {
+                    readyForDeployment = false,
+                    blockingIssues = Array.Empty<object>(),
+                    missingResources = Array.Empty<object>(),
+                    pendingActions = Array.Empty<object>(),
+                    metadataOnly = true
+                }))
+        ]);
+    }
+
     private static AiFlowGenerationRequest Request(
         VisionAgentPlanModeResult plan,
         string buildIntent = "new",
@@ -637,6 +759,43 @@ public sealed class VisionAgentBuildOrchestratorTests
                 Flow = new OperatorFlowDto(),
                 AiExplanation = "Generated empty draft placeholder for BuildOrchestrator fallback."
             });
+        }
+    }
+
+    private sealed class FakeVisionAgentTool : IVisionAgentTool
+    {
+        private readonly Func<VisionAgentToolContext, JsonElement, VisionAgentToolResult> _execute;
+
+        public FakeVisionAgentTool(
+            string name,
+            VisionAgentToolPermission permission,
+            Func<VisionAgentToolContext, JsonElement, VisionAgentToolResult> execute)
+        {
+            Name = name;
+            Permission = permission;
+            _execute = execute;
+        }
+
+        public string Name { get; }
+        public string DisplayName => Name;
+        public string Description => "Fake BuildOrchestrator test tool.";
+        public string Category => "test";
+        public VisionAgentToolPermission Permission { get; }
+        public JsonElement ParametersSchema { get; } = Schema();
+
+        public Task<VisionAgentToolResult> ExecuteAsync(
+            VisionAgentToolContext context,
+            JsonElement arguments,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(_execute(context, arguments));
+        }
+
+        private static JsonElement Schema()
+        {
+            using var doc = JsonDocument.Parse("""{"type":"object","properties":{}}""");
+            return doc.RootElement.Clone();
         }
     }
 

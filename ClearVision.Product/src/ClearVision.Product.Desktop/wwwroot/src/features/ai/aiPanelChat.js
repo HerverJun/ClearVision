@@ -65,7 +65,7 @@ export const aiPanelChatMixin = {
                     <div class="ai-assistant-section-body ai-assistant-process-body"></div>
                 </details>
                 <details class="ai-assistant-section ai-assistant-tools-section" hidden>
-                    <summary>工具调用</summary>
+                    <summary>Agent 工具调用</summary>
                     <div class="ai-assistant-section-body ai-assistant-tools-body"></div>
                 </details>
                 <details class="ai-assistant-section ai-assistant-artifacts-section" hidden>
@@ -296,7 +296,7 @@ export const aiPanelChatMixin = {
             case 'executionTrace':
                 return '执行过程';
             case 'toolEvents':
-                return '工具调用';
+                return 'Build 工具证据';
             case 'stageEvents':
                 return '阶段事件';
             case 'failureDiagnostics':

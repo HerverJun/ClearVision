@@ -138,6 +138,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             UserPrompt = BuildToolLoopUserPrompt(request),
             ToolContext = toolContext,
             EmitPublicEvents = true,
+            RequireFinalDraft = true,
             CompleteAsync = (messages, ct) => _toolLoopCompletionSource.CompleteAsync(
                 new VisionAgentLoopCompletionRequest
                 {
@@ -148,8 +149,38 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         }, cancellationToken);
 
         var fallbackReason = ResolveToolLoopFallbackReason(loopResult);
+        var draftValidationEmitted = false;
+        if (string.IsNullOrWhiteSpace(fallbackReason))
+        {
+            var draftValidation = await ValidateToolLoopFinalDraftAsync(
+                request,
+                toolContext,
+                loopResult,
+                cancellationToken);
+            draftValidationEmitted = true;
+            if (!draftValidation.Accepted)
+            {
+                fallbackReason = draftValidation.FallbackReason;
+            }
+        }
+        else if (ShouldEmitDraftRejected(loopResult, fallbackReason))
+        {
+            EmitToolLoopDraftRejected(
+                request.AgentRunId,
+                fallbackReason,
+                loopResult.ErrorMessage ?? "Tool Loop final draft was rejected before stable fallback.");
+            draftValidationEmitted = true;
+        }
+
         if (!string.IsNullOrWhiteSpace(fallbackReason))
         {
+            if (!draftValidationEmitted && loopResult.Success)
+            {
+                EmitToolLoopDraftRejected(
+                    request.AgentRunId,
+                    fallbackReason,
+                    "Tool Loop final draft did not satisfy the public draft acceptance contract.");
+            }
             EmitToolLoopFallback(
                 request.AgentRunId,
                 fallbackReason,
@@ -274,6 +305,242 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         {
             return false;
         }
+    }
+
+    private async Task<ToolLoopDraftValidationResult> ValidateToolLoopFinalDraftAsync(
+        AiFlowGenerationRequest request,
+        VisionAgentToolContext toolContext,
+        VisionAgentLoopResult loopResult,
+        CancellationToken cancellationToken)
+    {
+        if (!TryReadToolLoopFinalDraft(loopResult.FinalContent, out var flow, out var failureReason))
+        {
+            EmitToolLoopDraftRejected(
+                request.AgentRunId,
+                failureReason,
+                "Tool Loop final 未包含可验收的 workflowDraft 或 draftEdits。");
+            return ToolLoopDraftValidationResult.Rejected(failureReason);
+        }
+
+        if (!_redactor.IsRedactionSafe(flow))
+        {
+            EmitToolLoopDraftRejected(
+                request.AgentRunId,
+                "unsafe_final_payload",
+                "Tool Loop final 草稿包含不允许公开的敏感元数据。");
+            return ToolLoopDraftValidationResult.Rejected("unsafe_final_payload");
+        }
+
+        var validation = await RunToolLoopDraftCheckAsync(
+            "validate_flow",
+            toolContext,
+            new
+            {
+                flow,
+                entryOperatorTempId = string.Empty
+            },
+            cancellationToken);
+        if (!validation.Success || VisionAgentBuildSupport.ReadCount(validation.Data, "blockingIssues") > 0)
+        {
+            EmitToolLoopDraftRejected(
+                request.AgentRunId,
+                "validate_flow_failed",
+                "Tool Loop final 草稿未通过 validate_flow 结构验收。",
+                validation);
+            return ToolLoopDraftValidationResult.Rejected("validate_flow_failed");
+        }
+
+        var dryRun = await RunToolLoopDraftCheckAsync(
+            "dryrun_flow",
+            toolContext,
+            new
+            {
+                flow,
+                entryOperatorTempId = string.Empty
+            },
+            cancellationToken);
+        if (!dryRun.Success || VisionAgentBuildSupport.ReadBool(dryRun.Data, "dryRunSucceeded") == false)
+        {
+            EmitToolLoopDraftRejected(
+                request.AgentRunId,
+                "dryrun_flow_failed",
+                "Tool Loop final 草稿未通过 dryrun_flow 元数据预演。",
+                dryRun);
+            return ToolLoopDraftValidationResult.Rejected("dryrun_flow_failed");
+        }
+
+        var precheckContext = toolContext with
+        {
+            AllowedPermissions = toolContext.AllowedPermissions
+                .Concat([VisionAgentToolPermission.DeploymentPrepare])
+                .ToHashSet()
+        };
+        var precheck = await RunToolLoopDraftCheckAsync(
+            "runtime_package_precheck",
+            precheckContext,
+            new
+            {
+                flow,
+                validationSummary = validation.Data,
+                dryRunSummary = dryRun.Data,
+                requireReplay = false
+            },
+            cancellationToken);
+        if (!precheck.Success)
+        {
+            EmitToolLoopDraftRejected(
+                request.AgentRunId,
+                "runtime_package_precheck_failed",
+                "Tool Loop final 草稿未通过 runtime_package_precheck 元数据验收。",
+                precheck);
+            return ToolLoopDraftValidationResult.Rejected("runtime_package_precheck_failed");
+        }
+
+        var missingResourceCount =
+            VisionAgentBuildSupport.ReadMissingResources(validation.Data).Count() +
+            VisionAgentBuildSupport.ReadMissingResources(precheck.Data).Count();
+        var pendingActionCount = precheck.PendingActions.Count;
+        _eventSink?.Append(request.AgentRunId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.ToolLoopDraftAccepted,
+            Stage = "tool_loop",
+            Title = "Tool Loop draft accepted",
+            Summary = "实验 Tool Loop final 草稿已通过公开元数据验收；后续继续由稳定构建链路补全可回放 BuildResult。",
+            Status = AgentRunEventStatuses.Completed,
+            Payload = new
+            {
+                validation = "validate_flow",
+                dryRun = "dryrun_flow",
+                precheck = "runtime_package_precheck",
+                readyForDeployment = VisionAgentBuildSupport.ReadBool(precheck.Data, "readyForDeployment") == true,
+                missingResourceCount,
+                pendingActionCount,
+                metadataOnly = true
+            }
+        });
+
+        return ToolLoopDraftValidationResult.Accept();
+    }
+
+    private async Task<VisionAgentToolResult> RunToolLoopDraftCheckAsync(
+        string toolName,
+        VisionAgentToolContext context,
+        object arguments,
+        CancellationToken cancellationToken)
+    {
+        if (!_toolRegistry.TryGet(toolName, out _))
+        {
+            return VisionAgentToolResult.Fail(
+                "tool_not_registered",
+                $"Tool Loop draft validation tool '{toolName}' is not registered.");
+        }
+
+        try
+        {
+            return await _toolRegistry.ExecuteAsync(
+                toolName,
+                context,
+                VisionAgentBuildSupport.ToJsonElement(arguments),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return VisionAgentToolResult.Fail("tool_exception", ex.Message);
+        }
+    }
+
+    private void EmitToolLoopDraftRejected(
+        string? runId,
+        string reason,
+        string summary,
+        VisionAgentToolResult? checkResult = null)
+    {
+        _eventSink?.Append(runId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.ToolLoopDraftRejected,
+            Stage = "tool_loop",
+            Title = "Tool Loop draft rejected",
+            Summary = summary,
+            Status = AgentRunEventStatuses.Failed,
+            Payload = new
+            {
+                rejectionReason = reason,
+                checkErrorCode = checkResult?.ErrorCode,
+                checkErrorMessage = checkResult?.ErrorMessage,
+                firstFixRecommendation = "已回退稳定构建链路；请查看公开工具轨迹和 BuildResult 后再调整请求。",
+                metadataOnly = true
+            }
+        });
+    }
+
+    private static bool ShouldEmitDraftRejected(
+        VisionAgentLoopResult loopResult,
+        string fallbackReason)
+    {
+        if (loopResult.Success)
+        {
+            return true;
+        }
+
+        return string.Equals(fallbackReason, "invalid_json", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(fallbackReason, "partial_final_requires_stable_completion", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryReadToolLoopFinalDraft(
+        string content,
+        out object? flow,
+        out string failureReason)
+    {
+        flow = null;
+        failureReason = string.Empty;
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            failureReason = "empty_final";
+            return false;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                failureReason = "invalid_json";
+                return false;
+            }
+
+            if (doc.RootElement.TryGetProperty("workflowDraft", out var draft) &&
+                draft.ValueKind == JsonValueKind.Object)
+            {
+                flow = JsonSerializer.Deserialize<object>(draft.GetRawText(), AgentRunEventJson.Options);
+                return true;
+            }
+
+            if (doc.RootElement.TryGetProperty("draftEdits", out var edits) &&
+                edits.ValueKind == JsonValueKind.Array)
+            {
+                failureReason = "draft_edits_require_stable_completion";
+                return false;
+            }
+
+            failureReason = "final_draft_missing";
+            return false;
+        }
+        catch (JsonException)
+        {
+            failureReason = "invalid_json";
+            return false;
+        }
+    }
+
+    private sealed record ToolLoopDraftValidationResult(bool Accepted, string FallbackReason)
+    {
+        public static ToolLoopDraftValidationResult Accept() => new(true, string.Empty);
+
+        public static ToolLoopDraftValidationResult Rejected(string fallbackReason) => new(false, fallbackReason);
     }
 
     private void EmitToolLoopFallback(

@@ -44,7 +44,9 @@ internal sealed record TemplateStrategyResolution(
     string ScenarioKey,
     object? TemplateSkeleton,
     string GenerationMode,
-    string TemplateLockLevel);
+    string TemplateLockLevel,
+    bool RequiredTemplateMissing = false,
+    string MissingTemplateResourceKey = "");
 
 internal sealed record OperatorPipelineResolution(
     List<VisionAgentOperatorPipelineStep> Steps,

@@ -1790,11 +1790,32 @@ test('Tool Evidence Timeline distinguishes LLM tool loop and fallback fixed chai
     {
       stage: 'workflow_draft',
       toolName: 'stable_build_tool',
+      source: 'fixed_build_orchestrator',
+      status: 'completed',
+      durationMs: 10,
+      outputSummary: 'Stable BuildOrchestrator completed.',
+      metadataOnly: true,
+      redactionPass: true
+    },
+    {
+      stage: 'workflow_draft',
+      toolName: 'stable_build_tool',
       source: 'fallback_build_orchestrator',
       status: 'completed',
       warningCode: 'partial_final_requires_stable_completion',
       durationMs: 12,
       outputSummary: 'Stable BuildOrchestrator completed.',
+      metadataOnly: true,
+      redactionPass: true
+    },
+    {
+      stage: 'template_strategy',
+      toolName: 'get_flow_template_skeleton',
+      source: 'fixed_build_orchestrator',
+      status: 'warning',
+      warningCode: 'template_not_found',
+      durationMs: 6,
+      outputSummary: '未找到匹配模板骨架，已改用算子链生成。',
       metadataOnly: true,
       redactionPass: true
     }
@@ -1814,12 +1835,89 @@ test('Tool Evidence Timeline distinguishes LLM tool loop and fallback fixed chai
     }
   ];
 
+  panel._renderAgentWorkspaceOverview();
   panel._renderBuildWorkspaceFromAgentRun();
 
   const timelineHtml = elements['#ai-build-event-timeline'].innerHTML;
-  assert.match(timelineHtml, /LLM 自主工具/);
-  assert.match(timelineHtml, /回退固定链路/);
+  assert.match(timelineHtml, /Build 工具证据/);
+  assert.match(timelineHtml, /LLM 工具循环/);
+  assert.match(timelineHtml, /固定构建链路/);
+  assert.match(timelineHtml, /回退构建链路/);
   assert.match(timelineHtml, /Tool Loop 草稿不完整，已回退稳定构建链路/);
+  assert.match(timelineHtml, /未找到匹配模板骨架，已改用算子链生成/);
+});
+
+test('Build Workspace displays Tool Loop execution path and fallback reason', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.agentWorkspaceMode = 'build';
+  const payload = buildResultContractPayload();
+  panel.activeAgentRunEvents = [
+    {
+      runId: 'ar_tool_loop_path',
+      sequence: 1,
+      eventType: 'run.started',
+      stage: 'run',
+      title: 'Run started',
+      status: 'running',
+      payload: {
+        useVisionAgentGenerateFlow: true,
+        agentGenerateFlowMode: 'tool_loop',
+        metadataOnly: true
+      },
+      metadataOnly: true,
+      redactionPass: true
+    },
+    {
+      runId: 'ar_tool_loop_path',
+      sequence: 3,
+      eventType: 'tool_loop.started',
+      stage: 'tool_loop',
+      title: 'Tool Loop started',
+      status: 'running',
+      metadataOnly: true,
+      redactionPass: true
+    },
+    {
+      runId: 'ar_tool_loop_path',
+      sequence: 12,
+      eventType: 'tool_loop.fallback',
+      stage: 'tool_loop',
+      title: 'Tool Loop fallback',
+      status: 'blocked',
+      payload: {
+        fallbackReason: 'duplicate_tool_call',
+        metadataOnly: true
+      },
+      metadataOnly: true,
+      redactionPass: true
+    },
+    {
+      runId: 'ar_tool_loop_path',
+      sequence: 20,
+      eventType: 'run.completed',
+      stage: 'run',
+      title: 'Run completed',
+      summary: 'Build completed.',
+      status: 'completed',
+      payload,
+      metadataOnly: true,
+      redactionPass: true
+    }
+  ];
+
+  panel._renderAgentWorkspaceOverview();
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  const overviewHtml = elements['#ai-agent-workspace-overview'].innerHTML;
+  assert.match(overviewHtml, /当前模式/);
+  assert.match(overviewHtml, /Tool Loop 实验/);
+  assert.match(overviewHtml, /VisionAgentLoop/);
+  assert.match(overviewHtml, /已进入/);
+  assert.match(overviewHtml, /路径原因/);
+  assert.match(overviewHtml, /重复工具调用超限，已回退稳定构建链路/);
 });
 
 test('Canvas apply remains enabled when deployment is blocked by missing resources', async () => {
@@ -2196,6 +2294,14 @@ test('AgentRun tool_loop events render realtime public progress with fallback co
   const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
   const turn = attachAgentRunTurn(panel);
   panel.activeAgentRunId = 'ar_tool_loop';
+  panel.isGenerating = true;
+  panel.isCancellingGenerate = true;
+  let transportClosed = false;
+  panel.activeAgentRunTransport = {
+    close() {
+      transportClosed = true;
+    }
+  };
 
   panel._handleAgentRunEvent({
     runId: 'ar_tool_loop',
@@ -2211,6 +2317,77 @@ test('AgentRun tool_loop events render realtime public progress with fallback co
   panel._handleAgentRunEvent({
     runId: 'ar_tool_loop',
     sequence: 4,
+    eventType: 'tool_loop.round.started',
+    stage: 'tool_loop',
+    title: 'Tool Loop 第 1 轮',
+    summary: 'request next tool',
+    status: 'running',
+    payload: { round: 1, metadataOnly: true },
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_loop',
+    sequence: 5,
+    eventType: 'tool_call.requested',
+    stage: 'tool_loop',
+    title: 'Tool call requested: inspect_current_flow',
+    summary: 'metadata-only tool',
+    status: 'running',
+    payload: { round: 1, toolName: 'inspect_current_flow', metadataOnly: true },
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_loop',
+    sequence: 6,
+    eventType: 'tool_call.completed',
+    stage: 'tool_loop',
+    title: 'Tool call completed: inspect_current_flow',
+    summary: 'metadata returned',
+    status: 'completed',
+    payload: { round: 1, toolName: 'inspect_current_flow', metadataOnly: true },
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_loop',
+    sequence: 7,
+    eventType: 'tool_result.appended',
+    stage: 'tool_loop',
+    title: 'Tool result appended',
+    summary: 'tool result appended',
+    status: 'completed',
+    payload: { round: 1, metadataOnly: true },
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_loop',
+    sequence: 8,
+    eventType: 'tool_loop.finalized',
+    stage: 'tool_loop',
+    title: 'Tool Loop finalized',
+    summary: 'final returned',
+    status: 'completed',
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_loop',
+    sequence: 9,
+    eventType: 'tool_loop.draft.accepted',
+    stage: 'tool_loop',
+    title: 'Tool Loop draft accepted',
+    summary: 'accepted',
+    status: 'completed',
+    payload: { metadataOnly: true },
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_loop',
+    sequence: 10,
     eventType: 'tool_loop.fallback',
     stage: 'tool_loop',
     title: 'Tool Loop fallback',
@@ -2226,9 +2403,18 @@ test('AgentRun tool_loop events render realtime public progress with fallback co
   });
 
   const text = collectProcessText(turn);
-  assert.match(text, /Tool Loop 实验/);
-  assert.match(text, /Tool Loop 已回退/);
-  assert.match(text, /实验 Tool Loop 未能安全产出完整构建结果，已回退稳定构建链路。/);
+  assert.match(text, /Tool Loop 实验已启动/);
+  assert.match(text, /第 1 轮工具决策/);
+  assert.match(text, /请求工具：inspect_current_flow/);
+  assert.match(text, /工具完成：inspect_current_flow/);
+  assert.match(text, /工具结果已回填/);
+  assert.match(text, /LLM 已给出 final/);
+  assert.match(text, /实验草稿已通过校验/);
+  assert.match(text, /已回退稳定构建链路：工具权限被拒绝，已回退稳定构建链路/);
+  assert.equal(panel.isGenerating, false);
+  assert.equal(panel.isCancellingGenerate, false);
+  assert.equal(transportClosed, false);
+  assert.equal(panel.activeAgentRunTransport !== null, true);
 });
 
 test('AgentRun tool_call events render LLM requested tool cards', async () => {
@@ -2275,6 +2461,36 @@ test('AgentRun tool_call events render LLM requested tool cards', async () => {
   assert.match(turn.toolsBody.innerHTML, /inspect_current_flow/);
   assert.match(turn.toolsBody.innerHTML, /runtime_package_precheck/);
   assert.match(turn.toolsBody.innerHTML, /宸查樆鏂?|blocked|warning/);
+});
+
+test('AgentRun tool_loop draft rejected releases generating state', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_tool_loop_rejected';
+  panel.isGenerating = true;
+  panel.isCancellingGenerate = true;
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_loop_rejected',
+    sequence: 11,
+    eventType: 'tool_loop.draft.rejected',
+    stage: 'tool_loop',
+    title: 'Tool Loop draft rejected',
+    summary: 'draft rejected',
+    status: 'warning',
+    payload: {
+      rejectionReason: 'validate_flow_failed',
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.match(collectProcessText(turn), /实验草稿未通过校验：流程校验未通过，已回退稳定构建链路/);
+  assert.equal(panel.isGenerating, false);
+  assert.equal(panel.isCancellingGenerate, false);
+  assert.equal(turn.statusEl.textContent, '草稿验收未通过');
 });
 
 test('AgentRun duplicate replay events are ignored by run sequence and type', async () => {

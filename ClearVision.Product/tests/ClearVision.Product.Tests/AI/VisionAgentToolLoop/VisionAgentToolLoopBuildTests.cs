@@ -46,7 +46,8 @@ public sealed class VisionAgentToolLoopBuildTests
             AgentRunEventTypes.ToolCallRequested,
             AgentRunEventTypes.ToolCallLoopCompleted,
             AgentRunEventTypes.ToolResultAppended,
-            AgentRunEventTypes.ToolLoopFinalized
+            AgentRunEventTypes.ToolLoopFinalized,
+            AgentRunEventTypes.ToolLoopDraftAccepted
         ]);
         sink.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.ToolLoopFallback);
         result.BuildResult!.ToolEvidenceTimeline.Should().Contain(item =>
@@ -134,7 +135,11 @@ public sealed class VisionAgentToolLoopBuildTests
     {
         var sink = new CapturingAgentRunEventSink();
         var tool = new FakeTool("inspect_current_flow", VisionAgentToolPermission.ReadOnly);
-        var completion = new ScriptedLoopCompletionSource([ToolCall("inspect_current_flow")]);
+        var completion = new ScriptedLoopCompletionSource(
+        [
+            ToolCall("inspect_current_flow"),
+            ToolCall("inspect_current_flow")
+        ]);
         var stableBuild = new FakeBuildOrchestrator();
         var orchestrator = CreateOrchestrator(
             sink,
@@ -143,13 +148,13 @@ public sealed class VisionAgentToolLoopBuildTests
             stableBuild,
             new VisionAgentLoopOptions
             {
-                MaxToolRounds = 0
+                MaxToolRounds = 1
             });
 
         var result = await orchestrator.BuildFromPlanAsync(ToolLoopRequest(), CancellationToken.None);
 
         result.Success.Should().BeTrue();
-        tool.ExecuteCount.Should().Be(0);
+        tool.ExecuteCount.Should().Be(1);
         sink.Events.Should().Contain(evt => evt.EventType == AgentRunEventTypes.ToolLoopFailed);
         sink.Events.Should().Contain(evt =>
             evt.EventType == AgentRunEventTypes.ToolLoopFallback &&
@@ -157,6 +162,113 @@ public sealed class VisionAgentToolLoopBuildTests
         result.BuildResult!.ToolEvidenceTimeline.Should().Contain(item =>
             item.ToolName == "tool_loop_fallback" &&
             item.WarningCode == "failed_with_tool_limit");
+    }
+
+    [Fact(DisplayName = "BuildFromPlan tool_loop should fallback when draft validation rejects final")]
+    public async Task BuildFromPlanToolLoop_ShouldRejectDraftAndFallback()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var validateFlow = new FakeTool(
+            "validate_flow",
+            VisionAgentToolPermission.Simulation,
+            (_, _) => VisionAgentToolResult.Ok(new
+            {
+                valid = false,
+                blockingIssues = new[] { new { code = "invalid_flow", message = "Invalid draft." } },
+                warnings = Array.Empty<object>(),
+                missingResources = Array.Empty<object>(),
+                pendingParameters = Array.Empty<object>(),
+                metadataOnly = true
+            }));
+        var completion = new ScriptedLoopCompletionSource([FinalWorkflowDraft()]);
+        var stableBuild = new FakeBuildOrchestrator();
+        var orchestrator = CreateOrchestrator(
+            sink,
+            [validateFlow],
+            completion,
+            stableBuild);
+
+        var result = await orchestrator.BuildFromPlanAsync(ToolLoopRequest(), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        stableBuild.CallCount.Should().Be(1);
+        sink.Events.Should().Contain(evt =>
+            evt.EventType == AgentRunEventTypes.ToolLoopDraftRejected &&
+            Json(evt.Payload).GetProperty("rejectionReason").GetString() == "validate_flow_failed");
+        sink.Events.Should().Contain(evt =>
+            evt.EventType == AgentRunEventTypes.ToolLoopFallback &&
+            Json(evt.Payload).GetProperty("fallbackReason").GetString() == "validate_flow_failed");
+        sink.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.ToolLoopDraftAccepted);
+    }
+
+    [Fact(DisplayName = "BuildFromPlan tool_loop should fallback when duplicate tool calls exceed threshold")]
+    public async Task BuildFromPlanToolLoop_ShouldFallbackOnDuplicateToolCall()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var tool = new FakeTool("inspect_current_flow", VisionAgentToolPermission.ReadOnly);
+        var completion = new ScriptedLoopCompletionSource(
+        [
+            ToolCall("inspect_current_flow"),
+            ToolCall("inspect_current_flow")
+        ]);
+        var stableBuild = new FakeBuildOrchestrator();
+        var orchestrator = CreateOrchestrator(
+            sink,
+            [tool],
+            completion,
+            stableBuild,
+            new VisionAgentLoopOptions
+            {
+                MaxToolRounds = 4,
+                MaxRepeatedToolCalls = 1
+            });
+
+        var result = await orchestrator.BuildFromPlanAsync(ToolLoopRequest(), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        tool.ExecuteCount.Should().Be(1);
+        stableBuild.CallCount.Should().Be(1);
+        sink.Events.Should().Contain(evt =>
+            evt.EventType == AgentRunEventTypes.ToolLoopFailed &&
+            Json(evt.Payload).GetProperty("failureType").GetString() == "duplicate_tool_call");
+        sink.Events.Should().Contain(evt =>
+            evt.EventType == AgentRunEventTypes.ToolLoopFallback &&
+            Json(evt.Payload).GetProperty("fallbackReason").GetString() == "duplicate_tool_call");
+    }
+
+    [Fact(DisplayName = "BuildFromPlan tool_loop should reject invalid final JSON and fallback")]
+    public async Task BuildFromPlanToolLoop_ShouldFallbackOnInvalidFinalJson()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var completion = new ScriptedLoopCompletionSource(
+        [
+            "not json",
+            """{"kind":"final","draftEdits":"invalid"}"""
+        ]);
+        var stableBuild = new FakeBuildOrchestrator();
+        var orchestrator = CreateOrchestrator(
+            sink,
+            [new FakeTool("inspect_current_flow", VisionAgentToolPermission.ReadOnly)],
+            completion,
+            stableBuild,
+            new VisionAgentLoopOptions
+            {
+                MaxInvalidJsonResponses = 2
+            });
+
+        var result = await orchestrator.BuildFromPlanAsync(ToolLoopRequest(), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        stableBuild.CallCount.Should().Be(1);
+        sink.Events.Should().Contain(evt =>
+            evt.EventType == AgentRunEventTypes.ToolLoopFailed &&
+            Json(evt.Payload).GetProperty("failureType").GetString() == "invalid_json");
+        sink.Events.Should().Contain(evt =>
+            evt.EventType == AgentRunEventTypes.ToolLoopDraftRejected &&
+            Json(evt.Payload).GetProperty("rejectionReason").GetString() == "invalid_json");
+        sink.Events.Should().Contain(evt =>
+            evt.EventType == AgentRunEventTypes.ToolLoopFallback &&
+            Json(evt.Payload).GetProperty("fallbackReason").GetString() == "invalid_json");
     }
 
     [Fact(DisplayName = "BuildFromPlan tool_loop cancellation should stop before fallback")]
@@ -222,7 +334,12 @@ public sealed class VisionAgentToolLoopBuildTests
             MaxToolCallsPerRound = 4,
             MaxToolResultChars = 64_000
         };
-        var registry = new VisionAgentToolRegistryAdapter(tools);
+        var allTools = DefaultDraftValidationTools()
+            .Concat(tools)
+            .GroupBy(tool => tool.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .ToList();
+        var registry = new VisionAgentToolRegistryAdapter(allTools);
         var loop = new VisionAgentLoop(
             registry,
             new VisionAgentProtocolParser(),
@@ -272,6 +389,47 @@ public sealed class VisionAgentToolLoopBuildTests
                 MetadataOnly = true
             }
         };
+    }
+
+    private static IReadOnlyList<FakeTool> DefaultDraftValidationTools()
+    {
+        return
+        [
+            new FakeTool(
+                "validate_flow",
+                VisionAgentToolPermission.Simulation,
+                (_, _) => VisionAgentToolResult.Ok(new
+                {
+                    valid = true,
+                    blockingIssues = Array.Empty<object>(),
+                    warnings = Array.Empty<object>(),
+                    missingResources = Array.Empty<object>(),
+                    pendingParameters = Array.Empty<object>(),
+                    metadataOnly = true
+                })),
+            new FakeTool(
+                "dryrun_flow",
+                VisionAgentToolPermission.Simulation,
+                (_, _) => VisionAgentToolResult.Ok(new
+                {
+                    dryRunSucceeded = true,
+                    warnings = Array.Empty<object>(),
+                    blockingIssues = Array.Empty<object>(),
+                    missingResources = Array.Empty<object>(),
+                    metadataOnly = true
+                })),
+            new FakeTool(
+                "runtime_package_precheck",
+                VisionAgentToolPermission.DeploymentPrepare,
+                (_, _) => VisionAgentToolResult.Ok(new
+                {
+                    readyForDeployment = false,
+                    missingResources = Array.Empty<object>(),
+                    blockingIssues = Array.Empty<object>(),
+                    pendingActions = Array.Empty<object>(),
+                    metadataOnly = true
+                }))
+        ];
     }
 
     private static string ToolCall(string name)
@@ -472,10 +630,16 @@ public sealed class VisionAgentToolLoopBuildTests
 
     private sealed class FakeTool : IVisionAgentTool
     {
-        public FakeTool(string name, VisionAgentToolPermission permission)
+        private readonly Func<VisionAgentToolContext, JsonElement, VisionAgentToolResult>? _execute;
+
+        public FakeTool(
+            string name,
+            VisionAgentToolPermission permission,
+            Func<VisionAgentToolContext, JsonElement, VisionAgentToolResult>? execute = null)
         {
             Name = name;
             Permission = permission;
+            _execute = execute;
         }
 
         public string Name { get; }
@@ -493,7 +657,7 @@ public sealed class VisionAgentToolLoopBuildTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             ExecuteCount++;
-            return Task.FromResult(VisionAgentToolResult.Ok(new
+            return Task.FromResult(_execute?.Invoke(context, arguments) ?? VisionAgentToolResult.Ok(new
             {
                 tool = Name,
                 observed = true,

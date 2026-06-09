@@ -66,6 +66,8 @@ public sealed class VisionAgentLoop
 
         var traces = new List<VisionAgentToolTrace>();
         var pendingActions = new List<VisionAgentPendingAction>();
+        var repeatedToolCalls = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var invalidJsonResponses = 0;
         var systemPrompt = _promptBuilder.BuildSystemPrompt(_toolRegistry.ListTools());
         var messages = new List<VisionAgentLoopMessage>
         {
@@ -145,6 +147,48 @@ public sealed class VisionAgentLoop
             var parsed = _protocolParser.Parse(completion);
             if (!parsed.IsToolCall)
             {
+                if (request.RequireFinalDraft &&
+                    !TryReadFinalDraftEnvelope(completion, out _, out var invalidReason))
+                {
+                    invalidJsonResponses++;
+                    if (invalidJsonResponses >= _options.MaxInvalidJsonResponses)
+                    {
+                        AppendLoopEvent(
+                            request.EmitPublicEvents,
+                            request.ToolContext.AgentRunId,
+                            AgentRunEventTypes.ToolLoopFailed,
+                            "tool_loop",
+                            "Tool Loop final JSON 无效",
+                            "LLM 未能返回包含 workflowDraft 或 draftEdits 的有效 final JSON，已触发稳定构建链路回退。",
+                            AgentRunEventStatuses.Failed,
+                            new
+                            {
+                                failureType = "invalid_json",
+                                invalidReason,
+                                invalidJsonResponses,
+                                maxInvalidJsonResponses = _options.MaxInvalidJsonResponses,
+                                metadataOnly = true
+                            });
+                        return new VisionAgentLoopResult
+                        {
+                            Success = false,
+                            FailureType = "invalid_json",
+                            ErrorMessage = "Tool Loop final JSON did not contain workflowDraft or draftEdits.",
+                            FinalContent = completion,
+                            ToolTrace = traces,
+                            PendingActions = pendingActions,
+                            ToolRounds = round,
+                            SystemPrompt = systemPrompt
+                        };
+                    }
+
+                    messages.Add(new VisionAgentLoopMessage("assistant", completion));
+                    messages.Add(new VisionAgentLoopMessage(
+                        "user",
+                        "The previous final response was not valid public JSON for this build. Return exactly one JSON object with kind=\"final\" and workflowDraft or draftEdits. Do not include private reasoning."));
+                    continue;
+                }
+
                 AppendLoopEvent(
                     request.EmitPublicEvents,
                     request.ToolContext.AgentRunId,
@@ -164,6 +208,35 @@ public sealed class VisionAgentLoop
                 {
                     Success = true,
                     FinalContent = parsed.FinalContent,
+                    ToolTrace = traces,
+                    PendingActions = pendingActions,
+                    ToolRounds = round,
+                    SystemPrompt = systemPrompt
+                };
+            }
+
+            if (parsed.ToolCalls.Count > _options.MaxToolCallsPerRound)
+            {
+                AppendLoopEvent(
+                    request.EmitPublicEvents,
+                    request.ToolContext.AgentRunId,
+                    AgentRunEventTypes.ToolLoopFailed,
+                    "tool_loop",
+                    "Tool Loop 工具数超限",
+                    $"LLM 单轮请求工具数超过 MaxToolCallsPerRound={_options.MaxToolCallsPerRound}，已触发稳定构建链路回退。",
+                    AgentRunEventStatuses.Failed,
+                    new
+                    {
+                        failureType = "max_tool_calls_per_round",
+                        requestedToolCalls = parsed.ToolCalls.Count,
+                        maxToolCallsPerRound = _options.MaxToolCallsPerRound,
+                        metadataOnly = true
+                    });
+                return new VisionAgentLoopResult
+                {
+                    Success = false,
+                    FailureType = "max_tool_calls_per_round",
+                    ErrorMessage = $"Vision agent requested {parsed.ToolCalls.Count} tool calls in one round.",
                     ToolTrace = traces,
                     PendingActions = pendingActions,
                     ToolRounds = round,
@@ -200,8 +273,44 @@ public sealed class VisionAgentLoop
                 };
             }
 
+            foreach (var call in parsed.ToolCalls)
+            {
+                var signature = BuildToolCallSignature(call);
+                repeatedToolCalls.TryGetValue(signature, out var count);
+                count++;
+                repeatedToolCalls[signature] = count;
+                if (count > _options.MaxRepeatedToolCalls)
+                {
+                    AppendLoopEvent(
+                        request.EmitPublicEvents,
+                        request.ToolContext.AgentRunId,
+                        AgentRunEventTypes.ToolLoopFailed,
+                        "tool_loop",
+                        "Tool Loop 重复工具调用超限",
+                        "LLM 重复请求相同工具和参数，已触发稳定构建链路回退。",
+                        AgentRunEventStatuses.Failed,
+                        new
+                        {
+                            failureType = "duplicate_tool_call",
+                            toolName = call.Name,
+                            repeatedCount = count,
+                            maxRepeatedToolCalls = _options.MaxRepeatedToolCalls,
+                            metadataOnly = true
+                        });
+                    return new VisionAgentLoopResult
+                    {
+                        Success = false,
+                        FailureType = "duplicate_tool_call",
+                        ErrorMessage = $"Vision agent repeated tool call '{call.Name}' with identical arguments.",
+                        ToolTrace = traces,
+                        PendingActions = pendingActions,
+                        ToolRounds = round,
+                        SystemPrompt = systemPrompt
+                    };
+                }
+            }
+
             var toolCalls = parsed.ToolCalls
-                .Take(_options.MaxToolCallsPerRound)
                 .ToList();
             var roundResults = await ExecuteToolRoundAsync(
                 toolCalls,
@@ -559,6 +668,86 @@ public sealed class VisionAgentLoop
         }
     }
 
+    private static bool TryReadFinalDraftEnvelope(
+        string raw,
+        out JsonElement root,
+        out string invalidReason)
+    {
+        root = default;
+        invalidReason = string.Empty;
+        var candidate = StripJsonFences(raw ?? string.Empty);
+        if (!TryParseJsonObject(candidate, out root))
+        {
+            invalidReason = "invalid_json";
+            return false;
+        }
+
+        if (root.TryGetProperty("workflowDraft", out var draft) &&
+            draft.ValueKind == JsonValueKind.Object)
+        {
+            return true;
+        }
+
+        if (root.TryGetProperty("draftEdits", out var edits) &&
+            edits.ValueKind == JsonValueKind.Array)
+        {
+            return true;
+        }
+
+        invalidReason = "final_draft_missing";
+        return false;
+    }
+
+    private static string StripJsonFences(string raw)
+    {
+        var text = raw.Trim();
+        if (text.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[7..];
+        }
+        else if (text.StartsWith("```", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[3..];
+        }
+
+        if (text.EndsWith("```", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[..^3];
+        }
+
+        return text.Trim();
+    }
+
+    private static bool TryParseJsonObject(string text, out JsonElement root)
+    {
+        root = default;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            root = doc.RootElement.Clone();
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static string BuildToolCallSignature(VisionAgentToolCall call)
+    {
+        return $"{call.Name.Trim().ToLowerInvariant()}:{call.Arguments.GetRawText()}";
+    }
+
     private static string SummarizeString(string? value)
     {
         if (string.IsNullOrEmpty(value))
@@ -846,6 +1035,7 @@ public sealed record VisionAgentLoopRequest
     public VisionAgentToolContext ToolContext { get; init; } = new();
     public Func<IReadOnlyList<VisionAgentLoopMessage>, CancellationToken, Task<string>>? CompleteAsync { get; init; }
     public bool EmitPublicEvents { get; init; }
+    public bool RequireFinalDraft { get; init; }
 }
 
 public sealed record VisionAgentLoopMessage(string Role, string Content);
