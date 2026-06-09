@@ -302,6 +302,11 @@ function createPanel(AiPanel, overrides = {}) {
   panel.nextTemplateSelection = null;
   panel.activeGenerateRequestId = null;
   panel.activePlanRequestId = null;
+  panel.activePlanRunId = null;
+  panel.activePlanRunRequestId = null;
+  panel.activePlanRunEvents = [];
+  panel.activePlanRunEventKeys = new Set();
+  panel.activePlanRunCompletion = null;
   panel.activeGenerateSessionId = null;
   panel.activeAgentRunId = null;
   panel.activeAgentRunEventSource = null;
@@ -1232,6 +1237,7 @@ test('Plan Mode captures vague inspection request without starting Build', async
     '#ai-result-status-note': createFakeElement()
   });
   let capturedPlanRequest = null;
+  panel._shouldUsePlanRunEventStream = () => false;
   panel._requestBackendVisionPlan = async request => {
     capturedPlanRequest = request;
     return backendPlanResult({
@@ -1285,6 +1291,248 @@ test('Plan Mode captures vague inspection request without starting Build', async
     plan.innerHTML
   ].join('\n'), /Accept recommended defaults|rule_fallback|\bplanner_failed\b|collecting_context completed|What should count as a defect|Defect definition controls|Scratch\/blob|Use general surface defect candidates|Good first draft|>Crack<|Dent\/stain|Thresholds need sample confirmation/);
   assert.doesNotMatch(plan.innerHTML, /setTimeout/);
+});
+
+test('Plan Mode streams public Plan progress into the assistant message', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const chat = createFakeElement();
+  const overview = createFakeElement();
+  const plan = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': chat,
+    '#ai-agent-workspace-overview': overview,
+    '#ai-plan-workspace': plan,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.activeAgentRunId = 'ar_previous_build';
+  const planResult = backendPlanResult({
+    planSource: 'planner',
+    fallbackReason: '',
+    goal: 'streamed plan ready',
+    publicEvents: [
+      { stage: 'collecting_context', status: 'completed', title: 'Context collected', summary: 'Context collected' },
+      { stage: 'planning_with_model', status: 'completed', title: 'Planner candidate returned', summary: 'Planner returned a public structured candidate for validation.' },
+      { stage: 'validating_plan_contract', status: 'completed', title: 'Plan contract valid', summary: 'Planner plan was normalized to the public PlanModeResult contract.' },
+      { stage: 'applying_safety_constraints', status: 'completed', title: 'Safety constraints applied', summary: 'Redaction, metadata-only boundaries, resource placeholders, and PLC safety policy were applied.' }
+    ]
+  });
+  installFetchStream([
+    {
+      json: {
+        runId: 'ar_plan_stream',
+        events: [
+          {
+            runId: 'ar_plan_stream',
+            sequence: 1,
+            eventType: 'run.started',
+            stage: 'run',
+            title: 'Vision Agent run started',
+            summary: 'Plan run started.',
+            status: 'running',
+            payload: { mode: 'plan', metadataOnly: true },
+            metadataOnly: true,
+            redactionPass: true
+          },
+          {
+            runId: 'ar_plan_stream',
+            sequence: 2,
+            eventType: 'plan.started',
+            stage: 'plan',
+            title: '规划已启动',
+            summary: '正在进入规划阶段。',
+            status: 'running',
+            metadataOnly: true,
+            redactionPass: true
+          }
+        ]
+      }
+    },
+    {
+      body: [
+        encodeSseEvent({
+          runId: 'ar_plan_stream',
+          sequence: 3,
+          eventType: 'plan.context.completed',
+          stage: 'collecting_context',
+          title: '上下文已收集',
+          summary: '已收集公开需求、流程、模板、附件、算子和工站边界。',
+          status: 'completed',
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent({
+          runId: 'ar_plan_stream',
+          sequence: 4,
+          eventType: 'plan.model.started',
+          stage: 'planning_with_model',
+          title: '模型规划中',
+          summary: '模型正在生成公开结构化规划候选。',
+          status: 'running',
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent({
+          runId: 'ar_plan_stream',
+          sequence: 5,
+          eventType: 'plan.contract.completed',
+          stage: 'validating_plan_contract',
+          title: '规划契约已校验',
+          summary: '规划已归一到公开 PlanModeResult 契约。',
+          status: 'completed',
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent({
+          runId: 'ar_plan_stream',
+          sequence: 6,
+          eventType: 'plan.safety.completed',
+          stage: 'applying_safety_constraints',
+          title: '安全约束已应用',
+          summary: '已应用安全约束。',
+          status: 'completed',
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent({
+          runId: 'ar_plan_stream',
+          sequence: 7,
+          eventType: 'plan.completed',
+          stage: 'plan_ready',
+          title: '规划已就绪',
+          summary: '规划已完成，可以开始构建。',
+          status: 'completed',
+          payload: { planResult, metadataOnly: true },
+          metadataOnly: true,
+          redactionPass: true
+        })
+      ].join('')
+    }
+  ]);
+
+  const accepted = panel._dispatchGenerateRequest({
+    description: 'stream plan',
+    userMessage: 'stream plan'
+  });
+  const turn = panel.activeAssistantTurn;
+
+  assert.equal(accepted, true);
+  assert.ok(turn);
+  assert.match(turn.replyBody.textContent, /规划中/);
+  await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_backend_1', 'streamed plan result');
+
+  assert.equal(panel.pendingVisionPlan.goal, 'streamed plan ready');
+  assert.equal(panel.isGenerating, false);
+  assert.match(turn.replyBody.textContent, /规划已完成，可以接受推荐默认值或调整选项后开始构建/);
+  assert.match(collectProcessText(turn), /收集上下文：完成/);
+  assert.match(collectProcessText(turn), /模型规划：进行中|模型规划：完成/);
+  assert.match(collectProcessText(turn), /契约校验：完成/);
+  assert.match(collectProcessText(turn), /安全约束：完成/);
+  assert.match(overview.innerHTML, /streamed plan ready/);
+  assert.match(plan.innerHTML, /规划诊断/);
+  assert.doesNotMatch(turn.replyBody.textContent, /collecting_context|planning_with_model|rawPrompt|chain/i);
+});
+
+test('Plan Mode timeout stream shows rule fallback copy', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const planResult = backendPlanResult({
+    planSource: 'rule_fallback',
+    fallbackReason: 'planner_timeout',
+    goal: 'timeout fallback plan'
+  });
+  installFetchStream([
+    { json: { runId: 'ar_plan_timeout', events: [] } },
+    {
+      body: [
+        encodeSseEvent({
+          runId: 'ar_plan_timeout',
+          sequence: 3,
+          eventType: 'plan.model.timeout',
+          stage: 'planning_with_model',
+          title: '模型规划超时',
+          summary: '模型规划超时，已使用规则兜底方案。',
+          status: 'failed',
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent({
+          runId: 'ar_plan_timeout',
+          sequence: 4,
+          eventType: 'plan.fallback.used',
+          stage: 'rule_fallback_used',
+          title: '已使用规则兜底方案',
+          summary: '已使用规则兜底方案。',
+          status: 'completed',
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent({
+          runId: 'ar_plan_timeout',
+          sequence: 5,
+          eventType: 'plan.completed',
+          stage: 'plan_ready',
+          title: '规划已就绪',
+          summary: '模型规划超时，已使用规则兜底方案。',
+          status: 'completed',
+          payload: { planResult, metadataOnly: true },
+          metadataOnly: true,
+          redactionPass: true
+        })
+      ].join('')
+    }
+  ]);
+
+  panel._dispatchGenerateRequest({ description: 'timeout plan', userMessage: 'timeout plan' });
+  const turn = panel.activeAssistantTurn;
+  await waitFor(() => panel.pendingVisionPlan?.goal === 'timeout fallback plan', 'timeout fallback plan');
+
+  assert.match(turn.replyBody.textContent, /模型规划超时，已使用规则兜底方案/);
+  assert.match(turn.replyBody.textContent, /稍后重试深度规划/);
+  assert.match(collectProcessText(turn), /模型规划：超时|规则兜底：完成/);
+  assert.equal(panel.pendingVisionPlan.planSource, 'rule_fallback');
+  assert.match(panel.pendingVisionPlan.fallbackReason, /模型规划超时/);
+});
+
+test('Plan Mode falls back to ordinary POST when Plan run creation is unavailable', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  let fallbackCalls = 0;
+  panel._requestBackendVisionPlan = async () => {
+    fallbackCalls += 1;
+    return backendPlanResult({ planId: 'plan_fallback_post', goal: 'ordinary fallback plan' });
+  };
+  const requests = installFetchStream([
+    { status: 404, json: { error: 'missing endpoint' } }
+  ]);
+
+  panel._dispatchGenerateRequest({ description: 'fallback to post', userMessage: 'fallback to post' });
+  const turn = panel.activeAssistantTurn;
+  await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_fallback_post', 'ordinary plan fallback');
+
+  assert.equal(fallbackCalls, 1);
+  assert.equal(requests.length, 1);
+  assert.match(requests[0].url, /\/api\/ai\/agent-plan-runs$/);
+  assert.match(turn.replyBody.textContent, /规划已完成|已使用规则兜底方案/);
+  assert.match(panel.lastResultStatusNote.text, /规划模式等待确认/);
 });
 
 test('Start Build from Plan enters Build request with skipPlan', async () => {
@@ -1342,6 +1590,7 @@ test('Plan Mode ignores stale backend response when a newer Plan request wins', 
   const first = deferred();
   const second = deferred();
   let calls = 0;
+  panel._shouldUsePlanRunEventStream = () => false;
   panel._requestBackendVisionPlan = () => {
     calls += 1;
     return calls === 1 ? first.promise : second.promise;
@@ -1359,6 +1608,43 @@ test('Plan Mode ignores stale backend response when a newer Plan request wins', 
   await flushAsync();
   assert.equal(panel.pendingVisionPlan.planId, 'plan_new');
   assert.equal(panel.pendingVisionPlan.goal, 'new plan ready');
+});
+
+test('Plan Mode ignores stale Plan run events when a newer run is active', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.activePlanRequestId = 'plan-request-new';
+  panel.activePlanRunId = 'ar_plan_new';
+  panel.activePlanRunRequestId = 'plan-request-new';
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    planId: 'plan_new_active',
+    goal: 'new active plan'
+  }));
+
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_old',
+    sequence: 99,
+    eventType: 'plan.completed',
+    stage: 'plan_ready',
+    title: '规划已就绪',
+    summary: 'old completion',
+    status: 'completed',
+    payload: {
+      planResult: backendPlanResult({ planId: 'plan_old_late', goal: 'old late plan' })
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(panel.pendingVisionPlan.planId, 'plan_new_active');
+  assert.equal(panel.pendingVisionPlan.goal, 'new active plan');
+  assert.equal(panel.activePlanRunEvents.length, 0);
 });
 
 test('BuildFromPlan prefers Plan templateSelection over raw snapshot and queued selection', async () => {

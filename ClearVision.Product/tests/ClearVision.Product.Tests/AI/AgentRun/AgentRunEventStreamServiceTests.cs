@@ -228,6 +228,21 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
     [Theory(DisplayName = "AgentRun required event type is publishable")]
     [InlineData(AgentRunEventTypes.RunStarted)]
     [InlineData(AgentRunEventTypes.AssistantBrief)]
+    [InlineData(AgentRunEventTypes.PlanCreated)]
+    [InlineData(AgentRunEventTypes.PlanStarted)]
+    [InlineData(AgentRunEventTypes.PlanContextStarted)]
+    [InlineData(AgentRunEventTypes.PlanContextCompleted)]
+    [InlineData(AgentRunEventTypes.PlanModelStarted)]
+    [InlineData(AgentRunEventTypes.PlanModelCompleted)]
+    [InlineData(AgentRunEventTypes.PlanModelTimeout)]
+    [InlineData(AgentRunEventTypes.PlanModelFailed)]
+    [InlineData(AgentRunEventTypes.PlanContractStarted)]
+    [InlineData(AgentRunEventTypes.PlanContractCompleted)]
+    [InlineData(AgentRunEventTypes.PlanSafetyCompleted)]
+    [InlineData(AgentRunEventTypes.PlanFallbackUsed)]
+    [InlineData(AgentRunEventTypes.PlanCompleted)]
+    [InlineData(AgentRunEventTypes.PlanFailed)]
+    [InlineData(AgentRunEventTypes.PlanCancelled)]
     [InlineData(AgentRunEventTypes.StageStarted)]
     [InlineData(AgentRunEventTypes.StageCompleted)]
     [InlineData(AgentRunEventTypes.ToolCallStarted)]
@@ -298,6 +313,10 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         yield return ["package-path", new { packagePath = @"D:\deploy\run.cvpkg" }, "run.cvpkg"];
         yield return ["plc-url", new { endpoint = "plc://192.168.1.8/D100" }, "plc://192.168.1.8"];
         yield return ["long-base64", new { image = new string('A', 120) }, new string('A', 96)];
+        yield return ["raw-prompt-key", new { rawPrompt = "do not publish" }, "rawPrompt"];
+        yield return ["system-prompt-marker", new { summary = "systemPrompt=hidden instruction" }, "systemPrompt"];
+        yield return ["chain-of-thought-key", new { chainOfThought = "private reasoning" }, "chainOfThought"];
+        yield return ["reasoning-content-marker", new { summary = "reasoning_content: private trace" }, "reasoning_content"];
     }
 
     private static AgentRunEventDraft Draft(string eventType, string stage)

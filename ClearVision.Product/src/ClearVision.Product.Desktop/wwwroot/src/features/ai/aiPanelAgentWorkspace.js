@@ -68,6 +68,15 @@ const BUILD_STAGE_LABELS = {
     applying_safety_constraints: '应用安全约束'
 };
 
+const PLAN_PHASES = [
+    { key: 'context', label: '收集上下文' },
+    { key: 'model', label: '模型规划' },
+    { key: 'contract', label: '契约校验' },
+    { key: 'safety', label: '安全约束' }
+];
+
+const PLAN_PENDING_STATUS = 'waiting';
+
 const AI_DISPLAY_TEXT_MAP = {
     'Accept recommended defaults, then start Build.': '可接受推荐默认值，然后开始构建。',
     'Accept recommended defaults or answer questions, then start Build.': '可接受推荐默认值或回答关键问题，然后开始构建。',
@@ -266,6 +275,11 @@ const AI_PARAMETER_LABELS = {
 export const aiPanelAgentWorkspaceMixin = {
     _resetAgentWorkspace({ preservePlan = false } = {}) {
         this.activePlanRequestId = null;
+        this.activePlanRunId = null;
+        this.activePlanRunRequestId = null;
+        this.activePlanRunEvents = [];
+        this.activePlanRunEventKeys = new Set();
+        this.activePlanRunCompletion = null;
         if (!preservePlan) {
             this.pendingVisionPlan = null;
             this.planQuestionSelections = {};
@@ -304,13 +318,20 @@ export const aiPanelAgentWorkspaceMixin = {
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
         this.pendingVisionPlan = null;
         this.planQuestionSelections = {};
+        this.activePlanRunId = null;
+        this.activePlanRunRequestId = null;
+        this.activePlanRunEvents = [];
+        this.activePlanRunEventKeys = new Set();
+        this.activePlanRunCompletion = null;
         const planRequestId = this._createPlanRequestId();
         this.activePlanRequestId = planRequestId;
 
+        this._closeAgentRunEventSource?.();
+        this._setGeneratingState?.(true);
         this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
         this._addMessage('user', userMessage || normalizedDescription);
         const turn = this._startAssistantTurn({
-            activate: false,
+            activate: true,
             statusText: '规划中',
             statusTone: 'warning',
             openReply: true
@@ -318,10 +339,10 @@ export const aiPanelAgentWorkspaceMixin = {
         this._setAssistantSectionText(
             turn,
             'reply',
-            '规划模式正在收集公开工程上下文，并请求后端智能体生成结构化视觉工程计划。'
+            '规划中。公开进度会实时更新在下方时间线。'
         );
 
-        this._setResultStatusNote('规划模式正在等待后端智能体输出。', 'info');
+        this._setResultStatusNote('正在收集工程上下文。', 'info');
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun();
@@ -337,7 +358,11 @@ export const aiPanelAgentWorkspaceMixin = {
             attachmentPaths,
             templateSelection
         });
-        this._requestBackendVisionPlan(planRequest)
+        this._requestBackendVisionPlanLive(planRequest, {
+            planRequestId,
+            turn,
+            fallbackDescription: normalizedDescription
+        })
             .then(result => {
                 if (!this._isActivePlanRequest(planRequestId)) return;
                 this.pendingVisionPlan = this._normalizeBackendPlanResult(result, normalizedDescription);
@@ -345,22 +370,28 @@ export const aiPanelAgentWorkspaceMixin = {
                     this.pendingVisionPlan.questions.map(question => [question.id, question.defaultValue])
                 );
                 this._clearActivePlanRequest(planRequestId);
-                const sourceLabel = this.pendingVisionPlan.planSource === 'rule_fallback'
-                    ? `规划已生成（规则兜底：${this.pendingVisionPlan.fallbackReason || '已使用规则兜底方案'}）`
-                    : '规划已生成（模型规划）';
+                this._setGeneratingState?.(false);
+                const timeoutFallback = this._isPlannerTimeoutFallback(this.pendingVisionPlan);
+                const fallbackUsed = this.pendingVisionPlan.planSource === 'rule_fallback';
                 this._setAssistantTurnStatus(turn, '规划完成', 'success');
                 this._setAssistantSectionText(
                     turn,
                     'reply',
-                    `${sourceLabel}。可以接受推荐默认值，也可以调整选项后再开始构建。`
+                    timeoutFallback
+                        ? '模型规划超时，已使用规则兜底方案。可先按兜底方案构建，或稍后重试深度规划。'
+                        : fallbackUsed
+                            ? '规划已完成，已使用规则兜底方案。可以接受推荐默认值或调整选项后开始构建。'
+                            : '规划已完成，可以接受推荐默认值或调整选项后开始构建。'
                 );
                 this._setResultStatusNote('规划模式等待确认，确认后进入构建模式。', 'info');
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(this.pendingVisionPlan);
+                this.activeAssistantTurn = null;
             })
             .catch(error => {
                 if (!this._isActivePlanRequest(planRequestId)) return;
                 this._clearActivePlanRequest(planRequestId);
+                this._setGeneratingState?.(false);
                 this.pendingVisionPlan = null;
                 this._setAssistantTurnStatus(turn, '规划失败', 'failed');
                 this._setAssistantSectionText(
@@ -371,6 +402,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._setResultStatusNote('规划模式失败，请检查后端连接后重试。', 'warning');
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(null);
+                this.activeAssistantTurn = null;
             });
 
         return true;
@@ -476,6 +508,398 @@ export const aiPanelAgentWorkspaceMixin = {
         return await httpClient.post('/ai/agent-plan', request);
     },
 
+    _shouldUsePlanRunEventStream() {
+        return typeof window !== 'undefined' && typeof fetch === 'function';
+    },
+
+    async _requestBackendVisionPlanLive(request, { planRequestId, turn, fallbackDescription = '' } = {}) {
+        if (!this._shouldUsePlanRunEventStream()) {
+            this._setAssistantTurnStatus(turn, '普通规划请求', 'warning');
+            this._setAssistantSectionText(
+                turn,
+                'reply',
+                '事件流不可用，已切换为普通规划请求。'
+            );
+            this._setResultStatusNote('事件流不可用，已切换为普通规划请求。', 'warning');
+            return await this._requestBackendVisionPlan(request);
+        }
+
+        try {
+            return await this._requestBackendVisionPlanRun(request, {
+                planRequestId,
+                turn,
+                fallbackDescription
+            });
+        } catch (error) {
+            if (!this._isActivePlanRequest(planRequestId)) {
+                throw error;
+            }
+
+            if (this.activePlanRunId || this.activePlanRunCompletion) {
+                throw error;
+            }
+
+            this._closeAgentRunEventSource?.();
+            this.activePlanRunId = null;
+            this.activePlanRunRequestId = null;
+            this.activePlanRunEvents = [];
+            this.activePlanRunEventKeys = new Set();
+            this.activePlanRunCompletion = null;
+            this._setAssistantTurnStatus(turn, '普通规划请求', 'warning');
+            this._setAssistantSectionText(
+                turn,
+                'reply',
+                '事件流不可用，已切换为普通规划请求。'
+            );
+            this._setResultStatusNote('事件流不可用，已切换为普通规划请求。', 'warning');
+            return await this._requestBackendVisionPlan(request);
+        }
+    },
+
+    async _requestBackendVisionPlanRun(request, { planRequestId, turn, fallbackDescription = '' } = {}) {
+        const createResult = await httpClient.post('/ai/agent-plan-runs', request);
+        const runId = String(createResult?.runId || createResult?.RunId || '').trim();
+        if (!runId) {
+            throw new Error('Plan Run 创建接口没有返回 runId。');
+        }
+
+        if (!this._isActivePlanRequest(planRequestId)) {
+            throw new Error('Plan Run 已过期。');
+        }
+
+        this.activePlanRunId = runId;
+        this.activePlanRunRequestId = planRequestId;
+        this.activePlanRunEvents = [];
+        this.activePlanRunEventKeys = new Set();
+        this.activeAssistantTurn = turn;
+        this._setAssistantTurnStatus(turn, '规划中', 'streaming');
+
+        const completion = new Promise((resolve, reject) => {
+            this.activePlanRunCompletion = {
+                runId,
+                planRequestId,
+                fallbackDescription,
+                resolve,
+                reject
+            };
+        });
+
+        const initialEvents = createResult?.events || createResult?.Events || [];
+        initialEvents.forEach(evt => this._handleAgentRunEvent(evt));
+        this._renderPlanRunTimeline(turn);
+
+        const lastSequence = this._getPlanRunLastSequence();
+        this._startAgentRunEventSource?.(runId, { lastSequence });
+        return await completion;
+    },
+
+    _isActivePlanRunEvent(evt) {
+        const runId = String(evt?.runId || '').trim();
+        return Boolean(this.activePlanRunId) && runId === this.activePlanRunId;
+    },
+
+    _getPlanRunLastSequence() {
+        return (Array.isArray(this.activePlanRunEvents) ? this.activePlanRunEvents : [])
+            .reduce((max, evt) => Math.max(max, Number(evt?.sequence || 0)), 0);
+    },
+
+    _handlePlanRunEvent(evt) {
+        if (!evt || !this._isActivePlanRunEvent(evt)) return;
+        if (this.activePlanRunRequestId && !this._isActivePlanRequest(this.activePlanRunRequestId)) {
+            return;
+        }
+
+        this.activePlanRunEventKeys = this.activePlanRunEventKeys instanceof Set
+            ? this.activePlanRunEventKeys
+            : new Set();
+        const key = `${evt.runId}:${evt.sequence}:${evt.eventType}`;
+        if (this.activePlanRunEventKeys.has(key)) {
+            return;
+        }
+
+        this.activePlanRunEventKeys.add(key);
+        this.activePlanRunEvents = Array.isArray(this.activePlanRunEvents)
+            ? this.activePlanRunEvents
+            : [];
+        this.activePlanRunEvents.push(evt);
+
+        if (evt.eventType === 'assistant.brief') {
+            this._setAssistantTurnStatus(this.activeAssistantTurn, '规划中', 'streaming');
+        } else {
+            this._renderPlanRunTimeline(this.activeAssistantTurn);
+        }
+
+        this._renderAgentWorkspaceOverview();
+        this._renderPlanWorkspace(this.pendingVisionPlan);
+
+        if (evt.eventType === 'plan.completed') {
+            this._resolveActivePlanRun(evt);
+            return;
+        }
+
+        if (evt.eventType === 'run.completed') {
+            this._resolveActivePlanRun(evt);
+            return;
+        }
+
+        if (evt.eventType === 'plan.cancelled' || evt.eventType === 'run.cancelled') {
+            this._rejectActivePlanRun(new Error('规划已取消。'), { cancelled: true });
+            return;
+        }
+
+        if (evt.eventType === 'plan.failed' || evt.eventType === 'run.failed') {
+            this._rejectActivePlanRun(new Error(evt.summary || '规划失败。'));
+        }
+    },
+
+    _resolveActivePlanRun(evt) {
+        const completion = this.activePlanRunCompletion;
+        if (!completion || completion.runId !== evt.runId) return;
+        const payload = this._asObject?.(evt.payload) || evt.payload || {};
+        const result = payload.planResult ||
+            payload.PlanResult ||
+            payload.planModeResult ||
+            payload.PlanModeResult ||
+            payload.result ||
+            payload.Result ||
+            null;
+        if (!result) {
+            if (evt.eventType === 'run.completed') {
+                this._rejectActivePlanRun(new Error('Plan Run 完成事件缺少 PlanModeResult。'));
+            }
+            return;
+        }
+
+        this._closeAgentRunEventSource?.();
+        this.activePlanRunCompletion = null;
+        completion.resolve(result);
+    },
+
+    _rejectActivePlanRun(error, { cancelled = false } = {}) {
+        const completion = this.activePlanRunCompletion;
+        this._closeAgentRunEventSource?.();
+        this.activePlanRunCompletion = null;
+        this._setGeneratingState?.(false);
+        if (cancelled) {
+            this._clearActivePlanRequest(this.activePlanRunRequestId);
+            this._setWorkbenchState(AiWorkbenchStates.CANCELLED);
+            this._setAssistantTurnStatus(this.activeAssistantTurn, '已取消', 'cancelled');
+            this._setAssistantSectionText(this.activeAssistantTurn, 'reply', '规划已取消。');
+        }
+
+        completion?.reject(error);
+    },
+
+    _renderPlanRunTimeline(turn = this.activeAssistantTurn) {
+        if (!turn?.processSection || !turn?.processBody) return;
+
+        const progress = this._getPlanRunProgressState();
+        turn.processSection.hidden = false;
+        PLAN_PHASES.forEach(phase => {
+            const item = progress.phases[phase.key] || {
+                label: phase.label,
+                status: PLAN_PENDING_STATUS,
+                summary: ''
+            };
+            const statusLabel = this._formatPlanTimelineStatus(item.status);
+            const summary = item.summary ? `\n${item.summary}` : '';
+            const node = this._updateThinkingStep(
+                this.activePlanRunId || 'plan-run',
+                `plan:${phase.key}`,
+                `${item.label}：${statusLabel}${summary}`
+            );
+            if (!node) return;
+            node.className = `ai-agent-run-step is-${this._getPlanTimelineTone(item.status)}`;
+            node.dataset.stage = `plan:${phase.key}`;
+            node.dataset.eventType = item.eventType || '';
+            node.title = item.eventType || item.stage || '';
+        });
+
+        if (progress.currentLabel) {
+            this._setResultStatusNote(progress.currentLabel, progress.warning ? 'warning' : 'info');
+        }
+    },
+
+    _getPlanRunProgressState() {
+        const phases = Object.fromEntries(PLAN_PHASES.map(phase => [
+            phase.key,
+            {
+                label: phase.label,
+                status: PLAN_PENDING_STATUS,
+                summary: '',
+                eventType: ''
+            }
+        ]));
+        const events = Array.isArray(this.activePlanRunEvents) ? this.activePlanRunEvents : [];
+        let currentLabel = this.activePlanRunId ? '正在收集工程上下文。' : '';
+        let warning = false;
+
+        events
+            .slice()
+            .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0))
+            .forEach(evt => {
+                const update = this._mapPlanEventToProgress(evt);
+                if (!update) return;
+                phases[update.key] = {
+                    ...phases[update.key],
+                    ...update
+                };
+                currentLabel = update.summary || `${update.label}：${this._formatPlanTimelineStatus(update.status)}`;
+                warning = update.status === 'failed' || update.status === 'timeout';
+            });
+
+        return {
+            phases,
+            currentLabel,
+            warning,
+            eventCount: events.length
+        };
+    },
+
+    _mapPlanEventToProgress(evt) {
+        const eventType = String(evt?.eventType || '').trim();
+        const stage = String(evt?.stage || '').trim();
+        const summary = this._formatPlanEventSummary(evt);
+        const base = {
+            stage,
+            eventType,
+            summary
+        };
+
+        if (eventType === 'plan.context.started') {
+            return { ...base, key: 'context', label: '收集上下文', status: 'running' };
+        }
+        if (eventType === 'plan.context.completed') {
+            return { ...base, key: 'context', label: '收集上下文', status: 'completed' };
+        }
+        if (eventType === 'plan.model.started') {
+            return { ...base, key: 'model', label: '模型规划', status: 'running' };
+        }
+        if (eventType === 'plan.model.completed') {
+            return { ...base, key: 'model', label: '模型规划', status: 'completed' };
+        }
+        if (eventType === 'plan.model.timeout') {
+            return { ...base, key: 'model', label: '模型规划', status: 'timeout', summary: '模型规划超时，已使用规则兜底方案。' };
+        }
+        if (eventType === 'plan.model.failed') {
+            return { ...base, key: 'model', label: '模型规划', status: 'failed', summary: summary || '模型规划失败，已使用规则兜底方案。' };
+        }
+        if (eventType === 'plan.contract.started') {
+            return { ...base, key: 'contract', label: '契约校验', status: 'running' };
+        }
+        if (eventType === 'plan.contract.completed') {
+            return { ...base, key: 'contract', label: '契约校验', status: 'completed' };
+        }
+        if (eventType === 'plan.safety.completed') {
+            return { ...base, key: 'safety', label: '安全约束', status: 'completed' };
+        }
+        if (eventType === 'plan.fallback.used') {
+            return { ...base, key: 'model', label: '规则兜底', status: 'completed', summary: summary || '已使用规则兜底方案。' };
+        }
+        if (eventType === 'plan.completed' || eventType === 'run.completed') {
+            return { ...base, key: 'safety', label: '安全约束', status: 'completed', summary: '规划已就绪。' };
+        }
+        if (eventType === 'plan.cancelled' || eventType === 'run.cancelled') {
+            return { ...base, key: 'model', label: '规划', status: 'cancelled', summary: '规划已取消。' };
+        }
+        if (eventType === 'plan.failed' || eventType === 'run.failed') {
+            return { ...base, key: 'model', label: '规划', status: 'failed', summary: summary || '规划失败。' };
+        }
+
+        return null;
+    },
+
+    _formatPlanEventSummary(evt) {
+        const eventType = String(evt?.eventType || '').trim();
+        const summary = String(evt?.summary || '').trim();
+        const title = String(evt?.title || '').trim();
+        const normalized = summary || title;
+        if (!normalized) {
+            return '';
+        }
+
+        if (eventType === 'plan.context.completed') {
+            return '已收集公开需求、流程、模板、附件、算子和工站边界。';
+        }
+        if (eventType === 'plan.model.started') {
+            return '模型规划中。';
+        }
+        if (eventType === 'plan.contract.started') {
+            return '正在校验规划契约。';
+        }
+        if (eventType === 'plan.contract.completed') {
+            return '规划契约已校验。';
+        }
+        if (eventType === 'plan.safety.completed') {
+            return '已应用安全约束。';
+        }
+        if (eventType === 'plan.fallback.used') {
+            return '已使用规则兜底方案。';
+        }
+
+        return this._localizeDisplayText(normalized);
+    },
+
+    _formatPlanTimelineStatus(status) {
+        switch (String(status || '').trim().toLowerCase()) {
+            case 'running':
+                return '进行中';
+            case 'completed':
+                return '完成';
+            case 'timeout':
+                return '超时';
+            case 'failed':
+                return '失败';
+            case 'cancelled':
+            case 'canceled':
+                return '已取消';
+            case PLAN_PENDING_STATUS:
+            case 'pending':
+                return '等待中';
+            default:
+                return this._formatBuildStatus(status);
+        }
+    },
+
+    _getPlanTimelineTone(status) {
+        switch (String(status || '').trim().toLowerCase()) {
+            case 'completed':
+                return 'success';
+            case 'timeout':
+            case 'failed':
+                return 'warning';
+            case 'cancelled':
+            case 'canceled':
+                return 'cancelled';
+            case 'running':
+                return 'running';
+            default:
+                return 'warning';
+        }
+    },
+
+    _isPlannerTimeoutFallback(plan) {
+        return String(plan?.fallbackReason || '').includes('超时') ||
+            String(plan?.fallbackReason || '').toLowerCase() === 'planner_timeout';
+    },
+
+    _cancelActivePlanRun() {
+        const runId = String(this.activePlanRunId || '').trim();
+        if (!runId) {
+            return Promise.resolve(false);
+        }
+
+        return httpClient
+            .post(`/ai/agent-runs/${encodeURIComponent(runId)}/cancel`)
+            .then(() => true)
+            .catch(error => {
+                this.isCancellingGenerate = false;
+                this._setGeneratingState?.(this.isGenerating);
+                this._addMessage('system', `取消规划未生效：${error?.message || '未知错误'}`);
+                return false;
+            });
+    },
+
     _normalizeBackendPlanResult(result, fallbackDescription = '') {
         const plan = this._asObject?.(result) || result || {};
         const route = plan.recommendedRoute || plan.RecommendedRoute || {};
@@ -549,7 +973,8 @@ export const aiPanelAgentWorkspaceMixin = {
             stage: item.stage || item.Stage || '',
             status: item.status || item.Status || '',
             title: item.title || item.Title || '',
-            summary: item.summary || item.Summary || ''
+            summary: item.summary || item.Summary || '',
+            metadata: item.metadata || item.Metadata || {}
         };
     },
 
@@ -742,20 +1167,22 @@ export const aiPanelAgentWorkspaceMixin = {
         const phase = this._getAgentWorkspacePhase();
         const activeEvents = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
         const planEvents = Array.isArray(plan?.publicEvents) ? plan.publicEvents : [];
+        const planRunEvents = Array.isArray(this.activePlanRunEvents) ? this.activePlanRunEvents : [];
+        const planProgress = this._getPlanRunProgressState?.() || { currentLabel: '', eventCount: 0 };
         const terminal = activeEvents.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
         const lastEvent = activeEvents[activeEvents.length - 1];
         const blockerCount = this._countBuildBlockers(activeEvents);
         const goal = plan?.goal || this.lastUserPrompt || '描述视觉检测目标后开始规划。';
-        const confidence = this._formatWorkspaceValue(plan?.confidence || (activeEvents.length ? '事件驱动' : '未设置'));
+        const confidence = this._formatWorkspaceValue(plan?.confidence || (activeEvents.length || planRunEvents.length ? '事件驱动' : '未设置'));
         const nextAction = terminal
             ? (terminal.eventType === 'run.completed' ? '复核流程草稿，可应用到画布继续编辑。' : '查看首要修复建议后重试构建。')
             : this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
                 ? (lastEvent?.summary || '等待下一条后端公开事件。')
-                : (plan?.nextAction || '规划模式只提出高价值工程问题。');
+                : (plan?.nextAction || planProgress.currentLabel || '规划模式只提出高价值工程问题。');
         const executable = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
             ? activeEvents.length > 0
             : Boolean(plan?.executable);
-        const source = this._formatWorkspaceValue(plan?.planSource || (activeEvents.length ? '构建事件' : '未设置'));
+        const source = this._formatWorkspaceValue(plan?.planSource || (activeEvents.length ? '构建事件' : (planRunEvents.length ? '事件驱动' : '未设置')));
 
         el.innerHTML = `
             <section class="ai-agent-overview-card is-${this._escapeHtml(phase)}">
@@ -769,7 +1196,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <span><small>置信度</small><b>${this._escapeHtml(confidence)}</b></span>
                     <span><small>来源</small><b>${this._escapeHtml(source)}</b></span>
                     <span><small>阻断项</small><b>${this._escapeHtml(String(blockerCount))}</b></span>
-                    <span><small>事件数</small><b>${this._escapeHtml(String(activeEvents.length || planEvents.length))}</b></span>
+                    <span><small>事件数</small><b>${this._escapeHtml(String(activeEvents.length || planRunEvents.length || planEvents.length))}</b></span>
                 </div>
                 <div class="ai-agent-stage-strip" aria-label="Vision Agent 阶段">
                     ${['plan', 'build', 'applied'].map(key => `
@@ -854,10 +1281,27 @@ export const aiPanelAgentWorkspaceMixin = {
 
         el.hidden = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD;
         if (!plan) {
+            const progress = this._getPlanRunProgressState?.();
+            const liveStatus = progress?.eventCount > 0
+                ? `
+                    <div class="ai-build-compact">
+                        ${PLAN_PHASES.map(phase => {
+                            const item = progress.phases[phase.key];
+                            return `
+                                <div class="ai-build-compact-row">
+                                    <b>${this._escapeHtml(item.label)}</b>
+                                    <span>${this._escapeHtml(this._formatPlanTimelineStatus(item.status))}</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `
+                : '';
             el.innerHTML = `
                 <div class="ai-plan-empty">
                     <div class="ai-plan-empty-title">规划模式</div>
-                    <div class="ai-plan-empty-copy">正在收集工程上下文。请输入检测目标，智能体会先形成视觉工程计划，再进入构建。</div>
+                    <div class="ai-plan-empty-copy">${this._escapeHtml(progress?.currentLabel || '正在收集工程上下文。请输入检测目标，智能体会先形成视觉工程计划，再进入构建。')}</div>
+                    ${liveStatus}
                     <div class="ai-plan-empty-copy">资源补齐会在开始构建后出现；Plan 阶段只显示目标、关键问题、推荐默认值和规划诊断。</div>
                 </div>
             `;
@@ -879,7 +1323,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
             </section>
             <section class="ai-workspace-section">
-                <div class="ai-workspace-section-title">规划诊断</div>
+                <details class="ai-plan-diagnostics">
+                <summary class="ai-workspace-section-title">规划诊断</summary>
                 <div class="ai-build-compact">
                     <div class="ai-build-compact-row">
                         <b>${this._escapeHtml(this._formatPlanSource(plan.planSource))}</b>
@@ -893,6 +1338,7 @@ export const aiPanelAgentWorkspaceMixin = {
                         return `<div><b>${this._escapeHtml(event.stageLabel)}</b> ${this._escapeHtml(event.statusLabel)} - ${this._escapeHtml(event.summary)}</div>`;
                     }).join('')}</div>` : ''}
                 </div>
+                </details>
             </section>
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">关键问题</div>

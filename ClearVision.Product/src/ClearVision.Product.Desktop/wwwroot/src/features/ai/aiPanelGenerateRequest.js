@@ -554,9 +554,20 @@ export const aiPanelGenerateRequestMixin = {
 
         const requestId = this.activeGenerateRequestId;
         const sessionId = this.activeGenerateSessionId || this.sessionId;
-        if (!requestId && !this.activeAgentRunId) return;
+        if (!requestId && !this.activeAgentRunId && !this.activePlanRunId) return;
 
         this.isCancellingGenerate = true;
+
+        if (this.activePlanRunId && this._cancelActivePlanRun) {
+            this._cancelActivePlanRun();
+            this._updateProgress({
+                message: '正在取消规划...',
+                phase: 'cancelling'
+            });
+            this._addMessage('system', '已发送 Plan Run 取消请求，正在等待事件流确认。');
+            this._setGeneratingState(this.isGenerating);
+            return;
+        }
 
         if (this.activeAgentRunId && this._cancelActiveAgentRun) {
             this._cancelActiveAgentRun();

@@ -6,6 +6,21 @@ public static class AgentRunEventTypes
 {
     public const string RunStarted = "run.started";
     public const string AssistantBrief = "assistant.brief";
+    public const string PlanCreated = "plan.created";
+    public const string PlanStarted = "plan.started";
+    public const string PlanContextStarted = "plan.context.started";
+    public const string PlanContextCompleted = "plan.context.completed";
+    public const string PlanModelStarted = "plan.model.started";
+    public const string PlanModelCompleted = "plan.model.completed";
+    public const string PlanModelTimeout = "plan.model.timeout";
+    public const string PlanModelFailed = "plan.model.failed";
+    public const string PlanContractStarted = "plan.contract.started";
+    public const string PlanContractCompleted = "plan.contract.completed";
+    public const string PlanSafetyCompleted = "plan.safety.completed";
+    public const string PlanFallbackUsed = "plan.fallback.used";
+    public const string PlanCompleted = "plan.completed";
+    public const string PlanFailed = "plan.failed";
+    public const string PlanCancelled = "plan.cancelled";
     public const string StageStarted = "stage.started";
     public const string StageCompleted = "stage.completed";
     public const string ToolCallStarted = "tool.call.started";

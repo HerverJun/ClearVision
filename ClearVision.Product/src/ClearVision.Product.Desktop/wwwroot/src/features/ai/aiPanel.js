@@ -54,6 +54,11 @@ export class AiPanel {
         this.nextTemplateSelection = null;
         this.activeGenerateRequestId = null;
         this.activePlanRequestId = null;
+        this.activePlanRunId = null;
+        this.activePlanRunRequestId = null;
+        this.activePlanRunEvents = [];
+        this.activePlanRunEventKeys = new Set();
+        this.activePlanRunCompletion = null;
         this.activeGenerateSessionId = null;
         this.isCancellingGenerate = false;
         this.attachments = [];
@@ -181,6 +186,11 @@ export class AiPanel {
         this.nextTemplateSelection = null;
         this.activeGenerateRequestId = null;
         this.activePlanRequestId = null;
+        this.activePlanRunId = null;
+        this.activePlanRunRequestId = null;
+        this.activePlanRunEvents = [];
+        this.activePlanRunEventKeys = new Set();
+        this.activePlanRunCompletion = null;
         this.activeGenerateSessionId = null;
         this.isCancellingGenerate = false;
         this._resetAgentRunState();

@@ -2,6 +2,23 @@ import httpClient from '../../core/messaging/httpClient.js';
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 
 const TERMINAL_EVENT_TYPES = new Set(['run.completed', 'run.failed', 'run.cancelled']);
+const PLAN_EVENT_TYPES = new Set([
+    'plan.created',
+    'plan.started',
+    'plan.context.started',
+    'plan.context.completed',
+    'plan.model.started',
+    'plan.model.completed',
+    'plan.model.timeout',
+    'plan.model.failed',
+    'plan.contract.started',
+    'plan.contract.completed',
+    'plan.safety.completed',
+    'plan.fallback.used',
+    'plan.completed',
+    'plan.failed',
+    'plan.cancelled'
+]);
 const TOOL_EVENT_TYPES = new Set(['tool.call.started', 'tool.call.completed', 'tool.call.failed']);
 const ARTIFACT_EVENT_TYPES = new Set([
     'artifact.created',
@@ -52,7 +69,8 @@ const AGENT_RUN_EVENT_TYPES = [
     'artifact.created',
     'run.completed',
     'run.failed',
-    'run.cancelled'
+    'run.cancelled',
+    ...PLAN_EVENT_TYPES
 ];
 
 const AGENT_RUN_FIRST_EVENT_TIMEOUT_MS = 10000;
@@ -547,7 +565,16 @@ export const aiPanelAgentRunMixin = {
 
     _handleAgentRunEvent(rawEvent = {}) {
         const evt = this._normalizeAgentRunEvent(rawEvent);
-        if (!evt || (this.activeAgentRunId && evt.runId !== this.activeAgentRunId)) {
+        if (!evt) {
+            return;
+        }
+
+        if (this._isActivePlanRunEvent?.(evt)) {
+            this._handlePlanRunEvent?.(evt);
+            return;
+        }
+
+        if (this.activeAgentRunId && evt.runId !== this.activeAgentRunId) {
             return;
         }
 
@@ -600,7 +627,9 @@ export const aiPanelAgentRunMixin = {
 
     _isAgentRunTerminalSeen(runId = this.activeAgentRunId) {
         const expectedRunId = String(runId || '').trim();
-        return (Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [])
+        const buildEvents = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
+        const planEvents = Array.isArray(this.activePlanRunEvents) ? this.activePlanRunEvents : [];
+        return [...buildEvents, ...planEvents]
             .some(evt =>
                 (!expectedRunId || evt.runId === expectedRunId) &&
                 TERMINAL_EVENT_TYPES.has(evt.eventType));
@@ -614,7 +643,7 @@ export const aiPanelAgentRunMixin = {
 
         const summary = String(detail || '').trim();
         this._appendAgentRunProcessLine({
-            runId: this.activeAgentRunId || 'agent-run',
+            runId: this.activeAgentRunId || this.activePlanRunId || 'agent-run',
             sequence: `transport-${Date.now()}`,
             stage: 'run',
             status: tone === 'warning' ? 'blocked' : 'running',

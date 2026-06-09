@@ -11,6 +11,10 @@ public sealed class AgentRunEventRedactor
         "(api[-_ ]?key|x-api-key|authorization|bearer|password|secret|token|credential|authheader)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    private static readonly Regex PrivatePlanningKeyRegex = new(
+        "^(rawprompt|systemprompt|chainofthought|chain_of_thought|reasoningcontent|reasoning_content|hiddenreasoning)$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly Regex PathKeyRegex = new(
         "(path|directory|folder|root|cvpkg|modelpath|templatepath|filepath|packagepath|packageroot|packagedirectory)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -20,7 +24,7 @@ public sealed class AgentRunEventRedactor
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex AuthorizationRegex = new(
-        @"(?i)\b(authorization|x-api-key|api[-_ ]?key|bearer)\b\s*[:=]\s*[""']?[^""'\s,;}]+",
+        @"(?i)\b(authorization|x-api-key|api[-_ ]?key|token|secret|bearer)\b\s*[:=]\s*[""']?[^""'\s,;}]+",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex BearerRegex = new(
@@ -29,6 +33,10 @@ public sealed class AgentRunEventRedactor
 
     private static readonly Regex SecretTokenRegex = new(
         @"(?i)\bsk-[a-z0-9_\-]{8,}\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex PrivatePlanningMarkerRegex = new(
+        @"(?i)\b(rawPrompt|systemPrompt|chainOfThought|chain_of_thought|reasoningContent|reasoning_content|hiddenReasoning)\b\s*[:=]\s*[^,;}\r\n]+",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex IPv4Regex = new(
@@ -69,7 +77,14 @@ public sealed class AgentRunEventRedactor
         "data:image/",
         ".cvpkg",
         "plc://",
-        "station://"
+        "station://",
+        "rawprompt",
+        "systemprompt",
+        "chainofthought",
+        "chain_of_thought",
+        "reasoningcontent",
+        "reasoning_content",
+        "hiddenreasoning"
     ];
 
     public object? RedactObject(object? value)
@@ -153,7 +168,7 @@ public sealed class AgentRunEventRedactor
             foreach (var property in obj)
             {
                 var name = property.Key;
-                if (SensitiveKeyRegex.IsMatch(name))
+                if (SensitiveKeyRegex.IsMatch(name) || PrivatePlanningKeyRegex.IsMatch(name))
                 {
                     copy[NextRedactedKey(copy, "redactedSecret")] = "[redacted:secret]";
                     continue;
@@ -210,7 +225,8 @@ public sealed class AgentRunEventRedactor
 
     private static string RedactString(string text, string? propertyName)
     {
-        if (SensitiveKeyRegex.IsMatch(propertyName ?? string.Empty))
+        if (SensitiveKeyRegex.IsMatch(propertyName ?? string.Empty) ||
+            PrivatePlanningKeyRegex.IsMatch(propertyName ?? string.Empty))
         {
             return "[redacted:secret]";
         }
@@ -227,7 +243,8 @@ public sealed class AgentRunEventRedactor
         }
 
         var result = text;
-        result = AuthorizationRegex.Replace(result, "$1: [redacted:secret]");
+        result = PrivatePlanningMarkerRegex.Replace(result, "[redacted:private-planning]");
+        result = AuthorizationRegex.Replace(result, "[redacted:secret]");
         result = BearerRegex.Replace(result, "Bearer [redacted:secret]");
         result = SecretTokenRegex.Replace(result, "[redacted:secret]");
         result = DataImageRegex.Replace(result, "[redacted:image-bytes]");

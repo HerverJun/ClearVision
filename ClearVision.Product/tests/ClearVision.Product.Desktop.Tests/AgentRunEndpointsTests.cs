@@ -121,6 +121,195 @@ public sealed class AgentRunEndpointsTests
             .And.NotContain("defect_definition");
     }
 
+    [Fact(DisplayName = "POST Agent plan run streams public Plan events before completed")]
+    public async Task CreatePlanRun_ShouldStreamPublicEventsBeforeCompleted()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, ct) =>
+        {
+            await gate.Task.WaitAsync(ct);
+            return baseline with
+            {
+                PlanSource = "planner",
+                FallbackReason = string.Empty,
+                PublicEvents =
+                [
+                    PlanEvent("planning_with_model", "completed", "模型规划完成", "模型已返回公开结构化规划候选。"),
+                    PlanEvent("validating_plan_contract", "completed", "规划契约已校验", "规划已归一到公开 PlanModeResult 契约。"),
+                    PlanEvent("applying_safety_constraints", "completed", "安全约束已应用", "已应用安全约束。")
+                ],
+                MetadataOnly = true
+            };
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new
+        {
+            description = "stream plan progress",
+            originalUserPrompt = "stream plan progress",
+            currentFlowSnapshot = "{\"operators\":[]}",
+            attachmentSummary = new
+            {
+                count = 1,
+                resourceKinds = new[] { "sample_image_metadata" },
+                pathsRedacted = true
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = createDoc.RootElement.GetProperty("runId").GetString()!;
+
+        await host.WaitForEventAsync(runId, AgentRunEventTypes.PlanModelStarted);
+        var beforeCompleted = host.StreamService.Replay(runId)!;
+        beforeCompleted.Events.Select(evt => evt.EventType).Should().Contain(new[]
+        {
+            AgentRunEventTypes.PlanContextStarted,
+            AgentRunEventTypes.PlanContextCompleted,
+            AgentRunEventTypes.PlanModelStarted
+        });
+        beforeCompleted.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+
+        gate.SetResult();
+        await host.WaitForTerminalAsync(runId);
+        var replay = host.StreamService.Replay(runId)!;
+
+        replay.Events.Select(evt => evt.EventType).Should().Contain(new[]
+        {
+            AgentRunEventTypes.PlanModelCompleted,
+            AgentRunEventTypes.PlanContractCompleted,
+            AgentRunEventTypes.PlanSafetyCompleted,
+            AgentRunEventTypes.PlanCompleted,
+            AgentRunEventTypes.RunCompleted
+        });
+        var completed = replay.Events.Single(evt => evt.EventType == AgentRunEventTypes.PlanCompleted);
+        using var completedDoc = JsonDocument.Parse(JsonSerializer.Serialize(completed, AgentRunEventJson.Options));
+        completedDoc.RootElement.GetProperty("payload").GetProperty("planResult").GetProperty("planSource").GetString()
+            .Should().Be("planner");
+        completedDoc.RootElement.GetProperty("payload").GetProperty("planResult").GetProperty("planHash").GetString()
+            .Should().StartWith("sha256:");
+    }
+
+    [Fact(DisplayName = "Plan run timeout emits timeout and fallback before completed PlanResult")]
+    public async Task CreatePlanRun_ShouldEmitTimeoutFallbackBeforeCompleted()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
+        {
+            var fallback = baseline with
+            {
+                PlanSource = "rule_fallback",
+                FallbackReason = "planner_timeout",
+                PublicEvents =
+                [
+                    PlanEvent("planning_with_model", "failed", "模型规划超时", "模型规划超时，已使用规则兜底方案。",
+                        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["fallbackReason"] = "planner_timeout"
+                        }),
+                    PlanEvent("rule_fallback_used", "completed", "已使用规则兜底方案", "模型规划超时，已使用规则兜底方案。",
+                        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["fallbackReason"] = "planner_timeout"
+                        })
+                ],
+                MetadataOnly = true
+            };
+            return Task.FromResult(fallback with
+            {
+                PlanHash = VisionAgentOrchestrator.ComputePlanHash(fallback)
+            });
+        });
+
+        var runId = await host.CreatePlanRunAsync("timeout plan");
+        await host.WaitForTerminalAsync(runId);
+        var replay = host.StreamService.Replay(runId)!;
+        var eventTypes = replay.Events.Select(evt => evt.EventType).ToList();
+
+        eventTypes.Should().Contain(AgentRunEventTypes.PlanModelTimeout);
+        eventTypes.Should().Contain(AgentRunEventTypes.PlanFallbackUsed);
+        eventTypes.Should().Contain(AgentRunEventTypes.PlanCompleted);
+        eventTypes.IndexOf(AgentRunEventTypes.PlanModelTimeout)
+            .Should().BeLessThan(eventTypes.IndexOf(AgentRunEventTypes.PlanFallbackUsed));
+        eventTypes.IndexOf(AgentRunEventTypes.PlanFallbackUsed)
+            .Should().BeLessThan(eventTypes.IndexOf(AgentRunEventTypes.RunCompleted));
+
+        var completed = replay.Events.Single(evt => evt.EventType == AgentRunEventTypes.PlanCompleted);
+        var completedJson = JsonSerializer.Serialize(completed, AgentRunEventJson.Options);
+        completedJson.Should().Contain("\"planSource\":\"rule_fallback\"");
+        completedJson.Should().Contain("\"fallbackReason\":\"planner_timeout\"");
+    }
+
+    [Fact(DisplayName = "Plan run cancel closes stream without completed result")]
+    public async Task CreatePlanRunCancel_ShouldNotPublishCompleted()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, ct) =>
+        {
+            await gate.Task.WaitAsync(ct);
+            return baseline with { PlanSource = "planner" };
+        });
+        var runId = await host.CreatePlanRunAsync("cancel plan");
+        await host.WaitForEventAsync(runId, AgentRunEventTypes.PlanModelStarted);
+
+        using var cancel = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+        cancel.StatusCode.Should().Be(HttpStatusCode.OK);
+        gate.TrySetResult();
+        await host.WaitForTerminalAsync(runId);
+
+        var replay = host.StreamService.Replay(runId)!;
+        replay.Events.Select(evt => evt.EventType).Should().Contain(AgentRunEventTypes.PlanCancelled);
+        replay.Events.Should().Contain(evt => evt.EventType == AgentRunEventTypes.RunCancelled);
+        replay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.PlanCompleted);
+        replay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+    }
+
+    [Fact(DisplayName = "Plan run replay carries redacted PlanResult without private reasoning or raw prompts")]
+    public async Task CreatePlanRunReplay_ShouldRedactPrivatePlanPayload()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
+        {
+            var plan = baseline with
+            {
+                PlanSource = "planner",
+                OriginalUserPrompt = @"inspect C:\factory\secret.png token=abc123",
+                PlanWarnings =
+                [
+                    "rawPrompt=hidden prompt",
+                    "systemPrompt=hidden system",
+                    "reasoning_content: private trace",
+                    @"model path C:\factory\models\secret.onnx",
+                    "station 192.168.10.45 DB1.DBW0 data:image/png;base64,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                ],
+                PublicEvents =
+                [
+                    PlanEvent("planning_with_model", "completed", "模型规划完成", "模型已返回公开结构化规划候选。")
+                ],
+                MetadataOnly = true
+            };
+            return Task.FromResult(plan with
+            {
+                PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+            });
+        });
+
+        var runId = await host.CreatePlanRunAsync(@"inspect C:\factory\secret.png token=abc123");
+        await host.WaitForTerminalAsync(runId);
+
+        using var response = await host.Client.GetAsync($"/api/ai/agent-runs/{runId}");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var replayJson = await response.Content.ReadAsStringAsync();
+
+        replayJson.Should().Contain("\"planResult\"");
+        replayJson.Should().NotContain("rawPrompt");
+        replayJson.Should().NotContain("systemPrompt");
+        replayJson.Should().NotContain("chainOfThought");
+        replayJson.Should().NotContain("reasoning_content");
+        replayJson.Should().NotContain(@"C:\factory");
+        replayJson.Should().NotContain("192.168.10.45");
+        replayJson.Should().NotContain("DB1.DBW0");
+        replayJson.Should().NotContain("data:image/png;base64");
+        replayJson.Should().NotContain("abc123");
+    }
+
     [Fact(DisplayName = "AgentRun background GenerateFlow receives safe metadata-only request")]
     public async Task CreateRun_ShouldPassSafeGenerationRequest()
     {
@@ -707,7 +896,8 @@ public sealed class AgentRunEndpointsTests
         public static async Task<AgentRunEndpointTestHost> CreateAsync(
             Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>>? handler = null,
             bool useAuth = false,
-            Func<DateTimeOffset>? utcNowProvider = null)
+            Func<DateTimeOffset>? utcNowProvider = null,
+            Func<VisionAgentPlanModeRequest, VisionAgentPlanModeResult, CancellationToken, Task<VisionAgentPlanModeResult>>? planHandler = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -732,6 +922,10 @@ public sealed class AgentRunEndpointsTests
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);
             builder.Services.AddSingleton<IVisionAgentToolRegistry, EmptyVisionAgentToolRegistry>();
             builder.Services.AddScoped<IAgentRunEventSink, AgentRunEventSink>();
+            if (planHandler != null)
+            {
+                builder.Services.AddSingleton<IVisionAgentPlanPlannerService>(new FakeVisionAgentPlanPlannerService(planHandler));
+            }
             builder.Services.AddScoped<IVisionAgentOrchestrator, VisionAgentOrchestrator>();
             if (useAuth)
             {
@@ -776,6 +970,18 @@ public sealed class AgentRunEndpointsTests
             return document.RootElement.GetProperty("runId").GetString()!;
         }
 
+        public async Task<string> CreatePlanRunAsync(string description)
+        {
+            using var response = await Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new
+            {
+                description,
+                originalUserPrompt = description
+            });
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return document.RootElement.GetProperty("runId").GetString()!;
+        }
+
         public async Task<string> CreateStreamTokenAsync(string runId)
         {
             using var response = await Client.PostAsync($"/api/ai/agent-runs/{runId}/stream-token", content: null);
@@ -810,6 +1016,23 @@ public sealed class AgentRunEndpointsTests
             }
 
             throw new TimeoutException("AgentRun terminal event was not emitted.");
+        }
+
+        public async Task WaitForEventAsync(string runId, string eventType)
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            while (!cts.IsCancellationRequested)
+            {
+                var replay = StreamService.Replay(runId);
+                if (replay?.Events.Any(evt => evt.EventType == eventType) == true)
+                {
+                    return;
+                }
+
+                await Task.Delay(20, cts.Token);
+            }
+
+            throw new TimeoutException($"AgentRun event '{eventType}' was not emitted.");
         }
 
         public async ValueTask DisposeAsync()
@@ -854,6 +1077,25 @@ public sealed class AgentRunEndpointsTests
         public async Task WaitForCallAsync()
         {
             await _called.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    private sealed class FakeVisionAgentPlanPlannerService : IVisionAgentPlanPlannerService
+    {
+        private readonly Func<VisionAgentPlanModeRequest, VisionAgentPlanModeResult, CancellationToken, Task<VisionAgentPlanModeResult>> _handler;
+
+        public FakeVisionAgentPlanPlannerService(
+            Func<VisionAgentPlanModeRequest, VisionAgentPlanModeResult, CancellationToken, Task<VisionAgentPlanModeResult>> handler)
+        {
+            _handler = handler;
+        }
+
+        public Task<VisionAgentPlanModeResult> CreatePlanAsync(
+            VisionAgentPlanModeRequest request,
+            VisionAgentPlanModeResult ruleBaseline,
+            CancellationToken cancellationToken)
+        {
+            return _handler(request, ruleBaseline, cancellationToken);
         }
     }
 
@@ -914,5 +1156,23 @@ public sealed class AgentRunEndpointsTests
         {
             return token is "owner-a-token" or "owner-b-token" or "owner-default-token";
         }
+    }
+
+    private static VisionAgentPlanPublicEvent PlanEvent(
+        string stage,
+        string status,
+        string title,
+        string summary,
+        Dictionary<string, string>? metadata = null)
+    {
+        return new VisionAgentPlanPublicEvent
+        {
+            Stage = stage,
+            Status = status,
+            Title = title,
+            Summary = summary,
+            Metadata = metadata ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            MetadataOnly = true
+        };
     }
 }
