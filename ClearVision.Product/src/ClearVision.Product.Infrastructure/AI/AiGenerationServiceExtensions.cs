@@ -32,6 +32,8 @@ public static class AiGenerationServiceExtensions
             configuration.GetSection(AgentPlannerCompletionOptions.SectionName));
         services.Configure<VisionAgentPlanPlannerOptions>(
             configuration.GetSection(VisionAgentPlanPlannerOptions.SectionName));
+        services.Configure<VisionAgentIntentRouterOptions>(
+            configuration.GetSection(VisionAgentIntentRouterOptions.SectionName));
 
         // 注册运行时配置管理器（单例：启动时从 ai_models.json 加载，必要时从 ai_config.json 迁移）
         services.AddSingleton<AiConfigStore>();
@@ -75,6 +77,8 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IVisionAgentPlannerService, VisionAgentPlannerService>();
         services.AddScoped<IVisionAgentPlanCompletionSource, LlmVisionAgentPlanCompletionSource>();
         services.AddScoped<IVisionAgentPlanPlannerService, VisionAgentPlanPlannerService>();
+        services.AddScoped<IVisionAgentIntentRouterCompletionSource, LlmVisionAgentIntentRouterCompletionSource>();
+        services.AddScoped<IVisionAgentIntentRouterService, VisionAgentIntentRouterService>();
         services.AddScoped<IVisionAgentOperatorContractCatalog, VisionAgentOperatorContractCatalog>();
         services.AddScoped<BuildToolRunner>();
         services.AddScoped<BuildPlanContextLoader>();

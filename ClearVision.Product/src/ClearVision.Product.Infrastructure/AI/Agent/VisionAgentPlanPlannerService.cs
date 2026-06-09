@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Net;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI.Runtime;
@@ -158,7 +159,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
 
             var result = repaired with
             {
-                PlanSource = "planner",
+                PlanSource = "model_planner",
                 FallbackReason = string.Empty,
                 PlanWarnings = warnings,
                 ContractRepairNotes = repairNotes,
@@ -181,6 +182,17 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                 "planner_timeout",
                 events,
                 "模型规划超时，已使用规则兜底方案。");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            events.Add(Event("planning_with_model", "failed", "模型规划鉴权失败",
+                "模型规划鉴权失败，已使用规则兜底，请检查 Planner API Key/接口/模型名。",
+                new() { ["fallbackReason"] = "planner_unauthorized" }));
+            return BuildFallback(
+                ruleBaseline,
+                "planner_unauthorized",
+                events,
+                "模型规划鉴权失败，已使用规则兜底，请检查 Planner API Key/接口/模型名。");
         }
         catch (Exception ex)
         {

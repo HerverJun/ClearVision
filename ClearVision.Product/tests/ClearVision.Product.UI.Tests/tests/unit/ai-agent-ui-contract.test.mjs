@@ -301,7 +301,11 @@ function createPanel(AiPanel, overrides = {}) {
   panel.requirementMode = 'strict';
   panel.nextHintDraft = '';
   panel.nextTemplateSelection = null;
+  panel.agentWorkspaceMode = 'plan';
+  panel.pendingVisionPlan = null;
+  panel.planQuestionSelections = {};
   panel.activeGenerateRequestId = null;
+  panel.activeIntentRouterRequestId = null;
   panel.activePlanRequestId = null;
   panel.activePlanRunId = null;
   panel.activePlanRunRequestId = null;
@@ -348,6 +352,20 @@ function createPanel(AiPanel, overrides = {}) {
     panel.historyItems = panel.historyItems || [];
     panel.historyItems.push(item);
   };
+  panel._requestBackendIntentRouterRun = overrides.intentRouterRun || (async () => ({
+    intent: 'actionable_vision_plan',
+    confidence: 'high',
+    shouldOpenPlan: true,
+    shouldBuildDirectly: false,
+    canBuild: true,
+    needsClarification: false,
+    publicReason: '已识别为可规划的视觉需求。',
+    assistantReply: '将先进入 Plan 规划。',
+    clarificationQuestions: [],
+    fallbackAllowed: true,
+    routerSource: 'test_router',
+    metadataOnly: true
+  }));
   return panel;
 }
 
@@ -1254,6 +1272,178 @@ test('AgentRun create payload is metadata-only and does not send attachment path
   assert.deepEqual(payload.templateSelection, { mode: 'template_fill', templateId: 'tmpl-1' });
 });
 
+test('ordinary send runs Intent Router before Plan planner', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const chat = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': chat,
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const calls = [];
+  panel._requestBackendIntentRouterRun = async request => {
+    calls.push({ type: 'router', request });
+    return {
+      intent: 'actionable_vision_plan',
+      confidence: 'high',
+      shouldOpenPlan: true,
+      shouldBuildDirectly: false,
+      canBuild: true,
+      needsClarification: false,
+      publicReason: '已识别为可规划的视觉需求。',
+      assistantReply: '将先进入 Plan 规划。',
+      clarificationQuestions: [],
+      fallbackAllowed: true,
+      routerSource: 'model_router',
+      metadataOnly: true
+    };
+  };
+  panel._shouldUsePlanRunEventStream = () => false;
+  panel._requestBackendVisionPlan = async request => {
+    calls.push({ type: 'plan', request });
+    return backendPlanResult({ goal: 'router then plan' });
+  };
+
+  const accepted = panel._dispatchGenerateRequest({
+    description: '为我构建一个包装箱外观视觉检测流程',
+    userMessage: '为我构建一个包装箱外观视觉检测流程'
+  });
+  const turn = panel.activeAssistantTurn;
+  await flushAsync();
+
+  assert.equal(accepted, true);
+  assert.deepEqual(calls.map(item => item.type), ['router', 'plan']);
+  assert.equal(calls[0].request.description, '为我构建一个包装箱外观视觉检测流程');
+  assert.equal(calls[1].request.description, '为我构建一个包装箱外观视觉检测流程');
+  assert.equal(panel.pendingVisionPlan.goal, 'router then plan');
+  assert.equal(panel.isGenerating, false);
+  assert.match(collectProcessText(turn), /正在判断请求类型/);
+  assert.match(collectProcessText(turn), /已识别为：可规划视觉需求/);
+});
+
+test('casual Intent Router result replies without opening Plan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._requestBackendIntentRouterRun = async () => ({
+    intent: 'casual_chat',
+    confidence: 'high',
+    shouldOpenPlan: false,
+    shouldBuildDirectly: false,
+    canBuild: false,
+    needsClarification: false,
+    publicReason: '这是普通寒暄，不需要进入规划。',
+    assistantReply: '我在。你可以描述要做的视觉检测、测量、识别或输出流程。',
+    clarificationQuestions: [],
+    fallbackAllowed: true,
+    routerSource: 'model_router',
+    metadataOnly: true
+  });
+  panel._requestBackendVisionPlan = async () => {
+    throw new Error('casual chat should not request Plan');
+  };
+
+  panel._dispatchGenerateRequest({ description: 'hi', userMessage: 'hi' });
+  const turn = panel.activeAssistantTurn;
+  await flushAsync();
+
+  assert.equal(panel.pendingVisionPlan, null);
+  assert.equal(panel.isGenerating, false);
+  assert.match(turn.replyBody.textContent, /我在/);
+  assert.doesNotMatch(collectProcessText(turn), /规划中/);
+});
+
+test('help Intent Router result replies without opening Plan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._requestBackendIntentRouterRun = async () => ({
+    intent: 'help',
+    confidence: 'high',
+    shouldOpenPlan: false,
+    shouldBuildDirectly: false,
+    canBuild: false,
+    needsClarification: false,
+    publicReason: '这是能力咨询，不需要进入规划。',
+    assistantReply: '我可以先帮你梳理视觉检测需求，形成规划；确认推荐方案后再构建可编辑的算子链。',
+    clarificationQuestions: [],
+    fallbackAllowed: true,
+    routerSource: 'model_router',
+    metadataOnly: true
+  });
+  panel._requestBackendVisionPlan = async () => {
+    throw new Error('help should not request Plan');
+  };
+
+  panel._dispatchGenerateRequest({ description: '你好，你能做什么', userMessage: '你好，你能做什么' });
+  const turn = panel.activeAssistantTurn;
+  await flushAsync();
+
+  assert.equal(panel.pendingVisionPlan, null);
+  assert.equal(panel.isGenerating, false);
+  assert.match(turn.replyBody.textContent, /梳理视觉检测需求/);
+  assert.doesNotMatch(collectProcessText(turn), /规划中/);
+});
+
+test('ambiguous Intent Router result asks clarification and cannot Build', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._requestBackendIntentRouterRun = async () => ({
+    intent: 'ambiguous_vision_requirement',
+    confidence: 'medium',
+    shouldOpenPlan: false,
+    shouldBuildDirectly: false,
+    canBuild: false,
+    needsClarification: true,
+    publicReason: '需求信息不足，暂不可构建。',
+    assistantReply: '请补充检测目标、缺陷、输入来源、OK/NG 规则。',
+    clarificationQuestions: ['检测目标是什么？', '需要判断哪些缺陷？', '输入来源和 OK/NG 规则是什么？'],
+    fallbackAllowed: true,
+    routerSource: 'model_router',
+    metadataOnly: true
+  });
+  panel._requestBackendVisionPlan = async () => {
+    throw new Error('ambiguous input should not request Plan');
+  };
+
+  panel._dispatchGenerateRequest({ description: '包装箱', userMessage: '包装箱' });
+  const turn = panel.activeAssistantTurn;
+  await flushAsync();
+
+  assert.equal(panel.pendingVisionPlan, null);
+  assert.equal(panel.isGenerating, false);
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+  assert.match(panel.lastResultStatusNote.text, /需求不足/);
+  assert.match(turn.replyBody.textContent, /暂不可构建/);
+  assert.match(turn.replyBody.textContent, /检测目标是什么/);
+});
+
 test('Plan Mode captures vague inspection request without starting Build', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -1460,7 +1650,7 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
   });
   panel.activeAgentRunId = 'ar_previous_build';
   const planResult = backendPlanResult({
-    planSource: 'planner',
+    planSource: 'model_planner',
     fallbackReason: '',
     goal: 'streamed plan ready',
     publicEvents: [
@@ -1571,7 +1761,7 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
 
   assert.equal(accepted, true);
   assert.ok(turn);
-  assert.match(turn.replyBody.textContent, /规划中/);
+  assert.match(turn.replyBody.textContent, /正在判断请求类型/);
   await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_backend_1', 'streamed plan result');
 
   assert.equal(panel.pendingVisionPlan.goal, 'streamed plan ready');

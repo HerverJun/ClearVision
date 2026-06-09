@@ -121,6 +121,43 @@ public sealed class AgentRunEndpointsTests
             .And.NotContain("defect_definition");
     }
 
+    [Fact(DisplayName = "POST Agent intent router returns public route decision")]
+    public async Task CreateIntentRouter_ShouldReturnPublicRouteDecision()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(intentRouterHandler: (request, _) =>
+        {
+            request.Description.Should().Be("hi");
+            return Task.FromResult(new VisionAgentIntentRouterResult
+            {
+                Intent = "casual_chat",
+                Confidence = "high",
+                ShouldOpenPlan = false,
+                ShouldBuildDirectly = false,
+                CanBuild = false,
+                NeedsClarification = false,
+                PublicReason = "这是普通寒暄，不需要进入规划。",
+                AssistantReply = "我在。",
+                ClarificationQuestions = [],
+                RouterSource = "test_router",
+                MetadataOnly = true
+            });
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-intent-router-runs", new
+        {
+            description = "hi",
+            metadataOnly = true
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("intent").GetString().Should().Be("casual_chat");
+        root.GetProperty("shouldOpenPlan").GetBoolean().Should().BeFalse();
+        root.GetProperty("canBuild").GetBoolean().Should().BeFalse();
+        root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+    }
+
     [Fact(DisplayName = "POST Agent plan run streams public Plan events before completed")]
     public async Task CreatePlanRun_ShouldStreamPublicEventsBeforeCompleted()
     {
@@ -923,7 +960,8 @@ public sealed class AgentRunEndpointsTests
             Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>>? handler = null,
             bool useAuth = false,
             Func<DateTimeOffset>? utcNowProvider = null,
-            Func<VisionAgentPlanModeRequest, VisionAgentPlanModeResult, CancellationToken, Task<VisionAgentPlanModeResult>>? planHandler = null)
+            Func<VisionAgentPlanModeRequest, VisionAgentPlanModeResult, CancellationToken, Task<VisionAgentPlanModeResult>>? planHandler = null,
+            Func<VisionAgentIntentRouterRequest, CancellationToken, Task<VisionAgentIntentRouterResult>>? intentRouterHandler = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -947,6 +985,8 @@ public sealed class AgentRunEndpointsTests
             builder.Services.AddSingleton<IAgentRunEventStreamService>(streamService);
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);
             builder.Services.AddSingleton<IVisionAgentToolRegistry, EmptyVisionAgentToolRegistry>();
+            builder.Services.AddSingleton<IVisionAgentIntentRouterService>(
+                new FakeVisionAgentIntentRouterService(intentRouterHandler));
             builder.Services.AddScoped<IAgentRunEventSink, AgentRunEventSink>();
             if (planHandler != null)
             {
@@ -1122,6 +1162,42 @@ public sealed class AgentRunEndpointsTests
             CancellationToken cancellationToken)
         {
             return _handler(request, ruleBaseline, cancellationToken);
+        }
+    }
+
+    private sealed class FakeVisionAgentIntentRouterService : IVisionAgentIntentRouterService
+    {
+        private readonly Func<VisionAgentIntentRouterRequest, CancellationToken, Task<VisionAgentIntentRouterResult>> _handler;
+
+        public FakeVisionAgentIntentRouterService(
+            Func<VisionAgentIntentRouterRequest, CancellationToken, Task<VisionAgentIntentRouterResult>>? handler)
+        {
+            _handler = handler ?? ((_, _) => Task.FromResult(new VisionAgentIntentRouterResult
+            {
+                Intent = "ambiguous_vision_requirement",
+                Confidence = "low",
+                ShouldOpenPlan = false,
+                ShouldBuildDirectly = false,
+                CanBuild = false,
+                NeedsClarification = true,
+                PublicReason = "需求信息不足，暂不可构建。",
+                AssistantReply = "请补充检测目标、缺陷、输入来源、OK/NG 规则。",
+                ClarificationQuestions =
+                [
+                    "检测目标是什么？",
+                    "需要判断哪些缺陷？",
+                    "输入来源和 OK/NG 规则是什么？"
+                ],
+                RouterSource = "test_router",
+                MetadataOnly = true
+            }));
+        }
+
+        public Task<VisionAgentIntentRouterResult> RouteAsync(
+            VisionAgentIntentRouterRequest request,
+            CancellationToken cancellationToken)
+        {
+            return _handler(request, cancellationToken);
         }
     }
 

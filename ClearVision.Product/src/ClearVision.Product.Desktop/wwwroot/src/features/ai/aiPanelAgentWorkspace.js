@@ -308,6 +308,7 @@ const AI_PARAMETER_LABELS = {
 
 export const aiPanelAgentWorkspaceMixin = {
     _resetAgentWorkspace({ preservePlan = false } = {}) {
+        this.activeIntentRouterRequestId = null;
         this.activePlanRequestId = null;
         this.activePlanRunId = null;
         this.activePlanRunRequestId = null;
@@ -356,6 +357,18 @@ export const aiPanelAgentWorkspaceMixin = {
         return true;
     },
 
+    _shouldRouteIntentBeforeGenerate(args = {}) {
+        if (this._isAllowedSkipPlanRequest(args)) return false;
+        if (this.isGenerating) return false;
+
+        const mode = String(args?.explicitMode || '').trim().toLowerCase();
+        if (mode === 'review_pending_parameters') {
+            return false;
+        }
+
+        return true;
+    },
+
     _isAllowedSkipPlanRequest({
         explicitMode = '',
         skipPlan = false,
@@ -382,6 +395,10 @@ export const aiPanelAgentWorkspaceMixin = {
             return mode === 'review_pending_parameters' && this.currentResult?.flow;
         }
 
+        if (source === 'intent_router_build') {
+            return mode === 'modify' && this._hasCurrentFlowContext?.() === true;
+        }
+
         return false;
     },
 
@@ -401,6 +418,355 @@ export const aiPanelAgentWorkspaceMixin = {
         });
     },
 
+    _enterIntentRouterFromPrompt({
+        description,
+        hint = '',
+        userMessage = '',
+        attachmentPaths = [],
+        templateSelection = null,
+        clearInput = true,
+        input = null,
+        explicitMode = '',
+        hasCurrentFlowContext = false
+    }) {
+        const normalizedDescription = String(description || '').trim();
+        if (!normalizedDescription) {
+            this._addMessage('system', '请输入需求描述。');
+            return false;
+        }
+
+        const routerRequestId = this._createIntentRouterRequestId();
+        this.activeIntentRouterRequestId = routerRequestId;
+        this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
+        this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+        this.activePlanRequestId = null;
+        this.activePlanRunId = null;
+        this.activePlanRunRequestId = null;
+        this.activePlanRunEvents = [];
+        this.activePlanRunEventKeys = new Set();
+        this.activePlanRunCompletion = null;
+
+        this._closeAgentRunEventSource?.();
+        this._setGeneratingState?.(true);
+        this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
+        this._addMessage('user', userMessage || normalizedDescription);
+        const turn = this._startAssistantTurn({
+            activate: true,
+            statusText: '正在判断请求类型',
+            statusTone: 'streaming',
+            openReply: true
+        });
+        this._setAssistantSectionText(turn, 'reply', '正在判断请求类型。');
+        this._updateIntentRouterTimeline(routerRequestId, 'intent-router-run', '正在判断请求类型', 'running');
+        this._setResultStatusNote('正在判断请求类型。', 'info');
+        this._renderAgentWorkspaceOverview();
+        this._renderPlanWorkspace(this.pendingVisionPlan);
+        this._renderBuildWorkspaceFromAgentRun();
+        this._updatePlanBuildActionState();
+
+        if (clearInput && input) {
+            input.value = '';
+            input.style.height = 'auto';
+        }
+
+        const routerRequest = this._buildIntentRouterRequest({
+            description: normalizedDescription,
+            hint,
+            userMessage,
+            attachmentPaths,
+            templateSelection,
+            explicitMode,
+            hasCurrentFlowContext
+        });
+
+        this._requestBackendIntentRouterRun(routerRequest)
+            .then(result => {
+                if (!this._isActiveIntentRouterRequest(routerRequestId)) return;
+                this._clearActiveIntentRouterRequest(routerRequestId);
+                this._handleIntentRouterResult(result, {
+                    routerRequestId,
+                    turn,
+                    description: normalizedDescription,
+                    hint,
+                    userMessage,
+                    attachmentPaths,
+                    templateSelection,
+                    explicitMode,
+                    hasCurrentFlowContext
+                });
+            })
+            .catch(error => {
+                if (!this._isActiveIntentRouterRequest(routerRequestId)) return;
+                this._clearActiveIntentRouterRequest(routerRequestId);
+                const fallback = this._buildLocalIntentRouterFallback(normalizedDescription, error);
+                this._handleIntentRouterResult(fallback, {
+                    routerRequestId,
+                    turn,
+                    description: normalizedDescription,
+                    hint,
+                    userMessage,
+                    attachmentPaths,
+                    templateSelection,
+                    explicitMode,
+                    hasCurrentFlowContext
+                });
+            });
+
+        return true;
+    },
+
+    _createIntentRouterRequestId() {
+        const randomPart = Math.random().toString(36).slice(2, 8);
+        return `intent-${Date.now()}-${randomPart}`;
+    },
+
+    _isActiveIntentRouterRequest(requestId) {
+        return Boolean(this.activeIntentRouterRequestId) && requestId === this.activeIntentRouterRequestId;
+    },
+
+    _clearActiveIntentRouterRequest(requestId = null) {
+        if (!requestId || this.activeIntentRouterRequestId === requestId) {
+            this.activeIntentRouterRequestId = null;
+        }
+    },
+
+    _buildIntentRouterRequest({
+        description,
+        hint = '',
+        userMessage = '',
+        attachmentPaths = [],
+        templateSelection = null,
+        explicitMode = ''
+    }) {
+        const planRequest = this._buildPlanModeRequest({
+            description,
+            hint,
+            userMessage,
+            attachmentPaths,
+            templateSelection
+        });
+        return {
+            ...planRequest,
+            mode: String(explicitMode || this.agentGenerateFlowMode || 'auto').trim() || 'auto',
+            hasPendingPlan: Boolean(this.pendingVisionPlan),
+            pendingPlanSummary: this._buildPendingPlanIntentSummary(),
+            developerDirectBuildDebug: false,
+            metadataOnly: true
+        };
+    },
+
+    _buildPendingPlanIntentSummary() {
+        if (!this.pendingVisionPlan) return null;
+        const plan = this.pendingVisionPlan;
+        const summary = {
+            planId: plan.planId || plan.id || '',
+            planHash: plan.planHash || '',
+            goal: plan.goal || '',
+            intent: plan.intent || '',
+            canBuild: plan.executable !== false
+        };
+        try {
+            return JSON.stringify(summary);
+        } catch {
+            return null;
+        }
+    },
+
+    async _requestBackendIntentRouterRun(request) {
+        return await httpClient.post('/ai/agent-intent-router-runs', request);
+    },
+
+    _handleIntentRouterResult(result, context) {
+        const route = this._normalizeIntentRouterResult(result);
+        const label = this._formatIntentRouterIntentLabel(route.intent);
+        const tone = route.needsClarification ? 'warning' : 'streaming';
+        this._setAssistantTurnStatus(context.turn, `已识别为：${label}`, tone);
+        this._setAssistantSectionText(context.turn, 'reply', this._formatIntentRouterReply(route));
+        this._updateIntentRouterTimeline(context.routerRequestId, 'intent-router-result', `已识别为：${label}`, 'completed');
+
+        if (route.shouldOpenPlan || route.intent === 'actionable_vision_plan') {
+            return this._enterPlanModeFromPrompt({
+                description: context.description,
+                hint: context.hint,
+                userMessage: context.userMessage,
+                attachmentPaths: context.attachmentPaths,
+                templateSelection: context.templateSelection,
+                clearInput: false,
+                input: null,
+                turn: context.turn,
+                addUserMessage: false,
+                clearPendingPlan: true
+            });
+        }
+
+        if (route.intent === 'build_from_confirmed_plan' && this.pendingVisionPlan) {
+            this._setAssistantTurnStatus(context.turn, '进入构建', 'success');
+            this.activeAssistantTurn = null;
+            this._setGeneratingState?.(false);
+            return this._startBuildFromCurrentPlan({ acceptedRecommended: true });
+        }
+
+        if (route.intent === 'modify_existing_flow' && this._hasCurrentFlowContext?.() === true) {
+            this._setAssistantTurnStatus(context.turn, '进入构建', 'success');
+            this.activeAssistantTurn = null;
+            this._setGeneratingState?.(false);
+            return this._dispatchGenerateRequest({
+                description: context.description,
+                hint: context.hint,
+                userMessage: context.userMessage,
+                attachmentPaths: context.attachmentPaths,
+                explicitMode: 'modify',
+                templateSelection: context.templateSelection,
+                clearInput: false,
+                skipPlan: true,
+                skipPlanSource: 'intent_router_build',
+                suppressUserMessage: true
+            });
+        }
+
+        if (route.needsClarification || route.intent === 'ambiguous_vision_requirement') {
+            this.pendingVisionPlan = null;
+            this.planQuestionSelections = {};
+            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
+            this._setResultStatusNote('需求不足，暂不可构建。', 'warning');
+            this._setAssistantTurnStatus(context.turn, '需求不足', 'warning');
+        } else {
+            this._setWorkbenchState(AiWorkbenchStates.IDLE);
+            this._setResultStatusNote('', '');
+            this._setAssistantTurnStatus(context.turn, '已回复', 'success');
+        }
+
+        this._setGeneratingState?.(false);
+        this._renderAgentWorkspaceOverview();
+        this._renderPlanWorkspace(this.pendingVisionPlan);
+        this._renderBuildWorkspaceFromAgentRun();
+        this._updatePlanBuildActionState();
+        this.activeAssistantTurn = null;
+        return true;
+    },
+
+    _normalizeIntentRouterResult(result) {
+        const item = this._asObject?.(result) || result || {};
+        const intent = String(item.intent || item.Intent || 'ambiguous_vision_requirement').trim() || 'ambiguous_vision_requirement';
+        const questions = this._toArray(item.clarificationQuestions || item.ClarificationQuestions)
+            .map(question => this._localizeDisplayText(String(question || '').trim()))
+            .filter(Boolean)
+            .slice(0, 5);
+        return {
+            intent,
+            confidence: String(item.confidence || item.Confidence || 'low').trim() || 'low',
+            shouldOpenPlan: Boolean(item.shouldOpenPlan ?? item.ShouldOpenPlan),
+            shouldBuildDirectly: Boolean(item.shouldBuildDirectly ?? item.ShouldBuildDirectly),
+            canBuild: Boolean(item.canBuild ?? item.CanBuild),
+            needsClarification: Boolean(item.needsClarification ?? item.NeedsClarification),
+            publicReason: this._localizeDisplayText(item.publicReason || item.PublicReason || ''),
+            assistantReply: this._localizeDisplayText(item.assistantReply || item.AssistantReply || ''),
+            clarificationQuestions: questions,
+            fallbackReason: item.fallbackReason || item.FallbackReason || '',
+            routerSource: item.routerSource || item.RouterSource || ''
+        };
+    },
+
+    _formatIntentRouterIntentLabel(intent) {
+        switch (String(intent || '').trim()) {
+            case 'casual_chat':
+                return '普通寒暄';
+            case 'help':
+                return '能力咨询';
+            case 'actionable_vision_plan':
+                return '可规划视觉需求';
+            case 'modify_existing_flow':
+                return '当前流程修改';
+            case 'build_from_confirmed_plan':
+                return '已确认计划构建';
+            case 'direct_build_debug':
+                return '直接 Build 调试';
+            default:
+                return '需求不足';
+        }
+    },
+
+    _formatIntentRouterReply(route) {
+        const lines = [];
+        if (route.publicReason) {
+            lines.push(route.publicReason);
+        }
+        if (route.assistantReply && route.assistantReply !== route.publicReason) {
+            lines.push(route.assistantReply);
+        }
+        if (route.needsClarification || route.intent === 'ambiguous_vision_requirement') {
+            lines.push('需求不足，暂不可构建。');
+            const questions = route.clarificationQuestions.length
+                ? route.clarificationQuestions
+                : [
+                    '请补充检测目标或产品对象。',
+                    '请说明缺陷、测量项或识别内容。',
+                    '请说明输入来源和 OK/NG 判定规则。'
+                ];
+            questions.forEach((question, index) => {
+                lines.push(`${index + 1}. ${question}`);
+            });
+        }
+        return lines.filter(Boolean).join('\n');
+    },
+
+    _updateIntentRouterTimeline(chainId, stepId, text, status = 'running') {
+        const node = this._updateThinkingStep(chainId || 'intent-router', stepId || 'intent-router-run', text);
+        if (!node) return;
+        node.className = `ai-agent-run-step is-${status === 'completed' ? 'success' : 'running'}`;
+        node.dataset.stage = 'intent_router';
+        node.dataset.eventType = stepId || '';
+    },
+
+    _buildLocalIntentRouterFallback(description, error = null) {
+        const text = String(description || '').trim().toLowerCase();
+        const normalized = text.replace(/[\s!?！？。,.，、]/g, '');
+        const isCasual = ['hi', 'hello', 'hey', '你好', '您好', '在吗', '在不在'].includes(normalized);
+        const isHelp = normalized.includes('能做什么') ||
+            normalized.includes('可以做什么') ||
+            normalized === 'help' ||
+            normalized === '帮助';
+        const isActionable = this._looksLikeStandaloneVisionRequest?.(description) === true ||
+            this._looksLikeExplicitNewFlowRequest?.(description) === true;
+        const intent = isHelp
+            ? 'help'
+            : isCasual
+                ? 'casual_chat'
+                : isActionable
+                    ? 'actionable_vision_plan'
+                    : 'ambiguous_vision_requirement';
+        return {
+            intent,
+            confidence: isCasual || isHelp ? 'high' : 'medium',
+            shouldOpenPlan: intent === 'actionable_vision_plan',
+            shouldBuildDirectly: false,
+            canBuild: intent === 'actionable_vision_plan',
+            needsClarification: intent === 'ambiguous_vision_requirement',
+            publicReason: error
+                ? '模型路由不可用，已使用安全规则兜底。'
+                : '已使用安全规则兜底判断请求类型。',
+            assistantReply: intent === 'casual_chat'
+                ? '我在。你可以描述要做的视觉检测、测量、识别或输出流程。'
+                : intent === 'help'
+                    ? '我可以先帮你梳理视觉检测需求，形成规划；确认推荐方案后再构建可编辑的算子链。'
+                    : intent === 'actionable_vision_plan'
+                        ? '已识别为可规划的视觉需求，将先进入 Plan 规划。'
+                        : '需求不足，暂不可构建。请补充检测目标、缺陷或识别内容、输入来源、OK/NG 规则。',
+            clarificationQuestions: intent === 'ambiguous_vision_requirement'
+                ? [
+                    '请补充检测目标或产品对象。',
+                    '请说明缺陷、测量项或识别内容。',
+                    '请说明输入来源和 OK/NG 判定规则。'
+                ]
+                : [],
+            fallbackAllowed: true,
+            routerSource: 'local_rule_fallback',
+            fallbackReason: error?.message || 'router_unavailable',
+            metadataOnly: true
+        };
+    },
+
     _enterPlanModeFromPrompt({
         description,
         hint = '',
@@ -408,7 +774,10 @@ export const aiPanelAgentWorkspaceMixin = {
         attachmentPaths = [],
         templateSelection = null,
         clearInput = true,
-        input = null
+        input = null,
+        turn: existingTurn = null,
+        addUserMessage = true,
+        clearPendingPlan = true
     }) {
         const normalizedDescription = String(description || '').trim();
         if (!normalizedDescription) {
@@ -418,8 +787,10 @@ export const aiPanelAgentWorkspaceMixin = {
 
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
-        this.pendingVisionPlan = null;
-        this.planQuestionSelections = {};
+        if (clearPendingPlan) {
+            this.pendingVisionPlan = null;
+            this.planQuestionSelections = {};
+        }
         this.activePlanRunId = null;
         this.activePlanRunRequestId = null;
         this.activePlanRunEvents = [];
@@ -431,13 +802,17 @@ export const aiPanelAgentWorkspaceMixin = {
         this._closeAgentRunEventSource?.();
         this._setGeneratingState?.(true);
         this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
-        this._addMessage('user', userMessage || normalizedDescription);
-        const turn = this._startAssistantTurn({
+        if (addUserMessage) {
+            this._addMessage('user', userMessage || normalizedDescription);
+        }
+        const turn = existingTurn || this._startAssistantTurn({
             activate: true,
             statusText: '规划中',
             statusTone: 'warning',
             openReply: true
         });
+        this.activeAssistantTurn = turn;
+        this._setAssistantTurnStatus(turn, '规划中', 'warning');
         this._setAssistantSectionText(
             turn,
             'reply',

@@ -54,6 +54,7 @@ public static class AgentRunEndpoints
     public static IEndpointRouteBuilder MapAgentRunEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/ai/agent-plan", HandleCreatePlanAsync);
+        app.MapPost("/api/ai/agent-intent-router-runs", HandleCreateIntentRouterRunAsync);
         app.MapPost("/api/ai/agent-plan-runs", HandleCreatePlanRunAsync);
         app.MapPost("/api/ai/agent-runs", HandleCreateRunAsync);
         app.MapGet("/api/ai/agent-runs/{runId}", HandleReplayRun);
@@ -61,6 +62,23 @@ public static class AgentRunEndpoints
         app.MapPost("/api/ai/agent-runs/{runId}/stream-token", HandleCreateStreamToken);
         app.MapPost("/api/ai/agent-runs/{runId}/cancel", HandleCancelRun);
         return app;
+    }
+
+    private static async Task<IResult> HandleCreateIntentRouterRunAsync(
+        VisionAgentIntentRouterRequest request,
+        IVisionAgentIntentRouterService router,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Description))
+        {
+            return Results.BadRequest(new
+            {
+                error = "Description is required."
+            });
+        }
+
+        var result = await router.RouteAsync(request, ct);
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> HandleCreatePlanAsync(

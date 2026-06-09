@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.DTOs;
@@ -41,7 +42,7 @@ public sealed class VisionAgentPlanPlannerTests
             baseline,
             CancellationToken.None);
 
-        result.PlanSource.Should().Be("planner");
+        result.PlanSource.Should().Be("model_planner");
         result.FallbackReason.Should().BeEmpty();
         result.Intent.Should().Be(intent);
         result.RecommendedRoute.Operators.Should().Contain(requiredOperator);
@@ -82,6 +83,30 @@ public sealed class VisionAgentPlanPlannerTests
             evt.Status == "failed" &&
             evt.Summary.Contains("模型规划失败", StringComparison.Ordinal));
         result.PublicEvents.Should().Contain(evt => evt.Stage == "rule_fallback_used");
+        result.MetadataOnly.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Plan planner Unauthorized should return rule fallback with API key diagnostic")]
+    public async Task CreatePlanAsync_ShouldFallbackWhenPlannerUnauthorized()
+    {
+        var service = CreateService(_ => throw new HttpRequestException(
+            "401 unauthorized",
+            null,
+            HttpStatusCode.Unauthorized));
+        var baseline = Baseline("scratch", "surface_defect");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "scratch" },
+            baseline,
+            CancellationToken.None);
+
+        result.PlanSource.Should().Be("rule_fallback");
+        result.FallbackReason.Should().Be("planner_unauthorized");
+        result.PlanWarnings.Should().Contain("模型规划鉴权失败，已使用规则兜底，请检查 Planner API Key/接口/模型名。");
+        result.PublicEvents.Should().Contain(evt =>
+            evt.Stage == "planning_with_model" &&
+            evt.Status == "failed" &&
+            evt.Summary.Contains("模型规划鉴权失败", StringComparison.Ordinal));
         result.MetadataOnly.Should().BeTrue();
     }
 
@@ -130,7 +155,7 @@ public sealed class VisionAgentPlanPlannerTests
             baseline,
             CancellationToken.None);
 
-        result.PlanSource.Should().Be("planner");
+        result.PlanSource.Should().Be("model_planner");
         result.RecommendedRoute.Operators.Should().NotContain("QuantumScratchMagic");
         result.RecommendedRoute.Operators.Should().BeEquivalentTo(baseline.RecommendedRoute.Operators);
         result.ContractRepairNotes.Should().Contain("operator_pipeline_repaired_to_catalog");

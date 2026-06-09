@@ -12,7 +12,8 @@ export const aiPanelGenerateRequestMixin = {
         clearInput = true,
         skipPlan = false,
         skipPlanSource = '',
-        buildFromPlan = null
+        buildFromPlan = null,
+        suppressUserMessage = false
     }) {
         const input = this.container.querySelector('#ai-input');
         const normalizedDescription = String(description || '').trim();
@@ -30,6 +31,27 @@ export const aiPanelGenerateRequestMixin = {
         const hasCurrentFlowContext = hasExistingFlowOverride
             ? this._hasMeaningfulFlowPayload(existingFlowJson)
             : this._hasCurrentFlowContext();
+
+        if (this._shouldRouteIntentBeforeGenerate?.({
+            explicitMode,
+            skipPlan,
+            skipPlanSource,
+            buildFromPlan,
+            description: normalizedDescription,
+            hasCurrentFlowContext
+        })) {
+            return this._enterIntentRouterFromPrompt({
+                description: normalizedDescription,
+                hint: normalizedHint,
+                userMessage,
+                attachmentPaths,
+                templateSelection,
+                clearInput,
+                input,
+                explicitMode,
+                hasCurrentFlowContext
+            });
+        }
 
         if (this._shouldOpenPlanModeBeforeBuild?.({
             explicitMode,
@@ -73,7 +95,9 @@ export const aiPanelGenerateRequestMixin = {
             this._renderAttachments();
         }
 
-        this._addMessage('user', userMessage || normalizedDescription);
+        if (!suppressUserMessage) {
+            this._addMessage('user', userMessage || normalizedDescription);
+        }
         this._startAssistantTurn();
 
         const resolvedMode = this._resolveGenerateRequestMode(explicitMode, normalizedDescription, hasCurrentFlowContext);

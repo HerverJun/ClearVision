@@ -14,6 +14,41 @@ public sealed record VisionAgentPlanModeRequest
     public string? HistorySummary { get; init; }
 }
 
+public sealed record VisionAgentIntentRouterRequest
+{
+    public string Description { get; init; } = string.Empty;
+    public string? OriginalUserPrompt { get; init; }
+    public string? AdditionalContext { get; init; }
+    public string? SessionId { get; init; }
+    public string? Mode { get; init; }
+    public string? CurrentFlowSnapshot { get; init; }
+    public string? CurrentResultSnapshot { get; init; }
+    public AiTemplateSelectionInfo? TemplateSelection { get; init; }
+    public VisionAgentAttachmentSummary AttachmentSummary { get; init; } = new();
+    public string? HistorySummary { get; init; }
+    public bool HasPendingPlan { get; init; }
+    public string? PendingPlanSummary { get; init; }
+    public bool DeveloperDirectBuildDebug { get; init; }
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentIntentRouterResult
+{
+    public string Intent { get; init; } = "ambiguous_vision_requirement";
+    public string Confidence { get; init; } = "low";
+    public bool ShouldOpenPlan { get; init; }
+    public bool ShouldBuildDirectly { get; init; }
+    public bool CanBuild { get; init; }
+    public bool NeedsClarification { get; init; } = true;
+    public string PublicReason { get; init; } = string.Empty;
+    public string AssistantReply { get; init; } = string.Empty;
+    public List<string> ClarificationQuestions { get; init; } = [];
+    public bool FallbackAllowed { get; init; } = true;
+    public string RouterSource { get; init; } = string.Empty;
+    public string FallbackReason { get; init; } = string.Empty;
+    public bool MetadataOnly { get; init; } = true;
+}
+
 public sealed record VisionAgentPlanModeResult
 {
     public string PlanId { get; init; } = string.Empty;
