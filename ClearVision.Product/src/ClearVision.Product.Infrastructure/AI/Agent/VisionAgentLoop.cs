@@ -43,6 +43,19 @@ public sealed class VisionAgentLoop
     {
         if (request.CompleteAsync == null)
         {
+            AppendLoopEvent(
+                request.EmitPublicEvents,
+                request.ToolContext.AgentRunId,
+                AgentRunEventTypes.ToolLoopFailed,
+                "tool_loop",
+                "Tool Loop completion source missing",
+                "VisionAgentLoop requires a completion source before it can run.",
+                AgentRunEventStatuses.Failed,
+                new
+                {
+                    failureType = "completion_source_missing",
+                    metadataOnly = true
+                });
             return new VisionAgentLoopResult
             {
                 Success = false,
@@ -59,14 +72,94 @@ public sealed class VisionAgentLoop
             new("system", systemPrompt),
             new("user", request.UserPrompt)
         };
+        AppendLoopEvent(
+            request.EmitPublicEvents,
+            request.ToolContext.AgentRunId,
+            AgentRunEventTypes.ToolLoopStarted,
+            "tool_loop",
+            "Tool Loop 实验已启动",
+            "实验模式正在权限门禁内请求 LLM 选择下一步工具。",
+            AgentRunEventStatuses.Running,
+            new
+            {
+                maxToolRounds = _options.MaxToolRounds,
+                maxToolCallsPerRound = _options.MaxToolCallsPerRound,
+                allowedPermissions = request.ToolContext.AllowedPermissions.Select(permission => permission.ToString()).ToList(),
+                metadataOnly = true
+            });
 
         for (var round = 0; ; round++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var completion = await request.CompleteAsync(messages, cancellationToken);
+            AppendLoopEvent(
+                request.EmitPublicEvents,
+                request.ToolContext.AgentRunId,
+                AgentRunEventTypes.ToolLoopRoundStarted,
+                "tool_loop",
+                $"Tool Loop 第 {round + 1} 轮",
+                "正在请求 LLM 选择公开工具调用或给出 final 结果。",
+                AgentRunEventStatuses.Running,
+                new
+                {
+                    round = round + 1,
+                    messageCount = messages.Count,
+                    metadataOnly = true
+                });
+            string completion;
+            try
+            {
+                completion = await request.CompleteAsync(messages, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                AppendLoopEvent(
+                    request.EmitPublicEvents,
+                    request.ToolContext.AgentRunId,
+                    AgentRunEventTypes.ToolLoopFailed,
+                    "tool_loop",
+                    "Tool Loop completion 失败",
+                    "实验 Tool Loop completion 未能产出合法公开协议，将回退稳定构建链路。",
+                    AgentRunEventStatuses.Failed,
+                    new
+                    {
+                        failureType = "completion_failed",
+                        error = ex.Message,
+                        metadataOnly = true
+                    });
+                return new VisionAgentLoopResult
+                {
+                    Success = false,
+                    FailureType = "completion_failed",
+                    ErrorMessage = ex.Message,
+                    ToolTrace = traces,
+                    PendingActions = pendingActions,
+                    ToolRounds = round,
+                    SystemPrompt = systemPrompt
+                };
+            }
+
             var parsed = _protocolParser.Parse(completion);
             if (!parsed.IsToolCall)
             {
+                AppendLoopEvent(
+                    request.EmitPublicEvents,
+                    request.ToolContext.AgentRunId,
+                    AgentRunEventTypes.ToolLoopFinalized,
+                    "tool_loop",
+                    "Tool Loop 已生成 final 结果",
+                    "LLM 已停止自主工具调用；后续结果将继续走公开校验和稳定产物补齐。",
+                    AgentRunEventStatuses.Completed,
+                    new
+                    {
+                        round,
+                        toolCallCount = traces.Count,
+                        finalKind = DetectFinalKind(parsed.FinalContent),
+                        metadataOnly = true
+                    });
                 return new VisionAgentLoopResult
                 {
                     Success = true,
@@ -80,6 +173,21 @@ public sealed class VisionAgentLoop
 
             if (round >= _options.MaxToolRounds)
             {
+                AppendLoopEvent(
+                    request.EmitPublicEvents,
+                    request.ToolContext.AgentRunId,
+                    AgentRunEventTypes.ToolLoopFailed,
+                    "tool_loop",
+                    "Tool Loop 超过最大轮次",
+                    $"实验 Tool Loop 超过 MaxToolRounds={_options.MaxToolRounds}，将回退稳定构建链路。",
+                    AgentRunEventStatuses.Failed,
+                    new
+                    {
+                        failureType = "failed_with_tool_limit",
+                        maxToolRounds = _options.MaxToolRounds,
+                        toolCallCount = traces.Count,
+                        metadataOnly = true
+                    });
                 return new VisionAgentLoopResult
                 {
                     Success = false,
@@ -100,6 +208,7 @@ public sealed class VisionAgentLoop
                 request.ToolContext with { MaxToolResultChars = _options.MaxToolResultChars },
                 traces,
                 pendingActions,
+                request.EmitPublicEvents,
                 cancellationToken);
 
             messages.Add(new VisionAgentLoopMessage("assistant", completion));
@@ -109,6 +218,20 @@ public sealed class VisionAgentLoop
                 round = round + 1,
                 toolResults = roundResults
             }, JsonOptions)));
+            AppendLoopEvent(
+                request.EmitPublicEvents,
+                request.ToolContext.AgentRunId,
+                AgentRunEventTypes.ToolResultAppended,
+                "tool_loop",
+                "Tool result 已追加",
+                "公开工具结果摘要已回填给下一轮 LLM 上下文。",
+                AgentRunEventStatuses.Completed,
+                new
+                {
+                    round = round + 1,
+                    toolResultCount = roundResults.Count,
+                    metadataOnly = true
+                });
         }
     }
 
@@ -117,6 +240,7 @@ public sealed class VisionAgentLoop
         VisionAgentToolContext context,
         List<VisionAgentToolTrace> traces,
         List<VisionAgentPendingAction> pendingActions,
+        bool emitPublicEvents,
         CancellationToken cancellationToken)
     {
         var allReadOnly = toolCalls.All(call =>
@@ -125,14 +249,14 @@ public sealed class VisionAgentLoop
         if (allReadOnly)
         {
             var parallelResults = await Task.WhenAll(toolCalls.Select(call =>
-                ExecuteOneToolAsync(call, context, traces, pendingActions, cancellationToken)));
+                ExecuteOneToolAsync(call, context, traces, pendingActions, emitPublicEvents, cancellationToken)));
             return parallelResults;
         }
 
         var results = new List<object>();
         foreach (var call in toolCalls)
         {
-            results.Add(await ExecuteOneToolAsync(call, context, traces, pendingActions, cancellationToken));
+            results.Add(await ExecuteOneToolAsync(call, context, traces, pendingActions, emitPublicEvents, cancellationToken));
         }
 
         return results;
@@ -143,12 +267,28 @@ public sealed class VisionAgentLoop
         VisionAgentToolContext context,
         List<VisionAgentToolTrace> traces,
         List<VisionAgentPendingAction> pendingActions,
+        bool emitPublicEvents,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
         var knownTool = _toolRegistry.TryGet(call.Name, out var tool);
         var permission = knownTool ? tool.Permission.ToString() : string.Empty;
         VisionAgentToolResult result;
+        AppendLoopEvent(
+            emitPublicEvents,
+            context.AgentRunId,
+            AgentRunEventTypes.ToolCallRequested,
+            "tool_loop",
+            $"Tool call requested: {call.Name}",
+            "LLM requested a metadata-only Vision Agent tool.",
+            AgentRunEventStatuses.Running,
+            new
+            {
+                toolCallId = call.Id,
+                toolName = call.Name,
+                permission,
+                metadataOnly = true
+            });
         _eventSink?.ToolStarted(context.AgentRunId, ResolveToolStage(call.Name), call.Name, new
         {
             toolName = call.Name,
@@ -193,15 +333,23 @@ public sealed class VisionAgentLoop
         {
             try
             {
+                using var toolTimeout = CreateToolTimeout(cancellationToken);
                 result = await _toolRegistry.ExecuteAsync(
                     call.Name,
                     context,
                     call.Arguments,
-                    cancellationToken);
+                    toolTimeout.Token);
             }
             catch (OperationCanceledException)
             {
-                throw;
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+
+                result = VisionAgentToolResult.Fail(
+                    "tool_timeout",
+                    $"Tool '{call.Name}' exceeded timeout {_options.ToolTimeoutMs} ms.");
             }
             catch (Exception ex)
             {
@@ -252,6 +400,15 @@ public sealed class VisionAgentLoop
         };
         if (result.Success)
         {
+            AppendLoopEvent(
+                emitPublicEvents,
+                context.AgentRunId,
+                AgentRunEventTypes.ToolCallLoopCompleted,
+                "tool_loop",
+                $"Tool call completed: {call.Name}",
+                "LLM requested tool completed with public metadata.",
+                AgentRunEventStatuses.Completed,
+                eventPayload);
             _eventSink?.ToolCompleted(
                 context.AgentRunId,
                 ResolveToolStage(call.Name),
@@ -261,6 +418,19 @@ public sealed class VisionAgentLoop
         }
         else
         {
+            AppendLoopEvent(
+                emitPublicEvents,
+                context.AgentRunId,
+                IsDeniedResult(result) ? AgentRunEventTypes.ToolCallDenied : AgentRunEventTypes.ToolLoopFailed,
+                "tool_loop",
+                IsDeniedResult(result)
+                    ? $"Tool call denied: {call.Name}"
+                    : $"Tool call failed: {call.Name}",
+                IsDeniedResult(result)
+                    ? "LLM requested tool was denied by the experimental permission gate."
+                    : "LLM requested tool failed and the run will use public fallback handling.",
+                IsDeniedResult(result) ? AgentRunEventStatuses.Blocked : AgentRunEventStatuses.Failed,
+                eventPayload);
             _eventSink?.ToolFailed(
                 context.AgentRunId,
                 ResolveToolStage(call.Name),
@@ -311,6 +481,82 @@ public sealed class VisionAgentLoop
                     _ => string.Empty
                 },
                 StringComparer.OrdinalIgnoreCase);
+    }
+
+    private CancellationTokenSource CreateToolTimeout(CancellationToken cancellationToken)
+    {
+        var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        linked.CancelAfter(TimeSpan.FromMilliseconds(_options.ToolTimeoutMs));
+        return linked;
+    }
+
+    private void AppendLoopEvent(
+        bool emitPublicEvents,
+        string? runId,
+        string eventType,
+        string stage,
+        string title,
+        string summary,
+        string status,
+        object? payload)
+    {
+        if (!emitPublicEvents)
+        {
+            return;
+        }
+
+        _eventSink?.Append(runId, new AgentRunEventDraft
+        {
+            EventType = eventType,
+            Stage = stage,
+            Title = title,
+            Summary = summary,
+            Status = status,
+            Payload = payload,
+            MetadataOnly = true
+        });
+    }
+
+    private static bool IsDeniedResult(VisionAgentToolResult result)
+    {
+        return string.Equals(result.ErrorCode, "unknown_tool", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(result.ErrorCode, "tool_permission_denied", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(result.ErrorCode, RuntimePreviewPermissionGate.ConsentRequiredErrorCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string DetectFinalKind(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return "empty_final";
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return "final_answer";
+            }
+
+            if (doc.RootElement.TryGetProperty("workflowDraft", out var draft) &&
+                draft.ValueKind == JsonValueKind.Object)
+            {
+                return "workflow_draft";
+            }
+
+            if (doc.RootElement.TryGetProperty("draftEdits", out var edits) &&
+                edits.ValueKind == JsonValueKind.Array)
+            {
+                return "draft_edits";
+            }
+
+            return "final_answer";
+        }
+        catch (JsonException)
+        {
+            return "final_answer";
+        }
     }
 
     private static string SummarizeString(string? value)
@@ -599,6 +845,7 @@ public sealed record VisionAgentLoopRequest
     public string UserPrompt { get; init; } = string.Empty;
     public VisionAgentToolContext ToolContext { get; init; } = new();
     public Func<IReadOnlyList<VisionAgentLoopMessage>, CancellationToken, Task<string>>? CompleteAsync { get; init; }
+    public bool EmitPublicEvents { get; init; }
 }
 
 public sealed record VisionAgentLoopMessage(string Role, string Content);

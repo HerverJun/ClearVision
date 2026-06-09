@@ -60,6 +60,7 @@ public sealed class BuildToolRunner
             {
                 Stage = stage,
                 ToolName = toolName,
+                Source = "fixed_build_orchestrator",
                 InputSummary = _redactor.RedactText(inputSummary),
                 OutputSummary = _redactor.RedactText(result.OutputSummary),
                 Status = status,
@@ -110,6 +111,7 @@ public sealed class BuildToolRunner
             {
                 Stage = stage,
                 ToolName = toolName,
+                Source = "fixed_build_orchestrator",
                 InputSummary = _redactor.RedactText(inputSummary),
                 OutputSummary = _redactor.RedactText(ex.Message),
                 Status = AgentRunEventStatuses.Failed,
@@ -191,6 +193,7 @@ public sealed class BuildToolRunner
         {
             evidence.Stage,
             evidence.ToolName,
+            evidence.Source,
             evidence.InputSummary,
             evidence.OutputSummary,
             evidence.Status,
@@ -213,6 +216,7 @@ public sealed class BuildToolRunner
         {
             evidence.Stage,
             evidence.ToolName,
+            evidence.Source,
             evidence.InputSummary,
             OutputSummary = "发布该工具证据前，已移除不安全元数据。",
             Status = AgentRunEventStatuses.Completed,

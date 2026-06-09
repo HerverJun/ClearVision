@@ -30,6 +30,7 @@ public sealed record VisionAgentToolEvidence
 {
     public string Stage { get; init; } = string.Empty;
     public string ToolName { get; init; } = string.Empty;
+    public string Source { get; init; } = "fixed_build_orchestrator";
     public string InputSummary { get; init; } = string.Empty;
     public string OutputSummary { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;

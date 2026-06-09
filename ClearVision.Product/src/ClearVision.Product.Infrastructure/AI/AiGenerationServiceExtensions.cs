@@ -70,6 +70,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<AgentWorkflowDraftEditor>();
         services.AddScoped<VisionAgentProtocolParser>();
         services.AddScoped<VisionAgentLoop>();
+        services.AddScoped<IVisionAgentLoopCompletionSource, VisionAgentLoopCompletionSource>();
         services.AddScoped<IVisionAgentPlannerCompletionSource, LlmVisionAgentPlannerCompletionSource>();
         services.AddScoped<IVisionAgentPlannerService, VisionAgentPlannerService>();
         services.AddScoped<IVisionAgentPlanCompletionSource, LlmVisionAgentPlanCompletionSource>();

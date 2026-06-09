@@ -334,6 +334,8 @@ public sealed class AgentRunEndpointsTests
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = createDoc.RootElement.GetProperty("runId").GetString()!;
         await host.Generation.WaitForCallAsync();
 
         var request = host.Generation.LastRequest!;
@@ -348,6 +350,28 @@ public sealed class AgentRunEndpointsTests
         request.UseVisionAgentGenerateFlow.Should().BeTrue();
         request.TemplateSelection.Should().NotBeNull();
         request.TemplateSelection!.Mode.Should().Be("template_fill");
+        await host.WaitForTerminalAsync(runId);
+    }
+
+    [Fact(DisplayName = "AgentRun create preserves tool_loop GenerateFlow mode")]
+    public async Task CreateRun_ShouldPreserveToolLoopMode()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
+        {
+            description = "Tool Loop experimental build",
+            useVisionAgentGenerateFlow = true,
+            agentGenerateFlowMode = "tool_loop"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        await host.Generation.WaitForCallAsync();
+
+        host.Generation.LastRequest!.AgentGenerateFlowMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
+        await host.WaitForTerminalAsync(host.Generation.LastRequest.AgentRunId!);
+        var replay = host.StreamService.Replay(host.Generation.LastRequest.AgentRunId!)!;
+        replay.Events.Last().EventType.Should().Be(AgentRunEventTypes.RunCompleted);
     }
 
     [Fact(DisplayName = "POST AgentRun preserves structured BuildFromPlan input and replays Plan Build payload")]
@@ -637,6 +661,7 @@ public sealed class AgentRunEndpointsTests
         {
             gate.TrySetResult();
         }
+        await host.WaitForTerminalAsync(runId);
     }
 
     [Fact(DisplayName = "GET AgentRun SSE receives cancel terminal and closes")]
@@ -750,6 +775,7 @@ public sealed class AgentRunEndpointsTests
             host.AuthorizeAs("owner-a-token");
             gate.TrySetResult();
         }
+        await host.WaitForTerminalAsync(runId);
     }
 
     [Fact(DisplayName = "AgentRun EventSource stream token is single-use run-bound and expires")]

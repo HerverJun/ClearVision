@@ -1143,6 +1143,28 @@ test('scripted mode payload includes agentGenerateFlowMode=scripted', async () =
   });
 });
 
+test('developer mode can select Tool Loop experimental mode', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+
+  const html = panel._renderAgentDeveloperControls();
+  assert.match(html, /data-agent-generate-mode="tool_loop"/);
+  assert.match(html, /Tool Loop 实验/);
+  assert.match(html, /实验模式：LLM 会在权限门禁内自主选择工具；失败会回退稳定构建链路。/);
+  assert.deepEqual(panel._buildAgentGenerateFlowRequestPayload(), {
+    useVisionAgentGenerateFlow: true,
+    agentGenerateFlowMode: 'tool_loop'
+  });
+});
+
+test('ordinary UI still hides Tool Loop developer controls by default', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true, mode: 'tool_loop' });
+
+  assert.equal(panel._renderAgentDeveloperControls(), '');
+  assert.doesNotMatch(panel._renderAgentDeveloperControls(), /tool_loop|Tool Loop 实验/);
+});
+
 test('developer mode renders RuntimePreview consent switch', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
@@ -1747,6 +1769,59 @@ test('BuildResult replay payload renders Build Workspace and apply gate without 
   ].join('\n'));
 });
 
+test('Tool Evidence Timeline distinguishes LLM tool loop and fallback fixed chain sources', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.agentWorkspaceMode = 'build';
+  const payload = buildResultContractPayload();
+  payload.buildResult.toolEvidenceTimeline = [
+    {
+      stage: 'tool_loop',
+      toolName: 'inspect_current_flow',
+      source: 'llm_tool_loop',
+      status: 'completed',
+      durationMs: 8,
+      outputSummary: 'LLM-requested tool completed with public metadata.',
+      metadataOnly: true,
+      redactionPass: true
+    },
+    {
+      stage: 'workflow_draft',
+      toolName: 'stable_build_tool',
+      source: 'fallback_build_orchestrator',
+      status: 'completed',
+      warningCode: 'partial_final_requires_stable_completion',
+      durationMs: 12,
+      outputSummary: 'Stable BuildOrchestrator completed.',
+      metadataOnly: true,
+      redactionPass: true
+    }
+  ];
+  panel.activeAgentRunEvents = [
+    {
+      runId: 'ar_tool_loop_build',
+      sequence: 20,
+      eventType: 'run.completed',
+      stage: 'run',
+      title: 'Run completed',
+      summary: 'Build completed.',
+      status: 'completed',
+      payload,
+      metadataOnly: true,
+      redactionPass: true
+    }
+  ];
+
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  const timelineHtml = elements['#ai-build-event-timeline'].innerHTML;
+  assert.match(timelineHtml, /LLM 自主工具/);
+  assert.match(timelineHtml, /回退固定链路/);
+  assert.match(timelineHtml, /Tool Loop 草稿不完整，已回退稳定构建链路/);
+});
+
 test('Canvas apply remains enabled when deployment is blocked by missing resources', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -2114,6 +2189,92 @@ test('AgentRun stage events render public execution process steps', async () => 
   const copy = turn.processBody.children[0].querySelector('.ai-agent-run-step-copy');
   assert.match(copy.textContent, /规划器已开始/);
   assert.match(copy.textContent, /正在生成公开执行计划/);
+});
+
+test('AgentRun tool_loop events render realtime public progress with fallback copy', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_tool_loop';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_loop',
+    sequence: 3,
+    eventType: 'tool_loop.started',
+    stage: 'tool_loop',
+    title: 'Tool Loop started',
+    summary: 'Tool Loop started.',
+    status: 'running',
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_loop',
+    sequence: 4,
+    eventType: 'tool_loop.fallback',
+    stage: 'tool_loop',
+    title: 'Tool Loop fallback',
+    summary: 'Experimental Tool Loop could not safely produce a complete Build payload; using stable BuildOrchestrator.',
+    status: 'blocked',
+    payload: {
+      fallbackReason: 'tool_permission_denied',
+      userMessage: '实验 Tool Loop 已回退到稳定构建链路。',
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  const text = collectProcessText(turn);
+  assert.match(text, /Tool Loop 实验/);
+  assert.match(text, /Tool Loop 已回退/);
+  assert.match(text, /实验 Tool Loop 未能安全产出完整构建结果，已回退稳定构建链路。/);
+});
+
+test('AgentRun tool_call events render LLM requested tool cards', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_tool_call';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_call',
+    sequence: 5,
+    eventType: 'tool_call.requested',
+    stage: 'tool_loop',
+    title: 'Tool call requested: inspect_current_flow',
+    summary: 'LLM requested a metadata-only Vision Agent tool.',
+    status: 'running',
+    payload: {
+      toolName: 'inspect_current_flow',
+      permission: 'ReadOnly',
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handleAgentRunEvent({
+    runId: 'ar_tool_call',
+    sequence: 6,
+    eventType: 'tool_call.denied',
+    stage: 'tool_loop',
+    title: 'Tool call denied: runtime_package_precheck',
+    summary: 'LLM requested tool was denied by the experimental permission gate.',
+    status: 'blocked',
+    payload: {
+      toolName: 'runtime_package_precheck',
+      errorCode: 'tool_permission_denied',
+      firstFixRecommendation: 'Remove the blocked tool intent or retry in a mode that only uses metadata-only review tools.',
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(turn.toolsSection.hidden, false);
+  assert.match(turn.toolsBody.innerHTML, /inspect_current_flow/);
+  assert.match(turn.toolsBody.innerHTML, /runtime_package_precheck/);
+  assert.match(turn.toolsBody.innerHTML, /宸查樆鏂?|blocked|warning/);
 });
 
 test('AgentRun duplicate replay events are ignored by run sequence and type', async () => {
@@ -2614,7 +2775,8 @@ test('response mapping displays folded toolTrace summary only', async () => {
   assert.doesNotMatch(validation.innerHTML, /<details class="ai-agent-tool-trace"[^>]*open/);
   assert.match(validation.innerHTML, /工具轨迹/);
   assert.match(validation.innerHTML, /流程校验工具 已通过 12ms/);
-  assert.match(validation.innerHTML, /运行预演回放工具 已通过 7ms/);
+  assert.match(validation.innerHTML, /工具 已通过 7ms/);
+  assert.doesNotMatch(validation.innerHTML, /运行预演回放工具/);
   assert.doesNotMatch(validation.innerHTML, /validate_flow:Simulation/);
 });
 

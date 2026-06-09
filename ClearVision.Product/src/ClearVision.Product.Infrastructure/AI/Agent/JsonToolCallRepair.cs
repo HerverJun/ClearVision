@@ -55,8 +55,12 @@ public sealed class JsonToolCallRepair
                                workflowDraft.ValueKind == JsonValueKind.Object;
         var hasDraftEdits = root.TryGetProperty("draftEdits", out var draftEdits) &&
                             draftEdits.ValueKind == JsonValueKind.Array;
+        var hasFinalAnswer = root.TryGetProperty("finalAnswer", out var finalAnswer) &&
+                             finalAnswer.ValueKind == JsonValueKind.String;
+        var hasAnswer = root.TryGetProperty("answer", out var answer) &&
+                        answer.ValueKind == JsonValueKind.String;
         return (hasFinalKind || hasWorkflowDraft || hasDraftEdits) &&
-               (hasWorkflowDraft || hasDraftEdits);
+               (hasWorkflowDraft || hasDraftEdits || hasFinalAnswer || hasAnswer);
     }
 
     private static bool HasValidToolCalls(

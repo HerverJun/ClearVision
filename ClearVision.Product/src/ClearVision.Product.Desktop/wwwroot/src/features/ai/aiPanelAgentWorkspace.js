@@ -17,6 +17,7 @@ const BUILD_STAGE_ORDER = [
     'template_strategy',
     'operator_pipeline',
     'parameter_mapping',
+    'tool_loop',
     'planner',
     'workflow_draft',
     'validate_schema',
@@ -44,6 +45,7 @@ const BUILD_STAGE_LABELS = {
     template_strategy: '模板策略',
     operator_pipeline: '算子链',
     parameter_mapping: '参数映射',
+    tool_loop: 'Tool Loop 实验',
     planner: '规划与工具',
     tool_policy: '工具策略',
     workflow_draft: '流程草稿',
@@ -169,7 +171,12 @@ const AI_DISPLAY_TEXT_MAP = {
     'invalid operator was repaired': '非法算子已修复',
     'NG when scratch candidate exceeds pending threshold.': '当划痕候选超过待确认阈值时判为 NG。',
     'Bind model_resource metadata before deployment.': '部署前绑定模型资源元数据。',
-    'Bind missing model_resource metadata for op_detect.ModelId before deployment.': '部署前绑定 op_detect.模型资源 的模型资源元数据。'
+    'Bind missing model_resource metadata for op_detect.ModelId before deployment.': '部署前绑定 op_detect.模型资源 的模型资源元数据。',
+    'Tool Loop fallback': 'Tool Loop 已回退',
+    'Experimental Tool Loop could not safely produce a complete Build payload; using stable BuildOrchestrator.': '实验 Tool Loop 未能安全产出完整构建结果，已回退稳定构建链路。',
+    'Tool Loop completion source is not registered; using stable BuildOrchestrator.': 'Tool Loop completion source 未注册，已回退稳定构建链路。',
+    'Experimental Tool Loop fallback decision.': '实验 Tool Loop 回退决策。',
+    'LLM-requested tool completed with public metadata.': 'LLM 主动调用的工具已返回公开元数据。'
 };
 
 const AI_CODE_TEXT_MAP = {
@@ -223,7 +230,17 @@ const AI_CODE_TEXT_MAP = {
     measurement_parameter: '测量参数',
     camera_binding: '相机绑定',
     output_channel: '输出通道',
-    plc_address: 'PLC 地址'
+    plc_address: 'PLC 地址',
+    llm_tool_loop: 'LLM 自主工具',
+    fixed_build_orchestrator: '固定构建链路',
+    fallback_build_orchestrator: '回退固定链路',
+    partial_final_requires_stable_completion: 'Tool Loop 草稿不完整，已回退稳定构建链路',
+    completion_failed: 'Tool Loop completion 失败，已回退稳定构建链路',
+    failed_with_tool_limit: 'Tool Loop 超过最大轮次，已回退稳定构建链路',
+    tool_permission_denied: '工具权限被拒绝，已回退稳定构建链路',
+    unknown_tool: '未知工具被拒绝，已回退稳定构建链路',
+    runtime_preview_consent_required: 'RuntimePreview 需要显式授权，已回退稳定构建链路',
+    tool_loop_fallback: 'Tool Loop 回退'
 };
 
 const AI_OPERATOR_LABELS = {
@@ -1101,7 +1118,6 @@ export const aiPanelAgentWorkspaceMixin = {
         const map = {
             match_flow_template: '模板匹配',
             validate_flow: '流程校验',
-            replay_flow_with_frame: '离线回放',
             get_flow_template_skeleton: '获取模板骨架',
             select_operator_pipeline: '选择算子链',
             map_parameters: '参数映射',
@@ -1688,16 +1704,18 @@ export const aiPanelAgentWorkspaceMixin = {
                 const stage = item.stage || item.Stage || '';
                 const toolName = item.toolName || item.ToolName || '';
                 const status = item.status || item.Status || '';
+                const source = item.source || item.Source || '';
                 const duration = item.durationMs ?? item.DurationMs ?? '';
                 const warning = item.warningCode || item.WarningCode || '';
                 const summary = item.outputSummary || item.OutputSummary || '';
                 const stageLabel = BUILD_STAGE_LABELS[stage] || this._localizeDisplayText(stage);
                 const toolLabel = this._formatToolName(toolName);
                 const warningLabel = this._localizeDisplayText(warning);
+                const sourceLabel = this._localizeDisplayText(source);
                 return `
                     <div class="ai-build-compact-row">
                         <b>${this._escapeHtml(stageLabel)}${toolName ? ` / ${this._escapeHtml(toolLabel)}` : ''}</b>
-                        <span>${this._escapeHtml(this._formatBuildStatus(status))}${duration !== '' ? ` / ${this._escapeHtml(String(duration))} ms` : ''}${warning ? ` / ${this._escapeHtml(warningLabel)}` : ''}</span>
+                        <span>${this._escapeHtml(this._formatBuildStatus(status))}${source ? ` / ${this._escapeHtml(sourceLabel)}` : ''}${duration !== '' ? ` / ${this._escapeHtml(String(duration))} ms` : ''}${warning ? ` / ${this._escapeHtml(warningLabel)}` : ''}</span>
                         <small>${this._escapeHtml(this._localizeDisplayText(summary))}</small>
                     </div>
                 `;

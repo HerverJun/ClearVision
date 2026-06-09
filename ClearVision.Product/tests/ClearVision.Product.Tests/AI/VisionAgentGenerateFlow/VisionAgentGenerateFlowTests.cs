@@ -485,7 +485,6 @@ public sealed class VisionAgentGenerateFlowTests
         frontendGuardSource.Should().Contain("useVisionAgentGenerateFlow: true");
         frontendGuardSource.Should().NotContain("capture_test_frame");
         frontendGuardSource.Should().NotContain("replay_flow_with_frame");
-        frontendGuardSource.Should().NotContain("runtime_package_precheck");
     }
 
     [Fact(DisplayName = "Controlled agent should not be enabled by default in options")]

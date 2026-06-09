@@ -19,7 +19,14 @@ const PLAN_EVENT_TYPES = new Set([
     'plan.failed',
     'plan.cancelled'
 ]);
-const TOOL_EVENT_TYPES = new Set(['tool.call.started', 'tool.call.completed', 'tool.call.failed']);
+const TOOL_EVENT_TYPES = new Set([
+    'tool.call.started',
+    'tool.call.completed',
+    'tool.call.failed',
+    'tool_call.requested',
+    'tool_call.completed',
+    'tool_call.denied'
+]);
 const ARTIFACT_EVENT_TYPES = new Set([
     'artifact.created',
     'workflow.draft.updated',
@@ -41,6 +48,7 @@ const STAGE_LABELS = {
     requirement_parsing: '需求归一',
     planner: '规划器',
     tool_policy: '工具策略',
+    tool_loop: 'Tool Loop 实验',
     workflow_draft: '流程草稿',
     readiness: '就绪检查',
     manifest_dry_run: '运行包预演',
@@ -59,6 +67,15 @@ const AGENT_RUN_EVENT_TYPES = [
     'tool.call.started',
     'tool.call.completed',
     'tool.call.failed',
+    'tool_loop.started',
+    'tool_loop.round.started',
+    'tool_call.requested',
+    'tool_call.completed',
+    'tool_call.denied',
+    'tool_result.appended',
+    'tool_loop.finalized',
+    'tool_loop.fallback',
+    'tool_loop.failed',
     'workflow.draft.updated',
     'readiness.checked',
     'package.readiness.checked',
@@ -862,7 +879,7 @@ export const aiPanelAgentRunMixin = {
             evt.stage === 'assumption_confirmation' ||
             evt.stage === 'requirement_parsing') {
             this._setWorkbenchState(AiWorkbenchStates.PARSING);
-        } else if (evt.stage === 'planner' || evt.stage === 'tool_policy') {
+        } else if (evt.stage === 'planner' || evt.stage === 'tool_policy' || evt.stage === 'tool_loop') {
             this._setWorkbenchState(AiWorkbenchStates.GENERATING);
         } else if (evt.stage === 'readiness' || evt.stage === 'manifest_dry_run') {
             this._setWorkbenchState(AiWorkbenchStates.DRY_RUNNING);
@@ -902,10 +919,10 @@ export const aiPanelAgentRunMixin = {
 
     _getAgentRunTone(status, eventType = '') {
         const normalizedStatus = String(status || '').trim().toLowerCase();
-        if (normalizedStatus === 'failed' || eventType === 'run.failed' || eventType === 'tool.call.failed') {
+        if (normalizedStatus === 'failed' || eventType === 'run.failed' || eventType === 'tool.call.failed' || eventType === 'tool_loop.failed') {
             return 'failed';
         }
-        if (normalizedStatus === 'blocked') {
+        if (normalizedStatus === 'blocked' || eventType === 'tool_call.denied' || eventType === 'tool_loop.fallback') {
             return 'warning';
         }
         if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled' || eventType === 'run.cancelled') {

@@ -26,6 +26,15 @@ public static class AgentRunEventTypes
     public const string ToolCallStarted = "tool.call.started";
     public const string ToolCallCompleted = "tool.call.completed";
     public const string ToolCallFailed = "tool.call.failed";
+    public const string ToolLoopStarted = "tool_loop.started";
+    public const string ToolLoopRoundStarted = "tool_loop.round.started";
+    public const string ToolCallRequested = "tool_call.requested";
+    public const string ToolCallLoopCompleted = "tool_call.completed";
+    public const string ToolCallDenied = "tool_call.denied";
+    public const string ToolResultAppended = "tool_result.appended";
+    public const string ToolLoopFinalized = "tool_loop.finalized";
+    public const string ToolLoopFallback = "tool_loop.fallback";
+    public const string ToolLoopFailed = "tool_loop.failed";
     public const string WorkflowDraftUpdated = "workflow.draft.updated";
     public const string ReadinessChecked = "readiness.checked";
     public const string PackageReadinessChecked = "package.readiness.checked";

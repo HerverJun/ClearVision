@@ -6,6 +6,7 @@ using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
+using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
@@ -37,19 +38,36 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private readonly IVisionAgentPlanPlannerService? _planPlannerService;
     private readonly IVisionAgentBuildOrchestrator? _buildOrchestrator;
     private readonly IAgentRunEventSink? _eventSink;
+    private readonly VisionAgentLoop? _toolLoop;
+    private readonly IVisionAgentLoopCompletionSource? _toolLoopCompletionSource;
+    private readonly AgentGenerateFlowOptions _agentOptions;
+    private readonly VisionAgentLoopOptions _loopOptions;
+    private readonly AgentRunEventRedactor _redactor;
 
     public VisionAgentOrchestrator(
         IVisionAgentToolRegistry toolRegistry,
         IAiFlowGenerationService generationService,
         IAgentRunEventSink? eventSink = null,
         IVisionAgentBuildOrchestrator? buildOrchestrator = null,
-        IVisionAgentPlanPlannerService? planPlannerService = null)
+        IVisionAgentPlanPlannerService? planPlannerService = null,
+        VisionAgentLoop? toolLoop = null,
+        IVisionAgentLoopCompletionSource? toolLoopCompletionSource = null,
+        IOptions<AgentGenerateFlowOptions>? agentOptions = null,
+        IOptions<VisionAgentLoopOptions>? loopOptions = null,
+        AgentRunEventRedactor? redactor = null)
     {
         _toolRegistry = toolRegistry;
         _generationService = generationService;
         _planPlannerService = planPlannerService;
         _buildOrchestrator = buildOrchestrator;
         _eventSink = eventSink;
+        _toolLoop = toolLoop;
+        _toolLoopCompletionSource = toolLoopCompletionSource;
+        _agentOptions = agentOptions?.Value ?? new AgentGenerateFlowOptions();
+        _agentOptions.Mode = AiAgentGenerateFlowModes.Normalize(_agentOptions.Mode);
+        _loopOptions = loopOptions?.Value ?? new VisionAgentLoopOptions();
+        _loopOptions.Normalize();
+        _redactor = redactor ?? new AgentRunEventRedactor();
     }
 
     public async Task<VisionAgentPlanModeResult> CreatePlanAsync(
@@ -76,6 +94,18 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         AiFlowGenerationRequest request,
         CancellationToken cancellationToken)
     {
+        if (ShouldUseToolLoop(request))
+        {
+            return await BuildFromPlanWithToolLoopAsync(request, cancellationToken);
+        }
+
+        return await BuildFromPlanStableAsync(request, cancellationToken);
+    }
+
+    private async Task<AiFlowGenerationResult> BuildFromPlanStableAsync(
+        AiFlowGenerationRequest request,
+        CancellationToken cancellationToken)
+    {
         if (_buildOrchestrator != null)
         {
             return await _buildOrchestrator.BuildAsync(request, cancellationToken);
@@ -83,6 +113,295 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
         EmitBuildPreparationEvents(request);
         return await _generationService.GenerateFlowAsync(request, cancellationToken: cancellationToken);
+    }
+
+    private async Task<AiFlowGenerationResult> BuildFromPlanWithToolLoopAsync(
+        AiFlowGenerationRequest request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_toolLoop == null || _toolLoopCompletionSource == null)
+        {
+            EmitToolLoopFallback(
+                request.AgentRunId,
+                "completion_source_missing",
+                "Tool Loop completion source is not registered; using stable BuildOrchestrator.");
+            var stable = await BuildFromPlanStableAsync(request, cancellationToken);
+            MarkFixedEvidenceSource(stable, "fallback_build_orchestrator");
+            AppendFallbackMarker(stable, "completion_source_missing");
+            return stable;
+        }
+
+        var toolContext = BuildToolLoopContext(request);
+        var loopResult = await _toolLoop.RunAsync(new VisionAgentLoopRequest
+        {
+            UserPrompt = BuildToolLoopUserPrompt(request),
+            ToolContext = toolContext,
+            EmitPublicEvents = true,
+            CompleteAsync = (messages, ct) => _toolLoopCompletionSource.CompleteAsync(
+                new VisionAgentLoopCompletionRequest
+                {
+                    GenerationRequest = request,
+                    Messages = messages
+                },
+                ct)
+        }, cancellationToken);
+
+        var fallbackReason = ResolveToolLoopFallbackReason(loopResult);
+        if (!string.IsNullOrWhiteSpace(fallbackReason))
+        {
+            EmitToolLoopFallback(
+                request.AgentRunId,
+                fallbackReason,
+                "Experimental Tool Loop could not safely produce a complete Build payload; using stable BuildOrchestrator.");
+            var fallback = await BuildFromPlanStableAsync(request, cancellationToken);
+            MarkFixedEvidenceSource(fallback, "fallback_build_orchestrator");
+            MergeToolLoopEvidence(fallback, loopResult, fallbackReason);
+            return fallback;
+        }
+
+        var result = await BuildFromPlanStableAsync(request, cancellationToken);
+        MarkFixedEvidenceSource(result, "fixed_build_orchestrator");
+        MergeToolLoopEvidence(result, loopResult, fallbackReason: null);
+        return result;
+    }
+
+    private bool ShouldUseToolLoop(AiFlowGenerationRequest request)
+    {
+        var requestMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode);
+        if (string.Equals(requestMode, AiAgentGenerateFlowModes.ToolLoop, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return request.UseVisionAgentGenerateFlow &&
+               _agentOptions.Enabled &&
+               string.Equals(_agentOptions.Mode, AiAgentGenerateFlowModes.ToolLoop, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private VisionAgentToolContext BuildToolLoopContext(AiFlowGenerationRequest request)
+    {
+        var permissions = new HashSet<VisionAgentToolPermission>
+        {
+            VisionAgentToolPermission.ReadOnly,
+            VisionAgentToolPermission.Simulation
+        };
+        if (RuntimePreviewPermissionGate.HasConsent(request))
+        {
+            permissions.Add(VisionAgentToolPermission.RuntimePreview);
+        }
+
+        return new VisionAgentToolContext
+        {
+            UserDescription = request.BuildFromPlan?.OriginalUserPrompt ?? request.Description,
+            AdditionalContext = request.AdditionalContext,
+            SessionId = request.SessionId,
+            AgentRunId = request.AgentRunId,
+            ExistingFlowJson = VisionAgentBuildSupport.FirstNonEmpty(
+                request.BuildFromPlan?.CurrentFlowSnapshot,
+                request.ExistingFlowJson),
+            DebugTrace = false,
+            MaxToolResultChars = _loopOptions.MaxToolResultChars,
+            RuntimePreviewConsent = RuntimePreviewPermissionGate.HasConsent(request),
+            AllowedPermissions = permissions
+        };
+    }
+
+    private static string BuildToolLoopUserPrompt(AiFlowGenerationRequest request)
+    {
+        var build = request.BuildFromPlan;
+        var plan = build?.PlanSnapshot;
+        var routeOperators = plan?.RecommendedRoute.Operators ?? [];
+        return string.Join(Environment.NewLine,
+        [
+            "Build an experimental metadata-only workflow draft plan using JSON tool_call protocol.",
+            $"userGoal={Clean(build?.OriginalUserPrompt ?? request.Description)}",
+            $"buildIntent={Clean(build?.BuildIntent ?? request.Mode.ToWireValue())}",
+            $"planIntent={Clean(plan?.Intent)}",
+            $"recommendedOperators={string.Join(",", routeOperators.Select(Clean))}",
+            $"templateSelectionMode={Clean(build?.TemplateSelection?.Mode ?? request.TemplateSelection?.Mode)}",
+            $"templateId={Clean(build?.TemplateSelection?.TemplateId ?? request.TemplateSelection?.TemplateId)}",
+            $"hasCurrentFlowSnapshot={(!string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot) || !string.IsNullOrWhiteSpace(request.ExistingFlowJson)).ToString().ToLowerInvariant()}",
+            $"runtimePreviewConsent={RuntimePreviewPermissionGate.HasConsent(request).ToString().ToLowerInvariant()}",
+            "Default permissions are ReadOnly and Simulation only. Do not call ConfigWrite or DeploymentPrepare.",
+            "Return final JSON only after validating the operator and parameter metadata that is available."
+        ]);
+    }
+
+    private static string? ResolveToolLoopFallbackReason(VisionAgentLoopResult result)
+    {
+        if (!result.Success)
+        {
+            return string.IsNullOrWhiteSpace(result.FailureType)
+                ? "tool_loop_failed"
+                : result.FailureType;
+        }
+
+        var denied = result.ToolTrace.FirstOrDefault(trace =>
+            !trace.Success &&
+            (string.Equals(trace.ErrorCode, "unknown_tool", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(trace.ErrorCode, "tool_permission_denied", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(trace.ErrorCode, RuntimePreviewPermissionGate.ConsentRequiredErrorCode, StringComparison.OrdinalIgnoreCase)));
+        if (denied != null)
+        {
+            return string.IsNullOrWhiteSpace(denied.ErrorCode)
+                ? "tool_permission_denied"
+                : denied.ErrorCode;
+        }
+
+        return HasWorkflowDraftFinal(result.FinalContent)
+            ? null
+            : "partial_final_requires_stable_completion";
+    }
+
+    private static bool HasWorkflowDraftFinal(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            return doc.RootElement.ValueKind == JsonValueKind.Object &&
+                   ((doc.RootElement.TryGetProperty("workflowDraft", out var draft) &&
+                     draft.ValueKind == JsonValueKind.Object) ||
+                    (doc.RootElement.TryGetProperty("draftEdits", out var edits) &&
+                     edits.ValueKind == JsonValueKind.Array));
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private void EmitToolLoopFallback(
+        string? runId,
+        string reason,
+        string summary)
+    {
+        _eventSink?.Append(runId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.ToolLoopFallback,
+            Stage = "tool_loop",
+            Title = "Tool Loop fallback",
+            Summary = summary,
+            Status = AgentRunEventStatuses.Blocked,
+            Payload = new
+            {
+                fallbackReason = reason,
+                fallbackTarget = "VisionAgentBuildOrchestrator",
+                userMessage = "实验 Tool Loop 已回退到稳定构建链路。",
+                metadataOnly = true
+            }
+        });
+    }
+
+    private void MergeToolLoopEvidence(
+        AiFlowGenerationResult result,
+        VisionAgentLoopResult loopResult,
+        string? fallbackReason)
+    {
+        if (result.BuildResult == null)
+        {
+            result.ToolTrace.AddRange(loopResult.ToolTrace.Cast<object>());
+            return;
+        }
+
+        var loopEvidence = loopResult.ToolTrace
+            .Select(ToLoopEvidence)
+            .ToList();
+        if (!string.IsNullOrWhiteSpace(fallbackReason))
+        {
+            loopEvidence.Add(new VisionAgentToolEvidence
+            {
+                Stage = "tool_loop",
+                ToolName = "tool_loop_fallback",
+                Source = "fallback_build_orchestrator",
+                InputSummary = "Experimental Tool Loop fallback decision.",
+                OutputSummary = $"Stable BuildOrchestrator completed after fallbackReason={_redactor.RedactText(fallbackReason)}.",
+                Status = AgentRunEventStatuses.Completed,
+                DurationMs = 0,
+                EvidenceId = $"ev_loop_{Guid.NewGuid():N}",
+                WarningCode = _redactor.RedactText(fallbackReason),
+                ApplyImpact = "stable_build_completed",
+                DeploymentImpact = "stable_build_completed",
+                MetadataOnly = true,
+                RedactionPass = true
+            });
+        }
+
+        result.BuildResult.ToolEvidenceTimeline.InsertRange(0, loopEvidence);
+        result.ToolTrace.InsertRange(0, loopEvidence.Cast<object>());
+    }
+
+    private VisionAgentToolEvidence ToLoopEvidence(VisionAgentToolTrace trace)
+    {
+        var denied = string.Equals(trace.ErrorCode, "unknown_tool", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(trace.ErrorCode, "tool_permission_denied", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(trace.ErrorCode, RuntimePreviewPermissionGate.ConsentRequiredErrorCode, StringComparison.OrdinalIgnoreCase);
+        return new VisionAgentToolEvidence
+        {
+            Stage = "tool_loop",
+            ToolName = _redactor.RedactText(trace.ToolName),
+            Source = "llm_tool_loop",
+            InputSummary = _redactor.RedactText($"LLM requested {trace.Permission} tool."),
+            OutputSummary = trace.Success
+                ? "LLM-requested tool completed with public metadata."
+                : _redactor.RedactText($"LLM-requested tool did not complete: {trace.ErrorCode}."),
+            Status = trace.Success
+                ? AgentRunEventStatuses.Completed
+                : denied ? AgentRunEventStatuses.Blocked : AgentRunEventStatuses.Failed,
+            DurationMs = trace.DurationMs,
+            EvidenceId = $"ev_loop_{Guid.NewGuid():N}",
+            WarningCode = trace.Success ? string.Empty : _redactor.RedactText(trace.ErrorCode ?? "tool_failed"),
+            ApplyImpact = trace.Success ? "no_canvas_change" : "fallback_to_stable_build",
+            DeploymentImpact = trace.Success ? "no_deployment_action" : "fallback_to_stable_build",
+            MetadataOnly = true,
+            RedactionPass = true
+        };
+    }
+
+    private static void MarkFixedEvidenceSource(
+        AiFlowGenerationResult result,
+        string source)
+    {
+        var evidence = result.BuildResult?.ToolEvidenceTimeline;
+        if (evidence == null)
+        {
+            return;
+        }
+
+        for (var index = 0; index < evidence.Count; index++)
+        {
+            evidence[index] = evidence[index] with
+            {
+                Source = source
+            };
+        }
+    }
+
+    private static void AppendFallbackMarker(
+        AiFlowGenerationResult result,
+        string fallbackReason)
+    {
+        result.BuildResult?.ToolEvidenceTimeline.Insert(0, new VisionAgentToolEvidence
+        {
+            Stage = "tool_loop",
+            ToolName = "tool_loop_fallback",
+            Source = "fallback_build_orchestrator",
+            InputSummary = "Tool Loop could not start.",
+            OutputSummary = $"Stable BuildOrchestrator completed after fallbackReason={fallbackReason}.",
+            Status = AgentRunEventStatuses.Completed,
+            DurationMs = 0,
+            EvidenceId = $"ev_loop_{Guid.NewGuid():N}",
+            WarningCode = fallbackReason,
+            ApplyImpact = "stable_build_completed",
+            DeploymentImpact = "stable_build_completed",
+            MetadataOnly = true,
+            RedactionPass = true
+        });
     }
 
     private VisionAgentPlanModeResult BuildPlan(VisionAgentPlanModeRequest request)

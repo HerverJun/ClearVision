@@ -52,12 +52,16 @@ public static class AiAgentGenerateFlowModes
 {
     public const string Scripted = "scripted";
     public const string Planner = "planner";
+    public const string ToolLoop = "tool_loop";
 
     public static string Normalize(string? value)
     {
-        return string.Equals(value, Planner, StringComparison.OrdinalIgnoreCase)
-            ? Planner
-            : Scripted;
+        return value?.Trim().ToLowerInvariant() switch
+        {
+            Planner => Planner,
+            ToolLoop => ToolLoop,
+            _ => Scripted
+        };
     }
 }
 

@@ -82,10 +82,7 @@ export const RESOURCE_DISPLAY_NAMES = Object.freeze({
 
 export const TOOL_DISPLAY_NAMES = Object.freeze({
     validate_flow: '流程校验工具',
-    dry_run_flow: '元数据预演工具',
-    runtime_package_precheck: '运行包预检工具',
-    replay_flow_with_frame: '运行预演回放工具',
-    capture_test_frame: '测试帧采集工具'
+    dry_run_flow: '元数据预演工具'
 });
 
 export const STATUS_DISPLAY_NAMES = Object.freeze({

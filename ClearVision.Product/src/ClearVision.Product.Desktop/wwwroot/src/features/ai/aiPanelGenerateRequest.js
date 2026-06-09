@@ -340,7 +340,10 @@ export const aiPanelGenerateRequestMixin = {
     },
 
     _normalizeAgentGenerateFlowMode(mode) {
-        return String(mode || '').trim().toLowerCase() === 'planner' ? 'planner' : 'scripted';
+        const normalized = String(mode || '').trim().toLowerCase();
+        if (normalized === 'planner') return 'planner';
+        if (normalized === 'tool_loop') return 'tool_loop';
+        return 'scripted';
     },
 
     _loadAgentGenerateFlowEnabled() {
@@ -399,9 +402,11 @@ export const aiPanelGenerateRequestMixin = {
                     <span>Agent GenerateFlow</span>
                 </label>
                 <div class="ai-agent-dev-mode-toggle" id="ai-agent-generate-mode-toggle" role="group" aria-label="Agent GenerateFlow 模式">
-                    <button class="ai-mode-chip ${mode === 'scripted' ? 'is-active' : ''}" type="button" data-agent-generate-mode="scripted" ${enabled ? '' : 'disabled'}>scripted</button>
+                    <button class="ai-mode-chip ${mode === 'scripted' ? 'is-active' : ''}" type="button" data-agent-generate-mode="scripted" ${enabled ? '' : 'disabled'}>固定构建链路：稳定</button>
                     <button class="ai-mode-chip ${mode === 'planner' ? 'is-active' : ''}" type="button" data-agent-generate-mode="planner" ${enabled ? '' : 'disabled'}>planner</button>
+                    <button class="ai-mode-chip ${mode === 'tool_loop' ? 'is-active' : ''}" type="button" data-agent-generate-mode="tool_loop" ${enabled ? '' : 'disabled'}>Tool Loop 实验</button>
                 </div>
+                <div class="ai-agent-dev-note" ${mode === 'tool_loop' ? '' : 'hidden'}>实验模式：LLM 会在权限门禁内自主选择工具；失败会回退稳定构建链路。</div>
                 <label class="ai-agent-dev-toggle ai-agent-preview-consent">
                     <input id="ai-agent-runtime-preview-consent" type="checkbox" ${enabled && this.runtimePreviewConsent ? 'checked' : ''} ${enabled ? '' : 'disabled'} />
                     <span>允许本轮 RuntimePreview</span>
@@ -428,6 +433,10 @@ export const aiPanelGenerateRequestMixin = {
             if (previewConsentToggle) {
                 previewConsentToggle.disabled = !this.useVisionAgentGenerateFlow;
                 previewConsentToggle.checked = Boolean(this.useVisionAgentGenerateFlow && this.runtimePreviewConsent);
+            }
+            const note = this.container?.querySelector('.ai-agent-dev-note');
+            if (note) {
+                note.hidden = mode !== 'tool_loop';
             }
         };
 
