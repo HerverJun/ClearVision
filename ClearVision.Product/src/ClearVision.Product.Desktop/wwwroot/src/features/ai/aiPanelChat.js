@@ -714,6 +714,7 @@ export const aiPanelChatMixin = {
         const knownFacts = brief?.knownFacts || [];
 
         turn.clarificationSection.hidden = false;
+        turn.clarificationSection.open = true;
         turn.clarificationBody.innerHTML = `
             <div class="ai-assistant-clarification-summary">${this._escapeHtml(summary)}</div>
             ${knownFacts.length > 0 ? `

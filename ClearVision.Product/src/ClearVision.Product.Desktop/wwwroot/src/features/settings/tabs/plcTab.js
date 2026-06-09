@@ -23,6 +23,13 @@ export function installPlcTab(SettingsView) {
             if (!communicationTab || communicationTab.dataset.boundPlcEvents === 'true') return;
 
             communicationTab.dataset.boundPlcEvents = 'true';
+            const connectionFieldIds = new Set([
+                'cfg-plcIpAddress',
+                'cfg-plcPort',
+                'cfg-s7-cpuType',
+                'cfg-s7-rack',
+                'cfg-s7-slot'
+            ]);
 
             communicationTab.addEventListener('click', async (e) => {
                 const button = e.target.closest('button');
@@ -69,6 +76,11 @@ export function installPlcTab(SettingsView) {
             communicationTab.addEventListener('input', (e) => {
                 const target = e.target;
                 if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+                if (connectionFieldIds.has(target.id)) {
+                    this.plcDraftDirty = true;
+                    this.syncActivePlcProfileDraft(this.getActivePlcProtocol());
+                    return;
+                }
                 updateField(target);
             });
 
@@ -77,12 +89,18 @@ export function installPlcTab(SettingsView) {
                 if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
                 if (target.id === 'cfg-protocol') {
                     const previousProtocol = this.getActivePlcProtocol();
+                    this.plcDraftDirty = true;
                     this.syncActivePlcProfileDraft(previousProtocol);
                     this.config.communication.activeProtocol = this.normalizePlcProtocol(target.value);
                     this.syncPlcMappingsFromActiveProfile();
                     this.plcValidationErrors = [];
                     this.plcConnectionStatus = 'unknown';
                     this.refreshCommunicationPanel();
+                    return;
+                }
+                if (connectionFieldIds.has(target.id)) {
+                    this.plcDraftDirty = true;
+                    this.syncActivePlcProfileDraft(this.getActivePlcProtocol());
                     return;
                 }
                 updateField(target);
@@ -121,20 +139,36 @@ export function installPlcTab(SettingsView) {
                 nextProfile.slot = Number.parseInt(this.container?.querySelector('#cfg-s7-slot')?.value || `${currentProfile.slot ?? defaults.slot}`, 10);
             }
 
+            const normalizedProfile = this.normalizePlcProfile(nextProfile, defaults, protocol === 'S7');
             communication.activeProtocol = this.normalizePlcProtocol(protocol);
-            communication[profileKey] = this.normalizePlcProfile(nextProfile, defaults, protocol === 'S7');
+            communication[profileKey] = normalizedProfile;
+            this.plcProfileDrafts = {
+                ...(this.plcProfileDrafts || {}),
+                [profileKey]: this.cloneCommunicationConfig(normalizedProfile)
+            };
             this.config.communication = communication;
             this.syncPlcMappingsFromActiveProfile();
         }
         ,
+        mergePlcProfileDrafts(communication) {
+            const merged = this.cloneCommunicationConfig(communication);
+            const drafts = this.plcProfileDrafts || {};
+            ['s7', 'mc', 'fins'].forEach(key => {
+                if (drafts[key]) {
+                    merged[key] = this.cloneCommunicationConfig(drafts[key]);
+                }
+            });
+            return merged;
+        }
+        ,
         buildPlcSettingsPayload({ persistAllProfiles = false } = {}) {
             this.syncActivePlcProfileDraft(this.getActivePlcProtocol());
-            const workingCommunication = this.cloneCommunicationConfig(this.config.communication);
+            const workingCommunication = this.mergePlcProfileDrafts(this.config.communication);
             if (persistAllProfiles) {
                 return workingCommunication;
             }
 
-            const savedCommunication = this.cloneCommunicationConfig(this.savedCommunicationConfig || this.getDefaultConfig().communication);
+            const savedCommunication = this.mergePlcProfileDrafts(this.savedCommunicationConfig || this.getDefaultConfig().communication);
             const activeProtocol = this.getActivePlcProtocol();
             const profileKey = this.getPlcProfileKey(activeProtocol);
             savedCommunication.activeProtocol = activeProtocol;
@@ -158,8 +192,13 @@ export function installPlcTab(SettingsView) {
             try {
                 const result = await settingsApi.loadPlcSettings();
                 const settings = this.normalizeCommunicationConfig(result?.settings || result);
+                if (!force && this.plcDraftDirty) {
+                    return;
+                }
                 this.savedCommunicationConfig = this.cloneCommunicationConfig(settings);
                 this.config.communication = this.cloneCommunicationConfig(settings);
+                this.plcProfileDrafts = {};
+                this.plcDraftDirty = false;
                 this.plcValidationErrors = [];
                 this.plcSettingsLoaded = true;
                 this.syncPlcMappingsFromActiveProfile();
@@ -258,6 +297,7 @@ export function installPlcTab(SettingsView) {
                 this.plcMappings = [];
             }
 
+            this.plcDraftDirty = true;
             this.plcMappings.push({
                 name: '',
                 address: '',
@@ -272,6 +312,7 @@ export function installPlcTab(SettingsView) {
         deletePlcMapping(index) {
             if (!Array.isArray(this.plcMappings)) return;
             if (index < 0 || index >= this.plcMappings.length) return;
+            this.plcDraftDirty = true;
             this.plcMappings.splice(index, 1);
             this.renderPlcMappingsTable();
         }
@@ -280,6 +321,7 @@ export function installPlcTab(SettingsView) {
             if (!Array.isArray(this.plcMappings)) return;
             if (!this.plcMappings[index]) return;
 
+            this.plcDraftDirty = true;
             if (field === 'canWrite') {
                 this.plcMappings[index].canWrite = `${element.value}` === 'true';
                 return;
@@ -349,6 +391,14 @@ export function installPlcTab(SettingsView) {
                 this.config.communication = this.cloneCommunicationConfig(normalizedSettings);
                 this.plcValidationErrors = [];
                 this.plcSettingsLoaded = true;
+                this.plcDraftDirty = false;
+                this.plcProfileDrafts = {};
+                if (this.buildAppConfigForSave) {
+                    const appConfig = this.buildAppConfigForSave('communication');
+                    await settingsApi.saveSettings(appConfig);
+                    this.config = this.normalizeAppConfig(appConfig);
+                    this.savedCommunicationConfig = this.cloneCommunicationConfig(this.config.communication);
+                }
                 this.syncPlcMappingsFromActiveProfile();
                 this.refreshCommunicationPanel();
 

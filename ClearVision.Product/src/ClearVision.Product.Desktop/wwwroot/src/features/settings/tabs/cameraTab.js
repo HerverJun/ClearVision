@@ -155,7 +155,7 @@ export function installCameraTab(SettingsView) {
                             return;
                         }
 
-                        const module = await import('../../core/calibration/planarScaleOffsetCalibWizard.js');
+                        const module = await import('../../../core/calibration/planarScaleOffsetCalibWizard.js');
                         const wizard = new module.PlanarScaleOffsetCalibWizard(null, {
                             captureFrame: (cameraBindingId) => this.captureCameraPreview(cameraBindingId),
                             getCameraBindingId: () => binding.id
@@ -1835,11 +1835,17 @@ export function installCameraTab(SettingsView) {
         ,
         async saveCameraSettingsFromTop() {
             if (this.selectedCameraBindingId) {
-                await this.saveSelectedCameraParameters();
+                const saved = await this.saveSelectedCameraParameters();
+                if (saved) {
+                    await this.saveAppSettingsForTab('cameras');
+                }
                 return;
             }
 
             const saved = await this.saveCameraBindings();
+            if (saved) {
+                await this.saveAppSettingsForTab('cameras');
+            }
             if (saved) {
                 showToast('相机绑定配置已保存。', 'success');
             }

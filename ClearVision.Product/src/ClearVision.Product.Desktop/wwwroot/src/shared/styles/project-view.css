@@ -270,3 +270,78 @@
 [data-theme="light"] .project-view-header {
     border-bottom-color: #e2e8f0;
 }
+
+@media (max-width: 768px) {
+    .project-view-container {
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .project-view-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .project-search {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+    }
+
+    .project-search input,
+    .project-search .cv-input {
+        grid-column: 1 / -1;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .project-search .btn {
+        width: 100%;
+        min-width: 0;
+        padding-inline: 10px;
+    }
+
+    .project-view-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .sort-select {
+        width: 100%;
+    }
+
+    .project-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+    }
+
+    .project-tabs .tab-btn {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .project-list-item {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .project-list-meta {
+        grid-column: 2;
+        min-width: 0;
+        align-items: flex-start;
+        text-align: left;
+    }
+
+    .project-list-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+        opacity: 1;
+    }
+}

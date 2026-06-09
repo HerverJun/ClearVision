@@ -4982,12 +4982,12 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .ai-pane-right {
+    .ai-pane-left {
         grid-column: 1;
         grid-row: 1;
     }
 
-    .ai-pane-left {
+    .ai-pane-right {
         grid-column: 1;
         grid-row: 2;
         min-height: min(520px, 70vh);

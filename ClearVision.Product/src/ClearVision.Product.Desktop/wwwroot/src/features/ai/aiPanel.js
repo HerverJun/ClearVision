@@ -798,6 +798,10 @@ export class AiPanel {
             return;
         }
 
+        this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
+        this._renderAgentWorkspaceOverview();
+        this._renderPlanWorkspace(this.pendingVisionPlan);
+        this._renderBuildWorkspaceFromAgentRun();
         this._renderRequirementBrief(payload);
 
         if (!payload.success) {

@@ -25,6 +25,11 @@
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+html {
+    min-height: 100%;
+    overflow: hidden;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -47,13 +52,16 @@ body {
     justify-content: center;
     color: var(--text-primary);
     overflow: hidden;
+    position: relative;
+    isolation: isolate;
 }
 
 body::before {
     content: '';
-    position: absolute;
-    width: 200%;
-    height: 200%;
+    position: fixed;
+    inset: -50vh -50vw;
+    width: 200vw;
+    height: 200vh;
     background-image:
         linear-gradient(rgba(168, 162, 158, 0.06) 1px, transparent 1px),
         linear-gradient(90deg, rgba(168, 162, 158, 0.06) 1px, transparent 1px);

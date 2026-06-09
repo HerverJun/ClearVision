@@ -1391,8 +1391,8 @@ class StationMonitorView {
 
         this.resultOverview.innerHTML = `
             <article class="sm-result-kpi">
-                <span>命中总量</span>
-                <strong>${stats.total}</strong>
+                <span>总计</span>
+                <strong>${this.monitorTotalCount}</strong>
                 <small>当前页 ${this.monitorResults.length}</small>
             </article>
             <article class="sm-result-kpi">

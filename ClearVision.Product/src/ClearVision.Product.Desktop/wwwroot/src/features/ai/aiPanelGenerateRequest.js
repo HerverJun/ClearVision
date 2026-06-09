@@ -40,6 +40,10 @@ export const aiPanelGenerateRequestMixin = {
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this._setGeneratingState(true);
         this._setWorkbenchState(AiWorkbenchStates.GENERATING);
+        this.agentWorkspaceMode = 'build';
+        this._renderAgentWorkspaceOverview?.();
+        this._renderPlanWorkspace?.(this.pendingVisionPlan);
+        this._renderBuildWorkspaceFromAgentRun?.();
         this.activeGenerateRequestId = requestId;
         this.activeGenerateSessionId = this.sessionId;
         this.isCancellingGenerate = false;
@@ -509,7 +513,8 @@ export const aiPanelGenerateRequestMixin = {
             attachmentPaths,
             templateSelection,
             explicitMode: '',
-            clearInput: true
+            clearInput: true,
+            skipPlan: true
         });
     },
 
