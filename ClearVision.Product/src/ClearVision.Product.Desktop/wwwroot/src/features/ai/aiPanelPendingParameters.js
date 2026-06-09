@@ -38,8 +38,9 @@ export const aiPanelPendingParametersMixin = {
         container.innerHTML = `
             <div class="ai-parameter-editor-summary">
                 已填写 <span class="result-count">${totals.filled}</span> / <span class="result-count">${totals.total}</span> 项。
-                <span class="ai-parameter-editor-summary-note">${confirmationState.isConfirmed ? '参数已确认，可直接提交审核。' : '请先填写并确认全部参数，再提交审核。'}</span>
+                <span class="ai-parameter-editor-summary-note">${confirmationState.isConfirmed ? '人工参数已确认，可直接应用到画布。' : '请先填写并确认人工参数；AI 复核不是应用到画布的必要步骤。'}</span>
             </div>
+            <div class="ai-parameter-editor-policy">人工确认后的参数可直接应用到画布；AI 复核仅用于二次检查或继续优化，不是应用到画布的必要步骤。</div>
             <div class="ai-parameter-group-list">
                 ${groups.map(group => `
                     <section class="ai-parameter-group" data-draft-group="${this._escapeHtml(group.groupKey)}">
@@ -60,10 +61,10 @@ export const aiPanelPendingParametersMixin = {
                 `).join('')}
             </div>
             <div class="ai-parameter-editor-actions">
-                <div class="ai-parameter-editor-actions-hint">${confirmationState.isConfirmed ? '参数已确认，提交审核会带上当前方案、已填写参数、仍未填写项和输入框中的补充说明。' : '请先确认全部参数，再提交审核。审核会带上当前方案、已填写参数、仍未填写项和输入框中的补充说明。'}</div>
+                <div class="ai-parameter-editor-actions-hint">${confirmationState.isConfirmed ? '参数已确认，可应用到画布继续编辑；提交 AI 复核会带上当前方案、人工参数、画布人工修改记录、仍缺资源/参数和输入框补充说明。' : '请先确认人工参数。应用到画布不要求 AI 复核通过；可选 AI 复核只用于二次检查。'}</div>
                 <div class="ai-parameter-editor-action-row">
-                    <button class="ai-parameter-confirm-btn" type="button" id="ai-btn-confirm-parameters">确认全部参数</button>
-                    <button class="ai-parameter-review-btn" type="button" id="ai-btn-review-parameters">提交审核</button>
+                    <button class="ai-parameter-confirm-btn" type="button" id="ai-btn-confirm-parameters">确认人工参数</button>
+                    <button class="ai-parameter-review-btn" type="button" id="ai-btn-review-parameters">提交 AI 复核（可选）</button>
                 </div>
             </div>
         `;
@@ -409,15 +410,15 @@ export const aiPanelPendingParametersMixin = {
         if (summary) {
             summary.innerHTML = `
                 已填写 <span class="result-count">${totals.filled}</span> / <span class="result-count">${totals.total}</span> 项。
-                <span class="ai-parameter-editor-summary-note">${confirmationState.isConfirmed ? '参数已确认，可直接提交审核。' : '请先填写并确认全部参数，再提交审核。'}</span>
+                <span class="ai-parameter-editor-summary-note">${confirmationState.isConfirmed ? '人工参数已确认，可直接应用到画布。' : '请先填写并确认人工参数；AI 复核不是应用到画布的必要步骤。'}</span>
             `;
         }
 
         const hint = container.querySelector('.ai-parameter-editor-actions-hint');
         if (hint) {
             hint.textContent = confirmationState.isConfirmed
-                ? '参数已确认，提交审核会带上当前方案、已填写参数、仍未填写项和输入框中的补充说明。'
-                : '请先确认全部参数，再提交审核。审核会带上当前方案、已填写参数、仍未填写项和输入框中的补充说明。';
+                ? '参数已确认，可应用到画布继续编辑；提交 AI 复核会带上当前方案、人工参数、画布人工修改记录、仍缺资源/参数和输入框补充说明。'
+                : '请先确认人工参数。应用到画布不要求 AI 复核通过；可选 AI 复核只用于二次检查。';
         }
 
         container.querySelectorAll('.ai-parameter-field-status').forEach(statusEl => {
@@ -1113,6 +1114,255 @@ export const aiPanelPendingParametersMixin = {
         return '';
     },
 
+    _captureAppliedCanvasBaseline(flow) {
+        if (!flow || typeof flow !== 'object') {
+            this.appliedCanvasBaselineFlow = null;
+            this.canvasManualEditRecords = [];
+            this.canvasManualEditSignature = '';
+            return;
+        }
+
+        this.appliedCanvasBaselineFlow = this._cloneJsonSafe(flow);
+        this.canvasManualEditRecords = [];
+        this.canvasManualEditSignature = '';
+        this._attachCanvasManualEditRecordsToCurrentResult();
+    },
+
+    _cloneJsonSafe(value) {
+        if (value === null || value === undefined) return value;
+        try {
+            return typeof structuredClone === 'function'
+                ? structuredClone(value)
+                : JSON.parse(JSON.stringify(value));
+        } catch {
+            return JSON.parse(JSON.stringify(value));
+        }
+    },
+
+    _syncCanvasManualEditRecords(currentFlow = null) {
+        if (!this._isCurrentResultAppliedToCanvas?.() || !this.appliedCanvasBaselineFlow || !currentFlow) {
+            return [];
+        }
+
+        const previousByKey = new Map((this.canvasManualEditRecords || []).map(record => [
+            String(record.changeKey || '').trim(),
+            record
+        ]));
+        const nextRecords = this._collectCanvasManualParameterChanges(this.appliedCanvasBaselineFlow, currentFlow)
+            .map(change => {
+                const changeKey = [
+                    change.operatorId,
+                    change.parameterName,
+                    change.oldValueSummary,
+                    change.newValueSummary
+                ].join('::');
+                const existing = previousByKey.get(changeKey);
+                return {
+                    ...change,
+                    changeKey,
+                    changedAtUtc: existing?.changedAtUtc || new Date().toISOString(),
+                    actor: 'local-user',
+                    source: 'canvas_manual_edit',
+                    sourceLabel: '流程页算子属性面板',
+                    metadataOnly: true
+                };
+            });
+
+        const signature = nextRecords
+            .map(record => record.changeKey)
+            .sort()
+            .join('|');
+        if (signature === this.canvasManualEditSignature) {
+            return this.canvasManualEditRecords || [];
+        }
+
+        this.canvasManualEditSignature = signature;
+        this.canvasManualEditRecords = nextRecords;
+        this._attachCanvasManualEditRecordsToCurrentResult();
+        return nextRecords;
+    },
+
+    _attachCanvasManualEditRecordsToCurrentResult() {
+        if (!this.currentResult || typeof this.currentResult !== 'object') return;
+        const records = this.canvasManualEditRecords || [];
+        this.currentResult.canvasManualEditRecords = records;
+        this.currentResult.CanvasManualEditRecords = records;
+    },
+
+    _collectCanvasManualParameterChanges(baselineFlow, currentFlow) {
+        const baselineOperators = this._extractOperators(baselineFlow);
+        const currentOperators = this._extractOperators(currentFlow);
+        const baselineMap = this._buildCanvasOperatorCompareMap(baselineOperators);
+        const changes = [];
+
+        currentOperators.forEach((operator, index) => {
+            const match = this._findCanvasCompareOperator(baselineMap, operator, index);
+            if (!match) return;
+
+            const operatorId = this._getCanvasOperatorId(operator, index);
+            const operatorType = this._getCanvasOperatorType(operator);
+            const displayName = this._getCanvasOperatorDisplayName(operator, operatorId);
+            const baselineParams = this._flattenCanvasOperatorParameters(match.operator);
+            const currentParams = this._flattenCanvasOperatorParameters(operator);
+            const names = new Set([...baselineParams.keys(), ...currentParams.keys()]);
+
+            names.forEach(parameterName => {
+                const oldValue = baselineParams.get(parameterName);
+                const newValue = currentParams.get(parameterName);
+                if (this._areCanvasAuditValuesEquivalent(oldValue, newValue)) {
+                    return;
+                }
+
+                const isPendingParameter = this._isCanvasManualEditPendingParameter(operatorId, parameterName);
+                const affectsDeploymentReady = this._isCanvasManualEditDeploymentBlocking(operatorId, parameterName);
+                changes.push({
+                    operatorId: this._sanitizeCanvasAuditText(operatorId),
+                    displayName: this._sanitizeCanvasAuditText(displayName),
+                    operatorType: this._sanitizeCanvasAuditText(operatorType),
+                    parameterName: this._sanitizeCanvasAuditText(parameterName),
+                    oldValueSummary: this._summarizeCanvasManualEditValue(oldValue),
+                    newValueSummary: this._summarizeCanvasManualEditValue(newValue),
+                    isPendingParameter,
+                    affectsApplyGate: isPendingParameter || affectsDeploymentReady,
+                    affectsDeploymentReady
+                });
+            });
+        });
+
+        return changes;
+    },
+
+    _buildCanvasOperatorCompareMap(operators) {
+        const byId = new Map();
+        const byIndex = new Map();
+        (Array.isArray(operators) ? operators : []).forEach((operator, index) => {
+            const id = this._getCanvasOperatorId(operator, index);
+            if (id) byId.set(id, { operator, index });
+            byIndex.set(String(index), { operator, index });
+        });
+        return { byId, byIndex };
+    },
+
+    _findCanvasCompareOperator(map, operator, index) {
+        const id = this._getCanvasOperatorId(operator, index);
+        return (id && map.byId.get(id)) || map.byIndex.get(String(index)) || null;
+    },
+
+    _getCanvasOperatorId(operator, index = 0) {
+        return String(operator?.id ?? operator?.Id ?? operator?.tempId ?? operator?.TempId ?? `index-${index}`).trim();
+    },
+
+    _getCanvasOperatorType(operator) {
+        return String(operator?.type ?? operator?.Type ?? operator?.operatorType ?? operator?.OperatorType ?? '').trim();
+    },
+
+    _getCanvasOperatorDisplayName(operator, fallback = '') {
+        return String(
+            operator?.displayName ??
+            operator?.DisplayName ??
+            operator?.name ??
+            operator?.Name ??
+            fallback
+        ).trim();
+    },
+
+    _flattenCanvasOperatorParameters(operator) {
+        const result = new Map();
+        const parameters = operator?.parameters ?? operator?.Parameters ?? null;
+        if (Array.isArray(parameters)) {
+            parameters.forEach(item => {
+                const name = String(item?.name ?? item?.Name ?? '').trim();
+                if (!name) return;
+                result.set(name, item?.value ?? item?.Value ?? '');
+            });
+            return result;
+        }
+
+        if (parameters && typeof parameters === 'object') {
+            Object.keys(parameters).forEach(name => {
+                result.set(name, parameters[name]);
+            });
+        }
+
+        return result;
+    },
+
+    _areCanvasAuditValuesEquivalent(left, right) {
+        return JSON.stringify(left ?? '') === JSON.stringify(right ?? '');
+    },
+
+    _isCanvasManualEditPendingParameter(operatorId, parameterName) {
+        const pending = this._resolvePendingParametersForDraft(this.currentResult);
+        const normalizedOperator = String(operatorId || '').trim().toLowerCase();
+        const normalizedParameter = String(parameterName || '').trim().toLowerCase();
+        return pending.some(item => {
+            const operatorCandidates = [
+                item.operatorId,
+                item.actualOperatorId,
+                this.pendingOperatorBindings?.[item.operatorId]?.actualOperatorId
+            ].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+            const parameterNames = (item.parameterNames || []).map(name => String(name || '').trim().toLowerCase());
+            return operatorCandidates.includes(normalizedOperator) && parameterNames.includes(normalizedParameter);
+        });
+    },
+
+    _isCanvasManualEditDeploymentBlocking(operatorId, parameterName) {
+        const normalizedRef = `${String(operatorId || '').trim().toLowerCase()}.${String(parameterName || '').trim().toLowerCase()}`;
+        const gate = this._getPayloadApplyGate?.(this.currentResult) || this.currentResult?.applyGate || this.currentResult?.ApplyGate || null;
+        const blockers = this._toArray?.(gate?.deploymentBlockers || gate?.DeploymentBlockers) || [];
+        if (blockers.some(blocker => String(blocker || '').trim().toLowerCase() === normalizedRef)) {
+            return true;
+        }
+
+        const missing = this._normalizeMissingResources(this.currentResult?.missingResources ?? this.currentResult?.MissingResources);
+        return missing.some(item => {
+            const resourceRef = String(item.resourceKey || '').trim().toLowerCase();
+            const itemRef = `${String(item.operatorId || item.actualOperatorId || '').trim().toLowerCase()}.${String(item.parameterName || '').trim().toLowerCase()}`;
+            return resourceRef === normalizedRef || itemRef === normalizedRef;
+        });
+    },
+
+    _sanitizeCanvasAuditText(value) {
+        const text = String(value ?? '').trim();
+        return this._redactPublicDiagnosticText?.(text) || text;
+    },
+
+    _summarizeCanvasManualEditValue(value) {
+        const raw = typeof value === 'object' && value !== null
+            ? JSON.stringify(value)
+            : String(value ?? '');
+        const safe = this._sanitizeCanvasAuditText(raw);
+        return safe.length > 96 ? `${safe.slice(0, 96)}...` : safe;
+    },
+
+    _getCanvasManualEditRecords(target = this.currentResult) {
+        const explicit = this._toArray?.(target?.canvasManualEditRecords ?? target?.CanvasManualEditRecords) || [];
+        return explicit.length ? explicit : (this.canvasManualEditRecords || []);
+    },
+
+    _renderCanvasManualEditRecords(target = this.currentResult) {
+        const records = this._getCanvasManualEditRecords(target);
+        if (!records.length) return '';
+
+        const rows = records.slice().reverse().map(record => `
+            <div class="ai-manual-confirmation-record ai-canvas-manual-edit-record">
+                <div>
+                    <strong>${this._escapeHtml(record.displayName || record.operatorId || '未命名算子')}</strong>
+                    <span>${this._escapeHtml(record.changedAtUtc || '')} / ${this._escapeHtml(record.actor || 'local-user')}</span>
+                </div>
+                <p>${this._escapeHtml(record.operatorType || '未知算子')} · ${this._escapeHtml(getParameterDisplayName(record.parameterName, { fallback: record.parameterName || '参数' }))} · ${this._escapeHtml(record.oldValueSummary || '--')} -> ${this._escapeHtml(record.newValueSummary || '--')}</p>
+                <small>来源：${this._escapeHtml(record.sourceLabel || '流程页算子属性面板')}；pendingParameter=${record.isPendingParameter ? 'true' : 'false'}；影响 ApplyGate=${record.affectsApplyGate ? 'true' : 'false'}；影响 DeploymentReady=${record.affectsDeploymentReady ? 'true' : 'false'}；metadataOnly=true</small>
+            </div>
+        `).join('');
+
+        return `
+            <details class="ai-manual-confirmation-panel ai-canvas-manual-edit-panel">
+                <summary>画布人工修改记录（${this._escapeHtml(String(records.length))}）</summary>
+                <div class="ai-manual-confirmation-list">${rows}</div>
+            </details>
+        `;
+    },
+
     _buildFlowWithPendingDrafts(flow) {
         if (!flow || typeof flow !== 'object') return flow;
 
@@ -1121,6 +1371,7 @@ export const aiPanelPendingParametersMixin = {
             : JSON.parse(JSON.stringify(flow));
         const operators = this._extractOperators(clonedFlow);
         const pending = this._resolvePendingParametersForDraft(this.currentResult);
+        const confirmationState = this._getPendingParameterConfirmationState(pending, operators);
 
         pending.forEach(item => {
             const context = this._resolvePendingOperatorContext(item.operatorId, operators);
@@ -1134,6 +1385,9 @@ export const aiPanelPendingParametersMixin = {
                     return;
                 }
                 const confirmedValue = this._getPendingDraftConfirmedValue(item.operatorId, parameterName);
+                const entry = this._getPendingDraftEntry(item.operatorId, parameterName);
+                const canWriteValue = confirmationState.isConfirmed || entry.source === 'resource_binding';
+                if (!canWriteValue) return;
                 const fieldType = this._normalizePendingFieldType(
                     this._findMetadataParameter(
                         this._getCachedOperatorMetadata(context.operatorType),
@@ -1332,6 +1586,14 @@ export const aiPanelPendingParametersMixin = {
             });
         }
 
+        const canvasManualEdits = this._getCanvasManualEditRecords(this.currentResult);
+        if (canvasManualEdits.length > 0) {
+            lines.push('画布人工修改记录（metadata-only，来源：流程页算子属性面板）：');
+            canvasManualEdits.slice(-12).forEach(record => {
+                lines.push(`- ${record.displayName || record.operatorId || '未命名算子'} / ${record.parameterName}: ${record.oldValueSummary || '--'} -> ${record.newValueSummary || '--'}；pendingParameter=${record.isPendingParameter ? 'true' : 'false'}；affectsDeploymentReady=${record.affectsDeploymentReady ? 'true' : 'false'}`);
+            });
+        }
+
         if (queuedHint) {
             lines.push(`附加提示：${queuedHint}`);
         }
@@ -1340,7 +1602,7 @@ export const aiPanelPendingParametersMixin = {
             lines.push(`用户补充说明：${extraNote}`);
         }
 
-        const userMessage = `提交参数审核：已填写 ${filledCount}/${totalCount} 项${extraNote ? '，已附加补充说明' : ''}。`;
+        const userMessage = `提交 AI 复核（可选）：已确认人工参数 ${filledCount}/${totalCount} 项，画布人工修改 ${canvasManualEdits.length} 条${extraNote ? '，已附加补充说明' : ''}。`;
         return {
             hint: lines.join('\n'),
             userMessage,

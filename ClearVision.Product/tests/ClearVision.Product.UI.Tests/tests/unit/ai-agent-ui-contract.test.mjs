@@ -294,6 +294,12 @@ function createPanel(AiPanel, overrides = {}) {
   panel.cameraBindingsCache = [];
   panel.cameraBindingsLoadingPromise = null;
   panel.currentResultVersion = 1;
+  panel.appliedResultVersion = 0;
+  panel.currentCanvasRevision = 0;
+  panel.appliedCanvasRevision = 0;
+  panel.appliedCanvasBaselineFlow = null;
+  panel.canvasManualEditRecords = [];
+  panel.canvasManualEditSignature = '';
   panel.sessionId = 'agent-ui-contract';
   panel.currentResult = overrides.currentResult || null;
   panel.isGenerating = false;
@@ -1092,17 +1098,80 @@ function createBuildWorkspaceContainer() {
 function createFakeFlowCanvas(initialFlow = { operators: [], connections: [] }) {
   let flow = cloneJson(initialFlow);
   let revision = 0;
+  const listeners = new Set();
+  const notify = reason => {
+    revision += 1;
+    listeners.forEach(listener => listener({ flowRevision: revision, reason }));
+  };
   return {
     deserialize(nextFlow) {
       flow = cloneJson(nextFlow);
-      revision += 1;
+      notify('deserialize');
     },
     serialize() {
       return cloneJson(flow);
     },
     getFlowRevision() {
       return revision;
+    },
+    subscribeStructureState(listener) {
+      listeners.add(listener);
+      listener({ flowRevision: revision, reason: 'initial' });
+      return () => listeners.delete(listener);
+    },
+    replaceFlow(nextFlow, reason = 'parameter-change') {
+      flow = cloneJson(nextFlow);
+      notify(reason);
     }
+  };
+}
+
+function pendingParameterReviewResult() {
+  return {
+    flow: {
+      operators: [
+        {
+          id: 'op_detect',
+          type: 'DeepLearning',
+          displayName: '缺陷检测',
+          parameters: {
+            ModelPath: '<pending-model-resource>',
+            Threshold: 0.8
+          }
+        }
+      ],
+      connections: [],
+      metadataOnly: true
+    },
+    pendingParameters: [
+      { operatorId: 'op_detect', actualOperatorId: 'op_detect', parameterNames: ['ModelPath'] }
+    ],
+    missingResources: [
+      {
+        resourceType: 'model_resource',
+        resourceKey: 'op_detect.ModelPath',
+        operatorId: 'op_detect',
+        parameterName: 'ModelPath',
+        description: '部署前绑定模型资源元数据。'
+      }
+    ],
+    applyGate: {
+      canvasApplyReady: true,
+      runtimeDraftReady: true,
+      deploymentReady: false,
+      blocked: false,
+      status: 'canvas_apply_ready',
+      deploymentBlockers: ['op_detect.ModelPath'],
+      metadataOnly: true
+    },
+    validationPreview: {
+      deploymentPrecheck: {
+        readyForDeployment: false,
+        workflowDraftAllowed: true,
+        deploymentBlocked: true
+      }
+    },
+    metadataOnly: true
   };
 }
 
@@ -2368,6 +2437,203 @@ test('Canvas apply remains enabled when deployment is blocked by missing resourc
   const gate = panel._getPayloadApplyGate(panel.currentResult);
   assert.equal(gate.deploymentReady, false);
   assert.equal(gate.blocked, false);
+});
+
+test('parameter review copy makes AI review optional and removes submit audit wording', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = pendingParameterReviewResult();
+  panel.options.getOperators = () => resourceBindingOperatorMetadata();
+  panel._rebuildPendingOperatorBindings({
+    pending: panel._resolvePendingParametersForDraft(panel.currentResult),
+    flow: panel.currentResult.flow,
+    preferIndexFallback: true
+  });
+
+  panel._renderFollowupChecklist(panel.currentResult, panel.currentResult.flow);
+  panel._renderParameterDraftEditor(panel.currentResult, panel.currentResult.flow);
+  const combined = [
+    elements['#ai-result-followups'].innerHTML,
+    elements['#ai-result-parameter-editor'].innerHTML
+  ].join('\n');
+
+  assert.match(combined, /确认人工参数/);
+  assert.match(combined, /提交 AI 复核（可选）/);
+  assert.match(combined, /AI 复核仅用于二次检查或继续优化，不是应用到画布的必要步骤/);
+  assert.match(combined, /人工确认后的参数可直接应用到画布/);
+  assert.doesNotMatch(combined, /提交审核/);
+  assert.doesNotMatch(combined, /确认全部参数/);
+});
+
+test('apply hint separates canvas apply from DeploymentReady gate', async () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'),
+    'utf8'
+  );
+
+  assert.match(source, /确认人工参数后，可应用到画布继续编辑/);
+  assert.match(source, /部署仍受资源确认和 DeploymentReady 门禁约束/);
+});
+
+test('confirmed manual parameters are written when applying to canvas', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResultVersion = 7;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.options.getOperators = () => resourceBindingOperatorMetadata();
+  panel.options.onApplied = flow => {
+    panel.appliedFlow = flow;
+  };
+  panel._showApplyPreview = (_diff, flow) => panel._executeApplyFlow(flow);
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel._rebuildPendingOperatorBindings({
+    pending: panel._resolvePendingParametersForDraft(panel.currentResult),
+    flow: panel.currentResult.flow,
+    preferIndexFallback: true
+  });
+  panel._syncPendingParameterDrafts(panel.currentResult, panel.currentResult.flow, { force: true });
+  panel._setPendingDraftConfirmedValue('op_detect', 'ModelPath', 'model-resource-approved', 'text', 'user_input');
+  panel._handleConfirmPendingParameters(panel.currentResult, panel.currentResult.flow);
+
+  panel._handleApplyFlow();
+
+  const detect = panel._extractOperators(panel.appliedFlow).find(op => op.id === 'op_detect');
+  assert.equal(panel._readOperatorParameterValue(detect, 'ModelPath'), 'model-resource-approved');
+  assert.match(panel.lastResultStatusNote.text, /已应用到画布/);
+  assert.equal(panel._getPayloadApplyGate(panel.currentResult).deploymentReady, false);
+});
+
+test('unconfirmed pending parameters are not silently written during canvas apply', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResultVersion = 8;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.options.getOperators = () => resourceBindingOperatorMetadata();
+  panel.options.onApplied = flow => {
+    panel.appliedFlow = flow;
+  };
+  panel._showApplyPreview = (_diff, flow) => panel._executeApplyFlow(flow);
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel._rebuildPendingOperatorBindings({
+    pending: panel._resolvePendingParametersForDraft(panel.currentResult),
+    flow: panel.currentResult.flow,
+    preferIndexFallback: true
+  });
+  panel._syncPendingParameterDrafts(panel.currentResult, panel.currentResult.flow, { force: true });
+  panel._setPendingDraftConfirmedValue('op_detect', 'ModelPath', 'model-resource-not-confirmed', 'text', 'user_input');
+
+  panel._handleApplyFlow();
+
+  const detect = panel._extractOperators(panel.appliedFlow).find(op => op.id === 'op_detect');
+  assert.equal(panel._readOperatorParameterValue(detect, 'ModelPath'), '<pending-model-resource>');
+  assert.equal(panel._getPayloadApplyGate(panel.currentResult).deploymentReady, false);
+});
+
+test('canvas manual edits are audited after applying AI result', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResultVersion = 9;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.options.getOperators = () => resourceBindingOperatorMetadata();
+  panel._showApplyPreview = (_diff, flow) => panel._executeApplyFlow(flow);
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel._setupCanvasStructureSync();
+
+  panel._handleApplyFlow();
+  const editedFlow = panel.flowCanvas.serialize();
+  panel._writeOperatorParameterValue(editedFlow.operators[0], 'Threshold', 0.91);
+  panel.flowCanvas.replaceFlow(editedFlow, 'parameter-change');
+
+  assert.equal(panel.canvasManualEditRecords.length, 1);
+  const record = panel.canvasManualEditRecords[0];
+  assert.equal(record.source, 'canvas_manual_edit');
+  assert.equal(record.sourceLabel, '流程页算子属性面板');
+  assert.equal(record.actor, 'local-user');
+  assert.equal(record.parameterName, 'Threshold');
+  assert.equal(record.oldValueSummary, '0.8');
+  assert.equal(record.newValueSummary, '0.91');
+  assert.equal(record.isPendingParameter, false);
+  assert.equal(record.metadataOnly, true);
+  assert.equal(record.affectsDeploymentReady, false);
+  assert.equal(panel._getPayloadApplyGate(panel.currentResult).deploymentReady, false);
+  assert.match(elements['#ai-result-followups'].innerHTML, /画布人工修改记录/);
+  assert.match(elements['#ai-result-followups'].innerHTML, /Threshold/);
+});
+
+test('canvas edits to pending parameters sync back to review fields', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResultVersion = 10;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.options.getOperators = () => resourceBindingOperatorMetadata();
+  panel._showApplyPreview = (_diff, flow) => panel._executeApplyFlow(flow);
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel._setupCanvasStructureSync();
+
+  panel._handleApplyFlow();
+  const editedFlow = panel.flowCanvas.serialize();
+  panel._writeOperatorParameterValue(editedFlow.operators[0], 'ModelPath', 'model-resource-from-canvas');
+  panel.flowCanvas.replaceFlow(editedFlow, 'parameter-change');
+
+  const entry = panel._getPendingDraftEntry('op_detect', 'ModelPath');
+  assert.equal(entry.confirmedValue, 'model-resource-from-canvas');
+  assert.equal(entry.source, 'canvas_override');
+  assert.match(elements['#ai-result-parameter-editor'].innerHTML, /当前值已从画布同步/);
+  assert.match(elements['#ai-result-followups'].innerHTML, /pendingParameter=true/);
+  assert.equal(panel._getPayloadApplyGate(panel.currentResult).deploymentReady, false);
+});
+
+test('canvas manual edit audit redacts sensitive values', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.currentResult = pendingParameterReviewResult();
+  panel.currentResultVersion = 11;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.options.getOperators = () => resourceBindingOperatorMetadata();
+  panel._showApplyPreview = (_diff, flow) => panel._executeApplyFlow(flow);
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel._setupCanvasStructureSync();
+
+  panel._handleApplyFlow();
+  const editedFlow = panel.flowCanvas.serialize();
+  panel._writeOperatorParameterValue(
+    editedFlow.operators[0],
+    'Threshold',
+    'C:\\factory\\secret.onnx token=abc123 192.168.1.8 DB1.DBX0.0 data:image/png;base64,AAAA'
+  );
+  panel.flowCanvas.replaceFlow(editedFlow, 'parameter-change');
+
+  const combined = [
+    JSON.stringify(panel.canvasManualEditRecords),
+    elements['#ai-result-followups'].innerHTML
+  ].join('\n');
+  assert.doesNotMatch(combined, /C:\\factory/);
+  assert.doesNotMatch(combined, /secret\.onnx/);
+  assert.doesNotMatch(combined, /abc123/);
+  assert.doesNotMatch(combined, /192\.168\.1\.8/);
+  assert.doesNotMatch(combined, /DB1\.DBX0\.0/);
+  assert.doesNotMatch(combined, /data:image/);
 });
 
 test('AgentRun completed payload restores BuildResult fallback flow and keeps Apply state after replay', async () => {

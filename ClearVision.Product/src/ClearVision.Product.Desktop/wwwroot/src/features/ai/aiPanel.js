@@ -73,6 +73,9 @@ export class AiPanel {
         this.appliedResultVersion = 0;
         this.currentCanvasRevision = this.flowCanvas?.getFlowRevision?.() || 0;
         this.appliedCanvasRevision = 0;
+        this.appliedCanvasBaselineFlow = null;
+        this.canvasManualEditRecords = [];
+        this.canvasManualEditSignature = '';
         this.pendingOperatorBindings = {};
         this.unsubscribeStructureState = null;
         this.pendingParameterFilePickContext = null;
@@ -200,6 +203,9 @@ export class AiPanel {
         this._resetCurrentResultSyncState();
         this.pendingParameterFilePickContext = null;
         this.pendingManualRetry = null;
+        this.appliedCanvasBaselineFlow = null;
+        this.canvasManualEditRecords = [];
+        this.canvasManualEditSignature = '';
         this.activeAssistantTurn = null;
         this.directBuildDebugNextRequest = false;
         this._preApplySnapshot = null;
@@ -238,11 +244,13 @@ export class AiPanel {
                 return;
             }
 
+            const canvasFlow = this.flowCanvas?.serialize?.() || this.currentResult.flow;
+            this._syncCanvasManualEditRecords?.(canvasFlow);
             this._syncPendingParameterDrafts(this.currentResult, this.currentResult.flow, { force: true });
-            this._renderFollowupChecklist(this.currentResult, this.currentResult.flow);
+            this._renderFollowupChecklist(this.currentResult, canvasFlow);
             const editor = this.container?.querySelector('#ai-result-parameter-editor');
             if (editor && !editor.classList.contains('is-empty')) {
-                this._renderParameterDraftEditor(this.currentResult, this.currentResult.flow);
+                this._renderParameterDraftEditor(this.currentResult, canvasFlow);
             }
         });
     }
@@ -261,6 +269,9 @@ export class AiPanel {
         this.currentResultVersion = 0;
         this.appliedResultVersion = 0;
         this.appliedCanvasRevision = this.currentCanvasRevision;
+        this.appliedCanvasBaselineFlow = null;
+        this.canvasManualEditRecords = [];
+        this.canvasManualEditSignature = '';
         this._updateApplyButtonState();
     }
 
@@ -269,6 +280,9 @@ export class AiPanel {
         this.currentResultVersion += 1;
         this.appliedResultVersion = 0;
         this.appliedCanvasRevision = 0;
+        this.appliedCanvasBaselineFlow = null;
+        this.canvasManualEditRecords = [];
+        this.canvasManualEditSignature = '';
         this._updateApplyButtonState();
     }
 
@@ -505,6 +519,7 @@ export class AiPanel {
                                 </svg>
                                 应用到画布
                             </button>
+                            <div class="ai-apply-gate-hint">确认人工参数后，可应用到画布继续编辑；部署仍受资源确认和 DeploymentReady 门禁约束。</div>
                         </div>
                     </div>
                 </aside>
@@ -620,7 +635,7 @@ export class AiPanel {
         if (this.isGenerating) return;
 
         if (!this.currentResult?.flow) {
-            this._addMessage('system', '当前没有可提交审核的方案，请先生成工程方案。');
+            this._addMessage('system', '当前没有可确认的方案，请先生成工程方案。');
             return;
         }
 
@@ -641,13 +656,14 @@ export class AiPanel {
             return;
         }
         if (!confirmationState.canConfirm) {
-            this._addMessage('system', '请先填写全部待确认参数，再执行统一确认。');
+            this._addMessage('system', '请先填写全部待确认参数，再确认人工参数。');
             return;
         }
 
         this.pendingParameterConfirmedDraftSignature = this.pendingParameterDraftSignature;
         this.pendingParameterConfirmedValueSignature = confirmationState.valueSignature;
         this._updatePendingDraftSummary(data, flow);
+        this._setResultStatusNote?.('人工参数已确认，可直接应用到画布；AI 复核为可选二次检查。', 'success');
     }
 
     _updateProgress(data) {
@@ -1260,8 +1276,9 @@ export class AiPanel {
         }));
         const hasTemplateStrategy = Boolean(recommended || candidates.length > 0 || generationMode || templateLockLevel);
         const manualRecords = this._getManualResourceConfirmationRecords?.(data) || [];
+        const canvasManualEditRecords = this._getCanvasManualEditRecords?.(data) || [];
 
-        if (!hasTemplateStrategy && pendingGroups.length === 0 && missing.length === 0 && nonBlockingFields.length === 0 && manualRecords.length === 0) {
+        if (!hasTemplateStrategy && pendingGroups.length === 0 && missing.length === 0 && nonBlockingFields.length === 0 && manualRecords.length === 0 && canvasManualEditRecords.length === 0) {
             container.classList.add('is-empty');
             container.innerHTML = '<div class="ai-followup-empty">当前没有待确认参数或缺失资源。</div>';
             return;
@@ -1328,7 +1345,7 @@ export class AiPanel {
                 <div class="ai-followup-section">
                     <div class="ai-followup-section-header">
                         <div class="ai-followup-section-label">待确认参数</div>
-                        <div class="ai-followup-section-tip">人工填写后统一确认写回</div>
+                        <div class="ai-followup-section-tip">人工填写并确认后即可应用到画布</div>
                     </div>
                     <div class="ai-followup-list">
                         ${pendingGroups.map(group => {
@@ -1395,12 +1412,13 @@ export class AiPanel {
         container.innerHTML = `
             <div class="ai-resource-audit-intro">
                 <strong>资源补齐在此处集中完成，便于审计。</strong>
-                <span>应用到画布后，可在流程页点击算子进行细节复核与微调；流程页修改不会绕过部署门禁。</span>
+                <span>人工确认后的参数可直接应用到画布；AI 复核仅用于二次检查或继续优化，不是应用到画布的必要步骤。应用后可在流程页点击算子微调，流程页修改会回流为审计记录且不会绕过部署门禁。</span>
             </div>
             ${recommendedHtml}
             ${pendingHtml}
             ${missingHtml}
             ${nonBlockingHtml}
+            ${this._renderCanvasManualEditRecords?.(data) || ''}
             ${this._renderManualConfirmationRecords?.(data) || ''}
             <div class="ai-followup-actions">
                 <div class="ai-followup-actions-hint">可复制成下一轮补充文本，也可直接挂到下一次生成的 hint。</div>

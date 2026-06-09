@@ -113,8 +113,8 @@ export const aiPanelWorkbenchMixin = {
 
         if (interactionState === 'reviewing_parameters' || turnIntent === 'review_pending_parameters' || pendingCount > 0) {
             return pendingCount > 0
-                ? `下一步：补齐 ${pendingCount} 组待确认参数，再执行统一确认。`
-                : '下一步：审核待确认参数，流程结构保持不变。';
+                ? `下一步：补齐 ${pendingCount} 组待确认参数，再确认人工参数。`
+                : '下一步：可选提交 AI 复核，流程结构保持不变。';
         }
 
         if (interactionState === 'generating') {
@@ -123,7 +123,7 @@ export const aiPanelWorkbenchMixin = {
 
         if (turnIntent === 'chat_or_help') {
             return hasFlow
-                ? '下一步：可以继续提出微调、解释或参数审核需求。'
+                ? '下一步：可以继续提出微调、解释或 AI 复核需求。'
                 : '下一步：描述检测、测量或识别目标即可开始生成流程。';
         }
 
@@ -206,7 +206,7 @@ export const aiPanelWorkbenchMixin = {
             : interactionState === 'modifying'
                 ? '基于当前工程增量修改'
                 : interactionState === 'reviewing_parameters'
-                    ? '只审核待确认参数'
+                    ? '可选复核待确认参数'
                     : turnIntent === 'chat_or_help'
                         ? '普通回复，不进入澄清'
                         : turnIntent === 'unknown'

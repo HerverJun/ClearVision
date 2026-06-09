@@ -252,7 +252,7 @@ test('AiPanel runtime next action guides apply, review, and manual retry states'
       pendingCount: 2,
       hasFlow: true
     }),
-    '下一步：补齐 2 组待确认参数，再执行统一确认。'
+    '下一步：补齐 2 组待确认参数，再确认人工参数。'
   );
 
   assert.equal(
@@ -270,7 +270,7 @@ test('AiPanel runtime next action guides apply, review, and manual retry states'
       interactionState: 'completed',
       hasFlow: true
     }),
-    '下一步：确认方案后应用到流程草稿，或继续输入微调需求。'
+    '下一步：确认方案后应用到画布，或继续输入微调需求。'
   );
 });
 
@@ -375,17 +375,27 @@ test('AiPanel apply button is disabled until a generated flow is available', asy
 
   panel._updateApplyButtonState();
 
+  assert.equal(button.disabled, true);
+  assert.equal(button.getAttribute('aria-disabled'), 'true');
+  assert.match(button.innerHTML, /暂无可应用方案/);
+
+  panel.currentResult = { flow: { operators: [{ id: 'op_1', type: 'ImageAcquisition' }], connections: [] } };
+  panel.currentResultVersion = 2;
+  panel.appliedResultVersion = 0;
+
+  panel._updateApplyButtonState();
+
   assert.equal(button.disabled, false);
   assert.equal(button.getAttribute('aria-disabled'), 'false');
-  assert.match(button.innerHTML, /应用到当前流程草稿/);
+  assert.match(button.innerHTML, /应用到画布/);
 
-  panel.appliedResultVersion = 1;
+  panel.appliedResultVersion = 2;
 
   panel._updateApplyButtonState();
 
   assert.equal(button.disabled, true);
   assert.equal(button.getAttribute('aria-disabled'), 'true');
-  assert.match(button.innerHTML, /已应用到流程草稿/);
+  assert.match(button.innerHTML, /已应用到画布/);
 });
 
 test('AiPanel apply preview risk summary includes unresolved launch items and connection diffs', async () => {

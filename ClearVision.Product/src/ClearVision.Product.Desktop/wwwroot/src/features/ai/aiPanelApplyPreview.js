@@ -417,7 +417,9 @@ export const aiPanelApplyPreviewMixin = {
             }
             this.currentResult.flow = appliedFlow;
             this.currentResult.Flow = appliedFlow;
+            this._captureAppliedCanvasBaseline?.(appliedFlow);
             this._markCurrentResultAppliedToCanvas();
+            this._syncCanvasManualEditRecords?.(appliedFlow);
             this._syncPendingParameterDrafts(this.currentResult, appliedFlow, { force: true });
             this._renderFollowupChecklist(this.currentResult, appliedFlow);
             this._renderParameterDraftEditor(this.currentResult, appliedFlow);
@@ -467,6 +469,9 @@ export const aiPanelApplyPreviewMixin = {
             this.flowCanvas.deserialize(this._preApplySnapshot);
             this.appliedResultVersion = 0;
             this.appliedCanvasRevision = this.flowCanvas?.getFlowRevision?.() || 0;
+            this.appliedCanvasBaselineFlow = null;
+            this.canvasManualEditRecords = [];
+            this.canvasManualEditSignature = '';
             this._preApplySnapshot = null;
             this._preApplySnapshotVersion = 0;
             this._preApplyCanvasRevision = 0;

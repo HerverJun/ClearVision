@@ -616,18 +616,18 @@ export const aiPanelGenerateRequestMixin = {
 
         const confirmationState = this._getPendingParameterConfirmationState(pending, operators, groups);
         if (!confirmationState.canReview) {
-            this._addMessage('system', '请先确认全部参数，再提交审核。');
+            this._addMessage('system', '请先确认人工参数，再提交 AI 复核（可选）。');
             return;
         }
 
         const reviewRequest = this._buildPendingParameterReviewRequest();
         if (!reviewRequest) {
-            this._addMessage('system', '当前没有可提交的参数审核内容。');
+            this._addMessage('system', '当前没有可提交的 AI 复核内容。');
             return;
         }
 
         this._dispatchGenerateRequest({
-            description: '请审核并更新当前方案中的待确认参数，保持流程结构稳定，仅调整参数和必要补充信息。',
+            description: '请对当前方案做可选 AI 复核，重点检查已确认人工参数、画布人工修改记录、仍缺资源和仍缺参数；不要自动覆盖画布。',
             hint: reviewRequest.hint,
             userMessage: reviewRequest.userMessage,
             existingFlowJson: reviewRequest.existingFlowJson,
