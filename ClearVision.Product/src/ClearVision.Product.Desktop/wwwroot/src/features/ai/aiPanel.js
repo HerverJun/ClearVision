@@ -103,6 +103,7 @@ export class AiPanel {
         this.useVisionAgentGenerateFlow = this._loadAgentGenerateFlowEnabled();
         this.agentGenerateFlowMode = this._loadAgentGenerateFlowMode();
         this.runtimePreviewConsent = false;
+        this.directBuildDebugNextRequest = false;
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
         this.pendingVisionPlan = null;
         this.planQuestionSelections = {};
@@ -200,6 +201,7 @@ export class AiPanel {
         this.pendingParameterFilePickContext = null;
         this.pendingManualRetry = null;
         this.activeAssistantTurn = null;
+        this.directBuildDebugNextRequest = false;
         this._preApplySnapshot = null;
         this._lastAttachmentReport = null;
         this._lastModelSupportsVision = null;
@@ -538,13 +540,7 @@ export class AiPanel {
         
         this.container.querySelectorAll('.ai-tag').forEach(tag => {
             tag.addEventListener('click', () => {
-                const text = tag.dataset.text;
-                const input = this.container.querySelector('#ai-input');
-                input.value = text;
-                input.focus();
-                // 触发自动扩展
-                input.style.height = 'auto';
-                input.style.height = (input.scrollHeight) + 'px';
+                this._handleQuickExampleSelection(tag.dataset.text);
             });
         });
         
@@ -567,6 +563,17 @@ export class AiPanel {
         this._renderRequirementBrief(null);
         this._renderFollowupChecklist(null);
         this._resetAgentWorkspace({ preservePlan: true });
+    }
+
+    _handleQuickExampleSelection(text = '') {
+        const input = this.container.querySelector('#ai-input');
+        if (!input || this.isGenerating) return false;
+
+        input.value = String(text || '').trim();
+        input.focus?.();
+        input.style.height = 'auto';
+        input.style.height = `${input.scrollHeight || 0}px`;
+        return this._handleGenerate();
     }
     
     _checkConnection() {
@@ -1685,6 +1692,7 @@ export class AiPanel {
         if (clearHintBtn) clearHintBtn.disabled = busy;
         const input = this.container.querySelector('#ai-input');
         if(input) input.disabled = busy;
+        this._updatePlanBuildActionState?.();
         this._updateApplyButtonState();
         this._updatePendingDraftSummary();
     }

@@ -323,14 +323,82 @@ export const aiPanelAgentWorkspaceMixin = {
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun();
+        this._updatePlanBuildActionState();
     },
 
-    _shouldOpenPlanModeBeforeBuild({ explicitMode = '', skipPlan = false } = {}) {
-        if (skipPlan) return false;
+    _shouldOpenPlanModeBeforeBuild(args = {}) {
+        if (this._isAllowedSkipPlanRequest(args)) return false;
         if (this.isGenerating) return false;
+        if (args?.skipPlan) return true;
 
+        const {
+            explicitMode = '',
+            description = '',
+            hasCurrentFlowContext = false
+        } = args || {};
         const mode = String(explicitMode || '').trim().toLowerCase();
-        return mode === '' || mode === 'auto' || mode === 'new';
+        if (['modify', 'explain', 'review_pending_parameters'].includes(mode)) {
+            return false;
+        }
+
+        if (mode && !['auto', 'new', 'build', 'stable', 'scripted', 'planner', 'tool_loop'].includes(mode)) {
+            return false;
+        }
+
+        if (hasCurrentFlowContext) {
+            if (this._looksLikeExistingFlowEditRequest?.(description) ||
+                this._looksLikeExplainRequest?.(description) ||
+                (this._looksLikeModifyRequest?.(description) && !this._looksLikeExplicitNewFlowRequest?.(description))) {
+                return false;
+            }
+        }
+
+        return true;
+    },
+
+    _isAllowedSkipPlanRequest({
+        explicitMode = '',
+        skipPlan = false,
+        skipPlanSource = '',
+        buildFromPlan = null
+    } = {}) {
+        if (!skipPlan) return false;
+
+        const source = String(skipPlanSource || '').trim().toLowerCase();
+        const mode = String(explicitMode || '').trim().toLowerCase();
+        if (buildFromPlan && typeof buildFromPlan === 'object' && Object.keys(buildFromPlan).length > 0) {
+            return true;
+        }
+
+        if (source === 'confirmed_plan') {
+            return Boolean(buildFromPlan || this.pendingVisionPlan);
+        }
+
+        if (source === 'developer_direct_build_debug') {
+            return this.isVisionAgentDeveloperUiEnabled === true;
+        }
+
+        if (source === 'pending_parameter_review') {
+            return mode === 'review_pending_parameters' && this.currentResult?.flow;
+        }
+
+        return false;
+    },
+
+    _updatePlanBuildActionState() {
+        const busy = Boolean(this.isGenerating);
+        const hasPlan = Boolean(this.pendingVisionPlan);
+        const inlineBuildBtn = this.container?.querySelector('#ai-btn-start-build-inline');
+        if (inlineBuildBtn) {
+            inlineBuildBtn.disabled = busy || !hasPlan;
+            inlineBuildBtn.title = hasPlan ? '按已确认计划开始构建' : '请先完成规划';
+            inlineBuildBtn.setAttribute?.('aria-disabled', inlineBuildBtn.disabled ? 'true' : 'false');
+        }
+
+        this.container?.querySelectorAll?.('.ai-plan-action').forEach(button => {
+            button.disabled = busy || !hasPlan;
+            button.setAttribute?.('aria-disabled', button.disabled ? 'true' : 'false');
+        });
     },
 
     _enterPlanModeFromPrompt({
@@ -380,6 +448,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun();
+        this._updatePlanBuildActionState();
         if (clearInput && input) {
             input.value = '';
             input.style.height = 'auto';
@@ -420,6 +489,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._setResultStatusNote('规划模式等待确认，确认后进入构建模式。', 'info');
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(this.pendingVisionPlan);
+                this._updatePlanBuildActionState();
                 this.activeAssistantTurn = null;
             })
             .catch(error => {
@@ -436,6 +506,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._setResultStatusNote('规划模式失败，请检查后端连接后重试。', 'warning');
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(null);
+                this._updatePlanBuildActionState();
                 this.activeAssistantTurn = null;
             });
 
@@ -1406,6 +1477,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <div class="ai-plan-empty-copy">资源补齐会在开始构建后出现；Plan 阶段只显示目标、关键问题、推荐默认值和规划诊断。</div>
                 </div>
             `;
+            this._updatePlanBuildActionState();
             return;
         }
 
@@ -1484,6 +1556,7 @@ export const aiPanelAgentWorkspaceMixin = {
         });
         el.querySelector('#ai-btn-accept-plan')?.addEventListener('click', () => this._acceptRecommendedPlanAndBuild());
         el.querySelector('#ai-btn-start-build')?.addEventListener('click', () => this._startBuildFromCurrentPlan());
+        this._updatePlanBuildActionState();
     },
 
     _renderPlanQuestion(question, selectedValue) {
@@ -1541,7 +1614,18 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _startBuildFromCurrentPlan({ acceptedRecommended = false } = {}) {
-        if (this.isGenerating || !this.pendingVisionPlan) return false;
+        if (this.isGenerating) return false;
+
+        if (!this.pendingVisionPlan) {
+            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._addMessage?.('system', '请先完成规划，再开始构建。');
+            this._setResultStatusNote?.('请先完成规划，再开始构建。', 'warning');
+            this._renderAgentWorkspaceOverview();
+            this._renderPlanWorkspace(null);
+            this._renderBuildWorkspaceFromAgentRun();
+            this._updatePlanBuildActionState();
+            return false;
+        }
 
         const plan = this.pendingVisionPlan;
         this.activePlanRequestId = null;
@@ -1562,6 +1646,7 @@ export const aiPanelAgentWorkspaceMixin = {
             templateSelection: buildFromPlan.templateSelection || null,
             clearInput: true,
             skipPlan: true,
+            skipPlanSource: 'confirmed_plan',
             buildFromPlan
         });
     },

@@ -285,6 +285,7 @@ function createPanel(AiPanel, overrides = {}) {
   panel.useVisionAgentGenerateFlow = overrides.enabled === true;
   panel.agentGenerateFlowMode = overrides.mode || 'scripted';
   panel.runtimePreviewConsent = overrides.runtimePreviewConsent === true;
+  panel.directBuildDebugNextRequest = overrides.directBuildDebugNextRequest === true;
   panel.pendingParameterDrafts = {};
   panel.pendingResourceDrafts = {};
   panel.pendingOperatorBindings = {};
@@ -1165,6 +1166,17 @@ test('ordinary UI still hides Tool Loop developer controls by default', async ()
   assert.doesNotMatch(panel._renderAgentDeveloperControls(), /tool_loop|Tool Loop 实验/);
 });
 
+test('developer direct Build debug control is labeled as Plan skip debug only', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+
+  const html = panel._renderAgentDeveloperControls();
+
+  assert.match(html, /ai-agent-direct-build-debug/);
+  assert.match(html, /直接 Build 调试/);
+  assert.match(html, /跳过 Plan，仅用于调试/);
+});
+
 test('developer mode renders RuntimePreview consent switch', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
@@ -1313,6 +1325,123 @@ test('Plan Mode captures vague inspection request without starting Build', async
     plan.innerHTML
   ].join('\n'), /Accept recommended defaults|rule_fallback|\bplanner_failed\b|collecting_context completed|What should count as a defect|Defect definition controls|Scratch\/blob|Use general surface defect candidates|Good first draft|>Crack<|Dent\/stain|Thresholds need sample confirmation/);
   assert.doesNotMatch(plan.innerHTML, /setTimeout/);
+});
+
+test('ordinary build prompt stays Plan-first even when Tool Loop mode is selected', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+  const input = createFakeElement();
+  const overview = createFakeElement();
+  const plan = createFakeElement();
+  const build = createFakeElement();
+  panel.attachments = [];
+  panel.container = createContainer({
+    '#ai-input': input,
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': overview,
+    '#ai-plan-workspace': plan,
+    '#ai-build-workspace': build,
+    '#ai-result-status-note': createFakeElement()
+  });
+  let capturedPlanRequest = null;
+  panel._shouldUsePlanRunEventStream = () => false;
+  panel._requestBackendVisionPlan = async request => {
+    capturedPlanRequest = request;
+    return backendPlanResult({
+      goal: 'packaging box appearance inspection workflow',
+      originalUserPrompt: request.description
+    });
+  };
+  panel._dispatchAgentRunGenerateRequest = () => {
+    throw new Error('ordinary prompt should not start Build before Plan confirmation');
+  };
+  input.value = '为我构建一个包装箱外观视觉检测流程';
+
+  await panel._handleGenerate();
+  await flushAsync();
+
+  assert.equal(capturedPlanRequest.description, '为我构建一个包装箱外观视觉检测流程');
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.equal(panel.activeAgentRunId, null);
+  assert.equal(panel.isGenerating, false);
+  assert.equal(panel.pendingVisionPlan.goal, 'packaging box appearance inspection workflow');
+  assert.match(plan.innerHTML, /推荐方案/);
+  assert.match(plan.innerHTML, /关键问题/);
+  assert.match(plan.innerHTML, /推荐默认值/);
+  assert.match(plan.innerHTML, /按推荐方案开始构建/);
+  assert.doesNotMatch(overview.innerHTML, /VisionAgentLoop/);
+});
+
+test('quick example selection submits through Plan-first path', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const input = createFakeElement();
+  const plan = createFakeElement();
+  panel.attachments = [];
+  panel.container = createContainer({
+    '#ai-input': input,
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': plan,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  let capturedPlanRequest = null;
+  panel._shouldUsePlanRunEventStream = () => false;
+  panel._requestBackendVisionPlan = async request => {
+    capturedPlanRequest = request;
+    return backendPlanResult({ goal: 'quick example plan' });
+  };
+
+  await panel._handleQuickExampleSelection('检测金属零件表面的划痕缺陷。');
+  await flushAsync();
+
+  assert.equal(capturedPlanRequest.description, '检测金属零件表面的划痕缺陷。');
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.equal(panel.pendingVisionPlan.goal, 'quick example plan');
+  assert.match(plan.innerHTML, /按推荐方案开始构建/);
+});
+
+test('unknown skipPlan and build-like explicit modes cannot bypass Plan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true, mode: 'tool_loop' });
+
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({ explicitMode: 'build' }), true);
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({ explicitMode: 'stable' }), true);
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({ explicitMode: 'tool_loop' }), true);
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({ explicitMode: 'auto', skipPlan: true }), true);
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({
+    explicitMode: 'new',
+    skipPlan: true,
+    buildFromPlan: { planHash: 'sha256:from-plan' }
+  }), false);
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({
+    explicitMode: 'new',
+    skipPlan: true,
+    skipPlanSource: 'confirmed_plan',
+    buildFromPlan: { planHash: 'sha256:confirmed' }
+  }), false);
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({
+    explicitMode: 'new',
+    skipPlan: true,
+    skipPlanSource: 'developer_direct_build_debug'
+  }), false);
+});
+
+test('existing-flow modification turns still bypass Plan and enter Build', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({
+    explicitMode: '',
+    description: '把当前流程里的算子名称改成中文，其他参数保持不变',
+    hasCurrentFlowContext: true
+  }), false);
+  assert.equal(panel._shouldOpenPlanModeBeforeBuild({
+    explicitMode: '',
+    description: '新增一个缺陷检测流程',
+    hasCurrentFlowContext: true
+  }), true);
 });
 
 test('Plan Mode streams public Plan progress into the assistant message', async () => {
@@ -1585,6 +1714,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   assert.equal(started, true);
   assert.equal(panel.agentWorkspaceMode, 'build');
   assert.equal(captured.skipPlan, true);
+  assert.equal(captured.skipPlanSource, 'confirmed_plan');
   assert.equal(captured.explicitMode, 'new');
   assert.equal(captured.hint, '');
   assert.match(captured.userMessage, /从计划开始构建/);
@@ -1595,6 +1725,59 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
     scenarioKey: 'scratch'
   });
   assert.deepEqual(captured.templateSelection, captured.buildFromPlan.templateSelection);
+});
+
+test('Start Build without pending Plan is blocked with Plan-first prompt', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-btn-start-build-inline': inlineBuildButton
+  });
+  panel._dispatchGenerateRequest = () => {
+    throw new Error('Build should not dispatch without a pending Plan');
+  };
+
+  const started = panel._startBuildFromCurrentPlan();
+
+  assert.equal(started, false);
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.equal(panel.lastResultStatusNote.text, '请先完成规划，再开始构建。');
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+  assert.equal(panel.messages.at(-1).text, '请先完成规划，再开始构建。');
+  assert.equal(inlineBuildButton.disabled, true);
+  assert.equal(inlineBuildButton.getAttribute('aria-disabled'), 'true');
+});
+
+test('developer direct Build debug is one-shot and explicitly skips Plan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, {
+    developer: true,
+    enabled: true,
+    directBuildDebugNextRequest: true
+  });
+  const input = createFakeElement();
+  input.value = '直接调试构建路径';
+  panel.attachments = [];
+  panel.container = createContainer({
+    '#ai-input': input
+  });
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
+
+  await panel._handleGenerate();
+
+  assert.equal(captured.skipPlan, true);
+  assert.equal(captured.skipPlanSource, 'developer_direct_build_debug');
+  assert.equal(captured.explicitMode, 'new');
+  assert.equal(panel.directBuildDebugNextRequest, false);
 });
 
 test('Plan Mode ignores stale backend response when a newer Plan request wins', async () => {

@@ -11,6 +11,7 @@ export const aiPanelGenerateRequestMixin = {
         templateSelection = null,
         clearInput = true,
         skipPlan = false,
+        skipPlanSource = '',
         buildFromPlan = null
     }) {
         const input = this.container.querySelector('#ai-input');
@@ -25,7 +26,19 @@ export const aiPanelGenerateRequestMixin = {
 
         if (this.isGenerating) return false;
 
-        if (this._shouldOpenPlanModeBeforeBuild?.({ explicitMode, skipPlan })) {
+        const hasExistingFlowOverride = existingFlowJson !== null && existingFlowJson !== undefined;
+        const hasCurrentFlowContext = hasExistingFlowOverride
+            ? this._hasMeaningfulFlowPayload(existingFlowJson)
+            : this._hasCurrentFlowContext();
+
+        if (this._shouldOpenPlanModeBeforeBuild?.({
+            explicitMode,
+            skipPlan,
+            skipPlanSource,
+            buildFromPlan,
+            description: normalizedDescription,
+            hasCurrentFlowContext
+        })) {
             return this._enterPlanModeFromPrompt({
                 description: normalizedDescription,
                 hint: normalizedHint,
@@ -63,10 +76,6 @@ export const aiPanelGenerateRequestMixin = {
         this._addMessage('user', userMessage || normalizedDescription);
         this._startAssistantTurn();
 
-        const hasExistingFlowOverride = existingFlowJson !== null && existingFlowJson !== undefined;
-        const hasCurrentFlowContext = hasExistingFlowOverride
-            ? this._hasMeaningfulFlowPayload(existingFlowJson)
-            : this._hasCurrentFlowContext();
         const resolvedMode = this._resolveGenerateRequestMode(explicitMode, normalizedDescription, hasCurrentFlowContext);
         const shouldIncludeFlowPayload = this._shouldIncludeCurrentFlowPayload(
             resolvedMode,
@@ -399,6 +408,7 @@ export const aiPanelGenerateRequestMixin = {
 
         const enabled = Boolean(this.useVisionAgentGenerateFlow);
         const mode = this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode);
+        const directBuildDebugActive = Boolean(this.directBuildDebugNextRequest);
         return `
             <div class="ai-agent-dev-controls" id="ai-agent-dev-controls">
                 <label class="ai-agent-dev-toggle">
@@ -415,6 +425,14 @@ export const aiPanelGenerateRequestMixin = {
                     <input id="ai-agent-runtime-preview-consent" type="checkbox" ${enabled && this.runtimePreviewConsent ? 'checked' : ''} ${enabled ? '' : 'disabled'} />
                     <span>允许本轮 RuntimePreview</span>
                 </label>
+                <button
+                    class="ai-mode-chip ai-direct-build-debug ${directBuildDebugActive ? 'is-active' : ''}"
+                    id="ai-agent-direct-build-debug"
+                    type="button"
+                    title="跳过 Plan，仅用于调试">
+                    ${directBuildDebugActive ? '直接 Build 调试（下一次）' : '直接 Build 调试'}
+                </button>
+                <div class="ai-agent-dev-note ai-agent-direct-build-note">跳过 Plan，仅用于调试；下一次发送后自动关闭。</div>
             </div>
         `;
     },
@@ -427,6 +445,7 @@ export const aiPanelGenerateRequestMixin = {
         const toggle = this.container?.querySelector('#ai-agent-generate-toggle');
         const previewConsentToggle = this.container?.querySelector('#ai-agent-runtime-preview-consent');
         const modeButtons = Array.from(this.container?.querySelectorAll('[data-agent-generate-mode]') || []);
+        const directBuildDebugButton = this.container?.querySelector('#ai-agent-direct-build-debug');
         const refresh = () => {
             const mode = this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode);
             modeButtons.forEach(button => {
@@ -441,6 +460,14 @@ export const aiPanelGenerateRequestMixin = {
             const note = this.container?.querySelector('.ai-agent-dev-note');
             if (note) {
                 note.hidden = mode !== 'tool_loop';
+            }
+            if (directBuildDebugButton) {
+                directBuildDebugButton.disabled = false;
+                directBuildDebugButton.classList.toggle('is-active', Boolean(this.directBuildDebugNextRequest));
+                directBuildDebugButton.textContent = this.directBuildDebugNextRequest
+                    ? '直接 Build 调试（下一次）'
+                    : '直接 Build 调试';
+                directBuildDebugButton.title = '跳过 Plan，仅用于调试';
             }
         };
 
@@ -476,6 +503,19 @@ export const aiPanelGenerateRequestMixin = {
             });
         });
 
+        if (directBuildDebugButton) {
+            directBuildDebugButton.addEventListener('click', () => {
+                this.directBuildDebugNextRequest = !this.directBuildDebugNextRequest;
+                this._setResultStatusNote?.(
+                    this.directBuildDebugNextRequest
+                        ? '下一次发送将跳过 Plan，仅用于调试。'
+                        : '',
+                    this.directBuildDebugNextRequest ? 'warning' : ''
+                );
+                refresh();
+            });
+        }
+
         refresh();
     },
 
@@ -497,6 +537,15 @@ export const aiPanelGenerateRequestMixin = {
         return payload;
     },
 
+    _consumeDirectBuildDebugRequest() {
+        if (!this.isVisionAgentDeveloperUiEnabled || !this.directBuildDebugNextRequest) {
+            return false;
+        }
+
+        this.directBuildDebugNextRequest = false;
+        return true;
+    },
+
     async _handleGenerate() {
         const input = this.container.querySelector('#ai-input');
         const description = input.value.trim();
@@ -506,15 +555,17 @@ export const aiPanelGenerateRequestMixin = {
         const userMessage = attachmentPaths.length > 0
             ? `${description}\n\n[附件] ${this.attachments.map(item => item.name).join('，')}`
             : description;
-        this._dispatchGenerateRequest({
+        const directBuildDebug = this._consumeDirectBuildDebugRequest?.() === true;
+        return this._dispatchGenerateRequest({
             description,
             hint,
             userMessage,
             attachmentPaths,
             templateSelection,
-            explicitMode: '',
+            explicitMode: directBuildDebug ? 'new' : '',
             clearInput: true,
-            skipPlan: true
+            skipPlan: directBuildDebug,
+            skipPlanSource: directBuildDebug ? 'developer_direct_build_debug' : ''
         });
     },
 
@@ -559,7 +610,8 @@ export const aiPanelGenerateRequestMixin = {
             attachmentPaths: [],
             explicitMode: 'review_pending_parameters',
             clearInput: true,
-            skipPlan: true
+            skipPlan: true,
+            skipPlanSource: 'pending_parameter_review'
         });
     },
 
