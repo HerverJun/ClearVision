@@ -748,13 +748,41 @@ export const aiPanelAgentRunMixin = {
     },
 
     _renderAgentRunBrief(evt) {
-        const text = evt.summary || this._payloadString(evt.payload, 'brief') || '视觉智能体运行已创建，公开进度事件会在此处显示。';
+        const text = this._localizeAgentRunBriefText(
+            evt.summary || this._payloadString(evt.payload, 'brief') || ''
+        );
         const body = this.activeAssistantTurn?.replyBody;
         if (!body?.textContent?.includes(text)) {
             this._appendAssistantStreamText('reply', `${text}\n`);
         }
 
         this._setAssistantTurnStatus(this.activeAssistantTurn, '执行中', 'streaming');
+    },
+
+    _localizeAgentRunBriefText(value) {
+        const text = String(value || '').trim();
+        if (!text) {
+            return '视觉智能体运行已创建，公开进度事件会在此处显示。';
+        }
+
+        const localized = this._localizeDisplayText?.(text);
+        if (localized && localized !== text) {
+            return localized;
+        }
+
+        const defaultPrefix = 'I will turn this request into a safe Vision Agent workflow draft and stream each public progress step:';
+        if (text.startsWith(defaultPrefix)) {
+            const requirement = text.slice(defaultPrefix.length).trim();
+            return requirement
+                ? `已创建安全的视觉智能体流程草稿任务，将在此流式显示公开进度：${requirement}`
+                : '已创建安全的视觉智能体流程草稿任务，将在此流式显示公开进度。';
+        }
+
+        if (text === 'I will create a metadata-only Vision Agent run and report progress as public events.') {
+            return '已创建仅元数据的视觉智能体运行，公开进度事件会在此处显示。';
+        }
+
+        return text;
     },
 
     _appendAgentRunProcessLine(evt) {

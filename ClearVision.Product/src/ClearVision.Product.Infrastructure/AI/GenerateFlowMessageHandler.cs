@@ -131,7 +131,7 @@ public class GenerateFlowMessageHandler
                 ToolEvidenceTimeline = result.BuildResult?.ToolEvidenceTimeline,
                 FirstFixRecommendation = result.BuildResult?.FirstFixRecommendation,
                 ManualRetry = MapManualRetry(result.ManualRetry),
-                PromptTrace = result.PromptTrace is AiPromptTrace trace ? trace.Desensitize() : result.PromptTrace,
+                PromptTrace = MapPromptTrace(result.PromptTrace),
                 StageTimeline = MapStageTimeline(result.StageTimeline),
                 PerformanceBudget = BuildPerformanceBudget(result.StageTimeline, result.RetryCount, result.PromptTrace),
                 CompletionStatus = result.CompletionStatus,
@@ -403,6 +403,20 @@ public class GenerateFlowMessageHandler
             RepairTarget = manualRetry.RepairTarget,
             LastOutputSummary = manualRetry.LastOutputSummary,
             Diagnostics = manualRetry.Diagnostics.Cast<object>().ToList()
+        };
+    }
+
+    private static object? MapPromptTrace(object? promptTrace)
+    {
+        return promptTrace switch
+        {
+            null => null,
+            AiPromptTrace trace => trace.Desensitize(),
+            _ => new
+            {
+                redactionPass = true,
+                hidden = true
+            }
         };
     }
 

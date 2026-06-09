@@ -437,21 +437,30 @@ public class GenerateFlowMessageHandlerTests
             {
                 Success = true,
                 Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() },
-                PromptTrace = new
+                PromptTrace = new AiPromptTrace
                 {
-                    mode = "modify",
-                    provider = "OpenAI Compatible",
-                    model = "gpt-5.4",
-                    systemPrompt = "system",
-                    userPrompt = "user"
+                    Mode = "modify",
+                    Provider = "OpenAI Compatible",
+                    Model = "gpt-5.4",
+                    BaseUrl = "https://example.invalid/v1?token=secret",
+                    SystemPrompt = "system",
+                    UserPrompt = "user"
                 }
             }));
 
         var resultJson = await handler.HandleAsync("trace");
 
         using var doc = JsonDocument.Parse(resultJson);
-        doc.RootElement.GetProperty("promptTrace").GetProperty("mode").GetString().Should().Be("modify");
-        doc.RootElement.GetProperty("promptTrace").GetProperty("model").GetString().Should().Be("gpt-5.4");
+        var promptTrace = doc.RootElement.GetProperty("promptTrace");
+        promptTrace.GetProperty("mode").GetString().Should().Be("modify");
+        promptTrace.GetProperty("model").GetString().Should().Be("gpt-5.4");
+        promptTrace.GetProperty("baseUrl").GetString().Should().Be("[hidden]");
+        promptTrace.GetProperty("systemPrompt").GetString().Should().Be("[hidden]");
+        promptTrace.GetProperty("userPrompt").GetString().Should().Be("[hidden]");
+        resultJson.Should().NotContain("\"system\"");
+        resultJson.Should().NotContain("\"user\"");
+        resultJson.Should().NotContain("example.invalid");
+        resultJson.Should().NotContain("secret");
     }
 
     [Fact(DisplayName = "GenerateFlowMessageHandler should serialize clarification payload")]

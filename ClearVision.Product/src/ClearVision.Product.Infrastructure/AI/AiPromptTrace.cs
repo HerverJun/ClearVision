@@ -1,4 +1,6 @@
+using System.Linq;
 using System.Text.RegularExpressions;
+using ClearVision.Product.Contracts.Messages;
 
 namespace ClearVision.Product.Infrastructure.AI;
 
@@ -29,9 +31,11 @@ public sealed class AiPromptTrace
     /// <summary>Model selection reason (role binding, fallback, active).</summary>
     public string? SelectionReason { get; set; }
 
+    private const string HiddenValue = "[hidden]";
+
     /// <summary>
     /// Returns a desensitized copy safe for client transmission.
-    /// Masks API keys, local paths, private IP addresses, and customer filenames.
+    /// Hides prompt bodies, model base URLs, and attachment paths while preserving public metadata.
     /// </summary>
     public AiPromptTrace Desensitize()
     {
@@ -42,9 +46,9 @@ public sealed class AiPromptTrace
             Model = Model,
             BaseUrl = MaskBaseUrl(BaseUrl),
             Capabilities = Capabilities?.Clone(),
-            SystemPrompt = MaskSensitivePatterns(SystemPrompt),
-            UserPrompt = MaskSensitivePatterns(UserPrompt),
-            AttachmentReport = AttachmentReport,
+            SystemPrompt = HidePromptBody(SystemPrompt),
+            UserPrompt = HidePromptBody(UserPrompt),
+            AttachmentReport = HideAttachmentReport(AttachmentReport),
             UsedReferenceFlowSummary = MaskSensitivePatterns(UsedReferenceFlowSummary),
             PromptVersionId = PromptVersionId,
             PromptVersionName = PromptVersionName,
@@ -54,12 +58,41 @@ public sealed class AiPromptTrace
         };
     }
 
+    private static string HidePromptBody(string? text)
+    {
+        return string.IsNullOrWhiteSpace(text) ? string.Empty : HiddenValue;
+    }
+
     private static string? MaskBaseUrl(string? url)
     {
         if (string.IsNullOrWhiteSpace(url))
             return url;
-        return Regex.Replace(url, @"(api[_-]?key|apikey|key|token|secret)=[^&]+",
-            "$1=***", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return HiddenValue;
+    }
+
+    private static object? HideAttachmentReport(object? attachmentReport)
+    {
+        if (attachmentReport is null)
+            return null;
+
+        if (attachmentReport is GenerateFlowAttachmentReport report)
+        {
+            return new
+            {
+                sentCount = report.Sent.Count,
+                skippedCount = report.Skipped.Count,
+                skippedReasons = report.Skipped
+                    .Select(item => MaskSensitivePatterns(item.Reason))
+                    .Where(reason => !string.IsNullOrWhiteSpace(reason))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+            };
+        }
+
+        return new
+        {
+            hidden = true
+        };
     }
 
     internal static string MaskSensitivePatterns(string text)

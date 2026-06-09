@@ -1204,6 +1204,42 @@ test('default UI payload uses Agent GenerateFlow for Build Mode', async () => {
   });
 });
 
+test('Prompt Trace debug view hides raw prompts and sensitive metadata', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const promptTraceCard = createFakeElement();
+  const promptTrace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-result-prompt-trace-card': promptTraceCard,
+    '#ai-result-prompt-trace': promptTrace
+  });
+  panel._promptTraceViewMode = 'debug';
+
+  panel._renderPromptTrace({
+    mode: 'agent',
+    provider: 'provider-a',
+    model: 'planner-model',
+    baseUrl: 'https://example.invalid/v1?token=secret-token',
+    capabilities: {
+      headers: 'Authorization: Bearer super-secret-value',
+      modelPath: 'C:\\factory\\model.onnx'
+    },
+    attachmentReport: {
+      preview: `data:image/png;base64,${'A'.repeat(120)}`,
+      station: '192.168.1.10 DB1.DBX0.0'
+    },
+    usedReferenceFlowSummary: 'from /home/operator/flows/ref.json',
+    systemPrompt: 'raw system prompt with sk-secret-token',
+    userPrompt: 'raw user prompt'
+  });
+
+  assert.equal(promptTraceCard.hidden, false);
+  assert.match(promptTrace.innerHTML, /系统提示状态/);
+  assert.match(promptTrace.innerHTML, /用户提示状态/);
+  assert.doesNotMatch(promptTrace.innerHTML, /raw system prompt|raw user prompt|example\.invalid|super-secret-value/);
+  assertNoSensitiveLeak(promptTrace.innerHTML);
+});
+
 test('developer mode payload includes useVisionAgentGenerateFlow=true', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: true, enabled: true });
@@ -2949,13 +2985,15 @@ test('AgentRun assistant brief appends immediate public summary', async () => {
     sequence: 2,
     eventType: 'assistant.brief',
     stage: 'brief',
-    summary: 'I will build a safe workflow draft.',
+    summary: 'I will turn this request into a safe Vision Agent workflow draft and stream each public progress step: Detect scratches',
     status: 'completed',
     metadataOnly: true,
     redactionPass: true
   });
 
-  assert.match(turn.replyBody.textContent, /safe workflow draft/);
+  assert.match(turn.replyBody.textContent, /已创建安全的视觉智能体流程草稿任务/);
+  assert.match(turn.replyBody.textContent, /Detect scratches/);
+  assert.doesNotMatch(turn.replyBody.textContent, /I will turn this request|safe Vision Agent workflow draft/);
   assert.equal(turn.replySection.hidden, false);
   assert.equal(turn.statusEl.textContent, '执行中');
   assert.doesNotMatch(turn.replyBody.textContent, /chain.?of.?thought|hidden reasoning/i);

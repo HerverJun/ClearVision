@@ -1134,7 +1134,7 @@ export class AiPanel {
         const mode = String(trace.mode || '').trim();
         const provider = String(trace.provider || '').trim();
         const model = String(trace.model || '').trim();
-        const baseUrl = String(trace.baseUrl || '').trim();
+        const baseUrl = this._sanitizePromptTracePublicText(trace.baseUrl || '');
 
         card.hidden = false;
 
@@ -1163,16 +1163,16 @@ export class AiPanel {
             return;
         }
 
-        // Debug view: full prompt trace
+        // Debug view: public diagnostics only. Raw/system prompts stay hidden even when debugPrompt is enabled.
         const capabilities = this._formatPromptTraceJson(trace.capabilities || null);
         const attachmentReport = this._formatPromptTraceJson(trace.attachmentReport || null);
-        const referenceFlow = String(trace.usedReferenceFlowSummary || '').trim();
+        const referenceFlow = this._sanitizePromptTracePublicText(trace.usedReferenceFlowSummary || '');
         const systemPrompt = String(trace.systemPrompt || '').trim();
         const userPrompt = String(trace.userPrompt || '').trim();
 
         container.innerHTML = `
             <details class="ai-prompt-trace-details" open>
-                <summary>本次实际发送给模型的上下文</summary>
+                <summary>本次模型调用的公开诊断上下文</summary>
                 <div class="ai-prompt-trace-grid">
                     <div class="ai-prompt-trace-block">
                         <div class="ai-prompt-trace-label">元信息</div>
@@ -1196,12 +1196,12 @@ export class AiPanel {
                         <pre class="ai-prompt-trace-pre">${this._escapeHtml(referenceFlow || '--')}</pre>
                     </div>
                     <div class="ai-prompt-trace-block">
-                        <div class="ai-prompt-trace-label">系统提示</div>
-                        <pre class="ai-prompt-trace-pre">${this._escapeHtml(systemPrompt || '--')}</pre>
+                        <div class="ai-prompt-trace-label">系统提示状态</div>
+                        <pre class="ai-prompt-trace-pre">${this._escapeHtml(systemPrompt ? `已隐藏（${systemPrompt.length} 字符）` : '--')}</pre>
                     </div>
                     <div class="ai-prompt-trace-block">
-                        <div class="ai-prompt-trace-label">用户提示</div>
-                        <pre class="ai-prompt-trace-pre">${this._escapeHtml(userPrompt || '--')}</pre>
+                        <div class="ai-prompt-trace-label">用户提示状态</div>
+                        <pre class="ai-prompt-trace-pre">${this._escapeHtml(userPrompt ? `已隐藏（${userPrompt.length} 字符）` : '--')}</pre>
                     </div>
                 </div>
             </details>
@@ -1214,10 +1214,29 @@ export class AiPanel {
         }
 
         try {
-            return JSON.stringify(value, null, 2);
+            return this._sanitizePromptTracePublicText(JSON.stringify(value, null, 2));
         } catch {
-            return String(value);
+            return this._sanitizePromptTracePublicText(String(value));
         }
+    }
+
+    _sanitizePromptTracePublicText(value) {
+        return String(value || '')
+            .replace(/["']?(?:authorization|x-api-key|api[-_ ]?key|token|secret|baseUrl|base_url|headers?)["']?\s*:\s*["'][^"']+["']/gi, '"[已隐藏字段]": "[已隐藏]"')
+            .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, 'Bearer [已隐藏]')
+            .replace(/\b(?:authorization|x-api-key|api[-_ ]?key)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '[已隐藏字段]: [已隐藏]')
+            .replace(/\b(?:token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '[已隐藏字段]: [已隐藏]')
+            .replace(/https?:\/\/[^\s"'<>|]+/gi, '[已隐藏URL]')
+            .replace(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g, '[已隐藏IP]')
+            .replace(/\bDB\d+\.DB[XBWD]\d+(?:\.\d+)?\b/gi, '[已隐藏PLC]')
+            .replace(/\bM\d+(?:\.\d+)?\b/gi, '[已隐藏PLC]')
+            .replace(/\bD\d+\b/gi, '[已隐藏PLC]')
+            .replace(/plc:\/\/[^\s"'<>|]+/gi, '[已隐藏PLC]')
+            .replace(/(?:[a-z]:\\|\\\\)[^\s"'<>|]+/gi, '[已隐藏路径]')
+            .replace(/(?:\/users\/|\/home\/|\/var\/|\/tmp\/|\/mnt\/|\/data\/|\/models\/|\/artifacts\/)[^\s"'<>|]+/gi, '[已隐藏路径]')
+            .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\r\n]+/gi, '[已隐藏图像]')
+            .replace(/(?<![a-z0-9+/=])(?:[a-z0-9+/]{96,}={0,2})(?![a-z0-9+/=])/gi, '[已隐藏编码]')
+            .trim();
     }
 
     _buildTemplateFirstSummary(data) {
@@ -2058,24 +2077,6 @@ export class AiPanel {
     _scrollToBottom() {
         const container = this.container.querySelector('#ai-chat-container');
         if(container) container.scrollTop = container.scrollHeight;
-    }
-
-    _sanitizePath(path) {
-        if (!path || typeof path !== 'string') return path;
-        // Replace Windows absolute paths (including spaces, Unicode, parentheses)
-        return path.replace(/[A-Z]:\\[^\s"'\]]+/gi, '<local-path>')
-            .replace(/\/home\/[^\s"'\]]+/gi, '<local-path>')
-            .replace(/\/Users\/[^\s"'\]]+/gi, '<local-path>');
-    }
-
-    _sanitizePromptTraceForNormalMode(trace) {
-        if (!trace || typeof trace !== 'object') return trace;
-        return {
-            ...trace,
-            systemPrompt: this._sanitizePath(trace.systemPrompt || ''),
-            userPrompt: this._sanitizePath(trace.userPrompt || ''),
-            baseUrl: this._sanitizePath(trace.baseUrl || '')
-        };
     }
 
     // ── 缺失字段动作映射 ─────────────────────────────────────
