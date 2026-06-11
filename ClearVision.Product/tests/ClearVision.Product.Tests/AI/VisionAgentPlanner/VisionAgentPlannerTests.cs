@@ -315,7 +315,7 @@ public sealed class VisionAgentPlannerTests
             Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>());
 
         var json = await handler.HandleAsync(
-            "wire",
+            "检测端子线序是否正确",
             useVisionAgentGenerateFlow: true,
             agentGenerateFlowMode: AiAgentGenerateFlowModes.Planner);
 

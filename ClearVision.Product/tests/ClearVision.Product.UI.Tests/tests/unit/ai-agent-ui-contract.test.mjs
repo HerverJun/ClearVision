@@ -557,9 +557,11 @@ function backendPlanResult(overrides = {}) {
     risks: ['Thresholds need representative images.'],
     acceptanceCriteria: ['Workflow draft contains acquisition, inspection, judgment, and output stages.'],
     executablePlan: ['Map parameters and run readiness checks.'],
-    canBuild: true,
+    canBuild: overrides.canBuild ?? true,
     blockingReasons: [],
     nextAction: 'Accept recommended defaults, then start Build.',
+    requirementMaturity: overrides.requirementMaturity,
+    decisionTrace: overrides.decisionTrace,
     publicEvents: overrides.publicEvents ?? [
       {
         stage: 'collecting_context',
@@ -2099,6 +2101,68 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
     scenarioKey: 'scratch'
   });
   assert.deepEqual(captured.templateSelection, captured.buildFromPlan.templateSelection);
+});
+
+test('Backend Plan without explicit canBuild is not executable by default', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const rawPlan = backendPlanResult({
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'unknown',
+      canBuild: false,
+      missingFields: ['inspection_object', 'task_type'],
+      blockingReasons: ['inspection_object_missing'],
+      publicReason: '需求仍缺少检测对象或任务类型，暂不能构建。'
+    }
+  });
+  delete rawPlan.canBuild;
+
+  const plan = panel._normalizeBackendPlanResult(rawPlan);
+
+  assert.equal(plan.executable, false);
+  assert.equal(plan.requirementMaturity.maturity, 'ambiguous');
+  assert.deepEqual(plan.requirementMaturity.missingFields, ['inspection_object', 'task_type']);
+});
+
+test('Start Build from non-executable Plan is blocked before dispatch', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    requirementMaturity: {
+      maturity: 'abstract_goal',
+      taskType: 'abstract_goal',
+      canBuild: false,
+      missingFields: ['inspection_object', 'task_type'],
+      blockingReasons: ['abstract_goal_needs_decomposition'],
+      publicReason: '这是方案愿景，不是可直接构建的检测流程。'
+    },
+    decisionTrace: {
+      maturityLevel: 'abstract_goal',
+      taskType: 'abstract_goal',
+      canBuild: false,
+      fallbackReason: 'maturity_gate_blocked',
+      blockingReasons: ['abstract_goal_needs_decomposition']
+    }
+  }));
+  panel._dispatchGenerateRequest = () => {
+    throw new Error('Build should not dispatch for a non-executable Plan');
+  };
+
+  const started = panel._startBuildFromCurrentPlan();
+
+  assert.equal(started, false);
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+  assert.match(panel.lastResultStatusNote.text, /方案愿景|暂不可构建/);
+  assert.match(panel.container.querySelector('#ai-plan-workspace').innerHTML, /需求成熟度/);
 });
 
 test('Start Build without pending Plan is blocked with Plan-first prompt', async () => {

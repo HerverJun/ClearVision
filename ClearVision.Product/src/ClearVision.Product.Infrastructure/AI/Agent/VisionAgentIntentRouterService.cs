@@ -173,6 +173,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         string source,
         string fallbackReason)
     {
+        var maturity = EvaluateMaturity(request);
         var intent = NormalizeIntent(candidate.Intent);
         var confidence = NormalizeConfidence(candidate.Confidence);
         var canBuild = intent is IntentActionableVisionPlan or IntentModifyExistingFlow or IntentBuildFromConfirmedPlan or IntentDirectBuildDebug;
@@ -207,6 +208,18 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             questions = DefaultClarificationQuestions();
         }
 
+        ApplyMaturityGate(
+            request,
+            maturity,
+            ref intent,
+            ref confidence,
+            ref canBuild,
+            ref shouldOpenPlan,
+            ref shouldBuildDirectly,
+            ref needsClarification,
+            ref questions,
+            ref fallbackReason);
+
         return candidate with
         {
             Intent = intent,
@@ -215,7 +228,9 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             ShouldBuildDirectly = shouldBuildDirectly,
             CanBuild = canBuild,
             NeedsClarification = needsClarification,
-            PublicReason = SafeText(string.IsNullOrWhiteSpace(candidate.PublicReason)
+            PublicReason = SafeText(intent == IntentAmbiguousVisionRequirement && !maturity.CanBuild
+                ? maturity.PublicReason
+                : string.IsNullOrWhiteSpace(candidate.PublicReason)
                 ? DefaultReason(intent)
                 : candidate.PublicReason),
             AssistantReply = ResolveAssistantReply(candidate.AssistantReply, candidate.PublicReason, intent, request),
@@ -223,6 +238,13 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             FallbackAllowed = candidate.FallbackAllowed,
             RouterSource = source,
             FallbackReason = SafeToken(fallbackReason),
+            RequirementMaturity = maturity,
+            DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
+                ToMaturityRequest(request),
+                maturity,
+                intent,
+                shouldBuildDirectly ? "build_ready" : shouldOpenPlan ? "planning" : needsClarification ? "clarifying" : "idle",
+                fallbackReason),
             MetadataOnly = true
         };
     }
@@ -232,7 +254,8 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         string reason)
     {
         var text = Clean(request.Description);
-        var intent = ResolveRuleFallbackIntent(text, request);
+        var maturity = EvaluateMaturity(request);
+        var intent = ResolveRuleFallbackIntent(text, request, maturity);
         var isCasual = intent == IntentCasualChat;
         var isHelp = intent == IntentHelp;
         var isActionable = intent == IntentActionableVisionPlan;
@@ -241,28 +264,56 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         var isDirectDebug = intent == IntentDirectBuildDebug;
         var isAmbiguous = intent == IntentAmbiguousVisionRequirement;
         var questions = isAmbiguous ? DefaultClarificationQuestions() : [];
+        var canBuild = isActionable || isModify || isConfirmed || isDirectDebug;
+        var shouldOpenPlan = isActionable;
+        var shouldBuildDirectly = isModify || isConfirmed || isDirectDebug;
+        var needsClarification = isAmbiguous;
+        var confidence = reason == "router_unauthorized" && (isCasual || isHelp) ? "high" : "medium";
+        var fallbackReason = reason;
+
+        ApplyMaturityGate(
+            request,
+            maturity,
+            ref intent,
+            ref confidence,
+            ref canBuild,
+            ref shouldOpenPlan,
+            ref shouldBuildDirectly,
+            ref needsClarification,
+            ref questions,
+            ref fallbackReason);
 
         return new VisionAgentIntentRouterResult
         {
             Intent = intent,
-            Confidence = reason == "router_unauthorized" && (isCasual || isHelp) ? "high" : "medium",
-            ShouldOpenPlan = isActionable,
-            ShouldBuildDirectly = isModify || isConfirmed || isDirectDebug,
-            CanBuild = isActionable || isModify || isConfirmed || isDirectDebug,
-            NeedsClarification = isAmbiguous,
+            Confidence = confidence,
+            ShouldOpenPlan = shouldOpenPlan,
+            ShouldBuildDirectly = shouldBuildDirectly,
+            CanBuild = canBuild,
+            NeedsClarification = needsClarification,
             PublicReason = reason == "router_unauthorized"
                 ? UnauthorizedReason(intent)
-                : DefaultReason(intent),
+                : string.IsNullOrWhiteSpace(maturity.PublicReason) ? DefaultReason(intent) : maturity.PublicReason,
             AssistantReply = DefaultReply(intent, request),
             ClarificationQuestions = questions,
             FallbackAllowed = true,
             RouterSource = "rule_fallback",
-            FallbackReason = SafeToken(reason),
+            FallbackReason = SafeToken(fallbackReason),
+            RequirementMaturity = maturity,
+            DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
+                ToMaturityRequest(request),
+                maturity,
+                intent,
+                shouldBuildDirectly ? "build_ready" : shouldOpenPlan ? "planning" : needsClarification ? "clarifying" : "idle",
+                fallbackReason),
             MetadataOnly = true
         };
     }
 
-    private static string ResolveRuleFallbackIntent(string text, VisionAgentIntentRouterRequest request)
+    private static string ResolveRuleFallbackIntent(
+        string text,
+        VisionAgentIntentRouterRequest request,
+        AiRequirementMaturityResult maturity)
     {
         if (request.DeveloperDirectBuildDebug)
         {
@@ -289,12 +340,114 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             return IntentModifyExistingFlow;
         }
 
-        if (LooksLikeActionableVisionNeed(text))
+        return VisionAgentRequirementMaturityGate.ToRouterIntent(maturity);
+    }
+
+    private static AiRequirementMaturityResult EvaluateMaturity(VisionAgentIntentRouterRequest request)
+    {
+        return VisionAgentRequirementMaturityGate.Evaluate(ToMaturityRequest(request));
+    }
+
+    private static VisionAgentRequirementMaturityRequest ToMaturityRequest(VisionAgentIntentRouterRequest request)
+    {
+        return new VisionAgentRequirementMaturityRequest
         {
-            return IntentActionableVisionPlan;
+            Description = request.Description,
+            AdditionalContext = request.AdditionalContext,
+            Mode = request.Mode,
+            HasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
+            HasPendingPlan = request.HasPendingPlan,
+            DeveloperDirectBuildDebug = request.DeveloperDirectBuildDebug,
+            TemplateSelection = request.TemplateSelection
+        };
+    }
+
+    private static void ApplyMaturityGate(
+        VisionAgentIntentRouterRequest request,
+        AiRequirementMaturityResult maturity,
+        ref string intent,
+        ref string confidence,
+        ref bool canBuild,
+        ref bool shouldOpenPlan,
+        ref bool shouldBuildDirectly,
+        ref bool needsClarification,
+        ref List<string> questions,
+        ref string fallbackReason)
+    {
+        if (intent == IntentBuildFromConfirmedPlan && request.HasPendingPlan)
+        {
+            return;
         }
 
-        return IntentAmbiguousVisionRequirement;
+        if (intent == IntentDirectBuildDebug && request.DeveloperDirectBuildDebug)
+        {
+            return;
+        }
+
+        if (maturity.Maturity == AiRequirementMaturity.ChatOrHelp)
+        {
+            intent = LooksLikeCasual(Clean(request.Description)) ? IntentCasualChat : IntentHelp;
+            confidence = "high";
+            canBuild = false;
+            shouldOpenPlan = false;
+            shouldBuildDirectly = false;
+            needsClarification = false;
+            questions = [];
+            return;
+        }
+
+        if (maturity.Maturity == AiRequirementMaturity.ModifyExistingFlow &&
+            !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot))
+        {
+            intent = IntentModifyExistingFlow;
+            confidence = "high";
+            canBuild = true;
+            shouldOpenPlan = false;
+            shouldBuildDirectly = true;
+            needsClarification = false;
+            questions = [];
+            return;
+        }
+
+        if (!maturity.CanBuild)
+        {
+            intent = IntentAmbiguousVisionRequirement;
+            confidence = confidence == "high" ? "medium" : confidence;
+            canBuild = false;
+            shouldOpenPlan = false;
+            shouldBuildDirectly = false;
+            needsClarification = true;
+            questions = questions.Count == 0 ? DefaultClarificationQuestions() : questions;
+            fallbackReason = AppendFallbackReason(fallbackReason, "maturity_gate_blocked");
+            return;
+        }
+
+        if (intent == IntentAmbiguousVisionRequirement)
+        {
+            intent = IntentActionableVisionPlan;
+            confidence = confidence == "low" ? "medium" : confidence;
+        }
+
+        if (intent == IntentActionableVisionPlan)
+        {
+            canBuild = true;
+            shouldOpenPlan = true;
+            shouldBuildDirectly = false;
+            needsClarification = false;
+            questions = [];
+        }
+    }
+
+    private static string AppendFallbackReason(string existing, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(existing))
+        {
+            return reason;
+        }
+
+        return existing.Contains(reason, StringComparison.OrdinalIgnoreCase)
+            ? existing
+            : $"{existing}_{reason}";
     }
 
     private static VisionAgentIntentRouterPrompt BuildPrompt(

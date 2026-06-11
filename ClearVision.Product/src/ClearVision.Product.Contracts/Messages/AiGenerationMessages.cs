@@ -114,6 +114,8 @@ public record GenerateFlowResponse
     public string? RouterConfidence { get; init; }
     public List<string> BlockingClarificationFields { get; init; } = new();
     public List<string> NonBlockingMissingFields { get; init; } = new();
+    public object? RequirementMaturity { get; init; }
+    public object? DecisionTrace { get; init; }
 
     /// <summary>Active prompt template version ID at generation time.</summary>
     public string? PromptVersionId { get; init; }

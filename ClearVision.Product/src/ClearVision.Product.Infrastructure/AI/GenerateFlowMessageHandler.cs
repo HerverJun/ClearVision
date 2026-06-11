@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.Agent;
 using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.AI;
@@ -60,6 +61,31 @@ public class GenerateFlowMessageHandler
                     phase = "connecting",
                     requestId
                 }, _jsonOptions));
+
+            var maturityGate = TryBuildMaturityGateResponse(
+                description,
+                hint,
+                sessionId,
+                existingFlowJson,
+                mode,
+                requestId,
+                requirementMode,
+                templateSelection,
+                buildFromPlan,
+                useVisionAgentGenerateFlow);
+            if (maturityGate is { } gate)
+            {
+                onMessage?.Invoke(
+                    "GenerateFlowProgress",
+                    JsonSerializer.Serialize(new
+                    {
+                        message = gate.Response.AiExplanation ?? "当前需求还需要澄清，已阻断直接构建。",
+                        phase = "clarification",
+                        requestId
+                    }, _jsonOptions));
+
+                return SerializeResponse(gate.Response, gate.FailureType);
+            }
 
             var result = await _generationService.GenerateFlowAsync(
                 new AiFlowGenerationRequest(
@@ -142,6 +168,8 @@ public class GenerateFlowMessageHandler
                 RouterConfidence = result.RouterConfidence,
                 BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
                 NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
+                RequirementMaturity = result.RequirementMaturity,
+                DecisionTrace = result.DecisionTrace,
                 PromptVersionId = result.PromptTrace is AiPromptTrace pt ? pt.PromptVersionId : null,
                 PromptVersionName = result.PromptTrace is AiPromptTrace pt2 ? pt2.PromptVersionName : null
             };
@@ -204,6 +232,137 @@ public class GenerateFlowMessageHandler
         }
     }
 
+    private static (GenerateFlowResponse Response, string FailureType)? TryBuildMaturityGateResponse(
+        string description,
+        string? hint,
+        string? sessionId,
+        string? existingFlowJson,
+        GenerateFlowMode mode,
+        string? requestId,
+        string? requirementMode,
+        AiTemplateSelectionInfo? templateSelection,
+        VisionAgentBuildFromPlanRequest? buildFromPlan,
+        bool useVisionAgentGenerateFlow)
+    {
+        if (!useVisionAgentGenerateFlow || mode is GenerateFlowMode.Explain or GenerateFlowMode.ReviewPendingParameters)
+        {
+            return null;
+        }
+
+        var maturityRequest = new VisionAgentRequirementMaturityRequest
+        {
+            Description = buildFromPlan?.OriginalUserPrompt ?? description,
+            AdditionalContext = hint,
+            Mode = buildFromPlan?.BuildIntent ?? mode.ToWireValue(),
+            HasCurrentFlow = !string.IsNullOrWhiteSpace(existingFlowJson) ||
+                             !string.IsNullOrWhiteSpace(buildFromPlan?.CurrentFlowSnapshot),
+            HasPendingPlan = buildFromPlan?.PlanSnapshot != null,
+            TemplateSelection = buildFromPlan?.TemplateSelection ?? templateSelection
+        };
+        if (buildFromPlan?.PlanSnapshot?.CanBuild == true &&
+            buildFromPlan.PlanSnapshot.RequirementMaturity == null &&
+            buildFromPlan.RequirementMaturity == null)
+        {
+            return null;
+        }
+
+        var maturity = buildFromPlan?.PlanSnapshot?.RequirementMaturity ??
+                       buildFromPlan?.RequirementMaturity ??
+                       VisionAgentRequirementMaturityGate.Evaluate(maturityRequest);
+        var blocked = buildFromPlan?.PlanSnapshot?.CanBuild == false ||
+                      buildFromPlan?.RequirementMaturity?.CanBuild == false ||
+                      !maturity.CanBuild ||
+                      maturity.Maturity is AiRequirementMaturity.AbstractGoal or AiRequirementMaturity.Ambiguous or AiRequirementMaturity.ChatOrHelp;
+        if (!blocked)
+        {
+            return null;
+        }
+
+        var fields = maturity.MissingFields.Count > 0
+            ? maturity.MissingFields
+            : ["inspection_object", "task_type", "image_source", "acceptance_criteria"];
+        var trace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
+            maturityRequest,
+            maturity,
+            "build_blocked",
+            "clarifying",
+            "maturity_gate_blocked");
+        var brief = new AiRequirementBrief
+        {
+            IntentType = maturity.Maturity,
+            RequirementMode = requirementMode ?? AiRequirementModes.Strict,
+            Confidence = maturity.CanBuild ? 0.75 : 0.25,
+            HasOpenQuestions = true,
+            ClarificationRequired = true,
+            CanGenerateDraftNow = false,
+            DraftRiskLevel = "high",
+            KnownFacts = maturity.ObjectSignals
+                .Concat(maturity.TaskSignals)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(8)
+                .ToList(),
+            MissingFacts = fields.ToList(),
+            RequiredFields = fields.ToList(),
+            BlockingClarificationFields = fields.ToList(),
+            NonBlockingMissingFields = maturity.MissingFields.Except(fields, StringComparer.OrdinalIgnoreCase).ToList(),
+            ClarificationQuestions = fields.Select(field => new AiClarificationQuestion
+            {
+                Field = field,
+                Question = field switch
+                {
+                    "inspection_object" => "请说明要检测的产品或部件对象。",
+                    "task_type" => "请说明任务类型：缺陷、测量、线序、OCR/读码、有无/漏装或分类。",
+                    "image_source" => "请说明图像来源是相机、图片文件，还是先只做元数据规划。",
+                    "acceptance_criteria" => "请说明 OK/NG 判定标准、数值公差或输出目标。",
+                    "output_target" => "请说明结果要输出到画布、报表、PLC，还是仅做人工复核。",
+                    _ => "请补充该字段后再构建。"
+                },
+                Required = true,
+                Reason = "直接构建前要求需求成熟度达到可构建。",
+                Priority = "high",
+                Options = []
+            }).ToList()
+        };
+
+        var response = new GenerateFlowResponse
+        {
+            Success = false,
+            Status = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            ErrorMessage = maturity.PublicReason,
+            FailureSummary = maturity.PublicReason,
+            AiExplanation = maturity.PublicReason,
+            ClarificationRequired = true,
+            RequirementBrief = MapRequirementBrief(brief),
+            SessionId = sessionId,
+            RequestId = requestId,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            TurnIntent = AiTurnIntents.NewFlow,
+            InteractionState = AiInteractionStates.Clarifying,
+            RouterConfidence = AiRouterConfidence.High,
+            BlockingClarificationFields = fields.ToList(),
+            NonBlockingMissingFields = maturity.MissingFields.Except(fields, StringComparer.OrdinalIgnoreCase).ToList(),
+            RequirementMaturity = maturity,
+            DecisionTrace = trace,
+            StageTimeline =
+            [
+                new GenerateFlowStageDiagnostic
+                {
+                    Stage = "requirement_maturity_gate",
+                    Status = "blocked",
+                    Summary = maturity.PublicReason,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["maturity"] = maturity.Maturity,
+                        ["taskType"] = maturity.TaskType,
+                        ["canBuild"] = maturity.CanBuild ? "true" : "false"
+                    }
+                }
+            ]
+        };
+
+        return (response, AiFlowGenerationResult.FailureTypeClarificationRequired);
+    }
+
     private static string SerializeResponse(GenerateFlowResponse response, string? failureType)
     {
         return JsonSerializer.Serialize(new
@@ -250,6 +409,8 @@ public class GenerateFlowMessageHandler
             response.RouterConfidence,
             response.BlockingClarificationFields,
             response.NonBlockingMissingFields,
+            response.RequirementMaturity,
+            response.DecisionTrace,
             response.PromptVersionId,
             response.PromptVersionName,
             FailureType = failureType

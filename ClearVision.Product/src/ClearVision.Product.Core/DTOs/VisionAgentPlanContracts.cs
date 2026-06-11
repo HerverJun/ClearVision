@@ -1,5 +1,58 @@
 namespace ClearVision.Product.Core.DTOs;
 
+public static class AiRequirementMaturity
+{
+    public const string AbstractGoal = "abstract_goal";
+    public const string Ambiguous = "ambiguous";
+    public const string Actionable = "actionable";
+    public const string ChatOrHelp = "chat_or_help";
+    public const string ModifyExistingFlow = "modify_existing_flow";
+}
+
+public static class AiVisionTaskTypes
+{
+    public const string Unknown = "unknown";
+    public const string AbstractGoal = "abstract_goal";
+    public const string SurfaceOrPoseDefect = "surface_or_pose_defect";
+    public const string GeometryMeasurement = "geometry_measurement";
+    public const string WireSequence = "wire_sequence";
+    public const string BarcodeQr = "barcode_qr";
+    public const string PresenceAbsence = "presence_absence";
+    public const string Classification = "classification";
+    public const string TemplateLocation = "template_location";
+    public const string PlcOutput = "plc_output";
+}
+
+public sealed record AiRequirementMaturityResult
+{
+    public string Maturity { get; init; } = AiRequirementMaturity.Ambiguous;
+    public string TaskType { get; init; } = AiVisionTaskTypes.Unknown;
+    public bool CanBuild { get; init; }
+    public List<string> ObjectSignals { get; init; } = [];
+    public List<string> TaskSignals { get; init; } = [];
+    public List<string> MissingFields { get; init; } = [];
+    public List<string> BlockingReasons { get; init; } = [];
+    public string PublicReason { get; init; } = string.Empty;
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record AiDecisionTrace
+{
+    public string RawUserText { get; init; } = string.Empty;
+    public string TurnIntent { get; init; } = string.Empty;
+    public string InteractionState { get; init; } = string.Empty;
+    public List<string> BusinessSignalsHit { get; init; } = [];
+    public List<string> NewFlowSignalsHit { get; init; } = [];
+    public List<string> TaskTypeSignalsHit { get; init; } = [];
+    public List<string> ObjectSignalsHit { get; init; } = [];
+    public string MaturityLevel { get; init; } = AiRequirementMaturity.Ambiguous;
+    public string TaskType { get; init; } = AiVisionTaskTypes.Unknown;
+    public bool CanBuild { get; init; }
+    public string FallbackReason { get; init; } = string.Empty;
+    public List<string> BlockingReasons { get; init; } = [];
+    public bool MetadataOnly { get; init; } = true;
+}
+
 public sealed record VisionAgentPlanModeRequest
 {
     public string Description { get; init; } = string.Empty;
@@ -46,6 +99,8 @@ public sealed record VisionAgentIntentRouterResult
     public bool FallbackAllowed { get; init; } = true;
     public string RouterSource { get; init; } = string.Empty;
     public string FallbackReason { get; init; } = string.Empty;
+    public AiRequirementMaturityResult? RequirementMaturity { get; init; }
+    public AiDecisionTrace? DecisionTrace { get; init; }
     public bool MetadataOnly { get; init; } = true;
 }
 
@@ -68,6 +123,8 @@ public sealed record VisionAgentPlanModeResult
     public List<string> ExecutablePlan { get; init; } = [];
     public bool CanBuild { get; init; } = true;
     public List<string> BlockingReasons { get; init; } = [];
+    public AiRequirementMaturityResult? RequirementMaturity { get; init; }
+    public AiDecisionTrace? DecisionTrace { get; init; }
     public string NextAction { get; init; } = string.Empty;
     public VisionAgentPlanContextSummary ContextSummary { get; init; } = new();
     public string OperatorCatalogVersion { get; init; } = string.Empty;
@@ -164,5 +221,7 @@ public sealed record VisionAgentBuildFromPlanRequest
     public string BuildIntent { get; init; } = "new";
     public string OriginalUserPrompt { get; init; } = string.Empty;
     public bool AcceptedRecommendedDefaults { get; init; }
+    public AiRequirementMaturityResult? RequirementMaturity { get; init; }
+    public AiDecisionTrace? DecisionTrace { get; init; }
     public bool MetadataOnly { get; init; } = true;
 }

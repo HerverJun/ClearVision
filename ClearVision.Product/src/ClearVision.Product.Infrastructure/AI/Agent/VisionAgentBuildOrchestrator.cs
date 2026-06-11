@@ -71,6 +71,25 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
         var autoRepairs = new List<VisionAgentBuildRepairRecord>();
         var build = request.BuildFromPlan;
         var plan = build?.PlanSnapshot;
+        var maturityGate = EnforceMaturityGate(request, build, plan);
+        if (maturityGate != null)
+        {
+            _eventSink?.StageCompleted(
+                runId,
+                "requirement_maturity_gate",
+                "Build blocked by requirement maturity gate",
+                maturityGate.RequirementMaturity?.PublicReason ?? "Requirement maturity gate blocked Build.",
+                new
+                {
+                    maturity = maturityGate.RequirementMaturity?.Maturity ?? string.Empty,
+                    taskType = maturityGate.RequirementMaturity?.TaskType ?? string.Empty,
+                    canBuild = maturityGate.RequirementMaturity?.CanBuild ?? false,
+                    blockingReasons = maturityGate.RequirementMaturity?.BlockingReasons ?? [],
+                    metadataOnly = true,
+                    redactionPass = true
+                });
+            return maturityGate;
+        }
 
         try
         {
@@ -330,6 +349,103 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 ex.Message);
             return _resultAssembler.Failure(buildId, evidence, publicWarnings);
         }
+    }
+
+    private static AiFlowGenerationResult? EnforceMaturityGate(
+        AiFlowGenerationRequest request,
+        VisionAgentBuildFromPlanRequest? build,
+        VisionAgentPlanModeResult? plan)
+    {
+        var maturityRequest = new VisionAgentRequirementMaturityRequest
+        {
+            Description = build?.OriginalUserPrompt ?? request.Description,
+            AdditionalContext = request.AdditionalContext,
+            Mode = build?.BuildIntent ?? request.Mode.ToWireValue(),
+            HasCurrentFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson) ||
+                             !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot),
+            TemplateSelection = build?.TemplateSelection ?? request.TemplateSelection
+        };
+        if (plan?.CanBuild == true &&
+            plan.RequirementMaturity == null &&
+            build?.RequirementMaturity == null)
+        {
+            return null;
+        }
+
+        var maturity = plan?.RequirementMaturity ??
+                       build?.RequirementMaturity ??
+                       VisionAgentRequirementMaturityGate.Evaluate(maturityRequest);
+        var blocked = plan?.CanBuild == false ||
+                      build?.RequirementMaturity?.CanBuild == false ||
+                      !maturity.CanBuild ||
+                      maturity.Maturity is AiRequirementMaturity.AbstractGoal or AiRequirementMaturity.Ambiguous or AiRequirementMaturity.ChatOrHelp;
+        if (!blocked)
+        {
+            return null;
+        }
+
+        var trace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
+            maturityRequest,
+            maturity,
+            "build_blocked",
+            "clarifying",
+            "maturity_gate_blocked");
+        var fields = maturity.MissingFields.Count > 0
+            ? maturity.MissingFields
+            : ["inspection_object", "task_type", "image_source", "acceptance_criteria"];
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            FailureType = AiFlowGenerationResult.FailureTypeClarificationRequired,
+            ClarificationRequired = true,
+            ErrorMessage = maturity.PublicReason,
+            AiExplanation = maturity.PublicReason,
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "requirement_maturity",
+                Code = "maturity_gate_blocked",
+                Message = maturity.PublicReason,
+                RepairTarget = "请补充检测对象、任务类型、图像来源、判定标准和输出目标后再构建。"
+            },
+            RequirementBrief = new AiRequirementBrief
+            {
+                IntentType = maturity.Maturity,
+                RequirementMode = request.RequirementMode,
+                Confidence = 0.25,
+                HasOpenQuestions = true,
+                ClarificationRequired = true,
+                CanGenerateDraftNow = false,
+                DraftRiskLevel = "high",
+                MissingFacts = fields.ToList(),
+                RequiredFields = fields.ToList(),
+                BlockingClarificationFields = fields.ToList(),
+                NonBlockingMissingFields = maturity.MissingFields.Except(fields, StringComparer.OrdinalIgnoreCase).ToList(),
+                ClarificationQuestions = fields.Select(field => new AiClarificationQuestion
+                {
+                    Field = field,
+                    Question = field switch
+                    {
+                        "inspection_object" => "请说明要检测的产品或部件对象。",
+                        "task_type" => "请说明任务类型：缺陷、测量、线序、OCR/读码、有无/漏装或分类。",
+                        "image_source" => "请说明图像来源是相机、图片文件还是先只做元数据规划。",
+                        "acceptance_criteria" => "请说明 OK/NG 判定标准或输出目标。",
+                        _ => "请补充该字段后再构建。"
+                    },
+                    Required = true,
+                    Reason = "Build 前硬门禁要求需求成熟度达到可构建。",
+                    Priority = "high",
+                    Options = []
+                }).ToList()
+            },
+            BlockingClarificationFields = fields.ToList(),
+            NonBlockingMissingFields = maturity.MissingFields.Except(fields, StringComparer.OrdinalIgnoreCase).ToList(),
+            RequirementMaturity = maturity,
+            DecisionTrace = trace,
+            TurnIntent = AiTurnIntents.NewFlow,
+            InteractionState = AiInteractionStates.Clarifying,
+            RouterConfidence = AiRouterConfidence.High
+        };
     }
 
     private static bool ShouldAttemptRepair(

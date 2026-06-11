@@ -1,0 +1,456 @@
+[
+  {
+    "id": "abstract_ultimate_zh",
+    "input": "我想构建一个真正有野心的终极视觉检测方案。",
+    "expectedMaturity": "abstract_goal",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "abstract_goal",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object", "task_type", "image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "abstract_advanced_solution_zh",
+    "input": "帮我做一个高级视觉检测方案。",
+    "expectedMaturity": "abstract_goal",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "abstract_goal",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object", "task_type"]
+  },
+  {
+    "id": "abstract_complete_plan_zh",
+    "input": "设计一套完整方案，最好能覆盖所有检测。",
+    "expectedMaturity": "abstract_goal",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "abstract_goal",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object", "task_type"]
+  },
+  {
+    "id": "abstract_smart_solution_zh",
+    "input": "我需要一个智能方案来解决视觉检测问题。",
+    "expectedMaturity": "abstract_goal",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "abstract_goal",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object", "task_type"]
+  },
+  {
+    "id": "abstract_best_vision_zh",
+    "input": "帮我搞一个最佳视觉解决方案。",
+    "expectedMaturity": "abstract_goal",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "abstract_goal",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object", "task_type"]
+  },
+  {
+    "id": "abstract_ultimate_en",
+    "input": "Build an ambitious ultimate vision inspection solution.",
+    "expectedMaturity": "abstract_goal",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "abstract_goal",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object", "task_type"]
+  },
+  {
+    "id": "ambiguous_product_detection",
+    "input": "检测产品。",
+    "expectedMaturity": "ambiguous",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "unknown",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["task_type"]
+  },
+  {
+    "id": "ambiguous_generic_workflow",
+    "input": "帮我做一个检测流程。",
+    "expectedMaturity": "ambiguous",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "unknown",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object", "task_type"]
+  },
+  {
+    "id": "ambiguous_identify_issue",
+    "input": "帮我识别一下问题。",
+    "expectedMaturity": "ambiguous",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "unknown",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object", "task_type"]
+  },
+  {
+    "id": "ambiguous_algorithm_plan",
+    "input": "给我一个视觉算法方案。",
+    "expectedMaturity": "ambiguous",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "unknown",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object", "task_type"]
+  },
+  {
+    "id": "ambiguous_defect_without_object",
+    "input": "检测外观缺陷。",
+    "expectedMaturity": "ambiguous",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "surface_or_pose_defect",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object"]
+  },
+  {
+    "id": "ambiguous_measure_without_object",
+    "input": "测量尺寸和角度。",
+    "expectedMaturity": "ambiguous",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "geometry_measurement",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object"]
+  },
+  {
+    "id": "defect_package_tape",
+    "input": "检测包装箱胶带是否贴正。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "surface_or_pose_defect",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "defect_metal_scratch",
+    "input": "检测金属表面的划痕和凹坑。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "surface_or_pose_defect",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "defect_carton_corner",
+    "input": "检查纸箱箱角是否破损。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "surface_or_pose_defect",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "defect_cap_stain",
+    "input": "判断瓶盖表面是否有脏污。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "surface_or_pose_defect",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "defect_label_skew",
+    "input": "检测标签是否贴歪。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "surface_or_pose_defect",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "measurement_hole_center_distance",
+    "input": "测量两个圆形孔位的圆心距离。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "geometry_measurement",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "measurement_part_width",
+    "input": "测量金属件宽度是否在公差内。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "geometry_measurement",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source"]
+  },
+  {
+    "id": "measurement_hole_diameter",
+    "input": "测量零件圆孔直径。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "geometry_measurement",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "measurement_panel_spacing",
+    "input": "测量面板上两个按键的间距。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "geometry_measurement",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "measurement_en",
+    "input": "Measure the distance between two holes on the metal part.",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "geometry_measurement",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "wire_terminal_sequence",
+    "input": "检测端子线序是否正确。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "wire_sequence",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "wire_harness_color_order",
+    "input": "检查线束颜色顺序是否正确。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "wire_sequence",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "wire_terminal_insert",
+    "input": "识别连接器端子插线顺序。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "wire_sequence",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "wire_en",
+    "input": "Check the wire order on the harness terminal.",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "wire_sequence",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "barcode_label_qr",
+    "input": "识别标签上的二维码。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "barcode_qr",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "barcode_carton",
+    "input": "读取包装箱上的条码。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "barcode_qr",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "barcode_ocr_label",
+    "input": "OCR 识别标签字符并输出结果。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "barcode_qr",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source"]
+  },
+  {
+    "id": "barcode_en",
+    "input": "Read the QR code on the product label.",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "barcode_qr",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "presence_button_missing",
+    "input": "检查遥控器按键是否缺失。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "presence_absence",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "presence_screw_missing",
+    "input": "检测螺丝是否漏装。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "presence_absence",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "presence_connector_pin",
+    "input": "检查连接器 pin 有无缺件。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "presence_absence",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "presence_product_complete",
+    "input": "检测产品装配是否完整。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "presence_absence",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "classification_product_model",
+    "input": "对产品型号做分类识别。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "classification",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "classification_part_type",
+    "input": "识别零件类别并输出类别名称。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "classification",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source"]
+  },
+  {
+    "id": "template_button_location",
+    "input": "定位面板上的按键位置。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "template_location",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "template_label_matching",
+    "input": "使用模板匹配定位标签区域。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "template_location",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source", "acceptance_criteria"]
+  },
+  {
+    "id": "plc_product_output",
+    "input": "检测产品后输出 PLC OK 信号。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "plc_output",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source"]
+  },
+  {
+    "id": "plc_station_address",
+    "input": "识别标签二维码后把结果输出到 PLC 地址。",
+    "expectedMaturity": "actionable",
+    "expectedIntent": "actionable_vision_plan",
+    "expectedTaskType": "barcode_qr",
+    "expectedCanBuild": true,
+    "expectedMissingFields": ["image_source"]
+  },
+  {
+    "id": "modify_current_threshold",
+    "input": "把当前流程的阈值调高一点。",
+    "hasCurrentFlow": true,
+    "expectedMaturity": "modify_existing_flow",
+    "expectedIntent": "modify_existing_flow",
+    "expectedTaskType": "abstract_goal",
+    "expectedCanBuild": true,
+    "expectedMissingFields": []
+  },
+  {
+    "id": "modify_existing_barcode_output",
+    "input": "在已有流程里增加条码识别输出。",
+    "hasCurrentFlow": true,
+    "expectedMaturity": "modify_existing_flow",
+    "expectedIntent": "modify_existing_flow",
+    "expectedTaskType": "barcode_qr",
+    "expectedCanBuild": true,
+    "expectedMissingFields": []
+  },
+  {
+    "id": "modify_current_roi",
+    "input": "修改这个流程的 ROI 参数。",
+    "hasCurrentFlow": true,
+    "expectedMaturity": "modify_existing_flow",
+    "expectedIntent": "modify_existing_flow",
+    "expectedTaskType": "abstract_goal",
+    "expectedCanBuild": true,
+    "expectedMissingFields": []
+  },
+  {
+    "id": "modify_en",
+    "input": "Update the current flow to replace the threshold.",
+    "hasCurrentFlow": true,
+    "expectedMaturity": "modify_existing_flow",
+    "expectedIntent": "modify_existing_flow",
+    "expectedTaskType": "abstract_goal",
+    "expectedCanBuild": true,
+    "expectedMissingFields": []
+  },
+  {
+    "id": "chat_hello",
+    "input": "你好",
+    "expectedMaturity": "chat_or_help",
+    "expectedIntent": "help",
+    "expectedTaskType": "unknown",
+    "expectedCanBuild": false,
+    "expectedMissingFields": []
+  },
+  {
+    "id": "chat_help_ability",
+    "input": "你能做什么？",
+    "expectedMaturity": "chat_or_help",
+    "expectedIntent": "help",
+    "expectedTaskType": "unknown",
+    "expectedCanBuild": false,
+    "expectedMissingFields": []
+  },
+  {
+    "id": "chat_help_en",
+    "input": "help",
+    "expectedMaturity": "chat_or_help",
+    "expectedIntent": "help",
+    "expectedTaskType": "unknown",
+    "expectedCanBuild": false,
+    "expectedMissingFields": []
+  },
+  {
+    "id": "chat_out_of_domain",
+    "input": "今天状态怎么样？",
+    "expectedMaturity": "chat_or_help",
+    "expectedIntent": "help",
+    "expectedTaskType": "unknown",
+    "expectedCanBuild": false,
+    "expectedMissingFields": []
+  },
+  {
+    "id": "ambiguous_new_flow_without_object",
+    "input": "创建一个测量流程。",
+    "expectedMaturity": "ambiguous",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "geometry_measurement",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["inspection_object"]
+  },
+  {
+    "id": "ambiguous_object_without_task",
+    "input": "帮我处理包装箱图像。",
+    "expectedMaturity": "ambiguous",
+    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedTaskType": "unknown",
+    "expectedCanBuild": false,
+    "expectedMissingFields": ["task_type"]
+  }
+]

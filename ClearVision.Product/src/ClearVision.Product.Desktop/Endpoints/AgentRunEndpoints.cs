@@ -453,6 +453,8 @@ public static class AgentRunEndpoints
                         turnIntent = result.TurnIntent,
                         interactionState = result.InteractionState,
                         routerConfidence = result.RouterConfidence,
+                        requirementMaturity = result.RequirementMaturity,
+                        decisionTrace = result.DecisionTrace,
                         planSnapshot = request.BuildFromPlan?.PlanSnapshot,
                         buildFromPlan = BuildReplayPayload(request.BuildFromPlan),
                         buildInputSummary = BuildInputSummary(request),
@@ -476,6 +478,8 @@ public static class AgentRunEndpoints
                     failureType = result.FailureType,
                     failureSummary = result.FailureSummary,
                     diagnostics = result.LastAttemptDiagnostics,
+                    requirementMaturity = result.RequirementMaturity,
+                    decisionTrace = result.DecisionTrace,
                     metadataOnly = true
                 });
         }
@@ -620,6 +624,34 @@ public static class AgentRunEndpoints
             AcceptanceCriteria = SanitizePlanList(result.AcceptanceCriteria),
             ExecutablePlan = SanitizePlanList(result.ExecutablePlan),
             BlockingReasons = SanitizePlanList(result.BlockingReasons).Select(SanitizePlanToken).ToList(),
+            RequirementMaturity = result.RequirementMaturity == null
+                ? null
+                : result.RequirementMaturity with
+                {
+                    Maturity = SanitizePlanToken(result.RequirementMaturity.Maturity),
+                    TaskType = SanitizePlanToken(result.RequirementMaturity.TaskType),
+                    ObjectSignals = SanitizePlanList(result.RequirementMaturity.ObjectSignals),
+                    TaskSignals = SanitizePlanList(result.RequirementMaturity.TaskSignals),
+                    MissingFields = SanitizePlanList(result.RequirementMaturity.MissingFields).Select(SanitizePlanToken).ToList(),
+                    BlockingReasons = SanitizePlanList(result.RequirementMaturity.BlockingReasons).Select(SanitizePlanToken).ToList(),
+                    PublicReason = SanitizePlanText(result.RequirementMaturity.PublicReason)
+                },
+            DecisionTrace = result.DecisionTrace == null
+                ? null
+                : result.DecisionTrace with
+                {
+                    RawUserText = SanitizePlanText(result.DecisionTrace.RawUserText),
+                    TurnIntent = SanitizePlanToken(result.DecisionTrace.TurnIntent),
+                    InteractionState = SanitizePlanToken(result.DecisionTrace.InteractionState),
+                    BusinessSignalsHit = SanitizePlanList(result.DecisionTrace.BusinessSignalsHit),
+                    NewFlowSignalsHit = SanitizePlanList(result.DecisionTrace.NewFlowSignalsHit),
+                    TaskTypeSignalsHit = SanitizePlanList(result.DecisionTrace.TaskTypeSignalsHit),
+                    ObjectSignalsHit = SanitizePlanList(result.DecisionTrace.ObjectSignalsHit),
+                    MaturityLevel = SanitizePlanToken(result.DecisionTrace.MaturityLevel),
+                    TaskType = SanitizePlanToken(result.DecisionTrace.TaskType),
+                    FallbackReason = SanitizePlanToken(result.DecisionTrace.FallbackReason),
+                    BlockingReasons = SanitizePlanList(result.DecisionTrace.BlockingReasons).Select(SanitizePlanToken).ToList()
+                },
             NextAction = SanitizePlanText(result.NextAction),
             ContextSummary = result.ContextSummary with
             {
@@ -954,6 +986,8 @@ public static class AgentRunEndpoints
             buildIntent = buildFromPlan.BuildIntent,
             originalUserPrompt = buildFromPlan.OriginalUserPrompt,
             acceptedRecommendedDefaults = buildFromPlan.AcceptedRecommendedDefaults,
+            requirementMaturity = buildFromPlan.RequirementMaturity,
+            decisionTrace = buildFromPlan.DecisionTrace,
             metadataOnly = true
         };
     }

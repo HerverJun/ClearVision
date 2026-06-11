@@ -406,15 +406,23 @@ export const aiPanelAgentWorkspaceMixin = {
     _updatePlanBuildActionState() {
         const busy = Boolean(this.isGenerating);
         const hasPlan = Boolean(this.pendingVisionPlan);
+        const canBuild = hasPlan && this.pendingVisionPlan?.executable === true;
         const inlineBuildBtn = this.container?.querySelector('#ai-btn-start-build-inline');
         if (inlineBuildBtn) {
-            inlineBuildBtn.disabled = busy || !hasPlan;
-            inlineBuildBtn.title = hasPlan ? '按已确认计划开始构建' : '请先完成规划';
+            inlineBuildBtn.disabled = busy || !canBuild;
+            inlineBuildBtn.title = !hasPlan
+                ? '请先完成规划'
+                : canBuild
+                    ? '按已确认计划开始构建'
+                    : '当前计划仍需澄清，暂不可构建';
             inlineBuildBtn.setAttribute?.('aria-disabled', inlineBuildBtn.disabled ? 'true' : 'false');
         }
 
         this.container?.querySelectorAll?.('.ai-plan-action').forEach(button => {
-            button.disabled = busy || !hasPlan;
+            button.disabled = busy || !canBuild;
+            if (!canBuild && hasPlan) {
+                button.title = '当前计划仍需澄清，暂不可构建';
+            }
             button.setAttribute?.('aria-disabled', button.disabled ? 'true' : 'false');
         });
     },
@@ -565,7 +573,7 @@ export const aiPanelAgentWorkspaceMixin = {
             planHash: plan.planHash || '',
             goal: plan.goal || '',
             intent: plan.intent || '',
-            canBuild: plan.executable !== false
+            canBuild: plan.executable === true
         };
         try {
             return JSON.stringify(summary);
@@ -608,7 +616,13 @@ export const aiPanelAgentWorkspaceMixin = {
             });
         }
 
-        if (route.intent === 'build_from_confirmed_plan' && this.pendingVisionPlan) {
+        if (route.intent === 'build_from_confirmed_plan' && this.pendingVisionPlan && this.pendingVisionPlan.executable !== true) {
+            route.intent = 'ambiguous_vision_requirement';
+            route.needsClarification = true;
+            route.publicReason = route.publicReason || this.pendingVisionPlan.requirementMaturity?.publicReason || '当前计划仍需澄清，暂不可构建。';
+        }
+
+        if (route.intent === 'build_from_confirmed_plan' && this.pendingVisionPlan?.executable === true) {
             this._setAssistantTurnStatus(context.turn, '进入构建', 'success');
             this.activeAssistantTurn = null;
             this._setGeneratingState?.(false);
@@ -691,7 +705,9 @@ export const aiPanelAgentWorkspaceMixin = {
             assistantReply: normalizeDisplayText(item.assistantReply || item.AssistantReply || ''),
             clarificationQuestions: questions,
             fallbackReason: item.fallbackReason || item.FallbackReason || '',
-            routerSource: item.routerSource || item.RouterSource || ''
+            routerSource: item.routerSource || item.RouterSource || '',
+            requirementMaturity: this._normalizeRequirementMaturity(item.requirementMaturity || item.RequirementMaturity),
+            decisionTrace: this._normalizeDecisionTrace(item.decisionTrace || item.DecisionTrace)
         };
     },
 
@@ -738,6 +754,8 @@ export const aiPanelAgentWorkspaceMixin = {
             clarificationQuestions: questions,
             blockingClarificationFields,
             nonBlockingMissingFields,
+            requirementMaturity: route.requirementMaturity || null,
+            decisionTrace: route.decisionTrace || null,
             requirementBrief: {
                 scenarioKey: '',
                 scenarioName: '',
@@ -810,6 +828,66 @@ export const aiPanelAgentWorkspaceMixin = {
         }
     },
 
+    _assessLocalRequirementMaturity(description) {
+        const raw = String(description || '').trim();
+        const lower = raw.toLowerCase();
+        const collect = terms => terms.filter(term => lower.includes(String(term).toLowerCase()));
+        const objectTerms = ['包装箱', '纸箱', '箱体', '胶带', '金属件', '金属表面', '端子', '线束', '连接器', '标签', '二维码', '条码', '圆孔', '孔位', '遥控器', '按键', '面板', '产品', '零件', 'carton', 'package', 'tape', 'metal', 'surface', 'terminal', 'wire', 'harness', 'connector', 'label', 'qr', 'barcode', 'hole', 'button', 'part', 'product'];
+        const abstractTerms = ['终极', '有野心', '高级', '完整方案', '智能方案', '视觉检测方案', '检测方案', '真正', '最佳', '全套', '整体方案', '系统方案', '解决方案', 'ultimate', 'ambitious', 'advanced solution', 'complete solution', 'full solution'];
+        const taskGroups = [
+            ['geometry_measurement', ['测量', '尺寸', '孔距', '圆心距', '直径', '宽度', '高度', '距离', '间距', '角度', 'measure', 'measurement', 'distance', 'diameter', 'width', 'height', 'hole', 'spacing']],
+            ['wire_sequence', ['线序', '端子', '线束', '排线', '插线', '颜色顺序', 'wire sequence', 'terminal', 'harness', 'wire order']],
+            ['barcode_qr', ['二维码', '条码', '读码', '扫码', '标签识别', 'OCR', '字符', '文字', 'DataMatrix', 'barcode', 'qr', 'code', 'ocr']],
+            ['presence_absence', ['有无', '漏装', '缺件', '少装', '缺失', '装配完整', '装配是否完整', '是否存在', 'presence', 'absence', 'missing part']],
+            ['classification', ['分类', '类别', '型号', '类型识别', 'classification', 'classify']],
+            ['template_location', ['定位', '对位', '找正', '模板', '匹配', '位姿', 'locate', 'position', 'align', 'template', 'matching', 'pose']],
+            ['surface_or_pose_defect', ['缺陷', '外观', '划痕', '刮伤', '裂纹', '破损', '凹坑', '压痕', '脏污', '污渍', '贴正', '贴歪', '贴附', '胶带', '偏斜', 'surface', 'defect', 'scratch', 'crack', 'damage', 'dent', 'stain', 'tape']]
+        ];
+        const objectSignals = collect(objectTerms).slice(0, 12);
+        const matchedTask = taskGroups
+            .map(([taskType, terms]) => ({ taskType, signals: collect(terms).slice(0, 12) }))
+            .find(item => item.signals.length > 0) || { taskType: 'unknown', signals: [] };
+        const hasAbstractGoal = collect(abstractTerms).length > 0;
+        const hasTask = matchedTask.taskType !== 'unknown';
+        const hasObject = objectSignals.length > 0;
+        if (hasAbstractGoal && (!hasTask || !hasObject)) {
+            return {
+                maturity: 'abstract_goal',
+                taskType: 'abstract_goal',
+                canBuild: false,
+                objectSignals,
+                taskSignals: matchedTask.signals,
+                missingFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+                blockingReasons: ['abstract_goal_needs_decomposition', !hasTask ? 'task_type_missing' : '', !hasObject ? 'inspection_object_missing' : ''].filter(Boolean),
+                publicReason: '这是方案愿景，不是可直接构建的检测流程。'
+            };
+        }
+
+        if (!hasTask || !hasObject) {
+            return {
+                maturity: 'ambiguous',
+                taskType: hasTask ? matchedTask.taskType : 'unknown',
+                canBuild: false,
+                objectSignals,
+                taskSignals: matchedTask.signals,
+                missingFields: [!hasObject ? 'inspection_object' : '', !hasTask ? 'task_type' : '', 'image_source', 'acceptance_criteria'].filter(Boolean),
+                blockingReasons: [!hasObject ? 'inspection_object_missing' : '', !hasTask ? 'task_type_missing' : ''].filter(Boolean),
+                publicReason: '需求仍缺少检测对象或任务类型，暂不能构建。'
+            };
+        }
+
+        return {
+            maturity: 'actionable',
+            taskType: matchedTask.taskType,
+            canBuild: true,
+            objectSignals,
+            taskSignals: matchedTask.signals,
+            missingFields: ['image_source', 'acceptance_criteria'],
+            blockingReasons: [],
+            publicReason: '需求已明确到可规划视觉流程。'
+        };
+    },
+
     _buildLocalIntentRouterFallback(description, error = null) {
         const text = String(description || '').trim().toLowerCase();
         const normalized = text.replace(/[\s!?！？。,.，、]/g, '');
@@ -818,8 +896,8 @@ export const aiPanelAgentWorkspaceMixin = {
             normalized.includes('可以做什么') ||
             normalized === 'help' ||
             normalized === '帮助';
-        const isActionable = this._looksLikeStandaloneVisionRequest?.(description) === true ||
-            this._looksLikeExplicitNewFlowRequest?.(description) === true;
+        const maturity = this._assessLocalRequirementMaturity(description);
+        const isActionable = maturity.canBuild === true;
         const ambiguousReply = /包装箱|纸箱|箱/.test(String(description || ''))
             ? '你想检测包装箱的哪一类问题？比如胶带贴歪、条码不可读、Logo 缺失、箱角破损，或外观污渍。'
             : '你想检测哪一类问题？请补充检测目标、缺陷类型、输入来源，以及 OK/NG 判定规则。';
@@ -830,6 +908,17 @@ export const aiPanelAgentWorkspaceMixin = {
                 : isActionable
                     ? 'actionable_vision_plan'
                     : 'ambiguous_vision_requirement';
+        const routedMaturity = (isHelp || isCasual)
+            ? {
+                ...maturity,
+                maturity: 'chat_or_help',
+                taskType: 'unknown',
+                canBuild: false,
+                missingFields: [],
+                blockingReasons: [],
+                publicReason: '这是普通对话或能力咨询，不进入构建。'
+            }
+            : maturity;
         return {
             intent,
             confidence: isCasual || isHelp ? 'high' : 'medium',
@@ -857,6 +946,22 @@ export const aiPanelAgentWorkspaceMixin = {
             fallbackAllowed: true,
             routerSource: 'local_rule_fallback',
             fallbackReason: error?.message || 'router_unavailable',
+            requirementMaturity: routedMaturity,
+            decisionTrace: {
+                rawUserText: String(description || ''),
+                turnIntent: intent,
+                interactionState: intent === 'actionable_vision_plan' ? 'planning' : 'clarifying',
+                businessSignalsHit: [],
+                newFlowSignalsHit: [],
+                taskTypeSignalsHit: routedMaturity.taskSignals || [],
+                objectSignalsHit: routedMaturity.objectSignals || [],
+                maturityLevel: routedMaturity.maturity,
+                taskType: routedMaturity.taskType,
+                canBuild: routedMaturity.canBuild === true,
+                fallbackReason: error?.message || 'router_unavailable',
+                blockingReasons: routedMaturity.blockingReasons || [],
+                metadataOnly: true
+            },
             metadataOnly: true
         };
     },
@@ -1493,6 +1598,9 @@ export const aiPanelAgentWorkspaceMixin = {
         const normalizedDefaults = Array.isArray(defaults)
             ? defaults.map(item => this._normalizePlanDefault(item)).filter(Boolean)
             : [];
+        const requirementMaturity = this._normalizeRequirementMaturity(plan.requirementMaturity || plan.RequirementMaturity);
+        const decisionTrace = this._normalizeDecisionTrace(plan.decisionTrace || plan.DecisionTrace);
+        const rawCanBuild = plan.canBuild ?? plan.CanBuild;
 
         return {
             id: plan.planId || plan.PlanId || `plan-${Date.now()}`,
@@ -1512,7 +1620,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 .map(evt => this._normalizePlanPublicEvent(evt)),
             blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
             nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
-            executable: Boolean(plan.canBuild ?? plan.CanBuild ?? true),
+            executable: rawCanBuild === true,
             blockingReasons: this._toArray(plan.blockingReasons || plan.BlockingReasons).map(item => this._localizeDisplayText(item)),
             understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
                 ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).map(item => this._localizeDisplayText(item))
@@ -1536,9 +1644,52 @@ export const aiPanelAgentWorkspaceMixin = {
             operatorCatalogVersion: plan.operatorCatalogVersion || plan.OperatorCatalogVersion || '',
             templateCatalogVersion: plan.templateCatalogVersion || plan.TemplateCatalogVersion || '',
             templateSelection,
+            requirementMaturity,
+            decisionTrace,
             stationBoundarySummary: plan.stationBoundarySummary || plan.StationBoundarySummary || '',
             plcOutputPolicy: plan.plcOutputPolicy || plan.PlcOutputPolicy || '',
             rawPlanSnapshot: plan
+        };
+    },
+
+    _normalizeRequirementMaturity(value) {
+        const item = this._asObject?.(value) || value || null;
+        if (!item || typeof item !== 'object') return null;
+        const maturity = String(item.maturity || item.Maturity || '').trim();
+        const taskType = String(item.taskType || item.TaskType || '').trim();
+        const publicReason = this._localizeDisplayText(item.publicReason || item.PublicReason || '');
+        const missingFields = this._toArray(item.missingFields || item.MissingFields).map(field => String(field || '').trim()).filter(Boolean);
+        const blockingReasons = this._toArray(item.blockingReasons || item.BlockingReasons).map(field => String(field || '').trim()).filter(Boolean);
+        return {
+            maturity,
+            taskType,
+            canBuild: (item.canBuild ?? item.CanBuild) === true,
+            objectSignals: this._toArray(item.objectSignals || item.ObjectSignals).map(signal => String(signal || '').trim()).filter(Boolean),
+            taskSignals: this._toArray(item.taskSignals || item.TaskSignals).map(signal => String(signal || '').trim()).filter(Boolean),
+            missingFields,
+            blockingReasons,
+            publicReason,
+            metadataOnly: Boolean(item.metadataOnly ?? item.MetadataOnly)
+        };
+    },
+
+    _normalizeDecisionTrace(value) {
+        const item = this._asObject?.(value) || value || null;
+        if (!item || typeof item !== 'object') return null;
+        return {
+            rawUserText: String(item.rawUserText || item.RawUserText || '').trim(),
+            turnIntent: String(item.turnIntent || item.TurnIntent || '').trim(),
+            interactionState: String(item.interactionState || item.InteractionState || '').trim(),
+            businessSignalsHit: this._toArray(item.businessSignalsHit || item.BusinessSignalsHit).map(String),
+            newFlowSignalsHit: this._toArray(item.newFlowSignalsHit || item.NewFlowSignalsHit).map(String),
+            taskTypeSignalsHit: this._toArray(item.taskTypeSignalsHit || item.TaskTypeSignalsHit).map(String),
+            objectSignalsHit: this._toArray(item.objectSignalsHit || item.ObjectSignalsHit).map(String),
+            maturityLevel: String(item.maturityLevel || item.MaturityLevel || '').trim(),
+            taskType: String(item.taskType || item.TaskType || '').trim(),
+            canBuild: (item.canBuild ?? item.CanBuild) === true,
+            fallbackReason: String(item.fallbackReason || item.FallbackReason || '').trim(),
+            blockingReasons: this._toArray(item.blockingReasons || item.BlockingReasons).map(String),
+            metadataOnly: Boolean(item.metadataOnly ?? item.MetadataOnly)
         };
     },
 
@@ -1654,6 +1805,67 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _formatPlanFallbackReason(value) {
         return this._localizeDisplayText(value);
+    },
+
+    _formatRequirementMaturityLabel(value) {
+        switch (String(value || '').trim()) {
+            case 'abstract_goal':
+                return '抽象目标';
+            case 'ambiguous':
+                return '需求不完整';
+            case 'actionable':
+                return '可构建';
+            case 'chat_or_help':
+                return '对话/帮助';
+            case 'modify_existing_flow':
+                return '修改当前流程';
+            default:
+                return this._localizeDisplayText(value) || '未评估';
+        }
+    },
+
+    _formatRequirementTaskTypeLabel(value) {
+        switch (String(value || '').trim()) {
+            case 'surface_or_pose_defect':
+                return '缺陷/贴附/位姿';
+            case 'geometry_measurement':
+                return '几何测量';
+            case 'wire_sequence':
+                return '线序检测';
+            case 'barcode_qr':
+                return '读码/OCR';
+            case 'presence_absence':
+                return '有无/漏装';
+            case 'classification':
+                return '分类识别';
+            case 'template_location':
+                return '模板定位';
+            case 'plc_output':
+                return 'PLC 输出';
+            case 'abstract_goal':
+                return '方案愿景';
+            case 'unknown':
+                return '未识别';
+            default:
+                return this._localizeDisplayText(value) || '未识别';
+        }
+    },
+
+    _formatRequirementFieldLabel(value) {
+        switch (String(value || '').trim()) {
+            case 'inspection_object':
+                return '检测对象';
+            case 'task_type':
+                return '任务类型';
+            case 'image_source':
+                return '图像来源';
+            case 'acceptance_criteria':
+                return '判定标准';
+            case 'output_target':
+                return '输出目标';
+            default:
+                return this._localizeDisplayText(value) || value;
+        }
     },
 
     _formatPlanEvent(evt = {}) {
@@ -2275,6 +2487,50 @@ export const aiPanelAgentWorkspaceMixin = {
         }
     },
 
+    _renderRequirementMaturityPanel(plan) {
+        const maturity = plan?.requirementMaturity || null;
+        const trace = plan?.decisionTrace || null;
+        if (!maturity && !trace) return '';
+        const canBuild = plan?.executable === true;
+        const missingFields = this._toArray(maturity?.missingFields)
+            .map(field => this._formatRequirementFieldLabel(field))
+            .filter(Boolean);
+        const blockingReasons = this._toArray(maturity?.blockingReasons)
+            .map(reason => this._localizeDisplayText(reason))
+            .filter(Boolean);
+        const taskSignals = this._toArray(maturity?.taskSignals).slice(0, 8);
+        const objectSignals = this._toArray(maturity?.objectSignals).slice(0, 8);
+        const fallbackReason = trace?.fallbackReason || plan?.fallbackReason || '';
+        const renderChips = (items, emptyText) => items.length
+            ? `<div class="ai-plan-chain">${items.map(item => `<span>${this._escapeHtml(item)}</span>`).join('')}</div>`
+            : `<div class="ai-plan-maturity-empty">${this._escapeHtml(emptyText)}</div>`;
+
+        return `
+            <section class="ai-workspace-section ai-requirement-maturity ${canBuild ? 'is-ready' : 'is-blocked'}">
+                <div class="ai-workspace-section-title">需求成熟度</div>
+                <div class="ai-requirement-maturity-grid">
+                    <div class="ai-build-compact-row">
+                        <b>成熟度</b>
+                        <span>${this._escapeHtml(this._formatRequirementMaturityLabel(maturity?.maturity || trace?.maturityLevel))}</span>
+                    </div>
+                    <div class="ai-build-compact-row">
+                        <b>任务类型</b>
+                        <span>${this._escapeHtml(this._formatRequirementTaskTypeLabel(maturity?.taskType || trace?.taskType))}</span>
+                    </div>
+                    <div class="ai-build-compact-row">
+                        <b>Build</b>
+                        <span>${canBuild ? '允许' : '阻断'}</span>
+                    </div>
+                </div>
+                ${maturity?.publicReason ? `<div class="ai-build-note"><strong>判断原因</strong>${this._escapeHtml(maturity.publicReason)}</div>` : ''}
+                ${missingFields.length ? `<div class="ai-build-note"><strong>缺失字段</strong>${renderChips(missingFields, '无')}</div>` : ''}
+                ${blockingReasons.length ? `<div class="ai-build-note"><strong>阻断原因</strong>${renderChips(blockingReasons, '无')}</div>` : ''}
+                ${(objectSignals.length || taskSignals.length) ? `<div class="ai-build-note"><strong>命中信号</strong>${renderChips([...objectSignals, ...taskSignals], '无')}</div>` : ''}
+                ${fallbackReason ? `<div class="ai-build-note"><strong>Trace</strong>${this._escapeHtml(this._localizeDisplayText(fallbackReason))}</div>` : ''}
+            </section>
+        `;
+    },
+
     _renderPlanWorkspace(plan = this.pendingVisionPlan) {
         const el = this.container?.querySelector('#ai-plan-workspace');
         if (!el) return;
@@ -2317,17 +2573,23 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const selections = this.planQuestionSelections || {};
+        const maturityPanel = this._renderRequirementMaturityPanel(plan);
+        const routeOperators = this._toArray(plan.route?.operators);
+        const routeChain = routeOperators.length
+            ? `<div class="ai-plan-chain">${routeOperators.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`
+            : '<div class="ai-plan-maturity-empty">需求成熟度不足时不会提前选择算子链。</div>';
         el.innerHTML = `
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">需求理解</div>
                 <div class="ai-workspace-list">${plan.understanding.map(item => `<div>${this._escapeHtml(item)}</div>`).join('')}</div>
             </section>
+            ${maturityPanel}
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">推荐方案</div>
                 <div class="ai-plan-route">
                     <strong>${this._escapeHtml(plan.route.title)}</strong>
                     <span>${this._escapeHtml(plan.route.summary)}</span>
-                    <div class="ai-plan-chain">${plan.route.operators.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>
+                    ${routeChain}
                 </div>
             </section>
             <section class="ai-workspace-section">
@@ -2463,6 +2725,18 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const plan = this.pendingVisionPlan;
+        if (plan.executable !== true) {
+            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            const reason = plan.requirementMaturity?.publicReason || '当前计划仍需澄清，暂不可构建。';
+            this._addMessage?.('system', reason);
+            this._setResultStatusNote?.(reason, 'warning');
+            this._renderAgentWorkspaceOverview();
+            this._renderPlanWorkspace(plan);
+            this._renderBuildWorkspaceFromAgentRun();
+            this._updatePlanBuildActionState();
+            return false;
+        }
+
         this.activePlanRequestId = null;
         const buildFromPlan = this._buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended });
         this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
@@ -2514,6 +2788,8 @@ export const aiPanelAgentWorkspaceMixin = {
             buildIntent,
             originalUserPrompt: plan.originalDescription || plan.buildPrompt || '',
             acceptedRecommendedDefaults: Boolean(acceptedRecommended),
+            requirementMaturity: plan.requirementMaturity || plan.rawPlanSnapshot?.requirementMaturity || plan.rawPlanSnapshot?.RequirementMaturity || null,
+            decisionTrace: plan.decisionTrace || plan.rawPlanSnapshot?.decisionTrace || plan.rawPlanSnapshot?.DecisionTrace || null,
             metadataOnly: true
         };
     },
@@ -2549,6 +2825,15 @@ export const aiPanelAgentWorkspaceMixin = {
             if (!snapshot.templateSelection && !snapshot.TemplateSelection && plan?.templateSelection) {
                 snapshot.templateSelection = plan.templateSelection;
             }
+            if (!snapshot.requirementMaturity && !snapshot.RequirementMaturity && plan?.requirementMaturity) {
+                snapshot.requirementMaturity = plan.requirementMaturity;
+            }
+            if (!snapshot.decisionTrace && !snapshot.DecisionTrace && plan?.decisionTrace) {
+                snapshot.decisionTrace = plan.decisionTrace;
+            }
+            if (snapshot.canBuild === undefined && snapshot.CanBuild === undefined) {
+                snapshot.canBuild = plan?.executable === true;
+            }
             return snapshot;
         }
         return {
@@ -2567,13 +2852,15 @@ export const aiPanelAgentWorkspaceMixin = {
             risks: this._toArray(plan?.risks),
             acceptanceCriteria: this._toArray(plan?.acceptanceCriteria),
             executablePlan: this._toArray(plan?.steps),
-            canBuild: plan?.executable !== false,
+            canBuild: plan?.executable === true,
             blockingReasons: this._toArray(plan?.blockingReasons),
             nextAction: plan?.nextAction || '',
             contextSummary: plan?.contextSummary || {},
             operatorCatalogVersion: plan?.operatorCatalogVersion || '',
             templateCatalogVersion: plan?.templateCatalogVersion || '',
             templateSelection: plan?.templateSelection || null,
+            requirementMaturity: plan?.requirementMaturity || null,
+            decisionTrace: plan?.decisionTrace || null,
             stationBoundarySummary: plan?.stationBoundarySummary || '',
             plcOutputPolicy: plan?.plcOutputPolicy || '',
             planWarnings: this._toArray(plan?.planWarnings),

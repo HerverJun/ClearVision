@@ -279,6 +279,49 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             MetadataOnly = true
         };
 
+        var maturityRequest = new VisionAgentRequirementMaturityRequest
+        {
+            Description = request.Description,
+            AdditionalContext = request.AdditionalContext,
+            Mode = request.Mode,
+            HasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
+            TemplateSelection = baseline.TemplateSelection
+        };
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest);
+        if (!maturity.CanBuild || baseline.CanBuild == false)
+        {
+            result = result with
+            {
+                Intent = maturity.Maturity,
+                CanBuild = false,
+                RecommendedRoute = baseline.RecommendedRoute,
+                BlockingReasons = maturity.BlockingReasons.Count > 0
+                    ? maturity.BlockingReasons.ToList()
+                    : baseline.BlockingReasons.ToList(),
+                RequirementMaturity = maturity,
+                DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
+                    maturityRequest,
+                    maturity,
+                    "ambiguous_vision_requirement",
+                    "clarifying",
+                    string.Empty)
+            };
+            repairNotes.Add("maturity_gate_applied");
+        }
+        else
+        {
+            result = result with
+            {
+                RequirementMaturity = maturity,
+                DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
+                    maturityRequest,
+                    maturity,
+                    "actionable_vision_plan",
+                    "planning",
+                    string.Empty)
+            };
+        }
+
         if (!result.CanBuild && result.BlockingReasons.Count == 0)
         {
             result.BlockingReasons.Add("inspection_goal_missing");

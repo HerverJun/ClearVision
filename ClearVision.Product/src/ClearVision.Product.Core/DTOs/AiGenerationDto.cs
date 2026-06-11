@@ -262,6 +262,8 @@ public class AiFlowGenerationResult
     public string RouterConfidence { get; set; } = AiRouterConfidence.Low;
     public List<string> BlockingClarificationFields { get; set; } = new();
     public List<string> NonBlockingMissingFields { get; set; } = new();
+    public AiRequirementMaturityResult? RequirementMaturity { get; set; }
+    public AiDecisionTrace? DecisionTrace { get; set; }
 }
 
 public static class AiTurnIntents

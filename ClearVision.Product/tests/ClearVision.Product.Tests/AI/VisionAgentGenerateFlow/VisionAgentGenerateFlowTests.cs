@@ -395,7 +395,7 @@ public sealed class VisionAgentGenerateFlowTests
             generationService,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>());
 
-        var json = await handler.HandleAsync("wire", useVisionAgentGenerateFlow: true);
+        var json = await handler.HandleAsync("检测端子线序是否正确", useVisionAgentGenerateFlow: true);
 
         using var doc = JsonDocument.Parse(json);
         doc.RootElement.GetProperty("missingResources").GetArrayLength().Should().Be(1);
