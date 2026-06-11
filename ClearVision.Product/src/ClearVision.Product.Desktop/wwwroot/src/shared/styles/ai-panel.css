@@ -5347,6 +5347,186 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     padding: 12px;
 }
 
+.ai-clarification-plan-card {
+    display: grid;
+    gap: 12px;
+    border: 1px solid rgba(183, 121, 31, 0.42);
+    border-radius: 8px;
+    background: var(--ai-surface-pane);
+    padding: 12px;
+}
+
+.ai-clarification-plan-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ai-clarification-plan-header h3 {
+    margin: 2px 0 0;
+    color: var(--ai-text-main);
+    font-size: 16px;
+    line-height: 1.25;
+}
+
+.ai-clarification-plan-kicker {
+    color: var(--ai-accent-strong);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
+.ai-clarification-plan-count {
+    flex: 0 0 auto;
+    border: 1px solid rgba(183, 121, 31, 0.5);
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: rgba(183, 121, 31, 0.12);
+    color: #f8d38a;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.ai-clarification-plan-summary,
+.ai-clarification-plan-empty,
+.ai-clarification-plan-next,
+.ai-clarification-plan-reason,
+.ai-clarification-plan-options-title {
+    color: var(--ai-text-muted);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.ai-clarification-plan-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.ai-clarification-plan-grid section,
+.ai-clarification-plan-section,
+.ai-clarification-plan-question {
+    display: grid;
+    gap: 8px;
+    border: 1px solid var(--ai-border);
+    border-radius: 8px;
+    background: var(--ai-surface-panel);
+    padding: 10px;
+}
+
+.ai-clarification-plan-label {
+    color: var(--ai-text-main);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.ai-clarification-plan-tags,
+.ai-clarification-plan-options,
+.ai-clarification-plan-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ai-clarification-plan-chip,
+.ai-clarification-option {
+    min-height: 28px;
+    border: 1px solid var(--ai-border);
+    border-radius: 999px;
+    background: var(--ai-surface-pane);
+    color: var(--ai-text-main);
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.ai-clarification-plan-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 9px;
+}
+
+.ai-clarification-plan-chip.is-blocking {
+    border-color: rgba(183, 121, 31, 0.48);
+    color: #f8d38a;
+}
+
+.ai-clarification-plan-chip.is-nonblocking {
+    border-color: rgba(59, 130, 246, 0.42);
+}
+
+.ai-clarification-plan-chip.is-known {
+    border-color: rgba(34, 197, 94, 0.42);
+}
+
+.ai-clarification-plan-question-list {
+    display: grid;
+    gap: 8px;
+}
+
+.ai-clarification-plan-question-head {
+    display: grid;
+    gap: 4px;
+}
+
+.ai-clarification-plan-question-head span {
+    color: var(--ai-accent-strong);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.ai-clarification-plan-question-head strong {
+    color: var(--ai-text-main);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.ai-clarification-option {
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+.ai-clarification-option:hover,
+.ai-clarification-option.is-selected,
+.ai-clarification-option[aria-pressed="true"] {
+    border-color: var(--ai-accent-strong);
+    background: rgba(214, 54, 38, 0.12);
+    color: #fff;
+}
+
+.ai-clarification-plan-actions {
+    justify-content: flex-end;
+    position: sticky;
+    bottom: 0;
+    padding-top: 10px;
+    background: linear-gradient(180deg, transparent, var(--ai-surface-pane) 35%);
+}
+
+.ai-clarification-plan-action {
+    min-height: 32px;
+    border: 1px solid var(--ai-border);
+    border-radius: 6px;
+    background: var(--ai-surface-panel);
+    color: var(--ai-text-main);
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.ai-clarification-plan-action.is-primary {
+    border-color: var(--ai-accent-strong);
+    background: var(--ai-accent);
+    color: #fff;
+}
+
+.ai-clarification-plan-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
 .ai-plan-empty-title,
 .ai-workspace-section-title {
     margin-bottom: 8px;
@@ -5662,9 +5842,16 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 
 @media (max-width: 720px) {
     .ai-plan-question-options,
+    .ai-clarification-plan-grid,
     .ai-agent-overview-metrics,
     .ai-build-metric-row {
         grid-template-columns: 1fr;
+    }
+
+    .ai-clarification-plan-header,
+    .ai-clarification-plan-actions {
+        align-items: stretch;
+        flex-direction: column;
     }
 }
 

@@ -317,6 +317,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this.activePlanRunCompletion = null;
         if (!preservePlan) {
             this.pendingVisionPlan = null;
+            this.pendingClarificationPayload = null;
             this.planQuestionSelections = {};
         }
 
@@ -439,6 +440,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this.activeIntentRouterRequestId = routerRequestId;
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+        this.pendingClarificationPayload = null;
         this.activePlanRequestId = null;
         this.activePlanRunId = null;
         this.activePlanRunRequestId = null;
@@ -798,6 +800,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+        this.pendingClarificationPayload = null;
         if (clearPendingPlan) {
             this.pendingVisionPlan = null;
             this.planQuestionSelections = {};
@@ -1816,6 +1819,364 @@ export const aiPanelAgentWorkspaceMixin = {
         }
     },
 
+    _resolveActiveClarificationPayload() {
+        const candidates = [
+            this.pendingClarificationPayload,
+            this._lastAgentRuntime
+        ].filter(Boolean);
+
+        return candidates.find(payload => {
+            const interactionState = String(this._getInteractionState?.(payload) || '').trim().toLowerCase();
+            return interactionState === 'clarifying' || this._isClarificationResult?.(payload);
+        }) || null;
+    },
+
+    _normalizeClarificationQuestionList(value) {
+        const normalizeOptions = options => this._toArray(options)
+            .map(option => {
+                if (option && typeof option === 'object') {
+                    return String(option.value ?? option.Value ?? option.label ?? option.Label ?? '').trim();
+                }
+
+                return String(option ?? '').trim();
+            })
+            .filter(Boolean);
+
+        return this._toArray(value)
+            .map((item, index) => {
+                if (typeof item === 'string') {
+                    const question = item.trim();
+                    return question
+                        ? {
+                            field: `clarification_${index + 1}`,
+                            question,
+                            required: true,
+                            reason: '',
+                            priority: 'high',
+                            options: []
+                        }
+                        : null;
+                }
+
+                if (!item || typeof item !== 'object') return null;
+
+                const field = String(item.field ?? item.Field ?? item.id ?? item.Id ?? `clarification_${index + 1}`).trim();
+                const question = String(item.question ?? item.Question ?? item.title ?? item.Title ?? '').trim();
+                const options = normalizeOptions(item.options ?? item.Options);
+                return (field || question || options.length)
+                    ? {
+                        field,
+                        question: question || `请补充${this._getRequirementFieldLabel?.(field) || '关键信息'}。`,
+                        required: Boolean(item.required ?? item.Required ?? true),
+                        reason: String(item.reason ?? item.Reason ?? item.why ?? item.Why ?? '').trim(),
+                        priority: String(item.priority ?? item.Priority ?? 'high').trim() || 'high',
+                        options
+                    }
+                    : null;
+            })
+            .filter(Boolean);
+    },
+
+    _getDefaultClarificationQuestions() {
+        return [
+            {
+                field: 'scene',
+                question: '请确认这是哪一类视觉场景。',
+                required: true,
+                reason: '场景类型会决定模板、算子链和判定策略。',
+                priority: 'high',
+                options: ['外观缺陷', '漏装/有无', '线序判定', '尺寸测量']
+            },
+            {
+                field: 'object_type',
+                question: '请补充检测对象或产品对象。',
+                required: true,
+                reason: '检测对象不明确时无法安全选择模板和 ROI 策略。',
+                priority: 'high',
+                options: ['金属件', '包装箱/纸箱', '线束端子', '标签/条码']
+            },
+            {
+                field: 'image_source_roi',
+                question: '请说明图像来源以及是否已有 ROI。',
+                required: true,
+                reason: '采集来源和 ROI 会影响 ImageAcquisition、Crop 与坐标约定。',
+                priority: 'high',
+                options: ['相机实时图', '本地图像样本', '整图检测', '需要绘制 ROI']
+            },
+            {
+                field: 'decision_rule',
+                question: '请描述 OK/NG 或数值判定标准。',
+                required: true,
+                reason: '判定标准会影响阈值、Comparator 和 ResultJudgment。',
+                priority: 'high',
+                options: ['OK/NG 分类', '缺陷面积阈值', '尺寸公差', '类别/数量匹配']
+            },
+            {
+                field: 'output_target',
+                question: '请确认输出目标。',
+                required: false,
+                reason: '输出目标会影响结果字段、PLC/IO 和报表绑定。',
+                priority: 'medium',
+                options: ['画布流程', '运行包草稿', 'PLC/IO 输出', '报表字段']
+            },
+            {
+                field: 'draft_first',
+                question: '是否允许先按安全假设生成草稿，再把未确认项留作待补？',
+                required: false,
+                reason: '草稿优先可以推进方案，但应用前仍需复核阻断风险。',
+                priority: 'medium',
+                options: ['允许先出草稿', '必须补齐后生成']
+            }
+        ];
+    },
+
+    _normalizeClarificationPlanBrief(payload = {}) {
+        const item = this._asObject?.(payload) || payload || {};
+        const isClarification = this._isClarificationResult?.(item) ||
+            String(this._getInteractionState?.(item) || '').trim().toLowerCase() === 'clarifying';
+        let brief = this._normalizeRequirementBrief?.(item.requirementBrief ?? item.RequirementBrief ?? null) || null;
+
+        if (!brief && !isClarification) {
+            return null;
+        }
+
+        const normalizeList = value => this._normalizeRuntimeFieldList?.(value) ||
+            (Array.isArray(value) ? value.map(entry => String(entry || '').trim()).filter(Boolean) : []);
+        const topLevelQuestions = this._normalizeClarificationQuestionList(
+            item.clarificationQuestions ?? item.ClarificationQuestions ?? item.questions ?? item.Questions
+        );
+        const topLevelBlockingFields = normalizeList(item.blockingClarificationFields ?? item.BlockingClarificationFields);
+        const topLevelNonBlockingFields = normalizeList(item.nonBlockingMissingFields ?? item.NonBlockingMissingFields);
+
+        brief = {
+            scenarioKey: '',
+            scenarioName: '',
+            intentType: '',
+            requirementMode: this._normalizeRequirementMode?.(item.requirementMode ?? item.RequirementMode ?? 'strict') || 'strict',
+            confidence: 0,
+            hasOpenQuestions: true,
+            clarificationRequired: true,
+            canGenerateDraftNow: false,
+            draftRiskLevel: 'high',
+            requiredFields: [],
+            blockingClarificationFields: [],
+            nonBlockingMissingFields: [],
+            knownFacts: [],
+            missingFacts: [],
+            attachmentFacts: [],
+            objectName: '',
+            imageSource: '',
+            outputTarget: '',
+            decisionRule: '',
+            roiRequirement: '',
+            calibrationRequirement: '',
+            objectTypes: [],
+            defectTypes: [],
+            measurementTargets: [],
+            requiredResources: [],
+            clarificationQuestions: [],
+            ...(brief || {})
+        };
+
+        if (topLevelBlockingFields.length > 0 && brief.blockingClarificationFields.length === 0) {
+            brief.blockingClarificationFields = topLevelBlockingFields;
+        }
+        if (topLevelNonBlockingFields.length > 0 && brief.nonBlockingMissingFields.length === 0) {
+            brief.nonBlockingMissingFields = topLevelNonBlockingFields;
+        }
+        if (topLevelQuestions.length > 0 && brief.clarificationQuestions.length === 0) {
+            brief.clarificationQuestions = topLevelQuestions;
+        }
+        if (brief.clarificationQuestions.length === 0) {
+            brief.clarificationQuestions = this._getDefaultClarificationQuestions();
+        }
+
+        const requiredQuestionFields = brief.clarificationQuestions
+            .filter(question => question.required !== false)
+            .map(question => String(question.field || '').trim())
+            .filter(Boolean);
+        if (brief.blockingClarificationFields.length === 0) {
+            brief.blockingClarificationFields = [...new Set(requiredQuestionFields)];
+        }
+        if (brief.missingFacts.length === 0) {
+            brief.missingFacts = brief.blockingClarificationFields
+                .slice(0, 6)
+                .map(field => `请确认${this._getRequirementFieldLabel?.(field) || field}`);
+        }
+
+        brief.clarificationRequired = true;
+        brief.hasOpenQuestions = true;
+        return brief;
+    },
+
+    _renderClarificationPlanWorkspace(el, payload = {}) {
+        const brief = this._normalizeClarificationPlanBrief(payload);
+        if (!brief) return false;
+
+        const summary = String(payload.aiExplanation ?? payload.AiExplanation ?? payload.errorMessage ?? payload.message ?? '').trim()
+            || '当前需求需要先补充信息。';
+        const followupText = this._buildClarificationFollowupText?.(brief) || summary;
+        const safeHint = this._buildClarificationSafeHint?.(brief) || followupText;
+        const blockingCount = Math.max(
+            brief.blockingClarificationFields.length,
+            brief.clarificationQuestions.filter(question => question.required !== false).length,
+            brief.missingFacts.length
+        );
+        const nextAction = this._buildAgentNextAction?.({
+            turnIntent: this._getTurnIntent?.(payload) || 'new_flow',
+            interactionState: 'clarifying',
+            blockingCount,
+            nonBlockingCount: brief.nonBlockingMissingFields.length,
+            pendingCount: 0,
+            missingResourceCount: 0,
+            hasFlow: false
+        }) || '下一步：先回答阻断问题，系统会在补齐后继续生成。';
+
+        const renderTags = (items, emptyText, tone = '') => {
+            const normalized = this._normalizeRuntimeFieldList?.(items) ||
+                (Array.isArray(items) ? items.map(item => String(item || '').trim()).filter(Boolean) : []);
+            if (!normalized.length) {
+                return `<div class="ai-clarification-plan-empty">${this._escapeHtml(emptyText)}</div>`;
+            }
+            const toneClass = tone ? ` is-${tone}` : '';
+            return `<div class="ai-clarification-plan-tags">${normalized
+                .map(item => `<span class="ai-clarification-plan-chip${toneClass}">${this._escapeHtml(item)}</span>`)
+                .join('')}</div>`;
+        };
+
+        const renderFields = (fields, emptyText, tone = '') => {
+            const normalized = this._normalizeRuntimeFieldList?.(fields) || [];
+            if (!normalized.length) {
+                return `<div class="ai-clarification-plan-empty">${this._escapeHtml(emptyText)}</div>`;
+            }
+            const toneClass = tone ? ` is-${tone}` : '';
+            return `<div class="ai-clarification-plan-tags">${normalized
+                .map(field => `<span class="ai-clarification-plan-chip${toneClass}" title="${this._escapeHtml(field)}">${this._escapeHtml(this._getRequirementFieldLabel?.(field) || field)}</span>`)
+                .join('')}</div>`;
+        };
+
+        const renderQuestions = questions => `
+            <div class="ai-clarification-plan-question-list">
+                ${questions.map((question, index) => {
+                    const required = question.required !== false;
+                    const fieldLabel = this._getRequirementFieldLabel?.(question.field) || question.field || '澄清项';
+                    const options = this._normalizeClarificationQuestionList([question])[0]?.options || [];
+                    return `
+                        <article class="ai-clarification-plan-question ${required ? 'is-required' : 'is-optional'}">
+                            <div class="ai-clarification-plan-question-head">
+                                <span>${required ? '阻断问题' : '建议补充'} · ${this._escapeHtml(fieldLabel)}</span>
+                                <strong>${this._escapeHtml(`${index + 1}. ${question.question}`)}</strong>
+                            </div>
+                            ${question.reason ? `<div class="ai-clarification-plan-reason">${this._escapeHtml(question.reason)}</div>` : ''}
+                            ${options.length > 0 ? `
+                                <div class="ai-clarification-plan-options-title">参考选项，点击后生成澄清回答草稿</div>
+                                <div class="ai-clarification-plan-options">
+                                    ${options.map(option => `
+                                        <button class="ai-clarification-option ai-requirement-question-option" type="button"
+                                            aria-pressed="false"
+                                            data-clarification-field="${this._escapeHtml(question.field)}"
+                                            data-clarification-value="${this._escapeHtml(option)}">
+                                            ${this._escapeHtml(option)}
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </article>
+                    `;
+                }).join('')}
+            </div>
+        `;
+
+        el.hidden = false;
+        el.innerHTML = `
+            <section class="ai-clarification-plan-card" id="ai-clarification-plan-card" data-ai-clarification-plan-card="true">
+                <div class="ai-clarification-plan-header">
+                    <div>
+                        <span class="ai-clarification-plan-kicker">ClarificationPlanCard</span>
+                        <h3>待澄清</h3>
+                    </div>
+                    <span class="ai-clarification-plan-count">${this._escapeHtml(String(blockingCount))} 个阻断问题</span>
+                </div>
+                <div class="ai-clarification-plan-summary">${this._escapeHtml(summary)}</div>
+                <div class="ai-clarification-plan-grid">
+                    <section>
+                        <div class="ai-clarification-plan-label">已知事实</div>
+                        ${renderTags(brief.knownFacts, '当前还没有可靠的已知事实。', 'known')}
+                    </section>
+                    <section>
+                        <div class="ai-clarification-plan-label">阻断问题</div>
+                        ${renderTags(brief.missingFacts, '当前没有阻断待确认项。', 'blocking')}
+                        ${renderFields(brief.blockingClarificationFields, '当前没有阻断字段。', 'blocking')}
+                    </section>
+                    <section>
+                        <div class="ai-clarification-plan-label">非阻断待补</div>
+                        ${renderFields(brief.nonBlockingMissingFields, '当前没有非阻断待补字段。', 'nonblocking')}
+                    </section>
+                    <section>
+                        <div class="ai-clarification-plan-label">下一步</div>
+                        <div class="ai-clarification-plan-next">${this._escapeHtml(nextAction)}</div>
+                    </section>
+                </div>
+                <section class="ai-clarification-plan-section">
+                    <div class="ai-clarification-plan-label">澄清问题</div>
+                    ${renderQuestions(brief.clarificationQuestions)}
+                </section>
+                <div class="ai-clarification-plan-actions">
+                    <button class="ai-clarification-plan-action" type="button" data-brief-action="copy">复制澄清清单</button>
+                    <button class="ai-clarification-plan-action" type="button" data-brief-action="insert">插入输入框</button>
+                    <button class="ai-clarification-plan-action" type="button" data-brief-action="queue">挂到下一轮</button>
+                    <button class="ai-clarification-plan-action" type="button" data-brief-action="draft">切到草稿优先</button>
+                    <button class="ai-clarification-plan-action is-primary" type="button" id="ai-btn-send-clarification" data-brief-action="send-clarification" disabled>发送澄清回答</button>
+                </div>
+            </section>
+        `;
+
+        el.querySelectorAll('[data-brief-action]').forEach(button => {
+            const action = button.dataset.briefAction;
+            button.disabled = this.isGenerating || action === 'send-clarification';
+            button.addEventListener('click', async () => {
+                if (action === 'copy') {
+                    const copied = await this._copyTextToClipboard?.(followupText);
+                    this._addMessage?.('system', copied ? '澄清清单已复制。' : '复制失败，请手动复制。');
+                    return;
+                }
+
+                if (action === 'insert') {
+                    this._appendFollowupTextToInput?.(followupText);
+                    this._addMessage?.('system', '澄清清单已插入输入框。');
+                    return;
+                }
+
+                if (action === 'queue') {
+                    this.nextHintDraft = safeHint;
+                    this._renderQueuedHintBanner?.();
+                    this._addMessage?.('system', '已挂载安全澄清上下文，下一轮不会把示例选项误当作用户答案。');
+                    return;
+                }
+
+                if (action === 'draft') {
+                    this._setRequirementMode?.('draft');
+                    this._addMessage?.('system', '已切到草稿优先，下一轮会尽量在安全假设下先生成草稿。');
+                    return;
+                }
+
+                if (action === 'send-clarification') {
+                    const draftText = this._buildClarificationAnswerDraft?.() || '';
+                    if (!draftText) {
+                        this._addMessage?.('system', '请先选择澄清选项，或直接在输入框里补充答案。');
+                        return;
+                    }
+                    this._mergeClarificationDraftIntoInput?.(draftText);
+                    this._handleGenerate?.();
+                }
+            });
+        });
+
+        this._bindClarificationOptionButtons?.(el);
+        this._updatePlanBuildActionState?.();
+        return true;
+    },
+
     _formatGateStatus(status) {
         switch (String(status || '').trim().toLowerCase()) {
             case 'canvas_apply_ready':
@@ -1838,6 +2199,13 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!el) return;
 
         el.hidden = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD;
+        const clarificationPayload = !plan && this.agentWorkspaceMode !== AgentWorkspaceModes.BUILD
+            ? this._resolveActiveClarificationPayload()
+            : null;
+        if (clarificationPayload && this._renderClarificationPlanWorkspace(el, clarificationPayload)) {
+            return;
+        }
+
         if (!plan) {
             const progress = this._getPlanRunProgressState?.();
             const liveStatus = progress?.eventCount > 0

@@ -66,7 +66,7 @@ test('AI agent clarification layout stays usable on narrow viewports', async ({ 
   await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
     (element as HTMLElement).click();
   });
-  await page.waitForFunction(() => Boolean((window as any).aiPanel && document.querySelector('#ai-agent-runtime')));
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && document.querySelector('#ai-plan-workspace')));
 
   await page.evaluate(() => {
     const panel = (window as any).aiPanel;
@@ -115,9 +115,11 @@ test('AI agent clarification layout stays usable on narrow viewports', async ({ 
     });
   });
 
-  await expect(page.locator('#ai-agent-runtime')).toContainText('待澄清');
-  await expect(page.locator('#ai-agent-runtime')).toContainText('阻断 2');
-  await expect(page.locator('#ai-agent-runtime')).toContainText('下一步：先回答 2 个阻断问题');
+  const clarificationPlan = page.locator('#ai-clarification-plan-card');
+  await expect(clarificationPlan).toBeVisible();
+  await expect(clarificationPlan).toContainText('待澄清');
+  await expect(clarificationPlan).toContainText('阻断问题');
+  await expect(clarificationPlan).toContainText('下一步：先回答 2 个阻断问题');
   await expect(page.locator('#ai-btn-send-clarification')).toBeDisabled();
   const initialLayout = await page.evaluate(() => {
     const rect = (selector: string) => {
@@ -156,7 +158,7 @@ test('AI agent clarification layout stays usable on narrow viewports', async ({ 
   expect(initialLayout.rightPane?.y).toBeGreaterThanOrEqual(initialLayout.leftPane?.bottom || 0);
   expect(initialLayout.mainCanScroll).toBe(true);
 
-  const defectOption = page.locator('.ai-requirement-question-option[data-clarification-field="scene"][data-clarification-value="外观缺陷"]').first();
+  const defectOption = page.locator('#ai-clarification-plan-card .ai-clarification-option[data-clarification-field="scene"][data-clarification-value="外观缺陷"]').first();
   await defectOption.scrollIntoViewIfNeeded();
   await defectOption.click();
   await expect(page.locator('#ai-input')).toHaveValue(/澄清回答：\n场景类型：外观缺陷/);
@@ -199,7 +201,7 @@ test('AI assistant diagnostic text stays collapsed by default', async ({ page })
       interactionState: 'completed',
       routerConfidence: 'high',
       aiExplanation: '已生成可应用流程。',
-      reasoning: 'Raw model diagnostic trace that should not be expanded by default.',
+      publicDiagnostics: ['Raw model diagnostic trace that should not be expanded by default.'],
       flow: {
         operators: [],
         connections: [],
@@ -276,12 +278,19 @@ test('AI panel routes WebView GenerateFlowResult into agent clarification state'
   });
   await page.waitForFunction(() => Boolean((window as any).aiPanel && (window as any).mockWebViewResponse));
 
-  await page.locator('#ai-input').fill('帮我构建一个流程');
-  await page.locator('#ai-btn-gen').click();
-  await expect(page.locator('#ai-input')).toHaveValue('');
+  const requestId = await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.isVisionAgentDeveloperUiEnabled = true;
+    panel._dispatchGenerateRequest({
+      description: '帮我构建一个流程',
+      userMessage: '帮我构建一个流程',
+      explicitMode: 'new',
+      skipPlan: true,
+      skipPlanSource: 'developer_direct_build_debug',
+    });
+    return panel.activeGenerateRequestId;
+  });
   await expect(page.locator('#ai-agent-runtime')).toContainText('生成中');
-
-  const requestId = await page.evaluate(() => (window as any).aiPanel.activeGenerateRequestId);
   expect(requestId).toBeTruthy();
 
   await page.evaluate(id => {
@@ -330,9 +339,85 @@ test('AI panel routes WebView GenerateFlowResult into agent clarification state'
     });
   }, requestId);
 
-  await expect(page.locator('#ai-agent-runtime')).toContainText('待澄清');
-  await expect(page.locator('#ai-agent-runtime')).toContainText('意图 新建流程');
+  await expect(page.locator('#ai-clarification-plan-card')).toBeVisible();
+  await expect(page.locator('#ai-clarification-plan-card')).toContainText('待澄清');
+  await expect(page.locator('#ai-clarification-plan-card')).toContainText('阻断问题');
   await expect(page.locator('.ai-assistant-clarification-section').last()).toBeVisible();
+  await expect(page.locator('#ai-btn-apply')).toBeDisabled();
+  await expect(page.locator('#ai-btn-apply')).toContainText('暂无可应用方案');
+});
+
+test('AI panel renders fallback ClarificationPlanCard for no-template no-rule clarification_required response', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await mockShellApis(page);
+  await bootAuthenticatedApp(page);
+
+  await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
+    (element as HTMLElement).click();
+  });
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && (window as any).mockWebViewResponse));
+
+  const requestId = await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.isVisionAgentDeveloperUiEnabled = true;
+    panel._dispatchGenerateRequest({
+      description: '帮我做一个没有模板的检测',
+      userMessage: '帮我做一个没有模板的检测',
+      explicitMode: 'new',
+      skipPlan: true,
+      skipPlanSource: 'developer_direct_build_debug',
+    });
+    return panel.activeGenerateRequestId;
+  });
+  expect(requestId).toBeTruthy();
+
+  await page.evaluate(id => {
+    (window as any).mockWebViewResponse({
+      type: 'GenerateFlowResult',
+      payload: {
+        requestId: id,
+        success: false,
+        status: 'clarification_required',
+        failureType: 'clarification_required',
+        clarificationRequired: true,
+        turnIntent: 'new_flow',
+        interactionState: 'clarifying',
+        routerConfidence: 'medium',
+        aiExplanation: '未命中预置模板和规则兜底，需要先补充关键信息。',
+        generationMode: 'free_generate',
+        templateLockLevel: 'none',
+        templateCandidates: [],
+        blockingClarificationFields: [],
+        nonBlockingMissingFields: ['model_path'],
+        requirementBrief: {
+          requirementMode: 'strict',
+          confidence: 0,
+          clarificationRequired: true,
+          draftRiskLevel: 'high',
+          knownFacts: ['未命中预置模板', '未命中规则兜底'],
+          missingFacts: [],
+          blockingClarificationFields: [],
+          nonBlockingMissingFields: ['model_path'],
+          clarificationQuestions: [],
+        },
+      },
+    });
+  }, requestId);
+
+  const card = page.locator('#ai-clarification-plan-card');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('待澄清');
+  await expect(card).toContainText('阻断问题');
+  await expect(card).toContainText('场景类型');
+  await expect(card).toContainText('检测对象');
+  await expect(card).toContainText('图像来源/ROI');
+  await expect(card.locator('.ai-clarification-option')).toHaveCount(22);
+
+  const sceneOption = card.locator('.ai-clarification-option[data-clarification-field="scene"][data-clarification-value="外观缺陷"]').first();
+  await sceneOption.click();
+  await expect(page.locator('#ai-input')).toHaveValue(/澄清回答：\n场景类型：外观缺陷/);
+  await expect(page.locator('#ai-btn-send-clarification')).toBeEnabled();
+  await expect(sceneOption).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
   await expect(page.locator('#ai-btn-apply')).toContainText('暂无可应用方案');
 });
@@ -377,8 +462,16 @@ test('AI panel sends current flow context for modification turns', async ({ page
     panel._setCurrentResult({ success: true, flow });
   });
 
-  await page.locator('#ai-input').fill('把算子名称改成中文，其他参数和连线保持不变');
-  await page.locator('#ai-btn-gen').click();
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel._dispatchGenerateRequest({
+      description: '把算子名称改成中文，其他参数和连线保持不变',
+      userMessage: '把算子名称改成中文，其他参数和连线保持不变',
+      explicitMode: 'modify',
+      skipPlan: true,
+      skipPlanSource: 'intent_router_build',
+    });
+  });
 
   await page.waitForFunction(() =>
     ((window as any).__cvWebViewMessages || []).some((message: any) => message.messageType === 'GenerateFlow'));
@@ -424,8 +517,17 @@ test('AI panel keeps explicit new-flow requests from being coerced into modifica
     panel._setCurrentResult({ success: true, flow });
   });
 
-  await page.locator('#ai-input').fill('新增一个缺陷检测流程');
-  await page.locator('#ai-btn-gen').click();
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.isVisionAgentDeveloperUiEnabled = true;
+    panel._dispatchGenerateRequest({
+      description: '新增一个缺陷检测流程',
+      userMessage: '新增一个缺陷检测流程',
+      explicitMode: 'new',
+      skipPlan: true,
+      skipPlanSource: 'developer_direct_build_debug',
+    });
+  });
 
   await page.waitForFunction(() =>
     ((window as any).__cvWebViewMessages || []).some((message: any) => message.messageType === 'GenerateFlow'));
@@ -453,8 +555,17 @@ test('AI panel uses WebView2 postMessage contract for generation turns', async (
   });
   await page.waitForFunction(() => Boolean((window as any).aiPanel && !(window as any).mockWebViewResponse));
 
-  await page.locator('#ai-input').fill('你好，帮我做缺陷检测');
-  await page.locator('#ai-btn-gen').click();
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.isVisionAgentDeveloperUiEnabled = true;
+    panel._dispatchGenerateRequest({
+      description: '你好，帮我做缺陷检测',
+      userMessage: '你好，帮我做缺陷检测',
+      explicitMode: 'auto',
+      skipPlan: true,
+      skipPlanSource: 'developer_direct_build_debug',
+    });
+  });
 
   await page.waitForFunction(() =>
     ((window as any).__cvWebViewMessages || []).some((message: any) => message.messageType === 'GenerateFlow'));
@@ -508,7 +619,7 @@ test('AI panel uses WebView2 postMessage contract for generation turns', async (
     });
   }, sent.payload.requestId);
 
-  await expect(page.locator('#ai-agent-runtime')).toContainText('待澄清');
-  await expect(page.locator('#ai-agent-runtime')).toContainText('阻断 1');
+  await expect(page.locator('#ai-clarification-plan-card')).toContainText('待澄清');
+  await expect(page.locator('#ai-clarification-plan-card')).toContainText('1 个阻断问题');
   await expect(page.locator('.ai-assistant-clarification-section').last()).toContainText('请补充检测对象是什么。');
 });

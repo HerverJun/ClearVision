@@ -83,6 +83,7 @@ export const aiPanelGenerateRequestMixin = {
         this.activeGenerateSessionId = this.sessionId;
         this.isCancellingGenerate = false;
         this.pendingManualRetry = null;
+        this.pendingClarificationPayload = null;
         this._renderManualRetryBanner();
         this._streamBuffer = { thinking: '', content: '' };
         this._streamFlushPending = false;

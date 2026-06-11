@@ -483,10 +483,17 @@ public class GenerateFlowMessageHandlerTests
                 FailureType = AiFlowGenerationResult.FailureTypeClarificationRequired,
                 ClarificationRequired = true,
                 ErrorMessage = "当前需求还需要澄清 1 项关键信息。",
+                TurnIntent = AiTurnIntents.NewFlow,
+                InteractionState = AiInteractionStates.Clarifying,
+                RouterConfidence = AiRouterConfidence.High,
+                BlockingClarificationFields = ["object_type"],
+                NonBlockingMissingFields = ["model_path"],
                 RequirementBrief = new AiRequirementBrief
                 {
                     ScenarioName = "缺陷检测",
                     ClarificationRequired = true,
+                    BlockingClarificationFields = ["object_type"],
+                    NonBlockingMissingFields = ["model_path"],
                     ClarificationQuestions =
                     [
                         new AiClarificationQuestion
@@ -494,7 +501,8 @@ public class GenerateFlowMessageHandlerTests
                             Field = "object_type",
                             Question = "请确认检测对象是什么？",
                             Required = true,
-                            Priority = "high"
+                            Priority = "high",
+                            Options = ["金属件", "包装箱"]
                         }
                     ]
                 }
@@ -507,8 +515,22 @@ public class GenerateFlowMessageHandlerTests
         root.GetProperty("success").GetBoolean().Should().BeFalse();
         root.GetProperty("status").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
         root.GetProperty("clarificationRequired").GetBoolean().Should().BeTrue();
+        root.GetProperty("turnIntent").GetString().Should().Be(AiTurnIntents.NewFlow);
+        root.GetProperty("interactionState").GetString().Should().Be(AiInteractionStates.Clarifying);
+        root.GetProperty("routerConfidence").GetString().Should().Be(AiRouterConfidence.High);
+        root.GetProperty("blockingClarificationFields").EnumerateArray()
+            .Select(item => item.GetString()).Should().Contain("object_type");
+        root.GetProperty("nonBlockingMissingFields").EnumerateArray()
+            .Select(item => item.GetString()).Should().Contain("model_path");
         root.GetProperty("requirementBrief").GetProperty("scenarioName").GetString().Should().Be("缺陷检测");
         root.GetProperty("requirementBrief").GetProperty("clarificationQuestions").GetArrayLength().Should().Be(1);
+        root.GetProperty("requirementBrief").GetProperty("blockingClarificationFields").EnumerateArray()
+            .Select(item => item.GetString()).Should().Contain("object_type");
+        root.GetProperty("requirementBrief").GetProperty("nonBlockingMissingFields").EnumerateArray()
+            .Select(item => item.GetString()).Should().Contain("model_path");
+        root.GetProperty("requirementBrief").GetProperty("clarificationQuestions")[0]
+            .GetProperty("options").EnumerateArray()
+            .Select(item => item.GetString()).Should().Contain("金属件").And.Contain("包装箱");
     }
 
     [Fact(DisplayName = "GenerateFlowMessageHandler should serialize cancelled completion status")]

@@ -109,6 +109,7 @@ export class AiPanel {
         this.directBuildDebugNextRequest = false;
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
         this.pendingVisionPlan = null;
+        this.pendingClarificationPayload = null;
         this.planQuestionSelections = {};
 
         // 应用预览与撤销
@@ -203,6 +204,7 @@ export class AiPanel {
         this._resetCurrentResultSyncState();
         this.pendingParameterFilePickContext = null;
         this.pendingManualRetry = null;
+        this.pendingClarificationPayload = null;
         this.appliedCanvasBaselineFlow = null;
         this.canvasManualEditRecords = [];
         this.canvasManualEditSignature = '';
@@ -821,17 +823,27 @@ export class AiPanel {
             return;
         }
 
-        this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
+        if (isClarification) {
+            this.pendingClarificationPayload = payload;
+            this.pendingVisionPlan = null;
+            this.planQuestionSelections = {};
+            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
+        } else {
+            this.pendingClarificationPayload = null;
+            this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
+        }
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun();
-        this._renderRequirementBrief(payload);
+        if (!isClarification) {
+            this._renderRequirementBrief(payload);
+        }
 
         if (!payload.success) {
             this._clearActiveRequestState();
             if (isClarification) {
                 this.pendingManualRetry = null;
-                this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
                 this._renderManualRetryBanner();
                 this._setAssistantTurnStatus(activeTurn, '待澄清', 'warning');
                 this._setAssistantSectionText(
@@ -1716,7 +1728,7 @@ export class AiPanel {
         this.container.querySelectorAll('[data-brief-action]').forEach(btnEl => {
             btnEl.disabled = busy;
         });
-        this.container.querySelectorAll('.ai-plan-action, .ai-plan-option, #ai-btn-start-build-inline').forEach(btnEl => {
+        this.container.querySelectorAll('.ai-plan-action, .ai-plan-option, .ai-clarification-option, #ai-btn-start-build-inline').forEach(btnEl => {
             btnEl.disabled = busy;
         });
         this.container.querySelectorAll('.ai-followup-action').forEach(btnEl => {
@@ -2068,6 +2080,7 @@ export class AiPanel {
         if (promptTraceCard) promptTraceCard.hidden = true;
         if (promptTrace) promptTrace.innerHTML = '';
         this._resetClarificationSelectionDraft();
+        this.pendingClarificationPayload = null;
         this._renderAgentRuntime(null, { reset: true });
         this._setResultStatusNote('', '');
         this._streamBuffer = { thinking: '', content: '' };
