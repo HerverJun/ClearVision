@@ -27,6 +27,8 @@ public sealed class VisionAgentRequirementMaturityGateTests
 
         result.Maturity.Should().Be(item.ExpectedMaturity, item.Id);
         result.TaskType.Should().Be(item.ExpectedTaskType, item.Id);
+        var expectedCanPlan = item.ExpectedCanPlan ?? item.ExpectedCanBuild;
+        result.CanPlan.Should().Be(expectedCanPlan, item.Id);
         result.CanBuild.Should().Be(item.ExpectedCanBuild, item.Id);
         VisionAgentRequirementMaturityGate.ToRouterIntent(result).Should().Be(item.ExpectedIntent, item.Id);
         if (item.ExpectedMissingFields.Count > 0)
@@ -37,6 +39,138 @@ public sealed class VisionAgentRequirementMaturityGateTests
         {
             result.MissingFields.Should().BeEmpty(item.Id);
         }
+    }
+
+    [Fact(DisplayName = "Unknown explicit object and target should allow Plan but block Build")]
+    public async Task ExplicitUnknownObjectAndTarget_ShouldPlanWithoutAskingKnownSlots()
+    {
+        const string prompt = "检测目标是外星人，识别内容是额头上的第三只竖眼";
+
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(new VisionAgentRequirementMaturityRequest
+        {
+            Description = prompt
+        });
+
+        maturity.ObjectSignals.Should().Contain("外星人");
+        maturity.TaskSignals.Should().Contain("额头上的第三只竖眼");
+        maturity.CanPlan.Should().BeTrue();
+        maturity.CanBuild.Should().BeFalse();
+        maturity.MissingFields.Should().NotContain("inspection_object");
+        maturity.MissingFields.Should().NotContain("task_type");
+        maturity.MissingFields.Should().Contain(["image_source", "acceptance_criteria", "model_or_rule_strategy"]);
+
+        var orchestrator = CreateOrchestrator(Substitute.For<IAiFlowGenerationService>());
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = prompt,
+                OriginalUserPrompt = prompt
+            },
+            CancellationToken.None);
+
+        plan.RequirementMaturity.Should().NotBeNull();
+        plan.RequirementMaturity!.CanPlan.Should().BeTrue();
+        plan.CanBuild.Should().BeFalse();
+        plan.Intent.Should().NotBe(AiRequirementMaturity.Ambiguous);
+        plan.RecommendedRoute.Operators.Should().NotBeEmpty();
+        plan.ClarificationQuestions.Select(question => question.Id)
+            .Should()
+            .Contain(["image_source", "acceptance_criteria", "model_or_rule_strategy"]);
+        plan.ClarificationQuestions.Select(question => question.Id)
+            .Should()
+            .NotContain(["inspection_object", "task_type"]);
+    }
+
+    [Fact(DisplayName = "Abstract ambition should stay non-plannable and enter decomposition")]
+    public async Task AbstractAmbition_ShouldRemainNonPlannable()
+    {
+        const string prompt = "我想构建一个真正有野心的终极视觉检测方案";
+
+        var result = VisionAgentRequirementMaturityGate.Evaluate(new VisionAgentRequirementMaturityRequest
+        {
+            Description = prompt
+        });
+
+        result.CanPlan.Should().BeFalse();
+        result.CanBuild.Should().BeFalse();
+        result.Maturity.Should().Be(AiRequirementMaturity.AbstractGoal);
+
+        var orchestrator = CreateOrchestrator(Substitute.For<IAiFlowGenerationService>());
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = prompt,
+                OriginalUserPrompt = prompt
+            },
+            CancellationToken.None);
+
+        plan.RequirementMaturity.Should().NotBeNull();
+        plan.RequirementMaturity!.CanPlan.Should().BeFalse();
+        plan.RecommendedRoute.RouteId.Should().Be("requirement_decomposition");
+        plan.RecommendedRoute.Operators.Should().BeEmpty();
+    }
+
+    [Theory(DisplayName = "Concrete known prompts should be plannable with expected task type")]
+    [InlineData("检测包装箱胶带是否贴歪", AiVisionTaskTypes.SurfaceOrPoseDefect)]
+    [InlineData("测量两个圆形孔位的圆心距离", AiVisionTaskTypes.GeometryMeasurement)]
+    public void ConcreteKnownPrompt_ShouldBePlannable(string prompt, string expectedTaskType)
+    {
+        var result = VisionAgentRequirementMaturityGate.Evaluate(new VisionAgentRequirementMaturityRequest
+        {
+            Description = prompt
+        });
+
+        result.CanPlan.Should().BeTrue();
+        result.TaskType.Should().Be(expectedTaskType);
+    }
+
+    [Theory(DisplayName = "Explicit object target sentence patterns should create known slots")]
+    [InlineData("检测外星人上的第三只竖眼", "外星人", "第三只竖眼")]
+    [InlineData("判断异形水晶是否存在", "异形水晶", "是否存在")]
+    public void ExplicitObjectTargetPatterns_ShouldCreateKnownSlots(
+        string prompt,
+        string expectedObject,
+        string expectedTarget)
+    {
+        var result = VisionAgentRequirementMaturityGate.Evaluate(new VisionAgentRequirementMaturityRequest
+        {
+            Description = prompt
+        });
+
+        result.CanPlan.Should().BeTrue();
+        result.CanBuild.Should().BeFalse();
+        result.ObjectSignals.Should().Contain(expectedObject);
+        result.TaskSignals.Should().Contain(expectedTarget);
+        result.MissingFields.Should().NotContain("inspection_object");
+        result.MissingFields.Should().NotContain("task_type");
+    }
+
+    [Fact(DisplayName = "Rule fallback router should open Plan for unknown explicit slots")]
+    public async Task RuleFallbackRouter_ShouldOpenPlanForUnknownExplicitSlots()
+    {
+        var service = new VisionAgentIntentRouterService(
+            new DelegateIntentCompletionSource((_, _) => throw new InvalidOperationException("router unavailable")),
+            Microsoft.Extensions.Options.Options.Create(new VisionAgentIntentRouterOptions { Enabled = true }),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<VisionAgentIntentRouterService>.Instance);
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "检测目标是外星人，识别内容是额头上的第三只竖眼"
+            },
+            CancellationToken.None);
+
+        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentActionableVisionPlan);
+        result.ShouldOpenPlan.Should().BeTrue();
+        result.ShouldBuildDirectly.Should().BeFalse();
+        result.CanBuild.Should().BeFalse();
+        result.NeedsClarification.Should().BeFalse();
+        result.RouterSource.Should().Be("rule_fallback");
+        result.PublicReason.Should().Contain("模型路由不可用，当前为规则降级解析");
+        result.RequirementMaturity.Should().NotBeNull();
+        result.RequirementMaturity!.CanPlan.Should().BeTrue();
+        result.RequirementMaturity.MissingFields.Should().NotContain("inspection_object");
+        result.RequirementMaturity.MissingFields.Should().NotContain("task_type");
     }
 
     [Fact(DisplayName = "Intent Router should downgrade over-confident abstract build intents")]
@@ -229,6 +363,7 @@ public sealed class VisionAgentRequirementMaturityGateTests
         public string ExpectedMaturity { get; init; } = string.Empty;
         public string ExpectedIntent { get; init; } = string.Empty;
         public string ExpectedTaskType { get; init; } = string.Empty;
+        public bool? ExpectedCanPlan { get; init; }
         public bool ExpectedCanBuild { get; init; }
         public List<string> ExpectedMissingFields { get; init; } = new();
     }

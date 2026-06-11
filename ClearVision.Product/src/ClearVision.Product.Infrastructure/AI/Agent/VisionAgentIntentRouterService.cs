@@ -228,7 +228,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             ShouldBuildDirectly = shouldBuildDirectly,
             CanBuild = canBuild,
             NeedsClarification = needsClarification,
-            PublicReason = SafeText(intent == IntentAmbiguousVisionRequirement && !maturity.CanBuild
+            PublicReason = SafeText(intent == IntentAmbiguousVisionRequirement && !maturity.CanPlan
                 ? maturity.PublicReason
                 : string.IsNullOrWhiteSpace(candidate.PublicReason)
                 ? DefaultReason(intent)
@@ -263,7 +263,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         var isConfirmed = intent == IntentBuildFromConfirmedPlan;
         var isDirectDebug = intent == IntentDirectBuildDebug;
         var isAmbiguous = intent == IntentAmbiguousVisionRequirement;
-        var questions = isAmbiguous ? DefaultClarificationQuestions() : [];
+        var questions = isAmbiguous ? MaturityClarificationQuestions(maturity) : [];
         var canBuild = isActionable || isModify || isConfirmed || isDirectDebug;
         var shouldOpenPlan = isActionable;
         var shouldBuildDirectly = isModify || isConfirmed || isDirectDebug;
@@ -293,7 +293,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             NeedsClarification = needsClarification,
             PublicReason = reason == "router_unauthorized"
                 ? UnauthorizedReason(intent)
-                : string.IsNullOrWhiteSpace(maturity.PublicReason) ? DefaultReason(intent) : maturity.PublicReason,
+                : RuleFallbackReason(reason, maturity, intent),
             AssistantReply = DefaultReply(intent, request),
             ClarificationQuestions = questions,
             FallbackAllowed = true,
@@ -409,7 +409,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             return;
         }
 
-        if (!maturity.CanBuild)
+        if (!maturity.CanPlan)
         {
             intent = IntentAmbiguousVisionRequirement;
             confidence = confidence == "high" ? "medium" : confidence;
@@ -417,7 +417,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             shouldOpenPlan = false;
             shouldBuildDirectly = false;
             needsClarification = true;
-            questions = questions.Count == 0 ? DefaultClarificationQuestions() : questions;
+            questions = questions.Count == 0 ? MaturityClarificationQuestions(maturity) : questions;
             fallbackReason = AppendFallbackReason(fallbackReason, "maturity_gate_blocked");
             return;
         }
@@ -430,11 +430,16 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
 
         if (intent == IntentActionableVisionPlan)
         {
-            canBuild = true;
+            canBuild = maturity.CanBuild;
             shouldOpenPlan = true;
             shouldBuildDirectly = false;
             needsClarification = false;
             questions = [];
+            if (!maturity.CanBuild)
+            {
+                confidence = "low";
+                fallbackReason = AppendFallbackReason(fallbackReason, "planning_allowed_build_blocked");
+            }
         }
     }
 
@@ -590,6 +595,27 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         ];
     }
 
+    private static List<string> MaturityClarificationQuestions(AiRequirementMaturityResult maturity)
+    {
+        var fields = maturity.MissingFields.Count > 0
+            ? maturity.MissingFields
+            : ["inspection_object", "task_type", "image_source", "acceptance_criteria"];
+        return fields
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(field => field switch
+            {
+                "inspection_object" => "请补充检测目标或产品对象。",
+                "task_type" => "请说明要判断的缺陷、测量项或识别内容。",
+                "image_source" => "请说明输入来源是相机、文件还是仅先做元数据草稿。",
+                "acceptance_criteria" => "请说明 OK/NG 判定规则或输出目标。",
+                "model_or_rule_strategy" => "请说明倾向使用规则、传统算法、模板还是模型策略。",
+                "output_target" => "请说明输出目标或验收结果字段。",
+                _ => $"请补充 {field}。"
+            })
+            .Take(5)
+            .ToList();
+    }
+
     private static string DefaultReason(string intent)
     {
         return intent switch
@@ -612,6 +638,19 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             IntentActionableVisionPlan => "模型路由鉴权失败，明显视觉需求将进入规则兜底规划。",
             _ => "模型路由鉴权失败，需求信息不足，暂不可构建。"
         };
+    }
+
+    private static string RuleFallbackReason(
+        string reason,
+        AiRequirementMaturityResult maturity,
+        string intent)
+    {
+        var baseReason = string.IsNullOrWhiteSpace(maturity.PublicReason)
+            ? DefaultReason(intent)
+            : maturity.PublicReason;
+        return reason.StartsWith("router_", StringComparison.OrdinalIgnoreCase)
+            ? $"模型路由不可用，当前为规则降级解析。{baseReason}"
+            : baseReason;
     }
 
     private static string ResolveAssistantReply(

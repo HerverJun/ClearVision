@@ -66,7 +66,7 @@ public sealed class VisionAgentIntentRouterTests
         result.PublicReason.Should().Contain("普通寒暄");
     }
 
-    [Fact(DisplayName = "Intent Router should classify ambiguous vision input as not buildable")]
+    [Fact(DisplayName = "Intent Router should promote slot-known ambiguous input to Plan without Build")]
     public async Task RouteAsync_ShouldKeepAmbiguousVisionRequirementNotBuildable()
     {
         var service = CreateService(_ => Json(new
@@ -92,15 +92,17 @@ public sealed class VisionAgentIntentRouterTests
             new VisionAgentIntentRouterRequest { Description = "包装箱" },
             CancellationToken.None);
 
-        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentAmbiguousVisionRequirement);
-        result.ShouldOpenPlan.Should().BeFalse();
+        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentActionableVisionPlan);
+        result.ShouldOpenPlan.Should().BeTrue();
         result.ShouldBuildDirectly.Should().BeFalse();
         result.CanBuild.Should().BeFalse();
-        result.NeedsClarification.Should().BeTrue();
-        result.ClarificationQuestions.Should().Contain(question => question.Contains("OK/NG", StringComparison.Ordinal));
+        result.NeedsClarification.Should().BeFalse();
+        result.ClarificationQuestions.Should().BeEmpty();
+        result.RequirementMaturity.Should().NotBeNull();
+        result.RequirementMaturity!.CanPlan.Should().BeTrue();
     }
 
-    [Fact(DisplayName = "Intent Router should polish ambiguous diagnostic reply into user clarification")]
+    [Fact(DisplayName = "Intent Router should polish slot-known ambiguous diagnostic reply into Plan reply")]
     public async Task RouteAsync_ShouldPolishDiagnosticAssistantReplyForAmbiguousVision()
     {
         var service = CreateService(_ => Json(new
@@ -121,7 +123,9 @@ public sealed class VisionAgentIntentRouterTests
             new VisionAgentIntentRouterRequest { Description = "包装箱" },
             CancellationToken.None);
 
-        result.AssistantReply.Should().Contain("你想检测包装箱的哪一类问题");
+        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentActionableVisionPlan);
+        result.ShouldOpenPlan.Should().BeTrue();
+        result.AssistantReply.Should().Be("我先帮你整理规划方案。");
         result.AssistantReply.Should().NotContain("需求信息不足");
         result.AssistantReply.Should().NotContain("暂不可构建");
         result.CanBuild.Should().BeFalse();

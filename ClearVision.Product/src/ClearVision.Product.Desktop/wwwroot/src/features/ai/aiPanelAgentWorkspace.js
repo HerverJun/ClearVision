@@ -588,8 +588,11 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _handleIntentRouterResult(result, context) {
         const route = this._normalizeIntentRouterResult(result);
+        const isRuleFallback = /rule_fallback/i.test(String(route.routerSource || ''));
         const tone = route.needsClarification ? 'warning' : 'streaming';
-        const visibleStatus = route.needsClarification || route.intent === 'ambiguous_vision_requirement'
+        const visibleStatus = isRuleFallback
+            ? '规则降级解析'
+            : route.needsClarification || route.intent === 'ambiguous_vision_requirement'
             ? '需要补充信息'
             : '已理解请求';
         this._setAssistantTurnStatus(context.turn, visibleStatus, tone);
@@ -599,7 +602,9 @@ export const aiPanelAgentWorkspaceMixin = {
             'intent-router-result',
             visibleStatus,
             'completed',
-            route.publicReason);
+            isRuleFallback
+                ? (route.publicReason || '模型路由不可用，当前为规则降级解析。')
+                : route.publicReason);
 
         if (route.shouldOpenPlan || route.intent === 'actionable_vision_plan') {
             return this._enterPlanModeFromPrompt({
@@ -694,11 +699,13 @@ export const aiPanelAgentWorkspaceMixin = {
             }))
             .filter(question => question.question || question.options.length > 0)
             .slice(0, 5);
+        const requirementMaturity = this._normalizeRequirementMaturity(item.requirementMaturity || item.RequirementMaturity);
         return {
             intent,
             confidence: String(item.confidence || item.Confidence || 'low').trim() || 'low',
             shouldOpenPlan: Boolean(item.shouldOpenPlan ?? item.ShouldOpenPlan),
             shouldBuildDirectly: Boolean(item.shouldBuildDirectly ?? item.ShouldBuildDirectly),
+            canPlan: (item.canPlan ?? item.CanPlan ?? requirementMaturity?.canPlan) === true,
             canBuild: Boolean(item.canBuild ?? item.CanBuild),
             needsClarification: Boolean(item.needsClarification ?? item.NeedsClarification),
             publicReason: normalizeDisplayText(item.publicReason || item.PublicReason || ''),
@@ -706,7 +713,7 @@ export const aiPanelAgentWorkspaceMixin = {
             clarificationQuestions: questions,
             fallbackReason: item.fallbackReason || item.FallbackReason || '',
             routerSource: item.routerSource || item.RouterSource || '',
-            requirementMaturity: this._normalizeRequirementMaturity(item.requirementMaturity || item.RequirementMaturity),
+            requirementMaturity,
             decisionTrace: this._normalizeDecisionTrace(item.decisionTrace || item.DecisionTrace)
         };
     },
@@ -832,6 +839,26 @@ export const aiPanelAgentWorkspaceMixin = {
         const raw = String(description || '').trim();
         const lower = raw.toLowerCase();
         const collect = terms => terms.filter(term => lower.includes(String(term).toLowerCase()));
+        const explicitObject = [];
+        const explicitTarget = [];
+        raw.replace(/检测(?:目标|对象)\s*(?:是|为|:|：)\s*([^，。；;,.!?！？]+)/g, (_, value) => {
+            explicitObject.push(String(value || '').trim());
+            return '';
+        });
+        raw.replace(/识别内容\s*(?:是|为|:|：)\s*([^，。；;,.!?！？]+)/g, (_, value) => {
+            explicitTarget.push(String(value || '').trim());
+            return '';
+        });
+        raw.replace(/检测\s*([^，。；;,.!?！？]+?)上的([^，。；;,.!?！？]+)/g, (_, objectValue, targetValue) => {
+            explicitObject.push(String(objectValue || '').trim());
+            explicitTarget.push(String(targetValue || '').trim());
+            return '';
+        });
+        raw.replace(/判断\s*([^，。；;,.!?！？]+?)是否存在/g, (_, objectValue) => {
+            explicitObject.push(String(objectValue || '').trim());
+            explicitTarget.push('是否存在');
+            return '';
+        });
         const objectTerms = ['包装箱', '纸箱', '箱体', '胶带', '金属件', '金属表面', '端子', '线束', '连接器', '标签', '二维码', '条码', '圆孔', '孔位', '遥控器', '按键', '面板', '产品', '零件', 'carton', 'package', 'tape', 'metal', 'surface', 'terminal', 'wire', 'harness', 'connector', 'label', 'qr', 'barcode', 'hole', 'button', 'part', 'product'];
         const abstractTerms = ['终极', '有野心', '高级', '完整方案', '智能方案', '视觉检测方案', '检测方案', '真正', '最佳', '全套', '整体方案', '系统方案', '解决方案', 'ultimate', 'ambitious', 'advanced solution', 'complete solution', 'full solution'];
         const taskGroups = [
@@ -843,45 +870,71 @@ export const aiPanelAgentWorkspaceMixin = {
             ['template_location', ['定位', '对位', '找正', '模板', '匹配', '位姿', 'locate', 'position', 'align', 'template', 'matching', 'pose']],
             ['surface_or_pose_defect', ['缺陷', '外观', '划痕', '刮伤', '裂纹', '破损', '凹坑', '压痕', '脏污', '污渍', '贴正', '贴歪', '贴附', '胶带', '偏斜', 'surface', 'defect', 'scratch', 'crack', 'damage', 'dent', 'stain', 'tape']]
         ];
-        const objectSignals = collect(objectTerms).slice(0, 12);
+        const knownObjectSignals = collect(objectTerms).slice(0, 12);
+        const objectSignals = [...new Set([...knownObjectSignals, ...explicitObject.filter(Boolean)])].slice(0, 12);
         const matchedTask = taskGroups
             .map(([taskType, terms]) => ({ taskType, signals: collect(terms).slice(0, 12) }))
-            .find(item => item.signals.length > 0) || { taskType: 'unknown', signals: [] };
+            .find(item => item.signals.length > 0) || {
+                taskType: explicitTarget.length > 0 ? 'classification' : 'unknown',
+                signals: []
+            };
+        const taskSignals = [...new Set([...(matchedTask.signals || []), ...explicitTarget.filter(Boolean)])].slice(0, 12);
         const hasAbstractGoal = collect(abstractTerms).length > 0;
         const hasTask = matchedTask.taskType !== 'unknown';
         const hasObject = objectSignals.length > 0;
-        if (hasAbstractGoal && (!hasTask || !hasObject)) {
+        const canPlan = hasTask || hasObject;
+        if (hasAbstractGoal && !canPlan) {
             return {
                 maturity: 'abstract_goal',
                 taskType: 'abstract_goal',
+                canPlan: false,
                 canBuild: false,
                 objectSignals,
-                taskSignals: matchedTask.signals,
+                taskSignals,
                 missingFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
                 blockingReasons: ['abstract_goal_needs_decomposition', !hasTask ? 'task_type_missing' : '', !hasObject ? 'inspection_object_missing' : ''].filter(Boolean),
                 publicReason: '这是方案愿景，不是可直接构建的检测流程。'
             };
         }
 
-        if (!hasTask || !hasObject) {
+        if (!canPlan) {
+            return {
+                maturity: 'ambiguous',
+                taskType: 'unknown',
+                canPlan: false,
+                canBuild: false,
+                objectSignals,
+                taskSignals,
+                missingFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+                blockingReasons: ['inspection_object_missing', 'task_type_missing'],
+                publicReason: '需求仍缺少检测对象或任务类型，暂不能构建。'
+            };
+        }
+
+        const hasKnownObject = knownObjectSignals.length > 0;
+        const hasKnownTask = (matchedTask.signals || []).length > 0;
+        const canBuild = hasObject && hasTask && hasKnownObject && hasKnownTask;
+        if (!canBuild) {
             return {
                 maturity: 'ambiguous',
                 taskType: hasTask ? matchedTask.taskType : 'unknown',
+                canPlan: true,
                 canBuild: false,
                 objectSignals,
-                taskSignals: matchedTask.signals,
-                missingFields: [!hasObject ? 'inspection_object' : '', !hasTask ? 'task_type' : '', 'image_source', 'acceptance_criteria'].filter(Boolean),
-                blockingReasons: [!hasObject ? 'inspection_object_missing' : '', !hasTask ? 'task_type_missing' : ''].filter(Boolean),
-                publicReason: '需求仍缺少检测对象或任务类型，暂不能构建。'
+                taskSignals,
+                missingFields: [!hasObject ? 'inspection_object' : '', !hasTask ? 'task_type' : '', 'image_source', 'acceptance_criteria', 'model_or_rule_strategy'].filter(Boolean),
+                blockingReasons: [!hasObject ? 'inspection_object_missing' : '', !hasTask ? 'task_type_missing' : '', 'model_or_rule_strategy_missing'].filter(Boolean),
+                publicReason: '需求已足够进入规划，但构建前仍需补充图像来源、判定标准或实现策略。'
             };
         }
 
         return {
             maturity: 'actionable',
             taskType: matchedTask.taskType,
+            canPlan: true,
             canBuild: true,
             objectSignals,
-            taskSignals: matchedTask.signals,
+            taskSignals,
             missingFields: ['image_source', 'acceptance_criteria'],
             blockingReasons: [],
             publicReason: '需求已明确到可规划视觉流程。'
@@ -897,7 +950,7 @@ export const aiPanelAgentWorkspaceMixin = {
             normalized === 'help' ||
             normalized === '帮助';
         const maturity = this._assessLocalRequirementMaturity(description);
-        const isActionable = maturity.canBuild === true;
+        const isActionable = maturity.canPlan === true;
         const ambiguousReply = /包装箱|纸箱|箱/.test(String(description || ''))
             ? '你想检测包装箱的哪一类问题？比如胶带贴歪、条码不可读、Logo 缺失、箱角破损，或外观污渍。'
             : '你想检测哪一类问题？请补充检测目标、缺陷类型、输入来源，以及 OK/NG 判定规则。';
@@ -913,6 +966,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 ...maturity,
                 maturity: 'chat_or_help',
                 taskType: 'unknown',
+                canPlan: false,
                 canBuild: false,
                 missingFields: [],
                 blockingReasons: [],
@@ -921,13 +975,14 @@ export const aiPanelAgentWorkspaceMixin = {
             : maturity;
         return {
             intent,
-            confidence: isCasual || isHelp ? 'high' : 'medium',
+            confidence: isCasual || isHelp ? 'high' : (isActionable && maturity.canBuild !== true ? 'low' : 'medium'),
             shouldOpenPlan: intent === 'actionable_vision_plan',
             shouldBuildDirectly: false,
-            canBuild: intent === 'actionable_vision_plan',
+            canPlan: intent === 'actionable_vision_plan',
+            canBuild: intent === 'actionable_vision_plan' && routedMaturity.canBuild === true,
             needsClarification: intent === 'ambiguous_vision_requirement',
             publicReason: error
-                ? '模型路由不可用，已使用安全规则兜底。'
+                ? '模型路由不可用，当前为规则降级解析。'
                 : '已使用安全规则兜底判断请求类型。',
             assistantReply: intent === 'casual_chat'
                 ? '在的。你可以直接描述检测目标、缺陷类型、测量项或流程修改需求，我会先帮你规划方案。'
@@ -957,6 +1012,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 objectSignalsHit: routedMaturity.objectSignals || [],
                 maturityLevel: routedMaturity.maturity,
                 taskType: routedMaturity.taskType,
+                canPlan: routedMaturity.canPlan === true,
                 canBuild: routedMaturity.canBuild === true,
                 fallbackReason: error?.message || 'router_unavailable',
                 blockingReasons: routedMaturity.blockingReasons || [],
@@ -1601,6 +1657,8 @@ export const aiPanelAgentWorkspaceMixin = {
         const requirementMaturity = this._normalizeRequirementMaturity(plan.requirementMaturity || plan.RequirementMaturity);
         const decisionTrace = this._normalizeDecisionTrace(plan.decisionTrace || plan.DecisionTrace);
         const rawCanBuild = plan.canBuild ?? plan.CanBuild;
+        const rawCanPlan = plan.canPlan ?? plan.CanPlan;
+        const maturityCanPlan = requirementMaturity?.canPlan === true;
         const maturityCanBuild = requirementMaturity?.canBuild === true;
 
         return {
@@ -1621,6 +1679,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 .map(evt => this._normalizePlanPublicEvent(evt)),
             blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
             nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
+            canPlan: rawCanPlan === true || maturityCanPlan,
             executable: rawCanBuild === true && maturityCanBuild,
             blockingReasons: this._toArray(plan.blockingReasons || plan.BlockingReasons).map(item => this._localizeDisplayText(item)),
             understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
@@ -1664,6 +1723,7 @@ export const aiPanelAgentWorkspaceMixin = {
         return {
             maturity,
             taskType,
+            canPlan: (item.canPlan ?? item.CanPlan) === true,
             canBuild: (item.canBuild ?? item.CanBuild) === true,
             objectSignals: this._toArray(item.objectSignals || item.ObjectSignals).map(signal => String(signal || '').trim()).filter(Boolean),
             taskSignals: this._toArray(item.taskSignals || item.TaskSignals).map(signal => String(signal || '').trim()).filter(Boolean),
@@ -1687,6 +1747,7 @@ export const aiPanelAgentWorkspaceMixin = {
             objectSignalsHit: this._toArray(item.objectSignalsHit || item.ObjectSignalsHit).map(String),
             maturityLevel: String(item.maturityLevel || item.MaturityLevel || '').trim(),
             taskType: String(item.taskType || item.TaskType || '').trim(),
+            canPlan: (item.canPlan ?? item.CanPlan) === true,
             canBuild: (item.canBuild ?? item.CanBuild) === true,
             fallbackReason: String(item.fallbackReason || item.FallbackReason || '').trim(),
             blockingReasons: this._toArray(item.blockingReasons || item.BlockingReasons).map(String),
@@ -1973,6 +2034,9 @@ export const aiPanelAgentWorkspaceMixin = {
         const executable = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
             ? activeEvents.length > 0
             : Boolean(plan?.executable);
+        const canPlan = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
+            ? true
+            : Boolean(plan?.canPlan || plan?.requirementMaturity?.canPlan);
         const source = this._formatWorkspaceValue(plan?.planSource || (activeEvents.length ? '构建事件' : (planRunEvents.length ? '事件驱动' : '未设置')));
 
         el.innerHTML = `
@@ -1981,7 +2045,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <span class="ai-agent-overview-kicker">${this._escapeHtml(mode)}</span>
                     <strong>${this._escapeHtml(goal)}</strong>
                     <span>${this._escapeHtml(nextAction)}</span>
-                    <em>可构建：${executable ? '是' : '否'}</em>
+                    <em>可规划：${canPlan ? '是' : '否'} · 可构建：${executable ? '是' : '否'}</em>
                 </div>
                 <div class="ai-agent-overview-metrics">
                     ${showBuildExecutionPath
@@ -2492,6 +2556,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const maturity = plan?.requirementMaturity || null;
         const trace = plan?.decisionTrace || null;
         if (!maturity && !trace) return '';
+        const canPlan = plan?.canPlan === true || maturity?.canPlan === true || trace?.canPlan === true;
         const canBuild = plan?.executable === true;
         const missingFields = this._toArray(maturity?.missingFields)
             .map(field => this._formatRequirementFieldLabel(field))
@@ -2517,6 +2582,10 @@ export const aiPanelAgentWorkspaceMixin = {
                     <div class="ai-build-compact-row">
                         <b>任务类型</b>
                         <span>${this._escapeHtml(this._formatRequirementTaskTypeLabel(maturity?.taskType || trace?.taskType))}</span>
+                    </div>
+                    <div class="ai-build-compact-row">
+                        <b>Plan</b>
+                        <span>${canPlan ? '允许' : '阻断'}</span>
                     </div>
                     <div class="ai-build-compact-row">
                         <b>Build</b>

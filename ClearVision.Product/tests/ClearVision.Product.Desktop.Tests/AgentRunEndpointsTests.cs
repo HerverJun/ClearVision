@@ -117,7 +117,7 @@ public sealed class AgentRunEndpointsTests
         wire.GetProperty("clarificationQuestions").EnumerateArray()
             .Select(question => question.GetProperty("id").GetString())
             .Should()
-            .Contain("sequence_rule")
+            .Contain("inspection_object")
             .And.NotContain("defect_definition");
     }
 
@@ -397,7 +397,7 @@ public sealed class AgentRunEndpointsTests
 
         using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
         {
-            description = "Tool Loop experimental build",
+            description = "Detect scratches on a metal part with Tool Loop experimental build",
             useVisionAgentGenerateFlow = true,
             agentGenerateFlowMode = "tool_loop"
         });
@@ -1029,6 +1029,7 @@ public sealed class AgentRunEndpointsTests
             using var response = await Client.PostAsJsonAsync("/api/ai/agent-runs", new
             {
                 description,
+                additionalContext = "Detect scratches on a metal part.",
                 useVisionAgentGenerateFlow = true
             });
             response.EnsureSuccessStatusCode();

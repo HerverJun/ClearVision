@@ -497,6 +497,7 @@ function backendPlanResult(overrides = {}) {
     scenarioKey: 'scratch'
   };
   const canBuild = overrides.canBuild === true;
+  const canPlan = overrides.canPlan ?? canBuild;
   return {
     planId: overrides.planId || 'plan_backend_1',
     planHash: overrides.planHash || 'sha256:backend-plan-hash',
@@ -558,12 +559,14 @@ function backendPlanResult(overrides = {}) {
     risks: ['Thresholds need representative images.'],
     acceptanceCriteria: ['Workflow draft contains acquisition, inspection, judgment, and output stages.'],
     executablePlan: ['Map parameters and run readiness checks.'],
+    canPlan,
     canBuild,
     blockingReasons: [],
     nextAction: 'Accept recommended defaults, then start Build.',
     requirementMaturity: overrides.requirementMaturity ?? {
       maturity: canBuild ? 'actionable' : 'ambiguous',
       taskType: canBuild ? 'surface_or_pose_defect' : 'unknown',
+      canPlan,
       canBuild,
       objectSignals: canBuild ? ['metal', 'surface'] : [],
       taskSignals: canBuild ? ['scratch'] : [],
@@ -1642,6 +1645,29 @@ test('ambiguous Intent Router result asks clarification and cannot Build', async
   assert.doesNotMatch(collectProcessText(turn), /已识别为/);
 });
 
+test('local Intent Router fallback opens Plan for explicit unknown slots and reports degraded routing', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+
+  const route = panel._buildLocalIntentRouterFallback(
+    '检测目标是外星人，识别内容是额头上的第三只竖眼',
+    new Error('router unavailable')
+  );
+
+  assert.equal(route.intent, 'actionable_vision_plan');
+  assert.equal(route.shouldOpenPlan, true);
+  assert.equal(route.canPlan, true);
+  assert.equal(route.canBuild, false);
+  assert.equal(route.needsClarification, false);
+  assert.match(route.publicReason, /模型路由不可用，当前为规则降级解析/);
+  assert.equal(route.requirementMaturity.canPlan, true);
+  assert.equal(route.requirementMaturity.canBuild, false);
+  assert.deepEqual(route.requirementMaturity.objectSignals, ['外星人']);
+  assert.deepEqual(route.requirementMaturity.taskSignals, ['额头上的第三只竖眼']);
+  assert.ok(!route.requirementMaturity.missingFields.includes('inspection_object'));
+  assert.ok(!route.requirementMaturity.missingFields.includes('task_type'));
+});
+
 test('Plan Mode captures vague inspection request without starting Build', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -2189,6 +2215,46 @@ test('Backend Plan with canBuild true but missing RequirementMaturity remains no
   assert.match(overview.innerHTML, /可构建：否/);
   assert.equal(inlineBuildButton.disabled, true);
   assert.ok(planActionButtons.every(button => button.disabled));
+});
+
+test('Backend Plan can be plannable while Build remains disabled', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  const overview = createFakeElement();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': overview,
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-btn-start-build-inline': inlineBuildButton
+  });
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    goal: '检测目标是外星人，识别内容是额头上的第三只竖眼',
+    canPlan: true,
+    canBuild: false,
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'classification',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['外星人'],
+      taskSignals: ['额头上的第三只竖眼'],
+      missingFields: ['image_source', 'acceptance_criteria', 'model_or_rule_strategy'],
+      blockingReasons: ['model_or_rule_strategy_missing'],
+      publicReason: '需求已足够进入规划，但构建前仍需补充图像来源、判定标准或实现策略。'
+    }
+  }));
+
+  panel.pendingVisionPlan = plan;
+  panel._renderAgentWorkspaceOverview();
+  panel._updatePlanBuildActionState();
+
+  assert.equal(plan.canPlan, true);
+  assert.equal(plan.executable, false);
+  assert.match(overview.innerHTML, /可规划：是/);
+  assert.match(overview.innerHTML, /可构建：否/);
+  assert.equal(inlineBuildButton.disabled, true);
 });
 
 test('Backend Plan with explicit canBuild true and actionable maturity enables Build', async () => {

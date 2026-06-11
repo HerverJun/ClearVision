@@ -57,8 +57,9 @@
     "id": "ambiguous_product_detection",
     "input": "检测产品。",
     "expectedMaturity": "ambiguous",
-    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedIntent": "actionable_vision_plan",
     "expectedTaskType": "unknown",
+    "expectedCanPlan": true,
     "expectedCanBuild": false,
     "expectedMissingFields": ["task_type"]
   },
@@ -93,8 +94,9 @@
     "id": "ambiguous_defect_without_object",
     "input": "检测外观缺陷。",
     "expectedMaturity": "ambiguous",
-    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedIntent": "actionable_vision_plan",
     "expectedTaskType": "surface_or_pose_defect",
+    "expectedCanPlan": true,
     "expectedCanBuild": false,
     "expectedMissingFields": ["inspection_object"]
   },
@@ -102,8 +104,9 @@
     "id": "ambiguous_measure_without_object",
     "input": "测量尺寸和角度。",
     "expectedMaturity": "ambiguous",
-    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedIntent": "actionable_vision_plan",
     "expectedTaskType": "geometry_measurement",
+    "expectedCanPlan": true,
     "expectedCanBuild": false,
     "expectedMissingFields": ["inspection_object"]
   },
@@ -439,8 +442,9 @@
     "id": "ambiguous_new_flow_without_object",
     "input": "创建一个测量流程。",
     "expectedMaturity": "ambiguous",
-    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedIntent": "actionable_vision_plan",
     "expectedTaskType": "geometry_measurement",
+    "expectedCanPlan": true,
     "expectedCanBuild": false,
     "expectedMissingFields": ["inspection_object"]
   },
@@ -448,8 +452,9 @@
     "id": "ambiguous_object_without_task",
     "input": "帮我处理包装箱图像。",
     "expectedMaturity": "ambiguous",
-    "expectedIntent": "ambiguous_vision_requirement",
+    "expectedIntent": "actionable_vision_plan",
     "expectedTaskType": "unknown",
+    "expectedCanPlan": true,
     "expectedCanBuild": false,
     "expectedMissingFields": ["task_type"]
   }

@@ -265,7 +265,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             Risks = SanitizeList(risks, redactionNotes),
             AcceptanceCriteria = SanitizeList(acceptance, redactionNotes),
             ExecutablePlan = SanitizeList(executablePlan, redactionNotes),
-            CanBuild = candidate.CanBuild && !string.IsNullOrWhiteSpace(request.Description),
+            CanBuild = candidate.CanBuild && baseline.CanBuild && !string.IsNullOrWhiteSpace(request.Description),
             BlockingReasons = SanitizeList(blockingReasons, redactionNotes),
             NextAction = SafeText(
                 string.IsNullOrWhiteSpace(candidate.NextAction) ? baseline.NextAction : candidate.NextAction,
@@ -288,7 +288,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             TemplateSelection = baseline.TemplateSelection
         };
         var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest);
-        if (!maturity.CanBuild || baseline.CanBuild == false)
+        if (!maturity.CanPlan)
         {
             result = result with
             {
@@ -310,8 +310,15 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
         }
         else
         {
+            var canBuild = result.CanBuild && maturity.CanBuild;
             result = result with
             {
+                CanBuild = canBuild,
+                BlockingReasons = canBuild
+                    ? result.BlockingReasons
+                    : maturity.BlockingReasons.Count > 0
+                        ? maturity.BlockingReasons.ToList()
+                        : baseline.BlockingReasons.ToList(),
                 RequirementMaturity = maturity,
                 DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
                     maturityRequest,
@@ -320,11 +327,15 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                     "planning",
                     string.Empty)
             };
+            if (!canBuild)
+            {
+                repairNotes.Add("maturity_gate_build_blocked");
+            }
         }
 
         if (!result.CanBuild && result.BlockingReasons.Count == 0)
         {
-            result.BlockingReasons.Add("inspection_goal_missing");
+            result.BlockingReasons.Add(maturity.CanPlan ? "build_requirement_missing" : "inspection_goal_missing");
             repairNotes.Add("blocking_reason_added");
         }
 

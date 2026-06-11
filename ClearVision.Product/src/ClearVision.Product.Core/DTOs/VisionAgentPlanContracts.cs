@@ -27,6 +27,7 @@ public sealed record AiRequirementMaturityResult
 {
     public string Maturity { get; init; } = AiRequirementMaturity.Ambiguous;
     public string TaskType { get; init; } = AiVisionTaskTypes.Unknown;
+    public bool CanPlan { get; init; }
     public bool CanBuild { get; init; }
     public List<string> ObjectSignals { get; init; } = [];
     public List<string> TaskSignals { get; init; } = [];
@@ -47,6 +48,7 @@ public sealed record AiDecisionTrace
     public List<string> ObjectSignalsHit { get; init; } = [];
     public string MaturityLevel { get; init; } = AiRequirementMaturity.Ambiguous;
     public string TaskType { get; init; } = AiVisionTaskTypes.Unknown;
+    public bool CanPlan { get; init; }
     public bool CanBuild { get; init; }
     public string FallbackReason { get; init; } = string.Empty;
     public List<string> BlockingReasons { get; init; } = [];

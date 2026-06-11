@@ -14,6 +14,11 @@ public sealed record VisionAgentRequirementMaturityRequest
     public AiTemplateSelectionInfo? TemplateSelection { get; init; }
 }
 
+internal sealed record VisionAgentRequirementSemanticSlots(
+    List<string> ObjectSignals,
+    List<string> TaskSignals,
+    string? TaskTypeHint);
+
 public static class VisionAgentRequirementMaturityGate
 {
     private static readonly string[] BusinessSignals =
@@ -98,12 +103,35 @@ public static class VisionAgentRequirementMaturityGate
         "相机", "图片", "图像", "照片", "视频", "文件", "采集", "camera", "image", "photo", "video", "file"
     ];
 
+    private static readonly string[] StrategySignals =
+    [
+        "规则", "模型", "深度学习", "传统算法", "模板", "阈值", "AI", "rule", "model", "deep learning", "template", "threshold"
+    ];
+
     public static AiRequirementMaturityResult Evaluate(VisionAgentRequirementMaturityRequest request)
     {
         var text = NormalizeText(request.Description, request.AdditionalContext);
         var businessHits = HitTerms(text, BusinessSignals);
         var taskHits = HitTaskTerms(text, out var taskType);
         var objectHits = HitTerms(text, ObjectSignals);
+        var semanticSlots = ExtractSemanticSlots(text);
+        var knownObjectSignals = objectHits.ToList();
+        objectHits = objectHits
+            .Concat(semanticSlots.ObjectSignals)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(16)
+            .ToList();
+        var knownTaskSignals = taskHits.ToList();
+        taskHits = taskHits
+            .Concat(semanticSlots.TaskSignals)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(16)
+            .ToList();
+        if (taskType == AiVisionTaskTypes.Unknown &&
+            !string.IsNullOrWhiteSpace(semanticSlots.TaskTypeHint))
+        {
+            taskType = semanticSlots.TaskTypeHint!;
+        }
         var missingFields = new List<string>();
         var blockingReasons = new List<string>();
 
@@ -112,6 +140,7 @@ public static class VisionAgentRequirementMaturityGate
             return Result(
                 AiRequirementMaturity.Ambiguous,
                 AiVisionTaskTypes.Unknown,
+                canPlan: false,
                 canBuild: false,
                 objectHits,
                 taskHits,
@@ -125,6 +154,7 @@ public static class VisionAgentRequirementMaturityGate
             return Result(
                 AiRequirementMaturity.ChatOrHelp,
                 AiVisionTaskTypes.Unknown,
+                canPlan: false,
                 canBuild: false,
                 objectHits,
                 taskHits,
@@ -138,6 +168,7 @@ public static class VisionAgentRequirementMaturityGate
             return Result(
                 AiRequirementMaturity.ModifyExistingFlow,
                 taskType == AiVisionTaskTypes.Unknown ? AiVisionTaskTypes.AbstractGoal : taskType,
+                canPlan: true,
                 canBuild: true,
                 objectHits,
                 taskHits,
@@ -153,14 +184,16 @@ public static class VisionAgentRequirementMaturityGate
         var hasAbstractGoal = ContainsAny(text, AbstractGoalSignals);
         var hasTaskType = taskType != AiVisionTaskTypes.Unknown;
         var hasObject = objectHits.Count > 0;
+        var canPlan = hasObject || hasTaskType || request.TemplateSelection != null;
 
-        if (hasAbstractGoal && (!hasTaskType || !hasObject))
+        if (hasAbstractGoal && !canPlan)
         {
             missingFields.AddRange(["inspection_object", "task_type", "image_source", "acceptance_criteria", "output_target"]);
             blockingReasons.AddRange(["abstract_goal_needs_decomposition", "task_type_missing", "inspection_object_missing"]);
             return Result(
                 AiRequirementMaturity.AbstractGoal,
                 AiVisionTaskTypes.AbstractGoal,
+                canPlan: false,
                 canBuild: false,
                 objectHits,
                 taskHits,
@@ -174,6 +207,7 @@ public static class VisionAgentRequirementMaturityGate
             return Result(
                 AiRequirementMaturity.ChatOrHelp,
                 AiVisionTaskTypes.Unknown,
+                canPlan: false,
                 canBuild: false,
                 objectHits,
                 taskHits,
@@ -182,29 +216,14 @@ public static class VisionAgentRequirementMaturityGate
                 "输入未形成视觉工程需求。");
         }
 
-        if (!hasTaskType || !hasObject)
+        if (!canPlan)
         {
-            if (!hasObject)
-            {
-                missingFields.Add("inspection_object");
-                blockingReasons.Add("inspection_object_missing");
-            }
-
-            if (!hasTaskType)
-            {
-                missingFields.Add("task_type");
-                blockingReasons.Add("task_type_missing");
-            }
-
-            if (!ContainsAny(text, ImageSourceSignals))
-            {
-                missingFields.Add("image_source");
-            }
-
-            missingFields.Add("acceptance_criteria");
+            missingFields.AddRange(["inspection_object", "task_type", "image_source", "acceptance_criteria"]);
+            blockingReasons.AddRange(["inspection_object_missing", "task_type_missing"]);
             return Result(
                 AiRequirementMaturity.Ambiguous,
-                hasTaskType ? taskType : AiVisionTaskTypes.Unknown,
+                AiVisionTaskTypes.Unknown,
+                canPlan: false,
                 canBuild: false,
                 objectHits,
                 taskHits,
@@ -213,9 +232,55 @@ public static class VisionAgentRequirementMaturityGate
                 "需求仍缺少检测对象或任务类型，暂不能构建。");
         }
 
+        if (!hasObject)
+        {
+            missingFields.Add("inspection_object");
+            blockingReasons.Add("inspection_object_missing");
+        }
+
+        if (!hasTaskType)
+        {
+            missingFields.Add("task_type");
+            blockingReasons.Add("task_type_missing");
+        }
+
+        if (!ContainsAny(text, ImageSourceSignals))
+        {
+            missingFields.Add("image_source");
+        }
+
+        if (!ContainsAny(text, ["OK", "NG", "判定", "标准", "阈值", "公差", "输出", "report", "tolerance", "criteria"]))
+        {
+            missingFields.Add("acceptance_criteria");
+        }
+
+        var hasKnownObject = knownObjectSignals.Count > 0 || request.TemplateSelection != null;
+        var hasKnownTask = knownTaskSignals.Count > 0;
+        var canBuild = hasObject && hasTaskType && hasKnownObject && hasKnownTask;
+        if (!canBuild && !ContainsAny(text, StrategySignals))
+        {
+            missingFields.Add("model_or_rule_strategy");
+            blockingReasons.Add("model_or_rule_strategy_missing");
+        }
+
+        if (!canBuild)
+        {
+            return Result(
+                AiRequirementMaturity.Ambiguous,
+                hasTaskType ? taskType : AiVisionTaskTypes.Unknown,
+                canPlan: true,
+                canBuild: false,
+                objectHits,
+                taskHits,
+                missingFields,
+                blockingReasons.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+                "需求已足够进入规划，但构建前仍需补充图像来源、判定标准或实现策略。");
+        }
+
         return Result(
             AiRequirementMaturity.Actionable,
             taskType,
+            canPlan: true,
             canBuild: true,
             objectHits,
             taskHits,
@@ -243,6 +308,7 @@ public static class VisionAgentRequirementMaturityGate
             ObjectSignalsHit = maturity.ObjectSignals,
             MaturityLevel = maturity.Maturity,
             TaskType = maturity.TaskType,
+            CanPlan = maturity.CanPlan,
             CanBuild = maturity.CanBuild,
             FallbackReason = fallbackReason,
             BlockingReasons = maturity.BlockingReasons
@@ -273,6 +339,7 @@ public static class VisionAgentRequirementMaturityGate
             AiRequirementMaturity.ChatOrHelp => VisionAgentIntentRouterService.IntentHelp,
             AiRequirementMaturity.ModifyExistingFlow => VisionAgentIntentRouterService.IntentModifyExistingFlow,
             AiRequirementMaturity.Actionable => VisionAgentIntentRouterService.IntentActionableVisionPlan,
+            _ when maturity.CanPlan => VisionAgentIntentRouterService.IntentActionableVisionPlan,
             _ => VisionAgentIntentRouterService.IntentAmbiguousVisionRequirement
         };
     }
@@ -280,6 +347,7 @@ public static class VisionAgentRequirementMaturityGate
     private static AiRequirementMaturityResult Result(
         string maturity,
         string taskType,
+        bool canPlan,
         bool canBuild,
         IReadOnlyList<string> objectSignals,
         IReadOnlyList<string> taskSignals,
@@ -291,6 +359,7 @@ public static class VisionAgentRequirementMaturityGate
         {
             Maturity = maturity,
             TaskType = taskType,
+            CanPlan = canPlan,
             CanBuild = canBuild,
             ObjectSignals = objectSignals.Distinct(StringComparer.OrdinalIgnoreCase).Take(12).ToList(),
             TaskSignals = taskSignals.Distinct(StringComparer.OrdinalIgnoreCase).Take(12).ToList(),
@@ -314,6 +383,60 @@ public static class VisionAgentRequirementMaturityGate
         }
 
         return missing;
+    }
+
+    private static VisionAgentRequirementSemanticSlots ExtractSemanticSlots(string text)
+    {
+        var objects = new List<string>();
+        var tasks = new List<string>();
+        string? taskTypeHint = null;
+
+        foreach (Match match in Regex.Matches(text, @"检测(?:目标|对象)\s*(?:是|为|:|：)\s*(?<value>[^，。；;,.!?！？]+)"))
+        {
+            AddSlot(objects, match.Groups["value"].Value);
+        }
+
+        foreach (Match match in Regex.Matches(text, @"识别内容\s*(?:是|为|:|：)\s*(?<value>[^，。；;,.!?！？]+)"))
+        {
+            AddSlot(tasks, match.Groups["value"].Value);
+            taskTypeHint ??= AiVisionTaskTypes.Classification;
+        }
+
+        foreach (Match match in Regex.Matches(text, @"检测\s*(?<object>[^，。；;,.!?！？]+?)上的(?<target>[^，。；;,.!?！？]+)"))
+        {
+            AddSlot(objects, match.Groups["object"].Value);
+            AddSlot(tasks, match.Groups["target"].Value);
+            taskTypeHint ??= AiVisionTaskTypes.PresenceAbsence;
+        }
+
+        foreach (Match match in Regex.Matches(text, @"判断\s*(?<object>[^，。；;,.!?！？]+?)是否存在"))
+        {
+            AddSlot(objects, match.Groups["object"].Value);
+            AddSlot(tasks, "是否存在");
+            taskTypeHint ??= AiVisionTaskTypes.PresenceAbsence;
+        }
+
+        return new VisionAgentRequirementSemanticSlots(
+            objects.Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList(),
+            tasks.Distinct(StringComparer.OrdinalIgnoreCase).Take(8).ToList(),
+            taskTypeHint);
+    }
+
+    private static void AddSlot(List<string> values, string value)
+    {
+        var cleaned = CleanSlot(value);
+        if (!string.IsNullOrWhiteSpace(cleaned))
+        {
+            values.Add(cleaned);
+        }
+    }
+
+    private static string CleanSlot(string value)
+    {
+        var cleaned = Clean(value);
+        cleaned = Regex.Replace(cleaned, @"^(一个|一条|一种|某个|这个|那个|的)+", string.Empty);
+        cleaned = Regex.Replace(cleaned, @"(这个|那个|方案|流程)$", string.Empty);
+        return cleaned.Trim();
     }
 
     private static List<string> HitTaskTerms(string text, out string taskType)

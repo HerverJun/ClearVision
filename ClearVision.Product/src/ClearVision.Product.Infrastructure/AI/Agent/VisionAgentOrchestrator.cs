@@ -819,10 +819,10 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             TemplateSelection = templateSelection
         };
         var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest);
-        var scenario = maturity.CanBuild
+        var scenario = maturity.CanPlan
             ? VisionAgentRequirementMaturityGate.ToPlanIntent(maturity)
             : maturity.TaskType == AiVisionTaskTypes.AbstractGoal ? "abstract_goal" : "requirement_clarification";
-        var route = maturity.CanBuild
+        var route = maturity.CanPlan
             ? BuildRoute(scenario, templateSelection)
             : BuildClarificationRoute(maturity);
         var questions = maturity.CanBuild
@@ -852,8 +852,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             OriginalUserPrompt = originalPrompt,
             PlanSource = "rule_baseline",
             Goal = description.Length > 160 ? description[..160] : description,
-            Intent = canBuild ? scenario : maturity.Maturity,
-            Confidence = canBuild && scenario != "general_inspection" ? "high" : "medium",
+            Intent = maturity.CanPlan ? scenario : maturity.Maturity,
+            Confidence = canBuild && scenario != "general_inspection" ? "high" : maturity.CanPlan ? "low" : "medium",
             RequirementUnderstanding =
             [
                 maturity.PublicReason,
@@ -889,12 +889,14 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
                 maturityRequest,
                 maturity,
-                canBuild ? "actionable_vision_plan" : "ambiguous_vision_requirement",
-                canBuild ? "planning" : "clarifying",
+                maturity.CanPlan ? "actionable_vision_plan" : "ambiguous_vision_requirement",
+                maturity.CanPlan ? "planning" : "clarifying",
                 string.Empty),
             NextAction = canBuild
                 ? "可接受推荐默认值或回答关键问题，然后开始构建。"
-                : "请先描述检测目标，再开始构建。",
+                : maturity.CanPlan
+                    ? "可先复核低置信规划草案；开始构建前需补齐缺失槽位。"
+                    : "请先描述检测目标，再开始构建。",
             ContextSummary = new VisionAgentPlanContextSummary
             {
                 HasCurrentFlow = hasFlow,
@@ -1529,6 +1531,22 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                     Option("ok_ng_rule", "OK/NG 规则", true, "说明通过和不通过的边界。", "会映射到结果判定节点。"),
                     Option("numeric_tolerance", "数值公差", false, "适合尺寸测量。", "会映射到测量阈值。"),
                     Option("report_only", "仅输出报告", false, "先输出结构化结果，不直接判定。", "适合探索阶段。")
+                ]));
+        }
+
+        if (missing.Contains("model_or_rule_strategy"))
+        {
+            questions.Add(Question(
+                "model_or_rule_strategy",
+                "实现方式倾向是什么？",
+                "未知对象或未知识别内容需要先确认使用规则、传统算法、模板还是模型策略。",
+                "strategy_pending",
+                "先按可替换策略占位，Build 前再确认实现方式。",
+                "实现方式未确认时可以规划低置信草案，但不能直接构建。",
+                [
+                    Option("rule_first", "规则/传统算法优先", true, "先用阈值、几何、形态学或规则判断构成草案。", "适合可解释、低风险的初始方案。"),
+                    Option("template_first", "模板/定位优先", false, "先定位目标区域，再按目标内容做检测。", "适合目标姿态稳定的场景。"),
+                    Option("model_first", "模型识别优先", false, "保留模型资源为待确认占位。", "适合未知外观或语义识别，但需要后续模型资源。")
                 ]));
         }
 
