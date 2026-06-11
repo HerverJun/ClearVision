@@ -120,7 +120,7 @@ test('AI agent clarification layout stays usable on narrow viewports', async ({ 
   await expect(clarificationPlan).toContainText('待澄清');
   await expect(clarificationPlan).toContainText('阻断问题');
   await expect(clarificationPlan).toContainText('下一步：先回答 2 个阻断问题');
-  await expect(page.locator('#ai-btn-send-clarification')).toBeDisabled();
+  await expect(page.locator('#ai-btn-send-clarification-plan')).toBeDisabled();
   const initialLayout = await page.evaluate(() => {
     const rect = (selector: string) => {
       const element = document.querySelector(selector);
@@ -162,7 +162,7 @@ test('AI agent clarification layout stays usable on narrow viewports', async ({ 
   await defectOption.scrollIntoViewIfNeeded();
   await defectOption.click();
   await expect(page.locator('#ai-input')).toHaveValue(/澄清回答：\n场景类型：外观缺陷/);
-  await expect(page.locator('#ai-btn-send-clarification')).toBeEnabled();
+  await expect(page.locator('#ai-btn-send-clarification-plan')).toBeEnabled();
   await expect(defectOption).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
   await expect(page.locator('#ai-btn-apply')).toContainText('暂无可应用方案');
@@ -176,6 +176,84 @@ test('AI agent clarification layout stays usable on narrow viewports', async ({ 
 
   expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
   expect(metrics.bodyWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+});
+
+test('AI panel renders Intent Router clarification in Plan workspace and enables send after option', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await mockShellApis(page);
+  await page.route('**/ai/agent-intent-router-runs', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        intent: 'ambiguous_vision_requirement',
+        confidence: 'medium',
+        shouldOpenPlan: false,
+        shouldBuildDirectly: false,
+        canBuild: false,
+        needsClarification: true,
+        publicReason: '需求信息不足，暂不可构建。',
+        assistantReply: '请先确认包装箱检测的具体目标。',
+        clarificationQuestions: [
+          {
+            field: 'scene',
+            question: '请确认这是哪一类视觉场景。',
+            required: true,
+            priority: 'high',
+            reason: '场景类型会决定模板和算子链。',
+            options: ['外观缺陷', '漏装/有无', '线序判定'],
+          },
+        ],
+        fallbackAllowed: true,
+        routerSource: 'model_router',
+        metadataOnly: true,
+      }),
+    });
+  });
+  await bootAuthenticatedApp(page);
+
+  await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
+    (element as HTMLElement).click();
+  });
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && document.querySelector('#ai-plan-workspace')));
+
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel._dispatchGenerateRequest({
+      description: '包装箱检测',
+      userMessage: '包装箱检测',
+    });
+  });
+
+  const card = page.locator('#ai-clarification-plan-card');
+  await expect(card).toBeVisible();
+  await expect(page.locator('#ai-plan-workspace .ai-plan-empty')).toHaveCount(0);
+  await expect(page.locator('#ai-build-workspace')).toBeHidden();
+  await expect(page.locator('#ai-btn-send-clarification-plan')).toBeDisabled();
+
+  const option = card.locator('.ai-clarification-option[data-clarification-field="scene"][data-clarification-value="外观缺陷"]').first();
+  await option.click();
+  await expect(page.locator('#ai-input')).toHaveValue(/澄清回答：\n场景类型：外观缺陷/);
+  await expect(page.locator('#ai-btn-send-clarification-plan')).toBeEnabled();
+  await expect(option).toHaveAttribute('aria-pressed', 'true');
+
+  const state = await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    return {
+      mode: panel.agentWorkspaceMode,
+      hasPlan: Boolean(panel.pendingVisionPlan),
+      status: panel.pendingClarificationPayload?.status,
+      interactionState: panel.pendingClarificationPayload?.interactionState,
+      question: panel.pendingClarificationPayload?.requirementBrief?.clarificationQuestions?.[0]?.question,
+    };
+  });
+  expect(state).toEqual({
+    mode: 'plan',
+    hasPlan: false,
+    status: 'clarification_required',
+    interactionState: 'clarifying',
+    question: '请确认这是哪一类视觉场景。',
+  });
 });
 
 test('AI assistant diagnostic text stays collapsed by default', async ({ page }) => {
@@ -347,6 +425,63 @@ test('AI panel routes WebView GenerateFlowResult into agent clarification state'
   await expect(page.locator('#ai-btn-apply')).toContainText('暂无可应用方案');
 });
 
+test('AI agent runtime infers terminal states without interactionState', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await mockShellApis(page);
+  await bootAuthenticatedApp(page);
+
+  await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
+    (element as HTMLElement).click();
+  });
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && document.querySelector('#ai-agent-runtime')));
+
+  const runTerminal = async (payload: Record<string, unknown>) =>
+    page.evaluate(data => {
+      const panel = (window as any).aiPanel;
+      panel.activeGenerateRequestId = data.requestId;
+      panel.isGenerating = true;
+      panel._handleResult(data);
+      const runtime = document.querySelector('#ai-agent-runtime') as HTMLElement | null;
+      return {
+        text: runtime?.innerText || '',
+        className: runtime?.className || '',
+      };
+    }, payload);
+
+  const cancelled = await runTerminal({
+    requestId: 'terminal-cancelled',
+    success: false,
+    status: 'cancelled',
+    failureType: 'user_cancelled',
+    errorMessage: '已取消',
+  });
+  expect(cancelled.text).toContain('已取消');
+  expect(cancelled.text).not.toContain('生成中');
+  expect(cancelled.className).toContain('is-cancelled');
+
+  const timedOut = await runTerminal({
+    requestId: 'terminal-timeout',
+    success: false,
+    status: 'timed_out',
+    failureType: 'timeout',
+    errorMessage: '请求超时',
+  });
+  expect(timedOut.text).toContain('请求超时');
+  expect(timedOut.text).not.toContain('生成中');
+  expect(timedOut.className).toContain('is-timed_out');
+
+  const failed = await runTerminal({
+    requestId: 'terminal-failed',
+    success: false,
+    status: 'failed',
+    failureType: 'system_error',
+    errorMessage: '系统错误',
+  });
+  expect(failed.text).toContain('失败');
+  expect(failed.text).not.toContain('生成中');
+  expect(failed.className).toContain('is-failed');
+});
+
 test('AI panel renders fallback ClarificationPlanCard for no-template no-rule clarification_required response', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
   await mockShellApis(page);
@@ -416,10 +551,108 @@ test('AI panel renders fallback ClarificationPlanCard for no-template no-rule cl
   const sceneOption = card.locator('.ai-clarification-option[data-clarification-field="scene"][data-clarification-value="外观缺陷"]').first();
   await sceneOption.click();
   await expect(page.locator('#ai-input')).toHaveValue(/澄清回答：\n场景类型：外观缺陷/);
-  await expect(page.locator('#ai-btn-send-clarification')).toBeEnabled();
+  await expect(page.locator('#ai-btn-send-clarification-plan')).toBeEnabled();
   await expect(sceneOption).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#ai-btn-apply')).toBeDisabled();
   await expect(page.locator('#ai-btn-apply')).toContainText('暂无可应用方案');
+});
+
+test('AI panel keeps old requirement brief send button independent from new clarification Plan card', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await mockShellApis(page);
+  await bootAuthenticatedApp(page);
+
+  await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
+    (element as HTMLElement).click();
+  });
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && document.querySelector('#ai-result-requirement-brief')));
+
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.activeGenerateRequestId = 'old-flow';
+    panel.isGenerating = true;
+    panel._handleResult({
+      requestId: 'old-flow',
+      success: true,
+      status: 'completed',
+      turnIntent: 'new_flow',
+      interactionState: 'completed',
+      routerConfidence: 'high',
+      aiExplanation: '旧方案已生成。',
+      flow: {
+        operators: [{ id: 'op-old', type: 'ImageAcquisition', displayName: 'ImageAcquisition', parameters: {} }],
+        connections: [],
+      },
+      requirementBrief: {
+        requirementMode: 'strict',
+        confidence: 0.85,
+        clarificationRequired: false,
+        draftRiskLevel: 'low',
+        knownFacts: ['旧方案保留'],
+        missingFacts: [],
+        blockingClarificationFields: [],
+        nonBlockingMissingFields: [],
+        clarificationQuestions: [
+          {
+            field: 'scene',
+            question: '旧摘要里的可选澄清。',
+            required: false,
+            options: ['旧选项'],
+          },
+        ],
+      },
+    });
+
+    panel.activeGenerateRequestId = 'new-clarification';
+    panel.isGenerating = true;
+    panel._handleResult({
+      requestId: 'new-clarification',
+      success: false,
+      status: 'clarification_required',
+      failureType: 'clarification_required',
+      clarificationRequired: true,
+      turnIntent: 'new_flow',
+      routerConfidence: 'high',
+      aiExplanation: '新需求需要先澄清。',
+      blockingClarificationFields: ['scene'],
+      nonBlockingMissingFields: [],
+      requirementBrief: {
+        requirementMode: 'strict',
+        confidence: 0,
+        clarificationRequired: true,
+        draftRiskLevel: 'high',
+        knownFacts: [],
+        missingFacts: ['需要确认场景类型'],
+        blockingClarificationFields: ['scene'],
+        nonBlockingMissingFields: [],
+        clarificationQuestions: [
+          {
+            field: 'scene',
+            question: '请确认新需求的视觉场景。',
+            required: true,
+            reason: '未确认场景时不能构建。',
+            options: ['外观缺陷', '漏装/有无'],
+          },
+        ],
+      },
+    });
+  });
+
+  await expect(page.locator('#ai-btn-send-clarification-brief')).toHaveCount(1);
+  await expect(page.locator('#ai-btn-send-clarification-plan')).toBeVisible();
+  await expect(page.locator('#ai-btn-send-clarification-plan')).toBeDisabled();
+  expect(await page.locator('#ai-btn-send-clarification').count()).toBe(0);
+
+  const option = page.locator('#ai-clarification-plan-card .ai-clarification-option[data-clarification-field="scene"][data-clarification-value="外观缺陷"]').first();
+  await option.click();
+  await expect(page.locator('#ai-input')).toHaveValue(/澄清回答：\n场景类型：外观缺陷/);
+  await expect(page.locator('#ai-btn-send-clarification-plan')).toBeEnabled();
+  await expect(page.locator('#ai-btn-send-clarification-brief')).toBeEnabled();
+
+  const retainedFlowOperatorId = await page.evaluate(() =>
+    (window as any).aiPanel.currentResult?.flow?.operators?.[0]?.id);
+  expect(retainedFlowOperatorId).toBe('op-old');
+  await expect(page.locator('#ai-btn-apply')).not.toContainText('暂无可应用方案');
 });
 
 test('AI panel sends current flow context for modification turns', async ({ page }) => {

@@ -634,13 +634,18 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         if (route.needsClarification || route.intent === 'ambiguous_vision_requirement') {
+            const clarificationPayload = this._buildIntentRouterClarificationPayload(route, context);
             this.pendingVisionPlan = null;
+            this.pendingClarificationPayload = clarificationPayload;
             this.planQuestionSelections = {};
+            this._resetClarificationSelectionDraft?.();
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
+            this._renderAgentRuntime?.(clarificationPayload);
             this._setResultStatusNote('需求不足，暂不可构建。', 'warning');
             this._setAssistantTurnStatus(context.turn, '需求不足', 'warning');
         } else {
+            this.pendingClarificationPayload = null;
             this._setWorkbenchState(AiWorkbenchStates.IDLE);
             this._setResultStatusNote('', '');
             this._setAssistantTurnStatus(context.turn, '已回复', 'success');
@@ -662,9 +667,18 @@ export const aiPanelAgentWorkspaceMixin = {
             const localized = this._localizeDisplayText(String(value || '').trim());
             return this._redactPublicDiagnosticText?.(localized) || localized;
         };
-        const questions = this._toArray(item.clarificationQuestions || item.ClarificationQuestions)
-            .map(question => normalizeDisplayText(question))
-            .filter(Boolean)
+        const questions = (this._normalizeClarificationQuestionList?.(item.clarificationQuestions || item.ClarificationQuestions) || [])
+            .map((question, index) => ({
+                field: String(question.field || `clarification_${index + 1}`).trim() || `clarification_${index + 1}`,
+                question: normalizeDisplayText(question.question || ''),
+                required: question.required !== false,
+                reason: normalizeDisplayText(question.reason || ''),
+                priority: String(question.priority || 'high').trim() || 'high',
+                options: this._toArray(question.options)
+                    .map(option => normalizeDisplayText(option))
+                    .filter(Boolean)
+            }))
+            .filter(question => question.question || question.options.length > 0)
             .slice(0, 5);
         return {
             intent,
@@ -678,6 +692,70 @@ export const aiPanelAgentWorkspaceMixin = {
             clarificationQuestions: questions,
             fallbackReason: item.fallbackReason || item.FallbackReason || '',
             routerSource: item.routerSource || item.RouterSource || ''
+        };
+    },
+
+    _buildIntentRouterClarificationPayload(route = {}, context = {}) {
+        const normalizedQuestions = this._normalizeClarificationQuestionList?.(route.clarificationQuestions || []) || [];
+        const questions = normalizedQuestions.length > 0
+            ? normalizedQuestions
+            : (this._getDefaultClarificationQuestions?.() || []);
+        const requiredQuestions = questions.filter(question => question.required !== false);
+        const blockingClarificationFields = [...new Set(requiredQuestions
+            .map(question => String(question.field || '').trim())
+            .filter(Boolean))];
+        const nonBlockingMissingFields = [...new Set(questions
+            .filter(question => question.required === false)
+            .map(question => String(question.field || '').trim())
+            .filter(Boolean))];
+        const missingFacts = requiredQuestions
+            .map(question => String(question.question || question.field || '').trim())
+            .filter(Boolean);
+        const knownFacts = [
+            context.description ? `User request: ${context.description}` : '',
+            route.publicReason ? `Router reason: ${route.publicReason}` : ''
+        ].filter(Boolean).slice(0, 6);
+        const routerConfidence = String(route.confidence || 'low').trim().toLowerCase() || 'low';
+        const confidenceScore = routerConfidence === 'high'
+            ? 0.75
+            : routerConfidence === 'medium'
+                ? 0.5
+                : 0.25;
+        const aiExplanation = this._formatIntentRouterReply(route) ||
+            route.assistantReply ||
+            route.publicReason ||
+            'Current requirement needs clarification before build.';
+
+        return {
+            success: false,
+            status: 'clarification_required',
+            failureType: 'clarification_required',
+            clarificationRequired: true,
+            turnIntent: 'new_flow',
+            interactionState: 'clarifying',
+            routerConfidence,
+            aiExplanation,
+            clarificationQuestions: questions,
+            blockingClarificationFields,
+            nonBlockingMissingFields,
+            requirementBrief: {
+                scenarioKey: '',
+                scenarioName: '',
+                intentType: String(route.intent || 'ambiguous_vision_requirement').trim() || 'ambiguous_vision_requirement',
+                requirementMode: this.requirementMode || 'strict',
+                confidence: confidenceScore,
+                hasOpenQuestions: true,
+                clarificationRequired: true,
+                canGenerateDraftNow: false,
+                draftRiskLevel: 'high',
+                requiredFields: blockingClarificationFields,
+                blockingClarificationFields,
+                nonBlockingMissingFields,
+                knownFacts,
+                missingFacts,
+                attachmentFacts: [],
+                clarificationQuestions: questions
+            }
         };
     },
 
@@ -701,6 +779,9 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _formatIntentRouterReply(route) {
+        const getQuestionText = question => typeof question === 'string'
+            ? question
+            : String(question?.question ?? question?.Question ?? '').trim();
         if (route.assistantReply) {
             return route.assistantReply;
         }
@@ -712,7 +793,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     '请说明缺陷、测量项或识别内容。',
                     '请说明输入来源和 OK/NG 判定规则。'
                 ];
-            return questions[0] || '请补充检测目标、缺陷类型、输入来源和 OK/NG 规则。';
+            return getQuestionText(questions[0]) || '请补充检测目标、缺陷类型、输入来源和 OK/NG 规则。';
         }
         return '已理解。';
     },
@@ -2126,7 +2207,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <button class="ai-clarification-plan-action" type="button" data-brief-action="insert">插入输入框</button>
                     <button class="ai-clarification-plan-action" type="button" data-brief-action="queue">挂到下一轮</button>
                     <button class="ai-clarification-plan-action" type="button" data-brief-action="draft">切到草稿优先</button>
-                    <button class="ai-clarification-plan-action is-primary" type="button" id="ai-btn-send-clarification" data-brief-action="send-clarification" disabled>发送澄清回答</button>
+                    <button class="ai-clarification-plan-action is-primary" type="button" id="ai-btn-send-clarification-plan" data-brief-action="send-clarification" disabled>发送澄清回答</button>
                 </div>
             </section>
         `;

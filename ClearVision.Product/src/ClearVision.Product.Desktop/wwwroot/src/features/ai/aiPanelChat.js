@@ -663,7 +663,7 @@ export const aiPanelChatMixin = {
                 <button class="ai-requirement-brief-action" type="button" data-brief-action="insert">插入输入框</button>
                 <button class="ai-requirement-brief-action" type="button" data-brief-action="queue">挂到下一轮</button>
                 <button class="ai-requirement-brief-action" type="button" data-brief-action="draft">切到草稿模式</button>
-                <button class="ai-requirement-brief-action is-primary" type="button" id="ai-btn-send-clarification" data-brief-action="send-clarification" disabled>发送澄清回答</button>
+                <button class="ai-requirement-brief-action is-primary" type="button" id="ai-btn-send-clarification-brief" data-brief-action="send-clarification" disabled>发送澄清回答</button>
             </div>
         `;
 

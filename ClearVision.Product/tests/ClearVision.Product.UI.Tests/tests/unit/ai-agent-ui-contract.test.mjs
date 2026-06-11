@@ -1566,12 +1566,14 @@ test('help Intent Router result replies without opening Plan', async () => {
 test('ambiguous Intent Router result asks clarification and cannot Build', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = createFakeElement();
+  const build = createFakeElement();
   panel.container = createContainer({
     '#ai-input': createFakeElement(),
     '#ai-chat-container': createFakeElement(),
     '#ai-agent-workspace-overview': createFakeElement(),
-    '#ai-plan-workspace': createFakeElement(),
-    '#ai-build-workspace': createFakeElement(),
+    '#ai-plan-workspace': plan,
+    '#ai-build-workspace': build,
     '#ai-result-status-note': createFakeElement()
   });
   panel._requestBackendIntentRouterRun = async () => ({
@@ -1597,6 +1599,25 @@ test('ambiguous Intent Router result asks clarification and cannot Build', async
   await flushAsync();
 
   assert.equal(panel.pendingVisionPlan, null);
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.equal(panel.lastWorkbenchState, 'clarifying');
+  assert.equal(panel.pendingClarificationPayload?.status, 'clarification_required');
+  assert.equal(panel.pendingClarificationPayload?.failureType, 'clarification_required');
+  assert.equal(panel.pendingClarificationPayload?.clarificationRequired, true);
+  assert.equal(panel.pendingClarificationPayload?.turnIntent, 'new_flow');
+  assert.equal(panel.pendingClarificationPayload?.interactionState, 'clarifying');
+  assert.equal(panel.pendingClarificationPayload?.routerConfidence, 'medium');
+  assert.equal(
+    panel.pendingClarificationPayload?.requirementBrief?.clarificationQuestions?.[0]?.question,
+    '检测目标是什么？'
+  );
+  assert.deepEqual(
+    panel.pendingClarificationPayload?.requirementBrief?.blockingClarificationFields,
+    ['clarification_1', 'clarification_2', 'clarification_3']
+  );
+  assert.match(plan.innerHTML, /ai-clarification-plan-card/);
+  assert.doesNotMatch(plan.innerHTML, /ai-plan-empty/);
+  assert.equal(build.hidden, true);
   assert.equal(panel.isGenerating, false);
   assert.equal(panel.lastResultStatusNote.tone, 'warning');
   assert.match(panel.lastResultStatusNote.text, /需求不足/);

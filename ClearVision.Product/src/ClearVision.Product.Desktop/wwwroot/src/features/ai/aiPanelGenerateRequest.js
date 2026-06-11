@@ -716,12 +716,55 @@ export const aiPanelGenerateRequestMixin = {
         return String(payload?.status ?? payload?.Status ?? '').trim().toLowerCase();
     },
 
+    _normalizeRuntimePayload(payload) {
+        if (!payload || typeof payload !== 'object') return payload;
+
+        const explicitState = String(payload?.interactionState ?? payload?.InteractionState ?? '').trim().toLowerCase();
+        const inferredState = explicitState || this._inferRuntimeInteractionState(payload);
+        if (!inferredState || explicitState === inferredState) {
+            return payload;
+        }
+
+        return {
+            ...payload,
+            interactionState: inferredState
+        };
+    },
+
+    _inferRuntimeInteractionState(payload) {
+        const status = this._normalizeGenerateStatus(payload);
+        const failureType = String(payload?.failureType ?? payload?.FailureType ?? '').trim().toLowerCase();
+        const manualRetry = payload?.manualRetry ?? payload?.ManualRetry ?? payload?.manual_retry ?? null;
+        const manualRetryRequired = Boolean(manualRetry?.required ?? manualRetry?.Required) ||
+            status === 'manual_retry_required' ||
+            failureType === 'manual_retry_required';
+
+        if (this._isClarificationResult(payload)) return 'clarifying';
+        if (manualRetryRequired) return 'manual_retry';
+        if (['cancelled', 'canceled', 'user_cancelled', 'user_canceled'].includes(status) ||
+            ['cancelled', 'canceled', 'user_cancelled', 'user_canceled'].includes(failureType)) {
+            return 'cancelled';
+        }
+        if (['timed_out', 'timeout'].includes(status) || ['timed_out', 'timeout'].includes(failureType)) {
+            return 'timed_out';
+        }
+        if (['failed', 'system_error', 'service_call_failed'].includes(status) ||
+            ['failed', 'system_error', 'service_call_failed'].includes(failureType)) {
+            return 'failed';
+        }
+        if (Boolean(payload?.success ?? payload?.Success) || ['completed', 'success'].includes(status)) {
+            return 'completed';
+        }
+
+        return '';
+    },
+
     _isCancelledResult(payload) {
         const status = this._normalizeGenerateStatus(payload);
         const failureType = String(payload?.failureType ?? payload?.FailureType ?? '').trim().toLowerCase();
 
         return ['cancelled', 'canceled', 'user_cancelled', 'user_canceled'].includes(status)
-            || ['user_cancelled', 'user_canceled'].includes(failureType);
+            || ['cancelled', 'canceled', 'user_cancelled', 'user_canceled'].includes(failureType);
     },
 
     _isClarificationResult(payload) {
@@ -739,7 +782,8 @@ export const aiPanelGenerateRequestMixin = {
     },
 
     _getInteractionState(payload) {
-        return String(payload?.interactionState ?? payload?.InteractionState ?? '').trim().toLowerCase();
+        const explicitState = String(payload?.interactionState ?? payload?.InteractionState ?? '').trim().toLowerCase();
+        return explicitState || this._inferRuntimeInteractionState(payload);
     },
 
     _getRouterConfidence(payload) {

@@ -767,7 +767,8 @@ export class AiPanel {
             this._flushStreamBuffer();
         }
 
-        const payload = data.payload || data;
+        const rawPayload = data.payload || data;
+        const payload = this._normalizeRuntimePayload(rawPayload) || rawPayload;
         if (!this._shouldHandleGenerateTerminalPayload(payload)) {
             return;
         }
@@ -827,6 +828,7 @@ export class AiPanel {
             this.pendingClarificationPayload = payload;
             this.pendingVisionPlan = null;
             this.planQuestionSelections = {};
+            this._resetClarificationSelectionDraft();
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
         } else {
@@ -1742,6 +1744,7 @@ export class AiPanel {
         const input = this.container.querySelector('#ai-input');
         if(input) input.disabled = busy;
         this._updatePlanBuildActionState?.();
+        this._updateClarificationSendButtonState?.();
         this._updateApplyButtonState();
         this._updatePendingDraftSummary();
     }
@@ -1947,12 +1950,18 @@ export class AiPanel {
     }
 
     _updateClarificationSendButtonState() {
-        const button = this.container?.querySelector('#ai-btn-send-clarification');
-        if (!button) return;
+        const buttons = Array.from(this.container?.querySelectorAll?.('[data-brief-action="send-clarification"]') || []);
+        const legacyButton = this.container?.querySelector?.('#ai-btn-send-clarification');
+        if (legacyButton && !buttons.includes(legacyButton)) {
+            buttons.push(legacyButton);
+        }
+        if (buttons.length === 0) return;
 
         const hasDraft = Boolean(this._buildClarificationAnswerDraft());
-        button.disabled = this.isGenerating || !hasDraft;
-        button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
+        buttons.forEach(button => {
+            button.disabled = this.isGenerating || !hasDraft;
+            button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
+        });
     }
 
     _syncClarificationOptionPressedStates(field, selectedValue) {

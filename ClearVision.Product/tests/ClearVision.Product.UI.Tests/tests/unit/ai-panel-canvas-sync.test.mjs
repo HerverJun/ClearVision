@@ -274,6 +274,50 @@ test('AiPanel runtime next action guides apply, review, and manual retry states'
   );
 });
 
+test('AiPanel runtime infers terminal states when interactionState is missing', async () => {
+  installDom();
+  const { AiPanel } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/ai/aiPanel.js'
+  );
+
+  const cases = [
+    {
+      payload: { success: false, status: 'cancelled', failureType: 'user_cancelled', turnIntent: 'new_flow' },
+      className: /is-cancelled/,
+      label: /已取消/
+    },
+    {
+      payload: { success: false, status: 'timed_out', failureType: 'timeout', turnIntent: 'new_flow' },
+      className: /is-timed_out/,
+      label: /请求超时/
+    },
+    {
+      payload: { success: false, status: 'failed', failureType: 'system_error', turnIntent: 'new_flow' },
+      className: /is-failed/,
+      label: /失败/
+    },
+    {
+      payload: { success: false, status: 'manual_retry_required', turnIntent: 'manual_retry_repair', manualRetry: { required: true } },
+      className: /is-manual_retry/,
+      label: /修复中/
+    }
+  ];
+
+  for (const item of cases) {
+    const runtime = createFakeElement();
+    const panel = Object.create(AiPanel.prototype);
+    panel.container = createContainer({ '#ai-agent-runtime': runtime });
+    panel._lastAgentRuntime = null;
+
+    panel._renderAgentRuntime(item.payload);
+
+    assert.equal(runtime.hidden, false);
+    assert.match(runtime.className, item.className);
+    assert.match(runtime.innerHTML, item.label);
+    assert.doesNotMatch(runtime.innerHTML, /生成中/);
+  }
+});
+
 test('AiPanel request mode inference separates explicit new flow from current-flow edits', async () => {
   installDom();
   const { AiPanel } = await import(
@@ -312,7 +356,8 @@ test('AiPanel clarification option selection builds one managed answer draft', a
   );
 
   const input = createFakeElement();
-  const sendButton = createFakeElement();
+  const planSendButton = createFakeElement();
+  const briefSendButton = createFakeElement();
   const sceneButton = createFakeElement();
   sceneButton.setAttribute('data-clarification-field', 'scene');
   sceneButton.setAttribute('data-clarification-value', '外观缺陷');
@@ -323,11 +368,11 @@ test('AiPanel clarification option selection builds one managed answer draft', a
   const panel = Object.create(AiPanel.prototype);
   panel.container = createContainer(
     {
-      '#ai-input': input,
-      '#ai-btn-send-clarification': sendButton
+      '#ai-input': input
     },
     {
-      '[data-clarification-field][data-clarification-value]': [sceneButton, objectButton]
+      '[data-clarification-field][data-clarification-value]': [sceneButton, objectButton],
+      '[data-brief-action="send-clarification"]': [planSendButton, briefSendButton]
     }
   );
   panel.isGenerating = false;
@@ -338,8 +383,10 @@ test('AiPanel clarification option selection builds one managed answer draft', a
   panel._handleClarificationOptionSelection(sceneButton);
 
   assert.match(input.value, /澄清回答：\n场景类型：外观缺陷/);
-  assert.equal(sendButton.disabled, false);
-  assert.equal(sendButton.getAttribute('aria-disabled'), 'false');
+  assert.equal(planSendButton.disabled, false);
+  assert.equal(briefSendButton.disabled, false);
+  assert.equal(planSendButton.getAttribute('aria-disabled'), 'false');
+  assert.equal(briefSendButton.getAttribute('aria-disabled'), 'false');
   assert.equal(sceneButton.getAttribute('aria-pressed'), 'true');
 
   panel._handleClarificationOptionSelection(objectButton);

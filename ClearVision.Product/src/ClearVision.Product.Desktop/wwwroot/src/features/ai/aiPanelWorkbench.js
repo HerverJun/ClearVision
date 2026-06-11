@@ -107,6 +107,18 @@ export const aiPanelWorkbenchMixin = {
             return '下一步：检查已回填的修复草稿并发送，只进入修复链路，不重新澄清需求。';
         }
 
+        if (interactionState === 'cancelled') {
+            return '下一步：可调整需求后重新发送，或继续保留上一版可应用方案。';
+        }
+
+        if (interactionState === 'timed_out') {
+            return '下一步：请求超时，请简化需求或检查服务状态后重试。';
+        }
+
+        if (interactionState === 'failed') {
+            return '下一步：查看失败原因后重试；如右侧保留上一版方案，可继续按需应用。';
+        }
+
         if (interactionState === 'modifying' || turnIntent === 'modify_flow') {
             return '下一步：等待微调完成，系统只修改用户指定部分并保留其它算子和连线。';
         }
@@ -153,7 +165,7 @@ export const aiPanelWorkbenchMixin = {
             return;
         }
 
-        const source = payload || this._lastAgentRuntime;
+        const source = this._normalizeRuntimePayload?.(payload || this._lastAgentRuntime) || payload || this._lastAgentRuntime;
         if (!source) {
             el.hidden = true;
             el.innerHTML = '';
@@ -194,7 +206,9 @@ export const aiPanelWorkbenchMixin = {
             reviewing_parameters: '审核中',
             manual_retry: '修复中',
             completed: '已完成',
-            failed: '失败'
+            failed: '失败',
+            cancelled: '已取消',
+            timed_out: '请求超时'
         };
         const confidenceLabels = {
             high: '高',
@@ -207,13 +221,21 @@ export const aiPanelWorkbenchMixin = {
                 ? '基于当前工程增量修改'
                 : interactionState === 'reviewing_parameters'
                     ? '可选复核待确认参数'
-                    : turnIntent === 'chat_or_help'
-                        ? '普通回复，不进入澄清'
-                        : turnIntent === 'unknown'
-                            ? '正在判定本轮意图'
-                            : effectiveNonBlockingFields.length > 0
-                                ? `${effectiveNonBlockingFields.length} 项非阻断缺项`
-                                : '业务链路就绪';
+                    : interactionState === 'manual_retry'
+                        ? '等待手动修复确认'
+                        : interactionState === 'cancelled'
+                            ? '本轮请求已取消'
+                            : interactionState === 'timed_out'
+                                ? '请求超时'
+                                : interactionState === 'failed'
+                                    ? '本轮请求失败'
+                                    : turnIntent === 'chat_or_help'
+                                        ? '普通回复，不进入澄清'
+                                        : turnIntent === 'unknown'
+                                            ? '正在判定本轮意图'
+                                            : effectiveNonBlockingFields.length > 0
+                                                ? `${effectiveNonBlockingFields.length} 项非阻断缺项`
+                                                : '业务链路就绪';
         const blockingCount = effectiveBlockingFields.length || questionCount;
         const nextAction = this._buildAgentNextAction({
             turnIntent,
