@@ -121,7 +121,7 @@ public sealed record VisionAgentPlanModeResult
     public List<string> Risks { get; init; } = [];
     public List<string> AcceptanceCriteria { get; init; } = [];
     public List<string> ExecutablePlan { get; init; } = [];
-    public bool CanBuild { get; init; } = true;
+    public bool CanBuild { get; init; }
     public List<string> BlockingReasons { get; init; } = [];
     public AiRequirementMaturityResult? RequirementMaturity { get; init; }
     public AiDecisionTrace? DecisionTrace { get; init; }

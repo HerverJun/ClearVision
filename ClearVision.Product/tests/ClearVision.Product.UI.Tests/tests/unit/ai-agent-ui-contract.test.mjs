@@ -496,6 +496,7 @@ function backendPlanResult(overrides = {}) {
     templateId: 'tmpl-plan',
     scenarioKey: 'scratch'
   };
+  const canBuild = overrides.canBuild === true;
   return {
     planId: overrides.planId || 'plan_backend_1',
     planHash: overrides.planHash || 'sha256:backend-plan-hash',
@@ -557,10 +558,21 @@ function backendPlanResult(overrides = {}) {
     risks: ['Thresholds need representative images.'],
     acceptanceCriteria: ['Workflow draft contains acquisition, inspection, judgment, and output stages.'],
     executablePlan: ['Map parameters and run readiness checks.'],
-    canBuild: overrides.canBuild ?? true,
+    canBuild,
     blockingReasons: [],
     nextAction: 'Accept recommended defaults, then start Build.',
-    requirementMaturity: overrides.requirementMaturity,
+    requirementMaturity: overrides.requirementMaturity ?? {
+      maturity: canBuild ? 'actionable' : 'ambiguous',
+      taskType: canBuild ? 'surface_or_pose_defect' : 'unknown',
+      canBuild,
+      objectSignals: canBuild ? ['metal', 'surface'] : [],
+      taskSignals: canBuild ? ['scratch'] : [],
+      missingFields: canBuild ? ['image_source', 'acceptance_criteria'] : ['inspection_object', 'task_type'],
+      blockingReasons: canBuild ? [] : ['inspection_object_missing', 'task_type_missing'],
+      publicReason: canBuild
+        ? '需求已明确到可规划视觉流程。'
+        : '需求仍缺少检测对象或任务类型，暂不能构建。'
+    },
     decisionTrace: overrides.decisionTrace,
     publicEvents: overrides.publicEvents ?? [
       {
@@ -2074,6 +2086,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
     planId: 'plan_build_1',
     planHash: 'sha256:plan-build-1',
+    canBuild: true,
     templateSelection: { mode: 'template_adapt', templateId: 'tmpl-plan', scenarioKey: 'scratch' }
   }));
   panel.planQuestionSelections = Object.fromEntries(
@@ -2106,6 +2119,20 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
 test('Backend Plan without explicit canBuild is not executable by default', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  const planActionButtons = [createFakeButton(), createFakeButton()];
+  const overview = createFakeElement();
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': overview,
+      '#ai-plan-workspace': planWorkspace,
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': inlineBuildButton
+    },
+    { '.ai-plan-action': planActionButtons }
+  );
   const rawPlan = backendPlanResult({
     requirementMaturity: {
       maturity: 'ambiguous',
@@ -2119,10 +2146,90 @@ test('Backend Plan without explicit canBuild is not executable by default', asyn
   delete rawPlan.canBuild;
 
   const plan = panel._normalizeBackendPlanResult(rawPlan);
+  panel.pendingVisionPlan = plan;
+  panel._renderAgentWorkspaceOverview();
+  panel._renderPlanWorkspace(plan);
 
   assert.equal(plan.executable, false);
   assert.equal(plan.requirementMaturity.maturity, 'ambiguous');
   assert.deepEqual(plan.requirementMaturity.missingFields, ['inspection_object', 'task_type']);
+  assert.match(overview.innerHTML, /可构建：否/);
+  assert.equal(inlineBuildButton.disabled, true);
+  assert.equal(inlineBuildButton.getAttribute('aria-disabled'), 'true');
+  assert.ok(planActionButtons.every(button => button.disabled));
+});
+
+test('Backend Plan with canBuild true but missing RequirementMaturity remains non-executable', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  const planActionButtons = [createFakeButton(), createFakeButton()];
+  const overview = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': overview,
+      '#ai-plan-workspace': createFakeElement(),
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': inlineBuildButton
+    },
+    { '.ai-plan-action': planActionButtons }
+  );
+  const rawPlan = backendPlanResult({ canBuild: true });
+  delete rawPlan.requirementMaturity;
+  delete rawPlan.RequirementMaturity;
+
+  const plan = panel._normalizeBackendPlanResult(rawPlan);
+  panel.pendingVisionPlan = plan;
+  panel._renderAgentWorkspaceOverview();
+  panel._updatePlanBuildActionState();
+
+  assert.equal(plan.executable, false);
+  assert.equal(plan.requirementMaturity.canBuild, false);
+  assert.match(overview.innerHTML, /可构建：否/);
+  assert.equal(inlineBuildButton.disabled, true);
+  assert.ok(planActionButtons.every(button => button.disabled));
+});
+
+test('Backend Plan with explicit canBuild true and actionable maturity enables Build', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  const planActionButtons = [createFakeButton(), createFakeButton()];
+  const planWorkspace = createFakeElement();
+  const overview = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': overview,
+      '#ai-plan-workspace': planWorkspace,
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': inlineBuildButton
+    },
+    { '.ai-plan-action': planActionButtons }
+  );
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: true,
+    requirementMaturity: {
+      maturity: 'actionable',
+      taskType: 'surface_or_pose_defect',
+      canBuild: true,
+      objectSignals: ['metal', 'surface'],
+      taskSignals: ['scratch'],
+      missingFields: ['image_source', 'acceptance_criteria'],
+      blockingReasons: [],
+      publicReason: '需求已明确到可规划视觉流程。'
+    }
+  }));
+
+  panel.pendingVisionPlan = plan;
+  panel._renderAgentWorkspaceOverview();
+  panel._renderPlanWorkspace(plan);
+
+  assert.equal(plan.executable, true);
+  assert.match(overview.innerHTML, /可构建：是/);
+  assert.equal(inlineBuildButton.disabled, false);
+  assert.ok(planActionButtons.every(button => !button.disabled));
 });
 
 test('Start Build from non-executable Plan is blocked before dispatch', async () => {

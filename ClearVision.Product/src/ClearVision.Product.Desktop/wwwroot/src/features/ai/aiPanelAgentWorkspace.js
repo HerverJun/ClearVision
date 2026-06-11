@@ -1601,6 +1601,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const requirementMaturity = this._normalizeRequirementMaturity(plan.requirementMaturity || plan.RequirementMaturity);
         const decisionTrace = this._normalizeDecisionTrace(plan.decisionTrace || plan.DecisionTrace);
         const rawCanBuild = plan.canBuild ?? plan.CanBuild;
+        const maturityCanBuild = requirementMaturity?.canBuild === true;
 
         return {
             id: plan.planId || plan.PlanId || `plan-${Date.now()}`,
@@ -1620,7 +1621,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 .map(evt => this._normalizePlanPublicEvent(evt)),
             blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
             nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
-            executable: rawCanBuild === true,
+            executable: rawCanBuild === true && maturityCanBuild,
             blockingReasons: this._toArray(plan.blockingReasons || plan.BlockingReasons).map(item => this._localizeDisplayText(item)),
             understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
                 ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).map(item => this._localizeDisplayText(item))
