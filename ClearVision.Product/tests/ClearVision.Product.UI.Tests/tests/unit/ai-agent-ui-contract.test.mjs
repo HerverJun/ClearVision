@@ -1492,6 +1492,107 @@ test('ordinary send runs Intent Router before Plan planner', async () => {
   assert.doesNotMatch(collectProcessText(turn), /已识别为/);
 });
 
+test('Intent Router semanticExtraction is passed to PlanRun and rendered from Plan result', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const semanticExtraction = {
+    isVisionRequest: true,
+    intent: 'new_flow',
+    taskType: 'attribute_classification',
+    confidence: 0.92,
+    taskTypeConfidence: 0.9,
+    inspectionObject: 'strawberry',
+    targetAttribute: 'maturity',
+    imageSource: 'camera',
+    okCondition: 'ripe is OK',
+    ngCondition: 'otherwise NG',
+    suggestedRoute: 'attribute classification OK/NG route',
+    source: 'model',
+    metadataOnly: true
+  };
+  panel._requestBackendIntentRouterRun = async () => ({
+    intent: 'actionable_vision_plan',
+    confidence: 'high',
+    shouldOpenPlan: true,
+    shouldBuildDirectly: false,
+    canBuild: false,
+    needsClarification: false,
+    publicReason: 'semantic route ready',
+    assistantReply: 'Plan first.',
+    clarificationQuestions: [],
+    fallbackAllowed: true,
+    routerSource: 'model_router',
+    semanticExtraction,
+    metadataOnly: true
+  });
+  const planResult = backendPlanResult({
+    goal: 'semantic reused plan',
+    intent: 'attribute_classification',
+    canPlan: true,
+    canBuild: false,
+    semanticExtraction,
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'attribute_classification',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['strawberry'],
+      taskSignals: ['maturity'],
+      missingFields: ['model_or_rule_strategy'],
+      blockingReasons: ['model_or_rule_strategy_missing'],
+      publicReason: 'semantic extraction was reused for planning'
+    }
+  });
+  const requests = installFetchStream([
+    { json: { runId: 'ar_router_semantic_reuse', events: [] } },
+    {
+      body: encodeSseEvent({
+        runId: 'ar_router_semantic_reuse',
+        sequence: 3,
+        eventType: 'plan.completed',
+        stage: 'plan_ready',
+        title: 'Plan ready',
+        summary: 'Plan completed with semantic extraction.',
+        status: 'completed',
+        payload: { planResult, metadataOnly: true },
+        metadataOnly: true,
+        redactionPass: true
+      })
+    }
+  ]);
+
+  panel._dispatchGenerateRequest({
+    description: 'classify strawberry maturity',
+    userMessage: 'classify strawberry maturity'
+  });
+  await waitFor(() => panel.pendingVisionPlan?.goal === 'semantic reused plan', 'semantic reused plan');
+
+  const createRequestBody = JSON.parse(requests[0].options.body);
+  assert.match(requests[0].url, /\/api\/ai\/agent-plan-runs$/);
+  assert.equal(createRequestBody.semanticExtraction.source, 'model');
+  assert.equal(createRequestBody.semanticExtraction.taskType, 'attribute_classification');
+  assert.equal(createRequestBody.semanticExtraction.inspectionObject, 'strawberry');
+  assert.equal(createRequestBody.semanticExtraction.targetAttribute, 'maturity');
+  assert.equal(createRequestBody.semanticExtraction.okCondition, 'ripe is OK');
+  assert.equal(createRequestBody.semanticExtraction.ngCondition, 'otherwise NG');
+  assert.equal(createRequestBody.semanticExtraction.imageSource, 'camera');
+  assert.equal(panel.pendingVisionPlan.semanticExtraction.taskType, 'attribute_classification');
+  assert.match(planWorkspace.innerHTML, /strawberry/);
+  assert.match(planWorkspace.innerHTML, /maturity/);
+  assert.match(planWorkspace.innerHTML, /ripe is OK/);
+  assert.match(planWorkspace.innerHTML, /otherwise NG/);
+  assert.match(planWorkspace.innerHTML, /camera/);
+});
+
 test('casual Intent Router result replies without opening Plan', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });

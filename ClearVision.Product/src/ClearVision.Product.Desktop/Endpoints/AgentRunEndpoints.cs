@@ -348,11 +348,14 @@ public static class AgentRunEndpoints
             EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.PlanContextStarted, "collecting_context",
                 "收集上下文", "正在收集公开需求、流程、模板、附件、算子和工站边界。", AgentRunEventStatuses.Running,
                 BuildPlanContextPayload(request));
-            EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.SemanticStarted, "semantic_extraction",
-                "语义抽取中", "正在抽取视觉需求语义槽位。", AgentRunEventStatuses.Running, new
-                {
-                    metadataOnly = true
-                });
+            if (request.SemanticExtraction == null)
+            {
+                EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.SemanticStarted, "semantic_extraction",
+                    "语义抽取中", "正在抽取视觉需求语义槽位。", AgentRunEventStatuses.Running, new
+                    {
+                        metadataOnly = true
+                    });
+            }
             EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.PlanContextCompleted, "collecting_context",
                 "上下文已收集", "已收集公开需求、流程、模板、附件、算子和工站边界。", AgentRunEventStatuses.Completed,
                 BuildPlanContextPayload(request));

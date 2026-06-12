@@ -166,6 +166,70 @@ public sealed class VisionAgentRequirementMaturityGateTests
         plan.PublicEvents.Select(evt => evt.Stage).Should().Contain("semantic_extraction");
     }
 
+    [Fact(DisplayName = "Router semantic extraction should be reused by Plan without duplicate extractor call")]
+    public async Task RouteThenPlan_WithSemanticExtraction_ShouldNotCallSemanticExtractorTwice()
+    {
+        var semanticExtractor = new FakeSemanticExtractor(new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.AttributeClassification,
+            Confidence = 0.93,
+            TaskTypeConfidence = 0.91,
+            InspectionObject = "strawberry",
+            TargetAttribute = "maturity",
+            ImageSource = "camera",
+            OkCondition = "ripe is OK",
+            NgCondition = "otherwise NG",
+            SuggestedRoute = "attribute classification OK/NG route",
+            CanPlanCandidate = true,
+            CanBuildCandidate = false,
+            ObjectSignals = ["strawberry"],
+            TaskSignals = ["maturity", "ripe"],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        });
+        var router = new VisionAgentIntentRouterService(
+            new DelegateIntentCompletionSource((_, _) => throw new InvalidOperationException("router should be disabled")),
+            Microsoft.Extensions.Options.Options.Create(new VisionAgentIntentRouterOptions { Enabled = false }),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<VisionAgentIntentRouterService>.Instance,
+            semanticExtractor);
+
+        var routerResult = await router.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "classify strawberry maturity from camera",
+                OriginalUserPrompt = "classify strawberry maturity from camera"
+            },
+            CancellationToken.None);
+        var orchestrator = CreateOrchestrator(
+            Substitute.For<IAiFlowGenerationService>(),
+            semanticExtractor);
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "classify strawberry maturity from camera",
+                OriginalUserPrompt = "classify strawberry maturity from camera",
+                SemanticExtraction = routerResult.SemanticExtraction
+            },
+            CancellationToken.None);
+
+        semanticExtractor.CallCount.Should().Be(1);
+        routerResult.SemanticExtraction.Should().NotBeNull();
+        plan.SemanticExtraction.Should().NotBeNull();
+        plan.SemanticExtraction!.Source.Should().Be(routerResult.SemanticExtraction!.Source);
+        plan.SemanticExtraction.TaskType.Should().Be(routerResult.SemanticExtraction.TaskType);
+        plan.SemanticExtraction.InspectionObject.Should().Be(routerResult.SemanticExtraction.InspectionObject);
+        plan.SemanticExtraction.TargetAttribute.Should().Be(routerResult.SemanticExtraction.TargetAttribute);
+        plan.SemanticExtraction.OkCondition.Should().Be(routerResult.SemanticExtraction.OkCondition);
+        plan.SemanticExtraction.NgCondition.Should().Be(routerResult.SemanticExtraction.NgCondition);
+        plan.SemanticExtraction.ImageSource.Should().Be(routerResult.SemanticExtraction.ImageSource);
+        plan.RequirementMaturity.Should().NotBeNull();
+        plan.RequirementMaturity!.TaskType.Should().Be(AiVisionTaskTypes.AttributeClassification);
+        plan.RequirementMaturity.MissingFields.Should().NotContain("task_type");
+    }
+
     [Fact(DisplayName = "Abstract ambition should stay non-plannable and enter decomposition")]
     public async Task AbstractAmbition_ShouldRemainNonPlannable()
     {
@@ -507,10 +571,13 @@ public sealed class VisionAgentRequirementMaturityGateTests
             _result = result;
         }
 
+        public int CallCount { get; private set; }
+
         public Task<VisionAgentSemanticExtractionResult> ExtractAsync(
             VisionAgentSemanticExtractionRequest request,
             CancellationToken cancellationToken)
         {
+            CallCount++;
             return Task.FromResult(_result);
         }
     }

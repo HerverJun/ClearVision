@@ -1,8 +1,11 @@
 using System.Net;
 using System.Text.Json;
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -10,6 +13,32 @@ namespace ClearVision.Product.Tests.AI.VisionAgentSemanticExtraction;
 
 public sealed class VisionAgentSemanticExtractorServiceTests
 {
+    [Fact(DisplayName = "Semantic extractor options should bind through AddAiFlowGeneration")]
+    public void AddAiFlowGeneration_ShouldBindSemanticExtractorOptions()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AI:VisionAgent:SemanticExtractor:Enabled"] = "false",
+                ["AI:VisionAgent:SemanticExtractor:TimeoutSeconds"] = "7",
+                ["AI:VisionAgent:SemanticExtractor:MaxContextChars"] = "3000",
+                ["AI:VisionAgent:SemanticExtractor:ModelRole"] = "vision"
+            })
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddAiFlowGeneration(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<VisionAgentSemanticExtractorOptions>>()
+            .Value
+            .Normalize();
+        options.Enabled.Should().BeFalse();
+        options.TimeoutSeconds.Should().Be(7);
+        options.MaxContextChars.Should().Be(3000);
+        options.ModelRole.Should().Be(AiModelConfig.RoleVision);
+    }
+
     [Fact(DisplayName = "Semantic extractor parses markdown-wrapped JSON and normalizes attribute classification")]
     public async Task ExtractAsync_ShouldParseWrappedJson()
     {

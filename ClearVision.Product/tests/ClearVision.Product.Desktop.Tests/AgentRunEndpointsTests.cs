@@ -227,6 +227,94 @@ public sealed class AgentRunEndpointsTests
             .Should().StartWith("sha256:");
     }
 
+    [Fact(DisplayName = "POST Agent plan run reuses provided semantic extraction without duplicate semantic events")]
+    public async Task CreatePlanRun_WithSemanticExtraction_ShouldReuseSemanticAndAvoidDuplicateSemanticEvents()
+    {
+        var semantic = new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.AttributeClassification,
+            Confidence = 0.92,
+            TaskTypeConfidence = 0.9,
+            InspectionObject = "strawberry",
+            TargetAttribute = "maturity",
+            ImageSource = "camera",
+            OkCondition = "ripe is OK",
+            NgCondition = "otherwise NG",
+            SuggestedRoute = "attribute classification OK/NG route",
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (request, baseline, _) =>
+        {
+            request.SemanticExtraction.Should().NotBeNull();
+            request.SemanticExtraction!.TaskType.Should().Be(AiVisionTaskTypes.AttributeClassification);
+            return Task.FromResult(baseline with
+            {
+                PlanSource = "planner",
+                FallbackReason = string.Empty,
+                SemanticExtraction = request.SemanticExtraction,
+                PublicEvents =
+                [
+                    PlanEvent("semantic_extraction", "completed", "Semantic extraction completed",
+                        "Provided semantic extraction was reused.",
+                        new(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["semanticSource"] = "model",
+                            ["taskType"] = AiVisionTaskTypes.AttributeClassification,
+                            ["inspectionObject"] = "strawberry",
+                            ["targetAttribute"] = "maturity",
+                            ["okCondition"] = "ripe is OK",
+                            ["ngCondition"] = "otherwise NG",
+                            ["imageSource"] = "camera"
+                        }),
+                    PlanEvent("semantic_extraction", "completed", "Duplicate semantic extraction completed",
+                        "Duplicate semantic event should be dropped.")
+                ],
+                MetadataOnly = true
+            });
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "classify strawberry maturity",
+            OriginalUserPrompt = "classify strawberry maturity",
+            SemanticExtraction = semantic
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = createDoc.RootElement.GetProperty("runId").GetString()!;
+
+        await host.WaitForTerminalAsync(runId);
+        var replay = host.StreamService.Replay(runId)!;
+        replay.Events.Count(evt => evt.EventType == AgentRunEventTypes.SemanticStarted).Should().Be(0);
+        replay.Events.Count(evt => evt.EventType == AgentRunEventTypes.SemanticCompleted).Should().Be(1);
+        replay.Events
+            .Where(evt => evt.EventType is AgentRunEventTypes.SemanticStarted or AgentRunEventTypes.SemanticCompleted)
+            .Should()
+            .AllSatisfy(evt =>
+            {
+                evt.MetadataOnly.Should().BeTrue();
+                evt.RedactionPass.Should().BeTrue();
+            });
+
+        var completed = replay.Events.Single(evt => evt.EventType == AgentRunEventTypes.PlanCompleted);
+        using var completedDoc = JsonDocument.Parse(JsonSerializer.Serialize(completed, AgentRunEventJson.Options));
+        var planSemantic = completedDoc.RootElement
+            .GetProperty("payload")
+            .GetProperty("planResult")
+            .GetProperty("semanticExtraction");
+        planSemantic.GetProperty("source").GetString().Should().Be(VisionAgentSemanticSources.Model);
+        planSemantic.GetProperty("taskType").GetString().Should().Be(AiVisionTaskTypes.AttributeClassification);
+        planSemantic.GetProperty("inspectionObject").GetString().Should().Be("strawberry");
+        planSemantic.GetProperty("targetAttribute").GetString().Should().Be("maturity");
+        planSemantic.GetProperty("okCondition").GetString().Should().Be("ripe is OK");
+        planSemantic.GetProperty("ngCondition").GetString().Should().Be("otherwise NG");
+        planSemantic.GetProperty("imageSource").GetString().Should().Be("camera");
+    }
+
     [Fact(DisplayName = "Plan run timeout emits timeout and fallback before completed PlanResult")]
     public async Task CreatePlanRun_ShouldEmitTimeoutFallbackBeforeCompleted()
     {
