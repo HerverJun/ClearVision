@@ -294,12 +294,14 @@ export const aiPanelWorkbenchMixin = {
 
     _setWorkbenchState(state) {
         if (this.workbenchState === state) return;
+        const previousState = this.workbenchState;
         // Track last non-terminal state for failure recovery
         if (state !== AiWorkbenchStates.FAILED && state !== AiWorkbenchStates.CANCELLED && state !== AiWorkbenchStates.IDLE) {
             this._lastActiveWorkbenchState = state;
         }
         this.workbenchState = state;
         this._renderWorkbenchStateBar();
+        this._publishWorkbenchStatePublicEvent?.(state, previousState);
     },
 
     _renderWorkbenchStateBar() {

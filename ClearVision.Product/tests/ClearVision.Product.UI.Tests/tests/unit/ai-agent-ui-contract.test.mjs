@@ -305,6 +305,9 @@ function createPanel(AiPanel, overrides = {}) {
   panel.isGenerating = false;
   panel.flowCanvas = null;
   panel.requirementMode = 'strict';
+  panel.workbenchState = 'idle';
+  panel._lastActiveWorkbenchState = 'idle';
+  panel._workbenchStageTimeline = [];
   panel.nextHintDraft = '';
   panel.nextTemplateSelection = null;
   panel.agentWorkspaceMode = 'plan';
@@ -343,8 +346,10 @@ function createPanel(AiPanel, overrides = {}) {
   panel._setGeneratingState = busy => {
     panel.isGenerating = busy;
   };
+  const realSetWorkbenchState = AiPanel.prototype._setWorkbenchState;
   panel._setWorkbenchState = state => {
     panel.lastWorkbenchState = state;
+    return realSetWorkbenchState.call(panel, state);
   };
   panel._clearActiveRequestState = () => {
     panel.activeGenerateRequestId = null;
@@ -2192,6 +2197,107 @@ test('PlanRun public live events split ephemeral status persistent fallback and 
   assert.equal(panel.publicLiveEvents.filter(evt => evt.visibility === 'persistent').length, 2);
 });
 
+test('Workbench state changes publish matching right-side public events', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  const stateBar = createFakeElement();
+  panel.container = createContainer({
+    '#ai-workbench-state-bar': stateBar
+  });
+  panel.activeAgentRunId = 'ar_workbench';
+
+  const states = [
+    'clarifying',
+    'matching_template',
+    'generating',
+    'parsing',
+    'validating',
+    'dry_running',
+    'reviewing_parameters',
+    'ready_to_apply',
+    'applying',
+    'applied',
+    'failed',
+    'cancelled',
+    'idle'
+  ];
+
+  states.forEach(state => panel._setWorkbenchState(state));
+
+  const eventTypes = panel.publicLiveEvents.map(evt => evt.eventType);
+  for (const state of states) {
+    assert.ok(eventTypes.includes(`workbench.state.${state}`), state);
+  }
+  assert.match(collectProcessText(turn), /构建已完成，可应用到画布/);
+  assert.match(collectProcessText(turn), /流程草稿已应用/);
+  assert.match(collectProcessText(turn), /工作台进入失败状态/);
+  assert.equal(panel.publicLiveEvents.find(evt => evt.eventType === 'workbench.state.ready_to_apply')?.visibility, 'persistent');
+  assert.equal(panel.publicLiveEvents.find(evt => evt.eventType === 'workbench.state.dry_running')?.visibility, 'ephemeral');
+});
+
+test('Public live event snapshot can replay and rebuild the assistant public stream', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.activePlanRequestId = 'plan-request-snapshot';
+  panel.activePlanRunId = 'ar_plan_snapshot';
+  panel.activePlanRunRequestId = 'plan-request-snapshot';
+
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_snapshot',
+    sequence: 1,
+    eventType: 'plan.model.failed',
+    stage: 'planning_with_model',
+    title: '模型规划失败',
+    summary: '模型规划未能产出可用规划，已使用规则兜底方案。',
+    status: 'failed',
+    payload: {
+      fallbackReason: 'planner_failed',
+      plannerFailureCode: 'planner_json_parse_failed',
+      sanitizedErrorMessage: 'systemPrompt=secret token=abc123 http://192.168.1.9 C:\\factory\\model.onnx'
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_snapshot',
+    sequence: 2,
+    eventType: 'plan.fallback.used',
+    stage: 'rule_fallback_used',
+    title: '已使用规则兜底方案',
+    summary: '当前方案为规则兜底草案，不是大模型 Planner 生成结果。',
+    status: 'completed',
+    payload: {
+      fallbackReason: 'planner_failed',
+      plannerFailureCode: 'planner_json_parse_failed'
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  const snapshot = panel._buildPublicLiveEventSnapshot({ runId: 'ar_plan_snapshot' });
+  assert.equal(snapshot.length, 2);
+  assert.doesNotMatch(JSON.stringify(snapshot), /systemPrompt|rawPrompt|chainOfThought|C:\\|\.onnx|192\.168\.|abc123|data:image|base64|http:\/\//i);
+
+  const replayPanel = createPanel(AiPanel, { developer: false, enabled: true });
+  const replayTurn = attachAgentRunTurn(replayPanel);
+  replayPanel.activePlanRunId = 'ar_plan_snapshot';
+  const replayed = replayPanel._replayPublicLiveEventSnapshot(snapshot, { runId: 'ar_plan_snapshot' });
+
+  assert.equal(replayed, 2);
+  assert.match(collectProcessText(replayTurn), /Planner 未能产出可用规划/);
+  assert.match(collectProcessText(replayTurn), /不是大模型 Planner 生成结果/);
+  assert.equal(replayTurn.failureSection.hidden, false);
+  assert.match(replayTurn.failureBody.innerHTML, /Planner JSON 解析失败/);
+});
+
 test('Plan Mode timeout stream shows rule fallback copy', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -3821,6 +3927,83 @@ test('AgentRun run.failed renders failure diagnosis and first fix only', async (
   assert.doesNotMatch(turn.failureBody.innerHTML, /chain.?of.?thought|raw prompt|system prompt/i);
   assert.equal(panel.lastWorkbenchState, 'failed');
   assert.equal(turn.statusEl.textContent, '构建失败');
+});
+
+test('AgentRun non-Planner blockers render unified failure reason and next action', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_blockers';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_blockers',
+    sequence: 1,
+    eventType: 'readiness.checked',
+    stage: 'readiness',
+    title: 'Readiness checked',
+    summary: 'Deployment blocked by missing resources.',
+    status: 'blocked',
+    payload: {
+      warningCode: 'readiness_blocked',
+      blockedReasons: ['missing model_resource', 'missing output_channel'],
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.match(collectProcessText(turn), /就绪检查阻断/);
+  assert.match(collectProcessText(turn), /缺失资源|人工参数|运行包元数据/);
+  assert.equal(turn.failureSection.hidden, false);
+  assert.match(turn.failureBody.innerHTML, /失败原因/);
+  assert.match(turn.failureBody.innerHTML, /就绪检查阻断/);
+  assert.match(turn.failureBody.innerHTML, /下一步/);
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_blockers',
+    sequence: 2,
+    eventType: 'station.compatibility.completed',
+    stage: 'station_compatibility',
+    title: 'Station compatibility completed',
+    summary: 'Station compatibility blocked.',
+    status: 'failed',
+    payload: {
+      warningCode: 'station_incompatible',
+      blockedReasons: ['camera allowlist missing'],
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.match(collectProcessText(turn), /工站兼容性阻断/);
+  assert.match(turn.failureBody.innerHTML, /工站兼容性阻断/);
+  assert.match(turn.failureBody.innerHTML, /工站能力|allowlist|运行配置/);
+});
+
+test('Stale AgentRun events cannot pollute current public live turn', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_current';
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_old',
+    sequence: 99,
+    eventType: 'run.failed',
+    stage: 'run',
+    title: 'Old run failed',
+    summary: 'old failure should not render',
+    status: 'failed',
+    payload: { firstFixRecommendation: 'old fix should not render' },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(panel.publicLiveEvents.length, 0);
+  assert.equal(turn.processBody.children.length, 0);
+  assert.equal(turn.failureSection.hidden, false);
+  assert.equal(turn.failureBody.innerHTML, '');
 });
 
 test('AgentRun terminal completed event closes source and releases generating state', async () => {

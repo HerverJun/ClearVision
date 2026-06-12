@@ -96,6 +96,7 @@ export class AiPanel {
         this.publicLiveEventKeys = new Set();
         this.publicLiveEvents = [];
         this.publicLiveStatusTimer = null;
+        this.publicLiveWorkbenchSequence = 0;
         this.pendingManualRetry = null;
         this.requirementMode = this._loadRequirementMode();
 
