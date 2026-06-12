@@ -1062,6 +1062,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this.activePlanRunEvents = [];
         this.activePlanRunEventKeys = new Set();
         this.activePlanRunCompletion = null;
+        this._resetPublicLiveEventState?.();
         const planRequestId = this._createPlanRequestId();
         this.activePlanRequestId = planRequestId;
 
@@ -1317,6 +1318,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this.activePlanRunRequestId = planRequestId;
         this.activePlanRunEvents = [];
         this.activePlanRunEventKeys = new Set();
+        this._resetPublicLiveEventState?.();
         this.activeAssistantTurn = turn;
         this._setAssistantTurnStatus(turn, '规划中', 'streaming');
 
@@ -1368,6 +1370,7 @@ export const aiPanelAgentWorkspaceMixin = {
             ? this.activePlanRunEvents
             : [];
         this.activePlanRunEvents.push(evt);
+        this._routePublicLiveEvent?.(this._normalizePublicLiveEvent?.(evt, { source: 'plan-run' }));
 
         if (evt.eventType === 'assistant.brief') {
             this._setAssistantTurnStatus(this.activeAssistantTurn, '规划中', 'streaming');

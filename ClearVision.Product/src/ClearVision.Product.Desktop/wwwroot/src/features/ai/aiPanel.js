@@ -23,6 +23,7 @@ import { aiPanelSessionHistoryMixin } from './aiPanelSessionHistory.js';
 import { aiPanelApplyPreviewMixin } from './aiPanelApplyPreview.js';
 import { aiPanelTopologySummaryMixin } from './aiPanelTopologySummary.js';
 import { aiPanelAgentRunMixin } from './aiPanelAgentRun.js';
+import { aiPanelLiveEventsMixin } from './aiPanelLiveEvents.js';
 import {
     AgentWorkspaceModes,
     aiPanelAgentWorkspaceMixin
@@ -92,6 +93,9 @@ export class AiPanel {
         this.agentRunStepMap = new Map();
         this.agentRunToolMap = new Map();
         this.agentRunArtifactMap = new Map();
+        this.publicLiveEventKeys = new Set();
+        this.publicLiveEvents = [];
+        this.publicLiveStatusTimer = null;
         this.pendingManualRetry = null;
         this.requirementMode = this._loadRequirementMode();
 
@@ -196,6 +200,7 @@ export class AiPanel {
         this.activePlanRunEvents = [];
         this.activePlanRunEventKeys = new Set();
         this.activePlanRunCompletion = null;
+        this._resetPublicLiveEventState?.();
         this.activeGenerateSessionId = null;
         this.isCancellingGenerate = false;
         this._resetAgentRunState();
@@ -2321,6 +2326,7 @@ Object.assign(
     aiPanelValidationPreviewMixin,
     aiPanelGenerateRequestMixin,
     aiPanelAgentWorkspaceMixin,
+    aiPanelLiveEventsMixin,
     aiPanelAgentRunMixin,
     aiPanelRequirementBriefMixin,
     aiPanelAttachmentsMixin,

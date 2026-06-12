@@ -46,6 +46,7 @@ export const aiPanelChatMixin = {
                     <div class="ai-assistant-card-title">AI 工作流助手</div>
                     <div class="ai-assistant-status is-${this._escapeHtml(statusTone)}">${this._escapeHtml(statusText)}</div>
                 </div>
+                <div class="ai-assistant-live-status" hidden></div>
                 <details class="ai-assistant-section ai-assistant-reasoning-section" ${openReasoning ? 'open' : ''} hidden>
                     <summary>生成诊断</summary>
                     <div class="ai-stream-body-wrap">
@@ -88,6 +89,7 @@ export const aiPanelChatMixin = {
             root: msg,
             card: msg.querySelector('.ai-assistant-card'),
             statusEl: msg.querySelector('.ai-assistant-status'),
+            liveStatusEl: msg.querySelector('.ai-assistant-live-status'),
             reasoningSection: msg.querySelector('.ai-assistant-reasoning-section'),
             reasoningBody: msg.querySelector('.ai-assistant-reasoning-body'),
             replySection: msg.querySelector('.ai-assistant-reply-section'),
@@ -147,7 +149,12 @@ export const aiPanelChatMixin = {
             item.textContent = value;
         }
 
-        this._scrollToBottom();
+        if (this.userHasScrolledUp) {
+            this.unreadStreamCount = (Number(this.unreadStreamCount) || 0) + 1;
+            this._updateScrollBottomBtn?.();
+        } else {
+            this._scrollToBottom();
+        }
         return item;
     },
 
@@ -158,6 +165,7 @@ export const aiPanelChatMixin = {
         turn.card.dataset.turnTone = tone;
 
         if (tone !== 'streaming') {
+            this._clearAssistantLiveStatus?.(turn);
             [turn.reasoningCursor, turn.replyCursor].forEach(cursor => {
                 if (!cursor) return;
                 cursor.classList.add('fading');

@@ -471,6 +471,7 @@ export const aiPanelAgentRunMixin = {
         this.agentRunStepMap = new Map();
         this.agentRunToolMap = new Map();
         this.agentRunArtifactMap = new Map();
+        this._resetPublicLiveEventState?.();
     },
 
     _closeAgentRunEventSource() {
@@ -546,6 +547,7 @@ export const aiPanelAgentRunMixin = {
         this.agentRunStepMap = new Map();
         this.agentRunToolMap = new Map();
         this.agentRunArtifactMap = new Map();
+        this._resetPublicLiveEventState?.();
 
         const initialEvents = createResult?.events || createResult?.Events || [];
         initialEvents.forEach(evt => this._handleAgentRunEvent(evt));
@@ -632,6 +634,7 @@ export const aiPanelAgentRunMixin = {
             : [];
         this.activeAgentRunEvents.push(evt);
         this._handleAgentRunWorkspaceEvent?.(evt);
+        this._routePublicLiveEvent?.(this._normalizePublicLiveEvent?.(evt, { source: 'agent-run' }));
 
         if (evt.eventType === 'assistant.brief') {
             this._renderAgentRunBrief(evt);

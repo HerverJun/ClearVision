@@ -345,6 +345,76 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
     color: var(--paper-dim);
 }
 
+.ai-assistant-live-status {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr);
+    gap: 9px;
+    align-items: flex-start;
+    border: 1px solid rgba(231, 76, 60, 0.18);
+    border-radius: var(--radius-md);
+    background: rgba(231, 76, 60, 0.08);
+    padding: 9px 11px;
+}
+
+.ai-assistant-live-status[hidden] {
+    display: none;
+}
+
+.ai-assistant-live-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: var(--cinnabar);
+    box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.12);
+}
+
+.ai-assistant-live-status.is-success {
+    border-color: rgba(46, 204, 113, 0.24);
+    background: rgba(46, 204, 113, 0.08);
+}
+
+.ai-assistant-live-status.is-success .ai-assistant-live-dot {
+    background: #34d399;
+    box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.10);
+}
+
+.ai-assistant-live-status.is-warning {
+    border-color: rgba(249, 214, 107, 0.28);
+    background: rgba(249, 214, 107, 0.09);
+}
+
+.ai-assistant-live-status.is-warning .ai-assistant-live-dot {
+    background: #f9d66b;
+    box-shadow: 0 0 0 4px rgba(249, 214, 107, 0.12);
+}
+
+.ai-assistant-live-status.is-failed,
+.ai-assistant-live-status.is-cancelled {
+    border-color: rgba(231, 76, 60, 0.26);
+    background: rgba(231, 76, 60, 0.10);
+}
+
+.ai-assistant-live-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.ai-assistant-live-copy strong {
+    color: var(--paper-white);
+    font-size: 12px;
+    line-height: 1.45;
+    font-weight: 700;
+}
+
+.ai-assistant-live-copy small {
+    color: var(--paper-dim);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
 .ai-assistant-progress-panel,
 .ai-assistant-section,
 .ai-assistant-failure-section {
@@ -633,6 +703,24 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 
 .ai-assistant-failure-section {
     padding: 12px 14px;
+}
+
+.ai-public-live-diagnostics {
+    margin-top: 8px;
+}
+
+.ai-public-live-diagnostics summary {
+    cursor: pointer;
+    color: var(--paper-dim);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.ai-public-live-diagnostics-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 8px;
 }
 
 .ai-assistant-failure-body {
@@ -3556,6 +3644,30 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 [data-theme="light"] .ai-assistant-status.is-warning { color: #d35400; border-color: rgba(243, 156, 18, 0.4); background: rgba(243, 156, 18, 0.1); }
 [data-theme="light"] .ai-assistant-status.is-failed,
 [data-theme="light"] .ai-assistant-status.is-cancelled { color: #c0392b; border-color: rgba(231, 76, 60, 0.3); background: rgba(231, 76, 60, 0.08); }
+
+[data-theme="light"] .ai-assistant-live-status {
+    background: rgba(231, 76, 60, 0.05);
+    border-color: rgba(231, 76, 60, 0.18);
+}
+
+[data-theme="light"] .ai-assistant-live-status.is-success {
+    background: rgba(46, 204, 113, 0.08);
+    border-color: rgba(46, 204, 113, 0.28);
+}
+
+[data-theme="light"] .ai-assistant-live-status.is-warning {
+    background: rgba(243, 156, 18, 0.08);
+    border-color: rgba(243, 156, 18, 0.30);
+}
+
+[data-theme="light"] .ai-assistant-live-copy strong {
+    color: #1e293b;
+}
+
+[data-theme="light"] .ai-assistant-live-copy small,
+[data-theme="light"] .ai-public-live-diagnostics summary {
+    color: #475569;
+}
 
 [data-theme="light"] .ai-agent-runtime {
     background: #ffffff;

@@ -327,6 +327,9 @@ function createPanel(AiPanel, overrides = {}) {
   panel.agentRunStepMap = new Map();
   panel.agentRunToolMap = new Map();
   panel.agentRunArtifactMap = new Map();
+  panel.publicLiveEventKeys = new Set();
+  panel.publicLiveEvents = [];
+  panel.publicLiveStatusTimer = null;
   panel.activeAssistantTurn = null;
   panel.lastUserPrompt = '';
   panel.isCancellingGenerate = false;
@@ -442,6 +445,7 @@ function attachAgentRunTurn(panel) {
   const turn = {
     card: createFakeElement(),
     statusEl: createFakeElement(),
+    liveStatusEl: createFakeElement(),
     reasoningSection: createFakeElement(),
     reasoningBody: createFakeElement(),
     replySection: createFakeElement(),
@@ -2091,6 +2095,101 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
   assert.match(overview.innerHTML, /streamed plan ready/);
   assert.match(plan.innerHTML, /规划诊断/);
   assert.doesNotMatch(turn.replyBody.textContent, /collecting_context|planning_with_model|rawPrompt|chain/i);
+});
+
+test('PlanRun public live events split ephemeral status persistent fallback and diagnostics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.activePlanRequestId = 'plan-request-live';
+  panel.activePlanRunId = 'ar_plan_live';
+  panel.activePlanRunRequestId = 'plan-request-live';
+
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_live',
+    sequence: 1,
+    eventType: 'plan.context.started',
+    stage: 'collecting_context',
+    title: '收集上下文',
+    summary: '正在收集公开需求、流程、模板、附件、算子和工站边界。',
+    status: 'running',
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(turn.liveStatusEl.hidden, false);
+  assert.match(turn.liveStatusEl.innerHTML, /正在收集工程上下文/);
+
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_live',
+    sequence: 2,
+    eventType: 'plan.model.started',
+    stage: 'planning_with_model',
+    title: '模型规划中',
+    summary: '模型正在生成公开结构化规划候选。',
+    status: 'running',
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.match(turn.liveStatusEl.innerHTML, /Planner 模型/);
+
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_live',
+    sequence: 3,
+    eventType: 'plan.model.failed',
+    stage: 'planning_with_model',
+    title: '模型规划失败',
+    summary: '模型规划未能产出可用规划，已使用规则兜底方案。',
+    status: 'failed',
+    payload: {
+      fallbackReason: 'planner_failed',
+      plannerFailureStage: 'json_parse',
+      plannerFailureCode: 'planner_json_parse_failed',
+      sanitizedErrorKind: 'planner_json_parse_failed',
+      sanitizedErrorMessage: 'rawPrompt=secret baseUrl=http://10.1.2.3/v1 C:\\factory\\image.png DB1.DBX0.0 data:image/png;base64,abcd'
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  let processText = collectProcessText(turn);
+  assert.match(processText, /Planner 未能产出可用规划/);
+  assert.match(processText, /Planner JSON 解析失败/);
+  assert.match(processText, /当前方案为规则兜底草案/);
+  assert.equal(turn.failureSection.hidden, false);
+  assert.match(turn.failureBody.innerHTML, /诊断详情/);
+  assert.match(turn.failureBody.innerHTML, /Planner JSON 解析失败/);
+  assert.match(turn.failureBody.innerHTML, /规则兜底草案/);
+  assertNoSensitiveLeak(turn.failureBody.innerHTML);
+
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_live',
+    sequence: 4,
+    eventType: 'plan.fallback.used',
+    stage: 'rule_fallback_used',
+    title: '已使用规则兜底方案',
+    summary: '已启用规则兜底草案。',
+    status: 'completed',
+    payload: {
+      fallbackReason: 'planner_failed',
+      plannerFailureCode: 'planner_json_parse_failed'
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  processText = collectProcessText(turn);
+  assert.match(processText, /已启用规则兜底草案/);
+  assert.match(processText, /不是大模型 Planner 生成结果/);
+  assert.equal(panel.publicLiveEvents.filter(evt => evt.visibility === 'ephemeral').length, 2);
+  assert.equal(panel.publicLiveEvents.filter(evt => evt.visibility === 'persistent').length, 2);
 });
 
 test('Plan Mode timeout stream shows rule fallback copy', async () => {
@@ -6645,6 +6744,7 @@ test('source guard: Agent UI has no RuntimePreview hardware network or process t
   const guardedSource = [
     'aiPanel.js',
     'aiPanelGenerateRequest.js',
+    'aiPanelLiveEvents.js',
     'aiPanelValidationPreview.js',
     'aiPanelRuntimePreview.js',
     'aiPanelToolTrace.js'
