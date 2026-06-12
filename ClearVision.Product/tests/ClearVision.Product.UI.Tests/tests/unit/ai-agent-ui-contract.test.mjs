@@ -507,6 +507,10 @@ function backendPlanResult(overrides = {}) {
     confidence: overrides.confidence || 'high',
     planSource: overrides.planSource || 'rule_fallback',
     fallbackReason: overrides.fallbackReason || 'planner_failed',
+    plannerFailureStage: overrides.plannerFailureStage || '',
+    plannerFailureCode: overrides.plannerFailureCode || '',
+    sanitizedErrorKind: overrides.sanitizedErrorKind || '',
+    sanitizedErrorMessage: overrides.sanitizedErrorMessage || '',
     requirementUnderstanding: ['Inspection intent: surface defect inspection.'],
     recommendedRoute: {
       routeId: 'surface_defect_detection',
@@ -1737,8 +1741,97 @@ test('Plan Mode captures vague inspection request without starting Build', async
   assert.doesNotMatch([
     overview.innerHTML,
     plan.innerHTML
-  ].join('\n'), /Accept recommended defaults|rule_fallback|\bplanner_failed\b|collecting_context completed|What should count as a defect|Defect definition controls|Scratch\/blob|Use general surface defect candidates|Good first draft|>Crack<|Dent\/stain|Thresholds need sample confirmation/);
+  ].join('\n'), /Accept recommended defaults|rule_fallback|collecting_context completed|What should count as a defect|Defect definition controls|Scratch\/blob|Use general surface defect candidates|Good first draft|>Crack<|Dent\/stain|Thresholds need sample confirmation/);
   assert.doesNotMatch(plan.innerHTML, /setTimeout/);
+});
+
+test('Plan Mode diagnostics show planner failure code and rule fallback caveat', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': plan,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._shouldUsePlanRunEventStream = () => false;
+  panel._requestBackendVisionPlan = async () => backendPlanResult({
+    goal: 'planner json fallback plan',
+    plannerFailureStage: 'json_parse',
+    plannerFailureCode: 'planner_json_parse_failed',
+    sanitizedErrorKind: 'planner_json_parse_failed',
+    sanitizedErrorMessage: 'Planner 返回内容无法解析为 PlanModeResult JSON。'
+  });
+
+  panel._dispatchGenerateRequest({
+    description: 'detect board defects',
+    userMessage: 'detect board defects'
+  });
+  await flushAsync();
+
+  assert.match(plan.innerHTML, /当前方案为规则兜底草案，不是大模型 Planner 生成结果/);
+  assert.match(plan.innerHTML, /模型规划失败阶段：JSON 解析失败/);
+  assert.match(plan.innerHTML, /安全错误类型：<span class="ai-plan-tech-code">planner_json_parse_failed<\/span>/);
+  assert.match(plan.innerHTML, /fallbackReason：<span class="ai-plan-tech-code">planner_failed<\/span>/);
+  assert.match(plan.innerHTML, /请检查 Planner 模型是否按 PlanModeResult JSON 契约输出/);
+});
+
+test('Plan Mode diagnostics redact sensitive planner failure details', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': plan,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const unsafe = `token=abc123 api_key=secret baseUrl=https://planner.example.invalid/v1 C:\\factory\\model.onnx 192.168.1.10 DB1.DBX0.0 plc://line1 data:image/png;base64,${'A'.repeat(120)}`;
+  panel._shouldUsePlanRunEventStream = () => false;
+  panel._requestBackendVisionPlan = async () => backendPlanResult({
+    goal: 'redacted fallback plan',
+    plannerFailureStage: 'completion_request',
+    plannerFailureCode: 'completion_request_failed',
+    sanitizedErrorKind: 'completion_request_failed',
+    sanitizedErrorMessage: unsafe,
+    publicEvents: [
+      {
+        stage: 'planning_with_model',
+        status: 'failed',
+        title: unsafe,
+        summary: unsafe,
+        metadata: {
+          fallbackReason: 'planner_failed',
+          plannerFailureStage: 'completion_request',
+          plannerFailureCode: 'completion_request_failed',
+          sanitizedErrorKind: 'completion_request_failed',
+          sanitizedErrorMessage: unsafe
+        }
+      },
+      {
+        stage: 'rule_fallback_used',
+        status: 'completed',
+        title: 'Rule fallback used',
+        summary: unsafe,
+        metadata: { fallbackReason: 'planner_failed' }
+      }
+    ]
+  });
+
+  panel._dispatchGenerateRequest({
+    description: 'detect board defects',
+    userMessage: 'detect board defects'
+  });
+  await flushAsync();
+
+  assert.match(plan.innerHTML, /completion_request_failed/);
+  assert.match(plan.innerHTML, /请检查网络、Planner 接口地址配置、模型服务和中转站状态/);
+  assert.doesNotMatch(plan.innerHTML, /token=abc123|api_key=secret|baseUrl|https:\/\/planner\.example|C:\\factory|192\.168\.1\.10|DB1\.DBX0\.0|plc:\/\/line1|data:image|base64|AAAA/i);
 });
 
 test('ordinary build prompt stays Plan-first even when Tool Loop mode is selected', async () => {

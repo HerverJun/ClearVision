@@ -112,6 +112,10 @@ public sealed record VisionAgentPlanModeResult
     public string PlanHash { get; init; } = string.Empty;
     public string PlanSource { get; init; } = string.Empty;
     public string FallbackReason { get; init; } = string.Empty;
+    public string PlannerFailureStage { get; init; } = string.Empty;
+    public string PlannerFailureCode { get; init; } = string.Empty;
+    public string SanitizedErrorKind { get; init; } = string.Empty;
+    public string SanitizedErrorMessage { get; init; } = string.Empty;
     public string OriginalUserPrompt { get; init; } = string.Empty;
     public string Goal { get; init; } = string.Empty;
     public string Intent { get; init; } = string.Empty;

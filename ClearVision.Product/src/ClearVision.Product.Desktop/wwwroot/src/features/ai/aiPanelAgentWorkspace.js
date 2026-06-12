@@ -189,6 +189,16 @@ const AI_CODE_TEXT_MAP = {
     planner_failed: '模型规划失败，已使用规则兜底方案',
     planner_disabled: '模型规划未启用，已使用规则兜底方案',
     planner_timeout: '模型规划超时，已使用规则兜底方案',
+    planner_unauthorized: '模型规划鉴权失败，已使用规则兜底方案',
+    completion_request_failed: '模型请求失败',
+    completion_empty: '模型返回空内容',
+    planner_json_parse_failed: 'JSON 解析失败',
+    planner_contract_repair_failed: '契约修复失败',
+    planner_unknown_error: '模型规划未知错误',
+    completion_request: '模型请求阶段',
+    completion_response: '模型返回阶段',
+    json_parse: 'JSON 解析阶段',
+    contract_repair: '契约修复阶段',
     contract_repaired: '契约已修复',
     high: '高',
     medium: '中',
@@ -1524,6 +1534,9 @@ export const aiPanelAgentWorkspaceMixin = {
             return { ...base, key: 'contract', label: '契约校验', status: 'running' };
         }
         if (eventType === 'plan.contract.completed') {
+            if (String(evt?.status || '').trim().toLowerCase() === 'failed') {
+                return { ...base, key: 'contract', label: '契约校验', status: 'failed', summary: summary || '契约校验失败，已使用规则兜底方案。' };
+            }
             return { ...base, key: 'contract', label: '契约校验', status: 'completed' };
         }
         if (eventType === 'plan.safety.completed') {
@@ -1564,6 +1577,9 @@ export const aiPanelAgentWorkspaceMixin = {
             return '正在校验规划契约。';
         }
         if (eventType === 'plan.contract.completed') {
+            if (String(evt?.status || '').trim().toLowerCase() === 'failed') {
+                return this._localizeDisplayText(normalized) || '契约校验失败，已使用规则兜底方案。';
+            }
             return '规划契约已校验。';
         }
         if (eventType === 'plan.safety.completed') {
@@ -1660,6 +1676,10 @@ export const aiPanelAgentWorkspaceMixin = {
         const rawCanPlan = plan.canPlan ?? plan.CanPlan;
         const maturityCanPlan = requirementMaturity?.canPlan === true;
         const maturityCanBuild = requirementMaturity?.canBuild === true;
+        const publicEvents = this._toArray(plan.publicEvents || plan.PublicEvents)
+            .map(evt => this._normalizePlanPublicEvent(evt));
+        const rawFallbackReason = String(plan.fallbackReason || plan.FallbackReason || '').trim();
+        const plannerFailure = this._normalizePlannerFailureDiagnostics(plan, publicEvents);
 
         return {
             id: plan.planId || plan.PlanId || `plan-${Date.now()}`,
@@ -1672,11 +1692,20 @@ export const aiPanelAgentWorkspaceMixin = {
             intent: plan.intent || plan.Intent || '',
             confidence: plan.confidence || plan.Confidence || 'medium',
             planSource: plan.planSource || plan.PlanSource || '',
-            fallbackReason: this._formatPlanFallbackReason(plan.fallbackReason || plan.FallbackReason || ''),
-            planWarnings: this._toArray(plan.planWarnings || plan.PlanWarnings).map(item => this._localizeDisplayText(item)),
-            contractRepairNotes: this._toArray(plan.contractRepairNotes || plan.ContractRepairNotes).map(item => this._localizeDisplayText(item)),
-            publicEvents: this._toArray(plan.publicEvents || plan.PublicEvents)
-                .map(evt => this._normalizePlanPublicEvent(evt)),
+            rawFallbackReason,
+            fallbackReason: this._formatPlanFallbackReason(rawFallbackReason),
+            plannerFailure,
+            plannerFailureStage: plannerFailure.stage,
+            plannerFailureCode: plannerFailure.code,
+            sanitizedErrorKind: plannerFailure.kind,
+            sanitizedErrorMessage: plannerFailure.message,
+            planWarnings: this._toArray(plan.planWarnings || plan.PlanWarnings)
+                .map(item => this._sanitizePlanDiagnosticText(this._localizeDisplayText(item)))
+                .filter(Boolean),
+            contractRepairNotes: this._toArray(plan.contractRepairNotes || plan.ContractRepairNotes)
+                .map(item => this._sanitizePlanDiagnosticText(this._localizeDisplayText(item), 120))
+                .filter(Boolean),
+            publicEvents,
             blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
             nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
             canPlan: rawCanPlan === true || maturityCanPlan,
@@ -1757,13 +1786,122 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _normalizePlanPublicEvent(evt) {
         const item = this._asObject?.(evt) || evt || {};
+        const rawMetadata = item.metadata || item.Metadata || {};
+        const metadata = {};
+        if (rawMetadata && typeof rawMetadata === 'object') {
+            Object.entries(rawMetadata).forEach(([key, value]) => {
+                const safeKey = this._sanitizePlanDiagnosticCode(key);
+                if (!safeKey) return;
+                metadata[safeKey] = this._sanitizePlanDiagnosticText(value);
+            });
+        }
+
         return {
-            stage: item.stage || item.Stage || '',
-            status: item.status || item.Status || '',
-            title: item.title || item.Title || '',
-            summary: item.summary || item.Summary || '',
-            metadata: item.metadata || item.Metadata || {}
+            stage: this._sanitizePlanDiagnosticCode(item.stage || item.Stage || ''),
+            status: this._sanitizePlanDiagnosticCode(item.status || item.Status || ''),
+            title: this._sanitizePlanDiagnosticText(item.title || item.Title || ''),
+            summary: this._sanitizePlanDiagnosticText(item.summary || item.Summary || ''),
+            metadata
         };
+    },
+
+    _normalizePlannerFailureDiagnostics(plan, publicEvents = []) {
+        const item = this._asObject?.(plan) || plan || {};
+        const metadataSources = publicEvents
+            .map(evt => evt?.metadata || {})
+            .filter(metadata => metadata && typeof metadata === 'object');
+        const read = (...names) => {
+            for (const name of names) {
+                const direct = item[name] ?? item[this._capitalizeFirst(name)];
+                if (direct !== undefined && direct !== null && String(direct).trim()) {
+                    return direct;
+                }
+
+                for (const metadata of metadataSources) {
+                    const matchedKey = Object.keys(metadata).find(key => key.toLowerCase() === String(name).toLowerCase());
+                    if (matchedKey && String(metadata[matchedKey] ?? '').trim()) {
+                        return metadata[matchedKey];
+                    }
+                }
+            }
+
+            return '';
+        };
+        const stage = this._sanitizePlanDiagnosticCode(read('plannerFailureStage'));
+        const code = this._sanitizePlanDiagnosticCode(read('plannerFailureCode'));
+        const kind = this._sanitizePlanDiagnosticCode(read('sanitizedErrorKind')) || code;
+        const message = this._sanitizePlanDiagnosticText(read('sanitizedErrorMessage'));
+        return {
+            stage,
+            stageLabel: this._formatPlannerFailureStage(stage, code),
+            code,
+            kind,
+            message,
+            hint: this._formatPlannerFailureHint(code)
+        };
+    },
+
+    _capitalizeFirst(value) {
+        const text = String(value || '');
+        return text ? `${text[0].toUpperCase()}${text.slice(1)}` : text;
+    },
+
+    _sanitizePlanDiagnosticCode(value) {
+        const text = String(value ?? '').trim();
+        if (!text) return '';
+        const redacted = this._sanitizePlanDiagnosticText(text, 80);
+        return redacted
+            .replace(/[^A-Za-z0-9_.:-]/g, '')
+            .slice(0, 80);
+    },
+
+    _sanitizePlanDiagnosticText(value, maxChars = 200) {
+        let text = String(value ?? '').trim();
+        if (!text) return '';
+        text = this._redactPublicDiagnosticText?.(text) || text;
+        text = text
+            .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, '[redacted]')
+            .replace(/\b(?:authorization|x-api-key|api[-_ ]?key|token|secret|baseUrl|base_url|headers?)\b\s*[:=]\s*["']?[^"'\s,;}]+/gi, '[redacted]')
+            .replace(/\bhttps?:\/\/[^\s"'<>|]+/gi, '[redacted]')
+            .replace(/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?::\d+)?\b/g, '[redacted]')
+            .replace(/\bDB\d+\.DB[XBWD]\d+(?:\.\d+)?\b/gi, '[redacted]')
+            .replace(/\bM\d+(?:\.\d+)?\b/gi, '[redacted]')
+            .replace(/\bD\d+\b/gi, '[redacted]')
+            .replace(/plc:\/\/[^\s"'<>|]+/gi, '[redacted]')
+            .replace(/(?:[a-z]:\\|\\\\)[^\s"'<>|]+/gi, '[redacted]')
+            .replace(/(?:\/users\/|\/home\/|\/var\/|\/tmp\/|\/mnt\/|\/data\/|\/models\/|\/artifacts\/)[^\s"'<>|]+/gi, '[redacted]')
+            .replace(/data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\r\n]+/gi, '[redacted]')
+            .replace(/(?<![a-z0-9+/=])(?:[a-z0-9+/]{96,}={0,2})(?![a-z0-9+/=])/gi, '[redacted]');
+        return text.slice(0, maxChars);
+    },
+
+    _formatPlannerFailureStage(stage, code = '') {
+        const normalized = String(stage || '').trim().toLowerCase();
+        const failureCode = String(code || '').trim().toLowerCase();
+        if (failureCode === 'planner_timeout') return '模型规划超时';
+        if (failureCode === 'planner_unauthorized') return '模型鉴权失败';
+        if (normalized === 'completion_request') return '模型请求失败';
+        if (normalized === 'completion_response') return '模型返回为空';
+        if (normalized === 'json_parse') return 'JSON 解析失败';
+        if (normalized === 'contract_repair') return '契约修复失败';
+        return normalized ? this._localizeDisplayText(normalized) : '';
+    },
+
+    _formatPlannerFailureHint(code) {
+        switch (String(code || '').trim().toLowerCase()) {
+            case 'planner_unauthorized':
+                return '请检查 Planner API Key、模型名和接口配置。';
+            case 'planner_json_parse_failed':
+                return '请检查 Planner 模型是否按 PlanModeResult JSON 契约输出。';
+            case 'completion_request_failed':
+                return '请检查网络、Planner 接口地址配置、模型服务和中转站状态。';
+            case 'completion_empty':
+                return '请检查 Planner 模型返回内容和中转站响应体。';
+            case 'planner_contract_repair_failed':
+                return '请检查 Planner 输出字段是否满足 PlanModeResult 契约。';
+            default:
+                return '';
+        }
     },
 
     _normalizePlanQuestion(question) {
@@ -2648,6 +2786,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const routeChain = routeOperators.length
             ? `<div class="ai-plan-chain">${routeOperators.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`
             : '<div class="ai-plan-maturity-empty">需求成熟度不足时不会提前选择算子链。</div>';
+        const plannerFailureDiagnostics = this._renderPlannerFailureDiagnostics(plan);
         el.innerHTML = `
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">需求理解</div>
@@ -2670,6 +2809,7 @@ export const aiPanelAgentWorkspaceMixin = {
                         <b>${this._escapeHtml(this._formatPlanSource(plan.planSource))}</b>
                         <span class="ai-plan-tech-code">${this._escapeHtml(plan.planHash || '计划哈希待生成')}</span>
                     </div>
+                    ${plannerFailureDiagnostics}
                     ${plan.fallbackReason ? `<div class="ai-build-note"><strong>兜底原因</strong>${this._escapeHtml(plan.fallbackReason)}</div>` : ''}
                     ${plan.planWarnings.length ? `<ul>${plan.planWarnings.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>` : ''}
                     ${plan.contractRepairNotes.length ? `<div class="ai-plan-chain">${plan.contractRepairNotes.map(item => `<span>${this._escapeHtml(item)}</span>`).join('')}</div>` : ''}
@@ -2724,6 +2864,33 @@ export const aiPanelAgentWorkspaceMixin = {
         el.querySelector('#ai-btn-accept-plan')?.addEventListener('click', () => this._acceptRecommendedPlanAndBuild());
         el.querySelector('#ai-btn-start-build')?.addEventListener('click', () => this._startBuildFromCurrentPlan());
         this._updatePlanBuildActionState();
+    },
+
+    _renderPlannerFailureDiagnostics(plan) {
+        const diagnostic = plan?.plannerFailure || {};
+        const rawFallbackReason = this._sanitizePlanDiagnosticCode(plan?.rawFallbackReason || '');
+        const code = this._sanitizePlanDiagnosticCode(diagnostic.code || plan?.plannerFailureCode || '');
+        const stageLabel = this._sanitizePlanDiagnosticText(diagnostic.stageLabel || this._formatPlannerFailureStage(diagnostic.stage, code), 80);
+        const kind = this._sanitizePlanDiagnosticCode(diagnostic.kind || plan?.sanitizedErrorKind || code);
+        const message = this._sanitizePlanDiagnosticText(diagnostic.message || plan?.sanitizedErrorMessage || '');
+        const hint = this._sanitizePlanDiagnosticText(diagnostic.hint || this._formatPlannerFailureHint(code));
+        const isPlannerFallback = String(plan?.planSource || '').toLowerCase() === 'rule_fallback' &&
+            (code || rawFallbackReason.startsWith('planner_') || rawFallbackReason.startsWith('completion_'));
+        if (!isPlannerFallback) {
+            return '';
+        }
+
+        return `
+            <div class="ai-build-note">
+                <strong>Planner 诊断</strong>
+                <div>当前方案为规则兜底草案，不是大模型 Planner 生成结果。</div>
+                ${stageLabel ? `<div>模型规划失败阶段：${this._escapeHtml(stageLabel)}</div>` : ''}
+                ${kind ? `<div>安全错误类型：<span class="ai-plan-tech-code">${this._escapeHtml(kind)}</span></div>` : ''}
+                ${rawFallbackReason ? `<div>fallbackReason：<span class="ai-plan-tech-code">${this._escapeHtml(rawFallbackReason)}</span></div>` : ''}
+                ${message ? `<div>安全摘要：${this._escapeHtml(message)}</div>` : ''}
+                ${hint ? `<div>${this._escapeHtml(hint)}</div>` : ''}
+            </div>
+        `;
     },
 
     _renderPlanQuestion(question, selectedValue) {

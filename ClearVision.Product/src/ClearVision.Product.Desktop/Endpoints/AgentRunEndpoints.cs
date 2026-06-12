@@ -565,6 +565,10 @@ public static class AgentRunEndpoints
             generationMode = "plan",
             planSource = replaySafePlan.PlanSource,
             fallbackReason = replaySafePlan.FallbackReason,
+            plannerFailureStage = replaySafePlan.PlannerFailureStage,
+            plannerFailureCode = replaySafePlan.PlannerFailureCode,
+            sanitizedErrorKind = replaySafePlan.SanitizedErrorKind,
+            sanitizedErrorMessage = replaySafePlan.SanitizedErrorMessage,
             planResult = replaySafePlan,
             planModeResult = replaySafePlan,
             planId = replaySafePlan.PlanId,
@@ -584,6 +588,10 @@ public static class AgentRunEndpoints
             PlanHash = SanitizePlanToken(result.PlanHash),
             PlanSource = SanitizePlanToken(result.PlanSource),
             FallbackReason = SanitizePlanToken(result.FallbackReason),
+            PlannerFailureStage = SanitizePlanToken(result.PlannerFailureStage),
+            PlannerFailureCode = SanitizePlanToken(result.PlannerFailureCode),
+            SanitizedErrorKind = SanitizePlanToken(result.SanitizedErrorKind),
+            SanitizedErrorMessage = SanitizePlanText(result.SanitizedErrorMessage),
             OriginalUserPrompt = SanitizePlanText(result.OriginalUserPrompt),
             Goal = SanitizePlanText(result.Goal),
             Intent = SanitizePlanToken(result.Intent),
@@ -742,12 +750,17 @@ public static class AgentRunEndpoints
 
         var isFallback = string.Equals(result.PlanSource, "rule_fallback", StringComparison.OrdinalIgnoreCase);
         var fallbackReason = result.FallbackReason ?? string.Empty;
+        var plannerFailureMetadata = BuildPlannerFailureMetadata(result);
         if (string.Equals(fallbackReason, "planner_timeout", StringComparison.OrdinalIgnoreCase))
         {
             EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.PlanModelTimeout, "planning_with_model",
                 "模型规划超时", "模型规划超时，已使用规则兜底方案。", AgentRunEventStatuses.Failed, new
                 {
                     fallbackReason,
+                    plannerFailureMetadata.plannerFailureStage,
+                    plannerFailureMetadata.plannerFailureCode,
+                    plannerFailureMetadata.sanitizedErrorKind,
+                    plannerFailureMetadata.sanitizedErrorMessage,
                     metadataOnly = true
                 });
         }
@@ -757,6 +770,10 @@ public static class AgentRunEndpoints
                 "模型规划失败", "模型规划未能产出可用规划，已使用规则兜底方案。", AgentRunEventStatuses.Failed, new
                 {
                     fallbackReason,
+                    plannerFailureMetadata.plannerFailureStage,
+                    plannerFailureMetadata.plannerFailureCode,
+                    plannerFailureMetadata.sanitizedErrorKind,
+                    plannerFailureMetadata.sanitizedErrorMessage,
                     metadataOnly = true
                 });
         }
@@ -793,9 +810,28 @@ public static class AgentRunEndpoints
                 "已使用规则兜底方案", BuildFallbackSummary(fallbackReason), AgentRunEventStatuses.Completed, new
                 {
                     fallbackReason,
+                    plannerFailureMetadata.plannerFailureStage,
+                    plannerFailureMetadata.plannerFailureCode,
+                    plannerFailureMetadata.sanitizedErrorKind,
+                    plannerFailureMetadata.sanitizedErrorMessage,
                     metadataOnly = true
                 });
         }
+    }
+
+    private sealed record PlannerFailureMetadata(
+        string plannerFailureStage,
+        string plannerFailureCode,
+        string sanitizedErrorKind,
+        string sanitizedErrorMessage);
+
+    private static PlannerFailureMetadata BuildPlannerFailureMetadata(VisionAgentPlanModeResult result)
+    {
+        return new PlannerFailureMetadata(
+            SanitizePlanToken(result.PlannerFailureStage),
+            SanitizePlanToken(result.PlannerFailureCode),
+            SanitizePlanToken(result.SanitizedErrorKind),
+            SanitizePlanText(result.SanitizedErrorMessage));
     }
 
     private static void EmitPublicPlanEvent(

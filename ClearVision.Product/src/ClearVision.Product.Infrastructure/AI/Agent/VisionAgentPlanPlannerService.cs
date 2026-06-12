@@ -73,7 +73,13 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
         @"(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{96,}={0,2}(?![A-Za-z0-9+/])",
         RegexOptions.Compiled);
     private static readonly Regex SecretRegex = new(
-        @"(?i)(sk-[A-Za-z0-9_\-]{12,}|api[_-]?key\s*[:=]\s*[^\s,;]+|token\s*[:=]\s*[^\s,;]+|secret\s*[:=]\s*[^\s,;]+)",
+        @"(?i)(sk-[A-Za-z0-9_\-]{12,}|bearer\s+[A-Za-z0-9._~+/=-]{8,}|x-api-key\s*[:=]\s*[^\s,;]+|api[_-]?key\s*[:=]\s*[^\s,;]+|token\s*[:=]\s*[^\s,;]+|secret\s*[:=]\s*[^\s,;]+)",
+        RegexOptions.Compiled);
+    private static readonly Regex EndpointValueRegex = new(
+        @"(?i)\b(baseUrl|base_url|url|endpoint|host)\s*[:=]\s*[""']?[^\s,;""'}]+",
+        RegexOptions.Compiled);
+    private static readonly Regex UrlRegex = new(
+        @"(?i)\bhttps?:\/\/[^\s""'<>|]+",
         RegexOptions.Compiled);
     private static readonly Regex IpAddressRegex = new(
         @"\b(?:\d{1,3}\.){3}\d{1,3}\b",
@@ -81,6 +87,19 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
     private static readonly Regex PlcAddressRegex = new(
         @"(?i)\b(DB\d+\.DB[XBWD]\d+|M\d+(?:\.\d+)?|D\d+|plc://[^\s,;]+)\b",
         RegexOptions.Compiled);
+    private const int MaxSanitizedErrorMessageChars = 200;
+    private const string PlannerFailureStageRequest = "completion_request";
+    private const string PlannerFailureStageResponse = "completion_response";
+    private const string PlannerFailureStageJsonParse = "json_parse";
+    private const string PlannerFailureStageContractRepair = "contract_repair";
+    private const string PlannerFailureStageUnknown = "unknown";
+    private const string CompletionRequestFailed = "completion_request_failed";
+    private const string CompletionEmpty = "completion_empty";
+    private const string PlannerJsonParseFailed = "planner_json_parse_failed";
+    private const string PlannerContractRepairFailed = "planner_contract_repair_failed";
+    private const string PlannerTimeout = "planner_timeout";
+    private const string PlannerUnauthorized = "planner_unauthorized";
+    private const string PlannerUnknownError = "planner_unknown_error";
 
     private readonly IVisionAgentPlanCompletionSource _completionSource;
     private readonly VisionAgentPlanPromptComposer _promptComposer;
@@ -125,89 +144,211 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                 "Planner 生成未启用，已使用规则兜底方案。");
         }
 
+        VisionAgentPlanPrompt prompt;
         try
         {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-            var prompt = _promptComposer.Compose(request, ruleBaseline, _options);
-            events.Add(Event("planning_with_model", "started", "模型规划已开始",
-                "模型正在生成结构化 PlanModeResult 候选。",
-                new()
-                {
-                    ["modelRole"] = _options.ModelRole,
-                    ["metadataOnly"] = "true"
-                }));
-            var completion = await _completionSource.CompleteAsync(
-                new VisionAgentPlanCompletionRequest(prompt.SystemPrompt, prompt.Messages, _options.ModelRole),
-                timeout.Token);
-            events.Add(Event("planning_with_model", "completed", "模型规划候选已返回",
-                "模型已返回公开结构化候选，等待校验。"));
-
-            events.Add(Event("validating_plan_contract", "started", "校验规划契约",
-                "正在校验 JSON 结构、问题质量、算子目录和模板约束。"));
-            var candidate = ParseCandidate(completion);
-            var repaired = RepairCandidate(candidate, request, ruleBaseline, out var repairNotes, out var warnings);
-            events.Add(Event("validating_plan_contract", "completed", "规划契约已校验",
-                "模型规划已归一到公开 PlanModeResult 契约。",
-                new()
-                {
-                    ["repairCount"] = repairNotes.Count.ToString(),
-                    ["warningCount"] = warnings.Count.ToString()
-                }));
-            events.Add(Event("applying_safety_constraints", "completed", "安全约束已应用",
-                "已应用脱敏、元数据边界、资源占位和 PLC 安全策略。"));
-
-            var result = repaired with
-            {
-                PlanSource = "model_planner",
-                FallbackReason = string.Empty,
-                PlanWarnings = warnings,
-                ContractRepairNotes = repairNotes,
-                PublicEvents = [.. events, Event("plan_ready", "completed", "规划已就绪",
-                    "Planner 规划已就绪，等待用户确认。")],
-                MetadataOnly = true
-            };
-            return result with
-            {
-                PlanHash = VisionAgentOrchestrator.ComputePlanHash(result)
-            };
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            events.Add(Event("planning_with_model", "failed", "模型规划超时",
-                "模型规划超时，已使用规则兜底方案。",
-                new() { ["fallbackReason"] = "planner_timeout" }));
-            return BuildFallback(
-                ruleBaseline,
-                "planner_timeout",
-                events,
-                "模型规划超时，已使用规则兜底方案。");
-        }
-        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            events.Add(Event("planning_with_model", "failed", "模型规划鉴权失败",
-                "模型规划鉴权失败，已使用规则兜底，请检查 Planner API Key/接口/模型名。",
-                new() { ["fallbackReason"] = "planner_unauthorized" }));
-            return BuildFallback(
-                ruleBaseline,
-                "planner_unauthorized",
-                events,
-                "模型规划鉴权失败，已使用规则兜底，请检查 Planner API Key/接口/模型名。");
+            prompt = _promptComposer.Compose(request, ruleBaseline, _options);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(
-                "Vision Agent Plan Planner failed; rule fallback will be used. Error={Error}",
-                ex.Message);
+            var diagnostic = BuildDiagnostic(
+                PlannerFailureStageUnknown,
+                PlannerUnknownError,
+                "planner_prompt_compose_failed",
+                "Planner 请求准备失败，已使用规则兜底方案。",
+                ex);
+            LogPlannerFailure(diagnostic);
             events.Add(Event("planning_with_model", "failed", "模型规划失败",
                 "模型规划失败，已使用规则兜底方案。",
-                new() { ["fallbackReason"] = "planner_failed" }));
+                BuildDiagnosticMetadata("planner_failed", diagnostic)));
             return BuildFallback(
                 ruleBaseline,
                 "planner_failed",
                 events,
-                "模型规划失败，已使用规则兜底方案。");
+                "模型规划失败，已使用规则兜底方案。",
+                diagnostic);
         }
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
+        events.Add(Event("planning_with_model", "started", "模型规划已开始",
+            "模型正在生成结构化 PlanModeResult 候选。",
+            new()
+            {
+                ["modelRole"] = _options.ModelRole,
+                ["metadataOnly"] = "true"
+            }));
+
+        string completion;
+        try
+        {
+            completion = await _completionSource.CompleteAsync(
+                new VisionAgentPlanCompletionRequest(prompt.SystemPrompt, prompt.Messages, _options.ModelRole),
+                timeout.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            var diagnostic = BuildDiagnostic(
+                PlannerFailureStageRequest,
+                PlannerTimeout,
+                PlannerTimeout,
+                "模型规划超时，已使用规则兜底方案。",
+                null);
+            LogPlannerFailure(diagnostic);
+            events.Add(Event("planning_with_model", "failed", "模型规划超时",
+                "模型规划超时，已使用规则兜底方案。",
+                BuildDiagnosticMetadata("planner_timeout", diagnostic)));
+            return BuildFallback(
+                ruleBaseline,
+                "planner_timeout",
+                events,
+                "模型规划超时，已使用规则兜底方案。",
+                diagnostic);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            var diagnostic = BuildDiagnostic(
+                PlannerFailureStageRequest,
+                PlannerUnauthorized,
+                PlannerUnauthorized,
+                "模型规划鉴权失败，已使用规则兜底，请检查 Planner API Key、模型名和接口配置。",
+                ex);
+            LogPlannerFailure(diagnostic);
+            events.Add(Event("planning_with_model", "failed", "模型规划鉴权失败",
+                "模型规划鉴权失败，已使用规则兜底，请检查 Planner API Key/接口/模型名。",
+                BuildDiagnosticMetadata("planner_unauthorized", diagnostic)));
+            return BuildFallback(
+                ruleBaseline,
+                "planner_unauthorized",
+                events,
+                "模型规划鉴权失败，已使用规则兜底，请检查 Planner API Key/接口/模型名。",
+                diagnostic);
+        }
+        catch (Exception ex)
+        {
+            var diagnostic = BuildDiagnostic(
+                PlannerFailureStageRequest,
+                CompletionRequestFailed,
+                CompletionRequestFailed,
+                "Planner 模型请求失败，请检查网络、Planner 接口地址配置、模型服务和中转站状态。",
+                ex);
+            LogPlannerFailure(diagnostic);
+            events.Add(Event("planning_with_model", "failed", "模型请求失败",
+                "Planner 模型请求失败，已使用规则兜底方案。",
+                BuildDiagnosticMetadata("planner_failed", diagnostic)));
+            return BuildFallback(
+                ruleBaseline,
+                "planner_failed",
+                events,
+                "模型规划失败，已使用规则兜底方案。",
+                diagnostic);
+        }
+
+        if (string.IsNullOrWhiteSpace(completion))
+        {
+            var diagnostic = BuildDiagnostic(
+                PlannerFailureStageResponse,
+                CompletionEmpty,
+                CompletionEmpty,
+                "Planner 模型返回空内容，已使用规则兜底方案。",
+                null);
+            LogPlannerFailure(diagnostic);
+            events.Add(Event("planning_with_model", "failed", "模型返回为空",
+                "Planner 模型返回空内容，已使用规则兜底方案。",
+                BuildDiagnosticMetadata("planner_failed", diagnostic)));
+            return BuildFallback(
+                ruleBaseline,
+                "planner_failed",
+                events,
+                "模型规划失败，已使用规则兜底方案。",
+                diagnostic);
+        }
+
+        events.Add(Event("planning_with_model", "completed", "模型规划候选已返回",
+            "模型已返回公开结构化候选，等待校验。"));
+
+        events.Add(Event("validating_plan_contract", "started", "校验规划契约",
+            "正在校验 JSON 结构、问题质量、算子目录和模板约束。"));
+        VisionAgentPlanModeResult candidate;
+        try
+        {
+            candidate = ParseCandidate(completion);
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+        {
+            var diagnostic = BuildDiagnostic(
+                PlannerFailureStageJsonParse,
+                PlannerJsonParseFailed,
+                PlannerJsonParseFailed,
+                "Planner 返回内容无法解析为 PlanModeResult JSON，请检查 Planner 模型是否按 PlanModeResult JSON 契约输出。",
+                ex);
+            LogPlannerFailure(diagnostic);
+            events.Add(Event("validating_plan_contract", "failed", "JSON 解析失败",
+                "Planner 返回内容无法解析为合法 JSON，已使用规则兜底方案。",
+                BuildDiagnosticMetadata("planner_failed", diagnostic)));
+            return BuildFallback(
+                ruleBaseline,
+                "planner_failed",
+                events,
+                "模型规划失败，已使用规则兜底方案。",
+                diagnostic);
+        }
+
+        VisionAgentPlanModeResult repaired;
+        List<string> repairNotes;
+        List<string> warnings;
+        try
+        {
+            repaired = RepairCandidate(candidate, request, ruleBaseline, out repairNotes, out warnings);
+        }
+        catch (Exception ex)
+        {
+            var diagnostic = BuildDiagnostic(
+                PlannerFailureStageContractRepair,
+                PlannerContractRepairFailed,
+                PlannerContractRepairFailed,
+                "Planner JSON 可解析但未通过 PlanModeResult 契约修复，请检查输出字段完整性。",
+                ex);
+            LogPlannerFailure(diagnostic);
+            events.Add(Event("validating_plan_contract", "failed", "契约修复失败",
+                "Planner JSON 可解析但未通过契约修复，已使用规则兜底方案。",
+                BuildDiagnosticMetadata("planner_failed", diagnostic)));
+            return BuildFallback(
+                ruleBaseline,
+                "planner_failed",
+                events,
+                "模型规划失败，已使用规则兜底方案。",
+                diagnostic);
+        }
+
+        events.Add(Event("validating_plan_contract", "completed", "规划契约已校验",
+            "模型规划已归一到公开 PlanModeResult 契约。",
+            new()
+            {
+                ["repairCount"] = repairNotes.Count.ToString(),
+                ["warningCount"] = warnings.Count.ToString()
+            }));
+        events.Add(Event("applying_safety_constraints", "completed", "安全约束已应用",
+            "已应用脱敏、元数据边界、资源占位和 PLC 安全策略。"));
+
+        var result = repaired with
+        {
+            PlanSource = "model_planner",
+            FallbackReason = string.Empty,
+            PlannerFailureStage = string.Empty,
+            PlannerFailureCode = string.Empty,
+            SanitizedErrorKind = string.Empty,
+            SanitizedErrorMessage = string.Empty,
+            PlanWarnings = warnings,
+            ContractRepairNotes = repairNotes,
+            PublicEvents = [.. events, Event("plan_ready", "completed", "规划已就绪",
+                "Planner 规划已就绪，等待用户确认。")],
+            MetadataOnly = true
+        };
+        return result with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(result)
+        };
     }
 
     private static VisionAgentPlanModeResult ParseCandidate(string completion)
@@ -348,23 +489,47 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
         return result;
     }
 
+    private sealed record PlannerFailureDiagnostic(
+        string Stage,
+        string Code,
+        string SanitizedErrorKind,
+        string SanitizedErrorMessage);
+
     private static VisionAgentPlanModeResult BuildFallback(
         VisionAgentPlanModeResult baseline,
         string reason,
         List<VisionAgentPlanPublicEvent> events,
-        string summary)
+        string summary,
+        PlannerFailureDiagnostic? diagnostic = null)
     {
+        var planWarnings = new List<string> { summary };
+        var contractRepairNotes = new List<string>();
+        if (diagnostic != null)
+        {
+            planWarnings.Add(diagnostic.SanitizedErrorMessage);
+            contractRepairNotes.Add($"planner_failure_stage:{diagnostic.Stage}");
+            contractRepairNotes.Add($"planner_failure_code:{diagnostic.Code}");
+            contractRepairNotes.Add($"sanitized_error_kind:{diagnostic.SanitizedErrorKind}");
+        }
+
         var result = baseline with
         {
             PlanSource = "rule_fallback",
             FallbackReason = reason,
-            PlanWarnings = [summary],
-            ContractRepairNotes = [],
+            PlannerFailureStage = diagnostic?.Stage ?? string.Empty,
+            PlannerFailureCode = diagnostic?.Code ?? string.Empty,
+            SanitizedErrorKind = diagnostic?.SanitizedErrorKind ?? string.Empty,
+            SanitizedErrorMessage = diagnostic?.SanitizedErrorMessage ?? string.Empty,
+            PlanWarnings = planWarnings
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            ContractRepairNotes = contractRepairNotes,
             PublicEvents =
             [
                 .. events,
                 Event("rule_fallback_used", "completed", "已启用规则兜底", summary,
-                    new() { ["fallbackReason"] = reason }),
+                    BuildDiagnosticMetadata(reason, diagnostic)),
                 Event("plan_ready", "completed", "兜底规划已就绪",
                     "规则兜底规划已就绪，等待用户确认。")
             ],
@@ -374,6 +539,51 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
         {
             PlanHash = VisionAgentOrchestrator.ComputePlanHash(result)
         };
+    }
+
+    private static PlannerFailureDiagnostic BuildDiagnostic(
+        string stage,
+        string code,
+        string kind,
+        string publicSummary,
+        Exception? exception)
+    {
+        var sanitized = SafeErrorSummary(publicSummary, exception);
+        return new PlannerFailureDiagnostic(
+            SafeIdentifier(stage, PlannerFailureStageUnknown),
+            SafeIdentifier(code, PlannerUnknownError),
+            SafeIdentifier(kind, PlannerUnknownError),
+            sanitized);
+    }
+
+    private static Dictionary<string, string> BuildDiagnosticMetadata(
+        string fallbackReason,
+        PlannerFailureDiagnostic? diagnostic)
+    {
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["fallbackReason"] = SafeIdentifier(fallbackReason, "planner_failed")
+        };
+        if (diagnostic == null)
+        {
+            return metadata;
+        }
+
+        metadata["plannerFailureStage"] = diagnostic.Stage;
+        metadata["plannerFailureCode"] = diagnostic.Code;
+        metadata["sanitizedErrorKind"] = diagnostic.SanitizedErrorKind;
+        metadata["sanitizedErrorMessage"] = diagnostic.SanitizedErrorMessage;
+        return metadata;
+    }
+
+    private void LogPlannerFailure(PlannerFailureDiagnostic diagnostic)
+    {
+        _logger.LogWarning(
+            "Vision Agent Plan Planner failed; rule fallback will be used. Stage={Stage} Code={Code} Kind={Kind} Summary={Summary}",
+            diagnostic.Stage,
+            diagnostic.Code,
+            diagnostic.SanitizedErrorKind,
+            diagnostic.SanitizedErrorMessage);
     }
 
     private static VisionAgentRecommendedRoute RepairRoute(
@@ -669,6 +879,8 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
 
         var original = text;
         text = ImageBase64Regex.Replace(text, "<redacted-image-base64>");
+        text = EndpointValueRegex.Replace(text, "<redacted-endpoint>");
+        text = UrlRegex.Replace(text, "<redacted-url>");
         text = WindowsPathRegex.Replace(text, "<redacted-local-path>");
         text = SecretRegex.Replace(text, "<redacted-secret>");
         text = PlcAddressRegex.Replace(text, "<redacted-plc-address>");
@@ -682,12 +894,27 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
         return text;
     }
 
+    private static string SafeErrorSummary(string publicSummary, Exception? exception)
+    {
+        var text = publicSummary;
+        if (exception != null && !string.IsNullOrWhiteSpace(exception.Message))
+        {
+            text = $"{publicSummary} {exception.GetType().Name}: {exception.Message}";
+        }
+
+        var notes = new List<string>();
+        var safe = SafeText(text, notes);
+        return Truncate(safe, MaxSanitizedErrorMessageChars);
+    }
+
     private static bool LooksLikeUnsafe(string? value)
     {
         var text = value ?? string.Empty;
         return WindowsPathRegex.IsMatch(text) ||
                ImageBase64Regex.IsMatch(text) ||
                LongBase64Regex.IsMatch(text) ||
+               EndpointValueRegex.IsMatch(text) ||
+               UrlRegex.IsMatch(text) ||
                SecretRegex.IsMatch(text) ||
                IpAddressRegex.IsMatch(text) ||
                PlcAddressRegex.IsMatch(text);
@@ -729,6 +956,16 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
     private static string Clean(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
+    private static string Truncate(string text, int maxChars)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxChars)
+        {
+            return text;
+        }
+
+        return text[..maxChars];
     }
 }
 

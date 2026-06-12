@@ -67,7 +67,7 @@ public sealed class VisionAgentPlanPlannerTests
     [Fact(DisplayName = "Plan planner failure should return rule fallback with public diagnostic")]
     public async Task CreatePlanAsync_ShouldFallbackWhenPlannerFails()
     {
-        var service = CreateService(_ => throw new InvalidOperationException("planner unavailable"));
+        var service = CreateService(_ => throw new InvalidOperationException(UnsafeErrorText()));
         var baseline = Baseline("scratch", "surface_defect");
 
         var result = await service.CreatePlanAsync(
@@ -81,9 +81,59 @@ public sealed class VisionAgentPlanPlannerTests
         result.PublicEvents.Should().Contain(evt =>
             evt.Stage == "planning_with_model" &&
             evt.Status == "failed" &&
-            evt.Summary.Contains("模型规划失败", StringComparison.Ordinal));
+            evt.Summary.Contains("模型请求失败", StringComparison.Ordinal));
         result.PublicEvents.Should().Contain(evt => evt.Stage == "rule_fallback_used");
+        AssertPlannerFailure(result, "completion_request", "completion_request_failed");
+        AssertNoSensitiveDiagnostics(result);
         result.MetadataOnly.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Plan planner empty completion should return completion_empty diagnostic")]
+    public async Task CreatePlanAsync_ShouldFallbackWhenPlannerReturnsEmptyCompletion()
+    {
+        var service = CreateService(_ => "   ");
+        var baseline = Baseline("scratch", "surface_defect");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "scratch" },
+            baseline,
+            CancellationToken.None);
+
+        result.PlanSource.Should().Be("rule_fallback");
+        result.FallbackReason.Should().Be("planner_failed");
+        AssertPlannerFailure(result, "completion_response", "completion_empty");
+    }
+
+    [Fact(DisplayName = "Plan planner invalid JSON should return json parse diagnostic")]
+    public async Task CreatePlanAsync_ShouldFallbackWhenPlannerReturnsInvalidJson()
+    {
+        var service = CreateService(_ => "not valid json");
+        var baseline = Baseline("scratch", "surface_defect");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "scratch" },
+            baseline,
+            CancellationToken.None);
+
+        result.PlanSource.Should().Be("rule_fallback");
+        result.FallbackReason.Should().Be("planner_failed");
+        AssertPlannerFailure(result, "json_parse", "planner_json_parse_failed");
+    }
+
+    [Fact(DisplayName = "Plan planner repair failure should return contract repair diagnostic")]
+    public async Task CreatePlanAsync_ShouldFallbackWhenPlannerContractRepairFails()
+    {
+        var service = CreateService(_ => PlannerPlanJsonWithNullQuestionOptions());
+        var baseline = Baseline("scratch", "surface_defect");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "scratch" },
+            baseline,
+            CancellationToken.None);
+
+        result.PlanSource.Should().Be("rule_fallback");
+        result.FallbackReason.Should().Be("planner_failed");
+        AssertPlannerFailure(result, "contract_repair", "planner_contract_repair_failed");
     }
 
     [Fact(DisplayName = "Plan planner Unauthorized should return rule fallback with API key diagnostic")]
@@ -107,6 +157,7 @@ public sealed class VisionAgentPlanPlannerTests
             evt.Stage == "planning_with_model" &&
             evt.Status == "failed" &&
             evt.Summary.Contains("模型规划鉴权失败", StringComparison.Ordinal));
+        AssertPlannerFailure(result, "completion_request", "planner_unauthorized");
         result.MetadataOnly.Should().BeTrue();
     }
 
@@ -138,6 +189,7 @@ public sealed class VisionAgentPlanPlannerTests
         result.PublicEvents.Should().Contain(evt =>
             evt.Stage == "rule_fallback_used" &&
             evt.Summary.Contains("模型规划超时", StringComparison.Ordinal));
+        AssertPlannerFailure(result, "completion_request", "planner_timeout");
         result.MetadataOnly.Should().BeTrue();
     }
 
@@ -327,6 +379,54 @@ public sealed class VisionAgentPlanPlannerTests
         };
     }
 
+    private static void AssertPlannerFailure(
+        VisionAgentPlanModeResult result,
+        string expectedStage,
+        string expectedCode)
+    {
+        result.PlannerFailureStage.Should().Be(expectedStage);
+        result.PlannerFailureCode.Should().Be(expectedCode);
+        result.SanitizedErrorKind.Should().Be(expectedCode);
+        result.SanitizedErrorMessage.Should().NotBeNullOrWhiteSpace();
+        result.SanitizedErrorMessage.Length.Should().BeLessThanOrEqualTo(200);
+        result.ContractRepairNotes.Should().Contain($"planner_failure_stage:{expectedStage}");
+        result.ContractRepairNotes.Should().Contain($"planner_failure_code:{expectedCode}");
+        result.ContractRepairNotes.Should().Contain($"sanitized_error_kind:{expectedCode}");
+        result.PlanWarnings.Should().Contain(value => value.Contains(result.SanitizedErrorMessage, StringComparison.Ordinal));
+        result.PublicEvents.Any(evt =>
+        {
+            evt.Metadata.TryGetValue("plannerFailureStage", out var stage);
+            evt.Metadata.TryGetValue("plannerFailureCode", out var code);
+            evt.Metadata.TryGetValue("sanitizedErrorKind", out var kind);
+            return stage == expectedStage &&
+                   code == expectedCode &&
+                   kind == expectedCode;
+        }).Should().BeTrue();
+    }
+
+    private static void AssertNoSensitiveDiagnostics(VisionAgentPlanModeResult result)
+    {
+        var publicJson = JsonSerializer.Serialize(result);
+        publicJson.Should().NotContain("sk-secret-token");
+        publicJson.Should().NotContain("token=abc123");
+        publicJson.Should().NotContain("api_key=secret-key");
+        publicJson.Should().NotMatchRegex("(?i)baseUrl");
+        publicJson.Should().NotContain("https://planner.example.invalid");
+        publicJson.Should().NotContain(@"C:\factory");
+        publicJson.Should().NotContain("192.168.1.10");
+        publicJson.Should().NotContain("DB1.DBX0.0");
+        publicJson.Should().NotContain("plc://");
+        publicJson.Should().NotContain("data:image");
+        publicJson.Should().NotContain(new string('A', 120));
+    }
+
+    private static string UnsafeErrorText()
+    {
+        return "Planner failed baseUrl=https://planner.example.invalid/v1 token=abc123 " +
+               "api_key=secret-key C:\\factory\\models\\scratch.onnx 192.168.1.10 " +
+               "DB1.DBX0.0 plc://line1 data:image/png;base64," + new string('A', 120);
+    }
+
     private static string PlannerPlanJson(
         string intent,
         string questionId,
@@ -379,6 +479,59 @@ public sealed class VisionAgentPlanPlannerTests
                 : new { mode = "template_fill", templateId, scenarioKey = intent },
             stationBoundarySummary = "metadata-only Station boundary.",
             plcOutputPolicy = plcPolicy,
+            metadataOnly = true
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
+    private static string PlannerPlanJsonWithNullQuestionOptions()
+    {
+        var payload = new
+        {
+            goal = "surface defect planner goal",
+            intent = "surface_defect",
+            confidence = "high",
+            requirementUnderstanding = new[] { "Planner understood surface defect." },
+            recommendedRoute = new
+            {
+                routeId = "surface_defect_planner_route",
+                title = "surface defect planner route",
+                summary = "Planner selected route from semantic context.",
+                operators = OperatorsFor("surface_defect"),
+                templateDecision = "catalog_match"
+            },
+            clarificationQuestions = new[]
+            {
+                new
+                {
+                    id = "defect_morphology",
+                    title = "Primary engineering choice",
+                    why = "This changes operator choice.",
+                    defaultValue = "recommended",
+                    defaultAssumption = "Use recommended default.",
+                    impact = "Build can continue.",
+                    options = (object?)null
+                }
+            },
+            recommendedDefaults = new[]
+            {
+                new
+                {
+                    id = "metadata_only",
+                    label = "Public diagnostics only",
+                    value = "redacted_metadata",
+                    impact = "No unsafe public details are shown."
+                }
+            },
+            risks = new[] { "Representative samples are required before release." },
+            acceptanceCriteria = new[] { "Workflow draft contains acquisition, inspection, judgment, and output stages." },
+            executablePlan = new[] { "Confirm defaults.", "Generate draft.", "Run readiness checks." },
+            canBuild = true,
+            blockingReasons = Array.Empty<string>(),
+            nextAction = "Accept recommended defaults and Build.",
+            stationBoundarySummary = "metadata-only Station boundary.",
+            plcOutputPolicy = "Local ResultOutput first; PLC writes disabled until review.",
             metadataOnly = true
         };
 
