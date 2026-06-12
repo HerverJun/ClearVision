@@ -88,6 +88,107 @@ public sealed class VisionAgentPlanPlannerTests
         result.MetadataOnly.Should().BeTrue();
     }
 
+    [Fact(DisplayName = "Plan planner fallback should preserve semantic extraction route")]
+    public async Task CreatePlanAsync_ShouldPreserveSemanticRouteWhenPlannerFails()
+    {
+        var service = CreateService(_ => throw new InvalidOperationException("planner failed"));
+        var semantic = StrawberrySemantic();
+        var baseline = Baseline("检测成熟草莓", "attribute_classification") with
+        {
+            SemanticExtraction = semantic,
+            RequirementMaturity = new AiRequirementMaturityResult
+            {
+                Maturity = AiRequirementMaturity.Ambiguous,
+                TaskType = AiVisionTaskTypes.AttributeClassification,
+                CanPlan = true,
+                CanBuild = false,
+                ObjectSignals = ["草莓"],
+                TaskSignals = ["成熟度"],
+                MissingFields = ["model_or_rule_strategy"],
+                BlockingReasons = ["model_or_rule_strategy_missing"],
+                PublicReason = "语义抽取结果已足够进入规划。"
+            },
+            RecommendedRoute = new VisionAgentRecommendedRoute
+            {
+                RouteId = "attribute_classification_ok_ng",
+                Title = "属性分类 / OK-NG 判别路线",
+                Summary = "基于语义抽取结果生成属性分类路线。",
+                Operators = ["ImageAcquisition", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput"],
+                TemplateDecision = "catalog_match"
+            },
+            PublicEvents =
+            [
+                new VisionAgentPlanPublicEvent
+                {
+                    Stage = "semantic_extraction",
+                    Status = "completed",
+                    Title = "语义抽取完成",
+                    Summary = "语义理解来自模型。",
+                    MetadataOnly = true
+                }
+            ]
+        };
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "检测成熟草莓",
+                SemanticExtraction = semantic
+            },
+            baseline,
+            CancellationToken.None);
+
+        result.PlanSource.Should().Be("rule_fallback");
+        result.SemanticExtraction.Should().NotBeNull();
+        result.SemanticExtraction!.TaskType.Should().Be(AiVisionTaskTypes.AttributeClassification);
+        result.RecommendedRoute.Title.Should().Contain("属性分类");
+        result.RecommendedRoute.Operators.Should().NotContain("SurfaceDefectDetection");
+        result.PublicEvents.Select(evt => evt.Stage).Should().Contain("semantic_extraction");
+        result.PublicEvents.Should().Contain(evt => evt.Stage == "rule_fallback_used");
+    }
+
+    [Fact(DisplayName = "Plan planner prompt should sanitize semantic extraction echo")]
+    public void PromptComposer_ShouldSanitizeSemanticExtractionEcho()
+    {
+        var semantic = new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.AttributeClassification,
+            InspectionObject = @"strawberry rawPrompt=hidden C:\factory\secret.png",
+            TargetAttribute = "maturity",
+            ImageSource = @"camera C:\factory\image.png",
+            OkCondition = "ripe is OK token=abc123 sk-secret-token",
+            NgCondition = "unripe is NG baseUrl=http://10.1.2.3",
+            SuggestedRoute = "attribute classification",
+            MissingFields = ["systemPrompt=hidden"],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
+        var baseline = Baseline("classify strawberry maturity", "attribute_classification") with
+        {
+            SemanticExtraction = semantic
+        };
+
+        var prompt = new VisionAgentPlanPromptComposer().Compose(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "classify strawberry maturity",
+                SemanticExtraction = semantic
+            },
+            baseline,
+            new VisionAgentPlanPlannerOptions().Normalize());
+        var context = prompt.Messages.Single().Content;
+
+        context.Should().NotContain("rawPrompt");
+        context.Should().NotContain("systemPrompt");
+        context.Should().NotContain(@"C:\factory");
+        context.Should().NotContain("sk-secret-token");
+        context.Should().NotContain("10.1.2.3");
+        context.Should().Contain("<redacted>");
+    }
+
+
     [Fact(DisplayName = "Plan planner empty completion should return completion_empty diagnostic")]
     public async Task CreatePlanAsync_ShouldFallbackWhenPlannerReturnsEmptyCompletion()
     {
@@ -376,6 +477,29 @@ public sealed class VisionAgentPlanPlannerTests
             "template_location" => ["ImageAcquisition", "TemplateMatching", "ResultJudgment", "ResultOutput"],
             "plc_output" => ["ImageAcquisition", "ResultJudgment", "ResultOutput"],
             _ => ["ImageAcquisition", "SurfaceDefectDetection", "BlobAnalysis", "ResultJudgment", "ResultOutput"]
+        };
+    }
+
+    private static VisionAgentSemanticExtractionResult StrawberrySemantic()
+    {
+        return new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.AttributeClassification,
+            Confidence = 0.9,
+            TaskTypeConfidence = 0.88,
+            InspectionObject = "草莓",
+            TargetAttribute = "成熟度/熟透",
+            ImageSource = "相机",
+            OkCondition = "熟透则 OK",
+            NgCondition = "否则 NG",
+            SuggestedRoute = "属性分类 / OK-NG 判别路线",
+            CanPlanCandidate = true,
+            ObjectSignals = ["草莓"],
+            TaskSignals = ["成熟度"],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
         };
     }
 

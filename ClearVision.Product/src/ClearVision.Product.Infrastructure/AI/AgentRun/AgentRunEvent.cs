@@ -8,6 +8,10 @@ public static class AgentRunEventTypes
     public const string AssistantBrief = "assistant.brief";
     public const string PlanCreated = "plan.created";
     public const string PlanStarted = "plan.started";
+    public const string SemanticStarted = "semantic.started";
+    public const string SemanticCompleted = "semantic.completed";
+    public const string SemanticFailed = "semantic.failed";
+    public const string SemanticFallbackUsed = "semantic.fallback.used";
     public const string PlanContextStarted = "plan.context.started";
     public const string PlanContextCompleted = "plan.context.completed";
     public const string PlanModelStarted = "plan.model.started";
@@ -98,6 +102,9 @@ public sealed record AgentRunSummary
     public string FirstFixRecommendation { get; init; } = string.Empty;
     public long LastSequence { get; init; }
     public int EventCount { get; init; }
+    public int DuplicateEventCount { get; init; }
+    public int DroppedEventCount { get; init; }
+    public int StaleEventCount { get; init; }
     public string OwnerHash { get; init; } = string.Empty;
     public bool MetadataOnly { get; init; } = true;
     public bool RedactionPass { get; init; } = true;
@@ -109,9 +116,37 @@ public sealed record AgentRunCreateResult(
     string Brief,
     IReadOnlyList<AgentRunEvent> Events);
 
+public sealed record AgentRunReplaySnapshot
+{
+    public string StorageVersion { get; init; } = AgentRunEventStore.StorageVersion;
+    public string RunId { get; init; } = string.Empty;
+    public DateTimeOffset GeneratedAt { get; init; }
+    public long FirstSequence { get; init; }
+    public long LastSequence { get; init; }
+    public int EventCount { get; init; }
+    public bool MetadataOnly { get; init; } = true;
+    public bool RedactionPass { get; init; } = true;
+    public IReadOnlyList<AgentRunEvent> Events { get; init; } = [];
+}
+
+public sealed record AgentRunReplayDiagnostics
+{
+    public string RunId { get; init; } = string.Empty;
+    public int EventCount { get; init; }
+    public int DuplicateEventCount { get; init; }
+    public int DroppedEventCount { get; init; }
+    public int StaleEventCount { get; init; }
+    public bool MetadataOnly { get; init; } = true;
+    public bool RedactionPass { get; init; } = true;
+}
+
 public sealed record AgentRunReplayResult(
     AgentRunSummary Summary,
-    IReadOnlyList<AgentRunEvent> Events);
+    IReadOnlyList<AgentRunEvent> Events)
+{
+    public AgentRunReplaySnapshot Snapshot { get; init; } = new();
+    public AgentRunReplayDiagnostics Diagnostics { get; init; } = new();
+}
 
 public sealed record AgentRunStreamTokenValidationResult(
     bool Authorized,

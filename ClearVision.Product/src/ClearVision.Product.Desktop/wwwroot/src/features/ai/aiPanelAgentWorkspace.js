@@ -623,6 +623,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 userMessage: context.userMessage,
                 attachmentPaths: context.attachmentPaths,
                 templateSelection: context.templateSelection,
+                semanticExtraction: route.semanticExtraction,
                 clearInput: false,
                 input: null,
                 turn: context.turn,
@@ -710,6 +711,7 @@ export const aiPanelAgentWorkspaceMixin = {
             .filter(question => question.question || question.options.length > 0)
             .slice(0, 5);
         const requirementMaturity = this._normalizeRequirementMaturity(item.requirementMaturity || item.RequirementMaturity);
+        const semanticExtraction = this._normalizeSemanticExtraction(item.semanticExtraction || item.SemanticExtraction);
         return {
             intent,
             confidence: String(item.confidence || item.Confidence || 'low').trim() || 'low',
@@ -723,6 +725,7 @@ export const aiPanelAgentWorkspaceMixin = {
             clarificationQuestions: questions,
             fallbackReason: item.fallbackReason || item.FallbackReason || '',
             routerSource: item.routerSource || item.RouterSource || '',
+            semanticExtraction,
             requirementMaturity,
             decisionTrace: this._normalizeDecisionTrace(item.decisionTrace || item.DecisionTrace)
         };
@@ -1038,6 +1041,7 @@ export const aiPanelAgentWorkspaceMixin = {
         userMessage = '',
         attachmentPaths = [],
         templateSelection = null,
+        semanticExtraction = null,
         clearInput = true,
         input = null,
         turn: existingTurn = null,
@@ -1101,7 +1105,8 @@ export const aiPanelAgentWorkspaceMixin = {
             hint,
             userMessage,
             attachmentPaths,
-            templateSelection
+            templateSelection,
+            semanticExtraction
         });
         this._requestBackendVisionPlanLive(planRequest, {
             planRequestId,
@@ -1175,7 +1180,8 @@ export const aiPanelAgentWorkspaceMixin = {
         hint = '',
         userMessage = '',
         attachmentPaths = [],
-        templateSelection = null
+        templateSelection = null,
+        semanticExtraction = null
     }) {
         const normalizedTemplateSelection = this._normalizeTemplateSelection?.(templateSelection) || null;
         const currentFlowSnapshot = this._hasCurrentFlowContext?.()
@@ -1191,7 +1197,8 @@ export const aiPanelAgentWorkspaceMixin = {
             currentResultSnapshot: this._buildCurrentResultPlanSnapshot(),
             templateSelection: normalizedTemplateSelection,
             attachmentSummary: this._buildPlanAttachmentSummary(attachmentPaths),
-            historySummary: this._buildPlanHistorySummary()
+            historySummary: this._buildPlanHistorySummary(),
+            semanticExtraction: semanticExtraction || null
         };
     },
 
@@ -1352,8 +1359,16 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _handlePlanRunEvent(evt) {
-        if (!evt || !this._isActivePlanRunEvent(evt)) return;
+        if (!evt) {
+            this._recordPublicLiveEventDrop?.('dropped');
+            return;
+        }
+        if (!this._isActivePlanRunEvent(evt)) {
+            this._recordPublicLiveEventDrop?.('stale');
+            return;
+        }
         if (this.activePlanRunRequestId && !this._isActivePlanRequest(this.activePlanRunRequestId)) {
+            this._recordPublicLiveEventDrop?.('stale');
             return;
         }
 
@@ -1362,6 +1377,7 @@ export const aiPanelAgentWorkspaceMixin = {
             : new Set();
         const key = `${evt.runId}:${evt.sequence}:${evt.eventType}`;
         if (this.activePlanRunEventKeys.has(key)) {
+            this._recordPublicLiveEventDrop?.('duplicate');
             return;
         }
 
@@ -1674,6 +1690,7 @@ export const aiPanelAgentWorkspaceMixin = {
             ? defaults.map(item => this._normalizePlanDefault(item)).filter(Boolean)
             : [];
         const requirementMaturity = this._normalizeRequirementMaturity(plan.requirementMaturity || plan.RequirementMaturity);
+        const semanticExtraction = this._normalizeSemanticExtraction(plan.semanticExtraction || plan.SemanticExtraction);
         const decisionTrace = this._normalizeDecisionTrace(plan.decisionTrace || plan.DecisionTrace);
         const rawCanBuild = plan.canBuild ?? plan.CanBuild;
         const rawCanPlan = plan.canPlan ?? plan.CanPlan;
@@ -1736,11 +1753,49 @@ export const aiPanelAgentWorkspaceMixin = {
             operatorCatalogVersion: plan.operatorCatalogVersion || plan.OperatorCatalogVersion || '',
             templateCatalogVersion: plan.templateCatalogVersion || plan.TemplateCatalogVersion || '',
             templateSelection,
+            semanticExtraction,
             requirementMaturity,
             decisionTrace,
             stationBoundarySummary: plan.stationBoundarySummary || plan.StationBoundarySummary || '',
             plcOutputPolicy: plan.plcOutputPolicy || plan.PlcOutputPolicy || '',
             rawPlanSnapshot: plan
+        };
+    },
+
+    _normalizeSemanticExtraction(value) {
+        const item = this._asObject?.(value) || value || null;
+        if (!item || typeof item !== 'object') return null;
+        const source = String(item.source || item.Source || '').trim();
+        const taskType = String(item.taskType || item.TaskType || '').trim();
+        const missingFields = this._toArray(item.missingFields || item.MissingFields)
+            .map(field => String(field || '').trim())
+            .filter(Boolean);
+        return {
+            isVisionRequest: (item.isVisionRequest ?? item.IsVisionRequest) === true,
+            intent: String(item.intent || item.Intent || '').trim(),
+            taskType,
+            source,
+            sourceLabel: this._formatSemanticSourceLabel?.(source) || source,
+            confidence: Number(item.confidence ?? item.Confidence ?? 0) || 0,
+            taskTypeConfidence: Number(item.taskTypeConfidence ?? item.TaskTypeConfidence ?? 0) || 0,
+            inspectionObject: this._sanitizePlanDiagnosticText(item.inspectionObject || item.InspectionObject || '', 120),
+            targetAttribute: this._sanitizePlanDiagnosticText(item.targetAttribute || item.TargetAttribute || '', 120),
+            defectType: this._sanitizePlanDiagnosticText(item.defectType || item.DefectType || '', 120),
+            measurementTarget: this._sanitizePlanDiagnosticText(item.measurementTarget || item.MeasurementTarget || '', 120),
+            imageSource: this._sanitizePlanDiagnosticText(item.imageSource || item.ImageSource || '', 80),
+            okCondition: this._sanitizePlanDiagnosticText(item.okCondition || item.OkCondition || '', 160),
+            ngCondition: this._sanitizePlanDiagnosticText(item.ngCondition || item.NgCondition || '', 160),
+            outputTarget: this._sanitizePlanDiagnosticText(item.outputTarget || item.OutputTarget || '', 120),
+            suggestedRoute: this._sanitizePlanDiagnosticText(item.suggestedRoute || item.SuggestedRoute || '', 180),
+            objectSignals: this._toArray(item.objectSignals || item.ObjectSignals).map(signal => this._sanitizePlanDiagnosticText(signal, 80)).filter(Boolean),
+            taskSignals: this._toArray(item.taskSignals || item.TaskSignals).map(signal => this._sanitizePlanDiagnosticText(signal, 80)).filter(Boolean),
+            missingFields,
+            clarificationQuestions: this._toArray(item.clarificationQuestions || item.ClarificationQuestions)
+                .map(question => this._sanitizePlanDiagnosticText(question, 160))
+                .filter(Boolean),
+            failureCode: this._sanitizePlanDiagnosticCode(item.failureCode || item.FailureCode || ''),
+            sanitizedErrorMessage: this._sanitizePlanDiagnosticText(item.sanitizedErrorMessage || item.SanitizedErrorMessage || ''),
+            metadataOnly: Boolean(item.metadataOnly ?? item.MetadataOnly)
         };
     },
 
@@ -2029,18 +2084,22 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _formatRequirementTaskTypeLabel(value) {
         switch (String(value || '').trim()) {
+            case 'surface_defect':
             case 'surface_or_pose_defect':
                 return '缺陷/贴附/位姿';
             case 'geometry_measurement':
                 return '几何测量';
             case 'wire_sequence':
                 return '线序检测';
+            case 'code_recognition':
             case 'barcode_qr':
                 return '读码/OCR';
             case 'presence_absence':
                 return '有无/漏装';
             case 'classification':
                 return '分类识别';
+            case 'attribute_classification':
+                return '属性分类 / OK-NG 判别';
             case 'template_location':
                 return '模板定位';
             case 'plc_output':
@@ -2784,6 +2843,7 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const selections = this.planQuestionSelections || {};
+        const semanticPanel = this._renderSemanticExtractionPanel(plan);
         const maturityPanel = this._renderRequirementMaturityPanel(plan);
         const routeOperators = this._toArray(plan.route?.operators);
         const routeChain = routeOperators.length
@@ -2795,6 +2855,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-workspace-section-title">需求理解</div>
                 <div class="ai-workspace-list">${plan.understanding.map(item => `<div>${this._escapeHtml(item)}</div>`).join('')}</div>
             </section>
+            ${semanticPanel}
             ${maturityPanel}
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">推荐方案</div>
@@ -2867,6 +2928,56 @@ export const aiPanelAgentWorkspaceMixin = {
         el.querySelector('#ai-btn-accept-plan')?.addEventListener('click', () => this._acceptRecommendedPlanAndBuild());
         el.querySelector('#ai-btn-start-build')?.addEventListener('click', () => this._startBuildFromCurrentPlan());
         this._updatePlanBuildActionState();
+    },
+
+    _renderSemanticExtractionPanel(plan) {
+        const semantic = plan?.semanticExtraction || null;
+        if (!semantic) return '';
+
+        const sourceLabel = this._formatSemanticSourceLabel?.(semantic.source) || semantic.sourceLabel || semantic.source || '未知';
+        const confidence = Number.isFinite(semantic.confidence)
+            ? `${Math.round(semantic.confidence * 100)}%`
+            : '未设置';
+        const taskTypeLabel = this._formatRequirementTaskTypeLabel(semantic.taskType);
+        const missingFields = this._toArray(semantic.missingFields)
+            .map(field => this._formatRequirementFieldLabel(field))
+            .filter(Boolean);
+        const chips = [
+            semantic.inspectionObject ? ['对象', semantic.inspectionObject] : null,
+            semantic.targetAttribute ? ['属性', semantic.targetAttribute] : null,
+            semantic.okCondition ? ['OK', semantic.okCondition] : null,
+            semantic.ngCondition ? ['NG', semantic.ngCondition] : null,
+            semantic.imageSource ? ['输入源', semantic.imageSource] : null
+        ].filter(Boolean);
+        const isFallback = String(semantic.source || '').toLowerCase() === 'rule_fallback';
+
+        return `
+            <section class="ai-workspace-section ai-requirement-maturity ${isFallback ? 'is-blocked' : 'is-ready'}">
+                <div class="ai-workspace-section-title">语义抽取</div>
+                <div class="ai-requirement-maturity-grid">
+                    <div class="ai-build-compact-row">
+                        <b>来源</b>
+                        <span>${this._escapeHtml(sourceLabel)}</span>
+                    </div>
+                    <div class="ai-build-compact-row">
+                        <b>任务类型</b>
+                        <span>${this._escapeHtml(taskTypeLabel)}</span>
+                    </div>
+                    <div class="ai-build-compact-row">
+                        <b>置信度</b>
+                        <span>${this._escapeHtml(confidence)}</span>
+                    </div>
+                    <div class="ai-build-compact-row">
+                        <b>视觉需求</b>
+                        <span>${semantic.isVisionRequest ? '是' : '否'}</span>
+                    </div>
+                </div>
+                ${chips.length ? `<div class="ai-plan-chain">${chips.map(([label, value]) => `<span>${this._escapeHtml(label)}：${this._escapeHtml(value)}</span>`).join('')}</div>` : '<div class="ai-plan-maturity-empty">语义槽位暂未完整抽取。</div>'}
+                ${semantic.suggestedRoute ? `<div class="ai-build-note"><strong>语义路线</strong>${this._escapeHtml(semantic.suggestedRoute)}</div>` : ''}
+                ${missingFields.length ? `<div class="ai-build-note"><strong>缺失项</strong>${this._escapeHtml(missingFields.join('、'))}</div>` : ''}
+                ${semantic.failureCode ? `<div class="ai-build-note"><strong>降级诊断</strong><span class="ai-plan-tech-code">${this._escapeHtml(semantic.failureCode)}</span>${semantic.sanitizedErrorMessage ? ` ${this._escapeHtml(semantic.sanitizedErrorMessage)}` : ''}</div>` : ''}
+            </section>
+        `;
     },
 
     _renderPlannerFailureDiagnostics(plan) {
@@ -3068,6 +3179,9 @@ export const aiPanelAgentWorkspaceMixin = {
             if (!snapshot.requirementMaturity && !snapshot.RequirementMaturity && plan?.requirementMaturity) {
                 snapshot.requirementMaturity = plan.requirementMaturity;
             }
+            if (!snapshot.semanticExtraction && !snapshot.SemanticExtraction && plan?.semanticExtraction) {
+                snapshot.semanticExtraction = plan.semanticExtraction;
+            }
             if (!snapshot.decisionTrace && !snapshot.DecisionTrace && plan?.decisionTrace) {
                 snapshot.decisionTrace = plan.decisionTrace;
             }
@@ -3099,6 +3213,7 @@ export const aiPanelAgentWorkspaceMixin = {
             operatorCatalogVersion: plan?.operatorCatalogVersion || '',
             templateCatalogVersion: plan?.templateCatalogVersion || '',
             templateSelection: plan?.templateSelection || null,
+            semanticExtraction: plan?.semanticExtraction || null,
             requirementMaturity: plan?.requirementMaturity || null,
             decisionTrace: plan?.decisionTrace || null,
             stationBoundarySummary: plan?.stationBoundarySummary || '',

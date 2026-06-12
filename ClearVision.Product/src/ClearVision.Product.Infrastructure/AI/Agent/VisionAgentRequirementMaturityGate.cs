@@ -289,6 +289,134 @@ public static class VisionAgentRequirementMaturityGate
             "需求已明确到可规划视觉流程。");
     }
 
+    public static AiRequirementMaturityResult Evaluate(
+        VisionAgentRequirementMaturityRequest request,
+        VisionAgentSemanticExtractionResult? semantic)
+    {
+        if (!ShouldUseModelSemantic(semantic))
+        {
+            return Evaluate(request);
+        }
+
+        var normalizedIntent = Clean(semantic!.Intent).ToLowerInvariant();
+        var taskType = NormalizeSemanticTaskType(semantic.TaskType);
+        var objectSignals = BuildSemanticObjectSignals(semantic);
+        var taskSignals = BuildSemanticTaskSignals(semantic, taskType);
+        var hasObject = objectSignals.Count > 0;
+        var hasTaskType = taskType != AiVisionTaskTypes.Unknown &&
+                          taskType != AiVisionTaskTypes.AbstractGoal;
+        var hasImageSource = !string.IsNullOrWhiteSpace(semantic.ImageSource);
+        var hasAcceptance = !string.IsNullOrWhiteSpace(semantic.OkCondition) ||
+                            !string.IsNullOrWhiteSpace(semantic.NgCondition) ||
+                            !string.IsNullOrWhiteSpace(semantic.OutputTarget);
+        var hasStrategy = !string.IsNullOrWhiteSpace(semantic.SuggestedRoute);
+
+        if (normalizedIntent is "help" or "chat")
+        {
+            return Result(
+                AiRequirementMaturity.ChatOrHelp,
+                AiVisionTaskTypes.Unknown,
+                canPlan: false,
+                canBuild: false,
+                objectSignals,
+                taskSignals,
+                [],
+                [],
+                "语义抽取判断这是普通对话或能力咨询，不进入构建。");
+        }
+
+        if (request.HasCurrentFlow && normalizedIntent == "modify_flow")
+        {
+            return Result(
+                AiRequirementMaturity.ModifyExistingFlow,
+                hasTaskType ? taskType : AiVisionTaskTypes.AbstractGoal,
+                canPlan: true,
+                canBuild: true,
+                objectSignals,
+                taskSignals,
+                [],
+                [],
+                "语义抽取判断这是在当前流程基础上修改。");
+        }
+
+        if (taskType == AiVisionTaskTypes.AbstractGoal)
+        {
+            return Result(
+                AiRequirementMaturity.AbstractGoal,
+                AiVisionTaskTypes.AbstractGoal,
+                canPlan: false,
+                canBuild: false,
+                objectSignals,
+                taskSignals,
+                ["inspection_object", "task_type", "image_source", "acceptance_criteria", "output_target"],
+                ["abstract_goal_needs_decomposition", "task_type_missing", "inspection_object_missing"],
+                "语义抽取判断这是方案愿景，不是可直接构建的检测流程。");
+        }
+
+        var canPlan = hasObject || hasTaskType || semantic.CanPlanCandidate || request.TemplateSelection != null;
+        if (!canPlan)
+        {
+            return Result(
+                AiRequirementMaturity.Ambiguous,
+                AiVisionTaskTypes.Unknown,
+                canPlan: false,
+                canBuild: false,
+                objectSignals,
+                taskSignals,
+                ["inspection_object", "task_type", "image_source", "acceptance_criteria"],
+                ["inspection_object_missing", "task_type_missing"],
+                "语义抽取未形成可规划的视觉工程需求。");
+        }
+
+        var missingFields = new List<string>();
+        var blockingReasons = new List<string>();
+        if (!hasObject)
+        {
+            missingFields.Add("inspection_object");
+            blockingReasons.Add("inspection_object_missing");
+        }
+
+        if (!hasTaskType)
+        {
+            missingFields.Add("task_type");
+            blockingReasons.Add("task_type_missing");
+        }
+
+        if (!hasImageSource)
+        {
+            missingFields.Add("image_source");
+        }
+
+        if (!hasAcceptance)
+        {
+            missingFields.Add("acceptance_criteria");
+        }
+
+        if (!hasStrategy)
+        {
+            missingFields.Add("model_or_rule_strategy");
+            blockingReasons.Add("model_or_rule_strategy_missing");
+        }
+
+        var canBuild = hasObject &&
+                       hasTaskType &&
+                       hasImageSource &&
+                       hasAcceptance &&
+                       hasStrategy;
+        return Result(
+            canBuild ? AiRequirementMaturity.Actionable : AiRequirementMaturity.Ambiguous,
+            hasTaskType ? taskType : AiVisionTaskTypes.Unknown,
+            canPlan: true,
+            canBuild,
+            objectSignals,
+            taskSignals,
+            missingFields,
+            blockingReasons,
+            canBuild
+                ? "语义抽取结果已明确到可规划视觉流程。"
+                : "语义抽取结果已足够进入规划，但构建前仍需补充图像来源、判定标准或实现策略。");
+    }
+
     public static AiDecisionTrace BuildDecisionTrace(
         VisionAgentRequirementMaturityRequest request,
         AiRequirementMaturityResult maturity,
@@ -320,12 +448,15 @@ public static class VisionAgentRequirementMaturityGate
         return maturity.TaskType switch
         {
             AiVisionTaskTypes.WireSequence => "wire_sequence",
+            AiVisionTaskTypes.CodeRecognition => "code_recognition",
             AiVisionTaskTypes.BarcodeQr => "code_recognition",
             AiVisionTaskTypes.GeometryMeasurement => "measurement",
             AiVisionTaskTypes.TemplateLocation => "template_location",
             AiVisionTaskTypes.PlcOutput => "plc_output",
             AiVisionTaskTypes.PresenceAbsence => "presence_absence",
+            AiVisionTaskTypes.AttributeClassification => "attribute_classification",
             AiVisionTaskTypes.Classification => "classification",
+            AiVisionTaskTypes.SurfaceDefect => "surface_defect",
             AiVisionTaskTypes.SurfaceOrPoseDefect => "surface_defect",
             AiVisionTaskTypes.AbstractGoal => "abstract_goal",
             _ => "general_inspection"
@@ -477,6 +608,70 @@ public static class VisionAgentRequirementMaturityGate
     private static bool ContainsAny(string text, IEnumerable<string> terms)
     {
         return HitTerms(text, terms).Count > 0;
+    }
+
+    private static bool ShouldUseModelSemantic(VisionAgentSemanticExtractionResult? semantic)
+    {
+        return semantic != null &&
+               semantic.IsVisionRequest &&
+               string.Equals(semantic.Source, VisionAgentSemanticSources.Model, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeSemanticTaskType(string? taskType)
+    {
+        return Clean(taskType).ToLowerInvariant() switch
+        {
+            AiVisionTaskTypes.SurfaceDefect => AiVisionTaskTypes.SurfaceDefect,
+            AiVisionTaskTypes.SurfaceOrPoseDefect => AiVisionTaskTypes.SurfaceDefect,
+            AiVisionTaskTypes.GeometryMeasurement => AiVisionTaskTypes.GeometryMeasurement,
+            "measurement" => AiVisionTaskTypes.GeometryMeasurement,
+            AiVisionTaskTypes.WireSequence => AiVisionTaskTypes.WireSequence,
+            AiVisionTaskTypes.CodeRecognition => AiVisionTaskTypes.CodeRecognition,
+            AiVisionTaskTypes.BarcodeQr => AiVisionTaskTypes.CodeRecognition,
+            "ocr" => AiVisionTaskTypes.CodeRecognition,
+            AiVisionTaskTypes.PresenceAbsence => AiVisionTaskTypes.PresenceAbsence,
+            AiVisionTaskTypes.Classification => AiVisionTaskTypes.Classification,
+            AiVisionTaskTypes.AttributeClassification => AiVisionTaskTypes.AttributeClassification,
+            AiVisionTaskTypes.TemplateLocation => AiVisionTaskTypes.TemplateLocation,
+            AiVisionTaskTypes.PlcOutput => AiVisionTaskTypes.PlcOutput,
+            AiVisionTaskTypes.AbstractGoal => AiVisionTaskTypes.AbstractGoal,
+            _ => AiVisionTaskTypes.Unknown
+        };
+    }
+
+    private static List<string> BuildSemanticObjectSignals(VisionAgentSemanticExtractionResult semantic)
+    {
+        return semantic.ObjectSignals
+            .Concat(Single(semantic.InspectionObject))
+            .Select(Clean)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToList();
+    }
+
+    private static List<string> BuildSemanticTaskSignals(
+        VisionAgentSemanticExtractionResult semantic,
+        string taskType)
+    {
+        return semantic.TaskSignals
+            .Concat(Single(taskType))
+            .Concat(Single(semantic.TargetAttribute))
+            .Concat(Single(semantic.DefectType))
+            .Concat(Single(semantic.MeasurementTarget))
+            .Concat(Single(semantic.OkCondition))
+            .Concat(Single(semantic.NgCondition))
+            .Select(Clean)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToList();
+    }
+
+    private static IEnumerable<string> Single(string? value)
+    {
+        var text = Clean(value);
+        return string.IsNullOrWhiteSpace(text) ? [] : [text];
     }
 
     private static string NormalizeText(string? description, string? additionalContext)

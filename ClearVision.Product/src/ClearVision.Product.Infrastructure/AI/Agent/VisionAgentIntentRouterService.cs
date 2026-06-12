@@ -93,41 +93,45 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
     };
 
     private static readonly Regex UnsafeRegex = new(
-        @"(?i)(rawPrompt|raw_prompt|systemPrompt|system_prompt|chain[-_ ]?of[-_ ]?thought|reasoning_content|[A-Za-z]:\\|\\\\|/users/|/home/|data:image/|base64|sk-[A-Za-z0-9_\-]{8,}|api[_-]?key\s*[:=]|token\s*[:=]|secret\s*[:=]|authorization\s*[:=]|headers?\s*[:=]|baseUrl\s*[:=]|base_url\s*[:=]|bearer\s+[A-Za-z0-9._\-]+|\b(?:\d{1,3}\.){3}\d{1,3}\b|\bDB\d+\.DB[XBWD]\d+(?:\.\d+)?\b|\bM\d+(?:\.\d+)?\b|\bD\d+\b|plc://)",
+        @"(?i)((?:rawPrompt|raw_prompt|systemPrompt|system_prompt|chain[-_ ]?of[-_ ]?thought|reasoning_content)(?:\s*[:=]\s*[^\s,;]+)?|[A-Za-z]:\\[^\s,;]+|\\\\[^\s,;]+|/(?:users|home|var|tmp|mnt|data)/[^\s,;]+|data:image/[^\s,;]+|base64[^\s,;]*|sk-[A-Za-z0-9_\-]{8,}|(?:api[_-]?key|x-api-key|token|secret|authorization|headers?|baseUrl|base_url|endpoint)\s*[:=]\s*[^\s,;]+|bearer\s+[A-Za-z0-9._\-]+|\b(?:\d{1,3}\.){3}\d{1,3}\b|\bDB\d+\.DB[XBWD]\d+(?:\.\d+)?\b|\bM\d+(?:\.\d+)?\b|\bD\d+\b|plc://[^\s,;]*)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly IVisionAgentIntentRouterCompletionSource _completionSource;
     private readonly VisionAgentIntentRouterOptions _options;
     private readonly Microsoft.Extensions.Logging.ILogger<VisionAgentIntentRouterService> _logger;
+    private readonly IVisionAgentSemanticExtractorService? _semanticExtractor;
 
     public VisionAgentIntentRouterService(
         IVisionAgentIntentRouterCompletionSource completionSource,
         IOptions<VisionAgentIntentRouterOptions>? options,
-        Microsoft.Extensions.Logging.ILogger<VisionAgentIntentRouterService> logger)
+        Microsoft.Extensions.Logging.ILogger<VisionAgentIntentRouterService> logger,
+        IVisionAgentSemanticExtractorService? semanticExtractor = null)
     {
         _completionSource = completionSource;
         _options = (options?.Value ?? new VisionAgentIntentRouterOptions()).Normalize();
         _logger = logger;
+        _semanticExtractor = semanticExtractor;
     }
 
     public async Task<VisionAgentIntentRouterResult> RouteAsync(
         VisionAgentIntentRouterRequest request,
         CancellationToken cancellationToken)
     {
+        var routedRequest = await AttachSemanticExtractionAsync(request, cancellationToken);
         if (!_options.Enabled)
         {
-            return RuleFallback(request, "router_disabled");
+            return RuleFallback(routedRequest, "router_disabled");
         }
 
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-            var prompt = BuildPrompt(request, _options);
+            var prompt = BuildPrompt(routedRequest, _options);
             var completion = await _completionSource.CompleteAsync(
                 new VisionAgentIntentRouterCompletionRequest(prompt.SystemPrompt, prompt.Messages, _options.ModelRole),
                 timeout.Token);
-            return RepairResult(ParseResult(completion), request, "model_router", string.Empty);
+            return RepairResult(ParseResult(completion), routedRequest, "model_router", string.Empty);
         }
         catch (Exception firstError) when (!cancellationToken.IsCancellationRequested &&
                                          !IsUnauthorized(firstError) &&
@@ -137,18 +141,18 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-                var repairPrompt = BuildRepairPrompt(request, firstError.Message, _options);
+                var repairPrompt = BuildRepairPrompt(routedRequest, firstError.Message, _options);
                 var repaired = await _completionSource.CompleteAsync(
                     new VisionAgentIntentRouterCompletionRequest(repairPrompt.SystemPrompt, repairPrompt.Messages, _options.ModelRole),
                     timeout.Token);
-                return RepairResult(ParseResult(repaired), request, "model_router_repaired", "router_json_repaired");
+                return RepairResult(ParseResult(repaired), routedRequest, "model_router_repaired", "router_json_repaired");
             }
             catch (Exception repairError) when (!cancellationToken.IsCancellationRequested)
             {
                 _logger.LogWarning(
                     "Vision Agent Intent Router repair failed; rule fallback will be used. Error={Error}",
                     repairError.Message);
-                return RuleFallback(request, IsUnauthorized(repairError) ? "router_unauthorized" : "router_repair_failed");
+                return RuleFallback(routedRequest, IsUnauthorized(repairError) ? "router_unauthorized" : "router_repair_failed");
             }
         }
         catch (Exception error) when (!cancellationToken.IsCancellationRequested)
@@ -156,8 +160,45 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             _logger.LogWarning(
                 "Vision Agent Intent Router failed; rule fallback will be used. Error={Error}",
                 error.Message);
-            return RuleFallback(request, IsUnauthorized(error) ? "router_unauthorized" : "router_failed");
+            return RuleFallback(routedRequest, IsUnauthorized(error) ? "router_unauthorized" : "router_failed");
         }
+    }
+
+    private async Task<VisionAgentIntentRouterRequest> AttachSemanticExtractionAsync(
+        VisionAgentIntentRouterRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.SemanticExtraction != null)
+        {
+            return request with
+            {
+                SemanticExtraction = VisionAgentSemanticExtractionSafety.Sanitize(request.SemanticExtraction)
+            };
+        }
+
+        if (_semanticExtractor == null)
+        {
+            return request;
+        }
+
+        var semantic = await _semanticExtractor.ExtractAsync(
+            new VisionAgentSemanticExtractionRequest
+            {
+                Description = request.Description,
+                OriginalUserPrompt = request.OriginalUserPrompt,
+                AdditionalContext = request.AdditionalContext,
+                SessionId = request.SessionId,
+                Mode = request.Mode,
+                HasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
+                HasPendingPlan = request.HasPendingPlan,
+                TemplateSelection = request.TemplateSelection,
+                AttachmentSummary = request.AttachmentSummary,
+                HistorySummary = request.HistorySummary,
+                CurrentFlowSummary = SummarizeJsonText(request.CurrentFlowSnapshot, 1_000),
+                MetadataOnly = true
+            },
+            cancellationToken);
+        return request with { SemanticExtraction = semantic };
     }
 
     private static VisionAgentIntentRouterResult ParseResult(string completion)
@@ -238,6 +279,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             FallbackAllowed = candidate.FallbackAllowed,
             RouterSource = source,
             FallbackReason = SafeToken(fallbackReason),
+            SemanticExtraction = request.SemanticExtraction,
             RequirementMaturity = maturity,
             DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
                 ToMaturityRequest(request),
@@ -299,6 +341,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             FallbackAllowed = true,
             RouterSource = "rule_fallback",
             FallbackReason = SafeToken(fallbackReason),
+            SemanticExtraction = request.SemanticExtraction,
             RequirementMaturity = maturity,
             DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
                 ToMaturityRequest(request),
@@ -345,7 +388,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
 
     private static AiRequirementMaturityResult EvaluateMaturity(VisionAgentIntentRouterRequest request)
     {
-        return VisionAgentRequirementMaturityGate.Evaluate(ToMaturityRequest(request));
+        return VisionAgentRequirementMaturityGate.Evaluate(ToMaturityRequest(request), request.SemanticExtraction);
     }
 
     private static VisionAgentRequirementMaturityRequest ToMaturityRequest(VisionAgentIntentRouterRequest request)
@@ -505,12 +548,38 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         builder.AppendLine($"attachmentCount={request.AttachmentSummary.Count}");
         builder.AppendLine($"attachmentKinds={string.Join(",", request.AttachmentSummary.ResourceKinds.Select(SafeToken))}");
         builder.AppendLine($"attachmentPathsRedacted={request.AttachmentSummary.PathsRedacted.ToString().ToLowerInvariant()}");
+        AppendSemanticContext(builder, request.SemanticExtraction);
         builder.AppendLine($"templateSelectionMode={SafeToken(request.TemplateSelection?.Mode)}");
         builder.AppendLine($"templateSelectionId={SafeToken(request.TemplateSelection?.TemplateId)}");
         builder.AppendLine($"hasPendingPlan={request.HasPendingPlan.ToString().ToLowerInvariant()}");
         builder.AppendLine($"pendingPlanSummary={Truncate(SafeText(request.PendingPlanSummary), 1_500)}");
         builder.AppendLine($"developerDirectBuildDebug={request.DeveloperDirectBuildDebug.ToString().ToLowerInvariant()}");
         return Truncate(builder.ToString(), maxChars);
+    }
+
+    private static void AppendSemanticContext(
+        StringBuilder builder,
+        VisionAgentSemanticExtractionResult? semantic)
+    {
+        if (semantic == null)
+        {
+            builder.AppendLine("semanticExtraction=unavailable");
+            return;
+        }
+
+        builder.AppendLine("semanticExtraction:");
+        builder.AppendLine($"- source={SafeToken(semantic.Source)}");
+        builder.AppendLine($"- intent={SafeToken(semantic.Intent)}");
+        builder.AppendLine($"- taskType={SafeToken(semantic.TaskType)}");
+        builder.AppendLine($"- inspectionObject={Truncate(SafeText(semantic.InspectionObject), 200)}");
+        builder.AppendLine($"- targetAttribute={Truncate(SafeText(semantic.TargetAttribute), 200)}");
+        builder.AppendLine($"- okCondition={Truncate(SafeText(semantic.OkCondition), 240)}");
+        builder.AppendLine($"- ngCondition={Truncate(SafeText(semantic.NgCondition), 240)}");
+        builder.AppendLine($"- imageSource={Truncate(SafeText(semantic.ImageSource), 160)}");
+        builder.AppendLine($"- suggestedRoute={Truncate(SafeText(semantic.SuggestedRoute), 240)}");
+        builder.AppendLine($"- missingFields={string.Join(",", semantic.MissingFields.Select(SafeToken))}");
+        builder.AppendLine($"- failureCode={SafeToken(semantic.FailureCode)}");
+        builder.AppendLine("- safety=semantic extraction is read-only and cannot authorize Build.");
     }
 
     private static string ExtractJsonObject(string value)

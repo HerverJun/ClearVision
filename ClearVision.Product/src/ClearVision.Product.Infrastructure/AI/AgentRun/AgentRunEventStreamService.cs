@@ -14,6 +14,7 @@ public interface IAgentRunEventStreamService
     AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.");
     AgentRunEventSubscription? Subscribe(string runId, long afterSequence);
     AgentRunReplayResult? Replay(string runId);
+    AgentRunReplayResult? ReplayLatest(string? ownerHash = null);
     CancellationToken GetCancellationToken(string? runId);
     bool TryCancelToken(string runId);
     bool IsRunOwner(string runId, string? ownerHash);
@@ -97,6 +98,8 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         {
             if (state.IsTerminal)
             {
+                state.DroppedEventCount++;
+                _store.AppendSummary(state.ToSummary());
                 return null;
             }
 
@@ -239,10 +242,37 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
         lock (state.Gate)
         {
-            return new AgentRunReplayResult(
-                state.ToSummary(),
-                state.Events.OrderBy(evt => evt.Sequence).ToList());
+            var events = state.Events.OrderBy(evt => evt.Sequence).ToList();
+            return BuildReplayResult(state, events);
         }
+    }
+
+    public AgentRunReplayResult? ReplayLatest(string? ownerHash = null)
+    {
+        var normalizedOwner = NormalizeOwnerHash(ownerHash);
+        var summaries = _store.LoadSummaries().ToList();
+        foreach (var state in _runs.Values)
+        {
+            lock (state.Gate)
+            {
+                summaries.Add(state.ToSummary());
+            }
+        }
+
+        foreach (var summary in summaries
+            .GroupBy(item => item.RunId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.OrderByDescending(item => item.UpdatedAt).First())
+            .Where(summary => IsSummaryOwner(summary, normalizedOwner))
+            .OrderByDescending(summary => summary.UpdatedAt))
+        {
+            var replay = Replay(summary.RunId);
+            if (replay != null)
+            {
+                return replay;
+            }
+        }
+
+        return null;
     }
 
     public CancellationToken GetCancellationToken(string? runId)
@@ -408,7 +438,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         {
             RunId = runId,
             Sequence = sequence,
-            Timestamp = DateTimeOffset.UtcNow,
+            Timestamp = UtcNowProvider(),
             EventType = _redactor.RedactText(draft.EventType),
             Stage = _redactor.RedactText(draft.Stage),
             Title = title,
@@ -445,6 +475,39 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             };
     }
 
+    private AgentRunReplayResult BuildReplayResult(AgentRunState state, IReadOnlyList<AgentRunEvent> events)
+    {
+        var summary = state.ToSummary();
+        var snapshot = new AgentRunReplaySnapshot
+        {
+            StorageVersion = AgentRunEventStore.StorageVersion,
+            RunId = state.RunId,
+            GeneratedAt = UtcNowProvider(),
+            FirstSequence = events.Count == 0 ? 0 : events.Min(evt => evt.Sequence),
+            LastSequence = events.Count == 0 ? 0 : events.Max(evt => evt.Sequence),
+            EventCount = events.Count,
+            MetadataOnly = true,
+            RedactionPass = summary.RedactionPass && events.All(evt => evt.RedactionPass),
+            Events = events
+        };
+        var diagnostics = new AgentRunReplayDiagnostics
+        {
+            RunId = state.RunId,
+            EventCount = events.Count,
+            DuplicateEventCount = state.DuplicateEventCount,
+            DroppedEventCount = state.DroppedEventCount,
+            StaleEventCount = state.StaleEventCount,
+            MetadataOnly = true,
+            RedactionPass = snapshot.RedactionPass
+        };
+
+        return new AgentRunReplayResult(summary, events)
+        {
+            Snapshot = snapshot,
+            Diagnostics = diagnostics
+        };
+    }
+
     private AgentRunState? GetOrRestoreState(string runId)
     {
         if (_runs.TryGetValue(runId, out var existing))
@@ -468,6 +531,9 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             FirstFixRecommendation = summary?.FirstFixRecommendation ?? string.Empty,
             IsTerminal = IsTerminalStatus(summary?.Status) || events.Any(evt => IsTerminalEvent(evt.EventType)),
             EventCount = summary?.EventCount ?? events.Count,
+            DuplicateEventCount = summary?.DuplicateEventCount ?? 0,
+            DroppedEventCount = summary?.DroppedEventCount ?? 0,
+            StaleEventCount = summary?.StaleEventCount ?? 0,
             LastSequence = Math.Max(summary?.LastSequence ?? 0, events.Count == 0 ? 0 : events.Max(evt => evt.Sequence)),
             RedactionPass = summary?.RedactionPass ?? events.All(evt => evt.RedactionPass)
         };
@@ -527,6 +593,11 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         return string.IsNullOrWhiteSpace(ownerHash)
             ? string.Empty
             : ownerHash.Trim();
+    }
+
+    private static bool IsSummaryOwner(AgentRunSummary summary, string normalizedOwner)
+    {
+        return string.Equals(summary.OwnerHash ?? string.Empty, normalizedOwner, StringComparison.Ordinal);
     }
 
     private static string CreateOpaqueToken()
@@ -631,6 +702,9 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         public string FirstFixRecommendation { get; set; } = string.Empty;
         public long LastSequence { get; set; }
         public int EventCount { get; set; }
+        public int DuplicateEventCount { get; set; }
+        public int DroppedEventCount { get; set; }
+        public int StaleEventCount { get; set; }
         public bool RedactionPass { get; set; } = true;
         public bool IsTerminal { get; set; }
         public CancellationTokenSource Cancellation { get; } = new();
@@ -656,6 +730,9 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                 FirstFixRecommendation = FirstFixRecommendation,
                 LastSequence = LastSequence,
                 EventCount = EventCount,
+                DuplicateEventCount = DuplicateEventCount,
+                DroppedEventCount = DroppedEventCount,
+                StaleEventCount = StaleEventCount,
                 OwnerHash = OwnerHash,
                 MetadataOnly = true,
                 RedactionPass = RedactionPass,

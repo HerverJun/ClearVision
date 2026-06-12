@@ -457,6 +457,13 @@ export const aiPanelGenerateRequestMixin = {
                     title="跳过 Plan，仅用于调试">
                     ${directBuildDebugActive ? '直接 Build 调试（下一次）' : '直接 Build 调试'}
                 </button>
+                <button
+                    class="ai-mode-chip ai-agent-replay-latest"
+                    id="ai-agent-replay-latest"
+                    type="button"
+                    title="回放最近一次 AgentRun 公开事件">
+                    回放最近一次
+                </button>
                 <div class="ai-agent-dev-note ai-agent-direct-build-note">跳过 Plan，仅用于调试；下一次发送后自动关闭。</div>
             </div>
         `;
@@ -471,6 +478,7 @@ export const aiPanelGenerateRequestMixin = {
         const previewConsentToggle = this.container?.querySelector('#ai-agent-runtime-preview-consent');
         const modeButtons = Array.from(this.container?.querySelectorAll('[data-agent-generate-mode]') || []);
         const directBuildDebugButton = this.container?.querySelector('#ai-agent-direct-build-debug');
+        const replayLatestButton = this.container?.querySelector('#ai-agent-replay-latest');
         const refresh = () => {
             const mode = this._normalizeAgentGenerateFlowMode(this.agentGenerateFlowMode);
             modeButtons.forEach(button => {
@@ -493,6 +501,10 @@ export const aiPanelGenerateRequestMixin = {
                     ? '直接 Build 调试（下一次）'
                     : '直接 Build 调试';
                 directBuildDebugButton.title = '跳过 Plan，仅用于调试';
+            }
+            if (replayLatestButton) {
+                replayLatestButton.disabled = false;
+                replayLatestButton.title = '回放最近一次 AgentRun 公开事件';
             }
         };
 
@@ -538,6 +550,20 @@ export const aiPanelGenerateRequestMixin = {
                     this.directBuildDebugNextRequest ? 'warning' : ''
                 );
                 refresh();
+            });
+        }
+
+        if (replayLatestButton) {
+            replayLatestButton.addEventListener('click', () => {
+                replayLatestButton.disabled = true;
+                this._replayLatestAgentRunPublicEvents?.()
+                    .catch(error => {
+                        this._setResultStatusNote?.(
+                            `回放最近一次 AgentRun 失败：${error?.message || '未知错误'}`,
+                            'warning'
+                        );
+                    })
+                    .finally(() => refresh());
             });
         }
 

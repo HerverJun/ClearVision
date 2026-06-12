@@ -57,6 +57,7 @@ public static class AgentRunEndpoints
         app.MapPost("/api/ai/agent-intent-router-runs", HandleCreateIntentRouterRunAsync);
         app.MapPost("/api/ai/agent-plan-runs", HandleCreatePlanRunAsync);
         app.MapPost("/api/ai/agent-runs", HandleCreateRunAsync);
+        app.MapGet("/api/ai/agent-runs/latest", HandleReplayLatestRun);
         app.MapGet("/api/ai/agent-runs/{runId}", HandleReplayRun);
         app.MapGet("/api/ai/agent-runs/{runId}/events", HandleRunEventsAsync);
         app.MapPost("/api/ai/agent-runs/{runId}/stream-token", HandleCreateStreamToken);
@@ -203,6 +204,16 @@ public static class AgentRunEndpoints
             : Results.StatusCode(StatusCodes.Status403Forbidden);
     }
 
+    private static IResult HandleReplayLatestRun(
+        HttpContext context,
+        IAgentRunEventStreamService streamService)
+    {
+        var replay = streamService.ReplayLatest(ResolveCurrentOwnerHash(context));
+        return replay == null
+            ? Results.NotFound(new { error = "No Agent run replay is available." })
+            : Results.Ok(replay);
+    }
+
     private static IResult HandleCancelRun(
         string runId,
         HttpContext context,
@@ -337,6 +348,11 @@ public static class AgentRunEndpoints
             EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.PlanContextStarted, "collecting_context",
                 "收集上下文", "正在收集公开需求、流程、模板、附件、算子和工站边界。", AgentRunEventStatuses.Running,
                 BuildPlanContextPayload(request));
+            EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.SemanticStarted, "semantic_extraction",
+                "语义抽取中", "正在抽取视觉需求语义槽位。", AgentRunEventStatuses.Running, new
+                {
+                    metadataOnly = true
+                });
             EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.PlanContextCompleted, "collecting_context",
                 "上下文已收集", "已收集公开需求、流程、模板、附件、算子和工站边界。", AgentRunEventStatuses.Completed,
                 BuildPlanContextPayload(request));
@@ -870,6 +886,10 @@ public static class AgentRunEndpoints
         var status = publicEvent.Status ?? string.Empty;
         return stage switch
         {
+            "semantic_extraction" when IsStatus(status, "started") || IsStatus(status, AgentRunEventStatuses.Running) => AgentRunEventTypes.SemanticStarted,
+            "semantic_extraction" when IsStatus(status, "failed") => AgentRunEventTypes.SemanticFailed,
+            "semantic_extraction" => AgentRunEventTypes.SemanticCompleted,
+            "semantic_fallback_used" => AgentRunEventTypes.SemanticFallbackUsed,
             "collecting_context" when IsStatus(status, "started") => AgentRunEventTypes.PlanContextStarted,
             "collecting_context" => AgentRunEventTypes.PlanContextCompleted,
             "planning_with_model" when IsStatus(status, "started") => AgentRunEventTypes.PlanModelStarted,

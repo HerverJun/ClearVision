@@ -81,6 +81,91 @@ public sealed class VisionAgentRequirementMaturityGateTests
             .NotContain(["inspection_object", "task_type"]);
     }
 
+    [Fact(DisplayName = "Maturity gate should use model semantic task type without rule term hit")]
+    public void Evaluate_WithModelSemantic_ShouldTrustSemanticTaskTypeForPlanning()
+    {
+        var semantic = StrawberrySemantic(canBuildCandidate: true) with
+        {
+            SuggestedRoute = "属性分类 / OK-NG 判别路线"
+        };
+
+        var result = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest
+            {
+                Description = "检测目标是果园里的成熟了的草莓，如果草莓熟透了，则为OK，否则为NG，输入源是相机。"
+            },
+            semantic);
+
+        result.CanPlan.Should().BeTrue();
+        result.TaskType.Should().Be(AiVisionTaskTypes.AttributeClassification);
+        result.ObjectSignals.Should().Contain(signal => signal.Contains("草莓", StringComparison.Ordinal));
+        result.TaskSignals.Should().Contain(signal => signal.Contains("熟透", StringComparison.Ordinal));
+        result.MissingFields.Should().NotContain("task_type");
+    }
+
+    [Fact(DisplayName = "Maturity gate should not let semantic CanBuildCandidate bypass missing engineering fields")]
+    public void Evaluate_WithModelSemanticCandidate_ShouldStillBlockBuildWhenFieldsMissing()
+    {
+        var semantic = StrawberrySemantic(canBuildCandidate: true) with
+        {
+            ImageSource = string.Empty,
+            OkCondition = string.Empty,
+            NgCondition = string.Empty,
+            SuggestedRoute = "属性分类 / OK-NG 判别路线"
+        };
+
+        var result = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest { Description = "检测成熟草莓。" },
+            semantic);
+
+        result.CanPlan.Should().BeTrue();
+        result.CanBuild.Should().BeFalse();
+        result.MissingFields.Should().Contain(["image_source", "acceptance_criteria"]);
+        result.MissingFields.Should().NotContain("task_type");
+    }
+
+    [Fact(DisplayName = "Semantic failure should fall back to legacy rule maturity")]
+    public void Evaluate_WithSemanticFailure_ShouldUseRuleFallback()
+    {
+        var semantic = StrawberrySemantic(canBuildCandidate: false) with
+        {
+            Source = VisionAgentSemanticSources.RuleFallback,
+            FailureCode = VisionAgentSemanticFailureCodes.JsonParseFailed
+        };
+
+        var result = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest { Description = "检测成熟草莓。" },
+            semantic);
+
+        result.TaskType.Should().NotBe(AiVisionTaskTypes.AttributeClassification);
+    }
+
+    [Fact(DisplayName = "Rule fallback Plan should preserve semantic route for mature strawberry")]
+    public async Task CreatePlanAsync_WithSemanticAttributeClassification_ShouldNotFallbackToSurfaceDefectRoute()
+    {
+        var orchestrator = CreateOrchestrator(
+            Substitute.For<IAiFlowGenerationService>(),
+            new FakeSemanticExtractor(StrawberrySemantic(canBuildCandidate: false)));
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "检测目标是果园里的成熟了的草莓，如果草莓熟透了，则为OK，否则为NG，输入源是相机。",
+                OriginalUserPrompt = "检测目标是果园里的成熟了的草莓，如果草莓熟透了，则为OK，否则为NG，输入源是相机。"
+            },
+            CancellationToken.None);
+
+        plan.SemanticExtraction.Should().NotBeNull();
+        plan.SemanticExtraction!.Source.Should().Be(VisionAgentSemanticSources.Model);
+        plan.RequirementMaturity.Should().NotBeNull();
+        plan.RequirementMaturity!.TaskType.Should().Be(AiVisionTaskTypes.AttributeClassification);
+        plan.RequirementMaturity.MissingFields.Should().NotContain("task_type");
+        plan.RecommendedRoute.Title.Should().Contain("属性分类");
+        plan.RecommendedRoute.Summary.Should().Contain("OK/NG");
+        plan.RecommendedRoute.Operators.Should().NotContain("SurfaceDefectDetection");
+        plan.PublicEvents.Select(evt => evt.Stage).Should().Contain("semantic_extraction");
+    }
+
     [Fact(DisplayName = "Abstract ambition should stay non-plannable and enter decomposition")]
     public async Task AbstractAmbition_ShouldRemainNonPlannable()
     {
@@ -327,7 +412,9 @@ public sealed class VisionAgentRequirementMaturityGateTests
         return cases.Select(item => new object[] { item });
     }
 
-    private static VisionAgentOrchestrator CreateOrchestrator(IAiFlowGenerationService generationService)
+    private static VisionAgentOrchestrator CreateOrchestrator(
+        IAiFlowGenerationService generationService,
+        IVisionAgentSemanticExtractorService? semanticExtractor = null)
     {
         return new VisionAgentOrchestrator(
             new VisionAgentToolRegistry(
@@ -336,7 +423,33 @@ public sealed class VisionAgentRequirementMaturityGateTests
                 new FlowTemplateMatchTool(),
                 new FlowValidationTool()
             ]),
-            generationService);
+            generationService,
+            semanticExtractor: semanticExtractor);
+    }
+
+    private static VisionAgentSemanticExtractionResult StrawberrySemantic(bool canBuildCandidate)
+    {
+        return new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.AttributeClassification,
+            Confidence = 0.92,
+            TaskTypeConfidence = 0.9,
+            InspectionObject = "草莓",
+            TargetAttribute = "成熟度/熟透",
+            ImageSource = "相机",
+            OkCondition = "草莓熟透了则为OK",
+            NgCondition = "否则为NG",
+            SuggestedRoute = "属性分类 / OK-NG 判别路线",
+            CanPlanCandidate = true,
+            CanBuildCandidate = canBuildCandidate,
+            ObjectSignals = ["草莓"],
+            TaskSignals = ["成熟度", "熟透"],
+            MissingFields = [],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
     }
 
     private static string FindRepositoryRoot()
@@ -382,6 +495,23 @@ public sealed class VisionAgentRequirementMaturityGateTests
             CancellationToken cancellationToken)
         {
             return _completion(request, cancellationToken);
+        }
+    }
+
+    private sealed class FakeSemanticExtractor : IVisionAgentSemanticExtractorService
+    {
+        private readonly VisionAgentSemanticExtractionResult _result;
+
+        public FakeSemanticExtractor(VisionAgentSemanticExtractionResult result)
+        {
+            _result = result;
+        }
+
+        public Task<VisionAgentSemanticExtractionResult> ExtractAsync(
+            VisionAgentSemanticExtractionRequest request,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_result);
         }
     }
 }

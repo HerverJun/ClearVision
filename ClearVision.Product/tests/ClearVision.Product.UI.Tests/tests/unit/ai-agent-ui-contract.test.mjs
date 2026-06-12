@@ -590,6 +590,7 @@ function backendPlanResult(overrides = {}) {
         : '需求仍缺少检测对象或任务类型，暂不能构建。'
     },
     decisionTrace: overrides.decisionTrace,
+    semanticExtraction: overrides.semanticExtraction,
     publicEvents: overrides.publicEvents ?? [
       {
         stage: 'collecting_context',
@@ -1326,8 +1327,38 @@ test('developer direct Build debug control is labeled as Plan skip debug only', 
   const html = panel._renderAgentDeveloperControls();
 
   assert.match(html, /ai-agent-direct-build-debug/);
+  assert.match(html, /ai-agent-replay-latest/);
+  assert.match(html, /AgentRun/);
   assert.match(html, /直接 Build 调试/);
   assert.match(html, /跳过 Plan，仅用于调试/);
+});
+
+test('developer latest replay control invokes AgentRun replay entry', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const replayButton = createFakeElement();
+  const handlers = new Map();
+  replayButton.addEventListener = (type, handler) => {
+    handlers.set(type, handler);
+  };
+  panel.container = createContainer({
+    '#ai-agent-replay-latest': replayButton
+  }, {
+    '[data-agent-generate-mode]': []
+  });
+  let replayed = false;
+  panel._replayLatestAgentRunPublicEvents = async () => {
+    replayed = true;
+    assert.equal(replayButton.disabled, true);
+    return true;
+  };
+
+  panel._bindAgentDeveloperControls();
+  handlers.get('click')();
+  await flushAsync(3);
+
+  assert.equal(replayed, true);
+  assert.equal(replayButton.disabled, false);
 });
 
 test('developer mode renders RuntimePreview consent switch', async () => {
@@ -2197,6 +2228,105 @@ test('PlanRun public live events split ephemeral status persistent fallback and 
   assert.equal(panel.publicLiveEvents.filter(evt => evt.visibility === 'persistent').length, 2);
 });
 
+test('Public live event stats count accepted duplicate stale and dropped events', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  attachAgentRunTurn(panel);
+  panel.activePlanRequestId = 'plan-request-stats';
+  panel.activePlanRunId = 'ar_plan_stats';
+  panel.activePlanRunRequestId = 'plan-request-stats';
+
+  const evt = {
+    runId: 'ar_plan_stats',
+    sequence: 1,
+    eventType: 'plan.context.started',
+    stage: 'collecting_context',
+    title: 'Context started',
+    summary: 'Collecting public context.',
+    status: 'running',
+    metadataOnly: true,
+    redactionPass: true
+  };
+
+  panel._handlePlanRunEvent(evt);
+  panel._handlePlanRunEvent(evt);
+  panel._handlePlanRunEvent({
+    ...evt,
+    runId: 'ar_plan_old',
+    sequence: 2
+  });
+  panel._handlePlanRunEvent(null);
+
+  const stats = panel._getPublicLiveEventStats();
+  assert.equal(stats.accepted, 1);
+  assert.equal(stats.duplicate, 1);
+  assert.equal(stats.stale, 1);
+  assert.equal(stats.dropped, 1);
+  assert.equal(stats.ephemeral, 1);
+  assert.equal(panel.publicLiveEvents.length, 1);
+});
+
+test('Semantic public live events render public slots and redact unsafe diagnostics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activePlanRequestId = 'plan-request-semantic';
+  panel.activePlanRunId = 'ar_plan_semantic';
+  panel.activePlanRunRequestId = 'plan-request-semantic';
+
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_semantic',
+    sequence: 1,
+    eventType: 'semantic.completed',
+    stage: 'semantic_extraction',
+    title: '语义抽取完成',
+    summary: '语义理解来自模型，已生成公开结构化摘要。',
+    status: 'completed',
+    payload: {
+      metadata: {
+        semanticSource: 'model',
+        taskType: 'attribute_classification',
+        inspectionObject: '草莓',
+        targetAttribute: '成熟度',
+        okCondition: '熟透则 OK',
+        ngCondition: '否则 NG',
+        imageSource: '相机'
+      },
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_semantic',
+    sequence: 2,
+    eventType: 'semantic.fallback.used',
+    stage: 'semantic_fallback_used',
+    title: '已启用语义规则降级',
+    summary: '语义抽取模型不可用，当前为规则降级解析。',
+    status: 'warning',
+    payload: {
+      metadata: {
+        semanticSource: 'rule_fallback',
+        failureCode: 'semantic_json_parse_failed',
+        sanitizedErrorMessage: 'rawPrompt=secret C:\\factory\\hidden.png'
+      },
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  const processText = collectProcessText(turn);
+  assert.match(processText, /语义来源：模型/);
+  assert.match(processText, /任务类型：属性分类 \/ OK-NG 判别/);
+  assert.match(processText, /对象：草莓/);
+  assert.match(processText, /OK：熟透则 OK/);
+  assert.match(processText, /语义抽取 JSON 解析失败/);
+  assert.doesNotMatch(processText, /rawPrompt|C:\\|hidden\.png/);
+  assert.equal(panel._getPublicLiveEventStats().accepted, 2);
+});
+
 test('Workbench state changes publish matching right-side public events', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -2296,6 +2426,83 @@ test('Public live event snapshot can replay and rebuild the assistant public str
   assert.match(collectProcessText(replayTurn), /不是大模型 Planner 生成结果/);
   assert.equal(replayTurn.failureSection.hidden, false);
   assert.match(replayTurn.failureBody.innerHTML, /Planner JSON 解析失败/);
+});
+
+test('Developer latest AgentRun replay rebuilds public Plan stream from snapshot', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  const requests = installFetchStream([
+    {
+      json: {
+        summary: {
+          runId: 'ar_latest_plan',
+          status: 'completed'
+        },
+        snapshot: {
+          events: [
+            {
+              runId: 'ar_latest_plan',
+              sequence: 3,
+              eventType: 'plan.fallback.used',
+              stage: 'rule_fallback_used',
+              title: 'Rule fallback used',
+              summary: 'Rule fallback is available.',
+              status: 'completed',
+              payload: {
+                fallbackReason: 'planner_failed',
+                metadataOnly: true
+              },
+              metadataOnly: true,
+              redactionPass: true
+            },
+            {
+              runId: 'ar_latest_plan',
+              sequence: 2,
+              eventType: 'plan.model.failed',
+              stage: 'planning_with_model',
+              title: 'Planner failed',
+              summary: 'Planner did not produce a usable plan.',
+              status: 'failed',
+              payload: {
+                plannerFailureCode: 'planner_json_parse_failed',
+                sanitizedErrorMessage: 'systemPrompt=secret C:\\factory\\hidden.png'
+              },
+              metadataOnly: true,
+              redactionPass: true
+            }
+          ]
+        },
+        diagnostics: {
+          eventCount: 2,
+          droppedEventCount: 0,
+          duplicateEventCount: 0,
+          staleEventCount: 0
+        }
+      }
+    }
+  ]);
+  panel._startAssistantTurn = () => turn;
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+
+  const replayed = await panel._replayLatestAgentRunPublicEvents();
+
+  assert.equal(replayed, true);
+  assert.equal(requests[0].url, 'http://localhost:5000/api/ai/agent-runs/latest');
+  assert.equal(panel.activePlanRunId, 'ar_latest_plan');
+  assert.equal(panel.activeAgentRunId, null);
+  assert.deepEqual(panel.activePlanRunEvents.map(evt => evt.sequence), [2, 3]);
+  assert.equal(panel.publicLiveEvents.length, 2);
+  const stats = panel._getPublicLiveEventStats();
+  assert.equal(stats.accepted, 2);
+  assert.equal(stats.persistent, 2);
+  assert.match(panel.lastResultStatusNote.text, /ar_latest_plan/);
+  assert.doesNotMatch(JSON.stringify(panel.publicLiveEvents), /systemPrompt|C:\\|hidden\.png/);
 });
 
 test('Plan Mode timeout stream shows rule fallback copy', async () => {
@@ -2553,6 +2760,64 @@ test('Backend Plan can be plannable while Build remains disabled', async () => {
   assert.match(overview.innerHTML, /可规划：是/);
   assert.match(overview.innerHTML, /可构建：否/);
   assert.equal(inlineBuildButton.disabled, true);
+});
+
+test('Backend Plan renders semantic extraction slots and keeps them in Build snapshot', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    goal: '检测成熟草莓',
+    intent: 'attribute_classification',
+    canPlan: true,
+    canBuild: false,
+    semanticExtraction: {
+      isVisionRequest: true,
+      intent: 'new_flow',
+      taskType: 'attribute_classification',
+      confidence: 0.91,
+      taskTypeConfidence: 0.88,
+      inspectionObject: '草莓',
+      targetAttribute: '成熟度/熟透',
+      imageSource: '相机',
+      okCondition: '草莓熟透则 OK',
+      ngCondition: '否则 NG',
+      suggestedRoute: '属性分类 / OK-NG 判别路线',
+      source: 'model',
+      missingFields: [],
+      metadataOnly: true
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'attribute_classification',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['草莓'],
+      taskSignals: ['成熟度'],
+      missingFields: ['model_or_rule_strategy'],
+      blockingReasons: ['model_or_rule_strategy_missing'],
+      publicReason: '语义抽取结果已足够进入规划。'
+    }
+  }));
+
+  panel.pendingVisionPlan = plan;
+  panel._renderPlanWorkspace(plan);
+  const snapshot = panel._buildPlanSnapshotForBuild(plan);
+
+  assert.equal(plan.semanticExtraction.taskType, 'attribute_classification');
+  assert.match(planWorkspace.innerHTML, /语义抽取/);
+  assert.match(planWorkspace.innerHTML, /模型/);
+  assert.match(planWorkspace.innerHTML, /属性分类 \/ OK-NG 判别/);
+  assert.match(planWorkspace.innerHTML, /草莓/);
+  assert.match(planWorkspace.innerHTML, /熟透/);
+  assert.match(planWorkspace.innerHTML, /相机/);
+  assert.equal(snapshot.semanticExtraction.taskType, 'attribute_classification');
 });
 
 test('Backend Plan with explicit canBuild true and actionable maturity enables Build', async () => {
@@ -3806,6 +4071,7 @@ test('AgentRun duplicate replay events are ignored by run sequence and type', as
 
   assert.equal(panel.activeAgentRunEvents.length, 1);
   assert.equal(turn.processBody.children.length, 1);
+  assert.equal(panel._getPublicLiveEventStats().duplicate, 1);
 });
 
 test('AgentRun tool events render tool name duration report and blocked reasons', async () => {
@@ -4004,6 +4270,7 @@ test('Stale AgentRun events cannot pollute current public live turn', async () =
   assert.equal(turn.processBody.children.length, 0);
   assert.equal(turn.failureSection.hidden, false);
   assert.equal(turn.failureBody.innerHTML, '');
+  assert.equal(panel._getPublicLiveEventStats().stale, 1);
 });
 
 test('AgentRun terminal completed event closes source and releases generating state', async () => {

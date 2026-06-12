@@ -22,6 +22,43 @@ const PLAN_PUBLIC_EVENT_DEFINITIONS = {
         visibility: 'ephemeral',
         ttlMs: PUBLIC_LIVE_RUNNING_TTL_MS
     },
+    'semantic.started': {
+        channel: 'semantic',
+        kind: 'model_call',
+        phase: 'semantic_extraction',
+        title: '正在抽取视觉语义...',
+        summary: '正在抽取任务类型、检测对象、属性、OK/NG 条件和输入源。',
+        status: 'running',
+        visibility: 'ephemeral',
+        ttlMs: PUBLIC_LIVE_RUNNING_TTL_MS
+    },
+    'semantic.completed': {
+        channel: 'semantic',
+        kind: 'status',
+        phase: 'semantic_extraction',
+        title: '语义抽取完成',
+        summary: '语义理解来自模型，已生成公开结构化摘要。',
+        status: 'completed',
+        visibility: 'persistent'
+    },
+    'semantic.failed': {
+        channel: 'semantic',
+        kind: 'failure',
+        phase: 'semantic_extraction',
+        title: '语义抽取失败',
+        summary: '语义抽取模型不可用，当前为规则降级解析。',
+        status: 'failed',
+        visibility: 'persistent'
+    },
+    'semantic.fallback.used': {
+        channel: 'semantic',
+        kind: 'warning',
+        phase: 'semantic_fallback_used',
+        title: '已启用语义规则降级',
+        summary: '语义抽取模型不可用，当前为规则降级解析。',
+        status: 'warning',
+        visibility: 'persistent'
+    },
     'plan.context.started': {
         channel: 'plan',
         kind: 'status',
@@ -150,6 +187,12 @@ const PLAN_PUBLIC_EVENT_DEFINITIONS = {
 };
 
 const PUBLIC_LIVE_DIAGNOSTIC_LABELS = {
+    semantic_model_request_failed: '语义抽取请求失败',
+    semantic_model_empty: '语义抽取返回为空',
+    semantic_json_parse_failed: '语义抽取 JSON 解析失败',
+    semantic_timeout: '语义抽取超时',
+    semantic_unauthorized: '语义抽取鉴权失败',
+    semantic_unknown_error: '语义抽取未知错误',
     completion_request_failed: 'Planner 请求失败',
     completion_empty: 'Planner 返回为空',
     planner_json_parse_failed: 'Planner JSON 解析失败',
@@ -161,6 +204,12 @@ const PUBLIC_LIVE_DIAGNOSTIC_LABELS = {
 };
 
 const PUBLIC_LIVE_FALLBACK_LABELS = {
+    semantic_model_request_failed: '语义模型不可用，使用规则降级',
+    semantic_model_empty: '语义模型返回为空，使用规则降级',
+    semantic_json_parse_failed: '语义 JSON 解析失败，使用规则降级',
+    semantic_timeout: '语义模型超时，使用规则降级',
+    semantic_unauthorized: '语义模型鉴权失败，使用规则降级',
+    semantic_unknown_error: '语义模型异常，使用规则降级',
     planner_failed: 'Planner 失败后启用规则兜底',
     planner_timeout: 'Planner 超时后启用规则兜底',
     planner_disabled: 'Planner 未启用，使用规则兜底',
@@ -339,6 +388,7 @@ export const aiPanelLiveEventsMixin = {
     _resetPublicLiveEventState({ clearLiveStatus = true } = {}) {
         this.publicLiveEventKeys = new Set();
         this.publicLiveEvents = [];
+        this.publicLiveEventStats = this._createPublicLiveEventStats();
         this.publicLiveWorkbenchSequence = 0;
         if (this.publicLiveStatusTimer) {
             window.clearTimeout?.(this.publicLiveStatusTimer);
@@ -400,13 +450,20 @@ export const aiPanelLiveEventsMixin = {
     },
 
     _routePublicLiveEvent(publicEvent) {
-        if (!publicEvent?.runId || !publicEvent?.dedupeKey) return false;
-        if (!this._isPublicLiveEventForActiveRun(publicEvent)) return false;
+        if (!publicEvent?.runId || !publicEvent?.dedupeKey) {
+            this._recordPublicLiveEventDrop('dropped');
+            return false;
+        }
+        if (!this._isPublicLiveEventForActiveRun(publicEvent)) {
+            this._recordPublicLiveEventDrop('stale');
+            return false;
+        }
 
         this.publicLiveEventKeys = this.publicLiveEventKeys instanceof Set
             ? this.publicLiveEventKeys
             : new Set();
         if (this.publicLiveEventKeys.has(publicEvent.dedupeKey)) {
+            this._recordPublicLiveEventDrop('duplicate');
             return false;
         }
 
@@ -415,17 +472,21 @@ export const aiPanelLiveEventsMixin = {
             ? this.publicLiveEvents
             : [];
         this.publicLiveEvents.push(publicEvent);
+        this._recordPublicLiveEventDrop('accepted');
 
         if (this._shouldRenderEphemeralEvent(publicEvent)) {
             this._renderAssistantLiveStatus(publicEvent);
+            this._recordPublicLiveEventDrop('ephemeral');
         }
 
         if (this._shouldPersistEvent(publicEvent)) {
             this._appendPublicLiveEventProcessLine(publicEvent);
+            this._recordPublicLiveEventDrop('persistent');
         }
 
         if (this._shouldShowDiagnosticEvent(publicEvent)) {
             this._renderPublicLiveDiagnosticEvent(publicEvent);
+            this._recordPublicLiveEventDrop('diagnostic');
         }
 
         if (PUBLIC_LIVE_TERMINAL_EVENT_TYPES.has(publicEvent.eventType) && publicEvent.status !== 'running') {
@@ -433,6 +494,36 @@ export const aiPanelLiveEventsMixin = {
         }
 
         return true;
+    },
+
+    _createPublicLiveEventStats() {
+        return {
+            accepted: 0,
+            dropped: 0,
+            duplicate: 0,
+            stale: 0,
+            ephemeral: 0,
+            persistent: 0,
+            diagnostic: 0
+        };
+    },
+
+    _recordPublicLiveEventDrop(kind) {
+        this.publicLiveEventStats = this.publicLiveEventStats || this._createPublicLiveEventStats();
+        const key = String(kind || 'dropped').trim();
+        if (!Object.prototype.hasOwnProperty.call(this.publicLiveEventStats, key)) {
+            this.publicLiveEventStats.dropped += 1;
+            return;
+        }
+
+        this.publicLiveEventStats[key] += 1;
+    },
+
+    _getPublicLiveEventStats() {
+        return {
+            ...this._createPublicLiveEventStats(),
+            ...(this.publicLiveEventStats || {})
+        };
     },
 
     _publishWorkbenchStatePublicEvent(state, previousState = '') {
@@ -898,6 +989,13 @@ export const aiPanelLiveEventsMixin = {
         const message = diagnostics.sanitizedErrorMessage || '';
         const firstFix = diagnostics.firstFixRecommendation || this._getPublicLiveFirstFixRecommendation(code);
         const rows = [
+            diagnostics.semanticSource ? ['语义来源', this._formatSemanticSourceLabel(diagnostics.semanticSource)] : null,
+            diagnostics.semanticTaskType ? ['任务类型', this._formatRequirementTaskTypeLabel?.(diagnostics.semanticTaskType) || diagnostics.semanticTaskType] : null,
+            diagnostics.semanticObject ? ['检测对象', diagnostics.semanticObject] : null,
+            diagnostics.semanticAttribute ? ['目标属性', diagnostics.semanticAttribute] : null,
+            diagnostics.semanticOkCondition ? ['OK 条件', diagnostics.semanticOkCondition] : null,
+            diagnostics.semanticNgCondition ? ['NG 条件', diagnostics.semanticNgCondition] : null,
+            diagnostics.semanticImageSource ? ['输入源', diagnostics.semanticImageSource] : null,
             diagnostics.toolName ? ['工具', this._formatToolName?.(diagnostics.toolName) || diagnostics.toolName] : null,
             stageLabel ? ['失败阶段', stageLabel] : null,
             codeLabel ? ['失败原因', codeLabel] : null,
@@ -944,6 +1042,7 @@ export const aiPanelLiveEventsMixin = {
         ) || {};
         const sources = [
             payload,
+            this._asObject?.(payload.metadata || payload.Metadata) || {},
             this._asObject?.(payload.diagnostic || payload.Diagnostic) || {},
             this._asObject?.(payload.safeDiagnostics || payload.SafeDiagnostics) || {},
             planResult
@@ -972,15 +1071,24 @@ export const aiPanelLiveEventsMixin = {
         };
         const eventType = String(evt?.eventType || '').trim();
         const stage = String(evt?.stage || '').trim();
+        const semanticSource = this._sanitizePublicLiveDiagnosticCode(read('semanticSource'));
+        const semanticTaskType = this._sanitizePublicLiveDiagnosticCode(read('taskType'));
+        const semanticObject = this._sanitizePublicLiveEventText(read('inspectionObject'), 100);
+        const semanticAttribute = this._sanitizePublicLiveEventText(read('targetAttribute'), 100);
+        const semanticOkCondition = this._sanitizePublicLiveEventText(read('okCondition'), 140);
+        const semanticNgCondition = this._sanitizePublicLiveEventText(read('ngCondition'), 140);
+        const semanticImageSource = this._sanitizePublicLiveEventText(read('imageSource'), 80);
         const toolName = this._sanitizePublicLiveEventText(
             read('toolName', 'name') || this._deriveToolNameFromTitle?.(evt?.title) || '',
             80
         );
+        const semanticFailureCode = this._sanitizePublicLiveDiagnosticCode(read('failureCode'));
         const fallbackReason = this._sanitizePublicLiveDiagnosticCode(read('fallbackReason') ||
-            (eventType === 'plan.fallback.used' ? 'rule_fallback' : ''));
-        const failureReason = this._sanitizePublicLiveDiagnosticCode(read('failureReason', 'rejectionReason', 'reason'));
+            (eventType === 'plan.fallback.used' ? 'rule_fallback' : '') ||
+            (eventType === 'semantic.fallback.used' ? (semanticFailureCode || 'semantic_unknown_error') : ''));
+        const failureReason = this._sanitizePublicLiveDiagnosticCode(read('failureReason', 'rejectionReason', 'reason', 'failureCode'));
         const warningCode = this._sanitizePublicLiveDiagnosticCode(read('warningCode'));
-        const errorCode = this._sanitizePublicLiveDiagnosticCode(read('plannerFailureCode', 'errorCode') ||
+        const errorCode = this._sanitizePublicLiveDiagnosticCode(read('plannerFailureCode', 'errorCode', 'failureCode') ||
             (eventType === 'plan.model.timeout' ? 'planner_timeout' : ''));
         const plannerFailureCode = this._sanitizePublicLiveDiagnosticCode(
             errorCode
@@ -1008,6 +1116,13 @@ export const aiPanelLiveEventsMixin = {
         return {
             fallbackReason,
             failureReason,
+            semanticSource,
+            semanticTaskType,
+            semanticObject,
+            semanticAttribute,
+            semanticOkCondition,
+            semanticNgCondition,
+            semanticImageSource,
             plannerFailureStage,
             plannerFailureCode: plannerFailureCode || warningCode || failureReason,
             warningCode,
@@ -1029,6 +1144,12 @@ export const aiPanelLiveEventsMixin = {
         const fallbackLabel = this._formatPublicLiveFallbackReason(diagnostics.fallbackReason);
         const firstFix = diagnostics.firstFixRecommendation;
 
+        if (diagnostics.semanticSource) parts.push(`语义来源：${this._formatSemanticSourceLabel(diagnostics.semanticSource)}`);
+        if (diagnostics.semanticTaskType) parts.push(`任务类型：${this._formatRequirementTaskTypeLabel?.(diagnostics.semanticTaskType) || diagnostics.semanticTaskType}`);
+        if (diagnostics.semanticObject) parts.push(`对象：${diagnostics.semanticObject}`);
+        if (diagnostics.semanticAttribute) parts.push(`属性：${diagnostics.semanticAttribute}`);
+        if (diagnostics.semanticOkCondition) parts.push(`OK：${diagnostics.semanticOkCondition}`);
+        if (diagnostics.semanticNgCondition) parts.push(`NG：${diagnostics.semanticNgCondition}`);
         if (codeLabel) parts.push(`诊断：${codeLabel}`);
         if (!codeLabel && warningLabel) parts.push(`诊断：${warningLabel}`);
         if (!codeLabel && !warningLabel && failureLabel) parts.push(`诊断：${failureLabel}`);
@@ -1123,6 +1244,13 @@ export const aiPanelLiveEventsMixin = {
         return PUBLIC_LIVE_FALLBACK_LABELS[normalized] || this._localizeDisplayText?.(normalized) || normalized;
     },
 
+    _formatSemanticSourceLabel(source) {
+        const normalized = String(source || '').trim().toLowerCase();
+        if (normalized === 'model') return '模型';
+        if (normalized === 'rule_fallback') return '规则降级';
+        return this._localizeDisplayText?.(normalized) || normalized;
+    },
+
     _formatPublicLiveStage(stage) {
         const normalized = String(stage || '').trim();
         if (!normalized) return '';
@@ -1162,6 +1290,9 @@ export const aiPanelLiveEventsMixin = {
             'sanitizedErrorKind',
             'toolName',
             'reportId',
+            'semanticSource',
+            'taskType',
+            'failureCode',
             'previousWorkbenchState',
             'workbenchState'
         ]);

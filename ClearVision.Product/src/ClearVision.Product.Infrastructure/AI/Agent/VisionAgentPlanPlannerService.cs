@@ -123,8 +123,9 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
         VisionAgentPlanModeResult ruleBaseline,
         CancellationToken cancellationToken)
     {
-        var events = new List<VisionAgentPlanPublicEvent>
-        {
+        var events = new List<VisionAgentPlanPublicEvent>();
+        events.AddRange(ruleBaseline.PublicEvents);
+        events.Add(
             Event("collecting_context", "completed", "上下文收集完成",
                 "已收集公开需求、流程、模板、附件、算子和工站边界元数据。",
                 new()
@@ -132,8 +133,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                     ["hasCurrentFlow"] = ruleBaseline.ContextSummary.HasCurrentFlow.ToString().ToLowerInvariant(),
                     ["attachmentCount"] = ruleBaseline.ContextSummary.AttachmentCount.ToString(),
                     ["templateSelectionMode"] = ruleBaseline.ContextSummary.TemplateSelectionMode
-                })
-        };
+                }));
 
         if (!_options.Enabled)
         {
@@ -380,6 +380,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
         var acceptance = NormalizeList(candidate.AcceptanceCriteria, baseline.AcceptanceCriteria);
         var executablePlan = NormalizeList(candidate.ExecutablePlan, baseline.ExecutablePlan);
         var blockingReasons = NormalizeList(candidate.BlockingReasons, []);
+        var semantic = VisionAgentSemanticExtractionSafety.Sanitize(baseline.SemanticExtraction);
 
         var redactionNotes = new List<string>();
         var result = new VisionAgentPlanModeResult
@@ -408,6 +409,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             ExecutablePlan = SanitizeList(executablePlan, redactionNotes),
             CanBuild = candidate.CanBuild && baseline.CanBuild && !string.IsNullOrWhiteSpace(request.Description),
             BlockingReasons = SanitizeList(blockingReasons, redactionNotes),
+            SemanticExtraction = semantic,
             NextAction = SafeText(
                 string.IsNullOrWhiteSpace(candidate.NextAction) ? baseline.NextAction : candidate.NextAction,
                 redactionNotes),
@@ -428,7 +430,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             HasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
             TemplateSelection = baseline.TemplateSelection
         };
-        var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest);
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
         if (!maturity.CanPlan)
         {
             result = result with
@@ -1013,6 +1015,8 @@ public sealed class VisionAgentPlanPromptComposer
         builder.AppendLine($"attachmentCount={request.AttachmentSummary.Count}");
         builder.AppendLine($"attachmentKinds={string.Join(",", request.AttachmentSummary.ResourceKinds)}");
         builder.AppendLine($"attachmentPathsRedacted={request.AttachmentSummary.PathsRedacted.ToString().ToLowerInvariant()}");
+        var semantic = VisionAgentSemanticExtractionSafety.Sanitize(request.SemanticExtraction ?? ruleBaseline.SemanticExtraction);
+        AppendSemanticContext(builder, semantic);
         builder.AppendLine($"templateSelectionMode={ruleBaseline.TemplateSelection?.Mode}");
         builder.AppendLine($"templateSelectionId={ruleBaseline.TemplateSelection?.TemplateId}");
         builder.AppendLine($"stationBoundarySummary={ruleBaseline.StationBoundarySummary}");
@@ -1031,13 +1035,47 @@ public sealed class VisionAgentPlanPromptComposer
         }
 
         builder.AppendLine("ruleBaselineForFallback:");
-        builder.AppendLine(JsonSerializer.Serialize(ruleBaseline, new JsonSerializerOptions
+        var baselineForPrompt = semantic == null
+            ? ruleBaseline
+            : ruleBaseline with { SemanticExtraction = semantic };
+        builder.AppendLine(JsonSerializer.Serialize(baselineForPrompt, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false
         }));
         var text = builder.ToString();
         return Truncate(text, maxChars);
+    }
+
+    private static void AppendSemanticContext(
+        StringBuilder builder,
+        VisionAgentSemanticExtractionResult? semantic)
+    {
+        if (semantic == null)
+        {
+            builder.AppendLine("semanticExtraction=unavailable");
+            return;
+        }
+
+        builder.AppendLine("semanticExtraction:");
+        builder.AppendLine($"- source={VisionAgentSemanticExtractionSafety.SafeToken(semantic.Source)}");
+        builder.AppendLine($"- isVisionRequest={semantic.IsVisionRequest.ToString().ToLowerInvariant()}");
+        builder.AppendLine($"- intent={VisionAgentSemanticExtractionSafety.SafeToken(semantic.Intent)}");
+        builder.AppendLine($"- taskType={VisionAgentSemanticExtractionSafety.SafeToken(semantic.TaskType)}");
+        builder.AppendLine($"- confidence={semantic.Confidence:0.###}");
+        builder.AppendLine($"- taskTypeConfidence={semantic.TaskTypeConfidence:0.###}");
+        builder.AppendLine($"- inspectionObject={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic.InspectionObject), 200)}");
+        builder.AppendLine($"- targetAttribute={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic.TargetAttribute), 200)}");
+        builder.AppendLine($"- defectType={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic.DefectType), 200)}");
+        builder.AppendLine($"- measurementTarget={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic.MeasurementTarget), 200)}");
+        builder.AppendLine($"- imageSource={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic.ImageSource), 200)}");
+        builder.AppendLine($"- okCondition={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic.OkCondition), 300)}");
+        builder.AppendLine($"- ngCondition={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic.NgCondition), 300)}");
+        builder.AppendLine($"- outputTarget={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic.OutputTarget), 200)}");
+        builder.AppendLine($"- suggestedRoute={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic.SuggestedRoute), 300)}");
+        builder.AppendLine($"- missingFields={string.Join(",", semantic.MissingFields.Select(VisionAgentSemanticExtractionSafety.SafeToken))}");
+        builder.AppendLine($"- failureCode={VisionAgentSemanticExtractionSafety.SafeToken(semantic.FailureCode)}");
+        builder.AppendLine("- safety=semantic extraction is read-only; do not treat canBuildCandidate as final Build permission.");
     }
 
     private static string SummarizeJsonText(string? text, int maxChars)

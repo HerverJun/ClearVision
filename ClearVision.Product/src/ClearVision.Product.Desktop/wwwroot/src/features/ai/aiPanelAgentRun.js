@@ -12,6 +12,10 @@ const TOOL_LOOP_SEGMENT_TERMINAL_EVENT_TYPES = new Set([
 const PLAN_EVENT_TYPES = new Set([
     'plan.created',
     'plan.started',
+    'semantic.started',
+    'semantic.completed',
+    'semantic.failed',
+    'semantic.fallback.used',
     'plan.context.started',
     'plan.context.completed',
     'plan.model.started',
@@ -48,6 +52,8 @@ const ARTIFACT_EVENT_TYPES = new Set([
 const STAGE_LABELS = {
     run: '运行',
     brief: '摘要',
+    semantic_extraction: '语义抽取',
+    semantic_fallback_used: '语义降级',
     understand_requirement: '理解需求',
     context_collection: '收集上下文',
     plan_generation: '生成计划',
@@ -608,6 +614,7 @@ export const aiPanelAgentRunMixin = {
     _handleAgentRunEvent(rawEvent = {}) {
         const evt = this._normalizeAgentRunEvent(rawEvent);
         if (!evt) {
+            this._recordPublicLiveEventDrop?.('dropped');
             return;
         }
 
@@ -617,6 +624,7 @@ export const aiPanelAgentRunMixin = {
         }
 
         if (this.activeAgentRunId && evt.runId !== this.activeAgentRunId) {
+            this._recordPublicLiveEventDrop?.('stale');
             return;
         }
 
@@ -625,6 +633,7 @@ export const aiPanelAgentRunMixin = {
             ? this.activeAgentRunEventKeys
             : new Set();
         if (this.activeAgentRunEventKeys.has(key)) {
+            this._recordPublicLiveEventDrop?.('duplicate');
             return;
         }
 
@@ -1159,6 +1168,77 @@ export const aiPanelAgentRunMixin = {
         const text = String(title || '').trim();
         const marker = text.indexOf(':');
         return marker >= 0 ? text.slice(marker + 1).trim() : text;
+    },
+
+    async _replayLatestAgentRunPublicEvents({ statusText = '回放最近一次 AgentRun' } = {}) {
+        const replay = await httpClient.get('/ai/agent-runs/latest');
+        const snapshotEvents = Array.isArray(replay?.snapshot?.events)
+            ? replay.snapshot.events
+            : [];
+        const replayEvents = Array.isArray(replay?.events)
+            ? replay.events
+            : [];
+        const rawEvents = snapshotEvents.length > 0 ? snapshotEvents : replayEvents;
+        const events = rawEvents
+            .map(evt => this._normalizeAgentRunEvent(evt))
+            .filter(Boolean)
+            .sort((a, b) => a.sequence - b.sequence);
+        const runId = String(
+            replay?.summary?.runId ||
+            replay?.Summary?.RunId ||
+            events[0]?.runId ||
+            ''
+        ).trim();
+
+        if (!runId || events.length === 0) {
+            this._setResultStatusNote?.('没有可回放的 AgentRun 事件。', 'warning');
+            return false;
+        }
+
+        const hasPlanEvents = events.some(evt => String(evt.eventType || '').startsWith('plan.'));
+        const replayRequestId = `agent-run-replay-${runId}`;
+        const turn = this._startAssistantTurn?.({
+            statusText,
+            statusTone: 'streaming',
+            openReply: false
+        }) || this.activeAssistantTurn;
+        if (turn) {
+            this.activeAssistantTurn = turn;
+        }
+
+        this._resetPublicLiveEventState?.();
+        this.agentRunStepMap = new Map();
+        this.agentRunToolMap = new Map();
+        this.agentRunArtifactMap = new Map();
+        this.activeAgentRunEvents = [];
+        this.activeAgentRunEventKeys = new Set();
+        this.activePlanRunEvents = [];
+        this.activePlanRunEventKeys = new Set();
+
+        if (hasPlanEvents) {
+            this.activeAgentRunId = null;
+            this.activePlanRunId = runId;
+            this.activePlanRequestId = replayRequestId;
+            this.activePlanRunRequestId = replayRequestId;
+        } else {
+            this.activeAgentRunId = runId;
+            this.activePlanRunId = null;
+            this.activePlanRequestId = null;
+            this.activePlanRunRequestId = null;
+        }
+
+        events.forEach(evt => this._handleAgentRunEvent(evt));
+
+        const status = String(replay?.summary?.status || replay?.Summary?.Status || '').toLowerCase();
+        const tone = status === 'failed'
+            ? 'failed'
+            : (status === 'cancelled' || status === 'canceled' ? 'cancelled' : 'success');
+        this._setAssistantTurnStatus?.(turn || this.activeAssistantTurn, '回放完成', tone);
+        this._setResultStatusNote?.(
+            `已回放最近一次 AgentRun：${runId}`,
+            'info'
+        );
+        return true;
     },
 
     _cancelActiveAgentRun() {

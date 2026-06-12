@@ -143,6 +143,56 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         reloaded.IsRunOwner(run.RunId, "usr_other").Should().BeFalse();
     }
 
+    [Fact(DisplayName = "AgentRun replay returns replay-safe snapshot and diagnostics")]
+    public void Replay_ShouldReturnSnapshotAndDiagnostics()
+    {
+        var now = DateTimeOffset.Parse("2026-06-07T00:00:00Z");
+        _service.UtcNowProvider = () => now;
+        var run = _service.CreateRun("snapshot", ownerHash: "usr_owner_snapshot");
+        now = now.AddSeconds(1);
+        _service.Append(run.RunId, Draft(AgentRunEventTypes.ReadinessChecked, "readiness"));
+
+        var replay = _service.Replay(run.RunId)!;
+
+        replay.Snapshot.StorageVersion.Should().Be(AgentRunEventStore.StorageVersion);
+        replay.Snapshot.RunId.Should().Be(run.RunId);
+        replay.Snapshot.GeneratedAt.Should().Be(now);
+        replay.Snapshot.FirstSequence.Should().Be(1);
+        replay.Snapshot.LastSequence.Should().Be(3);
+        replay.Snapshot.EventCount.Should().Be(3);
+        replay.Snapshot.Events.Select(evt => evt.Sequence).Should().Equal(1, 2, 3);
+        replay.Snapshot.MetadataOnly.Should().BeTrue();
+        replay.Snapshot.RedactionPass.Should().BeTrue();
+        replay.Diagnostics.RunId.Should().Be(run.RunId);
+        replay.Diagnostics.EventCount.Should().Be(3);
+        replay.Diagnostics.DuplicateEventCount.Should().Be(0);
+        replay.Diagnostics.DroppedEventCount.Should().Be(0);
+        replay.Diagnostics.StaleEventCount.Should().Be(0);
+        replay.Diagnostics.MetadataOnly.Should().BeTrue();
+        replay.Diagnostics.RedactionPass.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "AgentRun replay latest returns newest run for owner")]
+    public void ReplayLatest_ShouldReturnNewestOwnerRun()
+    {
+        var now = DateTimeOffset.Parse("2026-06-07T00:00:00Z");
+        _service.UtcNowProvider = () => now;
+        var ownerAOld = _service.CreateRun("owner A old", ownerHash: "usr_owner_a");
+        _service.Complete(ownerAOld.RunId, "old done");
+
+        now = now.AddMinutes(1);
+        var ownerB = _service.CreateRun("owner B", ownerHash: "usr_owner_b");
+        _service.Complete(ownerB.RunId, "owner b done");
+
+        now = now.AddMinutes(1);
+        var ownerANew = _service.CreateRun("owner A new", ownerHash: "usr_owner_a");
+        _service.Append(ownerANew.RunId, Draft(AgentRunEventTypes.StageStarted, "planner"));
+
+        _service.ReplayLatest("usr_owner_a")!.Summary.RunId.Should().Be(ownerANew.RunId);
+        _service.ReplayLatest("usr_owner_b")!.Summary.RunId.Should().Be(ownerB.RunId);
+        _service.ReplayLatest("usr_missing").Should().BeNull();
+    }
+
     [Fact(DisplayName = "AgentRun stream token validates owner run binding expiry and single use")]
     public void StreamToken_ShouldValidateOwnerRunExpiryAndSingleUse()
     {
@@ -204,7 +254,10 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         var appended = _service.Append(run.RunId, Draft(AgentRunEventTypes.StageStarted, "planner"));
 
         appended.Should().BeNull();
-        _service.Replay(run.RunId)!.Events.Should().HaveCount(3);
+        var replay = _service.Replay(run.RunId)!;
+        replay.Events.Should().HaveCount(3);
+        replay.Summary.DroppedEventCount.Should().Be(1);
+        replay.Diagnostics.DroppedEventCount.Should().Be(1);
     }
 
     [Fact(DisplayName = "AgentRun JSONL storage writes metadata-only events and summaries")]

@@ -13,14 +13,81 @@ public static class AiVisionTaskTypes
 {
     public const string Unknown = "unknown";
     public const string AbstractGoal = "abstract_goal";
+    public const string SurfaceDefect = "surface_defect";
     public const string SurfaceOrPoseDefect = "surface_or_pose_defect";
     public const string GeometryMeasurement = "geometry_measurement";
     public const string WireSequence = "wire_sequence";
+    public const string CodeRecognition = "code_recognition";
     public const string BarcodeQr = "barcode_qr";
     public const string PresenceAbsence = "presence_absence";
     public const string Classification = "classification";
+    public const string AttributeClassification = "attribute_classification";
     public const string TemplateLocation = "template_location";
     public const string PlcOutput = "plc_output";
+}
+
+public static class VisionAgentSemanticSources
+{
+    public const string Model = "model";
+    public const string RuleFallback = "rule_fallback";
+}
+
+public static class VisionAgentSemanticFailureCodes
+{
+    public const string ModelRequestFailed = "semantic_model_request_failed";
+    public const string ModelEmpty = "semantic_model_empty";
+    public const string JsonParseFailed = "semantic_json_parse_failed";
+    public const string Timeout = "semantic_timeout";
+    public const string Unauthorized = "semantic_unauthorized";
+    public const string UnknownError = "semantic_unknown_error";
+}
+
+public sealed record VisionAgentSemanticExtractionRequest
+{
+    public string Description { get; init; } = string.Empty;
+    public string? OriginalUserPrompt { get; init; }
+    public string? AdditionalContext { get; init; }
+    public string? SessionId { get; init; }
+    public string? Mode { get; init; }
+    public bool HasCurrentFlow { get; init; }
+    public bool HasPendingPlan { get; init; }
+    public AiTemplateSelectionInfo? TemplateSelection { get; init; }
+    public VisionAgentAttachmentSummary AttachmentSummary { get; init; } = new();
+    public string? HistorySummary { get; init; }
+    public string? CurrentFlowSummary { get; init; }
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentSemanticExtractionResult
+{
+    public bool IsVisionRequest { get; init; }
+    public string Intent { get; init; } = "unknown";
+    public string TaskType { get; init; } = AiVisionTaskTypes.Unknown;
+    public double Confidence { get; init; }
+    public double TaskTypeConfidence { get; init; }
+
+    public string InspectionObject { get; init; } = string.Empty;
+    public string TargetAttribute { get; init; } = string.Empty;
+    public string DefectType { get; init; } = string.Empty;
+    public string MeasurementTarget { get; init; } = string.Empty;
+    public string ImageSource { get; init; } = string.Empty;
+    public string OkCondition { get; init; } = string.Empty;
+    public string NgCondition { get; init; } = string.Empty;
+    public string OutputTarget { get; init; } = string.Empty;
+    public string SuggestedRoute { get; init; } = string.Empty;
+
+    public bool CanPlanCandidate { get; init; }
+    public bool CanBuildCandidate { get; init; }
+
+    public IReadOnlyList<string> ObjectSignals { get; init; } = [];
+    public IReadOnlyList<string> TaskSignals { get; init; } = [];
+    public IReadOnlyList<string> MissingFields { get; init; } = [];
+    public IReadOnlyList<string> ClarificationQuestions { get; init; } = [];
+
+    public string Source { get; init; } = VisionAgentSemanticSources.Model;
+    public string FailureCode { get; init; } = string.Empty;
+    public string SanitizedErrorMessage { get; init; } = string.Empty;
+    public bool MetadataOnly { get; init; } = true;
 }
 
 public sealed record AiRequirementMaturityResult
@@ -67,6 +134,7 @@ public sealed record VisionAgentPlanModeRequest
     public AiTemplateSelectionInfo? TemplateSelection { get; init; }
     public VisionAgentAttachmentSummary AttachmentSummary { get; init; } = new();
     public string? HistorySummary { get; init; }
+    public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
 }
 
 public sealed record VisionAgentIntentRouterRequest
@@ -84,6 +152,7 @@ public sealed record VisionAgentIntentRouterRequest
     public bool HasPendingPlan { get; init; }
     public string? PendingPlanSummary { get; init; }
     public bool DeveloperDirectBuildDebug { get; init; }
+    public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
     public bool MetadataOnly { get; init; } = true;
 }
 
@@ -101,6 +170,7 @@ public sealed record VisionAgentIntentRouterResult
     public bool FallbackAllowed { get; init; } = true;
     public string RouterSource { get; init; } = string.Empty;
     public string FallbackReason { get; init; } = string.Empty;
+    public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
     public AiRequirementMaturityResult? RequirementMaturity { get; init; }
     public AiDecisionTrace? DecisionTrace { get; init; }
     public bool MetadataOnly { get; init; } = true;
@@ -129,6 +199,7 @@ public sealed record VisionAgentPlanModeResult
     public List<string> ExecutablePlan { get; init; } = [];
     public bool CanBuild { get; init; }
     public List<string> BlockingReasons { get; init; } = [];
+    public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
     public AiRequirementMaturityResult? RequirementMaturity { get; init; }
     public AiDecisionTrace? DecisionTrace { get; init; }
     public string NextAction { get; init; } = string.Empty;

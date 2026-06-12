@@ -268,7 +268,9 @@ public class GenerateFlowMessageHandler
 
         var maturity = buildFromPlan?.PlanSnapshot?.RequirementMaturity ??
                        buildFromPlan?.RequirementMaturity ??
-                       VisionAgentRequirementMaturityGate.Evaluate(maturityRequest);
+                       VisionAgentRequirementMaturityGate.Evaluate(
+                           maturityRequest,
+                           buildFromPlan?.PlanSnapshot?.SemanticExtraction);
         var blocked = buildFromPlan?.PlanSnapshot?.CanBuild == false ||
                       buildFromPlan?.RequirementMaturity?.CanBuild == false ||
                       !maturity.CanBuild ||

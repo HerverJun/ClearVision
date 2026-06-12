@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
@@ -595,6 +596,23 @@ public sealed class AgentRunEndpointsTests
             .Select(evt => evt.GetProperty("eventType").GetString())
             .Should()
             .Contain(AgentRunEventTypes.RunCompleted);
+        var eventCount = document.RootElement.GetProperty("events").EnumerateArray().Count();
+        var snapshot = document.RootElement.GetProperty("snapshot");
+        snapshot.GetProperty("storageVersion").GetString().Should().Be(AgentRunEventStore.StorageVersion);
+        snapshot.GetProperty("runId").GetString().Should().Be(runId);
+        snapshot.GetProperty("firstSequence").GetInt64().Should().Be(1);
+        snapshot.GetProperty("lastSequence").GetInt64().Should().BeGreaterThanOrEqualTo(3);
+        snapshot.GetProperty("eventCount").GetInt32().Should().Be(eventCount);
+        snapshot.GetProperty("events").EnumerateArray()
+            .Select(evt => evt.GetProperty("sequence").GetInt64())
+            .Should()
+            .BeInAscendingOrder();
+        var diagnostics = document.RootElement.GetProperty("diagnostics");
+        diagnostics.GetProperty("runId").GetString().Should().Be(runId);
+        diagnostics.GetProperty("eventCount").GetInt32().Should().Be(eventCount);
+        diagnostics.GetProperty("duplicateEventCount").GetInt32().Should().Be(0);
+        diagnostics.GetProperty("droppedEventCount").GetInt32().Should().Be(0);
+        diagnostics.GetProperty("staleEventCount").GetInt32().Should().Be(0);
 
         var completed = document.RootElement.GetProperty("events").EnumerateArray()
             .Single(evt => evt.GetProperty("eventType").GetString() == AgentRunEventTypes.RunCompleted);
@@ -609,6 +627,48 @@ public sealed class AgentRunEndpointsTests
         payloadJson.Should().NotContain("reasoningContent");
         payloadJson.Should().NotContain("systemPrompt");
         payloadJson.Should().NotContain("rawPrompt");
+    }
+
+    [Fact(DisplayName = "GET latest AgentRun replay returns newest owner run")]
+    public async Task ReplayLatest_ShouldReturnNewestOwnerRun()
+    {
+        var now = DateTimeOffset.Parse("2026-06-07T00:00:00Z");
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(useAuth: true, utcNowProvider: () => now);
+        var ownerA = ResolveOwnerHashForTest("user-owner-a");
+        var ownerB = ResolveOwnerHashForTest("user-owner-b");
+        var oldA = host.StreamService.CreateRun("owner A old", ownerHash: ownerA);
+        host.StreamService.Complete(oldA.RunId, "old done");
+
+        now = now.AddMinutes(1);
+        var latestB = host.StreamService.CreateRun("owner B latest", ownerHash: ownerB);
+        host.StreamService.Complete(latestB.RunId, "owner B done");
+
+        now = now.AddMinutes(1);
+        var latestA = host.StreamService.CreateRun("owner A latest", ownerHash: ownerA);
+        host.StreamService.Append(latestA.RunId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.StageStarted,
+            Stage = "planner",
+            Title = "Planner started",
+            Summary = "Planner replay is available.",
+            Status = AgentRunEventStatuses.Running
+        });
+
+        host.AuthorizeAs("owner-a-token");
+        using var ownerAResponse = await host.Client.GetAsync("/api/ai/agent-runs/latest");
+        ownerAResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var ownerADoc = JsonDocument.Parse(await ownerAResponse.Content.ReadAsStringAsync());
+        ownerADoc.RootElement.GetProperty("summary").GetProperty("runId").GetString().Should().Be(latestA.RunId);
+        ownerADoc.RootElement.GetProperty("snapshot").GetProperty("events").EnumerateArray()
+            .Select(evt => evt.GetProperty("eventType").GetString())
+            .Should()
+            .Contain(AgentRunEventTypes.StageStarted);
+
+        host.AuthorizeAs("owner-b-token");
+        using var ownerBResponse = await host.Client.GetAsync("/api/ai/agent-runs/latest");
+        ownerBResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var ownerBDoc = JsonDocument.Parse(await ownerBResponse.Content.ReadAsStringAsync());
+        ownerBDoc.RootElement.GetProperty("summary").GetProperty("runId").GetString().Should().Be(latestB.RunId);
     }
 
     [Fact(DisplayName = "GET AgentRun missing replay returns 404")]
@@ -930,6 +990,12 @@ public sealed class AgentRunEndpointsTests
         }
 
         throw new TimeoutException($"SSE event '{eventType}' was not received.");
+    }
+
+    private static string ResolveOwnerHashForTest(string userId)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"agent-run-owner:{userId.Trim()}"));
+        return "usr_" + Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private sealed class AgentRunEndpointTestHost : IAsyncDisposable

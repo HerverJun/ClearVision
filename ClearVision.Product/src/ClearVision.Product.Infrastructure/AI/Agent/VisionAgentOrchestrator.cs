@@ -36,6 +36,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private readonly IVisionAgentToolRegistry _toolRegistry;
     private readonly IAiFlowGenerationService _generationService;
     private readonly IVisionAgentPlanPlannerService? _planPlannerService;
+    private readonly IVisionAgentSemanticExtractorService? _semanticExtractor;
     private readonly IVisionAgentBuildOrchestrator? _buildOrchestrator;
     private readonly IAgentRunEventSink? _eventSink;
     private readonly VisionAgentLoop? _toolLoop;
@@ -50,6 +51,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         IAgentRunEventSink? eventSink = null,
         IVisionAgentBuildOrchestrator? buildOrchestrator = null,
         IVisionAgentPlanPlannerService? planPlannerService = null,
+        IVisionAgentSemanticExtractorService? semanticExtractor = null,
         VisionAgentLoop? toolLoop = null,
         IVisionAgentLoopCompletionSource? toolLoopCompletionSource = null,
         IOptions<AgentGenerateFlowOptions>? agentOptions = null,
@@ -59,6 +61,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         _toolRegistry = toolRegistry;
         _generationService = generationService;
         _planPlannerService = planPlannerService;
+        _semanticExtractor = semanticExtractor;
         _buildOrchestrator = buildOrchestrator;
         _eventSink = eventSink;
         _toolLoop = toolLoop;
@@ -75,7 +78,21 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var ruleBaseline = BuildPlan(request);
+        var semanticEvents = new List<VisionAgentPlanPublicEvent>();
+        var semantic = VisionAgentSemanticExtractionSafety.Sanitize(request.SemanticExtraction);
+        if (semantic == null && _semanticExtractor != null)
+        {
+            semanticEvents.Add(BuildSemanticStartedEvent());
+            semantic = await _semanticExtractor.ExtractAsync(
+                ToSemanticRequest(request),
+                cancellationToken);
+            semanticEvents.AddRange(BuildSemanticResultEvents(semantic));
+        }
+
+        var planRequest = semantic == null
+            ? request
+            : request with { SemanticExtraction = semantic };
+        var ruleBaseline = BuildPlan(planRequest, semanticEvents);
         if (_planPlannerService == null)
         {
             return BuildRuleFallbackPlan(
@@ -85,9 +102,164 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         }
 
         return await _planPlannerService.CreatePlanAsync(
-            request,
+            planRequest,
             ruleBaseline,
             cancellationToken);
+    }
+
+    private static VisionAgentSemanticExtractionRequest ToSemanticRequest(VisionAgentPlanModeRequest request)
+    {
+        return new VisionAgentSemanticExtractionRequest
+        {
+            Description = request.Description,
+            OriginalUserPrompt = request.OriginalUserPrompt,
+            AdditionalContext = request.AdditionalContext,
+            SessionId = request.SessionId,
+            Mode = request.Mode,
+            HasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
+            HasPendingPlan = false,
+            TemplateSelection = request.TemplateSelection,
+            AttachmentSummary = request.AttachmentSummary,
+            HistorySummary = request.HistorySummary,
+            CurrentFlowSummary = SummarizePublicJson(request.CurrentFlowSnapshot),
+            MetadataOnly = true
+        };
+    }
+
+    private static VisionAgentPlanPublicEvent BuildSemanticStartedEvent()
+    {
+        return new VisionAgentPlanPublicEvent
+        {
+            Stage = "semantic_extraction",
+            Status = AgentRunEventStatuses.Running,
+            Title = "语义抽取已开始",
+            Summary = "正在抽取视觉需求语义槽位。",
+            Metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["metadataOnly"] = "true"
+            },
+            MetadataOnly = true
+        };
+    }
+
+    private static IReadOnlyList<VisionAgentPlanPublicEvent> BuildSemanticResultEvents(
+        VisionAgentSemanticExtractionResult semantic)
+    {
+        if (string.Equals(semantic.Source, VisionAgentSemanticSources.Model, StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                new VisionAgentPlanPublicEvent
+                {
+                    Stage = "semantic_extraction",
+                    Status = AgentRunEventStatuses.Completed,
+                    Title = "语义抽取完成",
+                    Summary = "语义理解来自模型，已生成公开结构化摘要。",
+                    Metadata = BuildSemanticMetadata(semantic),
+                    MetadataOnly = true
+                }
+            ];
+        }
+
+        return
+        [
+            new VisionAgentPlanPublicEvent
+            {
+                Stage = "semantic_extraction",
+                Status = AgentRunEventStatuses.Failed,
+                Title = "语义抽取失败",
+                Summary = "语义抽取模型不可用，当前为规则降级解析。",
+                Metadata = BuildSemanticMetadata(semantic),
+                MetadataOnly = true
+            },
+            new VisionAgentPlanPublicEvent
+            {
+                Stage = "semantic_fallback_used",
+                Status = AgentRunEventStatuses.Warning,
+                Title = "已启用语义规则降级",
+                Summary = "语义抽取模型不可用，当前为规则降级解析。",
+                Metadata = BuildSemanticMetadata(semantic),
+                MetadataOnly = true
+            }
+        ];
+    }
+
+    private static Dictionary<string, string> BuildSemanticMetadata(
+        VisionAgentSemanticExtractionResult semantic)
+    {
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["semanticSource"] = Clean(semantic.Source),
+            ["taskType"] = Clean(semantic.TaskType),
+            ["inspectionObject"] = Clean(semantic.InspectionObject),
+            ["targetAttribute"] = Clean(semantic.TargetAttribute),
+            ["okCondition"] = Clean(semantic.OkCondition),
+            ["ngCondition"] = Clean(semantic.NgCondition),
+            ["imageSource"] = Clean(semantic.ImageSource),
+            ["failureCode"] = Clean(semantic.FailureCode),
+            ["sanitizedErrorMessage"] = Clean(semantic.SanitizedErrorMessage),
+            ["missingFields"] = string.Join(",", semantic.MissingFields.Select(Clean).Where(value => !string.IsNullOrWhiteSpace(value)).Take(8)),
+            ["metadataOnly"] = "true"
+        };
+        return metadata
+            .Where(pair => !string.IsNullOrWhiteSpace(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<string> BuildSemanticUnderstanding(
+        VisionAgentSemanticExtractionResult? semantic)
+    {
+        if (semantic == null)
+        {
+            return [];
+        }
+
+        var lines = new List<string>
+        {
+            string.Equals(semantic.Source, VisionAgentSemanticSources.Model, StringComparison.OrdinalIgnoreCase)
+                ? "semanticSource=model"
+                : "semanticSource=rule_fallback"
+        };
+        AddSemanticLine(lines, "semantic.taskType", semantic.TaskType);
+        AddSemanticLine(lines, "semantic.inspectionObject", semantic.InspectionObject);
+        AddSemanticLine(lines, "semantic.targetAttribute", semantic.TargetAttribute);
+        AddSemanticLine(lines, "semantic.okCondition", semantic.OkCondition);
+        AddSemanticLine(lines, "semantic.ngCondition", semantic.NgCondition);
+        AddSemanticLine(lines, "semantic.imageSource", semantic.ImageSource);
+        AddSemanticLine(lines, "semantic.suggestedRoute", semantic.SuggestedRoute);
+        if (!string.IsNullOrWhiteSpace(semantic.FailureCode))
+        {
+            AddSemanticLine(lines, "semantic.failureCode", semantic.FailureCode);
+        }
+
+        return lines;
+    }
+
+    private static void AddSemanticLine(List<string> lines, string key, string? value)
+    {
+        var text = Clean(value);
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            lines.Add($"{key}={text}");
+        }
+    }
+
+    private static string SummarizePublicJson(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            return Truncate(document.RootElement.GetRawText(), 1_000);
+        }
+        catch (JsonException)
+        {
+            return Truncate(text, 1_000);
+        }
     }
 
     public async Task<AiFlowGenerationResult> BuildFromPlanAsync(
@@ -121,15 +293,17 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
         var maturity = plan?.RequirementMaturity ??
                        build?.RequirementMaturity ??
-                       VisionAgentRequirementMaturityGate.Evaluate(new VisionAgentRequirementMaturityRequest
-                       {
-                           Description = build?.OriginalUserPrompt ?? request.Description,
-                           AdditionalContext = request.AdditionalContext,
-                           Mode = build?.BuildIntent ?? request.Mode.ToWireValue(),
-                           HasCurrentFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson) ||
-                                            !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot),
-                           TemplateSelection = build?.TemplateSelection ?? request.TemplateSelection
-                       });
+                       VisionAgentRequirementMaturityGate.Evaluate(
+                           new VisionAgentRequirementMaturityRequest
+                           {
+                               Description = build?.OriginalUserPrompt ?? request.Description,
+                               AdditionalContext = request.AdditionalContext,
+                               Mode = build?.BuildIntent ?? request.Mode.ToWireValue(),
+                               HasCurrentFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson) ||
+                                                !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot),
+                               TemplateSelection = build?.TemplateSelection ?? request.TemplateSelection
+                           },
+                           plan?.SemanticExtraction);
 
         var blocked = plan?.CanBuild == false ||
                       build?.RequirementMaturity?.CanBuild == false ||
@@ -803,7 +977,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         });
     }
 
-    private VisionAgentPlanModeResult BuildPlan(VisionAgentPlanModeRequest request)
+    private VisionAgentPlanModeResult BuildPlan(
+        VisionAgentPlanModeRequest request,
+        IReadOnlyList<VisionAgentPlanPublicEvent>? semanticEvents = null)
     {
         var description = Clean(request.Description);
         var originalPrompt = string.IsNullOrWhiteSpace(request.OriginalUserPrompt)
@@ -818,7 +994,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             HasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
             TemplateSelection = templateSelection
         };
-        var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest);
+        var semantic = request.SemanticExtraction;
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
         var scenario = maturity.CanPlan
             ? VisionAgentRequirementMaturityGate.ToPlanIntent(maturity)
             : maturity.TaskType == AiVisionTaskTypes.AbstractGoal ? "abstract_goal" : "requirement_clarification";
@@ -857,6 +1034,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             RequirementUnderstanding =
             [
                 maturity.PublicReason,
+                .. BuildSemanticUnderstanding(semantic),
                 $"taskType={maturity.TaskType}",
                 maturity.ObjectSignals.Count > 0 ? $"objectSignals={string.Join(",", maturity.ObjectSignals)}" : "objectSignals=missing",
                 maturity.TaskSignals.Count > 0 ? $"taskSignals={string.Join(",", maturity.TaskSignals)}" : "taskSignals=missing",
@@ -885,6 +1063,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             ],
             CanBuild = canBuild,
             BlockingReasons = blockingReasons,
+            SemanticExtraction = semantic,
             RequirementMaturity = maturity,
             DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
                 maturityRequest,
@@ -924,6 +1103,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             PlcOutputPolicy = scenario == "plc_output"
                 ? "PLC 输出先作为待确认元数据规划，直到 OK/NG 地址、握手和失效保护策略确认。"
                 : "优先本地结果输出；构建就绪复核前保持 PLC 写入禁用。",
+            PublicEvents = semanticEvents?.ToList() ?? [],
             MetadataOnly = true
         };
 
@@ -946,6 +1126,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             ContractRepairNotes = [],
             PublicEvents =
             [
+                .. baseline.PublicEvents,
                 new VisionAgentPlanPublicEvent
                 {
                     Stage = "collecting_context",
@@ -1353,6 +1534,22 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 Operators = ["ImageAcquisition", "InspectionOperator", "ResultJudgment", "ResultOutput"],
                 TemplateDecision = templateDecision
             },
+            "presence_absence" => new VisionAgentRecommendedRoute
+            {
+                RouteId = "presence_absence_inspection",
+                Title = "有无 / 漏装检测路线",
+                Summary = "采集图像、定位目标区域、检查有无或漏装状态，并输出 OK/NG。",
+                Operators = ["ImageAcquisition", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput"],
+                TemplateDecision = templateDecision
+            },
+            "classification" or "attribute_classification" => new VisionAgentRecommendedRoute
+            {
+                RouteId = "attribute_classification_ok_ng",
+                Title = "属性分类 / OK-NG 判别路线",
+                Summary = "图像采集后定位目标 ROI，抽取颜色、纹理、成熟度或类别特征，并按 OK/NG 条件判定。",
+                Operators = ["ImageAcquisition", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput"],
+                TemplateDecision = templateDecision
+            },
             _ => new VisionAgentRecommendedRoute
             {
                 RouteId = "surface_defect_detection",
@@ -1446,6 +1643,32 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                     Option("ng_on_failure", "失败判 NG", true, "输出失败默认判 NG。", "更安全的生产行为。"),
                     Option("hold_last", "保持上一信号", false, "保持上一次信号。", "需要 PLC 握手复核。"),
                     Option("block_release", "阻断发布", false, "确认前阻断部署。", "最保守。")
+                ])
+            ],
+            "presence_absence" =>
+            [
+                Question("presence_target", "主要检查哪类有无状态？", "有无/漏装目标决定 ROI 和分类标签。", "target_present", "检查目标存在、缺失或漏装。", "目标定义会影响 OK/NG 判定。", [
+                    Option("target_present", "目标有无", true, "检测指定目标是否存在。", "适合漏装和缺件场景。"),
+                    Option("assembly_complete", "装配完整", false, "检查多个部件是否齐全。", "需要补充部件清单。"),
+                    Option("state_pending", "状态待确认", false, "先保留有无状态为待确认元数据。", "可生成草稿但就绪会阻断。")
+                ]),
+                Question("presence_judgment", "缺失时如何判定？", "判定策略决定 ResultJudgment 输出。", "missing_is_ng", "目标缺失时返回 NG。", "保守生产默认值。", [
+                    Option("missing_is_ng", "缺失判 NG", true, "缺失或漏装直接判 NG。", "适合大多数量产检查。"),
+                    Option("report_only", "仅报告", false, "只输出有无结果，不立即判 NG。", "适合探索阶段。"),
+                    Option("manual_review", "人工复核", false, "缺失疑似时转人工复核。", "需要操作流程。")
+                ])
+            ],
+            "classification" or "attribute_classification" =>
+            [
+                Question("attribute_target", "要判别哪个属性？", "属性会影响特征、模型标签和 OK/NG 语义。", "semantic_attribute", "按用户描述的属性进行分类或 OK/NG 判别。", "属性定义不清会导致误判。", [
+                    Option("semantic_attribute", "语义属性", true, "例如成熟度、颜色、类别或状态。", "保留语义槽位并进入分类路线。"),
+                    Option("color_texture", "颜色/纹理", false, "基于颜色、纹理或外观特征判别。", "需要稳定光照。"),
+                    Option("model_label", "模型标签", false, "使用分类模型标签输出。", "需要模型资源。")
+                ]),
+                Question("ok_ng_rule", "OK/NG 条件如何落地？", "属性分类必须明确通过和不通过条件。", "use_extracted_conditions", "使用语义抽取出的 OK/NG 条件。", "后续可在构建前复核阈值或标签。", [
+                    Option("use_extracted_conditions", "使用抽取条件", true, "沿用用户描述中的 OK/NG 条件。", "最快形成可审查草案。"),
+                    Option("threshold_pending", "阈值待确认", false, "保留阈值或类别边界为待确认。", "不会猜测生产阈值。"),
+                    Option("sample_review", "样本复核", false, "需要样本确认边界。", "更稳但需要数据。")
                 ])
             ],
             _ =>
@@ -1623,6 +1846,10 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         {
             common.Add("测量精度依赖标定和镜头畸变控制。");
         }
+        if (scenario is "classification" or "attribute_classification")
+        {
+            common.Add("属性分类边界需要样本、光照和 OK/NG 标签复核。");
+        }
         return common;
     }
 
@@ -1642,6 +1869,10 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         if (scenario == "code_recognition")
         {
             criteria.Add("解码失败策略必须体现在结果判定或待确认输出策略中。");
+        }
+        if (scenario is "classification" or "attribute_classification")
+        {
+            criteria.Add("OK/NG 条件必须保留在结果判定或待确认标签策略中。");
         }
         return criteria;
     }
@@ -1699,6 +1930,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             "template_location" => "模板定位",
             "button_inspection" => "按键检测",
             "plc_output" => "带 PLC 输出的检测",
+            "presence_absence" => "有无 / 漏装检测",
+            "classification" => "分类识别",
+            "attribute_classification" => "属性分类 / OK-NG 判别",
             "surface_defect" => "表面缺陷检测",
             _ => "通用视觉检测"
         };
@@ -1756,6 +1990,12 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private static string Clean(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
+    private static string Truncate(string? value, int maxChars)
+    {
+        var text = value ?? string.Empty;
+        return text.Length <= maxChars ? text : text[..maxChars];
     }
 
     private static string SafeTemplateToken(string? value, string fallback)
