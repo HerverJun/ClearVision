@@ -225,6 +225,92 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ValueSummary == "1");
     }
 
+    [Fact(DisplayName = "BuildFromPlan should block strategy confirmation until user explicitly chooses or accepts recommended")]
+    public async Task BuildAsync_StrategyConfirmationMissing_ShouldBlockDespiteDefaultValue()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = PlanWithStrategyConfirmationBlocker();
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                acceptedRecommendedDefaults: false),
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.DecisionTrace!.BlockingReasons.Should()
+            .Contain("strategy_confirmation:model_or_rule_strategy_missing");
+    }
+
+    [Fact(DisplayName = "BuildFromPlan should accept recommended strategy and emit confirmation metadata")]
+    public async Task BuildAsync_AcceptedRecommendedStrategy_ShouldBuildDeepLearningDraft()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = PlanWithStrategyConfirmationBlocker();
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                acceptedRecommendedDefaults: true),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var build = result.BuildResult!;
+        build.StrategyConfirmed.Should().BeTrue();
+        build.StrategyConfirmationSource.Should().Be("accepted_recommended");
+        build.UnresolvedStrategyBlockers.Should().BeEmpty();
+        build.ParameterStrategy.Should().Be("deep_learning_classification");
+        build.EffectiveRouteId.Should().Be("attribute_classification_deep_learning");
+        build.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"])
+            .And
+            .NotContain(["Thresholding", "BlobAnalysis"]);
+    }
+
+    [Fact(DisplayName = "BuildFromPlan should use explicit stable strategy value for deep learning classification")]
+    public async Task BuildAsync_UserDeepLearningSelection_ShouldUseDeepLearningClassificationRoute()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = PlanWithStrategyConfirmationBlocker();
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["model_or_rule_strategy"] = "deep_learning",
+                    ["classification_ok_label"] = "expected class"
+                },
+                acceptedRecommendedDefaults: false),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var build = result.BuildResult!;
+        build.SelectionSource.Should().Be("user_strategy");
+        build.StrategyConfirmed.Should().BeTrue();
+        build.StrategyConfirmationSource.Should().Be("user_selection");
+        build.EffectiveRouteId.Should().Be("attribute_classification_deep_learning");
+        build.ParameterStrategy.Should().Be("deep_learning_classification");
+        build.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "FieldName" &&
+            item.ValueSummary == "TopClassLabel");
+        build.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "ExpectValue" &&
+            item.ValueSummary == "expected class");
+        build.MissingResources.Should().Contain(item =>
+            item.ResourceType == "model_resource" &&
+            item.ResourceKey == "op_detect.ModelPath");
+    }
+
     [Fact(DisplayName = "Build orchestrator should let user strategy override Planner attribute classification route")]
     public async Task BuildAsync_UserTraditionalRuleSelection_ShouldOverridePlannerDeepLearningRoute()
     {
@@ -249,16 +335,75 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.Should().NotBeNull();
         var build = result.BuildResult!;
         build.SelectionSource.Should().Be("user_strategy");
+        build.StrategyConfirmed.Should().BeTrue();
+        build.StrategyConfirmationSource.Should().Be("user_selection");
         build.EffectiveRouteId.Should().Be("attribute_classification_traditional_rule");
+        build.ParameterStrategy.Should().Be("traditional_numeric_rule");
         build.EffectiveOperators.Should().Contain(["ImageAcquisition", "Thresholding", "BlobAnalysis", "ResultJudgment", "ResultOutput"]);
         build.OperatorPipeline.Select(item => item.OperatorType)
             .Should()
             .Contain(["ImageAcquisition", "Thresholding", "BlobAnalysis", "ResultJudgment", "ResultOutput"])
             .And
             .NotContain("DeepLearning");
+        build.ParameterMapping.Should().NotContain(item => item.ValueSummary.Contains("TopClassLabel", StringComparison.OrdinalIgnoreCase));
+        build.ParameterMapping.Should().NotContain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "ExpectValue" &&
+            item.ValueSummary == "expected class");
+        build.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "FieldName" &&
+            item.ValueSummary == "BlobCount");
+        build.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "Condition" &&
+            item.ValueSummary == "GreaterOrEqual");
+        build.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "Thresholding" &&
+            item.ParameterName == "Threshold" &&
+            item.Pending);
+        build.MissingResources.Should().Contain(item =>
+            item.ResourceType == "threshold_parameter" &&
+            item.ResourceKey == "op_threshold.Threshold");
+        build.MissingResources.Should().Contain(item =>
+            item.ResourceType == "area_range_parameter" &&
+            item.ResourceKey == "op_blob.MinArea");
+        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        build.ApplyGate.DeploymentReady.Should().BeFalse();
         build.ToolEvidenceTimeline.Should().Contain(item =>
             item.Stage == "plan_selection" &&
             item.ToolName == "plan_selection_resolver");
+    }
+
+    [Fact(DisplayName = "Non-attribute tasks should not switch routes from incidental model or rule values")]
+    public async Task BuildAsync_NonAttributeStrategyText_ShouldNotSwitchToClassificationRoute()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = Plan(
+            "measurement",
+            ["ImageAcquisition", "CircleMeasurement", "MeasureDistance", "UnitConvert", "ResultJudgment", "ResultOutput"],
+            "hole distance measurement workflow");
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["model_or_rule_strategy"] = "traditional_rule",
+                    ["notes"] = "operator model/rule wording is just a parameter note"
+                }),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var build = result.BuildResult!;
+        build.EffectiveRouteId.Should().NotBe("attribute_classification_traditional_rule");
+        build.ParameterStrategy.Should().BeEmpty();
+        build.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["Measurement", "UnitConvert", "ResultJudgment", "ResultOutput"])
+            .And
+            .NotContain(["Thresholding", "BlobAnalysis", "DeepLearning"]);
     }
 
     [Fact(DisplayName = "Black-box scenario: hole distance measurement Build quality")]
@@ -790,7 +935,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         string? currentFlowSnapshot = null,
         string? planHashOverride = null,
         AiTemplateSelectionInfo? templateSelection = null,
-        Dictionary<string, string>? userSelections = null)
+        Dictionary<string, string>? userSelections = null,
+        bool acceptedRecommendedDefaults = true)
     {
         return new AiFlowGenerationRequest(plan.OriginalUserPrompt, Mode: GenerateFlowModeExtensions.ParseOrAuto(buildIntent))
         {
@@ -813,7 +959,7 @@ public sealed class VisionAgentBuildOrchestratorTests
                 PlcOutputPolicy = plan.PlcOutputPolicy,
                 BuildIntent = buildIntent,
                 OriginalUserPrompt = plan.OriginalUserPrompt,
-                AcceptedRecommendedDefaults = true,
+                AcceptedRecommendedDefaults = acceptedRecommendedDefaults,
                 MetadataOnly = true
             }
         };
@@ -875,6 +1021,55 @@ public sealed class VisionAgentBuildOrchestratorTests
         return result with
         {
             PlanHash = VisionAgentOrchestrator.ComputePlanHash(result)
+        };
+    }
+
+    private static VisionAgentPlanModeResult PlanWithStrategyConfirmationBlocker()
+    {
+        var plan = Plan(
+            "attribute_classification",
+            ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
+            "classify object maturity from camera");
+        var blocked = plan with
+        {
+            CanBuild = false,
+            BlockingReasons = ["strategy_confirmation:model_or_rule_strategy_missing"],
+            ClarificationQuestions =
+            [
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "model_or_rule_strategy",
+                    Title = "Classification strategy",
+                    Why = "The operator route changes between model classification and calibrated numeric rules.",
+                    DefaultValue = "deep_learning",
+                    DefaultAssumption = "Use deep learning classification unless the user chooses traditional rules.",
+                    Impact = "Deep learning keeps model resources pending; traditional rules keep calibration parameters pending.",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "deep_learning",
+                            Label = "Deep learning",
+                            Recommended = true,
+                            Description = "Use TopClassLabel and TopClassConfidence from DeepLearning.",
+                            Impact = "Editable draft is allowed; deployment waits for model binding."
+                        },
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "traditional_rule",
+                            Label = "Traditional rule",
+                            Recommended = false,
+                            Description = "Use thresholding and blob analysis with numeric judgment.",
+                            Impact = "Editable draft is allowed; deployment waits for calibration."
+                        }
+                    ]
+                }
+            ]
+        };
+
+        return blocked with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(blocked)
         };
     }
 

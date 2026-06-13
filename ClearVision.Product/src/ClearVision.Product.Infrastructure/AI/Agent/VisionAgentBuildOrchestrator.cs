@@ -190,7 +190,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 "parameter_mapping",
                 "parameter_mapper",
                 "将用户选择和已接受默认值映射到算子参数，并保持未知资源待确认。",
-                _ => Task.FromResult(_parameterMapper.Map(loadPlan.Payload, pipeline.Payload)),
+                _ => Task.FromResult(_parameterMapper.Map(loadPlan.Payload, pipeline.Payload, planSelection.Payload)),
                 cancellationToken);
 
             var draft = await _toolRunner.ExecuteEvidenceStepAsync(

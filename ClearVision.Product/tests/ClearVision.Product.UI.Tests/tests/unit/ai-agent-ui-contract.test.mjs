@@ -521,14 +521,14 @@ function backendPlanResult(overrides = {}) {
     sanitizedErrorKind: overrides.sanitizedErrorKind || '',
     sanitizedErrorMessage: overrides.sanitizedErrorMessage || '',
     requirementUnderstanding: ['Inspection intent: surface defect inspection.'],
-    recommendedRoute: {
+    recommendedRoute: overrides.recommendedRoute ?? {
       routeId: 'surface_defect_detection',
       title: 'Surface defect inspection route',
       summary: 'Detect visible scratches and blobs.',
       operators: ['ImageAcquisition', 'SurfaceDefectDetection', 'ResultOutput'],
       templateDecision: 'Use selected template first.'
     },
-    clarificationQuestions: [
+    clarificationQuestions: overrides.clarificationQuestions ?? [
       {
         id: 'defect_definition',
         title: 'What should count as a defect?',
@@ -574,7 +574,7 @@ function backendPlanResult(overrides = {}) {
     executablePlan: ['Map parameters and run readiness checks.'],
     canPlan,
     canBuild,
-    blockingReasons: [],
+    blockingReasons: overrides.blockingReasons ?? [],
     nextAction: 'Accept recommended defaults, then start Build.',
     requirementMaturity: overrides.requirementMaturity ?? {
       maturity: canBuild ? 'actionable' : 'ambiguous',
@@ -975,6 +975,13 @@ function buildResultContractPayload(overrides = {}) {
     planId: 'plan-contract-1',
     planHash: 'sha256:contract',
     buildIntent: overrides.buildIntent || 'modify',
+    selectionSource: overrides.selectionSource || 'accepted_recommended',
+    effectiveRouteId: overrides.effectiveRouteId || 'attribute_classification_deep_learning',
+    effectiveOperators: overrides.effectiveOperators || ['ImageAcquisition', 'DeepLearning', 'ResultJudgment', 'ResultOutput'],
+    strategyConfirmed: overrides.strategyConfirmed ?? true,
+    strategyConfirmationSource: overrides.strategyConfirmationSource || 'accepted_recommended',
+    unresolvedStrategyBlockers: overrides.unresolvedStrategyBlockers || [],
+    parameterStrategy: overrides.parameterStrategy || 'deep_learning_classification',
     workflowDraft,
     operatorPipeline: [
       { tempId: 'op_acq', operatorType: 'ImageAcquisition', source: 'template_skeleton', status: 'selected', repairNote: '' },
@@ -1047,6 +1054,13 @@ function buildResultContractPayload(overrides = {}) {
       PlanId: buildResult.planId,
       PlanHash: buildResult.planHash,
       BuildIntent: buildResult.buildIntent,
+      SelectionSource: buildResult.selectionSource,
+      EffectiveRouteId: buildResult.effectiveRouteId,
+      EffectiveOperators: buildResult.effectiveOperators,
+      StrategyConfirmed: buildResult.strategyConfirmed,
+      StrategyConfirmationSource: buildResult.strategyConfirmationSource,
+      UnresolvedStrategyBlockers: buildResult.unresolvedStrategyBlockers,
+      ParameterStrategy: buildResult.parameterStrategy,
       WorkflowDraft: workflowDraft,
       OperatorPipeline: buildResult.operatorPipeline.map(item => ({
         TempId: item.tempId,
@@ -1155,6 +1169,80 @@ function createFakeFlowCanvas(initialFlow = { operators: [], connections: [] }) 
       notify(reason);
     }
   };
+}
+
+function strategyConfirmationQuestion() {
+  return {
+    id: 'model_or_rule_strategy',
+    title: 'Classification strategy',
+    why: 'Changes the implementation route.',
+    defaultValue: 'deep_learning',
+    defaultAssumption: 'Use the recommended deep learning classification route.',
+    impact: 'Draft is editable; deployment waits for resources.',
+    options: [
+      {
+        value: 'deep_learning',
+        label: 'Deep learning',
+        recommended: true,
+        description: 'Use model classification.',
+        impact: 'Model resource remains pending.'
+      },
+      {
+        value: 'traditional_rule',
+        label: 'Traditional rule',
+        recommended: false,
+        description: 'Use numeric rule calibration.',
+        impact: 'Calibration parameters remain pending.'
+      }
+    ]
+  };
+}
+
+function strategyConfirmationPlanResult(overrides = {}) {
+  return backendPlanResult({
+    canBuild: true,
+    canPlan: true,
+    planSource: 'model_planner',
+    fallbackReason: '',
+    intent: 'attribute_classification',
+    goal: 'classify fruit maturity',
+    originalUserPrompt: 'detect strawberries, ripe is OK, otherwise NG, source is camera',
+    recommendedRoute: {
+      routeId: 'attribute_classification_planner_route',
+      title: 'Attribute classification route',
+      summary: 'Use acquisition, classification, judgment, and output.',
+      operators: ['ImageAcquisition', 'DeepLearning', 'ResultJudgment', 'ResultOutput'],
+      templateDecision: 'planner_route'
+    },
+    clarificationQuestions: [strategyConfirmationQuestion()],
+    blockingReasons: ['strategy_confirmation:model_or_rule_strategy_missing'],
+    requirementMaturity: {
+      maturity: 'actionable',
+      taskType: 'attribute_classification',
+      canPlan: true,
+      canBuild: true,
+      objectSignals: ['strawberry'],
+      taskSignals: ['maturity'],
+      missingFields: [],
+      blockingReasons: [],
+      publicReason: 'Requirement hard facts are ready; strategy still needs confirmation.'
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      source: 'model',
+      taskType: 'attribute_classification',
+      confidence: 0.91,
+      taskTypeConfidence: 0.9,
+      inspectionObject: 'strawberry',
+      targetAttribute: 'maturity',
+      imageSource: 'camera',
+      okCondition: 'ripe is OK',
+      ngCondition: 'otherwise NG',
+      outputTarget: 'OK/NG result',
+      missingFields: []
+    },
+    ...overrides
+  });
 }
 
 function pendingParameterReviewResult() {
@@ -2748,6 +2836,62 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   assert.deepEqual(captured.templateSelection, captured.buildFromPlan.templateSelection);
 });
 
+test('Strategy confirmation blocker keeps frontend Plan non-executable and defaultValue is not submitted', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
+  panel.planQuestionSelections = {};
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
+
+  assert.equal(panel.pendingVisionPlan.executable, false);
+  assert.deepEqual(panel._buildPlanSelectionMap(panel.pendingVisionPlan), {});
+
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  assert.match(planWorkspace.innerHTML, /需确认策略/);
+
+  const started = panel._startBuildFromCurrentPlan();
+  assert.equal(started, false);
+  assert.equal(captured, null);
+  assert.match(panel.lastResultStatusNote.text, /需确认策略/);
+});
+
+test('Accept recommended strategy sends recommended value as explicit BuildFromPlan selection', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
+  panel.planQuestionSelections = {};
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
+
+  panel._acceptRecommendedPlanAndBuild();
+
+  assert.equal(captured.skipPlan, true);
+  assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, true);
+  assert.equal(captured.buildFromPlan.userSelections.model_or_rule_strategy, 'deep_learning');
+  assert.deepEqual(panel.planQuestionSelections, { model_or_rule_strategy: 'deep_learning' });
+  assert.equal(panel.pendingVisionPlan.executable, true);
+});
+
 test('Backend Plan without explicit canBuild is not executable by default', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -3196,6 +3340,9 @@ test('BuildResult replay payload renders Build Workspace and apply gate without 
   assert.match(timelineHtml, /部署资源待绑定/);
   assert.match(timelineHtml, /15 ms/);
   assert.match(elements['#ai-build-operator-chain'].innerHTML, /表面缺陷检测/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /accepted_recommended/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /attribute_classification_deep_learning/);
+  assert.match(elements['#ai-build-operator-chain'].innerHTML, /deep_learning_classification/);
   assert.match(elements['#ai-build-operator-chain'].innerHTML, /title="op_detect \/ SurfaceDefectDetection"/);
   assert.doesNotMatch(elements['#ai-build-operator-chain'].innerHTML, />SurfaceDefectDetection</);
   assert.match(elements['#ai-build-operator-chain'].innerHTML, /模板骨架/);

@@ -30,11 +30,29 @@ public sealed class PlanSelectionResolver
         TemplateStrategyResolution template,
         List<string> publicWarnings)
     {
-        var strategy = ResolveStrategy(load);
+        var attributeClassification = IsAttributeClassification(load);
+        var templateExplicitlySelected = HasExplicitTemplateSelection(load);
+        var confirmation = templateExplicitlySelected
+            ? new VisionAgentStrategyConfirmationResolution(
+                true,
+                "template",
+                VisionAgentStrategyConfirmationSupport.UserSelectionSource,
+                VisionAgentStrategyConfirmationSupport.ExtractStrategyBlockers(load.Plan),
+                [])
+            : VisionAgentStrategyConfirmationSupport.Resolve(
+                load.Plan,
+                load.UserSelections,
+                load.AcceptedRecommendedDefaults);
+        var strategy = ResolveStrategy(confirmation, attributeClassification, templateExplicitlySelected);
         var evidence = new List<string>();
         var blocking = new List<string>();
         var source = "planner_route";
         var route = load.Plan?.RecommendedRoute ?? new VisionAgentRecommendedRoute();
+        if (confirmation.UnresolvedBlockers.Count > 0)
+        {
+            blocking.AddRange(confirmation.UnresolvedBlockers);
+            evidence.Add("strategy_confirmation_required");
+        }
 
         if (strategy == "template")
         {
@@ -52,9 +70,11 @@ public sealed class PlanSelectionResolver
             }
         }
         else if (strategy == "deep_learning" &&
-                 IsAttributeClassification(load))
+                 attributeClassification)
         {
-            source = "user_strategy";
+            source = confirmation.Source == VisionAgentStrategyConfirmationSupport.AcceptedRecommendedSource
+                ? "accepted_recommended"
+                : "user_strategy";
             route = BuildRoute(
                 "attribute_classification_deep_learning",
                 "Attribute classification with deep learning",
@@ -64,9 +84,11 @@ public sealed class PlanSelectionResolver
             evidence.Add("user_selected_deep_learning");
         }
         else if (strategy == "traditional_rule" &&
-                 IsAttributeClassification(load))
+                 attributeClassification)
         {
-            source = "user_strategy";
+            source = confirmation.Source == VisionAgentStrategyConfirmationSupport.AcceptedRecommendedSource
+                ? "accepted_recommended"
+                : "user_strategy";
             route = BuildRoute(
                 "attribute_classification_traditional_rule",
                 "Attribute classification with traditional vision",
@@ -89,6 +111,7 @@ public sealed class PlanSelectionResolver
         }
 
         var validRoute = ValidateRoute(route, out var invalidOperators);
+        var parameterStrategy = ResolveParameterStrategy(load, validRoute);
         if (invalidOperators.Count > 0)
         {
             publicWarnings.Add("invalid_operator_removed");
@@ -99,6 +122,13 @@ public sealed class PlanSelectionResolver
             validRoute,
             source,
             strategy,
+            confirmation.Confirmed,
+            confirmation.Source,
+            confirmation.UnresolvedBlockers
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(12)
+                .ToList(),
+            parameterStrategy,
             blocking
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -114,8 +144,12 @@ public sealed class PlanSelectionResolver
             {
                 selectionSource = resolution.SelectionSource,
                 strategy = resolution.Strategy,
+                strategyConfirmed = resolution.StrategyConfirmed,
+                strategyConfirmationSource = resolution.StrategyConfirmationSource,
+                unresolvedStrategyBlockers = resolution.UnresolvedStrategyBlockers,
                 effectiveRouteId = resolution.EffectiveRoute.RouteId,
                 effectiveOperators = resolution.EffectiveRoute.Operators,
+                parameterStrategy = resolution.ParameterStrategy,
                 blockingReasons = resolution.BlockingReasons,
                 evidence = resolution.Evidence,
                 metadataOnly = true
@@ -136,82 +170,28 @@ public sealed class PlanSelectionResolver
                reason.StartsWith("strategy_confirmation:", StringComparison.OrdinalIgnoreCase);
     }
 
-    private string ResolveStrategy(BuildPlanLoad load)
+    private static string ResolveStrategy(
+        VisionAgentStrategyConfirmationResolution confirmation,
+        bool attributeClassification,
+        bool templateExplicitlySelected)
     {
-        if (HasExplicitTemplateSelection(load))
+        if (templateExplicitlySelected)
         {
             return "template";
         }
 
-        var explicitStrategyText = string.Join(' ', load.UserSelections
-            .Where(item => IsStrategySelectionKey(item.Key))
-            .Select(item => item.Value));
-        if (ContainsAny(explicitStrategyText, "traditional", "traditional_rule", "rule_based", "threshold", "blob", "\u4f20\u7edf", "\u89c4\u5219"))
+        if (!confirmation.Confirmed)
         {
-            return "traditional_rule";
+            return "planner";
         }
 
-        if (ContainsAny(explicitStrategyText, "deep_learning", "deep learning", "model", "ai", "classification", "\u6a21\u578b"))
+        return confirmation.Strategy switch
         {
-            return "deep_learning";
-        }
-
-        if (ContainsAny(explicitStrategyText, "template", "\u6a21\u677f"))
-        {
-            return "template";
-        }
-
-        var valueText = string.Join(' ', load.UserSelections.Select(item => item.Value));
-        if (ContainsAny(valueText, "traditional_rule", "traditional", "rule_based", "threshold_rule", "threshold", "blob", "\u4f20\u7edf\u89c4\u5219"))
-        {
-            return "traditional_rule";
-        }
-
-        if (ContainsAny(valueText, "deep_learning", "deep learning", "model", "ai", "\u6a21\u578b"))
-        {
-            return "deep_learning";
-        }
-
-        if (ContainsAny(valueText, "template", "\u6a21\u677f"))
-        {
-            return "template";
-        }
-
-        var acceptedStrategyText = string.Join(' ', load.AcceptedDefaults.Where(IsAcceptedStrategyHint));
-        if (ContainsAny(acceptedStrategyText, "traditional_rule", "traditional", "rule_based", "threshold", "blob"))
-        {
-            return "traditional_rule";
-        }
-
-        if (ContainsAny(acceptedStrategyText, "deep_learning", "model_strategy", "model"))
-        {
-            return "deep_learning";
-        }
-
-        if (ContainsAny(acceptedStrategyText, "template_strategy", "template"))
-        {
-            return "template";
-        }
-
-        return "planner";
-    }
-
-    private static bool IsStrategySelectionKey(string key)
-    {
-        var normalized = VisionAgentBuildSupport.Clean(key).ToLowerInvariant();
-        return normalized.Contains("strategy", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("algorithm", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("method", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("model_or_rule", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsAcceptedStrategyHint(string value)
-    {
-        var normalized = VisionAgentBuildSupport.Clean(value).ToLowerInvariant();
-        return normalized.Contains("strategy", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("deep_learning", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("traditional_rule", StringComparison.OrdinalIgnoreCase) ||
-               normalized.Contains("template", StringComparison.OrdinalIgnoreCase);
+            "template" => "template",
+            "deep_learning" when attributeClassification => "deep_learning",
+            "traditional_rule" when attributeClassification => "traditional_rule",
+            _ => "planner"
+        };
     }
 
     private static bool HasExplicitTemplateSelection(BuildPlanLoad load)
@@ -309,9 +289,27 @@ public sealed class PlanSelectionResolver
                text.Contains("classification", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool ContainsAny(string text, params string[] terms)
+    private static string ResolveParameterStrategy(
+        BuildPlanLoad load,
+        VisionAgentRecommendedRoute route)
     {
-        return terms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
+        if (!IsAttributeClassification(load))
+        {
+            return string.Empty;
+        }
+
+        if (route.Operators.Any(op => op.Equals("Thresholding", StringComparison.OrdinalIgnoreCase)) &&
+            route.Operators.Any(op => op.Equals("BlobAnalysis", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "traditional_numeric_rule";
+        }
+
+        if (route.Operators.Any(op => op.Equals("DeepLearning", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "deep_learning_classification";
+        }
+
+        return string.Empty;
     }
 
     private static string FirstNonEmpty(params string[] values)

@@ -435,7 +435,10 @@ PlannerCandidateParsed:
         var acceptance = NormalizeList(candidate.AcceptanceCriteria, baseline.AcceptanceCriteria);
         var executablePlan = NormalizeList(candidate.ExecutablePlan, baseline.ExecutablePlan);
         var blockingReasons = NormalizeList(candidate.BlockingReasons, []);
-        var classifiedPlannerBlocking = ClassifyPlannerBlockingReasons(blockingReasons, candidate.CanBuildCandidate);
+        var classifiedPlannerBlocking = ClassifyPlannerBlockingReasons(
+            blockingReasons,
+            candidate.CanBuildCandidate,
+            questions);
         var semantic = VisionAgentSemanticExtractionSafety.Sanitize(baseline.SemanticExtraction);
 
         var redactionNotes = new List<string>();
@@ -980,7 +983,8 @@ PlannerCandidateParsed:
 
     private static List<string> ClassifyPlannerBlockingReasons(
         IEnumerable<string> reasons,
-        bool canBuildCandidate)
+        bool canBuildCandidate,
+        IEnumerable<VisionAgentClarificationQuestion>? questions)
     {
         var classified = reasons
             .Select(ClassifyPlannerBlockingReason)
@@ -991,7 +995,12 @@ PlannerCandidateParsed:
         if (!canBuildCandidate &&
             classified.Count == 0)
         {
-            classified.Add("resource_pending:planner_candidate_not_buildable");
+            var strategyQuestionId = questions?
+                .Select(question => question.Id)
+                .FirstOrDefault(VisionAgentStrategyConfirmationSupport.IsStrategyQuestionId);
+            classified.Add(string.IsNullOrWhiteSpace(strategyQuestionId)
+                ? "strategy_confirmation:planner_candidate_not_buildable"
+                : $"strategy_confirmation:{strategyQuestionId}_missing");
         }
 
         return classified;

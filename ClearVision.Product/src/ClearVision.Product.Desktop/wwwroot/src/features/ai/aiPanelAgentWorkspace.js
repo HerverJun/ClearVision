@@ -420,6 +420,24 @@ export const aiPanelAgentWorkspaceMixin = {
             this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
         }
         const canBuild = hasPlan && this.pendingVisionPlan?.executable === true;
+        const unresolvedStrategy = hasPlan
+            ? this._getUnresolvedStrategyBlockers({
+                blockingReasons: this.pendingVisionPlan.blockingReasons,
+                questions: this.pendingVisionPlan.questions
+            })
+            : [];
+        const canAcceptRecommended = hasPlan && this._computeEffectivePlanBuildReadiness({
+            rawCanBuild: this.pendingVisionPlan.rawPlanSnapshot?.canBuild ?? this.pendingVisionPlan.rawPlanSnapshot?.CanBuild ?? this.pendingVisionPlan.executable,
+            requirementMaturity: this.pendingVisionPlan.requirementMaturity,
+            semanticExtraction: this.pendingVisionPlan.semanticExtraction,
+            route: this.pendingVisionPlan.route,
+            blockingReasons: this.pendingVisionPlan.blockingReasons,
+            questions: this.pendingVisionPlan.questions,
+            acceptedRecommended: true
+        });
+        const blockedTitle = unresolvedStrategy.length
+            ? '需确认策略后才能开始构建'
+            : '当前计划仍需澄清，暂不可构建';
         const inlineBuildBtn = this.container?.querySelector('#ai-btn-start-build-inline');
         if (inlineBuildBtn) {
             inlineBuildBtn.disabled = busy || !canBuild;
@@ -428,13 +446,23 @@ export const aiPanelAgentWorkspaceMixin = {
                 : canBuild
                     ? '按已确认计划开始构建'
                     : '当前计划仍需澄清，暂不可构建';
+            if (hasPlan && !canBuild) {
+                inlineBuildBtn.title = blockedTitle;
+            }
             inlineBuildBtn.setAttribute?.('aria-disabled', inlineBuildBtn.disabled ? 'true' : 'false');
         }
 
         this.container?.querySelectorAll?.('.ai-plan-action').forEach(button => {
-            button.disabled = busy || !canBuild;
+            const isAcceptRecommended = button.id === 'ai-btn-accept-plan';
+            const enabled = isAcceptRecommended ? canAcceptRecommended : canBuild;
+            button.disabled = busy || !enabled;
             if (!canBuild && hasPlan) {
                 button.title = '当前计划仍需澄清，暂不可构建';
+            }
+            if (!canBuild && hasPlan) {
+                button.title = isAcceptRecommended && canAcceptRecommended
+                    ? '接受推荐方案并确认策略'
+                    : blockedTitle;
             }
             button.setAttribute?.('aria-disabled', button.disabled ? 'true' : 'false');
         });
@@ -1123,9 +1151,7 @@ export const aiPanelAgentWorkspaceMixin = {
             .then(result => {
                 if (!this._isActivePlanRequest(planRequestId)) return;
                 this.pendingVisionPlan = this._normalizeBackendPlanResult(result, normalizedDescription);
-                this.planQuestionSelections = Object.fromEntries(
-                    this.pendingVisionPlan.questions.map(question => [question.id, question.defaultValue])
-                );
+                this.planQuestionSelections = {};
                 this._clearActivePlanRequest(planRequestId);
                 this._setGeneratingState?.(false);
                 const timeoutFallback = this._isPlannerTimeoutFallback(this.pendingVisionPlan);
@@ -1702,6 +1728,8 @@ export const aiPanelAgentWorkspaceMixin = {
         const rawCanBuild = plan.canBuild ?? plan.CanBuild;
         const rawCanPlan = plan.canPlan ?? plan.CanPlan;
         const maturityCanPlan = requirementMaturity?.canPlan === true;
+        const blockingReasons = this._toArray(plan.blockingReasons || plan.BlockingReasons)
+            .map(item => this._localizeDisplayText(item));
         const publicEvents = this._toArray(plan.publicEvents || plan.PublicEvents)
             .map(evt => this._normalizePlanPublicEvent(evt));
         const rawFallbackReason = String(plan.fallbackReason || plan.FallbackReason || '').trim();
@@ -1732,16 +1760,18 @@ export const aiPanelAgentWorkspaceMixin = {
                 .map(item => this._sanitizePlanDiagnosticText(this._localizeDisplayText(item), 120))
                 .filter(Boolean),
             publicEvents,
-            blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
+            blockerCount: blockingReasons.length,
             nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
             canPlan: rawCanPlan === true || maturityCanPlan,
             executable: this._computeEffectivePlanBuildReadiness({
                 rawCanBuild,
                 requirementMaturity,
                 semanticExtraction,
-                route
+                route,
+                blockingReasons,
+                questions: normalizedQuestions
             }),
-            blockingReasons: this._toArray(plan.blockingReasons || plan.BlockingReasons).map(item => this._localizeDisplayText(item)),
+            blockingReasons,
             understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
                 ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).map(item => this._localizeDisplayText(item))
                 : [`用户目标：${fallbackDescription || '视觉流程草稿'}`],
@@ -1773,12 +1803,82 @@ export const aiPanelAgentWorkspaceMixin = {
         };
     },
 
-    _computeEffectivePlanBuildReadiness({ rawCanBuild, requirementMaturity, semanticExtraction, route }) {
+    _computeEffectivePlanBuildReadiness({
+        rawCanBuild,
+        requirementMaturity,
+        semanticExtraction,
+        route,
+        blockingReasons = [],
+        questions = [],
+        acceptedRecommended = false
+    }) {
+        const unresolvedStrategyBlockers = this._getUnresolvedStrategyBlockers({
+            blockingReasons,
+            questions,
+            acceptedRecommended
+        });
+        if (unresolvedStrategyBlockers.length) return false;
+
         const maturityCanBuild = requirementMaturity?.canBuild === true;
         if (rawCanBuild === true && maturityCanBuild) return true;
 
         return this._planHardFactsReady(requirementMaturity, semanticExtraction) &&
             this._planRouteSatisfiesBuildStrategy(route);
+    },
+
+    _getUnresolvedStrategyBlockers({ blockingReasons = [], questions = [], acceptedRecommended = false } = {}) {
+        const strategyBlockers = this._toArray(blockingReasons)
+            .map(reason => String(reason || '').trim())
+            .filter(reason => /^strategy_confirmation:/i.test(reason));
+        if (!strategyBlockers.length) return [];
+
+        const strategyQuestions = this._toArray(questions)
+            .filter(question => this._isPlanStrategyQuestionId(question?.id));
+        const selections = this.planQuestionSelections || {};
+        const hasExplicitStrategySelection = strategyQuestions.some(question =>
+            this._normalizePlanStrategyChoice(selections[question.id]));
+        if (hasExplicitStrategySelection) return [];
+
+        if (acceptedRecommended) {
+            const hasRecommendedStrategy = strategyQuestions.some(question =>
+                this._normalizePlanStrategyChoice(this._getQuestionRecommendedValue(question)));
+            if (hasRecommendedStrategy) return [];
+        }
+
+        return strategyBlockers;
+    },
+
+    _isPlanStrategyQuestionId(id) {
+        return ['classification_strategy', 'model_or_rule_strategy', 'algorithm_strategy']
+            .includes(String(id || '').trim().toLowerCase());
+    },
+
+    _getQuestionRecommendedValue(question) {
+        const recommendedOption = this._toArray(question?.options)
+            .find(option => option?.recommended === true);
+        return recommendedOption?.value || question?.defaultValue || '';
+    },
+
+    _normalizePlanStrategyChoice(value) {
+        const normalized = String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[-\s]+/g, '_')
+            .replace(/_+/g, '_');
+        if (!normalized) return '';
+        if (['deep_learning', 'deeplearning', 'model', 'ai', 'model_strategy', 'classification_model', 'model_classification'].includes(normalized)) {
+            return 'deep_learning';
+        }
+        if (['traditional_rule', 'traditional', 'rule', 'rule_based', 'classic_rule', 'threshold_rule', 'numeric_rule'].includes(normalized)) {
+            return 'traditional_rule';
+        }
+        if (['template', 'template_strategy', 'catalog_template', 'selected_template'].includes(normalized)) {
+            return 'template';
+        }
+        if (['planner_route', 'planner', 'recommended', 'use_planner_route'].includes(normalized)) {
+            return 'planner_route';
+        }
+        return '';
     },
 
     _planHardFactsReady(requirementMaturity, semanticExtraction) {
@@ -1819,13 +1919,16 @@ export const aiPanelAgentWorkspaceMixin = {
         return hasWorkOperator && hasResultOutput;
     },
 
-    _refreshPlanEffectiveBuildReadiness(plan) {
+    _refreshPlanEffectiveBuildReadiness(plan, { acceptedRecommended = false } = {}) {
         if (!plan) return false;
         plan.executable = this._computeEffectivePlanBuildReadiness({
             rawCanBuild: plan.rawPlanSnapshot?.canBuild ?? plan.rawPlanSnapshot?.CanBuild ?? plan.executable,
             requirementMaturity: plan.requirementMaturity,
             semanticExtraction: plan.semanticExtraction,
-            route: plan.route || plan.recommendedRoute || plan.RecommendedRoute
+            route: plan.route || plan.recommendedRoute || plan.RecommendedRoute,
+            blockingReasons: plan.blockingReasons,
+            questions: plan.questions,
+            acceptedRecommended
         });
         return plan.executable === true;
     },
@@ -2832,6 +2935,10 @@ export const aiPanelAgentWorkspaceMixin = {
         const blockingReasons = this._toArray(maturity?.blockingReasons)
             .map(reason => this._localizeDisplayText(reason))
             .filter(Boolean);
+        const unresolvedStrategyBlockers = this._getUnresolvedStrategyBlockers({
+            blockingReasons: plan?.blockingReasons,
+            questions: plan?.questions
+        });
         const taskSignals = this._toArray(maturity?.taskSignals).slice(0, 8);
         const objectSignals = this._toArray(maturity?.objectSignals).slice(0, 8);
         const fallbackReason = trace?.fallbackReason || plan?.fallbackReason || '';
@@ -2860,6 +2967,7 @@ export const aiPanelAgentWorkspaceMixin = {
                         <span>${canBuild ? '允许' : '阻断'}</span>
                     </div>
                 </div>
+                ${unresolvedStrategyBlockers.length ? `<div class="ai-build-note"><strong>需确认策略</strong>${renderChips(unresolvedStrategyBlockers, '无')}</div>` : ''}
                 ${maturity?.publicReason ? `<div class="ai-build-note"><strong>判断原因</strong>${this._escapeHtml(maturity.publicReason)}</div>` : ''}
                 ${missingFields.length ? `<div class="ai-build-note"><strong>缺失字段</strong>${renderChips(missingFields, '无')}</div>` : ''}
                 ${blockingReasons.length ? `<div class="ai-build-note"><strong>阻断原因</strong>${renderChips(blockingReasons, '无')}</div>` : ''}
@@ -3088,7 +3196,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
                 <div class="ai-plan-question-options">
                     ${question.options.map(option => {
-                        const selected = String(selectedValue || question.defaultValue) === option.value;
+                        const selected = String(selectedValue || '') === option.value;
                         return `
                             <button
                                 class="ai-plan-option ${selected ? 'is-selected' : ''} ${option.recommended ? 'is-recommended' : ''}"
@@ -3127,7 +3235,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 question.options.find(option => option.recommended)?.value || question.defaultValue
             ])
         );
-        this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
+        this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan, { acceptedRecommended: true });
         this._startBuildFromCurrentPlan({ acceptedRecommended: true });
     },
 
@@ -3146,10 +3254,17 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const plan = this.pendingVisionPlan;
-        this._refreshPlanEffectiveBuildReadiness?.(plan);
+        this._refreshPlanEffectiveBuildReadiness?.(plan, { acceptedRecommended });
         if (plan.executable !== true) {
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
-            const reason = plan.requirementMaturity?.publicReason || '当前计划仍需澄清，暂不可构建。';
+            const strategyBlockers = this._getUnresolvedStrategyBlockers({
+                blockingReasons: plan.blockingReasons,
+                questions: plan.questions,
+                acceptedRecommended
+            });
+            const reason = strategyBlockers.length
+                ? '需确认策略后才能开始构建。'
+                : plan.requirementMaturity?.publicReason || '当前计划仍需澄清，暂不可构建。';
             this._addMessage?.('system', reason);
             this._setResultStatusNote?.(reason, 'warning');
             this._renderAgentWorkspaceOverview();
@@ -3199,7 +3314,7 @@ export const aiPanelAgentWorkspaceMixin = {
             planId: plan.planId || plan.id || '',
             planHash,
             planSnapshot: this._buildPlanSnapshotForBuild(plan),
-            userSelections: this._buildPlanSelectionMap(plan),
+            userSelections: this._buildPlanSelectionMap(plan, { acceptedRecommended }),
             acceptedDefaults: this._collectAcceptedDefaultIds(plan, acceptedRecommended),
             currentFlowSnapshot,
             templateSelection,
@@ -3296,11 +3411,18 @@ export const aiPanelAgentWorkspaceMixin = {
         };
     },
 
-    _buildPlanSelectionMap(plan) {
+    _buildPlanSelectionMap(plan, { acceptedRecommended = false } = {}) {
         const selections = this.planQuestionSelections || {};
         return Object.fromEntries(this._toArray(plan?.questions)
             .map(question => {
-                const value = String(selections[question.id] || question.defaultValue || '').trim();
+                const selected = selections[question.id];
+                const value = String(
+                    selected !== undefined && selected !== null
+                        ? selected
+                        : acceptedRecommended
+                            ? this._getQuestionRecommendedValue(question)
+                            : ''
+                ).trim();
                 return value ? [question.id, value] : null;
             })
             .filter(Boolean));
@@ -3310,7 +3432,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const selected = this._buildPlanSelectionMap(plan);
         return this._toArray(plan?.questions)
             .filter(question => {
-                const recommended = question.options?.find(option => option.recommended)?.value || question.defaultValue;
+                const recommended = this._getQuestionRecommendedValue(question);
                 return acceptedRecommended || String(selected[question.id] || '') === String(recommended || '');
             })
             .map(question => question.id)
@@ -3476,7 +3598,24 @@ export const aiPanelAgentWorkspaceMixin = {
         const buildResult = this._getBuildResult(events);
         const pipeline = this._toArray(buildResult?.operatorPipeline || buildResult?.OperatorPipeline);
         if (pipeline.length) {
+            const selectionSource = buildResult?.selectionSource || buildResult?.SelectionSource || '';
+            const effectiveRouteId = buildResult?.effectiveRouteId || buildResult?.EffectiveRouteId || '';
+            const strategyConfirmed = this._readBooleanField(buildResult, 'strategyConfirmed', 'StrategyConfirmed');
+            const strategyConfirmationSource = buildResult?.strategyConfirmationSource || buildResult?.StrategyConfirmationSource || '';
+            const parameterStrategy = buildResult?.parameterStrategy || buildResult?.ParameterStrategy || '';
+            const unresolvedStrategyBlockers = this._toArray(buildResult?.unresolvedStrategyBlockers || buildResult?.UnresolvedStrategyBlockers);
             return `
+                <div class="ai-build-compact">
+                    <div class="ai-build-compact-row">
+                        <b>策略确认</b>
+                        <span>${strategyConfirmed ? '已确认' : '未确认'}${strategyConfirmationSource ? ` / ${this._escapeHtml(strategyConfirmationSource)}` : ''}</span>
+                    </div>
+                    <div class="ai-build-compact-row">
+                        <b>有效路线</b>
+                        <span>${this._escapeHtml([selectionSource, effectiveRouteId, parameterStrategy].filter(Boolean).join(' / '))}</span>
+                    </div>
+                    ${unresolvedStrategyBlockers.length ? `<div class="ai-build-compact-row"><b>未解除策略阻断</b><span>${this._escapeHtml(unresolvedStrategyBlockers.join(', '))}</span></div>` : ''}
+                </div>
                 <div class="ai-plan-chain">
                     ${pipeline.map(item => {
                         const rawType = item.operatorType || item.OperatorType || '';

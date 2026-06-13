@@ -28,6 +28,8 @@ internal static class VisionAgentPlanBuildReadiness
             return new VisionAgentPlanBuildReadinessResult(false, ["plan_snapshot_missing"]);
         }
 
+        blocking.AddRange(VisionAgentStrategyConfirmationSupport.ExtractHardBlockers(plan));
+
         var maturity = plan.RequirementMaturity;
         if (maturity is { CanPlan: false } ||
             maturity?.Maturity is AiRequirementMaturity.AbstractGoal or AiRequirementMaturity.ChatOrHelp)
@@ -39,7 +41,13 @@ internal static class VisionAgentPlanBuildReadiness
         }
 
         AddHardFieldBlockers(plan, blocking);
-        if (!HasSupportedStrategy(plan, userSelections, acceptedDefaults, acceptedRecommendedDefaults, out var invalidOperators))
+        var strategyConfirmation = VisionAgentStrategyConfirmationSupport.Resolve(
+            plan,
+            userSelections,
+            acceptedRecommendedDefaults);
+        blocking.AddRange(strategyConfirmation.UnresolvedBlockers);
+
+        if (!HasSupportedRouteOrTemplate(plan, out var invalidOperators))
         {
             blocking.Add("strategy_confirmation:model_or_rule_strategy_missing");
         }
@@ -118,11 +126,8 @@ internal static class VisionAgentPlanBuildReadiness
         }
     }
 
-    private static bool HasSupportedStrategy(
+    private static bool HasSupportedRouteOrTemplate(
         VisionAgentPlanModeResult plan,
-        IReadOnlyDictionary<string, string>? userSelections,
-        IReadOnlyList<string>? acceptedDefaults,
-        bool acceptedRecommendedDefaults,
         out List<string> invalidOperators)
     {
         invalidOperators = [];
@@ -158,26 +163,7 @@ internal static class VisionAgentPlanBuildReadiness
             return true;
         }
 
-        var selectionValues = userSelections?.Values ?? Array.Empty<string>();
-        var defaultValues = acceptedDefaults ?? Array.Empty<string>();
-        var choiceText = string.Join(' ', selectionValues)
-            + " " + string.Join(' ', defaultValues);
-        if (acceptedRecommendedDefaults)
-        {
-            choiceText += " recommended";
-        }
-
-        return ContainsAny(
-            choiceText,
-            "deep",
-            "model",
-            "rule",
-            "traditional",
-            "template",
-            "threshold",
-            "classification",
-            "model_pending",
-            "template_pending");
+        return false;
     }
 
     private static string NormalizeTaskType(string? taskType)
@@ -189,11 +175,6 @@ internal static class VisionAgentPlanBuildReadiness
             "" => string.Empty,
             var value => value
         };
-    }
-
-    private static bool ContainsAny(string text, params string[] terms)
-    {
-        return terms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string ClassifyHardRequirement(string reason)

@@ -78,6 +78,12 @@ public sealed class BuildResultAssembler
             SelectionSource = input.Selection.SelectionSource,
             EffectiveRouteId = input.Selection.EffectiveRoute.RouteId,
             EffectiveOperators = input.Selection.EffectiveRoute.Operators.ToList(),
+            StrategyConfirmed = input.Selection.StrategyConfirmed,
+            StrategyConfirmationSource = input.Selection.StrategyConfirmationSource,
+            UnresolvedStrategyBlockers = input.Selection.UnresolvedStrategyBlockers.ToList(),
+            ParameterStrategy = string.IsNullOrWhiteSpace(input.ParameterMapping.ParameterStrategy)
+                ? input.Selection.ParameterStrategy
+                : input.ParameterMapping.ParameterStrategy,
             WorkflowDraft = input.CurrentDraft.WorkflowDraft,
             OperatorPipeline = input.Pipeline.Steps,
             ParameterMapping = input.ParameterMapping.Mappings,
@@ -114,6 +120,13 @@ public sealed class BuildResultAssembler
             Payload = new
             {
                 buildId = input.BuildId,
+                selectionSource = result.BuildResult.SelectionSource,
+                effectiveRouteId = result.BuildResult.EffectiveRouteId,
+                effectiveOperators = result.BuildResult.EffectiveOperators,
+                strategyConfirmed = result.BuildResult.StrategyConfirmed,
+                strategyConfirmationSource = result.BuildResult.StrategyConfirmationSource,
+                unresolvedStrategyBlockers = result.BuildResult.UnresolvedStrategyBlockers,
+                parameterStrategy = result.BuildResult.ParameterStrategy,
                 workflowDiff = result.BuildResult.WorkflowDiff,
                 applyGate = result.BuildResult.ApplyGate,
                 firstFixRecommendation = firstFix,

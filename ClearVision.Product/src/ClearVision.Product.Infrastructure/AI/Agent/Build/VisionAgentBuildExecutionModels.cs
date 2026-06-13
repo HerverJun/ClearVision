@@ -52,6 +52,10 @@ internal sealed record PlanSelectionResolution(
     VisionAgentRecommendedRoute EffectiveRoute,
     string SelectionSource,
     string Strategy,
+    bool StrategyConfirmed,
+    string StrategyConfirmationSource,
+    List<string> UnresolvedStrategyBlockers,
+    string ParameterStrategy,
     List<string> BlockingReasons,
     List<string> Evidence);
 
@@ -62,7 +66,8 @@ internal sealed record OperatorPipelineResolution(
 internal sealed record ParameterMappingResolution(
     List<VisionAgentParameterMapping> Mappings,
     List<AiPendingParameterInfo> PendingParameters,
-    List<AiMissingResourceInfo> MissingResources);
+    List<AiMissingResourceInfo> MissingResources,
+    string ParameterStrategy);
 
 internal sealed record CanonicalDraft(
     object WorkflowDraft,

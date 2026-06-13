@@ -26,8 +26,10 @@ public sealed class ParameterMappingService
 
     internal BuildStepResult<ParameterMappingResolution> Map(
         BuildPlanLoad load,
-        OperatorPipelineResolution pipeline)
+        OperatorPipelineResolution pipeline,
+        PlanSelectionResolution selection)
     {
+        var parameterStrategy = ResolveParameterStrategy(load, pipeline, selection);
         var mappings = new List<VisionAgentParameterMapping>();
         var pending = new List<AiPendingParameterInfo>();
         var missing = new List<AiMissingResourceInfo>();
@@ -41,7 +43,7 @@ public sealed class ParameterMappingService
 
             foreach (var parameter in schema.Parameters)
             {
-                var mapped = MapParameterValue(op, parameter, load);
+                var mapped = MapParameterValue(op, parameter, load, parameterStrategy);
                 mappings.Add(mapped);
                 if (mapped.Pending)
                 {
@@ -53,7 +55,7 @@ public sealed class ParameterMappingService
                     });
                 }
 
-                var missingKind = MissingResourceKind(op.OperatorType, parameter.Name, mapped.Pending);
+                var missingKind = MissingResourceKind(op.OperatorType, parameter.Name, mapped.Pending, parameterStrategy);
                 if (!string.IsNullOrWhiteSpace(missingKind))
                 {
                     missing.Add(new AiMissingResourceInfo
@@ -69,7 +71,8 @@ public sealed class ParameterMappingService
         var resolution = new ParameterMappingResolution(
             mappings,
             VisionAgentBuildSupport.DeduplicatePending(pending),
-            VisionAgentBuildSupport.DeduplicateMissing(missing));
+            VisionAgentBuildSupport.DeduplicateMissing(missing),
+            parameterStrategy);
         return VisionAgentBuildSupport.StepResult(
             resolution,
             $"已映射 {mappings.Count} 个参数假设；仍有 {resolution.PendingParameters.Count} 组待确认参数、{resolution.MissingResources.Count} 个缺失资源。",
@@ -79,6 +82,7 @@ public sealed class ParameterMappingService
                 mappingCount = mappings.Count,
                 pendingParameterCount = resolution.PendingParameters.Count,
                 missingResourceCount = resolution.MissingResources.Count,
+                parameterStrategy = resolution.ParameterStrategy,
                 selections = load.UserSelections.Keys.ToList(),
                 acceptedDefaults = load.AcceptedDefaults,
                 metadataOnly = true
@@ -88,28 +92,62 @@ public sealed class ParameterMappingService
             deploymentImpact: resolution.MissingResources.Count > 0 ? "deployment_blocked_until_resources_bound" : "no_deployment_blocker");
     }
 
+    private static string ResolveParameterStrategy(
+        BuildPlanLoad load,
+        OperatorPipelineResolution pipeline,
+        PlanSelectionResolution selection)
+    {
+        if (!string.IsNullOrWhiteSpace(selection.ParameterStrategy))
+        {
+            return selection.ParameterStrategy;
+        }
+
+        if (!IsAttributeClassificationScenario(load))
+        {
+            return string.Empty;
+        }
+
+        var operators = pipeline.Steps
+            .Select(step => step.OperatorType)
+            .ToList();
+        if (operators.Any(op => op.Equals("Thresholding", StringComparison.OrdinalIgnoreCase)) &&
+            operators.Any(op => op.Equals("BlobAnalysis", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "traditional_numeric_rule";
+        }
+
+        if (operators.Any(op => op.Equals("DeepLearning", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "deep_learning_classification";
+        }
+
+        return string.Empty;
+    }
+
     private static VisionAgentParameterMapping MapParameterValue(
         VisionAgentOperatorPipelineStep op,
         VisionAgentParameterContract parameter,
-        BuildPlanLoad load)
+        BuildPlanLoad load,
+        string parameterStrategy)
     {
         var key = $"{op.OperatorType}.{parameter.Name}";
-        if (load.UserSelections.TryGetValue(parameter.Name, out var direct) ||
-            load.UserSelections.TryGetValue(key, out direct))
+        if (!IsTraditionalNumericRuleProtectedParameter(op.OperatorType, parameter.Name, parameterStrategy) &&
+            (load.UserSelections.TryGetValue(parameter.Name, out var direct) ||
+             load.UserSelections.TryGetValue(key, out direct)))
         {
             return new VisionAgentParameterMapping
             {
                 TempId = op.TempId,
-            OperatorType = op.OperatorType,
-            ParameterName = parameter.Name,
-            ValueSummary = VisionAgentBuildSupport.CleanValue(direct),
-            Source = "user_selection",
-            Pending = false,
-            Impact = "用户选择已写入草稿参数元数据。"
-        };
+                OperatorType = op.OperatorType,
+                ParameterName = parameter.Name,
+                ValueSummary = VisionAgentBuildSupport.CleanValue(direct),
+                Source = "user_selection",
+                Pending = false,
+                Impact = "用户选择已写入草稿参数元数据。"
+            };
         }
 
-        var fallback = DefaultParameterValue(op.OperatorType, parameter, load);
+        var fallback = DefaultParameterValue(op.OperatorType, parameter, load, parameterStrategy);
         var pending = IsPendingParameter(op.OperatorType, parameter, fallback, load);
         return new VisionAgentParameterMapping
         {
@@ -125,10 +163,35 @@ public sealed class ParameterMappingService
         };
     }
 
+    private static bool IsTraditionalNumericRuleProtectedParameter(
+        string operatorType,
+        string parameterName,
+        string parameterStrategy)
+    {
+        if (!IsTraditionalNumericRule(parameterStrategy))
+        {
+            return false;
+        }
+
+        if (operatorType.Equals("ResultJudgment", StringComparison.OrdinalIgnoreCase) &&
+            (parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) ||
+             parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) ||
+             parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) ||
+             parameterName.Equals("ExpectValueMin", StringComparison.OrdinalIgnoreCase) ||
+             parameterName.Equals("ExpectValueMax", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return operatorType.Equals("Thresholding", StringComparison.OrdinalIgnoreCase) ||
+               operatorType.Equals("BlobAnalysis", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string DefaultParameterValue(
         string operatorType,
         VisionAgentParameterContract parameter,
-        BuildPlanLoad load)
+        BuildPlanLoad load,
+        string parameterStrategy)
     {
         var parameterName = parameter.Name;
         if (operatorType.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
@@ -177,6 +240,15 @@ public sealed class ParameterMappingService
             return "<pending-output-channel>";
         }
 
+        if (IsTraditionalNumericRule(parameterStrategy))
+        {
+            var traditional = TraditionalNumericRuleParameterValue(operatorType, parameterName);
+            if (!string.IsNullOrWhiteSpace(traditional))
+            {
+                return traditional;
+            }
+        }
+
         return operatorType switch
         {
             "ResultJudgment" when parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "Value",
@@ -204,6 +276,30 @@ public sealed class ParameterMappingService
             "BlobAnalysis" when parameterName.Equals("MaxArea", StringComparison.OrdinalIgnoreCase) => "<pending-max-area>",
             "RoiManager" when parameterName.Equals("RoiName", StringComparison.OrdinalIgnoreCase) => "inspection_roi",
             _ => parameter.DefaultValue?.ToString() ?? string.Empty
+        };
+    }
+
+    private static string TraditionalNumericRuleParameterValue(
+        string operatorType,
+        string parameterName)
+    {
+        return operatorType switch
+        {
+            "Thresholding" when parameterName.Equals("Threshold", StringComparison.OrdinalIgnoreCase) => "<pending-threshold-calibration>",
+            "Thresholding" when parameterName.Equals("MaxValue", StringComparison.OrdinalIgnoreCase) => "255",
+            "Thresholding" when parameterName.Equals("Type", StringComparison.OrdinalIgnoreCase) => "0",
+            "Thresholding" when parameterName.Equals("UseOtsu", StringComparison.OrdinalIgnoreCase) => "false",
+            "BlobAnalysis" when parameterName.Equals("MinArea", StringComparison.OrdinalIgnoreCase) => "<pending-min-area-calibration>",
+            "BlobAnalysis" when parameterName.Equals("MaxArea", StringComparison.OrdinalIgnoreCase) => "<pending-max-area-calibration>",
+            "BlobAnalysis" when parameterName.Equals("Color", StringComparison.OrdinalIgnoreCase) => "White",
+            "BlobAnalysis" when parameterName.Equals("OutputDetailedFeatures", StringComparison.OrdinalIgnoreCase) => "true",
+            "ResultJudgment" when parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) => "BlobCount",
+            "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) => "GreaterOrEqual",
+            "ResultJudgment" when parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) => "<pending-blob-count-threshold>",
+            "ResultJudgment" when parameterName.Equals("ExpectValueMin", StringComparison.OrdinalIgnoreCase) => string.Empty,
+            "ResultJudgment" when parameterName.Equals("ExpectValueMax", StringComparison.OrdinalIgnoreCase) => string.Empty,
+            "ResultJudgment" when parameterName.Equals("MinConfidence", StringComparison.OrdinalIgnoreCase) => "0",
+            _ => string.Empty
         };
     }
 
@@ -287,6 +383,11 @@ public sealed class ParameterMappingService
                text.Contains("classification", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsTraditionalNumericRule(string parameterStrategy)
+    {
+        return parameterStrategy.Equals("traditional_numeric_rule", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string ExpectedClassificationOkValue(BuildPlanLoad load)
     {
         foreach (var key in new[]
@@ -356,11 +457,37 @@ public sealed class ParameterMappingService
             .Trim(' ', ',', '.', ';', ':', '，', '。', '；', '：');
     }
 
-    private static string MissingResourceKind(string operatorType, string parameterName, bool pending)
+    private static string MissingResourceKind(
+        string operatorType,
+        string parameterName,
+        bool pending,
+        string parameterStrategy)
     {
         if (!pending)
         {
             return string.Empty;
+        }
+
+        if (IsTraditionalNumericRule(parameterStrategy))
+        {
+            if (operatorType.Equals("Thresholding", StringComparison.OrdinalIgnoreCase) &&
+                parameterName.Equals("Threshold", StringComparison.OrdinalIgnoreCase))
+            {
+                return "threshold_parameter";
+            }
+
+            if (operatorType.Equals("BlobAnalysis", StringComparison.OrdinalIgnoreCase) &&
+                (parameterName.Equals("MinArea", StringComparison.OrdinalIgnoreCase) ||
+                 parameterName.Equals("MaxArea", StringComparison.OrdinalIgnoreCase)))
+            {
+                return "area_range_parameter";
+            }
+
+            if (operatorType.Equals("ResultJudgment", StringComparison.OrdinalIgnoreCase) &&
+                parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase))
+            {
+                return "calibration_parameter";
+            }
         }
 
         var resourceKind = VisionAgentResourceClassifier.Classify(operatorType, parameterName);
