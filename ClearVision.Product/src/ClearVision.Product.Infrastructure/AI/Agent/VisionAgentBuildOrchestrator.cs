@@ -20,6 +20,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
     private readonly BuildPlanContextLoader _contextLoader;
     private readonly BuildIntentResolver _intentResolver;
     private readonly TemplateStrategyResolver _templateStrategyResolver;
+    private readonly PlanSelectionResolver _planSelectionResolver;
     private readonly OperatorPipelineSelector _pipelineSelector;
     private readonly ParameterMappingService _parameterMapper;
     private readonly WorkflowDraftBuilder _workflowDraftBuilder;
@@ -33,6 +34,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
         BuildPlanContextLoader contextLoader,
         BuildIntentResolver intentResolver,
         TemplateStrategyResolver templateStrategyResolver,
+        PlanSelectionResolver planSelectionResolver,
         OperatorPipelineSelector pipelineSelector,
         ParameterMappingService parameterMapper,
         WorkflowDraftBuilder workflowDraftBuilder,
@@ -49,6 +51,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
         _contextLoader = contextLoader;
         _intentResolver = intentResolver;
         _templateStrategyResolver = templateStrategyResolver;
+        _planSelectionResolver = planSelectionResolver;
         _pipelineSelector = pipelineSelector;
         _parameterMapper = parameterMapper;
         _workflowDraftBuilder = workflowDraftBuilder;
@@ -149,13 +152,36 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 toolContext,
                 cancellationToken);
 
+            var planSelection = await _toolRunner.ExecuteEvidenceStepAsync(
+                runId,
+                evidence,
+                "plan_selection",
+                "plan_selection_resolver",
+                "Resolve confirmed user strategy and planner route into an effective catalog-backed Build route.",
+                _ => Task.FromResult(_planSelectionResolver.Resolve(loadPlan.Payload, template.Payload, publicWarnings)),
+                cancellationToken);
+            var blockingSelectionReasons = planSelection.Payload.BlockingReasons
+                .Where(PlanSelectionResolver.IsHardOrStrategyBlocker)
+                .ToList();
+            if (blockingSelectionReasons.Count > 0)
+            {
+                var maturityRequest = BuildMaturityRequest(request, build);
+                return BuildMaturityBlockedResult(
+                    request,
+                    maturityRequest,
+                    loadPlan.Payload.Plan?.RequirementMaturity ??
+                    build?.RequirementMaturity ??
+                    VisionAgentRequirementMaturityGate.Evaluate(maturityRequest),
+                    blockingSelectionReasons);
+            }
+
             var pipeline = await _toolRunner.ExecuteEvidenceStepAsync(
                 runId,
                 evidence,
                 "operator_pipeline",
                 "operator_pipeline_selector",
                 "根据计划路线、模板策略和算子目录选择并修复算子链。",
-                _ => Task.FromResult(_pipelineSelector.Select(loadPlan.Payload, template.Payload, publicWarnings)),
+                _ => Task.FromResult(_pipelineSelector.Select(loadPlan.Payload, template.Payload, planSelection.Payload, publicWarnings)),
                 cancellationToken);
 
             var parameterMapping = await _toolRunner.ExecuteEvidenceStepAsync(
@@ -321,6 +347,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 request,
                 loadPlan.Payload,
                 intent.Payload,
+                planSelection.Payload,
                 template.Payload,
                 pipeline.Payload,
                 parameterMapping.Payload,
@@ -356,15 +383,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
         VisionAgentBuildFromPlanRequest? build,
         VisionAgentPlanModeResult? plan)
     {
-        var maturityRequest = new VisionAgentRequirementMaturityRequest
-        {
-            Description = build?.OriginalUserPrompt ?? request.Description,
-            AdditionalContext = request.AdditionalContext,
-            Mode = build?.BuildIntent ?? request.Mode.ToWireValue(),
-            HasCurrentFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson) ||
-                             !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot),
-            TemplateSelection = build?.TemplateSelection ?? request.TemplateSelection
-        };
+        var maturityRequest = BuildMaturityRequest(request, build);
         if (plan != null)
         {
             var readiness = VisionAgentPlanBuildReadiness.Evaluate(
@@ -411,6 +430,21 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             maturityRequest,
             maturity,
             maturity.BlockingReasons.Count > 0 ? maturity.BlockingReasons : null);
+    }
+
+    private static VisionAgentRequirementMaturityRequest BuildMaturityRequest(
+        AiFlowGenerationRequest request,
+        VisionAgentBuildFromPlanRequest? build)
+    {
+        return new VisionAgentRequirementMaturityRequest
+        {
+            Description = build?.OriginalUserPrompt ?? request.Description,
+            AdditionalContext = request.AdditionalContext,
+            Mode = build?.BuildIntent ?? request.Mode.ToWireValue(),
+            HasCurrentFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson) ||
+                             !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot),
+            TemplateSelection = build?.TemplateSelection ?? request.TemplateSelection
+        };
     }
 
     private static AiFlowGenerationResult BuildMaturityBlockedResult(

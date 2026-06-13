@@ -88,6 +88,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<BuildPlanContextLoader>();
         services.AddScoped<BuildIntentResolver>();
         services.AddScoped<TemplateStrategyResolver>();
+        services.AddScoped<PlanSelectionResolver>();
         services.AddScoped<OperatorPipelineSelector>();
         services.AddScoped<ParameterMappingService>();
         services.AddScoped<WorkflowDraftBuilder>();

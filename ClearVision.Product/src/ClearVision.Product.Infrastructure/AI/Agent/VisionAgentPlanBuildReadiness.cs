@@ -32,18 +32,19 @@ internal static class VisionAgentPlanBuildReadiness
         if (maturity is { CanPlan: false } ||
             maturity?.Maturity is AiRequirementMaturity.AbstractGoal or AiRequirementMaturity.ChatOrHelp)
         {
-            blocking.AddRange(maturity.BlockingReasons.Count > 0
-                ? maturity.BlockingReasons
-                : ["requirement_not_plannable"]);
+            blocking.AddRange((maturity.BlockingReasons.Count > 0
+                    ? maturity.BlockingReasons
+                    : ["requirement_not_plannable"])
+                .Select(ClassifyHardRequirement));
         }
 
         AddHardFieldBlockers(plan, blocking);
         if (!HasSupportedStrategy(plan, userSelections, acceptedDefaults, acceptedRecommendedDefaults, out var invalidOperators))
         {
-            blocking.Add("model_or_rule_strategy_missing");
+            blocking.Add("strategy_confirmation:model_or_rule_strategy_missing");
         }
 
-        blocking.AddRange(invalidOperators.Select(op => $"invalid_operator:{op}"));
+        blocking.AddRange(invalidOperators.Select(op => $"hard_requirement:invalid_operator:{op}"));
         return new VisionAgentPlanBuildReadinessResult(
             blocking.Count == 0,
             blocking
@@ -64,24 +65,24 @@ internal static class VisionAgentPlanBuildReadiness
         {
             if (string.IsNullOrWhiteSpace(semantic.InspectionObject))
             {
-                blocking.Add("inspection_object_missing");
+                blocking.Add("hard_requirement:inspection_object_missing");
             }
 
             if (string.IsNullOrWhiteSpace(NormalizeTaskType(semantic.TaskType)))
             {
-                blocking.Add("task_type_missing");
+                blocking.Add("hard_requirement:task_type_missing");
             }
 
             if (string.IsNullOrWhiteSpace(semantic.ImageSource))
             {
-                blocking.Add("image_source_missing");
+                blocking.Add("hard_requirement:image_source_missing");
             }
 
             if (string.IsNullOrWhiteSpace(semantic.OkCondition) &&
                 string.IsNullOrWhiteSpace(semantic.NgCondition) &&
                 string.IsNullOrWhiteSpace(semantic.OutputTarget))
             {
-                blocking.Add("acceptance_criteria_missing");
+                blocking.Add("hard_requirement:acceptance_criteria_missing");
             }
 
             return;
@@ -90,7 +91,7 @@ internal static class VisionAgentPlanBuildReadiness
         var maturity = plan.RequirementMaturity;
         if (maturity == null)
         {
-            blocking.Add("requirement_maturity_missing");
+            blocking.Add("hard_requirement:requirement_maturity_missing");
             return;
         }
 
@@ -99,7 +100,7 @@ internal static class VisionAgentPlanBuildReadiness
             if (reason.Contains("inspection_object", StringComparison.OrdinalIgnoreCase) ||
                 reason.Contains("task_type", StringComparison.OrdinalIgnoreCase))
             {
-                blocking.Add(reason);
+                blocking.Add(ClassifyHardRequirement(reason));
             }
         }
 
@@ -112,7 +113,7 @@ internal static class VisionAgentPlanBuildReadiness
                          field.Contains("image_source", StringComparison.OrdinalIgnoreCase) ||
                          field.Contains("acceptance_criteria", StringComparison.OrdinalIgnoreCase)))
             {
-                blocking.Add($"{field}_missing");
+                blocking.Add(ClassifyHardRequirement($"{field}_missing"));
             }
         }
     }
@@ -193,6 +194,15 @@ internal static class VisionAgentPlanBuildReadiness
     private static bool ContainsAny(string text, params string[] terms)
     {
         return terms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string ClassifyHardRequirement(string reason)
+    {
+        return reason.StartsWith("hard_requirement:", StringComparison.OrdinalIgnoreCase) ||
+               reason.StartsWith("strategy_confirmation:", StringComparison.OrdinalIgnoreCase) ||
+               reason.StartsWith("resource_pending:", StringComparison.OrdinalIgnoreCase)
+            ? reason
+            : $"hard_requirement:{reason}";
     }
 
     private static string Clean(string? value)

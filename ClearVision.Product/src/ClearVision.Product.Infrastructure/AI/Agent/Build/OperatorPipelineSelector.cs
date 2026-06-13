@@ -34,17 +34,25 @@ public sealed class OperatorPipelineSelector
     internal BuildStepResult<OperatorPipelineResolution> Select(
         BuildPlanLoad load,
         TemplateStrategyResolution template,
+        PlanSelectionResolution selection,
         List<string> publicWarnings)
     {
-        var source = "plan";
-        var requested = ReadOperatorTypes(template.TemplateSkeleton).ToList();
-        if (requested.Count > 0)
+        var source = string.IsNullOrWhiteSpace(selection.SelectionSource)
+            ? "plan"
+            : selection.SelectionSource;
+        var requested = selection.EffectiveRoute.Operators.ToList();
+        if (requested.Count == 0)
         {
-            source = "template";
-        }
-        else if (load.Plan?.RecommendedRoute.Operators.Count > 0)
-        {
-            requested = load.Plan.RecommendedRoute.Operators;
+            requested = ReadOperatorTypes(template.TemplateSkeleton).ToList();
+            if (requested.Count > 0)
+            {
+                source = "template";
+            }
+            else if (load.Plan?.RecommendedRoute.Operators.Count > 0)
+            {
+                requested = load.Plan.RecommendedRoute.Operators;
+                source = "plan";
+            }
         }
 
         var allowed = _contractCatalog.OperatorTypes
@@ -105,6 +113,9 @@ public sealed class OperatorPipelineSelector
                 operatorTypes = repaired.Select(item => item.OperatorType).ToList(),
                 invalidOperators = invalid,
                 source,
+                effectiveRouteId = selection.EffectiveRoute.RouteId,
+                selectionSource = selection.SelectionSource,
+                selectionStrategy = selection.Strategy,
                 metadataOnly = true
             },
             warningCode: invalid.Count > 0 ? "invalid_operator_removed" : string.Empty,

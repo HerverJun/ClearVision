@@ -1947,9 +1947,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
     private static AiTemplateSelectionInfo? RedactTemplateSelection(AiTemplateSelectionInfo? selection)
     {
-        var mode = SafeTemplateToken(selection?.Mode, string.Empty).ToLowerInvariant();
-        var templateId = SafeTemplateToken(selection?.TemplateId, "redacted_template");
-        var scenarioKey = SafeTemplateToken(selection?.ScenarioKey, string.Empty);
+        var mode = SafeOptionalTemplateToken(selection?.Mode, string.Empty).ToLowerInvariant();
+        var templateId = SafeOptionalTemplateToken(selection?.TemplateId, "redacted_template");
+        var scenarioKey = SafeOptionalTemplateToken(selection?.ScenarioKey, string.Empty);
 
         if (string.IsNullOrWhiteSpace(mode) &&
             string.IsNullOrWhiteSpace(templateId) &&
@@ -2015,5 +2015,12 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             .Where(ch => char.IsLetterOrDigit(ch) || ch is '_' or '-' or '.')
             .ToArray());
         return string.IsNullOrWhiteSpace(safe) ? fallback : safe;
+    }
+
+    private static string SafeOptionalTemplateToken(string? value, string unsafeFallback)
+    {
+        return string.IsNullOrWhiteSpace(Clean(value))
+            ? string.Empty
+            : SafeTemplateToken(value, unsafeFallback);
     }
 }

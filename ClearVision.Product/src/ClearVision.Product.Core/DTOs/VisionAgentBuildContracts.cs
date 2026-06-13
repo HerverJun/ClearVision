@@ -6,6 +6,9 @@ public sealed record VisionAgentBuildResult
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
     public string BuildIntent { get; init; } = string.Empty;
+    public string SelectionSource { get; init; } = string.Empty;
+    public string EffectiveRouteId { get; init; } = string.Empty;
+    public List<string> EffectiveOperators { get; init; } = [];
     public object? WorkflowDraft { get; init; }
     public List<VisionAgentOperatorPipelineStep> OperatorPipeline { get; init; } = [];
     public List<VisionAgentParameterMapping> ParameterMapping { get; init; } = [];

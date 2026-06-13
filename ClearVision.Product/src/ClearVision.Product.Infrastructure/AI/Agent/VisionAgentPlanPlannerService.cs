@@ -97,6 +97,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
     private const string CompletionEmpty = "completion_empty";
     private const string PlannerJsonParseFailed = "planner_json_parse_failed";
     private const string PlannerJsonRepairFailed = "planner_json_repair_failed";
+    private const string PlannerJsonRepairTimeout = "planner_json_repair_timeout";
     private const string PlannerContractRepairFailed = "planner_contract_repair_failed";
     private const string PlannerTimeout = "planner_timeout";
     private const string PlannerUnauthorized = "planner_unauthorized";
@@ -296,17 +297,19 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                 PlannerJsonParseFailed,
                 "Planner returned content that could not be parsed as PlannerCandidate JSON.",
                 ex);
-            var repairedCompletion = await TryRepairJsonAsync(
-                prompt,
+            var repairAttempt = await TryRepairJsonAsync(
+                request,
+                ruleBaseline,
                 completion,
                 parseDiagnostic,
                 events,
-                timeout.Token);
-            if (!string.IsNullOrWhiteSpace(repairedCompletion))
+                timeout.Token,
+                cancellationToken);
+            if (!string.IsNullOrWhiteSpace(repairAttempt.Completion))
             {
                 try
                 {
-                    candidate = ParseCandidate(repairedCompletion);
+                    candidate = ParseCandidate(repairAttempt.Completion);
                     goto PlannerCandidateParsed;
                 }
                 catch (Exception repairEx) when (repairEx is JsonException or InvalidOperationException or FormatException)
@@ -322,7 +325,7 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
                 }
             }
 
-            var diagnostic = BuildDiagnostic(
+            var diagnostic = repairAttempt.Diagnostic ?? BuildDiagnostic(
                 PlannerFailureStageJsonParse,
                 PlannerJsonParseFailed,
                 PlannerJsonParseFailed,
@@ -331,10 +334,10 @@ public sealed class VisionAgentPlanPlannerService : IVisionAgentPlanPlannerServi
             LogPlannerFailure(diagnostic);
             events.Add(Event("validating_plan_contract", "failed", "JSON 解析失败",
                 "Planner 返回内容无法解析为合法 JSON，已使用规则兜底方案。",
-                BuildDiagnosticMetadata("planner_failed", diagnostic)));
+                BuildDiagnosticMetadata(repairAttempt.FallbackReason ?? "planner_failed", diagnostic)));
             return BuildFallback(
                 ruleBaseline,
-                "planner_failed",
+                repairAttempt.FallbackReason ?? "planner_failed",
                 events,
                 "模型规划失败，已使用规则兜底方案。",
                 diagnostic);
@@ -432,6 +435,7 @@ PlannerCandidateParsed:
         var acceptance = NormalizeList(candidate.AcceptanceCriteria, baseline.AcceptanceCriteria);
         var executablePlan = NormalizeList(candidate.ExecutablePlan, baseline.ExecutablePlan);
         var blockingReasons = NormalizeList(candidate.BlockingReasons, []);
+        var classifiedPlannerBlocking = ClassifyPlannerBlockingReasons(blockingReasons, candidate.CanBuildCandidate);
         var semantic = VisionAgentSemanticExtractionSafety.Sanitize(baseline.SemanticExtraction);
 
         var redactionNotes = new List<string>();
@@ -458,7 +462,7 @@ PlannerCandidateParsed:
             AcceptanceCriteria = SanitizeList(acceptance, redactionNotes),
             ExecutablePlan = SanitizeList(executablePlan, redactionNotes),
             CanBuild = false,
-            BlockingReasons = SanitizeList(blockingReasons, redactionNotes),
+            BlockingReasons = SanitizeList(classifiedPlannerBlocking, redactionNotes),
             SemanticExtraction = semantic,
             NextAction = SafeText(
                 string.IsNullOrWhiteSpace(candidate.NextAction) ? baseline.NextAction : candidate.NextAction,
@@ -504,13 +508,20 @@ PlannerCandidateParsed:
         else
         {
             var readiness = VisionAgentPlanBuildReadiness.Evaluate(result with { RequirementMaturity = maturity });
-            var canBuild = readiness.CanBuild;
+            var buildBlockingReasons = readiness.BlockingReasons
+                .Concat(result.BlockingReasons.Where(IsBuildBlockingReason))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(12)
+                .ToList();
+            var canBuild = readiness.CanBuild && buildBlockingReasons.Count == 0;
             result = result with
             {
                 CanBuild = canBuild,
                 BlockingReasons = canBuild
-                    ? result.BlockingReasons
-                    : readiness.BlockingReasons.Count > 0
+                    ? result.BlockingReasons.Where(reason => !IsBuildBlockingReason(reason)).ToList()
+                    : buildBlockingReasons.Count > 0
+                        ? buildBlockingReasons
+                        : readiness.BlockingReasons.Count > 0
                         ? readiness.BlockingReasons.ToList()
                         : maturity.BlockingReasons.Count > 0
                         ? maturity.BlockingReasons.ToList()
@@ -544,12 +555,14 @@ PlannerCandidateParsed:
         return result;
     }
 
-    private async Task<string> TryRepairJsonAsync(
-        VisionAgentPlanPrompt originalPrompt,
+    private async Task<JsonRepairAttempt> TryRepairJsonAsync(
+        VisionAgentPlanModeRequest request,
+        VisionAgentPlanModeResult ruleBaseline,
         string invalidCompletion,
         PlannerFailureDiagnostic parseDiagnostic,
         List<VisionAgentPlanPublicEvent> events,
-        CancellationToken cancellationToken)
+        CancellationToken repairCancellationToken,
+        CancellationToken callerCancellationToken)
     {
         events.Add(Event("planner_json_repair_started", "started", "Planner JSON repair started",
             "Planner JSON parse failed; requesting one sanitized repair completion.",
@@ -559,19 +572,24 @@ PlannerCandidateParsed:
         {
             var repairPrompt = _promptComposer.ComposeRepair(
                 SanitizeCompletionSummary(invalidCompletion),
-                parseDiagnostic);
+                parseDiagnostic,
+                request,
+                ruleBaseline);
             var repaired = await _completionSource.CompleteAsync(
                 new VisionAgentPlanCompletionRequest(
                     repairPrompt.SystemPrompt,
                     repairPrompt.Messages,
                     _options.ModelRole),
-                cancellationToken);
+                repairCancellationToken);
             if (string.IsNullOrWhiteSpace(repaired))
             {
                 events.Add(Event("planner_json_repair_failed", "failed", "Planner JSON repair empty",
                     "Planner JSON repair returned empty content.",
                     BuildDiagnosticMetadata("planner_json_repair_empty", parseDiagnostic)));
-                return string.Empty;
+                return new JsonRepairAttempt(
+                    string.Empty,
+                    parseDiagnostic,
+                    "planner_failed");
             }
 
             var tooLarge = repaired.Length > _options.MaxCompletionChars;
@@ -583,7 +601,24 @@ PlannerCandidateParsed:
                     ["completionTooLarge"] = tooLarge.ToString().ToLowerInvariant(),
                     ["metadataOnly"] = "true"
                 }));
-            return bounded;
+            return new JsonRepairAttempt(bounded, null, null);
+        }
+        catch (OperationCanceledException) when (!callerCancellationToken.IsCancellationRequested)
+        {
+            var diagnostic = BuildDiagnostic(
+                PlannerFailureStageJsonParse,
+                PlannerJsonRepairTimeout,
+                PlannerJsonRepairTimeout,
+                "Planner JSON repair request timed out.",
+                null);
+            LogPlannerFailure(diagnostic);
+            events.Add(Event("planner_json_repair_timeout", "failed", "Planner JSON repair timeout",
+                "Planner JSON repair timed out; rule fallback will be used.",
+                BuildDiagnosticMetadata(PlannerJsonRepairTimeout, diagnostic)));
+            return new JsonRepairAttempt(
+                string.Empty,
+                diagnostic,
+                PlannerJsonRepairTimeout);
         }
         catch (OperationCanceledException)
         {
@@ -601,9 +636,17 @@ PlannerCandidateParsed:
             events.Add(Event("planner_json_repair_failed", "failed", "Planner JSON repair failed",
                 "Planner JSON repair request failed; rule fallback will be used.",
                 BuildDiagnosticMetadata("planner_failed", diagnostic)));
-            return string.Empty;
+            return new JsonRepairAttempt(
+                string.Empty,
+                diagnostic,
+                "planner_failed");
         }
     }
+
+    private sealed record JsonRepairAttempt(
+        string Completion,
+        PlannerFailureDiagnostic? Diagnostic,
+        string? FallbackReason);
 
     internal sealed record PlannerFailureDiagnostic(
         string Stage,
@@ -845,9 +888,9 @@ PlannerCandidateParsed:
 
     private static AiTemplateSelectionInfo? RedactTemplateSelection(AiTemplateSelectionInfo? selection)
     {
-        var mode = SafeIdentifier(selection?.Mode, string.Empty).ToLowerInvariant();
-        var templateId = SafeIdentifier(selection?.TemplateId, "redacted_template");
-        var scenarioKey = SafeIdentifier(selection?.ScenarioKey, string.Empty);
+        var mode = SafeOptionalIdentifier(selection?.Mode, string.Empty).ToLowerInvariant();
+        var templateId = SafeOptionalIdentifier(selection?.TemplateId, "redacted_template");
+        var scenarioKey = SafeOptionalIdentifier(selection?.ScenarioKey, string.Empty);
         if (string.IsNullOrWhiteSpace(mode) &&
             string.IsNullOrWhiteSpace(templateId) &&
             string.IsNullOrWhiteSpace(scenarioKey))
@@ -933,6 +976,72 @@ PlannerCandidateParsed:
             .Take(12)
             .ToList() ?? [];
         return values.Count > 0 ? values : baseline;
+    }
+
+    private static List<string> ClassifyPlannerBlockingReasons(
+        IEnumerable<string> reasons,
+        bool canBuildCandidate)
+    {
+        var classified = reasons
+            .Select(ClassifyPlannerBlockingReason)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToList();
+        if (!canBuildCandidate &&
+            classified.Count == 0)
+        {
+            classified.Add("resource_pending:planner_candidate_not_buildable");
+        }
+
+        return classified;
+    }
+
+    private static string ClassifyPlannerBlockingReason(string reason)
+    {
+        var raw = Clean(reason);
+        foreach (var prefix in new[] { "hard_requirement:", "strategy_confirmation:", "resource_pending:" })
+        {
+            if (raw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var tail = SafeIdentifier(raw[prefix.Length..], "planner_blocker");
+                return $"{prefix}{tail}";
+            }
+        }
+
+        var clean = SafeIdentifier(raw, "planner_blocker");
+        if (string.IsNullOrWhiteSpace(clean))
+        {
+            return string.Empty;
+        }
+
+        if (ContainsAny(clean, "model_or_rule_strategy", "strategy", "choose", "confirm", "selection"))
+        {
+            return $"strategy_confirmation:{clean}";
+        }
+
+        if (ContainsAny(clean, "resource", "pending", "model", "camera", "template", "calibration"))
+        {
+            return $"resource_pending:{clean}";
+        }
+
+        if (ContainsAny(clean, "inspection_object", "task_type", "image_source", "acceptance_criteria", "condition"))
+        {
+            return $"hard_requirement:{clean}";
+        }
+
+        return $"strategy_confirmation:{clean}";
+    }
+
+    private static bool IsBuildBlockingReason(string reason)
+    {
+        return reason.StartsWith("hard_requirement:", StringComparison.OrdinalIgnoreCase) ||
+               reason.StartsWith("strategy_confirmation:", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsAny(string text, params string[] terms)
+    {
+        return terms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
 
     private static List<string> SanitizeList(IEnumerable<string> values, List<string> notes)
@@ -1076,6 +1185,13 @@ PlannerCandidateParsed:
         return string.IsNullOrWhiteSpace(safe) ? fallback : safe;
     }
 
+    private static string SafeOptionalIdentifier(string? value, string unsafeFallback)
+    {
+        return string.IsNullOrWhiteSpace(Clean(value))
+            ? string.Empty
+            : SafeIdentifier(value, unsafeFallback);
+    }
+
     private static string SafeToken(string? value, List<string> notes)
     {
         var safe = SafeText(value, notes);
@@ -1139,7 +1255,9 @@ public sealed class VisionAgentPlanPromptComposer
 
     internal VisionAgentPlanPrompt ComposeRepair(
         string invalidOutputSummary,
-        VisionAgentPlanPlannerService.PlannerFailureDiagnostic diagnostic)
+        VisionAgentPlanPlannerService.PlannerFailureDiagnostic diagnostic,
+        VisionAgentPlanModeRequest request,
+        VisionAgentPlanModeResult ruleBaseline)
     {
         var systemPrompt = string.Join(Environment.NewLine,
         [
@@ -1153,10 +1271,44 @@ public sealed class VisionAgentPlanPromptComposer
             $"parseStage={diagnostic.Stage}",
             $"parseCode={diagnostic.Code}",
             $"sanitizedInvalidOutputSummary={Truncate(invalidOutputSummary, 600)}",
+            "[compact_business_context]",
+            BuildRepairBusinessContext(request, ruleBaseline, 1_800),
             "PlannerCandidate compact contract:",
             PlannerCandidateContract()
         ]);
         return new VisionAgentPlanPrompt(systemPrompt, [new ChatMessage("user", user)]);
+    }
+
+    private static string BuildRepairBusinessContext(
+        VisionAgentPlanModeRequest request,
+        VisionAgentPlanModeResult ruleBaseline,
+        int maxChars)
+    {
+        var semantic = VisionAgentSemanticExtractionSafety.Sanitize(request.SemanticExtraction ?? ruleBaseline.SemanticExtraction);
+        var builder = new StringBuilder();
+        builder.AppendLine($"description={Truncate(VisionAgentSemanticExtractionSafety.SafeText(request.Description), 360)}");
+        builder.AppendLine($"taskType={VisionAgentSemanticExtractionSafety.SafeToken(semantic?.TaskType)}");
+        builder.AppendLine($"inspectionObject={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic?.InspectionObject), 160)}");
+        builder.AppendLine($"targetAttribute={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic?.TargetAttribute), 160)}");
+        builder.AppendLine($"defectType={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic?.DefectType), 160)}");
+        builder.AppendLine($"measurementTarget={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic?.MeasurementTarget), 160)}");
+        builder.AppendLine($"imageSource={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic?.ImageSource), 120)}");
+        builder.AppendLine($"okCondition={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic?.OkCondition), 220)}");
+        builder.AppendLine($"ngCondition={Truncate(VisionAgentSemanticExtractionSafety.SafeText(semantic?.NgCondition), 220)}");
+        builder.AppendLine($"maturityCanPlan={ruleBaseline.RequirementMaturity?.CanPlan.ToString().ToLowerInvariant() ?? "unknown"}");
+        builder.AppendLine($"maturityTaskType={VisionAgentSemanticExtractionSafety.SafeToken(ruleBaseline.RequirementMaturity?.TaskType)}");
+        builder.AppendLine($"baselineRouteId={VisionAgentSemanticExtractionSafety.SafeToken(ruleBaseline.RecommendedRoute.RouteId)}");
+        builder.AppendLine($"baselineOperators={string.Join(",", ruleBaseline.RecommendedRoute.Operators.Select(VisionAgentSemanticExtractionSafety.SafeToken))}");
+        builder.AppendLine($"templateSelectionMode={VisionAgentSemanticExtractionSafety.SafeToken(ruleBaseline.TemplateSelection?.Mode)}");
+        builder.AppendLine($"templateSelectionId={VisionAgentSemanticExtractionSafety.SafeToken(ruleBaseline.TemplateSelection?.TemplateId)}");
+        builder.AppendLine("allowedOperators=");
+        foreach (var item in VisionAgentReadOnlyCatalog.Operators.Take(32))
+        {
+            VisionAgentReadOnlyCatalog.Schemas.TryGetValue(item.OperatorType, out var schema);
+            builder.AppendLine($"- {VisionAgentSemanticExtractionSafety.SafeToken(item.OperatorType)} inputs={string.Join(",", schema?.InputPorts ?? Array.Empty<string>())} outputs={string.Join(",", schema?.OutputPorts ?? Array.Empty<string>())}");
+        }
+
+        return Truncate(builder.ToString(), maxChars);
     }
 
     private static string BuildContext(
@@ -1164,49 +1316,124 @@ public sealed class VisionAgentPlanPromptComposer
         VisionAgentPlanModeResult ruleBaseline,
         int maxChars)
     {
+        maxChars = Math.Max(0, maxChars);
+        var semantic = VisionAgentSemanticExtractionSafety.Sanitize(request.SemanticExtraction ?? ruleBaseline.SemanticExtraction);
+        var semanticContext = new StringBuilder();
+        semanticContext.AppendLine("[semantic_extraction]");
+        AppendSemanticContext(semanticContext, semantic);
+        semanticContext.AppendLine("[maturity_summary]");
+        AppendMaturityContext(semanticContext, ruleBaseline.RequirementMaturity);
+        var safetyAndContract = new StringBuilder();
+        safetyAndContract.AppendLine("[safety_boundary]");
+        safetyAndContract.AppendLine($"stationBoundarySummary={Truncate(VisionAgentSemanticExtractionSafety.SafeText(ruleBaseline.StationBoundarySummary), 300)}");
+        safetyAndContract.AppendLine($"plcOutputPolicy={Truncate(VisionAgentSemanticExtractionSafety.SafeText(ruleBaseline.PlcOutputPolicy), 300)}");
+        safetyAndContract.AppendLine("No camera capture, file read, model load, PLC write, network request, secret/path echo, or deployment approval can be performed in Plan Mode.");
+        safetyAndContract.AppendLine("[planner_candidate_contract]");
+        safetyAndContract.AppendLine(PlannerCandidateContract());
+
+        var remaining = Math.Max(0, maxChars - semanticContext.Length - safetyAndContract.Length - "Plan request context:".Length - 4);
+        var userBudget = Math.Min(2_800, remaining * 35 / 100);
+        var flowBudget = Math.Min(1_400, remaining * 15 / 100);
+        var templateBudget = Math.Min(1_800, remaining * 20 / 100);
+        var operatorBudget = Math.Max(0, remaining - userBudget - flowBudget - templateBudget);
+
         var builder = new StringBuilder();
         builder.AppendLine("Plan request context:");
+        AppendBudgetedSection(builder, BuildUserRequirementSection(request), userBudget);
+        AppendBudgetedSection(builder, BuildCurrentFlowSection(request), flowBudget);
+        builder.Append(semanticContext);
+        AppendBudgetedSection(builder, BuildTemplateSection(ruleBaseline), templateBudget);
+        AppendBudgetedSection(builder, BuildOperatorCatalogSection(), operatorBudget);
+        builder.Append(safetyAndContract);
+        return builder.ToString();
+    }
+
+    private static string BuildUserRequirementSection(VisionAgentPlanModeRequest request)
+    {
+        var builder = new StringBuilder();
         builder.AppendLine("[user_requirement]");
-        builder.AppendLine($"description={Truncate(request.Description, 1_200)}");
-        builder.AppendLine($"originalUserPrompt={Truncate(request.OriginalUserPrompt, 1_200)}");
-        builder.AppendLine($"additionalContext={Truncate(request.AdditionalContext, 800)}");
-        builder.AppendLine($"mode={request.Mode}");
-        builder.AppendLine($"historySummary={Truncate(request.HistorySummary, 800)}");
+        builder.AppendLine($"description={Truncate(VisionAgentSemanticExtractionSafety.SafeText(request.Description), 1_000)}");
+        builder.AppendLine($"originalUserPrompt={Truncate(VisionAgentSemanticExtractionSafety.SafeText(request.OriginalUserPrompt), 1_000)}");
+        builder.AppendLine($"additionalContext={Truncate(VisionAgentSemanticExtractionSafety.SafeText(request.AdditionalContext), 700)}");
+        builder.AppendLine($"mode={VisionAgentSemanticExtractionSafety.SafeToken(request.Mode)}");
+        builder.AppendLine($"historySummary={Truncate(VisionAgentSemanticExtractionSafety.SafeText(request.HistorySummary), 600)}");
+        return builder.ToString();
+    }
+
+    private static string BuildCurrentFlowSection(VisionAgentPlanModeRequest request)
+    {
+        var builder = new StringBuilder();
         builder.AppendLine("[current_flow]");
         builder.AppendLine($"hasCurrentFlow={!string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot)}");
-        builder.AppendLine($"currentFlowSummary={SummarizeJsonText(request.CurrentFlowSnapshot, 800)}");
-        builder.AppendLine($"currentResultSummary={SummarizeJsonText(request.CurrentResultSnapshot, 800)}");
+        builder.AppendLine($"currentFlowSummary={Truncate(VisionAgentSemanticExtractionSafety.SafeText(SummarizeJsonText(request.CurrentFlowSnapshot, 700)), 700)}");
+        builder.AppendLine($"currentResultSummary={Truncate(VisionAgentSemanticExtractionSafety.SafeText(SummarizeJsonText(request.CurrentResultSnapshot, 500)), 500)}");
         builder.AppendLine($"attachmentCount={request.AttachmentSummary.Count}");
-        builder.AppendLine($"attachmentKinds={string.Join(",", request.AttachmentSummary.ResourceKinds)}");
+        builder.AppendLine($"attachmentKinds={string.Join(",", request.AttachmentSummary.ResourceKinds.Select(VisionAgentSemanticExtractionSafety.SafeToken))}");
         builder.AppendLine($"attachmentPathsRedacted={request.AttachmentSummary.PathsRedacted.ToString().ToLowerInvariant()}");
-        var semantic = VisionAgentSemanticExtractionSafety.Sanitize(request.SemanticExtraction ?? ruleBaseline.SemanticExtraction);
-        builder.AppendLine("[semantic_extraction]");
-        AppendSemanticContext(builder, semantic);
-        builder.AppendLine("[maturity_summary]");
-        AppendMaturityContext(builder, ruleBaseline.RequirementMaturity);
+        return builder.ToString();
+    }
+
+    private static string BuildTemplateSection(VisionAgentPlanModeResult ruleBaseline)
+    {
+        var builder = new StringBuilder();
         builder.AppendLine("[template_candidates]");
-        builder.AppendLine($"templateSelectionMode={ruleBaseline.TemplateSelection?.Mode}");
-        builder.AppendLine($"templateSelectionId={ruleBaseline.TemplateSelection?.TemplateId}");
+        builder.AppendLine($"templateSelectionMode={VisionAgentSemanticExtractionSafety.SafeToken(ruleBaseline.TemplateSelection?.Mode)}");
+        builder.AppendLine($"templateSelectionId={VisionAgentSemanticExtractionSafety.SafeToken(ruleBaseline.TemplateSelection?.TemplateId)}");
         foreach (var item in VisionAgentReadOnlyCatalog.Templates)
         {
-            builder.AppendLine($"- {item.TemplateId} scenario={item.ScenarioKey} operators={string.Join(",", item.OperatorTypes)}");
+            builder.AppendLine($"- {VisionAgentSemanticExtractionSafety.SafeToken(item.TemplateId)} scenario={VisionAgentSemanticExtractionSafety.SafeToken(item.ScenarioKey)} operators={string.Join(",", item.OperatorTypes.Select(VisionAgentSemanticExtractionSafety.SafeToken))}");
         }
 
+        return builder.ToString();
+    }
+
+    private static string BuildOperatorCatalogSection()
+    {
+        var builder = new StringBuilder();
         builder.AppendLine("[operator_catalog_key_io]");
         foreach (var item in VisionAgentReadOnlyCatalog.Operators)
         {
             VisionAgentReadOnlyCatalog.Schemas.TryGetValue(item.OperatorType, out var schema);
-            builder.AppendLine($"- {item.OperatorType}: {item.Summary}; inputs={string.Join(",", schema?.InputPorts ?? Array.Empty<string>())}; outputs={string.Join(",", schema?.OutputPorts ?? Array.Empty<string>())}");
+            builder.AppendLine($"- {VisionAgentSemanticExtractionSafety.SafeToken(item.OperatorType)}: {Truncate(VisionAgentSemanticExtractionSafety.SafeText(item.Summary), 160)}; inputs={string.Join(",", schema?.InputPorts ?? Array.Empty<string>())}; outputs={string.Join(",", schema?.OutputPorts ?? Array.Empty<string>())}");
         }
 
-        builder.AppendLine("[safety_boundary]");
-        builder.AppendLine($"stationBoundarySummary={Truncate(ruleBaseline.StationBoundarySummary, 300)}");
-        builder.AppendLine($"plcOutputPolicy={Truncate(ruleBaseline.PlcOutputPolicy, 300)}");
-        builder.AppendLine("No camera capture, file read, model load, PLC write, network request, secret/path echo, or deployment approval can be performed in Plan Mode.");
-        builder.AppendLine("[planner_candidate_contract]");
-        builder.AppendLine(PlannerCandidateContract());
-        var text = builder.ToString();
-        return Truncate(text, maxChars);
+        return builder.ToString();
+    }
+
+    private static void AppendBudgetedSection(
+        StringBuilder target,
+        string section,
+        int maxChars)
+    {
+        if (maxChars <= 0 ||
+            string.IsNullOrWhiteSpace(section))
+        {
+            return;
+        }
+
+        var used = 0;
+        var lines = section.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n');
+        foreach (var line in lines)
+        {
+            var projected = line.Length + Environment.NewLine.Length;
+            if (used + projected > maxChars)
+            {
+                if (used == 0)
+                {
+                    target.AppendLine(Truncate(line, Math.Max(0, maxChars - Environment.NewLine.Length)));
+                }
+                else if (used + "...[section_truncated]".Length + Environment.NewLine.Length <= maxChars)
+                {
+                    target.AppendLine("...[section_truncated]");
+                }
+
+                break;
+            }
+
+            target.AppendLine(line);
+            used += projected;
+        }
     }
 
     private static void AppendSemanticContext(
@@ -1319,7 +1546,8 @@ public sealed class VisionAgentPlanPromptComposer
 
     private static string Truncate(string? text, int maxChars)
     {
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(text) ||
+            maxChars <= 0)
         {
             return string.Empty;
         }

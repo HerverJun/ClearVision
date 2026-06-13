@@ -48,6 +48,13 @@ internal sealed record TemplateStrategyResolution(
     bool RequiredTemplateMissing = false,
     string MissingTemplateResourceKey = "");
 
+internal sealed record PlanSelectionResolution(
+    VisionAgentRecommendedRoute EffectiveRoute,
+    string SelectionSource,
+    string Strategy,
+    List<string> BlockingReasons,
+    List<string> Evidence);
+
 internal sealed record OperatorPipelineResolution(
     List<VisionAgentOperatorPipelineStep> Steps,
     List<string> InvalidOperators);
@@ -91,6 +98,7 @@ internal sealed record BuildResultAssemblyInput(
     AiFlowGenerationRequest Request,
     BuildPlanLoad LoadPlan,
     BuildIntentResolution Intent,
+    PlanSelectionResolution Selection,
     TemplateStrategyResolution Template,
     OperatorPipelineResolution Pipeline,
     ParameterMappingResolution ParameterMapping,

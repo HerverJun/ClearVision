@@ -297,6 +297,10 @@ public sealed class VisionAgentPlanPlannerTests
         calls.Should().Be(2);
         repairRequest.Should().NotBeNull();
         repairRequest!.SystemPrompt.Should().Contain("repair invalid JSON");
+        repairRequest.Messages.Single().Content.Should().Contain("[compact_business_context]");
+        repairRequest.Messages.Single().Content.Should().Contain("taskType=attribute_classification");
+        repairRequest.Messages.Single().Content.Should().Contain("allowedOperators=");
+        repairRequest.Messages.Single().Content.Should().NotContain("PlanModeResult");
         result.PlanSource.Should().Be("model_planner");
         result.FallbackReason.Should().BeEmpty();
         result.CanBuild.Should().BeTrue();
@@ -333,6 +337,65 @@ public sealed class VisionAgentPlanPlannerTests
         result.ContractRepairNotes.Should().Contain("completion_truncated_to_max_completion_chars");
         result.PublicEvents.Should().Contain(evt => evt.Stage == "completion_too_large");
         result.PublicEvents.Should().Contain(evt => evt.Stage == "planner_json_repair_completed");
+    }
+
+    [Fact(DisplayName = "Plan planner repair timeout should fallback with public repair timeout diagnostic")]
+    public async Task CreatePlanAsync_ShouldFallbackWhenJsonRepairTimesOut()
+    {
+        var calls = 0;
+        var service = CreateService((_, token) =>
+        {
+            calls++;
+            return calls == 1
+                ? Task.FromResult("{\"goal\":\"truncated\"")
+                : Task.Delay(TimeSpan.FromSeconds(5), token).ContinueWith(
+                    _ => PlannerPlanJson("surface_defect", "defect_morphology", OperatorsFor("surface_defect")),
+                    token);
+        }, new VisionAgentPlanPlannerOptions { Enabled = true, TimeoutSeconds = 1 });
+        var baseline = Baseline("scratch", "surface_defect");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "scratch" },
+            baseline,
+            CancellationToken.None);
+
+        calls.Should().Be(2);
+        result.PlanSource.Should().Be("rule_fallback");
+        result.FallbackReason.Should().Be("planner_json_repair_timeout");
+        AssertPlannerFailure(result, "json_parse", "planner_json_repair_timeout");
+        result.PublicEvents.Select(evt => evt.Stage).Should().ContainInOrder([
+            "planner_json_repair_started",
+            "planner_json_repair_timeout",
+            "rule_fallback_used"
+        ]);
+        AssertNoSensitiveDiagnostics(result);
+    }
+
+    [Fact(DisplayName = "Plan planner prompt should preserve semantic core and contract under tiny context budget")]
+    public void PromptComposer_ShouldPreserveSemanticAndContractWhenContextBudgetIsTiny()
+    {
+        var semantic = StrawberrySemantic();
+        var baseline = Baseline("classify strawberry maturity", "attribute_classification") with
+        {
+            SemanticExtraction = semantic
+        };
+
+        var prompt = new VisionAgentPlanPromptComposer().Compose(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "classify strawberry maturity from camera",
+                SemanticExtraction = semantic
+            },
+            baseline,
+            new VisionAgentPlanPlannerOptions { MaxContextChars = 120 }.Normalize());
+        var context = prompt.Messages.Single().Content;
+
+        context.Should().Contain("[semantic_extraction]");
+        context.Should().Contain("taskType=attribute_classification");
+        context.Should().Contain("[safety_boundary]");
+        context.Should().Contain("[planner_candidate_contract]");
+        context.Should().Contain("\"canBuildCandidate\"");
+        context.Should().NotContain("PlanModeResult");
     }
 
     [Fact(DisplayName = "Plan planner should normalize null nested question options without fallback")]
@@ -376,6 +439,28 @@ public sealed class VisionAgentPlanPlannerTests
         result.ContractRepairNotes.Should().Contain("recommended_route_repaired_to_baseline");
         result.ContractRepairNotes.Should().Contain("clarification_questions_repaired_to_baseline");
         result.ContractRepairNotes.Should().Contain("recommended_defaults_repaired_to_baseline");
+    }
+
+    [Fact(DisplayName = "Plan planner should not invent template selection when none is provided")]
+    public async Task CreatePlanAsync_ShouldNotInventTemplateSelection()
+    {
+        var service = CreateService(_ => PlannerPlanJson(
+            "attribute_classification",
+            "classification_strategy",
+            ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"]));
+        var baseline = Baseline("classify strawberry maturity", "attribute_classification");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "classify strawberry maturity" },
+            baseline,
+            CancellationToken.None);
+
+        result.PlanSource.Should().Be("model_planner");
+        result.TemplateSelection.Should().BeNull();
+        result.ContextSummary.TemplateId.Should().BeEmpty();
+        result.ContextSummary.TemplateSelectionMode.Should().BeEmpty();
+        result.TemplateCatalogVersion.Should().Be("template.v1");
+        JsonSerializer.Serialize(result).Should().NotContain("redacted_template");
     }
 
 

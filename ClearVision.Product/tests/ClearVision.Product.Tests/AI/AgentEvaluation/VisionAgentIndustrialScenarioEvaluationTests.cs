@@ -211,6 +211,7 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
             new BuildPlanContextLoader(sink),
             new BuildIntentResolver(),
             new TemplateStrategyResolver(toolRunner),
+            new PlanSelectionResolver(),
             new OperatorPipelineSelector(),
             new ParameterMappingService(),
             new WorkflowDraftBuilder(new FakeAiFlowGenerationService()),

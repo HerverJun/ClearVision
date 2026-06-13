@@ -21,6 +21,7 @@ public sealed class VisionAgentBuildOrchestratorTests
     [
         "plan_generation",
         "template_strategy",
+        "plan_selection",
         "operator_pipeline",
         "parameter_mapping",
         "workflow_draft",
@@ -224,6 +225,42 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ValueSummary == "1");
     }
 
+    [Fact(DisplayName = "Build orchestrator should let user strategy override Planner attribute classification route")]
+    public async Task BuildAsync_UserTraditionalRuleSelection_ShouldOverridePlannerDeepLearningRoute()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = Plan(
+            "attribute_classification",
+            ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
+            "classify object maturity from camera");
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["model_or_rule_strategy"] = "traditional_rule",
+                    ["classification_ok_label"] = "expected class"
+                }),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult.Should().NotBeNull();
+        var build = result.BuildResult!;
+        build.SelectionSource.Should().Be("user_strategy");
+        build.EffectiveRouteId.Should().Be("attribute_classification_traditional_rule");
+        build.EffectiveOperators.Should().Contain(["ImageAcquisition", "Thresholding", "BlobAnalysis", "ResultJudgment", "ResultOutput"]);
+        build.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["ImageAcquisition", "Thresholding", "BlobAnalysis", "ResultJudgment", "ResultOutput"])
+            .And
+            .NotContain("DeepLearning");
+        build.ToolEvidenceTimeline.Should().Contain(item =>
+            item.Stage == "plan_selection" &&
+            item.ToolName == "plan_selection_resolver");
+    }
+
     [Fact(DisplayName = "Black-box scenario: hole distance measurement Build quality")]
     public async Task BuildAsync_BlackBoxHoleDistance_ShouldProduceMeasurementDraftWithCalibrationBlockers()
     {
@@ -312,6 +349,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult!.ToolEvidenceTimeline.Select(item => item.Stage).Should().Contain([
             "plan_generation",
             "template_strategy",
+            "plan_selection",
             "operator_pipeline",
             "parameter_mapping",
             "workflow_draft",
@@ -556,6 +594,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             new BuildPlanContextLoader(sink),
             new BuildIntentResolver(),
             new TemplateStrategyResolver(toolRunner),
+            new PlanSelectionResolver(),
             new OperatorPipelineSelector(),
             new ParameterMappingService(),
             new WorkflowDraftBuilder(new FakeAiFlowGenerationService()),
@@ -657,6 +696,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         services.AddSingleton<BuildPlanContextLoader>();
         services.AddSingleton<BuildIntentResolver>();
         services.AddSingleton<TemplateStrategyResolver>();
+        services.AddSingleton<PlanSelectionResolver>();
         services.AddSingleton<OperatorPipelineSelector>();
         services.AddSingleton<ParameterMappingService>();
         services.AddSingleton<WorkflowDraftBuilder>();
