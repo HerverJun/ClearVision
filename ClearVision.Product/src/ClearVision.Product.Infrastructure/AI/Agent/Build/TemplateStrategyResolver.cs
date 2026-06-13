@@ -47,7 +47,9 @@ public sealed class TemplateStrategyResolver
                 ? "adapt_selected_template"
                 : "use_selected_template";
         }
-        else if (candidate != null && candidate.Score >= 0.4)
+        else if (candidate != null &&
+                 candidate.Score >= 0.72 &&
+                 IsCandidateCompatible(candidate, load))
         {
             templateId = candidate.TemplateId;
             scenarioKey = candidate.ScenarioKey;
@@ -147,6 +149,45 @@ public sealed class TemplateStrategyResolver
                mode.Contains("selected", StringComparison.OrdinalIgnoreCase) ||
                mode.Contains("fill", StringComparison.OrdinalIgnoreCase) ||
                mode.Contains("adapt", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsCandidateCompatible(
+        TemplateCandidate candidate,
+        BuildPlanLoad load)
+    {
+        var candidateScenario = NormalizeScenario(candidate.ScenarioKey);
+        if (string.IsNullOrWhiteSpace(candidateScenario))
+        {
+            return false;
+        }
+
+        var semanticTask = NormalizeScenario(load.Plan?.SemanticExtraction?.TaskType);
+        var planIntent = NormalizeScenario(load.Plan?.Intent);
+        var routeId = NormalizeScenario(load.Plan?.RecommendedRoute?.RouteId);
+        return candidateScenario.Equals(semanticTask, StringComparison.OrdinalIgnoreCase) ||
+               candidateScenario.Equals(planIntent, StringComparison.OrdinalIgnoreCase) ||
+               (!string.IsNullOrWhiteSpace(routeId) &&
+                routeId.Contains(candidateScenario, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeScenario(string? value)
+    {
+        return VisionAgentBuildSupport.Clean(value).ToLowerInvariant() switch
+        {
+            "barcode_qr" => "code_recognition",
+            "code_recognition" => "code_recognition",
+            "geometry_measurement" => "measurement",
+            "measurement" => "measurement",
+            "template_matching" => "template_location",
+            "template_location" => "template_location",
+            "classification" => "attribute_classification",
+            "attribute_classification" => "attribute_classification",
+            "surface_or_pose_defect" => "surface_defect",
+            "surface_defect" => "surface_defect",
+            "wire_sequence" => "wire_sequence",
+            "presence_absence" => "presence_absence",
+            var other => other
+        };
     }
 
     private static bool IsTemplateNotFound(VisionAgentToolResult result)

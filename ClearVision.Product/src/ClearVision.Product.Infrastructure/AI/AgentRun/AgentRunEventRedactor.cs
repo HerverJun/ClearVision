@@ -23,6 +23,10 @@ public sealed class AgentRunEventRedactor
         "(stationaddress|plcaddress|ipaddress|endpoint|host|port|url)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    private static readonly Regex PlcAddressKeyRegex = new(
+        "(plc|stationaddress|register|memoryaddress|deviceaddress|wordaddress)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly Regex AuthorizationRegex = new(
         @"(?i)\b(authorization|x-api-key|api[-_ ]?key|token|secret|bearer)\b\s*[:=]\s*[""']?[^""'\s,;}]+",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -45,6 +49,10 @@ public sealed class AgentRunEventRedactor
 
     private static readonly Regex PlcAddressRegex = new(
         @"(?i)\b(DB\d+\.DB[XBWD]\d+(?:\.\d+)?|M\d+(?:\.\d+)?|D\d+|plc://[^\s,;""'}]+)\b",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static readonly Regex ExplicitPlcAddressRegex = new(
+        @"(?i)\b(DB\d+\.DB[XBWD]\d+(?:\.\d+)?|plc://[^\s,;""'}]+)\b",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex WindowsPathRegex = new(
@@ -111,8 +119,13 @@ public sealed class AgentRunEventRedactor
 
     public bool IsRedactionSafe(object? value)
     {
-        var json = JsonSerializer.Serialize(value, AgentRunEventJson.Options);
-        return IsRedactionSafeText(json);
+        if (value == null)
+        {
+            return true;
+        }
+
+        var node = ToJsonNode(value);
+        return IsRedactionSafeNode(node, propertyName: null);
     }
 
     public bool IsRedactionSafeText(string? text)
@@ -122,11 +135,23 @@ public sealed class AgentRunEventRedactor
             return true;
         }
 
+        if (LooksLikeJson(text) && TryParseJson(text, out var node))
+        {
+            return IsRedactionSafeNode(node, propertyName: null);
+        }
+
+        return IsRedactionSafeScalarText(text, propertyName: null);
+    }
+
+    private static bool IsRedactionSafeScalarText(string text, string? propertyName)
+    {
         if (AuthorizationRegex.IsMatch(text) ||
             BearerRegex.IsMatch(text) ||
             SecretTokenRegex.IsMatch(text) ||
             IPv4Regex.IsMatch(text) ||
-            PlcAddressRegex.IsMatch(text) ||
+            ExplicitPlcAddressRegex.IsMatch(text) ||
+            ShouldRedactPlcAddress(propertyName, text) ||
+            ContainsLikelyFreeTextPlcAddress(text) ||
             WindowsPathRegex.IsMatch(text) ||
             UnixSensitivePathRegex.IsMatch(text) ||
             DataImageRegex.IsMatch(text) ||
@@ -174,12 +199,6 @@ public sealed class AgentRunEventRedactor
                     continue;
                 }
 
-                if (PathKeyRegex.IsMatch(name))
-                {
-                    copy[name] = "[redacted:path]";
-                    continue;
-                }
-
                 copy[name] = RedactNode(property.Value, name);
             }
 
@@ -197,8 +216,7 @@ public sealed class AgentRunEventRedactor
             return copy;
         }
 
-        var value = node.GetValue<object?>();
-        if (value is string text)
+        if (node is JsonValue jsonValue && jsonValue.TryGetValue<string>(out var text))
         {
             return JsonValue.Create(RedactString(text, propertyName));
         }
@@ -233,7 +251,9 @@ public sealed class AgentRunEventRedactor
 
         if (PathKeyRegex.IsMatch(propertyName ?? string.Empty))
         {
-            return "[redacted:path]";
+            return IsSafeMissingResourceValue(text)
+                ? text
+                : "[redacted:path]";
         }
 
         if (StationAddressKeyRegex.IsMatch(propertyName ?? string.Empty) &&
@@ -253,8 +273,112 @@ public sealed class AgentRunEventRedactor
         result = UnixSensitivePathRegex.Replace(result, "[redacted:path]");
         result = ArtifactPathRegex.Replace(result, "[redacted:artifact-path]");
         result = IPv4Regex.Replace(result, RedactIPv4);
-        result = PlcAddressRegex.Replace(result, "[redacted:plc-address]");
+        result = ExplicitPlcAddressRegex.Replace(result, "[redacted:plc-address]");
+        if (ShouldRedactPlcAddress(propertyName, result) || ContainsLikelyFreeTextPlcAddress(result))
+        {
+            result = PlcAddressRegex.Replace(result, "[redacted:plc-address]");
+        }
+
         return result;
+    }
+
+    private bool IsRedactionSafeNode(JsonNode? node, string? propertyName)
+    {
+        if (node == null)
+        {
+            return true;
+        }
+
+        if (node is JsonObject obj)
+        {
+            foreach (var property in obj)
+            {
+                if (SensitiveKeyRegex.IsMatch(property.Key) || PrivatePlanningKeyRegex.IsMatch(property.Key))
+                {
+                    return false;
+                }
+
+                if (!IsRedactionSafeNode(property.Value, property.Key))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (node is JsonArray array)
+        {
+            foreach (var item in array)
+            {
+                if (!IsRedactionSafeNode(item, propertyName))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return node is not JsonValue jsonValue ||
+               !jsonValue.TryGetValue<string>(out var text) ||
+               IsRedactionSafeScalarText(text, propertyName);
+    }
+
+    private static bool LooksLikeJson(string text)
+    {
+        var trimmed = text.AsSpan().TrimStart();
+        return trimmed.Length > 0 && (trimmed[0] == '{' || trimmed[0] == '[');
+    }
+
+    private static bool TryParseJson(string text, out JsonNode? node)
+    {
+        try
+        {
+            node = JsonNode.Parse(text);
+            return true;
+        }
+        catch (JsonException)
+        {
+            node = null;
+            return false;
+        }
+    }
+
+    private static bool ShouldRedactPlcAddress(string? propertyName, string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        if (text.Contains("plc://", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return PlcAddressRegex.IsMatch(text) &&
+               PlcAddressKeyRegex.IsMatch(propertyName ?? string.Empty);
+    }
+
+    private static bool ContainsLikelyFreeTextPlcAddress(string text)
+    {
+        return ExplicitPlcAddressRegex.IsMatch(text) ||
+               PlcAddressRegex.IsMatch(text) &&
+               (text.Contains("plc", StringComparison.OrdinalIgnoreCase) ||
+                text.Contains("register", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsSafeMissingResourceValue(string text)
+    {
+        var normalized = text.Trim();
+        return normalized.Length == 0 ||
+               normalized.Equals("[redacted:path]", StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals("<redacted:path>", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("[pending", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("pending_", StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith("pending-", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string RedactIPv4(Match match)

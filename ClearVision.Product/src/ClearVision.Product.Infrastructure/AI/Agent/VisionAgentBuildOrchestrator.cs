@@ -365,6 +365,28 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                              !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot),
             TemplateSelection = build?.TemplateSelection ?? request.TemplateSelection
         };
+        if (plan != null)
+        {
+            var readiness = VisionAgentPlanBuildReadiness.Evaluate(
+                plan,
+                build?.UserSelections,
+                build?.AcceptedDefaults,
+                build?.AcceptedRecommendedDefaults == true);
+            if (readiness.CanBuild)
+            {
+                return null;
+            }
+
+            var planMaturity = plan.RequirementMaturity ??
+                               build?.RequirementMaturity ??
+                               VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, plan.SemanticExtraction);
+            return BuildMaturityBlockedResult(
+                request,
+                maturityRequest,
+                planMaturity,
+                readiness.BlockingReasons);
+        }
+
         if (plan?.CanBuild == true &&
             plan.RequirementMaturity == null &&
             build?.RequirementMaturity == null)
@@ -384,6 +406,19 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             return null;
         }
 
+        return BuildMaturityBlockedResult(
+            request,
+            maturityRequest,
+            maturity,
+            maturity.BlockingReasons.Count > 0 ? maturity.BlockingReasons : null);
+    }
+
+    private static AiFlowGenerationResult BuildMaturityBlockedResult(
+        AiFlowGenerationRequest request,
+        VisionAgentRequirementMaturityRequest maturityRequest,
+        AiRequirementMaturityResult maturity,
+        IReadOnlyList<string>? overrideBlockingReasons)
+    {
         var trace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
             maturityRequest,
             maturity,
@@ -392,7 +427,12 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             "maturity_gate_blocked");
         var fields = maturity.MissingFields.Count > 0
             ? maturity.MissingFields
-            : ["inspection_object", "task_type", "image_source", "acceptance_criteria"];
+            : overrideBlockingReasons?.Count > 0
+                ? overrideBlockingReasons.ToList()
+                : ["inspection_object", "task_type", "image_source", "acceptance_criteria"];
+        var blockingReasons = overrideBlockingReasons?.Count > 0
+            ? overrideBlockingReasons.ToList()
+            : maturity.BlockingReasons;
         return new AiFlowGenerationResult
         {
             Success = false,
@@ -441,7 +481,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             BlockingClarificationFields = fields.ToList(),
             NonBlockingMissingFields = maturity.MissingFields.Except(fields, StringComparer.OrdinalIgnoreCase).ToList(),
             RequirementMaturity = maturity,
-            DecisionTrace = trace,
+            DecisionTrace = trace with { BlockingReasons = blockingReasons.ToList() },
             TurnIntent = AiTurnIntents.NewFlow,
             InteractionState = AiInteractionStates.Clarifying,
             RouterConfidence = AiRouterConfidence.High

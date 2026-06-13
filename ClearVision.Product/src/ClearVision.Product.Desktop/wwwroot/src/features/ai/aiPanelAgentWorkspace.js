@@ -416,6 +416,9 @@ export const aiPanelAgentWorkspaceMixin = {
     _updatePlanBuildActionState() {
         const busy = Boolean(this.isGenerating);
         const hasPlan = Boolean(this.pendingVisionPlan);
+        if (hasPlan) {
+            this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
+        }
         const canBuild = hasPlan && this.pendingVisionPlan?.executable === true;
         const inlineBuildBtn = this.container?.querySelector('#ai-btn-start-build-inline');
         if (inlineBuildBtn) {
@@ -630,6 +633,10 @@ export const aiPanelAgentWorkspaceMixin = {
                 addUserMessage: false,
                 clearPendingPlan: true
             });
+        }
+
+        if (route.intent === 'build_from_confirmed_plan' && this.pendingVisionPlan) {
+            this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
         }
 
         if (route.intent === 'build_from_confirmed_plan' && this.pendingVisionPlan && this.pendingVisionPlan.executable !== true) {
@@ -1695,7 +1702,6 @@ export const aiPanelAgentWorkspaceMixin = {
         const rawCanBuild = plan.canBuild ?? plan.CanBuild;
         const rawCanPlan = plan.canPlan ?? plan.CanPlan;
         const maturityCanPlan = requirementMaturity?.canPlan === true;
-        const maturityCanBuild = requirementMaturity?.canBuild === true;
         const publicEvents = this._toArray(plan.publicEvents || plan.PublicEvents)
             .map(evt => this._normalizePlanPublicEvent(evt));
         const rawFallbackReason = String(plan.fallbackReason || plan.FallbackReason || '').trim();
@@ -1729,7 +1735,12 @@ export const aiPanelAgentWorkspaceMixin = {
             blockerCount: this._toArray(plan.blockingReasons || plan.BlockingReasons).length,
             nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
             canPlan: rawCanPlan === true || maturityCanPlan,
-            executable: rawCanBuild === true && maturityCanBuild,
+            executable: this._computeEffectivePlanBuildReadiness({
+                rawCanBuild,
+                requirementMaturity,
+                semanticExtraction,
+                route
+            }),
             blockingReasons: this._toArray(plan.blockingReasons || plan.BlockingReasons).map(item => this._localizeDisplayText(item)),
             understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
                 ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).map(item => this._localizeDisplayText(item))
@@ -1760,6 +1771,63 @@ export const aiPanelAgentWorkspaceMixin = {
             plcOutputPolicy: plan.plcOutputPolicy || plan.PlcOutputPolicy || '',
             rawPlanSnapshot: plan
         };
+    },
+
+    _computeEffectivePlanBuildReadiness({ rawCanBuild, requirementMaturity, semanticExtraction, route }) {
+        const maturityCanBuild = requirementMaturity?.canBuild === true;
+        if (rawCanBuild === true && maturityCanBuild) return true;
+
+        return this._planHardFactsReady(requirementMaturity, semanticExtraction) &&
+            this._planRouteSatisfiesBuildStrategy(route);
+    },
+
+    _planHardFactsReady(requirementMaturity, semanticExtraction) {
+        const semanticSource = String(semanticExtraction?.source || '').toLowerCase();
+        if (semanticExtraction && semanticSource === 'model') {
+            const hasObject = Boolean(String(semanticExtraction.inspectionObject || '').trim());
+            const task = String(semanticExtraction.taskType || '').trim().toLowerCase();
+            const hasTask = Boolean(task && task !== 'unknown' && task !== 'abstract_goal');
+            const hasInput = Boolean(String(semanticExtraction.imageSource || '').trim());
+            const hasJudgment = Boolean(String(
+                semanticExtraction.okCondition ||
+                semanticExtraction.ngCondition ||
+                semanticExtraction.outputTarget ||
+                ''
+            ).trim());
+            return hasObject && hasTask && hasInput && hasJudgment;
+        }
+
+        if (!requirementMaturity) return false;
+        const hardMissing = this._toArray(requirementMaturity.missingFields).some(field =>
+            /inspection_object|task_type|image_source|acceptance_criteria/i.test(String(field || '')));
+        const hardBlocked = this._toArray(requirementMaturity.blockingReasons).some(reason =>
+            /inspection_object|task_type|image_source|acceptance_criteria|abstract_goal|empty_requirement/i.test(String(reason || '')));
+        return requirementMaturity.canBuild === true && !hardMissing && !hardBlocked;
+    },
+
+    _planRouteSatisfiesBuildStrategy(route) {
+        const forbidden = new Set(['modbuscommunication', 'httprequest', 'scriptoperator']);
+        const operators = this._toArray(route?.operators || route?.Operators)
+            .map(op => String(op || '').trim())
+            .filter(Boolean);
+        if (!operators.length) return false;
+        if (operators.some(op => forbidden.has(op.toLowerCase()))) return false;
+        const hasWorkOperator = operators.some(op =>
+            !/^imageacquisition$/i.test(op) &&
+            !/^resultoutput$/i.test(op));
+        const hasResultOutput = operators.some(op => /^resultoutput$/i.test(op));
+        return hasWorkOperator && hasResultOutput;
+    },
+
+    _refreshPlanEffectiveBuildReadiness(plan) {
+        if (!plan) return false;
+        plan.executable = this._computeEffectivePlanBuildReadiness({
+            rawCanBuild: plan.rawPlanSnapshot?.canBuild ?? plan.rawPlanSnapshot?.CanBuild ?? plan.executable,
+            requirementMaturity: plan.requirementMaturity,
+            semanticExtraction: plan.semanticExtraction,
+            route: plan.route || plan.recommendedRoute || plan.RecommendedRoute
+        });
+        return plan.executable === true;
     },
 
     _normalizeSemanticExtraction(value) {
@@ -3046,6 +3114,7 @@ export const aiPanelAgentWorkspaceMixin = {
             ...(this.planQuestionSelections || {}),
             [questionId]: value
         };
+        this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderAgentWorkspaceOverview();
     },
@@ -3058,6 +3127,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 question.options.find(option => option.recommended)?.value || question.defaultValue
             ])
         );
+        this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
         this._startBuildFromCurrentPlan({ acceptedRecommended: true });
     },
 
@@ -3076,6 +3146,7 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const plan = this.pendingVisionPlan;
+        this._refreshPlanEffectiveBuildReadiness?.(plan);
         if (plan.executable !== true) {
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             const reason = plan.requirementMaturity?.publicReason || '当前计划仍需澄清，暂不可构建。';

@@ -97,10 +97,35 @@ public sealed class VisionAgentRequirementMaturityGateTests
             semantic);
 
         result.CanPlan.Should().BeTrue();
+        result.CanBuild.Should().BeTrue();
         result.TaskType.Should().Be(AiVisionTaskTypes.AttributeClassification);
         result.ObjectSignals.Should().Contain(signal => signal.Contains("草莓", StringComparison.Ordinal));
         result.TaskSignals.Should().Contain(signal => signal.Contains("熟透", StringComparison.Ordinal));
         result.MissingFields.Should().NotContain("task_type");
+        result.MissingFields.Should().NotContain("model_or_rule_strategy");
+        result.BlockingReasons.Should().NotContain("model_or_rule_strategy_missing");
+    }
+
+    [Fact(DisplayName = "Maturity gate should not require semantic implementation strategy before Plan")]
+    public void Evaluate_WithModelSemanticWithoutSuggestedRoute_ShouldStillAllowBuildFacts()
+    {
+        var semantic = StrawberrySemantic(canBuildCandidate: false) with
+        {
+            SuggestedRoute = string.Empty
+        };
+
+        var result = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest
+            {
+                Description = "检测果园里的草莓，熟透为 OK，否则 NG，输入源是相机。"
+            },
+            semantic);
+
+        result.CanPlan.Should().BeTrue();
+        result.CanBuild.Should().BeTrue();
+        result.TaskType.Should().Be(AiVisionTaskTypes.AttributeClassification);
+        result.MissingFields.Should().NotContain("model_or_rule_strategy");
+        result.BlockingReasons.Should().NotContain("model_or_rule_strategy_missing");
     }
 
     [Fact(DisplayName = "Maturity gate should not let semantic CanBuildCandidate bypass missing engineering fields")]
@@ -164,6 +189,42 @@ public sealed class VisionAgentRequirementMaturityGateTests
         plan.RecommendedRoute.Summary.Should().Contain("OK/NG");
         plan.RecommendedRoute.Operators.Should().NotContain("SurfaceDefectDetection");
         plan.PublicEvents.Select(evt => evt.Stage).Should().Contain("semantic_extraction");
+    }
+
+    [Theory(DisplayName = "Model semantic route cases should not cross scenario routes")]
+    [InlineData("tape_skew", AiVisionTaskTypes.SurfaceDefect, "SurfaceDefectDetection", true)]
+    [InlineData("hole_distance", AiVisionTaskTypes.GeometryMeasurement, "Measurement", false)]
+    [InlineData("terminal_wire_sequence", AiVisionTaskTypes.WireSequence, "DetectionSequenceJudge", false)]
+    [InlineData("qr_code", AiVisionTaskTypes.CodeRecognition, "CodeRecognition", false)]
+    [InlineData("missing_part", AiVisionTaskTypes.PresenceAbsence, "DeepLearning", false)]
+    public async Task CreatePlanAsync_WithModelSemanticRouteCases_ShouldNotCrossScenario(
+        string id,
+        string taskType,
+        string expectedOperator,
+        bool expectSurfaceDefectRoute)
+    {
+        var semantic = SemanticRouteCase(id, taskType);
+        var orchestrator = CreateOrchestrator(
+            Substitute.For<IAiFlowGenerationService>(),
+            new FakeSemanticExtractor(semantic));
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = $"{id} inspection from camera with OK/NG condition",
+                OriginalUserPrompt = $"{id} inspection from camera with OK/NG condition"
+            },
+            CancellationToken.None);
+
+        plan.SemanticExtraction.Should().NotBeNull();
+        plan.SemanticExtraction!.Source.Should().Be(VisionAgentSemanticSources.Model);
+        plan.RequirementMaturity.Should().NotBeNull();
+        plan.RequirementMaturity!.TaskType.Should().Be(taskType);
+        plan.RecommendedRoute.Operators.Should().Contain(expectedOperator);
+        if (!expectSurfaceDefectRoute)
+        {
+            plan.RecommendedRoute.Operators.Should().NotContain("SurfaceDefectDetection");
+        }
     }
 
     [Fact(DisplayName = "Router semantic extraction should be reused by Plan without duplicate extractor call")]
@@ -510,6 +571,34 @@ public sealed class VisionAgentRequirementMaturityGateTests
             CanBuildCandidate = canBuildCandidate,
             ObjectSignals = ["草莓"],
             TaskSignals = ["成熟度", "熟透"],
+            MissingFields = [],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
+    }
+
+    private static VisionAgentSemanticExtractionResult SemanticRouteCase(string id, string taskType)
+    {
+        return new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = taskType,
+            Confidence = 0.9,
+            TaskTypeConfidence = 0.9,
+            InspectionObject = id,
+            TargetAttribute = taskType == AiVisionTaskTypes.AttributeClassification ? "attribute" : string.Empty,
+            MeasurementTarget = taskType == AiVisionTaskTypes.GeometryMeasurement ? "distance" : string.Empty,
+            DefectType = taskType is AiVisionTaskTypes.SurfaceDefect or AiVisionTaskTypes.SurfaceOrPoseDefect ? "pose_or_surface" : string.Empty,
+            ImageSource = "camera",
+            OkCondition = "condition met is OK",
+            NgCondition = "otherwise NG",
+            OutputTarget = "OK/NG",
+            SuggestedRoute = string.Empty,
+            CanPlanCandidate = true,
+            CanBuildCandidate = false,
+            ObjectSignals = [id],
+            TaskSignals = [taskType],
             MissingFields = [],
             Source = VisionAgentSemanticSources.Model,
             MetadataOnly = true

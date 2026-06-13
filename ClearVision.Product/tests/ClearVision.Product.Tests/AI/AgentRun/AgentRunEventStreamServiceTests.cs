@@ -365,6 +365,99 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         json.Should().NotContain(forbiddenNeedle);
     }
 
+    [Fact(DisplayName = "AgentRun completed event keeps editable draft flow with pending path parameters")]
+    public void Complete_ShouldPublishEditableDraftFlowWithPendingPathParameters()
+    {
+        var run = _service.CreateRun("draft flow");
+        const string stableDraftId = "9b852389-d100-430b-8105-e028c11b89fd";
+
+        var evt = _service.Complete(run.RunId, "done", new
+        {
+            flow = new
+            {
+                operators = new object[]
+                {
+                    new
+                    {
+                        id = "op_detect",
+                        operatorType = "DeepLearning",
+                        parameters = new Dictionary<string, string>
+                        {
+                            ["ParameterId"] = stableDraftId,
+                            ["ModelPath"] = "<pending-model-resource>",
+                            ["FilePath"] = "",
+                            ["TargetClasses"] = "熟透"
+                        }
+                    }
+                },
+                connections = Array.Empty<object>()
+            },
+            applyGate = new
+            {
+                canvasApplyReady = true,
+                deploymentReady = false
+            },
+            metadataOnly = true
+        });
+
+        evt.Should().NotBeNull();
+        evt!.EventType.Should().Be(AgentRunEventTypes.RunCompleted);
+        evt.Title.Should().Be("Run completed");
+
+        var json = JsonSerializer.Serialize(evt, AgentRunEventJson.Options);
+        json.Should().Contain("\"flow\"");
+        json.Should().Contain("\"ModelPath\"");
+        json.Should().Contain("pending-model-resource");
+        json.Should().Contain(stableDraftId);
+        json.Should().Contain("\"canvasApplyReady\":true");
+        json.Should().NotContain("[redacted:plc-address]");
+        json.Should().NotContain("Unsafe metadata was removed");
+        _redactor.IsRedactionSafeText(json).Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "AgentRun completed event redacts real path values without removing draft flow")]
+    public void Complete_ShouldRedactRealPathValuesWithoutRemovingDraftFlow()
+    {
+        var run = _service.CreateRun("draft flow path redaction");
+
+        var evt = _service.Complete(run.RunId, "done", new
+        {
+            flow = new
+            {
+                operators = new object[]
+                {
+                    new
+                    {
+                        id = "op_detect",
+                        operatorType = "DeepLearning",
+                        parameters = new Dictionary<string, string>
+                        {
+                            ["ModelPath"] = @"C:\factory\models\ripe-strawberry.onnx",
+                            ["FilePath"] = @"D:\samples\strawberry.png",
+                            ["TargetClasses"] = "熟透"
+                        }
+                    }
+                },
+                connections = Array.Empty<object>()
+            },
+            metadataOnly = true
+        });
+
+        evt.Should().NotBeNull();
+        evt!.EventType.Should().Be(AgentRunEventTypes.RunCompleted);
+        evt.Title.Should().Be("Run completed");
+
+        var json = JsonSerializer.Serialize(evt, AgentRunEventJson.Options);
+        json.Should().Contain("\"flow\"");
+        json.Should().Contain("[redacted:path]");
+        json.Should().NotContain(@"C:\factory");
+        json.Should().NotContain(@"D:\samples");
+        json.Should().NotContain("ripe-strawberry.onnx");
+        json.Should().NotContain("strawberry.png");
+        json.Should().NotContain("Unsafe metadata was removed");
+        _redactor.IsRedactionSafeText(json).Should().BeTrue();
+    }
+
     public static IEnumerable<object[]> UnsafePayloadCases()
     {
         yield return ["authorization-header", new { Authorization = "Bearer test-secret-value" }, "test-secret-value"];
@@ -376,6 +469,7 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         yield return ["image-data-uri", new { preview = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA" }, "data:image/png"];
         yield return ["package-path", new { packagePath = @"D:\deploy\run.cvpkg" }, "run.cvpkg"];
         yield return ["plc-url", new { endpoint = "plc://192.168.1.8/D100" }, "plc://192.168.1.8"];
+        yield return ["plc-register", new { plcAddress = "D100" }, "D100"];
         yield return ["long-base64", new { image = new string('A', 120) }, new string('A', 96)];
         yield return ["raw-prompt-key", new { rawPrompt = "do not publish" }, "rawPrompt"];
         yield return ["system-prompt-marker", new { summary = "systemPrompt=hidden instruction" }, "systemPrompt"];

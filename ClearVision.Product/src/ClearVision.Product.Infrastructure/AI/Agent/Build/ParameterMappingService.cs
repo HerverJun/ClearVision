@@ -186,6 +186,10 @@ public sealed class ParameterMappingService
             "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "Range",
             "ResultJudgment" when parameterName.Equals("ExpectValueMin", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "<pending-measurement-threshold>",
             "ResultJudgment" when parameterName.Equals("ExpectValueMax", StringComparison.OrdinalIgnoreCase) && IsMeasurementScenario(load) => "<pending-measurement-threshold>",
+            "ResultJudgment" when parameterName.Equals("FieldName", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => "TopClassLabel",
+            "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => "Equal",
+            "ResultJudgment" when parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => ExpectedClassificationOkValue(load),
+            "ResultJudgment" when parameterName.Equals("MinConfidence", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => "0.6",
             "ResultJudgment" when parameterName.Equals("Condition", StringComparison.OrdinalIgnoreCase) => "GreaterOrEqual",
             "ResultJudgment" when parameterName.Equals("ExpectValue", StringComparison.OrdinalIgnoreCase) => "1",
             "DetectionSequenceJudge" when parameterName.Equals("ExpectedLabels", StringComparison.OrdinalIgnoreCase) && IsWireSequenceScenario(load) => "<pending-wire-sequence-labels>",
@@ -194,6 +198,8 @@ public sealed class ParameterMappingService
             "TemplateMatching" when parameterName.Equals("Threshold", StringComparison.OrdinalIgnoreCase) => "0.8",
             "TemplateMatching" when parameterName.Equals("MaxMatches", StringComparison.OrdinalIgnoreCase) => "1",
             "DeepLearning" when parameterName.Equals("Confidence", StringComparison.OrdinalIgnoreCase) => "0.6",
+            "DeepLearning" when parameterName.Equals("TargetClasses", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => ExpectedClassificationOkValue(load),
+            "DeepLearning" when parameterName.Equals("DetectionMode", StringComparison.OrdinalIgnoreCase) && IsAttributeClassificationScenario(load) => "Object",
             "BlobAnalysis" when parameterName.Equals("MinArea", StringComparison.OrdinalIgnoreCase) => "20",
             "BlobAnalysis" when parameterName.Equals("MaxArea", StringComparison.OrdinalIgnoreCase) => "<pending-max-area>",
             "RoiManager" when parameterName.Equals("RoiName", StringComparison.OrdinalIgnoreCase) => "inspection_roi",
@@ -269,6 +275,85 @@ public sealed class ParameterMappingService
                text.Contains("spacing", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("hole", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("circle", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAttributeClassificationScenario(BuildPlanLoad load)
+    {
+        var taskType = load.Plan?.SemanticExtraction?.TaskType ?? string.Empty;
+        var text = $"{load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt} {load.Plan?.RecommendedRoute?.RouteId}";
+        return taskType.Equals(AiVisionTaskTypes.AttributeClassification, StringComparison.OrdinalIgnoreCase) ||
+               taskType.Equals(AiVisionTaskTypes.Classification, StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("attribute_classification", StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("classification", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ExpectedClassificationOkValue(BuildPlanLoad load)
+    {
+        foreach (var key in new[]
+                 {
+                     "ResultJudgment.ExpectValue",
+                     "ExpectValue",
+                     "classification_ok_label",
+                     "ok_label",
+                     "target_attribute",
+                     "targetAttribute"
+                 })
+        {
+            if (load.UserSelections.TryGetValue(key, out var selected) &&
+                !string.IsNullOrWhiteSpace(selected))
+            {
+                return VisionAgentBuildSupport.CleanValue(selected);
+            }
+        }
+
+        var semantic = load.Plan?.SemanticExtraction;
+        var fromOkCondition = ExtractOkClassLabel(semantic?.OkCondition);
+        if (!string.IsNullOrWhiteSpace(fromOkCondition))
+        {
+            return fromOkCondition;
+        }
+
+        var target = VisionAgentBuildSupport.CleanValue(semantic?.TargetAttribute);
+        return string.IsNullOrWhiteSpace(target) ? "<pending-ok-class-label>" : target;
+    }
+
+    private static string ExtractOkClassLabel(string? okCondition)
+    {
+        var text = VisionAgentBuildSupport.CleanValue(okCondition);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var candidates = new[]
+        {
+            " is OK",
+            " is ok",
+            " as OK",
+            " as ok",
+            "=> OK",
+            "=> ok",
+            "= OK",
+            "= ok",
+            "为 OK",
+            "为OK",
+            "判为 OK",
+            "判为OK",
+            "则 OK",
+            "则OK"
+        };
+        foreach (var marker in candidates)
+        {
+            var index = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (index > 0)
+            {
+                return text[..index].Trim(' ', ',', '.', ';', ':', '，', '。', '；', '：');
+            }
+        }
+
+        return text.Replace("OK", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("ok", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim(' ', ',', '.', ';', ':', '，', '。', '；', '：');
     }
 
     private static string MissingResourceKind(string operatorType, string parameterName, bool pending)

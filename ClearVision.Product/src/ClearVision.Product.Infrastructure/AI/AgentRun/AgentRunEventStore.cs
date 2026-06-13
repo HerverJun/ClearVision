@@ -74,7 +74,7 @@ public sealed class AgentRunEventStore
     private void Append<T>(string path, T item)
     {
         var line = JsonSerializer.Serialize(item, AgentRunEventJson.Options);
-        if (!_redactor.IsRedactionSafeText(line))
+        if (!_redactor.IsRedactionSafe(item))
         {
             throw new InvalidOperationException("AgentRun event storage rejected an unsafe metadata payload.");
         }

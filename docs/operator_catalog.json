@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-02T13:55:09.4780462+08:00",
+  "generatedAt": "2026-06-13T18:02:14.6855594+08:00",
   "totalCount": 118,
   "categories": {
     "AI检测": {
@@ -344,13 +344,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageAcquisition.md"
     },
@@ -451,13 +451,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Filtering.md"
     },
@@ -600,13 +600,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/EdgeDetection.md"
     },
@@ -715,13 +715,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Thresholding.md"
     },
@@ -826,13 +826,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Morphology.md"
     },
@@ -1088,13 +1088,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/BlobAnalysis.md"
     },
@@ -1224,13 +1224,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/TemplateMatching.md"
     },
@@ -1352,13 +1352,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Measurement.md"
     },
@@ -1459,13 +1459,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/CodeRecognition.md"
     },
@@ -1660,13 +1660,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/DeepLearning.md"
     },
@@ -1785,13 +1785,13 @@
         }
       ],
       "quality": {
-        "totalScore": 98,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=90"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ResultOutput.md"
     },
@@ -1958,13 +1958,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ContourDetection.md"
     },
@@ -2011,13 +2011,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/MedianBlur.md"
     },
@@ -2086,13 +2086,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/BilateralFilter.md"
     },
@@ -2200,13 +2200,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageResize.md"
     },
@@ -2286,13 +2286,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageCrop.md"
     },
@@ -2383,13 +2383,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageRotate.md"
     },
@@ -2657,13 +2657,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/PerspectiveTransform.md"
     },
@@ -2821,13 +2821,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 23,
+        "level": "D",
         "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/CircleMeasurement.md"
     },
@@ -2940,13 +2940,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/LineMeasurement.md"
     },
@@ -3053,13 +3053,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ContourMeasurement.md"
     },
@@ -3187,13 +3187,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/AngleMeasurement.md"
     },
@@ -3361,13 +3361,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/GeometricTolerance.md"
     },
@@ -3504,13 +3504,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/CameraCalibration.md"
     },
@@ -3563,13 +3563,13 @@
         }
       ],
       "quality": {
-        "totalScore": 91,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Undistort.md"
     },
@@ -3673,13 +3673,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 23,
+        "level": "D",
         "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/CoordinateTransform.md"
     },
@@ -3835,13 +3835,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ModbusCommunication.md"
     },
@@ -3971,13 +3971,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/TcpCommunication.md"
     },
@@ -4065,13 +4065,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/DatabaseWrite.md"
     },
@@ -4167,13 +4167,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ConditionalBranch.md"
     },
@@ -4256,13 +4256,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ColorConversion.md"
     },
@@ -4371,13 +4371,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/AdaptiveThreshold.md"
     },
@@ -4455,13 +4455,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/HistogramEqualization.md"
     },
@@ -4626,13 +4626,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/GeometricFitting.md"
     },
@@ -4806,13 +4806,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/RoiManager.md"
     },
@@ -4970,13 +4970,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ShapeMatching.md"
     },
@@ -5086,13 +5086,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/SubpixelEdgeDetection.md"
     },
@@ -5267,13 +5267,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ColorDetection.md"
     },
@@ -5457,13 +5457,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/SerialCommunication.md"
     },
@@ -5764,13 +5764,13 @@
         }
       ],
       "quality": {
-        "totalScore": 80,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=90"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/SiemensS7Communication.md"
     },
@@ -6016,13 +6016,13 @@
         }
       ],
       "quality": {
-        "totalScore": 80,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=90"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/MitsubishiMcCommunication.md"
     },
@@ -6268,13 +6268,13 @@
         }
       ],
       "quality": {
-        "totalScore": 80,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=90"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/OmronFinsCommunication.md"
     },
@@ -6453,13 +6453,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ResultJudgment.md"
     },
@@ -6588,13 +6588,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ClaheEnhancement.md"
     },
@@ -6749,13 +6749,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/MorphologicalOperation.md"
     },
@@ -6824,13 +6824,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/LaplacianSharpen.md"
     },
@@ -6955,13 +6955,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageAdd.md"
     },
@@ -7032,13 +7032,13 @@
         }
       ],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageSubtract.md"
     },
@@ -7113,13 +7113,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageBlend.md"
     },
@@ -7210,13 +7210,13 @@
         }
       ],
       "quality": {
-        "totalScore": 73,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/VariableRead.md"
     },
@@ -7325,13 +7325,13 @@
         }
       ],
       "quality": {
-        "totalScore": 63,
-        "level": "C",
+        "totalScore": 23,
+        "level": "D",
         "documentationScore": 60,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=60, Test=30, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/VariableWrite.md"
     },
@@ -7456,13 +7456,13 @@
         }
       ],
       "quality": {
-        "totalScore": 73,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/VariableIncrement.md"
     },
@@ -7549,13 +7549,13 @@
         }
       ],
       "quality": {
-        "totalScore": 93,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 90,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=90"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/TryCatch.md"
     },
@@ -7643,13 +7643,13 @@
         }
       ],
       "quality": {
-        "totalScore": 79,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/CycleCounter.md"
     },
@@ -7770,13 +7770,13 @@
         }
       ],
       "quality": {
-        "totalScore": 73,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/AkazeFeatureMatch.md"
     },
@@ -7919,13 +7919,13 @@
         }
       ],
       "quality": {
-        "totalScore": 73,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/OrbFeatureMatch.md"
     },
@@ -8057,13 +8057,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/GradientShapeMatch.md"
     },
@@ -8316,13 +8316,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/PyramidShapeMatch.md"
     },
@@ -8463,13 +8463,13 @@
         }
       ],
       "quality": {
-        "totalScore": 84,
-        "level": "B",
+        "totalScore": 23,
+        "level": "D",
         "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/DualModalVoting.md"
     },
@@ -8558,13 +8558,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ForEach.md"
     },
@@ -8659,13 +8659,13 @@
         }
       ],
       "quality": {
-        "totalScore": 79,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=85"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ArrayIndexer.md"
     },
@@ -8718,13 +8718,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/JsonExtractor.md"
     },
@@ -8828,13 +8828,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/MathOperation.md"
     },
@@ -8912,13 +8912,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/LogicGate.md"
     },
@@ -9023,13 +9023,13 @@
         }
       ],
       "quality": {
-        "totalScore": 83,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=100"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/TypeConvert.md"
     },
@@ -9166,13 +9166,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/HttpRequest.md"
     },
@@ -9280,13 +9280,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/MqttPublish.md"
     },
@@ -9339,13 +9339,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/StringFormat.md"
     },
@@ -9420,13 +9420,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageSave.md"
     },
@@ -9467,13 +9467,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/OcrRecognition.md"
     },
@@ -9520,13 +9520,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 89,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=80, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageDiff.md"
     },
@@ -9653,13 +9653,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Statistics.md"
     },
@@ -9759,13 +9759,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Aggregator.md"
     },
@@ -9818,13 +9818,13 @@
         }
       ],
       "quality": {
-        "totalScore": 73,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=60"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Comment.md"
     },
@@ -9956,13 +9956,13 @@
         }
       ],
       "quality": {
-        "totalScore": 71,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 80,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=80, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Comparator.md"
     },
@@ -10015,13 +10015,13 @@
         }
       ],
       "quality": {
-        "totalScore": 76,
-        "level": "B",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
         "testCoverageScore": 30,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=30, Validation=100, ErrorHandling=75"
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/Delay.md"
     },
@@ -10255,13 +10255,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/CaliperTool.md"
     },
@@ -10389,13 +10389,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/WidthMeasurement.md"
     },
@@ -10442,13 +10442,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/PointLineDistance.md"
     },
@@ -10525,13 +10525,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/LineLineDistance.md"
     },
@@ -10618,13 +10618,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/BoxNms.md"
     },
@@ -10794,13 +10794,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/BoxFilter.md"
     },
@@ -10931,13 +10931,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/SharpnessEvaluation.md"
     },
@@ -11057,13 +11057,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/PositionCorrection.md"
     },
@@ -11153,13 +11153,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/NPointCalibration.md"
     },
@@ -11241,13 +11241,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/CalibrationLoader.md"
     },
@@ -11373,13 +11373,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/UnitConvert.md"
     },
@@ -11464,13 +11464,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/TimerStatistics.md"
     },
@@ -11572,13 +11572,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 23,
+        "level": "D",
         "documentationScore": 60,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=60, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=60, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ScriptOperator.md"
     },
@@ -11672,13 +11672,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/TriggerModule.md"
     },
@@ -11763,13 +11763,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/PointAlignment.md"
     },
@@ -11892,13 +11892,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/PointCorrection.md"
     },
@@ -12027,13 +12027,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/GapMeasurement.md"
     },
@@ -12163,13 +12163,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/PolarUnwrap.md"
     },
@@ -12246,13 +12246,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ShadingCorrection.md"
     },
@@ -12325,13 +12325,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/FrameAveraging.md"
     },
@@ -12481,13 +12481,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/AffineTransform.md"
     },
@@ -12668,13 +12668,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ColorMeasurement.md"
     },
@@ -12802,13 +12802,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/SurfaceDefectDetection.md"
     },
@@ -12927,13 +12927,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/EdgePairDefect.md"
     },
@@ -13049,13 +13049,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/RectangleDetection.md"
     },
@@ -13145,13 +13145,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/TranslationRotationCalibration.md"
     },
@@ -13263,13 +13263,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/CornerDetection.md"
     },
@@ -13322,13 +13322,13 @@
       ],
       "parameters": [],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/EdgeIntersection.md"
     },
@@ -13438,13 +13438,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ParallelLineFind.md"
     },
@@ -13548,13 +13548,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/QuadrilateralFind.md"
     },
@@ -13676,13 +13676,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/GeoMeasurement.md"
     },
@@ -13781,13 +13781,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageStitching.md"
     },
@@ -13888,13 +13888,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageTiling.md"
     },
@@ -13976,13 +13976,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageNormalize.md"
     },
@@ -14086,13 +14086,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/ImageCompose.md"
     },
@@ -14211,13 +14211,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/CopyMakeBorder.md"
     },
@@ -14342,13 +14342,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/TextSave.md"
     },
@@ -14508,13 +14508,13 @@
         }
       ],
       "quality": {
-        "totalScore": 90,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 60,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=60"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/PointSetTool.md"
     },
@@ -14618,13 +14618,13 @@
         }
       ],
       "quality": {
-        "totalScore": 100,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 100,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=100"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/BlobLabeling.md"
     },
@@ -14779,13 +14779,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/HistogramAnalysis.md"
     },
@@ -14933,13 +14933,13 @@
         }
       ],
       "quality": {
-        "totalScore": 96,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 85,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=85"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/PixelStatistics.md"
     },
@@ -15018,13 +15018,13 @@
         }
       ],
       "quality": {
-        "totalScore": 94,
-        "level": "A",
+        "totalScore": 33,
+        "level": "D",
         "documentationScore": 100,
-        "testCoverageScore": 100,
-        "parameterValidationScore": 100,
-        "errorHandlingScore": 75,
-        "summary": "Doc=100, Test=100, Validation=100, ErrorHandling=75"
+        "testCoverageScore": 30,
+        "parameterValidationScore": 0,
+        "errorHandlingScore": 0,
+        "summary": "Doc=100, Test=30, Validation=0, ErrorHandling=0"
       },
       "docPath": "docs/operators/MeanFilter.md"
     }

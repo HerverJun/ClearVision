@@ -79,14 +79,32 @@ internal sealed class VisionAgentOperatorContractCatalog : IVisionAgentOperatorC
 
     private static VisionAgentOperatorContract ToContract(OperatorMetadata metadata)
     {
+        var outputPorts = metadata.OutputPorts.Select(ToPort).ToList();
+        if (metadata.Type == OperatorType.DeepLearning)
+        {
+            AddPortIfMissing(outputPorts, Port("TopClassLabel", "Top Class Label", PortDataType.String, false));
+            AddPortIfMissing(outputPorts, Port("TopClassConfidence", "Top Class Confidence", PortDataType.Float, false));
+            AddPortIfMissing(outputPorts, Port("ClassificationResult", "Classification Result", PortDataType.Any, false));
+        }
+
         return new VisionAgentOperatorContract(
             metadata.Type.ToString(),
             metadata.DisplayName,
             metadata.Category,
             metadata.Description,
             metadata.InputPorts.Select(ToPort).ToList(),
-            metadata.OutputPorts.Select(ToPort).ToList(),
+            outputPorts,
             metadata.Parameters.Select(ToParameter).ToList());
+    }
+
+    private static void AddPortIfMissing(
+        List<VisionAgentPortContract> ports,
+        VisionAgentPortContract port)
+    {
+        if (ports.All(existing => !existing.Name.Equals(port.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            ports.Add(port);
+        }
     }
 
     private static VisionAgentPortContract ToPort(PortDefinition port)

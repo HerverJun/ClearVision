@@ -215,6 +215,24 @@ public sealed record VisionAgentPlanModeResult
     public bool MetadataOnly { get; init; } = true;
 }
 
+public sealed record VisionAgentPlannerCandidate
+{
+    public string Goal { get; init; } = string.Empty;
+    public string Intent { get; init; } = string.Empty;
+    public string Confidence { get; init; } = "medium";
+    public List<string>? RequirementUnderstanding { get; init; }
+    public VisionAgentRecommendedRoute? RecommendedRoute { get; init; }
+    public List<VisionAgentClarificationQuestion>? ClarificationQuestions { get; init; }
+    public List<VisionAgentDefaultAssumption>? RecommendedDefaults { get; init; }
+    public List<string>? Risks { get; init; }
+    public List<string>? AcceptanceCriteria { get; init; }
+    public List<string>? ExecutablePlan { get; init; }
+    public bool CanBuildCandidate { get; init; }
+    public bool? CanBuild { get; init; }
+    public List<string>? BlockingReasons { get; init; }
+    public string NextAction { get; init; } = string.Empty;
+}
+
 public sealed record VisionAgentPlanPublicEvent
 {
     public string Stage { get; init; } = string.Empty;

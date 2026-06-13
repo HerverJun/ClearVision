@@ -82,7 +82,7 @@ internal static class VisionAgentReadOnlyCatalog
                 ]),
             ["DeepLearning"] = new(
                 "DeepLearning",
-                ["Detections", "Classes", "Scores"],
+                ["Detections", "Classes", "Scores", "TopClassLabel", "TopClassConfidence", "ClassificationResult"],
                 ["Image"],
                 [
                     new("ModelPath", "file", true, "Configured model artifact path; not loaded by read-only agent tools."),

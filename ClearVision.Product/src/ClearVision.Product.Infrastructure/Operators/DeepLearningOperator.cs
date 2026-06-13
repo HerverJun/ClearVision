@@ -454,6 +454,17 @@ public class DeepLearningOperator : OperatorBase
         }
 
         var detectionList = new DetectionList(outputDetections);
+        var topDetection = outputDetections
+            .OrderByDescending(detection => detection.Confidence)
+            .FirstOrDefault();
+        var topClassLabel = topDetection?.Label ?? string.Empty;
+        var topClassConfidence = topDetection?.Confidence ?? 0.0;
+        var classificationResult = new
+        {
+            Label = topClassLabel,
+            Confidence = topClassConfidence,
+            CandidateCount = outputDetections.Count
+        };
 
         // 输出原始图像（不带任何绘制），供下游节点重新绘制
         var originalImage = src.Clone();
@@ -470,6 +481,9 @@ public class DeepLearningOperator : OperatorBase
             { "DetectionList", detectionList },
             { "Objects", isObjectMode ? detectionList : new DetectionList() },
             { "ObjectCount", isObjectMode ? detections.Count : 0 },
+            { "TopClassLabel", topClassLabel },
+            { "TopClassConfidence", topClassConfidence },
+            { "ClassificationResult", classificationResult },
             { "Defects", isObjectMode ? new DetectionList() : detectionList },
             { "DefectCount", isObjectMode ? 0 : detections.Count },
             { "OriginalImage", new ImageWrapper(originalImage) },

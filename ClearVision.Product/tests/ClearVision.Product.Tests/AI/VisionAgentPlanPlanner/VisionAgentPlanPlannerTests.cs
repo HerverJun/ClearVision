@@ -186,6 +186,13 @@ public sealed class VisionAgentPlanPlannerTests
         context.Should().NotContain("sk-secret-token");
         context.Should().NotContain("10.1.2.3");
         context.Should().Contain("<redacted>");
+        prompt.SystemPrompt.Should().Contain("PlannerCandidate");
+        context.Should().Contain("[semantic_extraction]");
+        context.Should().Contain("[maturity_summary]");
+        context.Should().Contain("[operator_catalog_key_io]");
+        context.Should().Contain("[planner_candidate_contract]");
+        context.Should().NotContain("ruleBaselineForFallback");
+        context.Should().NotContain("PlanModeResult");
     }
 
 
@@ -221,8 +228,115 @@ public sealed class VisionAgentPlanPlannerTests
         AssertPlannerFailure(result, "json_parse", "planner_json_parse_failed");
     }
 
-    [Fact(DisplayName = "Plan planner repair failure should return contract repair diagnostic")]
-    public async Task CreatePlanAsync_ShouldFallbackWhenPlannerContractRepairFails()
+    [Theory(DisplayName = "Plan planner should parse supported JSON completion shapes")]
+    [InlineData("legal_json")]
+    [InlineData("markdown_json")]
+    [InlineData("json_with_explanation")]
+    public async Task CreatePlanAsync_ShouldParseSupportedJsonCompletionShapes(string shape)
+    {
+        var json = PlannerPlanJson(
+            "surface_defect",
+            "defect_morphology",
+            OperatorsFor("surface_defect"));
+        var completion = shape switch
+        {
+            "markdown_json" => $"```json\n{json}\n```",
+            "json_with_explanation" => $"Here is the candidate:\n{json}\nReview the metadata-only route.",
+            _ => json
+        };
+        var service = CreateService(_ => completion);
+        var baseline = Baseline("scratch", "surface_defect");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "scratch" },
+            baseline,
+            CancellationToken.None);
+
+        result.PlanSource.Should().Be("model_planner");
+        result.FallbackReason.Should().BeEmpty();
+        result.PublicEvents.Should().NotContain(evt => evt.Stage == "rule_fallback_used");
+        result.PublicEvents.Should().NotContain(evt => evt.Stage == "planner_json_repair_started");
+    }
+
+    [Fact(DisplayName = "Plan planner invalid JSON should perform one repair completion before fallback")]
+    public async Task CreatePlanAsync_ShouldRepairInvalidJsonOnce()
+    {
+        var calls = 0;
+        VisionAgentPlanCompletionRequest? repairRequest = null;
+        var semantic = StrawberrySemantic();
+        var baseline = Baseline("检测果园里的草莓，熟透为 OK，否则 NG，输入源是相机。", "attribute_classification") with
+        {
+            SemanticExtraction = semantic
+        };
+        var repairJson = PlannerPlanJson(
+            "attribute_classification",
+            "classification_strategy",
+            OperatorsFor("attribute_classification"));
+        var service = CreateService((request, _) =>
+        {
+            calls++;
+            if (calls == 1)
+            {
+                return Task.FromResult("{\"goal\":\"truncated\"");
+            }
+
+            repairRequest = request;
+            return Task.FromResult(repairJson);
+        }, new VisionAgentPlanPlannerOptions { Enabled = true });
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "检测果园里的草莓，熟透为 OK，否则 NG，输入源是相机。",
+                OriginalUserPrompt = "检测果园里的草莓，熟透为 OK，否则 NG，输入源是相机。",
+                SemanticExtraction = semantic
+            },
+            baseline,
+            CancellationToken.None);
+
+        calls.Should().Be(2);
+        repairRequest.Should().NotBeNull();
+        repairRequest!.SystemPrompt.Should().Contain("repair invalid JSON");
+        result.PlanSource.Should().Be("model_planner");
+        result.FallbackReason.Should().BeEmpty();
+        result.CanBuild.Should().BeTrue();
+        result.RecommendedRoute.Operators.Should().Contain("DeepLearning");
+        result.RecommendedRoute.Operators.Should().NotContain("SurfaceDefectDetection");
+        result.PublicEvents.Should().Contain(evt => evt.Stage == "planner_json_repair_started" && evt.Status == "started");
+        result.PublicEvents.Should().Contain(evt => evt.Stage == "planner_json_repair_completed" && evt.Status == "completed");
+        result.PublicEvents.Should().NotContain(evt => evt.Stage == "planner_json_repair_failed");
+        result.PublicEvents.Should().NotContain(evt => evt.Stage == "rule_fallback_used");
+    }
+
+    [Fact(DisplayName = "Plan planner should safely bound oversized completions before repair")]
+    public async Task CreatePlanAsync_ShouldBoundOversizedCompletionBeforeRepair()
+    {
+        var calls = 0;
+        var oversizedInvalid = "not-json " + new string('x', 5000);
+        var service = CreateService((_, _) =>
+        {
+            calls++;
+            return Task.FromResult(calls == 1
+                ? oversizedInvalid
+                : PlannerPlanJson("surface_defect", "defect_morphology", OperatorsFor("surface_defect")));
+        }, new VisionAgentPlanPlannerOptions { Enabled = true, MaxCompletionChars = 4096 });
+        var baseline = Baseline("scratch", "surface_defect");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "scratch" },
+            baseline,
+            CancellationToken.None);
+
+        calls.Should().Be(2);
+        result.PlanSource.Should().Be("model_planner");
+        result.PlanWarnings.Should().Contain("completion_too_large");
+        result.ContractRepairNotes.Should().Contain("completion_truncated_to_max_completion_chars");
+        result.PublicEvents.Should().Contain(evt => evt.Stage == "completion_too_large");
+        result.PublicEvents.Should().Contain(evt => evt.Stage == "planner_json_repair_completed");
+    }
+
+    [Fact(DisplayName = "Plan planner should normalize null nested question options without fallback")]
+    public async Task CreatePlanAsync_ShouldNormalizeNullQuestionOptions()
     {
         var service = CreateService(_ => PlannerPlanJsonWithNullQuestionOptions());
         var baseline = Baseline("scratch", "surface_defect");
@@ -232,10 +346,38 @@ public sealed class VisionAgentPlanPlannerTests
             baseline,
             CancellationToken.None);
 
-        result.PlanSource.Should().Be("rule_fallback");
-        result.FallbackReason.Should().Be("planner_failed");
-        AssertPlannerFailure(result, "contract_repair", "planner_contract_repair_failed");
+        result.PlanSource.Should().Be("model_planner");
+        result.FallbackReason.Should().BeEmpty();
+        result.ContractRepairNotes.Should().Contain("clarification_questions_repaired_to_baseline");
+        result.ClarificationQuestions.Should().NotBeEmpty();
+        result.ClarificationQuestions.Should().AllSatisfy(question =>
+        {
+            question.Options.Should().NotBeNull();
+            question.Options.Should().Contain(option => option.Recommended);
+        });
     }
+
+    [Fact(DisplayName = "Plan planner should normalize missing route and null lists without fallback")]
+    public async Task CreatePlanAsync_ShouldNormalizeMissingRouteAndNullLists()
+    {
+        var service = CreateService(_ => PlannerPlanJsonWithNullRouteAndLists());
+        var baseline = Baseline("scratch", "surface_defect");
+
+        var result = await service.CreatePlanAsync(
+            new VisionAgentPlanModeRequest { Description = "scratch" },
+            baseline,
+            CancellationToken.None);
+
+        result.PlanSource.Should().Be("model_planner");
+        result.FallbackReason.Should().BeEmpty();
+        result.RecommendedRoute.Operators.Should().BeEquivalentTo(baseline.RecommendedRoute.Operators);
+        result.ClarificationQuestions.Should().NotBeEmpty();
+        result.RecommendedDefaults.Should().NotBeEmpty();
+        result.ContractRepairNotes.Should().Contain("recommended_route_repaired_to_baseline");
+        result.ContractRepairNotes.Should().Contain("clarification_questions_repaired_to_baseline");
+        result.ContractRepairNotes.Should().Contain("recommended_defaults_repaired_to_baseline");
+    }
+
 
     [Fact(DisplayName = "Plan planner Unauthorized should return rule fallback with API key diagnostic")]
     public async Task CreatePlanAsync_ShouldFallbackWhenPlannerUnauthorized()
@@ -381,7 +523,8 @@ public sealed class VisionAgentPlanPlannerTests
 
         result.TemplateSelection.Should().NotBeNull();
         result.TemplateSelection!.TemplateId.Should().Be("tmpl-user-selected");
-        result.ContractRepairNotes.Should().Contain("template_selection_repaired_to_user_selection");
+        result.ContractRepairNotes.Should().NotContain("template_selection_repaired_to_user_selection");
+        JsonSerializer.Serialize(result).Should().NotContain("tmpl-model-hallucinated");
     }
 
     private static VisionAgentPlanPlannerService CreateService(
@@ -475,6 +618,8 @@ public sealed class VisionAgentPlanPlannerTests
             "wire_sequence" => ["ImageAcquisition", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput"],
             "measurement" => ["ImageAcquisition", "CircleMeasurement", "MeasureDistance", "ResultJudgment", "ResultOutput"],
             "template_location" => ["ImageAcquisition", "TemplateMatching", "ResultJudgment", "ResultOutput"],
+            "classification" => ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
+            "attribute_classification" => ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
             "plc_output" => ["ImageAcquisition", "ResultJudgment", "ResultOutput"],
             _ => ["ImageAcquisition", "SurfaceDefectDetection", "BlobAnalysis", "ResultJudgment", "ResultOutput"]
         };
@@ -595,7 +740,7 @@ public sealed class VisionAgentPlanPlannerTests
             risks = new[] { "Representative samples are required before release." },
             acceptanceCriteria = new[] { "Workflow draft contains acquisition, inspection, judgment, and output stages." },
             executablePlan = new[] { "Confirm defaults.", "Generate draft.", "Run readiness checks." },
-            canBuild = true,
+            canBuildCandidate = true,
             blockingReasons = Array.Empty<string>(),
             nextAction = "Accept recommended defaults and Build.",
             templateSelection = templateId == null
@@ -651,12 +796,34 @@ public sealed class VisionAgentPlanPlannerTests
             risks = new[] { "Representative samples are required before release." },
             acceptanceCriteria = new[] { "Workflow draft contains acquisition, inspection, judgment, and output stages." },
             executablePlan = new[] { "Confirm defaults.", "Generate draft.", "Run readiness checks." },
-            canBuild = true,
+            canBuildCandidate = true,
             blockingReasons = Array.Empty<string>(),
             nextAction = "Accept recommended defaults and Build.",
             stationBoundarySummary = "metadata-only Station boundary.",
             plcOutputPolicy = "Local ResultOutput first; PLC writes disabled until review.",
             metadataOnly = true
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
+    private static string PlannerPlanJsonWithNullRouteAndLists()
+    {
+        var payload = new
+        {
+            goal = "surface defect planner goal",
+            intent = "surface_defect",
+            confidence = "high",
+            requirementUnderstanding = (object?)null,
+            recommendedRoute = (object?)null,
+            clarificationQuestions = (object?)null,
+            recommendedDefaults = (object?)null,
+            risks = (object?)null,
+            acceptanceCriteria = (object?)null,
+            executablePlan = (object?)null,
+            canBuildCandidate = true,
+            blockingReasons = (object?)null,
+            nextAction = "Accept recommended defaults and Build."
         };
 
         return JsonSerializer.Serialize(payload);

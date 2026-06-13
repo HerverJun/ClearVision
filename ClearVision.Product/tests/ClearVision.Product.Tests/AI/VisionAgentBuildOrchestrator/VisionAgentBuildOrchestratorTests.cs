@@ -132,6 +132,98 @@ public sealed class VisionAgentBuildOrchestratorTests
         AssertBuildQuality(result, sink, expectPreserved: true);
     }
 
+    [Fact(DisplayName = "End-to-end mature strawberry Plan repair and Build should create editable classification draft")]
+    public async Task SemanticPlannerConfirmationBuild_MatureStrawberry_ShouldCreateEditableClassificationDraft()
+    {
+        const string prompt = "检测果园里的草莓，熟透为 OK，否则 NG，输入源是相机。";
+        var sink = new CapturingAgentRunEventSink();
+        var semantic = StrawberrySemantic();
+        var plannerCalls = 0;
+        var planner = new VisionAgentPlanPlannerService(
+            new DelegatePlanCompletionSource((_, _) =>
+            {
+                plannerCalls++;
+                return Task.FromResult(plannerCalls == 1
+                    ? "{\"goal\":\"truncated\""
+                    : PlannerCandidateJson(
+                        "attribute_classification",
+                        "classification_strategy",
+                        ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"]));
+            }),
+            new VisionAgentPlanPromptComposer(),
+            Microsoft.Extensions.Options.Options.Create(new VisionAgentPlanPlannerOptions { Enabled = true }),
+            NullLogger<VisionAgentPlanPlannerService>.Instance);
+        var planOrchestrator = new VisionAgentOrchestrator(
+            CreateToolRegistry(),
+            new FakeAiFlowGenerationService(),
+            sink,
+            planPlannerService: planner,
+            semanticExtractor: new FakeSemanticExtractor(semantic));
+
+        var plan = await planOrchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = prompt,
+                OriginalUserPrompt = prompt
+            },
+            CancellationToken.None);
+
+        plannerCalls.Should().Be(2);
+        plan.SemanticExtraction.Should().NotBeNull();
+        plan.SemanticExtraction!.Source.Should().Be(VisionAgentSemanticSources.Model);
+        plan.SemanticExtraction.TaskType.Should().Be(AiVisionTaskTypes.AttributeClassification);
+        plan.PlanSource.Should().Be("model_planner");
+        plan.FallbackReason.Should().BeEmpty();
+        plan.CanBuild.Should().BeTrue();
+        plan.RecommendedRoute.Operators.Should().Contain(["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"]);
+        plan.RecommendedRoute.Operators.Should().NotContain("SurfaceDefectDetection");
+        plan.PublicEvents.Should().Contain(evt => evt.Stage == "planner_json_repair_started");
+        plan.PublicEvents.Should().Contain(evt => evt.Stage == "planner_json_repair_completed");
+
+        var buildOrchestrator = CreateOrchestrator(sink);
+        var result = await buildOrchestrator.BuildAsync(
+            Request(
+                plan,
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["attribute_target"] = "semantic_attribute",
+                    ["ok_ng_rule"] = "use_extracted_conditions",
+                    ["classification_ok_label"] = "熟透"
+                }),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult.Should().NotBeNull();
+        var build = result.BuildResult!;
+        build.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"])
+            .And
+            .NotContain("SurfaceDefectDetection");
+        Flow(result).Operators.Should().NotBeEmpty();
+        build.MissingResources.Should().Contain(item =>
+            item.ResourceType == "model_resource" &&
+            item.ResourceKey == "op_detect.ModelPath");
+        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        build.ApplyGate.DeploymentReady.Should().BeFalse();
+        build.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "FieldName" &&
+            item.ValueSummary == "TopClassLabel");
+        build.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "Condition" &&
+            item.ValueSummary == "Equal");
+        build.ParameterMapping.Should().Contain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "ExpectValue" &&
+            item.ValueSummary.Contains("熟透", StringComparison.Ordinal));
+        build.ParameterMapping.Should().NotContain(item =>
+            item.OperatorType == "ResultJudgment" &&
+            item.ParameterName == "ExpectValue" &&
+            item.ValueSummary == "1");
+    }
+
     [Fact(DisplayName = "Black-box scenario: hole distance measurement Build quality")]
     public async Task BuildAsync_BlackBoxHoleDistance_ShouldProduceMeasurementDraftWithCalibrationBlockers()
     {
@@ -692,6 +784,13 @@ public sealed class VisionAgentBuildOrchestratorTests
         List<string> operators,
         string originalUserPrompt = "metal surface scratch detection")
     {
+        var semantic = SemanticForPlan(intent, originalUserPrompt);
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest
+            {
+                Description = originalUserPrompt
+            },
+            semantic);
         var result = new VisionAgentPlanModeResult
         {
             PlanId = "plan_build_test",
@@ -723,6 +822,8 @@ public sealed class VisionAgentBuildOrchestratorTests
             AcceptanceCriteria = ["Editable workflow draft can be applied to canvas."],
             ExecutablePlan = ["Build draft", "Validate", "Dry-run", "Review gates"],
             CanBuild = true,
+            SemanticExtraction = semantic,
+            RequirementMaturity = maturity,
             NextAction = "Build",
             OperatorCatalogVersion = "catalog.v1",
             TemplateCatalogVersion = "template.v1",
@@ -740,6 +841,196 @@ public sealed class VisionAgentBuildOrchestratorTests
     private static OperatorFlowDto Flow(AiFlowGenerationResult result)
     {
         return result.Flow.Should().BeOfType<OperatorFlowDto>().Subject;
+    }
+
+    private static VisionAgentSemanticExtractionResult SemanticForPlan(
+        string intent,
+        string originalUserPrompt)
+    {
+        var taskType = intent switch
+        {
+            "wire_sequence" => AiVisionTaskTypes.WireSequence,
+            "measurement" => AiVisionTaskTypes.GeometryMeasurement,
+            "template_positioning" or "template_location" => AiVisionTaskTypes.TemplateLocation,
+            "presence_absence" => AiVisionTaskTypes.PresenceAbsence,
+            "classification" or "attribute_classification" => AiVisionTaskTypes.AttributeClassification,
+            "code_recognition" => AiVisionTaskTypes.CodeRecognition,
+            _ => AiVisionTaskTypes.SurfaceDefect
+        };
+        var inspectionObject = taskType switch
+        {
+            AiVisionTaskTypes.WireSequence => "terminal wire",
+            AiVisionTaskTypes.GeometryMeasurement => "hole distance",
+            AiVisionTaskTypes.TemplateLocation => "template target",
+            AiVisionTaskTypes.PresenceAbsence => "assembly part",
+            AiVisionTaskTypes.AttributeClassification => "classified object",
+            AiVisionTaskTypes.CodeRecognition => "code",
+            _ => "metal surface"
+        };
+
+        return new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = taskType,
+            Confidence = 0.9,
+            TaskTypeConfidence = 0.9,
+            InspectionObject = inspectionObject,
+            TargetAttribute = taskType == AiVisionTaskTypes.AttributeClassification ? "attribute" : string.Empty,
+            MeasurementTarget = taskType == AiVisionTaskTypes.GeometryMeasurement ? "hole distance" : string.Empty,
+            DefectType = taskType == AiVisionTaskTypes.SurfaceDefect ? "scratch" : string.Empty,
+            ImageSource = "camera",
+            OkCondition = taskType == AiVisionTaskTypes.AttributeClassification ? "expected class is OK" : "meets requirement is OK",
+            NgCondition = "otherwise NG",
+            OutputTarget = "OK/NG result",
+            CanPlanCandidate = true,
+            CanBuildCandidate = true,
+            ObjectSignals = [inspectionObject],
+            TaskSignals = [taskType],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
+    }
+
+    private static VisionAgentSemanticExtractionResult StrawberrySemantic()
+    {
+        return new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.AttributeClassification,
+            Confidence = 0.94,
+            TaskTypeConfidence = 0.91,
+            InspectionObject = "草莓",
+            TargetAttribute = "成熟度/熟透",
+            ImageSource = "相机",
+            OkCondition = "熟透为 OK",
+            NgCondition = "否则 NG",
+            CanPlanCandidate = true,
+            CanBuildCandidate = false,
+            ObjectSignals = ["草莓"],
+            TaskSignals = ["成熟度", "熟透"],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
+    }
+
+    private static string PlannerCandidateJson(
+        string intent,
+        string questionId,
+        IReadOnlyList<string> operators)
+    {
+        var payload = new
+        {
+            goal = $"{intent} planner goal",
+            intent,
+            confidence = "high",
+            requirementUnderstanding = new[]
+            {
+                "Planner understood the object attribute classification requirement.",
+                "Use public metadata and keep camera/model resources pending."
+            },
+            recommendedRoute = new
+            {
+                routeId = $"{intent}_planner_route",
+                title = $"{intent} planner route",
+                summary = "Planner selected a model-backed attribute classification route.",
+                operators,
+                templateDecision = "planner_route"
+            },
+            clarificationQuestions = new[]
+            {
+                QuestionPayload(questionId, "Classification strategy"),
+                QuestionPayload("ok_ng_rule", "OK/NG judgment")
+            },
+            recommendedDefaults = new[]
+            {
+                new
+                {
+                    id = "metadata_only",
+                    label = "Metadata only",
+                    value = "pending_resources",
+                    impact = "Camera and model resources remain pending."
+                }
+            },
+            risks = new[] { "Classification boundary requires sample review before deployment." },
+            acceptanceCriteria = new[] { "Workflow draft contains acquisition, model classification, judgment, and output stages." },
+            executablePlan = new[] { "Confirm recommended strategy.", "Build editable draft.", "Review pending model resource." },
+            canBuildCandidate = true,
+            blockingReasons = Array.Empty<string>(),
+            nextAction = "Accept recommended defaults and Build."
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
+    private static object QuestionPayload(string id, string title)
+    {
+        return new
+        {
+            id,
+            title,
+            why = "This affects operator parameters and release readiness.",
+            defaultValue = "recommended",
+            defaultAssumption = "Use the planner recommended metadata-only default.",
+            impact = "Build can continue with pending resources.",
+            options = new[]
+            {
+                new
+                {
+                    value = "recommended",
+                    label = "Recommended",
+                    recommended = true,
+                    description = "Use the recommended default.",
+                    impact = "Fastest path to editable draft."
+                },
+                new
+                {
+                    value = "pending",
+                    label = "Keep pending",
+                    recommended = false,
+                    description = "Keep this choice pending.",
+                    impact = "Draft remains editable; deployment remains blocked."
+                }
+            }
+        };
+    }
+
+    private sealed class FakeSemanticExtractor : IVisionAgentSemanticExtractorService
+    {
+        private readonly VisionAgentSemanticExtractionResult _result;
+
+        public FakeSemanticExtractor(VisionAgentSemanticExtractionResult result)
+        {
+            _result = result;
+        }
+
+        public Task<VisionAgentSemanticExtractionResult> ExtractAsync(
+            VisionAgentSemanticExtractionRequest request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(_result);
+        }
+    }
+
+    private sealed class DelegatePlanCompletionSource : IVisionAgentPlanCompletionSource
+    {
+        private readonly Func<VisionAgentPlanCompletionRequest, CancellationToken, Task<string>> _completion;
+
+        public DelegatePlanCompletionSource(
+            Func<VisionAgentPlanCompletionRequest, CancellationToken, Task<string>> completion)
+        {
+            _completion = completion;
+        }
+
+        public Task<string> CompleteAsync(
+            VisionAgentPlanCompletionRequest request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return _completion(request, cancellationToken);
+        }
     }
 
     private sealed class FakeAiFlowGenerationService : IAiFlowGenerationService

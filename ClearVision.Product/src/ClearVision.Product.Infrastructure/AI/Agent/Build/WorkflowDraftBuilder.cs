@@ -345,8 +345,8 @@ public sealed class WorkflowDraftBuilder
                     break;
                 case "ResultJudgment":
                     Add(FindLatestCompatibleSource(steps, targetIndex, target, "Value",
-                        ["Result", "IsMatch", "BlobCount", "DefectCount", "ObjectCount", "MatchCount", "Score", "Distance", "JudgmentResult"]));
-                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Confidence", ["Score", "NormalizedScore"]));
+                        ["TopClassLabel", "Result", "IsMatch", "BlobCount", "DefectCount", "ObjectCount", "MatchCount", "Score", "Distance", "JudgmentResult"]));
+                    Add(FindLatestCompatibleSource(steps, targetIndex, target, "Confidence", ["TopClassConfidence", "Score", "NormalizedScore"]));
                     break;
                 case "ResultOutput":
                     Add(FindLatestCompatibleSource(steps, targetIndex, target, "Result",
@@ -472,7 +472,7 @@ public sealed class WorkflowDraftBuilder
 
         if (targetPortName.Equals("Value", StringComparison.OrdinalIgnoreCase))
         {
-            return ["Result", "Distance", "DefectCount", "BlobCount", "MatchCount", "Score", "IsMatch"];
+            return ["TopClassLabel", "Result", "Distance", "DefectCount", "BlobCount", "MatchCount", "Score", "IsMatch"];
         }
 
         if (targetPortName.Equals("Result", StringComparison.OrdinalIgnoreCase))

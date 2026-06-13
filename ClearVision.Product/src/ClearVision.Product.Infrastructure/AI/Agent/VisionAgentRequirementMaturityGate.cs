@@ -309,7 +309,6 @@ public static class VisionAgentRequirementMaturityGate
         var hasAcceptance = !string.IsNullOrWhiteSpace(semantic.OkCondition) ||
                             !string.IsNullOrWhiteSpace(semantic.NgCondition) ||
                             !string.IsNullOrWhiteSpace(semantic.OutputTarget);
-        var hasStrategy = !string.IsNullOrWhiteSpace(semantic.SuggestedRoute);
 
         if (normalizedIntent is "help" or "chat")
         {
@@ -392,17 +391,10 @@ public static class VisionAgentRequirementMaturityGate
             missingFields.Add("acceptance_criteria");
         }
 
-        if (!hasStrategy)
-        {
-            missingFields.Add("model_or_rule_strategy");
-            blockingReasons.Add("model_or_rule_strategy_missing");
-        }
-
         var canBuild = hasObject &&
                        hasTaskType &&
                        hasImageSource &&
-                       hasAcceptance &&
-                       hasStrategy;
+                       hasAcceptance;
         return Result(
             canBuild ? AiRequirementMaturity.Actionable : AiRequirementMaturity.Ambiguous,
             hasTaskType ? taskType : AiVisionTaskTypes.Unknown,
