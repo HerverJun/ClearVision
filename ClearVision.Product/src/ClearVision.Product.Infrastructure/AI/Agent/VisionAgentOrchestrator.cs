@@ -266,12 +266,6 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         AiFlowGenerationRequest request,
         CancellationToken cancellationToken)
     {
-        var maturityGate = EnforceBuildMaturityGate(request);
-        if (maturityGate != null)
-        {
-            return maturityGate;
-        }
-
         if (ShouldUseToolLoop(request))
         {
             return await BuildFromPlanWithToolLoopAsync(request, cancellationToken);

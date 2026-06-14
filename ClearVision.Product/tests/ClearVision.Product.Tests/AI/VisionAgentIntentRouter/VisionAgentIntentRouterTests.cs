@@ -268,6 +268,69 @@ public sealed class VisionAgentIntentRouterTests
         result.ShouldResetPendingPlan.Should().BeFalse();
     }
 
+    [Fact(DisplayName = "Intent Router draft confirmed Plan should build when only one hard fact is resolved and Planner route is legal")]
+    public async Task RouteAsync_DraftSingleResolvedFieldWithPlannerRoute_ShouldBuildFromConfirmedPlan()
+    {
+        var service = CreateService(_ => Json(new
+        {
+            intent = "build_from_confirmed_plan",
+            confidence = "high",
+            shouldOpenPlan = false,
+            shouldBuildDirectly = true,
+            canBuild = true,
+            needsClarification = false,
+            publicReason = "Draft route has enough information to start Build.",
+            assistantReply = "Starting Build.",
+            clarificationQuestions = Array.Empty<string>(),
+            fallbackAllowed = true
+        }));
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "start build",
+                HasPendingPlan = true,
+                RequirementMode = AiRequirementModes.Draft,
+                PendingPlanSummary = Json(new
+                {
+                    route = new
+                    {
+                        operators = new[] { "ImageAcquisition", "SurfaceDefectDetection", "ResultOutput" }
+                    }
+                }),
+                ConfirmedPlanAnswers =
+                [
+                    new VisionAgentPlanAnswer
+                    {
+                        Field = VisionAgentPlanAnswerFields.TaskType,
+                        Value = AiVisionTaskTypes.SurfaceDefect,
+                        Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                    }
+                ],
+                ResolvedPlanFields = [VisionAgentPlanAnswerFields.TaskType],
+                RemainingPlanFields =
+                [
+                    VisionAgentPlanAnswerFields.InspectionObject,
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    VisionAgentPlanAnswerFields.AcceptanceCriteria
+                ],
+                SemanticExtraction = new VisionAgentSemanticExtractionResult
+                {
+                    IsVisionRequest = true,
+                    Intent = "new_flow",
+                    TaskType = AiVisionTaskTypes.SurfaceDefect,
+                    Source = VisionAgentSemanticSources.RuleFallback,
+                    MetadataOnly = true
+                }
+            },
+            CancellationToken.None);
+
+        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentBuildFromConfirmedPlan);
+        result.ShouldBuildDirectly.Should().BeTrue();
+        result.NeedsClarification.Should().BeFalse();
+        result.ShouldResetPendingPlan.Should().BeFalse();
+    }
+
     [Fact(DisplayName = "Intent Router HTTP fallback should preserve Pending Plan")]
     public async Task RouteAsync_HttpFallbackWithPendingPlan_ShouldNotResetPlan()
     {

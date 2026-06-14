@@ -244,7 +244,9 @@ public class GenerateFlowMessageHandler
         VisionAgentBuildFromPlanRequest? buildFromPlan,
         bool useVisionAgentGenerateFlow)
     {
-        if (!useVisionAgentGenerateFlow || mode is GenerateFlowMode.Explain or GenerateFlowMode.ReviewPendingParameters)
+        if (!useVisionAgentGenerateFlow ||
+            buildFromPlan != null ||
+            mode is GenerateFlowMode.Explain or GenerateFlowMode.ReviewPendingParameters)
         {
             return null;
         }

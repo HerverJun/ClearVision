@@ -618,7 +618,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
     {
         if (intent == IntentBuildFromConfirmedPlan && request.HasPendingPlan)
         {
-            if (!HasBlockingRemainingPlanFields(request, maturity))
+            if (CanBuildFromConfirmedPlan(request, maturity))
             {
                 return;
             }
@@ -708,6 +708,119 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         return existing.Contains(reason, StringComparison.OrdinalIgnoreCase)
             ? existing
             : $"{existing}_{reason}";
+    }
+
+    private static bool CanBuildFromConfirmedPlan(
+        VisionAgentIntentRouterRequest request,
+        AiRequirementMaturityResult maturity)
+    {
+        var blockingRemainingFields = NormalizePlanFields(request.RemainingPlanFields)
+            .Where(field =>
+                string.Equals(request.RequirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase)
+                    ? VisionAgentPlanFieldPolicy.IsDraftBlocking(field, maturity.TaskType, maturity)
+                    : VisionAgentPlanFieldPolicy.IsStrictBlocking(field, maturity.TaskType, maturity))
+            .ToList();
+        if (blockingRemainingFields.Count == 0)
+        {
+            return true;
+        }
+
+        if (!string.Equals(request.RequirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) ||
+            maturity.CanPlan != true)
+        {
+            return false;
+        }
+
+        var resolved = NormalizePlanFields(request.ResolvedPlanFields
+                .Concat(request.ConfirmedPlanAnswers.Select(answer => answer.Field)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var hasObjectOrTask = resolved.Contains(VisionAgentPlanAnswerFields.InspectionObject) ||
+                              resolved.Contains(VisionAgentPlanAnswerFields.TaskType) ||
+                              maturity.ObjectSignals.Count > 0 ||
+                              maturity.TaskSignals.Count > 0 ||
+                              (maturity.TaskType != AiVisionTaskTypes.Unknown &&
+                               maturity.TaskType != AiVisionTaskTypes.AbstractGoal);
+        return hasObjectOrTask && RequestHasPendingPlannerRoute(request);
+    }
+
+    private static bool RequestHasPendingPlannerRoute(VisionAgentIntentRouterRequest request)
+    {
+        var summary = request.PendingPlanSummary;
+        if (string.IsNullOrWhiteSpace(summary))
+        {
+            return true;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(summary);
+            if (document.RootElement.TryGetProperty("route", out var route) ||
+                document.RootElement.TryGetProperty("recommendedRoute", out route))
+            {
+                return RouteHasWorkAndOutput(route);
+            }
+
+            if (document.RootElement.TryGetProperty("operators", out var operators))
+            {
+                return OperatorsHaveWorkAndOutput(operators);
+            }
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            return true;
+        }
+    }
+
+    private static bool RouteHasWorkAndOutput(JsonElement route)
+    {
+        if (route.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        if (route.TryGetProperty("operators", out var operators) ||
+            route.TryGetProperty("Operators", out operators))
+        {
+            return OperatorsHaveWorkAndOutput(operators);
+        }
+
+        return false;
+    }
+
+    private static bool OperatorsHaveWorkAndOutput(JsonElement operators)
+    {
+        if (operators.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var values = operators
+            .EnumerateArray()
+            .Select(item => item.ValueKind == JsonValueKind.String ? item.GetString() : null)
+            .Select(Clean)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+        if (values.Count == 0)
+        {
+            return false;
+        }
+
+        var forbidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "ModbusCommunication",
+            "HttpRequest",
+            "ScriptOperator"
+        };
+        if (values.Any(forbidden.Contains))
+        {
+            return false;
+        }
+
+        return values.Any(op => !op.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+                                !op.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase)) &&
+               values.Any(op => op.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase));
     }
 
     private static VisionAgentIntentRouterPrompt BuildPrompt(

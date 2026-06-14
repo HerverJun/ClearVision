@@ -294,7 +294,7 @@ public static class VisionAgentRequirementMaturityGate
         VisionAgentRequirementMaturityRequest request,
         VisionAgentSemanticExtractionResult? semantic)
     {
-        if (!ShouldUseModelSemantic(semantic))
+        if (!ShouldUseStructuredSemantic(semantic))
         {
             return Evaluate(request);
         }
@@ -634,11 +634,11 @@ public static class VisionAgentRequirementMaturityGate
         return HitTerms(text, terms).Count > 0;
     }
 
-    private static bool ShouldUseModelSemantic(VisionAgentSemanticExtractionResult? semantic)
+    private static bool ShouldUseStructuredSemantic(VisionAgentSemanticExtractionResult? semantic)
     {
         return semantic != null &&
                semantic.IsVisionRequest &&
-               string.Equals(semantic.Source, VisionAgentSemanticSources.Model, StringComparison.OrdinalIgnoreCase);
+               string.IsNullOrWhiteSpace(semantic.FailureCode);
     }
 
     private static string NormalizeSemanticTaskType(string? taskType)

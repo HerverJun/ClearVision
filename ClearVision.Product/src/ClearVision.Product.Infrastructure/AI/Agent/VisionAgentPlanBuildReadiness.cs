@@ -35,10 +35,10 @@ internal static class VisionAgentPlanBuildReadiness
             return new VisionAgentPlanBuildReadinessResult(false, ["plan_snapshot_missing"], [], [], []);
         }
 
-        blocking.AddRange(VisionAgentStrategyConfirmationSupport.ExtractHardBlockers(plan)
-            .Where(reason => !IsDraftableImageSourceBlocker(plan, reason, requirementMode)));
-
         var maturity = effectiveRequirement?.Maturity ?? plan.RequirementMaturity;
+        blocking.AddRange(VisionAgentStrategyConfirmationSupport.ExtractHardBlockers(plan)
+            .Where(reason => ShouldKeepPlanHardBlocker(reason, requirementMode, maturity, effectiveRequirement)));
+
         if (maturity is { CanPlan: false } ||
             maturity?.Maturity is AiRequirementMaturity.AbstractGoal or AiRequirementMaturity.ChatOrHelp)
         {
@@ -50,13 +50,21 @@ internal static class VisionAgentPlanBuildReadiness
 
         AddValidationBlockers(validatedAnswers, blocking, warnings);
         AddHardFieldBlockers(plan, maturity, effectiveRequirement, requirementMode, blocking);
+        var hasSupportedRoute = HasSupportedRouteOrTemplate(plan, out var invalidOperators);
         var strategyConfirmation = VisionAgentStrategyConfirmationSupport.Resolve(
             plan,
             buildDecisions,
             acceptedRecommendedDefaults);
-        blocking.AddRange(strategyConfirmation.UnresolvedBlockers);
+        if (RequiresStrategyConfirmation(requirementMode, maturity, hasSupportedRoute))
+        {
+            blocking.AddRange(strategyConfirmation.UnresolvedBlockers);
+        }
+        else if (strategyConfirmation.UnresolvedBlockers.Count > 0)
+        {
+            warnings.Add("strategy_confirmation_pending_draft");
+        }
 
-        if (!HasSupportedRouteOrTemplate(plan, out var invalidOperators))
+        if (!hasSupportedRoute)
         {
             blocking.Add("strategy_confirmation:model_or_rule_strategy_missing");
         }
@@ -175,14 +183,40 @@ internal static class VisionAgentPlanBuildReadiness
         return field.Contains("acceptance_criteria", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsDraftableImageSourceBlocker(
-        VisionAgentPlanModeResult plan,
+    private static bool ShouldKeepPlanHardBlocker(
         string reason,
-        string requirementMode)
+        string requirementMode,
+        AiRequirementMaturityResult? maturity,
+        VisionAgentEffectiveRequirement? effectiveRequirement)
     {
-        return reason.Contains("image_source", StringComparison.OrdinalIgnoreCase) &&
-               requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
-               CanDraftWithPendingImageSource(plan);
+        var field = NormalizeBlockingField(reason);
+        if (string.IsNullOrWhiteSpace(field))
+        {
+            return true;
+        }
+
+        if (effectiveRequirement != null)
+        {
+            if (effectiveRequirement.ResolvedFields.Contains(field, StringComparer.OrdinalIgnoreCase) ||
+                !effectiveRequirement.RemainingFields.Contains(field, StringComparer.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase)
+            ? VisionAgentPlanFieldPolicy.IsDraftBlocking(field, maturity?.TaskType, maturity)
+            : VisionAgentPlanFieldPolicy.IsStrictBlocking(field, maturity?.TaskType, maturity);
+    }
+
+    private static bool RequiresStrategyConfirmation(
+        string requirementMode,
+        AiRequirementMaturityResult? maturity,
+        bool hasSupportedRoute)
+    {
+        return !requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) ||
+               maturity?.CanPlan != true ||
+               !hasSupportedRoute;
     }
 
     private static bool CanDraftWithPendingImageSource(VisionAgentPlanModeResult plan)
@@ -241,6 +275,30 @@ internal static class VisionAgentPlanBuildReadiness
             "" => string.Empty,
             var value => value
         };
+    }
+
+    private static string NormalizeBlockingField(string reason)
+    {
+        var value = Clean(reason).ToLowerInvariant();
+        foreach (var field in VisionAgentPlanFieldPolicy.CanonicalFields)
+        {
+            if (value.Contains(field, StringComparison.OrdinalIgnoreCase))
+            {
+                return field;
+            }
+        }
+
+        if (value.Contains("condition", StringComparison.OrdinalIgnoreCase))
+        {
+            return VisionAgentPlanAnswerFields.AcceptanceCriteria;
+        }
+
+        if (value.Contains("strategy", StringComparison.OrdinalIgnoreCase))
+        {
+            return VisionAgentPlanAnswerFields.AlgorithmStrategy;
+        }
+
+        return string.Empty;
     }
 
     private static string ClassifyHardRequirement(string reason)

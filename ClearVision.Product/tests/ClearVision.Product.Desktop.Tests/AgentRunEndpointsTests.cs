@@ -481,6 +481,61 @@ public sealed class AgentRunEndpointsTests
         await host.WaitForTerminalAsync(runId);
     }
 
+    [Fact(DisplayName = "POST AgentRun BuildFromPlan with old blocked Plan and confirmed answers completes through orchestrator")]
+    public async Task CreateRun_BuildFromPlanWithOldBlockedPlanAndConfirmedAnswers_ShouldCompleteThroughOrchestrator()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync((request, _) =>
+        {
+            request.BuildFromPlan.Should().NotBeNull();
+            request.BuildFromPlan!.PlanSnapshot.Should().NotBeNull();
+            request.BuildFromPlan.PlanSnapshot!.CanBuild.Should().BeFalse();
+            request.BuildFromPlan.ConfirmedAnswers.Select(answer => answer.Field)
+                .Should()
+                .Contain([
+                    VisionAgentPlanAnswerFields.InspectionObject,
+                    VisionAgentPlanAnswerFields.TaskType,
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    VisionAgentPlanAnswerFields.AcceptanceCriteria
+                ]);
+
+            var result = AgentRunEndpointTestHost.SuccessResult();
+            result.GenerationMode = "agent_run_build_from_plan_entry_reached";
+            return Task.FromResult(result);
+        });
+        var plan = LegacyBlockedAgentRunBuildFromPlanSnapshot();
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "start build from confirmed plan",
+            Mode = "new",
+            RequirementMode = AiRequirementModes.Strict,
+            UseVisionAgentGenerateFlow = true,
+            AgentGenerateFlowMode = AiAgentGenerateFlowModes.Scripted,
+            BuildFromPlan = new VisionAgentBuildFromPlanRequest
+            {
+                PlanId = plan.PlanId,
+                PlanHash = plan.PlanHash,
+                PlanSnapshot = plan,
+                ConfirmedAnswers = ConfirmedAgentRunBuildFromPlanAnswers(),
+                OriginalUserPrompt = plan.OriginalUserPrompt,
+                MetadataOnly = true
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = createDoc.RootElement.GetProperty("runId").GetString()!;
+        await host.Generation.WaitForCallAsync();
+        await host.WaitForTerminalAsync(runId);
+
+        var replay = host.StreamService.Replay(runId)!;
+        replay.Summary.Status.Should().Be(AgentRunEventStatuses.Completed);
+        replay.Events.Should().Contain(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+        replay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunFailed);
+        host.Generation.LastRequest!.BuildFromPlan!.ConfirmedAnswers.Should().HaveCount(4);
+        host.Generation.LastRequest.BuildFromPlan.PlanSnapshot!.CanBuild.Should().BeFalse();
+    }
+
     [Fact(DisplayName = "AgentRun create preserves tool_loop GenerateFlow mode")]
     public async Task CreateRun_ShouldPreserveToolLoopMode()
     {
@@ -1088,6 +1143,81 @@ public sealed class AgentRunEndpointsTests
         return "usr_" + Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
+    private static VisionAgentPlanModeResult LegacyBlockedAgentRunBuildFromPlanSnapshot()
+    {
+        var result = new VisionAgentPlanModeResult
+        {
+            PlanId = "plan-agent-run-entry",
+            OriginalUserPrompt = "start build from confirmed plan",
+            Goal = "logo surface defect inspection",
+            Intent = AiVisionTaskTypes.Unknown,
+            Confidence = "low",
+            RequirementUnderstanding = ["Legacy snapshot was captured before confirmed answers were applied."],
+            RecommendedRoute = new VisionAgentRecommendedRoute
+            {
+                RouteId = "surface_defect_route",
+                Title = "Surface defect route",
+                Summary = "Acquisition, defect detection, judgment, and output.",
+                Operators = ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+                TemplateDecision = "planner_route"
+            },
+            ClarificationQuestions = [],
+            BlockingReasons =
+            [
+                "hard_requirement:inspection_object_missing",
+                "hard_requirement:task_type_missing",
+                "hard_requirement:image_source_missing",
+                "hard_requirement:acceptance_criteria_missing"
+            ],
+            CanBuild = false,
+            SemanticExtraction = new VisionAgentSemanticExtractionResult
+            {
+                IsVisionRequest = true,
+                Intent = "new_flow",
+                TaskType = AiVisionTaskTypes.Unknown,
+                Source = VisionAgentSemanticSources.RuleFallback,
+                MetadataOnly = true
+            },
+            RequirementMaturity = new AiRequirementMaturityResult
+            {
+                Maturity = AiRequirementMaturity.Ambiguous,
+                TaskType = AiVisionTaskTypes.Unknown,
+                CanPlan = false,
+                CanBuild = false,
+                MissingFields = ["inspection_object", "task_type", "image_source", "acceptance_criteria"],
+                BlockingReasons = ["inspection_object_missing", "task_type_missing", "image_source_missing", "acceptance_criteria_missing"],
+                PublicReason = "Legacy snapshot was not buildable before answers."
+            },
+            MetadataOnly = true
+        };
+
+        return result with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(result)
+        };
+    }
+
+    private static List<VisionAgentPlanAnswer> ConfirmedAgentRunBuildFromPlanAnswers()
+    {
+        return
+        [
+            AgentRunTextPlanAnswer(VisionAgentPlanAnswerFields.InspectionObject, "logo area"),
+            AgentRunTextPlanAnswer(VisionAgentPlanAnswerFields.TaskType, AiVisionTaskTypes.SurfaceDefect),
+            AgentRunTextPlanAnswer(VisionAgentPlanAnswerFields.ImageSource, "camera"),
+            AgentRunTextPlanAnswer(VisionAgentPlanAnswerFields.AcceptanceCriteria, "scratch is NG")
+        ];
+    }
+
+    private static VisionAgentPlanAnswer AgentRunTextPlanAnswer(string field, string value)
+    {
+        return new VisionAgentPlanAnswer
+        {
+            Field = field,
+            Value = value,
+            Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+        };
+    }
+
     private sealed class AgentRunEndpointTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -1265,7 +1395,36 @@ public sealed class AgentRunEndpointsTests
             await _app.DisposeAsync();
             if (Directory.Exists(_directory))
             {
-                Directory.Delete(_directory, recursive: true);
+                await DeleteDirectoryWithRetryAsync(_directory);
+            }
+        }
+
+        private static async Task DeleteDirectoryWithRetryAsync(string directory)
+        {
+            for (var attempt = 0; attempt < 10; attempt++)
+            {
+                try
+                {
+                    if (Directory.Exists(directory))
+                    {
+                        Directory.Delete(directory, recursive: true);
+                    }
+
+                    return;
+                }
+                catch (IOException) when (attempt < 9)
+                {
+                    await Task.Delay(100);
+                }
+                catch (UnauthorizedAccessException) when (attempt < 9)
+                {
+                    await Task.Delay(100);
+                }
+            }
+
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
             }
         }
     }

@@ -670,7 +670,8 @@ export const aiPanelAgentWorkspaceMixin = {
             planHash: plan.planHash || '',
             goal: plan.goal || '',
             intent: plan.intent || '',
-            canBuild: plan.executable === true
+            canBuild: plan.executable === true,
+            route: plan.route || plan.recommendedRoute || plan.RecommendedRoute || null
         };
         try {
             return JSON.stringify(summary);
@@ -1991,10 +1992,16 @@ export const aiPanelAgentWorkspaceMixin = {
             questions,
             acceptedRecommended
         });
-        if (unresolvedStrategyBlockers.length) return false;
 
         if (mode === 'draft' &&
             !this._planHasAnyObjectOrTaskFact(requirementMaturity, semanticExtraction, resolvedFields)) {
+            return false;
+        }
+
+        if (unresolvedStrategyBlockers.length &&
+            (mode !== 'draft' ||
+                requirementMaturity?.canPlan !== true ||
+                !this._planRouteSatisfiesBuildStrategy(route))) {
             return false;
         }
 
@@ -2382,8 +2389,8 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _planHardFactsReady(requirementMaturity, semanticExtraction, route = null, resolvedFields = new Set(), requirementMode = 'strict') {
         const mode = this._normalizeRequirementMode?.(requirementMode || this.requirementMode || 'strict') || 'strict';
-        const semanticSource = String(semanticExtraction?.source || '').toLowerCase();
-        if (semanticExtraction && semanticSource === 'model') {
+        const semanticFailureCode = String(semanticExtraction?.failureCode || semanticExtraction?.FailureCode || '').trim();
+        if (semanticExtraction && !semanticFailureCode) {
             const hasObject = Boolean(String(semanticExtraction.inspectionObject || '').trim()) ||
                 resolvedFields.has(PLAN_ANSWER_FIELDS.INSPECTION_OBJECT);
             const task = String(semanticExtraction.taskType || '').trim().toLowerCase();

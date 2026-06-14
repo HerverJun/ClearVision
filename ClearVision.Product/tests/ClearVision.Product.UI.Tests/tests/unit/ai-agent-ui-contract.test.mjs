@@ -2852,6 +2852,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
 test('Recommended strategy is not selected until accepted for Build', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.requirementMode = 'strict';
   const planWorkspace = createFakeElement();
   panel.container = createContainer({
     '#ai-agent-workspace-overview': createFakeElement(),
@@ -2893,6 +2894,44 @@ test('Recommended strategy is not selected until accepted for Build', async () =
       origin: 'accepted_recommended_default'
     }
   ]);
+});
+
+test('Draft Plan can start Build with legal Planner route without accepting strategy', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.requirementMode = 'draft';
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult({
+    requirementMode: 'draft',
+    canBuild: false
+  }));
+  panel.planQuestionSelections = {};
+  panel.planQuestionAnswers = {};
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
+
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  assert.equal(panel.pendingVisionPlan.executable, true);
+  assert.deepEqual(panel.planQuestionSelections, {});
+  assert.deepEqual(panel.planQuestionAnswers, {});
+
+  const started = panel._startBuildFromCurrentPlan();
+
+  assert.equal(started, true);
+  assert.equal(panel.agentWorkspaceMode, 'build');
+  assert.equal(captured.skipPlan, true);
+  assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
+  assert.deepEqual(captured.buildFromPlan.userSelections, {});
+  assert.deepEqual(captured.buildFromPlan.confirmedAnswers, []);
 });
 
 test('Explicit strategy switch is submitted through unified Build button', async () => {

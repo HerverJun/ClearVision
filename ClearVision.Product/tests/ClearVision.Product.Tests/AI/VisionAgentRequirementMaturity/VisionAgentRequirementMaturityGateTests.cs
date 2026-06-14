@@ -467,8 +467,8 @@ public sealed class VisionAgentRequirementMaturityGateTests
         plan.BlockingReasons.Should().Contain("abstract_goal_needs_decomposition");
     }
 
-    [Fact(DisplayName = "BuildFromPlan should hard-block low maturity plans before generation")]
-    public async Task BuildFromPlanAsync_ShouldBlockLowMaturityPlanBeforeGeneration()
+    [Fact(DisplayName = "BuildFromPlan should bypass old low maturity pre-gate and enter generation")]
+    public async Task BuildFromPlanAsync_ShouldBypassOldLowMaturityPreGateAndEnterGeneration()
     {
         var generationCalls = 0;
         var generationService = Substitute.For<IAiFlowGenerationService>();
@@ -481,7 +481,13 @@ public sealed class VisionAgentRequirementMaturityGateTests
             .Returns(_ =>
             {
                 generationCalls++;
-                return Task.FromResult(new AiFlowGenerationResult { Success = true, Flow = new OperatorFlowDto() });
+                return Task.FromResult(new AiFlowGenerationResult
+                {
+                    Success = true,
+                    CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+                    GenerationMode = "build_from_plan_entry_reached",
+                    Flow = new OperatorFlowDto()
+                });
             });
         var orchestrator = CreateOrchestrator(generationService);
         var plan = await orchestrator.CreatePlanAsync(
@@ -508,13 +514,10 @@ public sealed class VisionAgentRequirementMaturityGateTests
             },
             CancellationToken.None);
 
-        result.Success.Should().BeFalse();
-        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
-        result.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeClarificationRequired);
-        result.RequirementMaturity.Should().NotBeNull();
-        result.RequirementMaturity!.CanBuild.Should().BeFalse();
-        result.DecisionTrace.Should().NotBeNull();
-        generationCalls.Should().Be(0);
+        result.Success.Should().BeTrue();
+        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusCompleted);
+        result.GenerationMode.Should().Be("build_from_plan_entry_reached");
+        generationCalls.Should().Be(1);
     }
 
     [Fact(DisplayName = "GenerateFlow direct Vision Agent request should hard-block low maturity input")]

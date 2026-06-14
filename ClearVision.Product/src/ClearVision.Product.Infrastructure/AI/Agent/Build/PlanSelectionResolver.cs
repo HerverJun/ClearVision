@@ -48,12 +48,6 @@ public sealed class PlanSelectionResolver
         var blocking = new List<string>();
         var source = "planner_route";
         var route = load.Plan?.RecommendedRoute ?? new VisionAgentRecommendedRoute();
-        if (confirmation.UnresolvedBlockers.Count > 0)
-        {
-            blocking.AddRange(confirmation.UnresolvedBlockers);
-            evidence.Add("strategy_confirmation_required");
-        }
-
         if (strategy == "template")
         {
             if (template.TemplateSkeleton != null)
@@ -111,6 +105,19 @@ public sealed class PlanSelectionResolver
         }
 
         var validRoute = ValidateRoute(route, out var invalidOperators);
+        if (confirmation.UnresolvedBlockers.Count > 0)
+        {
+            if (RequiresStrategyConfirmation(load, validRoute, template))
+            {
+                blocking.AddRange(confirmation.UnresolvedBlockers);
+                evidence.Add("strategy_confirmation_required");
+            }
+            else
+            {
+                evidence.Add("planner_route_used_without_strategy_confirmation");
+            }
+        }
+
         var parameterStrategy = ResolveParameterStrategy(load, validRoute);
         if (invalidOperators.Count > 0)
         {
@@ -210,6 +217,34 @@ public sealed class PlanSelectionResolver
                 mode.Contains("lock", StringComparison.OrdinalIgnoreCase) ||
                 mode.Contains("fill", StringComparison.OrdinalIgnoreCase) ||
                 mode.Contains("adapt", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool RequiresStrategyConfirmation(
+        BuildPlanLoad load,
+        VisionAgentRecommendedRoute route,
+        TemplateStrategyResolution template)
+    {
+        return !load.RequirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) ||
+               load.EffectiveRequirement.Maturity.CanPlan != true ||
+               !HasSupportedPlannerRoute(route, template);
+    }
+
+    private static bool HasSupportedPlannerRoute(
+        VisionAgentRecommendedRoute route,
+        TemplateStrategyResolution template)
+    {
+        if (template.TemplateSkeleton != null)
+        {
+            return true;
+        }
+
+        var operators = route.Operators
+            .Select(VisionAgentBuildSupport.Clean)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+        return operators.Any(op => !op.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase) &&
+                                   !op.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase)) &&
+               operators.Any(op => op.Equals("ResultOutput", StringComparison.OrdinalIgnoreCase));
     }
 
     private VisionAgentRecommendedRoute RouteFromTemplate(

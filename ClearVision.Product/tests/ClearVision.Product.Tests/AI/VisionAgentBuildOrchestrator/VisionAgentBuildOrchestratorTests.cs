@@ -70,8 +70,8 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ResourceKey == "op_surface_defect.ModelId");
     }
 
-    [Fact(DisplayName = "BuildFromPlan should allow editable draft when image source is pending but acquisition route exists")]
-    public async Task BuildAsync_DraftPendingImageSourceWithAcquisitionRoute_ShouldBuildEditableDraft()
+    [Fact(DisplayName = "BuildFromPlan should allow editable draft when image source and acceptance stay pending but acquisition route exists")]
+    public async Task BuildAsync_DraftPendingImageAndAcceptanceWithAcquisitionRoute_ShouldBuildEditableDraft()
     {
         var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
         var baseline = Plan(
@@ -81,7 +81,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         var plan = baseline with
         {
             CanBuild = false,
-            BlockingReasons = ["hard_requirement:image_source_missing"],
+            BlockingReasons = ["hard_requirement:image_source_missing", "hard_requirement:acceptance_criteria_missing"],
             SemanticExtraction = baseline.SemanticExtraction! with
             {
                 ImageSource = string.Empty
@@ -89,8 +89,8 @@ public sealed class VisionAgentBuildOrchestratorTests
             RequirementMaturity = baseline.RequirementMaturity! with
             {
                 CanBuild = false,
-                MissingFields = ["image_source"],
-                BlockingReasons = ["image_source_missing"],
+                MissingFields = ["image_source", "acceptance_criteria"],
+                BlockingReasons = ["image_source_missing", "acceptance_criteria_missing"],
                 PublicReason = "图像来源需要在部署前绑定。"
             }
         };
@@ -113,6 +113,77 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ResourceKey == "op_cam.CameraId");
         build.ApplyGate.CanvasApplyReady.Should().BeTrue();
         build.ApplyGate.DeploymentReady.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "BuildFromPlan should synthesize EffectiveRequirement from rule fallback semantic and confirmed answers")]
+    public async Task BuildAsync_RuleFallbackSemanticWithConfirmedAnswers_ShouldBuildFromEffectiveRequirement()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "start build from confirmed plan");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons =
+            [
+                "hard_requirement:inspection_object_missing",
+                "hard_requirement:task_type_missing",
+                "hard_requirement:image_source_missing",
+                "hard_requirement:acceptance_criteria_missing"
+            ],
+            SemanticExtraction = new VisionAgentSemanticExtractionResult
+            {
+                IsVisionRequest = true,
+                Intent = "new_flow",
+                TaskType = AiVisionTaskTypes.Unknown,
+                Source = VisionAgentSemanticSources.RuleFallback,
+                MetadataOnly = true
+            },
+            RequirementMaturity = new AiRequirementMaturityResult
+            {
+                Maturity = AiRequirementMaturity.Ambiguous,
+                TaskType = AiVisionTaskTypes.Unknown,
+                CanPlan = false,
+                CanBuild = false,
+                MissingFields = ["inspection_object", "task_type", "image_source", "acceptance_criteria"],
+                BlockingReasons = ["inspection_object_missing", "task_type_missing", "image_source_missing", "acceptance_criteria_missing"],
+                PublicReason = "Legacy plan snapshot was not buildable before answers were applied."
+            }
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                confirmedAnswers:
+                [
+                    PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.InspectionObject, "logo area", VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                    PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.TaskType, AiVisionTaskTypes.SurfaceDefect, VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                    PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.ImageSource, "camera", VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                    PlanAnswer(string.Empty, VisionAgentPlanAnswerFields.AcceptanceCriteria, "scratch is NG", VisionAgentPlanAnswerOrigins.ExplicitUserText)
+                ],
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                acceptedRecommendedDefaults: false,
+                requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var build = result.BuildResult!;
+        build.ResolvedFields.Should().Contain([
+            VisionAgentPlanAnswerFields.InspectionObject,
+            VisionAgentPlanAnswerFields.TaskType,
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria]);
+        build.RemainingFields.Should().NotContain(VisionAgentPlanAnswerFields.InspectionObject);
+        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        build.ToolEvidenceTimeline.Should().Contain(item =>
+            item.Stage == "plan_generation" &&
+            item.ToolName == "plan_snapshot_loader");
     }
 
     [Fact(DisplayName = "BuildFromPlan draft should block when object and task are both empty")]
@@ -340,6 +411,34 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.ClarificationRequired.Should().BeTrue();
         result.DecisionTrace!.BlockingReasons.Should()
             .Contain("strategy_confirmation:model_or_rule_strategy_missing");
+    }
+
+    [Fact(DisplayName = "BuildFromPlan draft should allow unconfirmed strategy when Planner route is buildable")]
+    public async Task BuildAsync_DraftStrategyConfirmationMissingWithPlannerRoute_ShouldBuildEditableDraft()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = PlanWithStrategyConfirmationBlocker();
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                acceptedRecommendedDefaults: false,
+                requirementMode: AiRequirementModes.Draft),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var build = result.BuildResult!;
+        build.StrategyConfirmed.Should().BeFalse();
+        build.UnresolvedStrategyBlockers.Should()
+            .Contain("strategy_confirmation:model_or_rule_strategy_missing");
+        build.SelectionSource.Should().Be("planner_route");
+        build.EffectiveRouteId.Should().Be("attribute_classification_route");
+        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        build.ToolEvidenceTimeline.Should().Contain(item =>
+            item.Stage == "plan_selection" &&
+            item.OutputSummary.Contains("Build route selection resolved", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact(DisplayName = "BuildFromPlan should block invalid confirmed answer values")]
