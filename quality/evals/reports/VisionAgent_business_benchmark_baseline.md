@@ -1,7 +1,7 @@
 ﻿# Vision Agent Executable Business Benchmark
 
 - Benchmark: `vision_agent_executable_business_benchmark`
-- Generated UTC: `2026-06-07T05:24:30.1767064+00:00`
+- Generated UTC: `2026-06-14T09:23:58.3753856+00:00`
 - Commit SHA: `local`
 - Branch: `local`
 - Workflow run: `local` attempt `local`
@@ -25,7 +25,7 @@
 | structuralValidationPassRate | 98.33% | 90.00% | True |
 | dryRunPassRate | 97.50% | 85.00% | True |
 | previewReadyRate | 95.65% | 70.00% | True |
-| parameterCompletionRate | 76.67% | 70.00% | True |
+| parameterCompletionRate | 75.00% | 70.00% | True |
 | userApplicableRate | 98.33% | 90.00% | True |
 
 ## Task Set

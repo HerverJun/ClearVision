@@ -213,7 +213,7 @@ public sealed class VisionAgentRuntimePreviewTests
             Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>());
 
         _ = await handler.HandleAsync(
-            "preview",
+            "inspect terminal wire sequence from camera and output OK/NG",
             useVisionAgentGenerateFlow: true,
             agentGenerateFlowMode: AiAgentGenerateFlowModes.Planner,
             runtimePreviewConsent: true);
@@ -336,15 +336,11 @@ public sealed class VisionAgentRuntimePreviewTests
             operators = new object[]
             {
                 Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "<pending-camera-binding>" }),
-                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "<pending-template-path>" }),
-                Operator("op_judge", "ResultJudgment"),
-                Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["Channel"] = "<pending-output-channel>" })
+                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "<pending-template-path>" })
             },
             connections = new object[]
             {
-                Connection("op_cam", "Image", "op_match", "Image"),
-                Connection("op_match", "Score", "op_judge", "Input"),
-                Connection("op_judge", "Result", "op_out", "Input")
+                Connection("op_cam", "Image", "op_match", "Image")
             }
         };
     }

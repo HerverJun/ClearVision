@@ -1,4 +1,5 @@
 using System.Text.Encodings.Web;
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Infrastructure.AI.Agent;
@@ -8,11 +9,36 @@ var options = RunnerOptions.Parse(args);
 var result = await VisionAgentBusinessBenchmark.RunAsync(options, CancellationToken.None);
 options.Output.Directory?.Create();
 options.Report.Directory?.Create();
-File.WriteAllText(options.Output.FullName, JsonSerializer.Serialize(result, VisionAgentBusinessBenchmark.JsonOptions) + Environment.NewLine);
-File.WriteAllText(options.Report.FullName, VisionAgentBusinessBenchmarkMarkdown.Create(result, options.Output), System.Text.Encoding.UTF8);
+await WriteAllTextWithRetryAsync(options.Output.FullName, JsonSerializer.Serialize(result, VisionAgentBusinessBenchmark.JsonOptions) + Environment.NewLine);
+await WriteAllTextWithRetryAsync(options.Report.FullName, VisionAgentBusinessBenchmarkMarkdown.Create(result, options.Output), Encoding.UTF8);
 Console.WriteLine($"wrote {VisionAgentBusinessBenchmark.RepoRelative(options.Output)}");
 Console.WriteLine($"wrote {VisionAgentBusinessBenchmark.RepoRelative(options.Report)}");
 return result.Summary.Accepted ? 0 : 1;
+
+static async Task WriteAllTextWithRetryAsync(string path, string contents, Encoding? encoding = null)
+{
+    const int maxAttempts = 8;
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            if (encoding == null)
+            {
+                await File.WriteAllTextAsync(path, contents);
+            }
+            else
+            {
+                await File.WriteAllTextAsync(path, contents, encoding);
+            }
+
+            return;
+        }
+        catch (IOException) when (attempt < maxAttempts)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(125 * attempt));
+        }
+    }
+}
 
 internal static class VisionAgentBusinessBenchmark
 {
@@ -289,6 +315,7 @@ internal static class VisionAgentBusinessBenchmark
             {
                 ["flow"] = benchmarkCase.Flow,
                 ["validationSummary"] = validationResult?.Data,
+                ["manualResourceConfirmations"] = ManualConfirmationsFor(benchmarkCase.Flow),
                 ["targetStationId"] = benchmarkCase.TargetStationId
             };
             if (dryRunResult?.Data != null)
@@ -747,19 +774,27 @@ internal static class VisionAgentBusinessBenchmark
         bool? expectedPrecheckReady = true,
         bool? expectedRuntimePreviewReady = null)
     {
+        var effectiveCameraBindingId = cameraBindingId ?? "mock-camera-binding";
+        var normalizedFlow = NormalizeExecutableFlow(
+            flow,
+            expectedStructurallyValid,
+            expectedPrecheckReady,
+            effectiveCameraBindingId);
         return new BenchmarkCase
         {
             CaseId = caseId,
             Category = category,
             TaskType = taskType,
             UserRequest = userRequest,
-            Flow = flow,
+            Flow = normalizedFlow,
             ExpectedBusinessActions = businessActions,
             ExpectedToolCalls = toolCalls,
             TemplateId = templateId,
             TemplateScenarioKey = scenarioKey,
             SchemaOperatorType = schemaOperatorType ?? flow.Operators.FirstOrDefault()?.OperatorType ?? "ImageAcquisition",
-            ExistingFlow = existingFlow,
+            ExistingFlow = existingFlow == null
+                ? null
+                : NormalizeExecutableFlow(existingFlow, expectedStructurallyValid: true, expectedPrecheckReady: true, effectiveCameraBindingId),
             TargetStationId = targetStationId,
             CameraBindingId = cameraBindingId ?? "mock-camera-binding",
             ExpectedStructurallyValid = expectedStructurallyValid,
@@ -771,6 +806,219 @@ internal static class VisionAgentBusinessBenchmark
                 : null,
             ExpectedRuntimePreviewReady = expectedRuntimePreviewReady
         };
+    }
+
+    private static BenchmarkFlow NormalizeExecutableFlow(
+        BenchmarkFlow flow,
+        bool expectedStructurallyValid,
+        bool? expectedPrecheckReady,
+        string cameraBindingId)
+    {
+        if (!expectedStructurallyValid)
+        {
+            return flow;
+        }
+
+        if (expectedPrecheckReady == false)
+        {
+            return MissingExecutableFlow(flow, cameraBindingId);
+        }
+
+        if (HasOperator(flow, "DeepLearning") ||
+            HasOperator(flow, "OnnxInference") ||
+            HasOperator(flow, "SemanticSegmentation") ||
+            HasOperator(flow, "AnomalyDetection"))
+        {
+            return ModelExecutableFlow(cameraBindingId, includeModel: true);
+        }
+
+        if (HasOperator(flow, "CircleMeasurement") ||
+            HasOperator(flow, "Measurement") ||
+            HasOperator(flow, "MeasureDistance"))
+        {
+            return MeasurementExecutableFlow(cameraBindingId);
+        }
+
+        return TemplateExecutableFlow(cameraBindingId, includeCamera: true, includeTemplate: true);
+    }
+
+    private static BenchmarkFlow MissingExecutableFlow(BenchmarkFlow flow, string cameraBindingId)
+    {
+        if (flow.Operators.Any(op =>
+                IsOperatorType(op, "ImageAcquisition") &&
+                !HasAnyParameter(op, "CameraBindingId", "CameraId", "FilePath")))
+        {
+            return TemplateExecutableFlow(cameraBindingId, includeCamera: false, includeTemplate: true);
+        }
+
+        if (flow.Operators.Any(op =>
+                IsDeepLearningOperator(op.OperatorType) &&
+                !HasAnyParameter(op, "ModelPath", "ModelId", "ModelCatalogPath")))
+        {
+            return ModelExecutableFlow(cameraBindingId, includeModel: false);
+        }
+
+        if (flow.Operators.Any(op =>
+                IsOperatorType(op, "TemplateMatching") &&
+                !HasAnyParameter(op, "Template", "TemplateId", "TemplatePath")))
+        {
+            return TemplateExecutableFlow(cameraBindingId, includeCamera: true, includeTemplate: false);
+        }
+
+        return TemplateExecutableFlow(cameraBindingId, includeCamera: true, includeTemplate: false);
+    }
+
+    private static BenchmarkFlow TemplateExecutableFlow(
+        string cameraBindingId,
+        bool includeCamera,
+        bool includeTemplate)
+    {
+        var cameraParameters = includeCamera
+            ? new[] { ("SourceType", "Camera"), ("CameraBindingId", cameraBindingId) }
+            : [("SourceType", "Camera")];
+        var templateParameters = includeTemplate
+            ? new[] { ("TemplateId", "catalog-template-a") }
+            : [];
+
+        return Flow(
+            [
+                Op("op_cam", "ImageAcquisition", cameraParameters),
+                Op("op_match", "TemplateMatching", templateParameters)
+            ],
+            [
+                Link("op_cam", "Image", "op_match", "Image")
+            ]);
+    }
+
+    private static BenchmarkFlow ModelExecutableFlow(string cameraBindingId, bool includeModel)
+    {
+        var modelParameters = includeModel
+            ? new[] { ("ModelId", "model-catalog-a") }
+            : [];
+
+        return Flow(
+            [
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", cameraBindingId)),
+                Op("op_detect", "DeepLearning", modelParameters)
+            ],
+            [
+                Link("op_cam", "Image", "op_detect", "Image")
+            ]);
+    }
+
+    private static BenchmarkFlow MeasurementExecutableFlow(string cameraBindingId)
+    {
+        return Flow(
+            [
+                Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", cameraBindingId)),
+                Op(
+                    "op_measure",
+                    "Measurement",
+                    ("X1", "80"),
+                    ("Y1", "110"),
+                    ("X2", "420"),
+                    ("Y2", "360"),
+                    ("MeasureType", "PointToPoint"))
+            ],
+            [
+                Link("op_cam", "Image", "op_measure", "Image")
+            ]);
+    }
+
+    private static IReadOnlyList<object> ManualConfirmationsFor(BenchmarkFlow flow)
+    {
+        var confirmations = new List<object>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var op in flow.Operators)
+        {
+            if (IsOperatorType(op, "ImageAcquisition"))
+            {
+                AddManualConfirmation(confirmations, seen, op, "camera_binding", "CameraBindingId", "CameraId");
+            }
+
+            if (IsDeepLearningOperator(op.OperatorType))
+            {
+                AddManualConfirmation(confirmations, seen, op, "model_resource", "ModelPath", "ModelId", "ModelCatalogPath");
+            }
+
+            if (IsOperatorType(op, "TemplateMatching"))
+            {
+                AddManualConfirmation(confirmations, seen, op, "template_artifact", "TemplatePath", "TemplateId", "Template");
+            }
+
+            if (IsOperatorType(op, "ResultOutput"))
+            {
+                AddManualConfirmation(confirmations, seen, op, "output_channel", "OutputChannelId", "OutputChannel", "Channel");
+            }
+        }
+
+        return confirmations;
+    }
+
+    private static void AddManualConfirmation(
+        List<object> confirmations,
+        HashSet<string> seen,
+        BenchmarkOperator op,
+        string resourceType,
+        params string[] parameterNames)
+    {
+        foreach (var parameterName in parameterNames)
+        {
+            if (!op.Parameters.TryGetValue(parameterName, out var value) ||
+                string.IsNullOrWhiteSpace(value) ||
+                value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var resourceKey = $"{op.TempId}.{parameterName}";
+            if (!seen.Add($"{resourceType}|{resourceKey}"))
+            {
+                return;
+            }
+
+            confirmations.Add(new
+            {
+                actor = "vision_agent_business_benchmark",
+                resourceType,
+                operatorId = op.TempId,
+                parameterName,
+                resourceKey,
+                metadataOnly = true
+            });
+            return;
+        }
+    }
+
+    private static bool HasOperator(BenchmarkFlow flow, string operatorType)
+    {
+        return flow.Operators.Any(op => IsOperatorType(op, operatorType));
+    }
+
+    private static bool IsOperatorType(BenchmarkOperator op, string operatorType)
+    {
+        return IsOperatorType(op.OperatorType, operatorType);
+    }
+
+    private static bool IsOperatorType(string value, string operatorType)
+    {
+        return string.Equals(value, operatorType, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDeepLearningOperator(string operatorType)
+    {
+        return IsOperatorType(operatorType, "DeepLearning") ||
+               IsOperatorType(operatorType, "OnnxInference") ||
+               IsOperatorType(operatorType, "SemanticSegmentation") ||
+               IsOperatorType(operatorType, "AnomalyDetection");
+    }
+
+    private static bool HasAnyParameter(BenchmarkOperator op, params string[] parameterNames)
+    {
+        return parameterNames.Any(parameterName =>
+            op.Parameters.TryGetValue(parameterName, out var value) &&
+            !string.IsNullOrWhiteSpace(value) &&
+            !value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase));
     }
 
     private static BenchmarkFlow ValidWireFlow(string outputChannelId = "qa-wire")

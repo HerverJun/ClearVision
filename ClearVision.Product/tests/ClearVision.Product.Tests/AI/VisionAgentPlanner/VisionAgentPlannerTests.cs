@@ -76,7 +76,7 @@ public sealed class VisionAgentPlannerTests
 
         result.Success.Should().BeTrue();
         Flow(result).Operators.Select(op => op.Type).Should().Contain(OperatorType.TemplateMatching);
-        result.MissingResources.Select(item => item.ResourceType).Should().Contain("template_path");
+        result.MissingResources.Select(item => item.ResourceType).Should().Contain("template_artifact");
     }
 
     [Fact(DisplayName = "Planner mode should generate hole distance measurement workflow")]
@@ -114,7 +114,7 @@ public sealed class VisionAgentPlannerTests
                 CancellationToken.None);
 
         result.Success.Should().BeTrue();
-        Json(result.PendingActions).GetRawText().Should().Contain("TemplatePath");
+        Json(result.PendingActions).GetRawText().Should().Contain("Template");
         Flow(result).Operators.Single(op => op.Type == OperatorType.TemplateMatching)
             .Parameters.Single(parameter => parameter.Name == "TemplatePath")
             .Value
@@ -146,7 +146,7 @@ public sealed class VisionAgentPlannerTests
         result.Success.Should().BeTrue();
         Codes(ValidationPreview(result).GetProperty("structuralValidation"), "blockingIssues")
             .Should()
-            .Contain("broken_connection_temp_id");
+            .Contain("invalid_connection");
     }
 
     [Fact(DisplayName = "Planner policy should reject non-whitelisted tools")]

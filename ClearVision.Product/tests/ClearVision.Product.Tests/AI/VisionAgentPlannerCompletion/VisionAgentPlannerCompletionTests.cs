@@ -238,7 +238,7 @@ public sealed class VisionAgentPlannerCompletionTests
         var precheck = ValidationPreview(result).GetProperty("deploymentPrecheck");
         precheck.GetProperty("workflowDraftAllowed").GetBoolean().Should().BeTrue();
         precheck.GetProperty("readyForDeployment").GetBoolean().Should().BeFalse();
-        result.MissingResources.Select(resource => resource.ResourceType).Should().Contain("model_path");
+        result.MissingResources.Select(resource => resource.ResourceType).Should().Contain("model_resource");
     }
 
     [Fact(DisplayName = "GenerateFlow response should map pending actions missing resources validation preview and tool trace")]
@@ -252,8 +252,8 @@ public sealed class VisionAgentPlannerCompletionTests
             CancellationToken.None);
 
         result.Success.Should().BeTrue();
-        result.MissingResources.Select(resource => resource.ResourceType).Should().Contain("template_path");
-        Json(result.PendingActions).GetRawText().Should().Contain("TemplatePath");
+        result.MissingResources.Select(resource => resource.ResourceType).Should().Contain("template_artifact");
+        Json(result.PendingActions).GetRawText().Should().Contain("Template");
         ValidationPreview(result).GetProperty("structuralValidation").ValueKind.Should().Be(JsonValueKind.Object);
         ValidationPreview(result).GetProperty("dryRun").ValueKind.Should().Be(JsonValueKind.Object);
         ValidationPreview(result).GetProperty("deploymentPrecheck").ValueKind.Should().Be(JsonValueKind.Object);

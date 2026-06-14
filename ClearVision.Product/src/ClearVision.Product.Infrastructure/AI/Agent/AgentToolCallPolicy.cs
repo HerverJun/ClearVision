@@ -97,7 +97,7 @@ public sealed class AgentToolCallPolicy
         {
             return AgentToolCallPolicyResult.Deny(
                 "tool_not_whitelisted",
-                $"Planner tool '{toolName}' is outside the allowed tool set.");
+                $"Planner tool policy denied: planner tool '{toolName}' is outside the allowed tool set.");
         }
 
         return AgentToolCallPolicyResult.Allow();

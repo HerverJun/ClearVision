@@ -12,17 +12,34 @@ var result = await VisionAgentPlannerAutonomyBenchmark.RunAsync(options, Cancell
 options.Output.Directory?.Create();
 options.Report.Directory?.Create();
 var utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-File.WriteAllText(
+await WriteAllTextWithRetryAsync(
     options.Output.FullName,
     JsonSerializer.Serialize(result, VisionAgentPlannerAutonomyBenchmark.JsonOptions) + Environment.NewLine,
     utf8NoBom);
-File.WriteAllText(
+await WriteAllTextWithRetryAsync(
     options.Report.FullName,
     VisionAgentPlannerAutonomyBenchmarkMarkdown.Create(result, options.Output),
     utf8NoBom);
 Console.WriteLine($"wrote {VisionAgentPlannerAutonomyBenchmark.RepoRelative(options.Output)}");
 Console.WriteLine($"wrote {VisionAgentPlannerAutonomyBenchmark.RepoRelative(options.Report)}");
 return result.Summary.Accepted ? 0 : 1;
+
+static async Task WriteAllTextWithRetryAsync(string path, string contents, Encoding encoding)
+{
+    const int maxAttempts = 8;
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            await File.WriteAllTextAsync(path, contents, encoding);
+            return;
+        }
+        catch (IOException) when (attempt < maxAttempts)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(125 * attempt));
+        }
+    }
+}
 
 internal static class VisionAgentPlannerAutonomyBenchmark
 {
@@ -181,6 +198,12 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                                    BuildDeniedRuntimePreviewResult(toolTrace, toolContext);
         var finalWorkflowDraftAllowed = ReadWorkflowDraftAllowed(loopResult?.FinalContent, actualPrecheck);
         var finalContent = loopResult?.FinalContent ?? string.Empty;
+        var plannerPolicyDenial = LastPlannerPolicyDenial(policyDecisions);
+        var failureType = policyViolation != null || plannerPolicyDenial != null
+            ? "planner_policy_denied"
+            : loopResult?.FailureType;
+        var errorCode = policyViolation?.ErrorCode ?? plannerPolicyDenial?.ErrorCode;
+        var errorMessage = policyViolation?.Message ?? plannerPolicyDenial?.ErrorMessage ?? loopResult?.ErrorMessage;
         var failures = BuildFailures(
             testCase,
             loopResult,
@@ -218,9 +241,9 @@ internal static class VisionAgentPlannerAutonomyBenchmark
             finalContent,
             finalWorkflowDraftAllowed,
             loopResult?.Success ?? false,
-            policyViolation == null ? loopResult?.FailureType : "planner_policy_denied",
-            policyViolation?.ErrorCode,
-            policyViolation?.Message ?? loopResult?.ErrorMessage,
+            failureType,
+            errorCode,
+            errorMessage,
             failures.Count == 0,
             failures);
     }
@@ -245,6 +268,15 @@ internal static class VisionAgentPlannerAutonomyBenchmark
             .ToList();
     }
 
+    private static PlannerPolicyDecision? LastPlannerPolicyDenial(
+        IReadOnlyList<PlannerPolicyDecision> policyDecisions)
+    {
+        return policyDecisions.LastOrDefault(decision =>
+            !decision.Allowed &&
+            string.Equals(decision.Stage, "planner_policy", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(decision.ToolName));
+    }
+
     private static IReadOnlyList<VisionAgentToolTrace> BuildToolTrace(
         VisionAgentLoopResult? loopResult,
         RecordingPlannerCompletionSource source,
@@ -252,27 +284,64 @@ internal static class VisionAgentPlannerAutonomyBenchmark
     {
         if (loopResult != null)
         {
-            return loopResult.ToolTrace
+            var trace = loopResult.ToolTrace
                 .Select(NormalizeTrace)
+                .ToList();
+            if (trace.Count > 0)
+            {
+                return trace;
+            }
+        }
+
+        var deniedDecisions = source.PolicyDecisions
+            .Where(decision => !decision.Allowed && !string.IsNullOrWhiteSpace(decision.ToolName))
+            .GroupBy(decision => decision.ToolName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
+
+        if (source.PlannedToolCalls.Count > 0)
+        {
+            return source.PlannedToolCalls
+                .Select(call =>
+                {
+                    deniedDecisions.TryGetValue(call.ToolName, out var decision);
+                    return DeniedTrace(
+                        call.ToolName,
+                        call.Arguments,
+                        decision?.ErrorCode ?? policyViolation?.ErrorCode ?? "planner_policy_denied",
+                        decision?.ErrorMessage ?? policyViolation?.Message);
+                })
                 .ToList();
         }
 
-        return source.PlannedToolCalls
-            .Select(call => new VisionAgentToolTrace
+        return deniedDecisions.Values
+            .Select(decision => DeniedTrace(
+                decision.ToolName,
+                VisionAgentPlannerAutonomyBenchmark.Args(new { }),
+                decision.ErrorCode ?? policyViolation?.ErrorCode ?? "planner_policy_denied",
+                decision.ErrorMessage ?? policyViolation?.Message))
+            .ToList();
+
+        static VisionAgentToolTrace DeniedTrace(
+            string toolName,
+            JsonElement arguments,
+            string errorCode,
+            string? errorMessage)
+        {
+            return new VisionAgentToolTrace
             {
-                ToolName = call.ToolName,
-                Arguments = call.Arguments,
+                ToolName = toolName,
+                Arguments = arguments,
                 Success = false,
-                ErrorCode = policyViolation?.ErrorCode ?? "planner_policy_denied",
-                ErrorMessage = policyViolation?.Message,
+                ErrorCode = errorCode,
+                ErrorMessage = errorMessage,
                 Permission = string.Empty,
                 PermissionDecision = new
                 {
                     allowed = false,
-                    reason = policyViolation?.ErrorCode ?? "planner_policy_denied"
+                    reason = errorCode
                 }
-            })
-            .ToList();
+            };
+        }
     }
 
     private static VisionAgentToolTrace NormalizeTrace(VisionAgentToolTrace trace)
@@ -385,7 +454,9 @@ internal static class VisionAgentPlannerAutonomyBenchmark
 
         if (!string.IsNullOrWhiteSpace(testCase.ExpectedFailureType))
         {
-            var actualFailureType = policyViolation == null ? loopResult?.FailureType : "planner_policy_denied";
+            var actualFailureType = policyViolation != null || LastPlannerPolicyDenial(policyDecisions) != null
+                ? "planner_policy_denied"
+                : loopResult?.FailureType;
             if (!string.Equals(actualFailureType, testCase.ExpectedFailureType, StringComparison.OrdinalIgnoreCase))
             {
                 failures.Add($"failureType expected {testCase.ExpectedFailureType}.");
@@ -1041,8 +1112,74 @@ internal static class VisionAgentPlannerAutonomyBenchmark
             flow = state.Case.Flow,
             validationSummary,
             dryRunSummary,
+            manualResourceConfirmations = ManualConfirmationsFor(state.Case.Flow),
             targetStationId = state.Case.TargetStationId
         });
+    }
+
+    private static IReadOnlyList<object> ManualConfirmationsFor(PlannerFlow flow)
+    {
+        var confirmations = new List<object>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var op in flow.Operators)
+        {
+            if (IsOperatorType(op, "ImageAcquisition"))
+            {
+                AddManualConfirmation(confirmations, seen, op, "camera_binding", "CameraBindingId", "CameraId");
+            }
+
+            if (IsDeepLearningOperator(op.OperatorType))
+            {
+                AddManualConfirmation(confirmations, seen, op, "model_resource", "ModelPath", "ModelId", "ModelCatalogPath");
+            }
+
+            if (IsOperatorType(op, "TemplateMatching"))
+            {
+                AddManualConfirmation(confirmations, seen, op, "template_artifact", "TemplatePath", "TemplateId", "Template");
+            }
+
+            if (IsOperatorType(op, "ResultOutput"))
+            {
+                AddManualConfirmation(confirmations, seen, op, "output_channel", "OutputChannelId", "OutputChannel", "Channel");
+            }
+        }
+
+        return confirmations;
+    }
+
+    private static void AddManualConfirmation(
+        List<object> confirmations,
+        HashSet<string> seen,
+        PlannerOperator op,
+        string resourceType,
+        params string[] parameterNames)
+    {
+        foreach (var parameterName in parameterNames)
+        {
+            if (!op.Parameters.TryGetValue(parameterName, out var value) ||
+                string.IsNullOrWhiteSpace(value) ||
+                value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var resourceKey = $"{op.TempId}.{parameterName}";
+            if (!seen.Add($"{resourceType}|{resourceKey}"))
+            {
+                return;
+            }
+
+            confirmations.Add(new
+            {
+                actor = "vision_agent_planner_autonomy_benchmark",
+                resourceType,
+                operatorId = op.TempId,
+                parameterName,
+                resourceKey,
+                metadataOnly = true
+            });
+            return;
+        }
     }
 
     private static JsonElement CaptureArgs(PlannerCaseRuntimeState state)
@@ -1288,6 +1425,19 @@ internal static class VisionAgentPlannerAutonomyBenchmark
             value.Contains(fragment, StringComparison.OrdinalIgnoreCase));
     }
 
+    private static bool IsOperatorType(PlannerOperator op, string operatorType)
+    {
+        return string.Equals(op.OperatorType, operatorType, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDeepLearningOperator(string operatorType)
+    {
+        return string.Equals(operatorType, "DeepLearning", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(operatorType, "OnnxInference", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(operatorType, "SemanticSegmentation", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(operatorType, "AnomalyDetection", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string SerializeFlow(PlannerFlow flow)
     {
         return JsonSerializer.Serialize(flow, JsonOptions);
@@ -1363,16 +1513,16 @@ internal static class VisionAgentPlannerAutonomyBenchmark
         return Flow(
             [
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-wire")),
-                Op("op_roi", "RoiManager", ("RoiName", "terminal_strip")),
+                Op("op_roi", "RoiManager", ("Shape", "Rectangle"), ("Operation", "Crop"), ("X", "0"), ("Y", "0"), ("Width", "320"), ("Height", "160")),
                 Op("op_detect", "DeepLearning", ("ModelId", "mock-wire-sequence-model")),
-                Op("op_judge", "ResultJudgment", ("Rule", "wire_order_matches_expected")),
+                Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "NotEqual"), ("ExpectValue", "")),
                 Op("op_out", "ResultOutput", ("OutputChannelId", outputChannelId))
             ],
             [
                 Link("op_cam", "Image", "op_roi", "Image"),
-                Link("op_roi", "RoiImage", "op_detect", "Image"),
-                Link("op_detect", "Detections", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_roi", "Image", "op_detect", "Image"),
+                Link("op_detect", "DetectionList", "op_judge", "Value"),
+                Link("op_judge", "JudgmentResult", "op_out", "Result")
             ],
             "op_cam");
     }
@@ -1396,7 +1546,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
         var templateParams = new List<(string Key, string Value)>();
         if (string.IsNullOrWhiteSpace(templateId))
         {
-            templateParams.Add(("TemplatePath", "mock://templates/bracket-a.template"));
+            templateParams.Add(("TemplateId", "mock-template-bracket"));
         }
         else
         {
@@ -1405,20 +1555,20 @@ internal static class VisionAgentPlannerAutonomyBenchmark
 
         if (!string.IsNullOrWhiteSpace(minScore))
         {
-            templateParams.Add(("MinScore", minScore));
+            templateParams.Add(("Threshold", minScore));
         }
 
         return Flow(
             [
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-template")),
                 Op("op_match", "TemplateMatching", templateParams.ToArray()),
-                Op("op_judge", "ResultJudgment", ("MinScore", minScore ?? "0.82")),
+                Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "GreaterOrEqual"), ("ExpectValue", minScore ?? "0.82")),
                 Op("op_out", "ResultOutput", ("OutputChannelId", "qa-template"))
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
-                Link("op_match", "Score", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_match", "Score", "op_judge", "Value"),
+                Link("op_judge", "JudgmentResult", "op_out", "Result")
             ],
             "op_cam");
     }
@@ -1433,7 +1583,7 @@ internal static class VisionAgentPlannerAutonomyBenchmark
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
-                Link("op_match", "Score", "op_out", "Input")
+                Link("op_match", "Score", "op_out", "Result")
             ],
             "op_cam");
     }
@@ -1444,13 +1594,13 @@ internal static class VisionAgentPlannerAutonomyBenchmark
             [
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-model")),
                 Op("op_detect", "DeepLearning"),
-                Op("op_judge", "ResultJudgment"),
+                Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "NotEqual"), ("ExpectValue", "")),
                 Op("op_out", "ResultOutput", ("OutputChannelId", "qa-model"))
             ],
             [
                 Link("op_cam", "Image", "op_detect", "Image"),
-                Link("op_detect", "Detections", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_detect", "DetectionList", "op_judge", "Value"),
+                Link("op_judge", "JudgmentResult", "op_out", "Result")
             ],
             "op_cam");
     }
@@ -1461,13 +1611,13 @@ internal static class VisionAgentPlannerAutonomyBenchmark
             [
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-model")),
                 Op("op_detect", "DeepLearning", ("ModelId", "mock-model-catalog-item")),
-                Op("op_judge", "ResultJudgment"),
+                Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "NotEqual"), ("ExpectValue", "")),
                 Op("op_out", "ResultOutput", ("OutputChannelId", "qa-model"))
             ],
             [
                 Link("op_cam", "Image", "op_detect", "Image"),
-                Link("op_detect", "Detections", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_detect", "DetectionList", "op_judge", "Value"),
+                Link("op_judge", "JudgmentResult", "op_out", "Result")
             ],
             "op_cam");
     }
@@ -1479,14 +1629,14 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-combo")),
                 Op("op_match", "TemplateMatching", ("TemplateId", "mock-template-combo")),
                 Op("op_detect", "DeepLearning", ("ModelId", "mock-combo-model")),
-                Op("op_judge", "ResultJudgment"),
+                Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "GreaterOrEqual"), ("ExpectValue", "0.8")),
                 Op("op_out", "ResultOutput", ("OutputChannelId", "qa-combo"))
             ],
             [
                 Link("op_cam", "Image", "op_match", "Image"),
                 Link("op_cam", "Image", "op_detect", "Image"),
-                Link("op_match", "Score", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_match", "Score", "op_judge", "Value"),
+                Link("op_judge", "JudgmentResult", "op_out", "Result")
             ],
             "op_cam");
     }
@@ -1496,10 +1646,10 @@ internal static class VisionAgentPlannerAutonomyBenchmark
         return Flow(
             [
                 Op("op_cam", "ImageAcquisition", ("SourceType", "Camera"), ("CameraBindingId", "mock-cam-hole")),
-                Op("op_circle_a", "CircleMeasurement", ("Roi", "hole_a")),
-                Op("op_circle_b", "CircleMeasurement", ("Roi", "hole_b")),
-                Op("op_distance", "MeasureDistance", ("Unit", "mm"), ("Tolerance", "+/-0.05")),
-                Op("op_judge", "ResultJudgment", ("Tolerance", "+/-0.05")),
+                Op("op_circle_a", "CircleMeasurement", ("Method", "HoughCircle"), ("MinRadius", "10"), ("MaxRadius", "200")),
+                Op("op_circle_b", "CircleMeasurement", ("Method", "HoughCircle"), ("MinRadius", "10"), ("MaxRadius", "200")),
+                Op("op_distance", "Measurement", ("MeasureType", "PointToPoint")),
+                Op("op_judge", "ResultJudgment", ("FieldName", "Value"), ("Condition", "Range"), ("ExpectValueMin", "0"), ("ExpectValueMax", "1000")),
                 Op("op_out", "ResultOutput", ("OutputChannelId", "qa-hole"))
             ],
             [
@@ -1507,8 +1657,8 @@ internal static class VisionAgentPlannerAutonomyBenchmark
                 Link("op_cam", "Image", "op_circle_b", "Image"),
                 Link("op_circle_a", "Center", "op_distance", "PointA"),
                 Link("op_circle_b", "Center", "op_distance", "PointB"),
-                Link("op_distance", "Distance", "op_judge", "Input"),
-                Link("op_judge", "Result", "op_out", "Input")
+                Link("op_distance", "Distance", "op_judge", "Value"),
+                Link("op_judge", "JudgmentResult", "op_out", "Result")
             ],
             "op_cam");
     }

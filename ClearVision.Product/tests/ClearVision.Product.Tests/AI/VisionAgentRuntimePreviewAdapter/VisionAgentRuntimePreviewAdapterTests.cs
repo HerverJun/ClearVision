@@ -517,7 +517,7 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         payload.GetProperty("blockingIssues").EnumerateArray()
             .Select(item => item.GetProperty("code").GetString())
             .Should()
-            .Contain("broken_connection_temp_id");
+            .Contain("invalid_connection");
     }
 
     [Fact(DisplayName = "Offline replay should not block workflow draft when resources are missing")]
@@ -534,7 +534,7 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
         payload.GetProperty("missingResources").EnumerateArray()
             .Select(item => item.GetProperty("parameterName").GetString())
             .Should()
-            .Contain(["CameraBindingId", "TemplatePath"]);
+            .Contain(["CameraBindingId", "Template"]);
         payload.GetProperty("previewReady").GetBoolean().Should().BeTrue();
     }
 
@@ -780,15 +780,11 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
             operators = new object[]
             {
                 Operator("op_cam", "ImageAcquisition", new Dictionary<string, string> { ["CameraBindingId"] = "<pending-camera-binding>" }),
-                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "<pending-template-path>" }),
-                Operator("op_measure", "MeasureDistance"),
-                Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["Channel"] = "<pending-output-channel>" })
+                Operator("op_match", "TemplateMatching", new Dictionary<string, string> { ["TemplatePath"] = "<pending-template-path>" })
             },
             connections = new object[]
             {
-                Connection("op_cam", "Image", "op_match", "Image"),
-                Connection("op_match", "Pose", "op_measure", "PointA"),
-                Connection("op_measure", "Distance", "op_out", "Input")
+                Connection("op_cam", "Image", "op_match", "Image")
             }
         };
     }
@@ -817,15 +813,11 @@ public sealed class VisionAgentRuntimePreviewAdapterTests
                     ["SourceType"] = "Camera",
                     ["CameraBindingId"] = cameraBindingId
                 }),
-                Operator("op_match", "TemplateMatching", templateParameters),
-                Operator("op_judge", "ResultJudgment"),
-                Operator("op_out", "ResultOutput", new Dictionary<string, string> { ["OutputChannelId"] = "memory" })
+                Operator("op_match", "TemplateMatching", templateParameters)
             },
             connections = new object[]
             {
-                Connection("op_cam", "Image", "op_match", "Image"),
-                Connection("op_match", "Score", "op_judge", "Input"),
-                Connection("op_judge", "Result", "op_out", "Input")
+                Connection("op_cam", "Image", "op_match", "Image")
             }
         };
     }

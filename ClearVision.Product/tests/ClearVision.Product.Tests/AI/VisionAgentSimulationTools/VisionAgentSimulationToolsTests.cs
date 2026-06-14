@@ -105,7 +105,7 @@ public sealed class VisionAgentSimulationToolsTests
         payload.GetProperty("imageAcquisitionCount").GetInt32().Should().Be(2);
     }
 
-    [Fact(DisplayName = "validate_flow should report missing ModelPath Template input and CameraId")]
+    [Fact(DisplayName = "validate_flow should report missing ModelPath Template input and CameraBindingId")]
     public async Task ValidateFlow_ShouldReportMissingResources()
     {
         var result = await new FlowValidationTool().ExecuteAsync(
@@ -120,7 +120,7 @@ public sealed class VisionAgentSimulationToolsTests
             .Select(item => item.GetProperty("parameterName").GetString())
             .ToList();
 
-        missingParameters.Should().Contain("CameraId");
+        missingParameters.Should().Contain("CameraBindingId");
         missingParameters.Should().Contain("ModelPath");
         missingParameters.Should().Contain("Template");
     }

@@ -134,7 +134,7 @@ public sealed class VisionAgentReadOnlyToolsTests
 
         result.Success.Should().BeTrue();
         var payload = Json(result.Data);
-        payload.GetProperty("source").GetString().Should().Be("readonly_static_catalog");
+        payload.GetProperty("source").GetString().Should().Be("real_operator_contract_catalog");
         payload.GetProperty("operators").EnumerateArray()
             .Select(item => item.GetProperty("operatorType").GetString())
             .Should()
@@ -153,13 +153,13 @@ public sealed class VisionAgentReadOnlyToolsTests
         var payload = Json(result.Data);
         payload.GetProperty("operatorType").GetString().Should().Be("ImageAcquisition");
         payload.GetProperty("outputPorts").EnumerateArray()
-            .Select(item => item.GetString())
+            .Select(PortName)
             .Should()
             .Contain("Image");
         payload.GetProperty("parameters").EnumerateArray()
             .Select(item => item.GetProperty("name").GetString())
             .Should()
-            .Contain("CameraBindingId");
+            .Contain("CameraId");
     }
 
     [Fact(DisplayName = "get_operator_schema should return TemplateMatching schema")]
@@ -176,7 +176,7 @@ public sealed class VisionAgentReadOnlyToolsTests
         payload.GetProperty("parameters").EnumerateArray()
             .Select(item => item.GetProperty("name").GetString())
             .Should()
-            .Contain("TemplatePath");
+            .Contain("Threshold");
     }
 
     [Fact(DisplayName = "get_operator_schema should return structured unknown operator failure")]
@@ -221,11 +221,11 @@ public sealed class VisionAgentReadOnlyToolsTests
         payload.GetProperty("operators").EnumerateArray()
             .Select(item => item.GetProperty("operatorType").GetString())
             .Should()
-            .Equal("ImageAcquisition", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput");
+            .Equal("ImageAcquisition", "RoiManager", "DeepLearning", "DetectionSequenceJudge", "ResultJudgment", "ResultOutput");
         payload.GetProperty("connections").GetArrayLength().Should().BeGreaterThan(0);
         payload.GetProperty("operators")[0]
             .GetProperty("parameters")
-            .GetProperty("CameraBindingId")
+            .GetProperty("CameraId")
             .GetString()
             .Should()
             .Be("<pending-camera-binding>");
@@ -455,6 +455,13 @@ public sealed class VisionAgentReadOnlyToolsTests
     {
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(value));
         return doc.RootElement.Clone();
+    }
+
+    private static string? PortName(JsonElement item)
+    {
+        return item.ValueKind == JsonValueKind.String
+            ? item.GetString()
+            : item.GetProperty("name").GetString();
     }
 
     private static JsonElement EmptySchema()

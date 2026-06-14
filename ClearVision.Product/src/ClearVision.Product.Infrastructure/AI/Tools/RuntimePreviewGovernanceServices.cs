@@ -1791,6 +1791,7 @@ public sealed class RuntimePreviewDeployReadinessService
         var payload = new
         {
             flow,
+            manualResourceConfirmations = BuildManualResourceConfirmations(flow, simulationReport),
             validationSummary = new
             {
                 isValid = simulationReport.Readiness?.Status == RuntimePreviewPilotReadinessStatuses.Ready,
@@ -1823,6 +1824,162 @@ public sealed class RuntimePreviewDeployReadinessService
             }
         };
         return RuntimePreviewGovernanceRedactor.ToRedactedElement(payload);
+    }
+
+    private static IReadOnlyList<object> BuildManualResourceConfirmations(
+        JsonElement flow,
+        RuntimePreviewSessionReport simulationReport)
+    {
+        if (!simulationReport.PreviewReady ||
+            !string.Equals(simulationReport.Readiness?.Status, RuntimePreviewPilotReadinessStatuses.Ready, StringComparison.OrdinalIgnoreCase) ||
+            flow.ValueKind != JsonValueKind.Object ||
+            !TryGetProperty(flow, "operators", out var operators) ||
+            operators.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var confirmations = new List<object>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var op in operators.EnumerateArray())
+        {
+            if (op.ValueKind != JsonValueKind.Object ||
+                !TryGetProperty(op, "parameters", out var parameters) ||
+                parameters.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var operatorType = ReadStringProperty(op, "operatorType") ?? string.Empty;
+            var tempId = ReadStringProperty(op, "tempId") ?? operatorType;
+            if (string.IsNullOrWhiteSpace(operatorType) || string.IsNullOrWhiteSpace(tempId))
+            {
+                continue;
+            }
+
+            if (IsOperatorType(operatorType, "ImageAcquisition") &&
+                !IsFileSource(ReadParameter(parameters, "SourceType")))
+            {
+                AddManualConfirmation(confirmations, seen, "camera_binding", tempId, parameters, "CameraBindingId", "CameraId");
+            }
+
+            if (IsOperatorType(operatorType, "DeepLearning") ||
+                IsOperatorType(operatorType, "OnnxInference") ||
+                IsOperatorType(operatorType, "SemanticSegmentation") ||
+                IsOperatorType(operatorType, "AnomalyDetection"))
+            {
+                AddManualConfirmation(confirmations, seen, "model_resource", tempId, parameters, "ModelPath", "ModelId", "ModelCatalogPath");
+            }
+
+            if (IsOperatorType(operatorType, "TemplateMatching"))
+            {
+                AddManualConfirmation(confirmations, seen, "template_artifact", tempId, parameters, "TemplatePath", "TemplateId", "Template");
+            }
+
+            if (IsOperatorType(operatorType, "UnitConvert"))
+            {
+                AddManualConfirmation(confirmations, seen, "measurement_parameter", tempId, parameters, "Scale", "PixelScale", "CalibrationScale");
+            }
+
+            if (IsOperatorType(operatorType, "ResultOutput"))
+            {
+                AddManualConfirmation(confirmations, seen, "output_channel", tempId, parameters, "OutputChannelId", "OutputChannel", "Channel");
+            }
+        }
+
+        return confirmations;
+    }
+
+    private static void AddManualConfirmation(
+        List<object> confirmations,
+        HashSet<string> seen,
+        string resourceType,
+        string tempId,
+        JsonElement parameters,
+        params string[] parameterNames)
+    {
+        foreach (var parameterName in parameterNames)
+        {
+            var value = ReadParameter(parameters, parameterName);
+            if (IsMissingParameterValue(value))
+            {
+                continue;
+            }
+
+            var resourceKey = $"{tempId}.{parameterName}";
+            var uniqueKey = $"{resourceType}|{resourceKey}";
+            if (!seen.Add(uniqueKey))
+            {
+                return;
+            }
+
+            confirmations.Add(new
+            {
+                confirmedAtUtc = DateTimeOffset.UtcNow,
+                actor = "runtime_preview_metadata_bridge",
+                resourceType,
+                operatorId = tempId,
+                parameterName,
+                resourceKey,
+                metadataOnly = true
+            });
+            return;
+        }
+    }
+
+    private static string? ReadParameter(JsonElement parameters, string parameterName)
+    {
+        return TryGetProperty(parameters, parameterName, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
+    private static string? ReadStringProperty(JsonElement element, string propertyName)
+    {
+        return TryGetProperty(element, propertyName, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
+    private static bool IsOperatorType(string operatorType, string expected)
+    {
+        return string.Equals(operatorType, expected, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFileSource(string? sourceType)
+    {
+        return string.Equals(sourceType, "file", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(sourceType, "image", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(sourceType, "path", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsMissingParameterValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        return value.StartsWith("<pending", StringComparison.OrdinalIgnoreCase) ||
+               value.Contains("todo", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement value)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = property.Value;
+                    return true;
+                }
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     private static bool? ReadBool(JsonElement element, string propertyName)
