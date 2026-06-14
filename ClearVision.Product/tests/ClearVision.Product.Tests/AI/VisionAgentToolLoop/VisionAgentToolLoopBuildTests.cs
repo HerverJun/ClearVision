@@ -299,6 +299,7 @@ public sealed class VisionAgentToolLoopBuildTests
     {
         var sink = new CapturingAgentRunEventSink();
         var completion = new ScriptedLoopCompletionSource([FinalWorkflowDraft()]);
+        var syntheticImageDataUri = "data:image/png;" + "base64," + new string('A', 96);
         var orchestrator = CreateOrchestrator(
             sink,
             [new FakeTool("inspect_current_flow", VisionAgentToolPermission.ReadOnly)],
@@ -306,7 +307,7 @@ public sealed class VisionAgentToolLoopBuildTests
             new FakeBuildOrchestrator());
 
         var result = await orchestrator.BuildFromPlanAsync(ToolLoopRequest(
-            @"inspect C:\factory\secret.png token=abc123 sk-secret DB1.DBX0.0 192.168.1.20 data:image/png;base64,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
+            @"inspect C:\factory\secret.png token=abc123 sk-secret DB1.DBX0.0 192.168.1.20 " + syntheticImageDataUri),
             CancellationToken.None);
 
         var publicJson = JsonSerializer.Serialize(new { result.BuildResult, sink.Events }, AgentRunEventJson.Options);

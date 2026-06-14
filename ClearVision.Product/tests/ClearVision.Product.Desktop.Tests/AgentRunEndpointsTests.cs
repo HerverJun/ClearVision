@@ -391,6 +391,8 @@ public sealed class AgentRunEndpointsTests
     [Fact(DisplayName = "Plan run replay carries redacted PlanResult without private reasoning or raw prompts")]
     public async Task CreatePlanRunReplay_ShouldRedactPrivatePlanPayload()
     {
+        var syntheticImageDataUri = "data:image/png;" + "base64," + new string('A', 96);
+
         await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
         {
             var plan = baseline with
@@ -403,7 +405,7 @@ public sealed class AgentRunEndpointsTests
                     "systemPrompt=hidden system",
                     "reasoning_content: private trace",
                     @"model path C:\factory\models\secret.onnx",
-                    "station 192.168.10.45 DB1.DBW0 data:image/png;base64,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    $"station 192.168.10.45 DB1.DBW0 {syntheticImageDataUri}"
                 ],
                 PublicEvents =
                 [

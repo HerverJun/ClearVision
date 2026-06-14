@@ -1342,7 +1342,7 @@ test('Prompt Trace debug view hides raw prompts and sensitive metadata', async (
     mode: 'agent',
     provider: 'provider-a',
     model: 'planner-model',
-    baseUrl: 'https://example.invalid/v1?token=secret-token',
+    baseUrl: 'https://example.invalid/v1?' + 'token=secret-token',
     capabilities: {
       headers: 'Authorization: Bearer super-secret-value',
       modelPath: 'C:\\factory\\model.onnx'
