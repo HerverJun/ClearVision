@@ -28,7 +28,8 @@ internal static class VisionAgentPlanBuildReadiness
             return new VisionAgentPlanBuildReadinessResult(false, ["plan_snapshot_missing"]);
         }
 
-        blocking.AddRange(VisionAgentStrategyConfirmationSupport.ExtractHardBlockers(plan));
+        blocking.AddRange(VisionAgentStrategyConfirmationSupport.ExtractHardBlockers(plan)
+            .Where(reason => !IsDraftableImageSourceBlocker(plan, reason)));
 
         var maturity = plan.RequirementMaturity;
         if (maturity is { CanPlan: false } ||
@@ -81,7 +82,8 @@ internal static class VisionAgentPlanBuildReadiness
                 blocking.Add("hard_requirement:task_type_missing");
             }
 
-            if (string.IsNullOrWhiteSpace(semantic.ImageSource))
+            if (string.IsNullOrWhiteSpace(semantic.ImageSource) &&
+                !CanDraftWithPendingImageSource(plan))
             {
                 blocking.Add("hard_requirement:image_source_missing");
             }
@@ -114,16 +116,41 @@ internal static class VisionAgentPlanBuildReadiness
 
         if (!maturity.CanBuild &&
             maturity.MissingFields.Any(field =>
-                field.Contains("image_source", StringComparison.OrdinalIgnoreCase) ||
-                field.Contains("acceptance_criteria", StringComparison.OrdinalIgnoreCase)))
+                IsBlockingMissingField(plan, field)))
         {
             foreach (var field in maturity.MissingFields.Where(field =>
-                         field.Contains("image_source", StringComparison.OrdinalIgnoreCase) ||
-                         field.Contains("acceptance_criteria", StringComparison.OrdinalIgnoreCase)))
+                         IsBlockingMissingField(plan, field)))
             {
                 blocking.Add(ClassifyHardRequirement($"{field}_missing"));
             }
         }
+    }
+
+    private static bool IsBlockingMissingField(
+        VisionAgentPlanModeResult plan,
+        string field)
+    {
+        if (field.Contains("image_source", StringComparison.OrdinalIgnoreCase))
+        {
+            return !CanDraftWithPendingImageSource(plan);
+        }
+
+        return field.Contains("acceptance_criteria", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDraftableImageSourceBlocker(
+        VisionAgentPlanModeResult plan,
+        string reason)
+    {
+        return reason.Contains("image_source", StringComparison.OrdinalIgnoreCase) &&
+               CanDraftWithPendingImageSource(plan);
+    }
+
+    private static bool CanDraftWithPendingImageSource(VisionAgentPlanModeResult plan)
+    {
+        return (plan.RecommendedRoute?.Operators ?? [])
+            .Select(Clean)
+            .Any(op => op.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool HasSupportedRouteOrTemplate(

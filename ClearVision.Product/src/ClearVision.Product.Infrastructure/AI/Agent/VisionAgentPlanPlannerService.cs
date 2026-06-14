@@ -512,7 +512,9 @@ PlannerCandidateParsed:
         {
             var readiness = VisionAgentPlanBuildReadiness.Evaluate(result with { RequirementMaturity = maturity });
             var buildBlockingReasons = readiness.BlockingReasons
-                .Concat(result.BlockingReasons.Where(IsBuildBlockingReason))
+                .Concat(result.BlockingReasons.Where(reason =>
+                    IsBuildBlockingReason(reason) &&
+                    !IsDraftableImageSourceBlocker(result, reason)))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(12)
                 .ToList();
@@ -1046,6 +1048,15 @@ PlannerCandidateParsed:
     {
         return reason.StartsWith("hard_requirement:", StringComparison.OrdinalIgnoreCase) ||
                reason.StartsWith("strategy_confirmation:", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDraftableImageSourceBlocker(
+        VisionAgentPlanModeResult result,
+        string reason)
+    {
+        return reason.Contains("image_source", StringComparison.OrdinalIgnoreCase) &&
+               (result.RecommendedRoute?.Operators ?? [])
+               .Any(op => op.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool ContainsAny(string text, params string[] terms)

@@ -80,9 +80,9 @@ const PLAN_PHASES = [
 const PLAN_PENDING_STATUS = 'waiting';
 
 const AI_DISPLAY_TEXT_MAP = {
-    'Accept recommended defaults, then start Build.': '可接受推荐默认值，然后开始构建。',
-    'Accept recommended defaults or answer questions, then start Build.': '可接受推荐默认值或回答关键问题，然后开始构建。',
-    'Accept recommended defaults and Build.': '接受推荐默认值并开始构建。',
+    'Accept recommended defaults, then start Build.': '推荐项已作为当前选择，可开始构建。',
+    'Accept recommended defaults or answer questions, then start Build.': '推荐项已作为当前选择，可调整选项后开始构建。',
+    'Accept recommended defaults and Build.': '按当前选择开始构建。',
     'Describe the inspection target before Build can start.': '请先描述检测目标，再开始构建。',
     'Surface defect inspection route': '表面缺陷检测路线',
     'Detect visible scratches and blobs.': '检测可见划痕、斑点等表面缺陷。',
@@ -417,27 +417,13 @@ export const aiPanelAgentWorkspaceMixin = {
         const busy = Boolean(this.isGenerating);
         const hasPlan = Boolean(this.pendingVisionPlan);
         if (hasPlan) {
+            this._ensureRecommendedPlanQuestionSelections?.(this.pendingVisionPlan);
             this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
         }
         const canBuild = hasPlan && this.pendingVisionPlan?.executable === true;
-        const unresolvedStrategy = hasPlan
-            ? this._getUnresolvedStrategyBlockers({
-                blockingReasons: this.pendingVisionPlan.blockingReasons,
-                questions: this.pendingVisionPlan.questions
-            })
-            : [];
-        const canAcceptRecommended = hasPlan && this._computeEffectivePlanBuildReadiness({
-            rawCanBuild: this.pendingVisionPlan.rawPlanSnapshot?.canBuild ?? this.pendingVisionPlan.rawPlanSnapshot?.CanBuild ?? this.pendingVisionPlan.executable,
-            requirementMaturity: this.pendingVisionPlan.requirementMaturity,
-            semanticExtraction: this.pendingVisionPlan.semanticExtraction,
-            route: this.pendingVisionPlan.route,
-            blockingReasons: this.pendingVisionPlan.blockingReasons,
-            questions: this.pendingVisionPlan.questions,
-            acceptedRecommended: true
-        });
-        const blockedTitle = unresolvedStrategy.length
-            ? '需确认策略后才能开始构建'
-            : '当前计划仍需澄清，暂不可构建';
+        const blockedTitle = hasPlan
+            ? this._getPlanBuildBlockedReason(this.pendingVisionPlan)
+            : '请先完成规划';
         const inlineBuildBtn = this.container?.querySelector('#ai-btn-start-build-inline');
         if (inlineBuildBtn) {
             inlineBuildBtn.disabled = busy || !canBuild;
@@ -452,17 +438,19 @@ export const aiPanelAgentWorkspaceMixin = {
             inlineBuildBtn.setAttribute?.('aria-disabled', inlineBuildBtn.disabled ? 'true' : 'false');
         }
 
-        this.container?.querySelectorAll?.('.ai-plan-action').forEach(button => {
-            const isAcceptRecommended = button.id === 'ai-btn-accept-plan';
-            const enabled = isAcceptRecommended ? canAcceptRecommended : canBuild;
-            button.disabled = busy || !enabled;
-            if (!canBuild && hasPlan) {
-                button.title = '当前计划仍需澄清，暂不可构建';
-            }
-            if (!canBuild && hasPlan) {
-                button.title = isAcceptRecommended && canAcceptRecommended
-                    ? '接受推荐方案并确认策略'
+        const buildStatus = this.container?.querySelector('#ai-plan-build-status');
+        if (buildStatus) {
+            buildStatus.textContent = !hasPlan
+                ? ''
+                : canBuild
+                    ? '当前选择已满足构建条件'
                     : blockedTitle;
+        }
+
+        this.container?.querySelectorAll?.('.ai-plan-action').forEach(button => {
+            button.disabled = busy || !canBuild;
+            if (!canBuild && hasPlan) {
+                button.title = blockedTitle;
             }
             button.setAttribute?.('aria-disabled', button.disabled ? 'true' : 'false');
         });
@@ -677,7 +665,7 @@ export const aiPanelAgentWorkspaceMixin = {
             this._setAssistantTurnStatus(context.turn, '进入构建', 'success');
             this.activeAssistantTurn = null;
             this._setGeneratingState?.(false);
-            return this._startBuildFromCurrentPlan({ acceptedRecommended: true });
+            return this._startBuildFromCurrentPlan();
         }
 
         if (route.intent === 'modify_existing_flow' && this._hasCurrentFlowContext?.() === true) {
@@ -1163,8 +1151,8 @@ export const aiPanelAgentWorkspaceMixin = {
                     timeoutFallback
                         ? '模型规划超时，已使用规则兜底方案。可先按兜底方案构建，或稍后重试深度规划。'
                         : fallbackUsed
-                            ? '规划已完成，已使用规则兜底方案。可以接受推荐默认值或调整选项后开始构建。'
-                            : '规划已完成，可以接受推荐默认值或调整选项后开始构建。'
+                            ? '规划已完成，已使用规则兜底方案。推荐项已作为当前选择，可调整选项后开始构建。'
+                            : '规划已完成，推荐项已作为当前选择，可调整选项后开始构建。'
                 );
                 this._setResultStatusNote('规划模式等待确认，确认后进入构建模式。', 'info');
                 this._renderAgentWorkspaceOverview();
@@ -1729,7 +1717,8 @@ export const aiPanelAgentWorkspaceMixin = {
         const rawCanPlan = plan.canPlan ?? plan.CanPlan;
         const maturityCanPlan = requirementMaturity?.canPlan === true;
         const blockingReasons = this._toArray(plan.blockingReasons || plan.BlockingReasons)
-            .map(item => this._localizeDisplayText(item));
+            .map(item => this._localizeDisplayText(item))
+            .filter(reason => !this._isDraftableImageSourceBlockingReason(reason, route));
         const publicEvents = this._toArray(plan.publicEvents || plan.PublicEvents)
             .map(evt => this._normalizePlanPublicEvent(evt));
         const rawFallbackReason = String(plan.fallbackReason || plan.FallbackReason || '').trim();
@@ -1822,8 +1811,58 @@ export const aiPanelAgentWorkspaceMixin = {
         const maturityCanBuild = requirementMaturity?.canBuild === true;
         if (rawCanBuild === true && maturityCanBuild) return true;
 
-        return this._planHardFactsReady(requirementMaturity, semanticExtraction) &&
+        return this._planHardFactsReady(requirementMaturity, semanticExtraction, route) &&
             this._planRouteSatisfiesBuildStrategy(route);
+    },
+
+    _ensureRecommendedPlanQuestionSelections(plan) {
+        if (!plan) return false;
+        const current = { ...(this.planQuestionSelections || {}) };
+        let changed = false;
+        this._toArray(plan.questions).forEach(question => {
+            const id = String(question?.id || '').trim();
+            if (!id || String(current[id] || '').trim()) return;
+            const recommended = this._getQuestionRecommendedValue(question);
+            if (!recommended) return;
+            current[id] = recommended;
+            changed = true;
+        });
+        if (changed) {
+            this.planQuestionSelections = current;
+        }
+        return changed;
+    },
+
+    _getPlanBuildBlockedReason(plan) {
+        if (!plan) return '请先完成规划';
+        const strategyBlockers = this._getUnresolvedStrategyBlockers({
+            blockingReasons: plan.blockingReasons,
+            questions: plan.questions
+        });
+        if (strategyBlockers.length) {
+            return '需确认策略后才能开始构建';
+        }
+
+        const hardBlocker = this._toArray(plan.blockingReasons)
+            .map(reason => String(reason || '').trim())
+            .find(reason => /^hard_requirement:/i.test(reason));
+        if (hardBlocker) {
+            return this._formatPlanHardBlockerTitle(hardBlocker);
+        }
+
+        return plan.requirementMaturity?.publicReason || '当前计划仍需澄清，暂不可构建';
+    },
+
+    _formatPlanHardBlockerTitle(reason) {
+        const normalized = String(reason || '').toLowerCase();
+        if (normalized.includes('image_source')) return '需补充图像来源后才能开始构建';
+        if (normalized.includes('inspection_object')) return '需补充检测对象后才能开始构建';
+        if (normalized.includes('task_type')) return '需补充检测任务类型后才能开始构建';
+        if (normalized.includes('acceptance_criteria') || normalized.includes('condition')) {
+            return '需补充 OK/NG 判定条件后才能开始构建';
+        }
+        if (normalized.includes('invalid_operator')) return '计划包含不支持算子，暂不可构建';
+        return '当前计划仍有硬性缺口，暂不可构建';
     },
 
     _getUnresolvedStrategyBlockers({ blockingReasons = [], questions = [], acceptedRecommended = false } = {}) {
@@ -1881,13 +1920,14 @@ export const aiPanelAgentWorkspaceMixin = {
         return '';
     },
 
-    _planHardFactsReady(requirementMaturity, semanticExtraction) {
+    _planHardFactsReady(requirementMaturity, semanticExtraction, route = null) {
         const semanticSource = String(semanticExtraction?.source || '').toLowerCase();
         if (semanticExtraction && semanticSource === 'model') {
             const hasObject = Boolean(String(semanticExtraction.inspectionObject || '').trim());
             const task = String(semanticExtraction.taskType || '').trim().toLowerCase();
             const hasTask = Boolean(task && task !== 'unknown' && task !== 'abstract_goal');
-            const hasInput = Boolean(String(semanticExtraction.imageSource || '').trim());
+            const hasInput = Boolean(String(semanticExtraction.imageSource || '').trim()) ||
+                this._routeAllowsPendingImageSource(route);
             const hasJudgment = Boolean(String(
                 semanticExtraction.okCondition ||
                 semanticExtraction.ngCondition ||
@@ -1903,6 +1943,16 @@ export const aiPanelAgentWorkspaceMixin = {
         const hardBlocked = this._toArray(requirementMaturity.blockingReasons).some(reason =>
             /inspection_object|task_type|image_source|acceptance_criteria|abstract_goal|empty_requirement/i.test(String(reason || '')));
         return requirementMaturity.canBuild === true && !hardMissing && !hardBlocked;
+    },
+
+    _routeAllowsPendingImageSource(route) {
+        return this._toArray(route?.operators || route?.Operators)
+            .some(op => /^imageacquisition$/i.test(String(op || '').trim()));
+    },
+
+    _isDraftableImageSourceBlockingReason(reason, route) {
+        return /^hard_requirement:.*image_source/i.test(String(reason || '').trim()) &&
+            this._routeAllowsPendingImageSource(route);
     },
 
     _planRouteSatisfiesBuildStrategy(route) {
@@ -2382,6 +2432,10 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!el) return;
 
         const plan = this.pendingVisionPlan;
+        if (plan) {
+            this._ensureRecommendedPlanQuestionSelections?.(plan);
+            this._refreshPlanEffectiveBuildReadiness?.(plan);
+        }
         const mode = this._formatWorkspaceModeLabel();
         const phase = this._getAgentWorkspacePhase();
         const activeEvents = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
@@ -3018,6 +3072,7 @@ export const aiPanelAgentWorkspaceMixin = {
             return;
         }
 
+        this._ensureRecommendedPlanQuestionSelections(plan);
         const selections = this.planQuestionSelections || {};
         const semanticPanel = this._renderSemanticExtractionPanel(plan);
         const maturityPanel = this._renderRequirementMaturityPanel(plan);
@@ -3088,8 +3143,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
             </section>
             <div class="ai-plan-actions">
-                <button class="ai-plan-action is-primary" type="button" id="ai-btn-accept-plan">按推荐方案开始构建</button>
-                <button class="ai-plan-action" type="button" id="ai-btn-start-build">开始构建</button>
+                <span class="ai-plan-action-status" id="ai-plan-build-status"></span>
+                <button class="ai-plan-action is-primary" type="button" id="ai-btn-start-build">开始构建</button>
             </div>
         `;
 
@@ -3101,7 +3156,6 @@ export const aiPanelAgentWorkspaceMixin = {
                 );
             });
         });
-        el.querySelector('#ai-btn-accept-plan')?.addEventListener('click', () => this._acceptRecommendedPlanAndBuild());
         el.querySelector('#ai-btn-start-build')?.addEventListener('click', () => this._startBuildFromCurrentPlan());
         this._updatePlanBuildActionState();
     },
@@ -3227,18 +3281,6 @@ export const aiPanelAgentWorkspaceMixin = {
         this._renderAgentWorkspaceOverview();
     },
 
-    _acceptRecommendedPlanAndBuild() {
-        if (!this.pendingVisionPlan) return;
-        this.planQuestionSelections = Object.fromEntries(
-            this.pendingVisionPlan.questions.map(question => [
-                question.id,
-                question.options.find(option => option.recommended)?.value || question.defaultValue
-            ])
-        );
-        this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan, { acceptedRecommended: true });
-        this._startBuildFromCurrentPlan({ acceptedRecommended: true });
-    },
-
     _startBuildFromCurrentPlan({ acceptedRecommended = false } = {}) {
         if (this.isGenerating) return false;
 
@@ -3254,6 +3296,7 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const plan = this.pendingVisionPlan;
+        this._ensureRecommendedPlanQuestionSelections?.(plan);
         this._refreshPlanEffectiveBuildReadiness?.(plan, { acceptedRecommended });
         if (plan.executable !== true) {
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;

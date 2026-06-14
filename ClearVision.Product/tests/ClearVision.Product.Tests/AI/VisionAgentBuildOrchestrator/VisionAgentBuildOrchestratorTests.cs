@@ -70,6 +70,51 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ResourceKey == "op_surface_defect.ModelId");
     }
 
+    [Fact(DisplayName = "BuildFromPlan should allow editable draft when image source is pending but acquisition route exists")]
+    public async Task BuildAsync_PendingImageSourceWithAcquisitionRoute_ShouldBuildEditableDraft()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "steering wheel logo appearance defect workflow");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["hard_requirement:image_source_missing"],
+            SemanticExtraction = baseline.SemanticExtraction! with
+            {
+                ImageSource = string.Empty
+            },
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanBuild = false,
+                MissingFields = ["image_source"],
+                BlockingReasons = ["image_source_missing"],
+                PublicReason = "图像来源需要在部署前绑定。"
+            }
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, acceptedRecommendedDefaults: false),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var build = result.BuildResult!;
+        build.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"]);
+        build.MissingResources.Should().Contain(item =>
+            item.ResourceType == "camera_binding" &&
+            item.ResourceKey == "op_cam.CameraId");
+        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+        build.ApplyGate.DeploymentReady.Should().BeFalse();
+    }
+
     [Fact(DisplayName = "Black-box scenario: metal scratch Build quality")]
     public async Task BuildAsync_BlackBoxMetalScratch_ShouldProduceDeployBlockedSurfaceDefectDraft()
     {

@@ -1960,7 +1960,8 @@ test('Plan Mode captures vague inspection request without starting Build', async
   assert.match(plan.innerHTML, /裂纹/);
   assert.match(plan.innerHTML, /凹痕\/污渍/);
   assert.match(plan.innerHTML, /阈值需要结合样品确认/);
-  assert.match(plan.innerHTML, /按推荐方案开始构建/);
+  assert.match(plan.innerHTML, /开始构建/);
+  assert.doesNotMatch(plan.innerHTML, /按推荐方案开始构建/);
   assert.match(plan.innerHTML, /资源补齐会在开始构建后出现/);
   assert.match(overview.innerHTML, /Plan 规划/);
   assert.match(overview.innerHTML, /Build 审计/);
@@ -2104,7 +2105,8 @@ test('ordinary build prompt stays Plan-first even when Tool Loop mode is selecte
   assert.match(plan.innerHTML, /推荐方案/);
   assert.match(plan.innerHTML, /关键问题/);
   assert.match(plan.innerHTML, /推荐默认值/);
-  assert.match(plan.innerHTML, /按推荐方案开始构建/);
+  assert.match(plan.innerHTML, /开始构建/);
+  assert.doesNotMatch(plan.innerHTML, /按推荐方案开始构建/);
   assert.doesNotMatch(overview.innerHTML, /VisionAgentLoop/);
 });
 
@@ -2135,7 +2137,8 @@ test('quick example selection submits through Plan-first path', async () => {
   assert.equal(capturedPlanRequest.description, '检测金属零件表面的划痕缺陷。');
   assert.equal(panel.agentWorkspaceMode, 'plan');
   assert.equal(panel.pendingVisionPlan.goal, 'quick example plan');
-  assert.match(plan.innerHTML, /按推荐方案开始构建/);
+  assert.match(plan.innerHTML, /开始构建/);
+  assert.doesNotMatch(plan.innerHTML, /按推荐方案开始构建/);
 });
 
 test('unknown skipPlan and build-like explicit modes cannot bypass Plan', async () => {
@@ -2312,7 +2315,7 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
 
   assert.equal(panel.pendingVisionPlan.goal, 'streamed plan ready');
   assert.equal(panel.isGenerating, false);
-  assert.match(turn.replyBody.textContent, /规划已完成，可以接受推荐默认值或调整选项后开始构建/);
+  assert.match(turn.replyBody.textContent, /规划已完成，推荐项已作为当前选择，可调整选项后开始构建/);
   assert.match(collectProcessText(turn), /收集上下文：完成/);
   assert.match(collectProcessText(turn), /模型规划：进行中|模型规划：完成/);
   assert.match(collectProcessText(turn), /契约校验：完成/);
@@ -2818,7 +2821,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
     return true;
   };
 
-  const started = panel._startBuildFromCurrentPlan({ acceptedRecommended: true });
+  const started = panel._startBuildFromCurrentPlan();
 
   assert.equal(started, true);
   assert.equal(panel.agentWorkspaceMode, 'build');
@@ -2828,6 +2831,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   assert.equal(captured.hint, '');
   assert.match(captured.userMessage, /从计划开始构建/);
   assert.equal(captured.buildFromPlan.planHash, 'sha256:plan-build-1');
+  assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
   assert.deepEqual(captured.buildFromPlan.templateSelection, {
     mode: 'template_adapt',
     templateId: 'tmpl-plan',
@@ -2836,7 +2840,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   assert.deepEqual(captured.templateSelection, captured.buildFromPlan.templateSelection);
 });
 
-test('Strategy confirmation blocker keeps frontend Plan non-executable and defaultValue is not submitted', async () => {
+test('Recommended strategy is selected by default and submitted through unified Build button', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const planWorkspace = createFakeElement();
@@ -2854,24 +2858,28 @@ test('Strategy confirmation blocker keeps frontend Plan non-executable and defau
     return true;
   };
 
-  assert.equal(panel.pendingVisionPlan.executable, false);
-  assert.deepEqual(panel._buildPlanSelectionMap(panel.pendingVisionPlan), {});
-
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
-  assert.match(planWorkspace.innerHTML, /需确认策略/);
+  assert.equal(panel.pendingVisionPlan.executable, true);
+  assert.deepEqual(panel.planQuestionSelections, { model_or_rule_strategy: 'deep_learning' });
+  assert.deepEqual(panel._buildPlanSelectionMap(panel.pendingVisionPlan), {
+    model_or_rule_strategy: 'deep_learning'
+  });
+  assert.match(planWorkspace.innerHTML, /aria-pressed="true"/);
 
   const started = panel._startBuildFromCurrentPlan();
-  assert.equal(started, false);
-  assert.equal(captured, null);
-  assert.match(panel.lastResultStatusNote.text, /需确认策略/);
+  assert.equal(started, true);
+  assert.equal(captured.skipPlan, true);
+  assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
+  assert.equal(captured.buildFromPlan.userSelections.model_or_rule_strategy, 'deep_learning');
 });
 
-test('Accept recommended strategy sends recommended value as explicit BuildFromPlan selection', async () => {
+test('Explicit strategy switch is submitted through unified Build button', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
   panel.container = createContainer({
     '#ai-agent-workspace-overview': createFakeElement(),
-    '#ai-plan-workspace': createFakeElement(),
+    '#ai-plan-workspace': planWorkspace,
     '#ai-build-workspace': createFakeElement(),
     '#ai-result-status-note': createFakeElement()
   });
@@ -2883,12 +2891,15 @@ test('Accept recommended strategy sends recommended value as explicit BuildFromP
     return true;
   };
 
-  panel._acceptRecommendedPlanAndBuild();
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  panel._selectPlanQuestionOption('model_or_rule_strategy', 'traditional_rule');
+  const started = panel._startBuildFromCurrentPlan();
 
+  assert.equal(started, true);
   assert.equal(captured.skipPlan, true);
-  assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, true);
-  assert.equal(captured.buildFromPlan.userSelections.model_or_rule_strategy, 'deep_learning');
-  assert.deepEqual(panel.planQuestionSelections, { model_or_rule_strategy: 'deep_learning' });
+  assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
+  assert.equal(captured.buildFromPlan.userSelections.model_or_rule_strategy, 'traditional_rule');
+  assert.deepEqual(panel.planQuestionSelections, { model_or_rule_strategy: 'traditional_rule' });
   assert.equal(panel.pendingVisionPlan.executable, true);
 });
 
@@ -2896,7 +2907,7 @@ test('Backend Plan without explicit canBuild is not executable by default', asyn
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const inlineBuildButton = createFakeButton();
-  const planActionButtons = [createFakeButton(), createFakeButton()];
+  const planActionButtons = [createFakeButton()];
   const overview = createFakeElement();
   const planWorkspace = createFakeElement();
   panel.container = createContainer(
@@ -2939,7 +2950,7 @@ test('Backend Plan with canBuild true but missing RequirementMaturity remains no
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const inlineBuildButton = createFakeButton();
-  const planActionButtons = [createFakeButton(), createFakeButton()];
+  const planActionButtons = [createFakeButton()];
   const overview = createFakeElement();
   panel.container = createContainer(
     {
@@ -3007,6 +3018,72 @@ test('Backend Plan can be plannable while Build remains disabled', async () => {
   assert.equal(inlineBuildButton.disabled, true);
 });
 
+test('Plan with pending image source and acquisition route can start editable draft', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  const planActionButton = createFakeButton();
+  const buildStatus = createFakeElement();
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': createFakeElement(),
+      '#ai-plan-workspace': planWorkspace,
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': inlineBuildButton,
+      '#ai-plan-build-status': buildStatus
+    },
+    { '.ai-plan-action': [planActionButton] }
+  );
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    goal: 'logo appearance defect workflow',
+    canBuild: false,
+    recommendedRoute: {
+      routeId: 'surface_defect_with_pending_camera',
+      title: 'Surface defect route',
+      summary: 'Acquisition placeholder plus defect judgment.',
+      operators: ['ImageAcquisition', 'SurfaceDefectDetection', 'ResultJudgment', 'ResultOutput']
+    },
+    blockingReasons: ['hard_requirement:image_source_missing'],
+    semanticExtraction: {
+      isVisionRequest: true,
+      source: 'model',
+      taskType: 'surface_defect',
+      confidence: 0.9,
+      taskTypeConfidence: 0.9,
+      inspectionObject: 'steering wheel logo area',
+      defectType: 'appearance defect',
+      imageSource: '',
+      okCondition: 'logo area has no visible defect',
+      ngCondition: 'scratch, dirt, deformation, or missing print',
+      outputTarget: 'OK/NG result',
+      missingFields: ['image_source']
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['logo area'],
+      taskSignals: ['appearance defect'],
+      missingFields: ['image_source'],
+      blockingReasons: ['image_source_missing'],
+      publicReason: '图像来源需要在部署前绑定。'
+    }
+  }));
+
+  panel.pendingVisionPlan = plan;
+  panel._renderPlanWorkspace(plan);
+
+  assert.equal(plan.executable, true);
+  assert.equal(inlineBuildButton.disabled, false);
+  assert.equal(planActionButton.disabled, false);
+  assert.equal(buildStatus.textContent, '当前选择已满足构建条件');
+  assert.match(planWorkspace.innerHTML, /开始构建/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /按推荐方案开始构建/);
+});
+
 test('Backend Plan renders semantic extraction slots and keeps them in Build snapshot', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -3069,7 +3146,7 @@ test('Backend Plan with explicit canBuild true and actionable maturity enables B
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const inlineBuildButton = createFakeButton();
-  const planActionButtons = [createFakeButton(), createFakeButton()];
+  const planActionButtons = [createFakeButton()];
   const planWorkspace = createFakeElement();
   const overview = createFakeElement();
   panel.container = createContainer(
