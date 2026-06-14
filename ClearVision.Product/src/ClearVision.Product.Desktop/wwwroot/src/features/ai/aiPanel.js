@@ -116,6 +116,8 @@ export class AiPanel {
         this.pendingVisionPlan = null;
         this.pendingClarificationPayload = null;
         this.planQuestionSelections = {};
+        this.planQuestionAnswers = {};
+        this.planAnswerRevision = 0;
 
         // 应用预览与撤销
         this._preApplySnapshot = null;
@@ -543,7 +545,11 @@ export class AiPanel {
         this._updateApplyButtonState();
         if (attachBtn) attachBtn.addEventListener('click', this._handleAttachmentClick);
         if (cancelBtn) cancelBtn.addEventListener('click', this._handleCancelGenerate);
-        if (inlineBuildBtn) inlineBuildBtn.addEventListener('click', () => this._startBuildFromCurrentPlan());
+        if (inlineBuildBtn) {
+            inlineBuildBtn.addEventListener('click', event => this._startBuildFromCurrentPlan({
+                acceptedRecommended: event.currentTarget?.dataset?.acceptRecommended === 'true'
+            }));
+        }
         const newSessionBtn = this.container.querySelector('#ai-btn-new-session');
         if (newSessionBtn) newSessionBtn.addEventListener('click', this._handleNewConversation);
         const historyBtn = this.container.querySelector('#ai-btn-history');
@@ -833,7 +839,7 @@ export class AiPanel {
         if (isClarification) {
             this.pendingClarificationPayload = payload;
             this.pendingVisionPlan = null;
-            this.planQuestionSelections = {};
+            this._clearPlanQuestionAnswers?.();
             this._resetClarificationSelectionDraft();
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);

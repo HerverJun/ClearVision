@@ -22,6 +22,26 @@ internal sealed record BuildPlanLoad
     public VisionAgentPlanModeResult? Plan { get; init; }
     public IReadOnlyDictionary<string, string> UserSelections { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyList<VisionAgentPlanAnswer> ConfirmedAnswers { get; init; } = [];
+    public VisionAgentPlanAnswerValidationResult ValidatedPlanAnswers { get; init; } =
+        new([], new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            [], [], [], [], string.Empty, []);
+    public VisionAgentEffectiveRequirement EffectiveRequirement { get; init; } =
+        new(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            new AiRequirementMaturityResult(),
+            [], []);
+    public IReadOnlyDictionary<string, string> RequirementAnswers { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<string, string> BuildDecisions { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<string, string> ParameterSelections { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyList<string> ResolvedFields { get; init; } = [];
+    public IReadOnlyList<string> RemainingFields { get; init; } = [];
+    public string AnswerSetFingerprint { get; init; } = string.Empty;
+    public string RequirementMode { get; init; } = AiRequirementModes.Strict;
     public IReadOnlyList<string> AcceptedDefaults { get; init; } = [];
     public bool AcceptedRecommendedDefaults { get; init; }
     public string CurrentFlowSnapshot { get; init; } = string.Empty;

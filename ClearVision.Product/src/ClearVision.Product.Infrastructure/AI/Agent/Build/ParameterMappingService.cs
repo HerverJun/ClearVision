@@ -83,7 +83,7 @@ public sealed class ParameterMappingService
                 pendingParameterCount = resolution.PendingParameters.Count,
                 missingResourceCount = resolution.MissingResources.Count,
                 parameterStrategy = resolution.ParameterStrategy,
-                selections = load.UserSelections.Keys.ToList(),
+                selections = load.ParameterSelections.Keys.ToList(),
                 acceptedDefaults = load.AcceptedDefaults,
                 metadataOnly = true
             },
@@ -132,8 +132,8 @@ public sealed class ParameterMappingService
     {
         var key = $"{op.OperatorType}.{parameter.Name}";
         if (!IsTraditionalNumericRuleProtectedParameter(op.OperatorType, parameter.Name, parameterStrategy) &&
-            (load.UserSelections.TryGetValue(parameter.Name, out var direct) ||
-             load.UserSelections.TryGetValue(key, out direct)))
+            (load.ParameterSelections.TryGetValue(parameter.Name, out var direct) ||
+             load.ParameterSelections.TryGetValue(key, out direct)))
         {
             return new VisionAgentParameterMapping
             {
@@ -396,11 +396,12 @@ public sealed class ParameterMappingService
                      "ExpectValue",
                      "classification_ok_label",
                      "ok_label",
-                     "target_attribute",
-                     "targetAttribute"
-                 })
+            "target_attribute",
+            "targetAttribute"
+         })
         {
-            if (load.UserSelections.TryGetValue(key, out var selected) &&
+            if ((load.ParameterSelections.TryGetValue(key, out var selected) ||
+                 load.RequirementAnswers.TryGetValue(key, out selected)) &&
                 !string.IsNullOrWhiteSpace(selected))
             {
                 return VisionAgentBuildSupport.CleanValue(selected);

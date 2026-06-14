@@ -149,6 +149,29 @@ public sealed class VisionAgentRequirementMaturityGateTests
         result.MissingFields.Should().NotContain("task_type");
     }
 
+    [Fact(DisplayName = "Maturity gate should only ask semantic fields that are actually missing")]
+    public void Evaluate_WithSemanticImageSourceOnly_ShouldNotAskImageSourceAgain()
+    {
+        var semantic = new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.Unknown,
+            Confidence = 0.8,
+            ImageSource = "camera",
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
+
+        var result = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest { Description = "use camera input" },
+            semantic);
+
+        result.CanPlan.Should().BeFalse();
+        result.MissingFields.Should().Contain(["inspection_object", "task_type", "acceptance_criteria"]);
+        result.MissingFields.Should().NotContain("image_source");
+    }
+
     [Fact(DisplayName = "Semantic failure should fall back to legacy rule maturity")]
     public void Evaluate_WithSemanticFailure_ShouldUseRuleFallback()
     {

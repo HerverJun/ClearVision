@@ -12,6 +12,7 @@ public sealed record VisionAgentRequirementMaturityRequest
     public bool HasPendingPlan { get; init; }
     public bool DeveloperDirectBuildDebug { get; init; }
     public AiTemplateSelectionInfo? TemplateSelection { get; init; }
+    public string RequirementMode { get; init; } = AiRequirementModes.Strict;
 }
 
 internal sealed record VisionAgentRequirementSemanticSlots(
@@ -355,6 +356,7 @@ public static class VisionAgentRequirementMaturityGate
         var canPlan = hasObject || hasTaskType || semantic.CanPlanCandidate || request.TemplateSelection != null;
         if (!canPlan)
         {
+            var semanticMissingFields = BuildMissingFields(hasObject, hasTaskType, hasImageSource, hasAcceptance);
             return Result(
                 AiRequirementMaturity.Ambiguous,
                 AiVisionTaskTypes.Unknown,
@@ -362,7 +364,7 @@ public static class VisionAgentRequirementMaturityGate
                 canBuild: false,
                 objectSignals,
                 taskSignals,
-                ["inspection_object", "task_type", "image_source", "acceptance_criteria"],
+                semanticMissingFields,
                 ["inspection_object_missing", "task_type_missing"],
                 "语义抽取未形成可规划的视觉工程需求。");
         }
@@ -501,6 +503,36 @@ public static class VisionAgentRequirementMaturityGate
         }
 
         if (!ContainsAny(text, ["OK", "NG", "判定", "标准", "阈值", "公差", "输出", "report", "tolerance", "criteria"]))
+        {
+            missing.Add("acceptance_criteria");
+        }
+
+        return missing;
+    }
+
+    private static List<string> BuildMissingFields(
+        bool hasObject,
+        bool hasTaskType,
+        bool hasImageSource,
+        bool hasAcceptance)
+    {
+        var missing = new List<string>();
+        if (!hasObject)
+        {
+            missing.Add("inspection_object");
+        }
+
+        if (!hasTaskType)
+        {
+            missing.Add("task_type");
+        }
+
+        if (!hasImageSource)
+        {
+            missing.Add("image_source");
+        }
+
+        if (!hasAcceptance)
         {
             missing.Add("acceptance_criteria");
         }

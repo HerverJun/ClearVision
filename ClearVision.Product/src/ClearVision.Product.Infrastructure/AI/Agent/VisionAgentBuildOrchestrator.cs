@@ -74,25 +74,6 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
         var autoRepairs = new List<VisionAgentBuildRepairRecord>();
         var build = request.BuildFromPlan;
         var plan = build?.PlanSnapshot;
-        var maturityGate = EnforceMaturityGate(request, build, plan);
-        if (maturityGate != null)
-        {
-            _eventSink?.StageCompleted(
-                runId,
-                "requirement_maturity_gate",
-                "Build blocked by requirement maturity gate",
-                maturityGate.RequirementMaturity?.PublicReason ?? "Requirement maturity gate blocked Build.",
-                new
-                {
-                    maturity = maturityGate.RequirementMaturity?.Maturity ?? string.Empty,
-                    taskType = maturityGate.RequirementMaturity?.TaskType ?? string.Empty,
-                    canBuild = maturityGate.RequirementMaturity?.CanBuild ?? false,
-                    blockingReasons = maturityGate.RequirementMaturity?.BlockingReasons ?? [],
-                    metadataOnly = true,
-                    redactionPass = true
-                });
-            return maturityGate;
-        }
 
         try
         {
@@ -117,6 +98,30 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                     metadataOnly = true,
                     redactionPass = true
                 });
+
+            var maturityGate = EnforceMaturityGate(request, loadPlan.Payload);
+            if (maturityGate != null)
+            {
+                _eventSink?.StageCompleted(
+                    runId,
+                    "requirement_maturity_gate",
+                    "Build blocked by requirement maturity gate",
+                    maturityGate.RequirementMaturity?.PublicReason ?? "Requirement maturity gate blocked Build.",
+                    new
+                    {
+                        maturity = maturityGate.RequirementMaturity?.Maturity ?? string.Empty,
+                        taskType = maturityGate.RequirementMaturity?.TaskType ?? string.Empty,
+                        canBuild = maturityGate.RequirementMaturity?.CanBuild ?? false,
+                        blockingReasons = maturityGate.DecisionTrace?.BlockingReasons ?? [],
+                        resolvedFields = loadPlan.Payload.ResolvedFields,
+                        remainingFields = loadPlan.Payload.RemainingFields,
+                        answerSetFingerprint = loadPlan.Payload.AnswerSetFingerprint,
+                        requirementMode = loadPlan.Payload.RequirementMode,
+                        metadataOnly = true,
+                        redactionPass = true
+                    });
+                return maturityGate;
+            }
 
             var intent = await _toolRunner.ExecuteEvidenceStepAsync(
                 runId,
@@ -165,13 +170,11 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 .ToList();
             if (blockingSelectionReasons.Count > 0)
             {
-                var maturityRequest = BuildMaturityRequest(request, build);
+                var maturityRequest = BuildMaturityRequest(request, build, loadPlan.Payload);
                 return BuildMaturityBlockedResult(
                     request,
                     maturityRequest,
-                    loadPlan.Payload.Plan?.RequirementMaturity ??
-                    build?.RequirementMaturity ??
-                    VisionAgentRequirementMaturityGate.Evaluate(maturityRequest),
+                    loadPlan.Payload.EffectiveRequirement.Maturity,
                     blockingSelectionReasons);
             }
 
@@ -380,25 +383,26 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
 
     private static AiFlowGenerationResult? EnforceMaturityGate(
         AiFlowGenerationRequest request,
-        VisionAgentBuildFromPlanRequest? build,
-        VisionAgentPlanModeResult? plan)
+        BuildPlanLoad load)
     {
-        var maturityRequest = BuildMaturityRequest(request, build);
+        var plan = load.Plan;
+        var maturityRequest = BuildMaturityRequest(request, request.BuildFromPlan, load);
         if (plan != null)
         {
             var readiness = VisionAgentPlanBuildReadiness.Evaluate(
                 plan,
-                build?.UserSelections,
-                build?.AcceptedDefaults,
-                build?.AcceptedRecommendedDefaults == true);
+                load.BuildDecisions,
+                load.AcceptedDefaults,
+                load.AcceptedRecommendedDefaults,
+                load.ValidatedPlanAnswers,
+                load.EffectiveRequirement,
+                load.RequirementMode);
             if (readiness.CanBuild)
             {
                 return null;
             }
 
-            var planMaturity = plan.RequirementMaturity ??
-                               build?.RequirementMaturity ??
-                               VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, plan.SemanticExtraction);
+            var planMaturity = load.EffectiveRequirement.Maturity;
             return BuildMaturityBlockedResult(
                 request,
                 maturityRequest,
@@ -408,16 +412,14 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
 
         if (plan?.CanBuild == true &&
             plan.RequirementMaturity == null &&
-            build?.RequirementMaturity == null)
+            request.BuildFromPlan?.RequirementMaturity == null)
         {
             return null;
         }
 
-        var maturity = plan?.RequirementMaturity ??
-                       build?.RequirementMaturity ??
-                       VisionAgentRequirementMaturityGate.Evaluate(maturityRequest);
+        var maturity = load.EffectiveRequirement.Maturity;
         var blocked = plan?.CanBuild == false ||
-                      build?.RequirementMaturity?.CanBuild == false ||
+                      request.BuildFromPlan?.RequirementMaturity?.CanBuild == false ||
                       !maturity.CanBuild ||
                       maturity.Maturity is AiRequirementMaturity.AbstractGoal or AiRequirementMaturity.Ambiguous or AiRequirementMaturity.ChatOrHelp;
         if (!blocked)
@@ -434,7 +436,8 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
 
     private static VisionAgentRequirementMaturityRequest BuildMaturityRequest(
         AiFlowGenerationRequest request,
-        VisionAgentBuildFromPlanRequest? build)
+        VisionAgentBuildFromPlanRequest? build,
+        BuildPlanLoad? load = null)
     {
         return new VisionAgentRequirementMaturityRequest
         {
@@ -443,7 +446,8 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             Mode = build?.BuildIntent ?? request.Mode.ToWireValue(),
             HasCurrentFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson) ||
                              !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot),
-            TemplateSelection = build?.TemplateSelection ?? request.TemplateSelection
+            TemplateSelection = build?.TemplateSelection ?? request.TemplateSelection,
+            RequirementMode = load?.RequirementMode ?? request.RequirementMode
         };
     }
 
@@ -459,11 +463,14 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             "build_blocked",
             "clarifying",
             "maturity_gate_blocked");
-        var fields = maturity.MissingFields.Count > 0
-            ? maturity.MissingFields
-            : overrideBlockingReasons?.Count > 0
-                ? overrideBlockingReasons.ToList()
-                : ["inspection_object", "task_type", "image_source", "acceptance_criteria"];
+        var fields = (maturity.MissingFields.Count > 0
+                ? maturity.MissingFields
+                : overrideBlockingReasons?.Count > 0
+                    ? overrideBlockingReasons.Select(NormalizeBlockingField).ToList()
+                    : ["inspection_object", "task_type", "image_source", "acceptance_criteria"])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         var blockingReasons = overrideBlockingReasons?.Count > 0
             ? overrideBlockingReasons.ToList()
             : maturity.BlockingReasons;
@@ -520,6 +527,31 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             InteractionState = AiInteractionStates.Clarifying,
             RouterConfidence = AiRouterConfidence.High
         };
+    }
+
+    private static string NormalizeBlockingField(string reason)
+    {
+        var value = (reason ?? string.Empty).Trim();
+        if (value.Contains("strategy_confirmation", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("model_or_rule_strategy", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("classification_strategy", StringComparison.OrdinalIgnoreCase) ||
+            value.Contains("algorithm_strategy", StringComparison.OrdinalIgnoreCase))
+        {
+            return VisionAgentPlanAnswerFields.AlgorithmStrategy;
+        }
+
+        foreach (var field in VisionAgentPlanFieldPolicy.CanonicalFields)
+        {
+            if (value.Contains(field, StringComparison.OrdinalIgnoreCase))
+            {
+                return field;
+            }
+        }
+
+        return value
+            .Replace("hard_requirement:", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("_missing", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim(':');
     }
 
     private static bool ShouldAttemptRepair(

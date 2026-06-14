@@ -1306,6 +1306,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
         var payload = new
         {
+            planContractVersion = NormalizePlanContractVersion(plan),
             goal = Clean(plan.Goal),
             intent = Clean(plan.Intent),
             confidence = Clean(plan.Confidence),
@@ -1322,6 +1323,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 .Select(question => new
                 {
                     id = Clean(question.Id),
+                    field = NormalizePlanContractVersion(plan) == VisionAgentPlanContractVersions.V2
+                        ? Clean(question.Field)
+                        : string.Empty,
                     title = Clean(question.Title),
                     why = Clean(question.Why),
                     defaultValue = Clean(question.DefaultValue),
@@ -1383,6 +1387,18 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var json = JsonSerializer.Serialize(payload, PlanHashJsonOptions);
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
         return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()}";
+    }
+
+    private static string NormalizePlanContractVersion(VisionAgentPlanModeResult plan)
+    {
+        var version = Clean(plan.PlanContractVersion);
+        if (version.Equals(VisionAgentPlanContractVersions.V2, StringComparison.OrdinalIgnoreCase) &&
+            plan.ClarificationQuestions.Any(question => !string.IsNullOrWhiteSpace(question.Field)))
+        {
+            return VisionAgentPlanContractVersions.V2;
+        }
+
+        return VisionAgentPlanContractVersions.V1;
     }
 
     private void EmitPlanHashDiagnosticIfNeeded(
@@ -1889,6 +1905,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         return new VisionAgentClarificationQuestion
         {
             Id = id,
+            Field = VisionAgentPlanFieldPolicy.ResolveQuestionField(new VisionAgentClarificationQuestion { Id = id }),
             Title = title,
             Why = why,
             DefaultValue = defaultValue,

@@ -84,6 +84,8 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<IVisionAgentSemanticExtractionCompletionSource, LlmVisionAgentSemanticExtractionCompletionSource>();
         services.AddScoped<IVisionAgentSemanticExtractorService, VisionAgentSemanticExtractorService>();
         services.AddScoped<IVisionAgentOperatorContractCatalog, VisionAgentOperatorContractCatalog>();
+        services.AddScoped<VisionAgentPlanAnswerValidator>();
+        services.AddScoped<VisionAgentPlanRequirementOverlay>();
         services.AddScoped<BuildToolRunner>();
         services.AddScoped<BuildPlanContextLoader>();
         services.AddScoped<BuildIntentResolver>();

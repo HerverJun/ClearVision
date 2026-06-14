@@ -831,6 +831,7 @@ PlannerCandidateParsed:
         return question with
         {
             Id = SafeIdentifier(question.Id, "clarification"),
+            Field = VisionAgentPlanFieldPolicy.ResolveQuestionField(question),
             Title = FallbackText(question.Title, "关键澄清问题"),
             Why = FallbackText(question.Why, "这会影响算子链、参数或发布就绪。"),
             DefaultValue = FallbackText(question.DefaultValue, recommended),
@@ -998,8 +999,10 @@ PlannerCandidateParsed:
             classified.Count == 0)
         {
             var strategyQuestionId = questions?
-                .Select(question => question.Id)
-                .FirstOrDefault(VisionAgentStrategyConfirmationSupport.IsStrategyQuestionId);
+                .FirstOrDefault(question =>
+                    VisionAgentStrategyConfirmationSupport.IsStrategyQuestionId(question.Id) ||
+                    VisionAgentStrategyConfirmationSupport.IsStrategyQuestionId(question.Field))
+                ?.Id;
             classified.Add(string.IsNullOrWhiteSpace(strategyQuestionId)
                 ? "strategy_confirmation:planner_candidate_not_buildable"
                 : $"strategy_confirmation:{strategyQuestionId}_missing");
@@ -1092,6 +1095,7 @@ PlannerCandidateParsed:
         return question with
         {
             Id = SafeIdentifier(question.Id, "clarification"),
+            Field = VisionAgentPlanFieldPolicy.ResolveQuestionField(question),
             Title = SafeText(question.Title, notes),
             Why = SafeText(question.Why, notes),
             DefaultValue = SafeIdentifier(question.DefaultValue, "default"),
@@ -1260,7 +1264,7 @@ public sealed class VisionAgentPlanPromptComposer
             "You are ClearVision Plan Mode, an industrial vision engineering planner.",
             "Return exactly one JSON object that matches PlannerCandidate. No prose, markdown, comments, raw prompt, system prompt, reasoning, or chain-of-thought.",
             "You must plan from public metadata only. Do not include local paths, image bytes/base64, tokens, secrets, PLC addresses, Station IPs, camera resource paths, or hidden reasoning.",
-            "Generate 2 to 5 high-value clarification questions. Each question needs id, title, why, defaultValue, defaultAssumption, impact, and 2 to 5 options. Exactly one or more options must have recommended=true.",
+            "Generate 2 to 5 high-value clarification questions. Each question needs id, field, title, why, defaultValue, defaultAssumption, impact, and 2 to 5 options. The field must be one of inspection_object, task_type, image_source, acceptance_criteria, output_target, target_attribute, defect_type, measurement_target, algorithm_strategy, roi_strategy, template_strategy. Exactly one or more options must have recommended=true.",
             "Use only operator types from the provided operator catalog. Missing camera/model/template/calibration/PLC resources must stay pending metadata.",
             "If a templateSelection is provided, respect it and do not replace it.",
             "Required top-level fields: goal, intent, confidence, requirementUnderstanding, recommendedRoute, clarificationQuestions, recommendedDefaults, risks, acceptanceCriteria, executablePlan, canBuildCandidate, blockingReasons, nextAction.",
@@ -1524,6 +1528,7 @@ public sealed class VisionAgentPlanPromptComposer
   "clarificationQuestions": [
     {
       "id": "stable_question_id",
+      "field": "algorithm_strategy",
       "title": "question",
       "why": "impact",
       "defaultValue": "recommended option value",

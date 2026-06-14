@@ -8,10 +8,17 @@ namespace ClearVision.Product.Infrastructure.AI.Agent;
 public sealed class BuildPlanContextLoader
 {
     private readonly IAgentRunEventSink? _eventSink;
+    private readonly VisionAgentPlanAnswerValidator _answerValidator;
+    private readonly VisionAgentPlanRequirementOverlay _requirementOverlay;
 
-    public BuildPlanContextLoader(IAgentRunEventSink? eventSink = null)
+    public BuildPlanContextLoader(
+        IAgentRunEventSink? eventSink = null,
+        VisionAgentPlanAnswerValidator? answerValidator = null,
+        VisionAgentPlanRequirementOverlay? requirementOverlay = null)
     {
         _eventSink = eventSink;
+        _answerValidator = answerValidator ?? new VisionAgentPlanAnswerValidator();
+        _requirementOverlay = requirementOverlay ?? new VisionAgentPlanRequirementOverlay();
     }
 
     internal BuildStepResult<BuildPlanLoad> Load(
@@ -48,6 +55,24 @@ public sealed class BuildPlanContextLoader
 
         var currentFlowSnapshot = VisionAgentBuildSupport.FirstNonEmpty(build?.CurrentFlowSnapshot, request.ExistingFlowJson);
         var templateSelection = build?.TemplateSelection ?? request.TemplateSelection ?? plan?.TemplateSelection;
+        var requirementMode = NormalizeRequirementMode(request.RequirementMode);
+        var maturityRequest = new VisionAgentRequirementMaturityRequest
+        {
+            Description = build?.OriginalUserPrompt ?? request.Description,
+            AdditionalContext = request.AdditionalContext,
+            Mode = build?.BuildIntent ?? request.Mode.ToWireValue(),
+            HasCurrentFlow = !string.IsNullOrWhiteSpace(request.ExistingFlowJson) ||
+                             !string.IsNullOrWhiteSpace(build?.CurrentFlowSnapshot),
+            HasPendingPlan = plan != null,
+            TemplateSelection = templateSelection,
+            RequirementMode = requirementMode
+        };
+        var validatedAnswers = _answerValidator.Validate(
+            plan,
+            build?.ConfirmedAnswers,
+            build?.UserSelections,
+            build?.AcceptedRecommendedDefaults == true);
+        var effectiveRequirement = _requirementOverlay.Build(plan, validatedAnswers, maturityRequest);
         var payload = new BuildPlanLoad
         {
             PlanId = VisionAgentBuildSupport.Clean(build?.PlanId) is { Length: > 0 } planId
@@ -59,6 +84,20 @@ public sealed class BuildPlanContextLoader
             ComputedPlanHash = computed,
             Plan = plan,
             UserSelections = build?.UserSelections ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            ConfirmedAnswers = build?.ConfirmedAnswers ?? [],
+            ValidatedPlanAnswers = validatedAnswers,
+            EffectiveRequirement = effectiveRequirement,
+            RequirementAnswers = validatedAnswers.RequirementAnswers,
+            BuildDecisions = validatedAnswers.BuildDecisions,
+            ParameterSelections = validatedAnswers.ParameterSelections,
+            ResolvedFields = effectiveRequirement.ResolvedFields
+                .Concat(validatedAnswers.ResolvedFields)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(field => field, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            RemainingFields = effectiveRequirement.RemainingFields,
+            AnswerSetFingerprint = validatedAnswers.AnswerSetFingerprint,
+            RequirementMode = requirementMode,
             AcceptedDefaults = build?.AcceptedDefaults ?? [],
             AcceptedRecommendedDefaults = build?.AcceptedRecommendedDefaults ?? false,
             CurrentFlowSnapshot = currentFlowSnapshot,
@@ -85,6 +124,15 @@ public sealed class BuildPlanContextLoader
                 planHash = payload.PlanHash,
                 hashMismatch,
                 userSelectionCount = payload.UserSelections.Count,
+                confirmedAnswerCount = payload.ConfirmedAnswers.Count,
+                acceptedAnswerCount = payload.ValidatedPlanAnswers.AcceptedAnswers.Count,
+                invalidQuestionIds = payload.ValidatedPlanAnswers.InvalidQuestionIds,
+                invalidValues = payload.ValidatedPlanAnswers.InvalidValues,
+                conflictedFields = payload.ValidatedPlanAnswers.ConflictedFields,
+                resolvedFields = payload.ResolvedFields,
+                remainingFields = payload.RemainingFields,
+                answerSetFingerprint = payload.AnswerSetFingerprint,
+                requirementMode = payload.RequirementMode,
                 acceptedDefaultCount = payload.AcceptedDefaults.Count,
                 hasCurrentFlow = payload.HasCurrentFlow,
                 templateSelectionMode = payload.TemplateSelection?.Mode ?? string.Empty,
@@ -117,5 +165,12 @@ public sealed class BuildPlanContextLoader
                 VisionAgentToolPermission.DeploymentPrepare
             }
         };
+    }
+
+    private static string NormalizeRequirementMode(string? value)
+    {
+        return string.Equals(value, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase)
+            ? AiRequirementModes.Draft
+            : AiRequirementModes.Strict;
     }
 }

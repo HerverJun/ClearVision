@@ -5,7 +5,10 @@ namespace ClearVision.Product.Infrastructure.AI.Agent;
 
 internal sealed record VisionAgentPlanBuildReadinessResult(
     bool CanBuild,
-    List<string> BlockingReasons);
+    List<string> BlockingReasons,
+    List<string> ResolvedFields,
+    List<string> RemainingFields,
+    List<string> Warnings);
 
 internal static class VisionAgentPlanBuildReadiness
 {
@@ -18,20 +21,24 @@ internal static class VisionAgentPlanBuildReadiness
 
     public static VisionAgentPlanBuildReadinessResult Evaluate(
         VisionAgentPlanModeResult? plan,
-        IReadOnlyDictionary<string, string>? userSelections = null,
+        IReadOnlyDictionary<string, string>? buildDecisions = null,
         IReadOnlyList<string>? acceptedDefaults = null,
-        bool acceptedRecommendedDefaults = false)
+        bool acceptedRecommendedDefaults = false,
+        VisionAgentPlanAnswerValidationResult? validatedAnswers = null,
+        VisionAgentEffectiveRequirement? effectiveRequirement = null,
+        string requirementMode = AiRequirementModes.Strict)
     {
         var blocking = new List<string>();
+        var warnings = new List<string>();
         if (plan == null)
         {
-            return new VisionAgentPlanBuildReadinessResult(false, ["plan_snapshot_missing"]);
+            return new VisionAgentPlanBuildReadinessResult(false, ["plan_snapshot_missing"], [], [], []);
         }
 
         blocking.AddRange(VisionAgentStrategyConfirmationSupport.ExtractHardBlockers(plan)
             .Where(reason => !IsDraftableImageSourceBlocker(plan, reason)));
 
-        var maturity = plan.RequirementMaturity;
+        var maturity = effectiveRequirement?.Maturity ?? plan.RequirementMaturity;
         if (maturity is { CanPlan: false } ||
             maturity?.Maturity is AiRequirementMaturity.AbstractGoal or AiRequirementMaturity.ChatOrHelp)
         {
@@ -41,10 +48,11 @@ internal static class VisionAgentPlanBuildReadiness
                 .Select(ClassifyHardRequirement));
         }
 
-        AddHardFieldBlockers(plan, blocking);
+        AddValidationBlockers(validatedAnswers, blocking, warnings);
+        AddHardFieldBlockers(plan, maturity, effectiveRequirement, requirementMode, blocking);
         var strategyConfirmation = VisionAgentStrategyConfirmationSupport.Resolve(
             plan,
-            userSelections,
+            buildDecisions,
             acceptedRecommendedDefaults);
         blocking.AddRange(strategyConfirmation.UnresolvedBlockers);
 
@@ -60,45 +68,73 @@ internal static class VisionAgentPlanBuildReadiness
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(12)
+                .ToList(),
+            effectiveRequirement?.ResolvedFields ?? validatedAnswers?.ResolvedFields ?? [],
+            effectiveRequirement?.RemainingFields ?? [],
+            warnings
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(12)
                 .ToList());
+    }
+
+    private static void AddValidationBlockers(
+        VisionAgentPlanAnswerValidationResult? validatedAnswers,
+        List<string> blocking,
+        List<string> warnings)
+    {
+        if (validatedAnswers == null)
+        {
+            return;
+        }
+
+        if (validatedAnswers.InvalidQuestionIds.Count > 0)
+        {
+            blocking.Add("hard_requirement:invalid_plan_answer_question");
+        }
+
+        if (validatedAnswers.InvalidValues.Count > 0)
+        {
+            blocking.Add("hard_requirement:invalid_plan_answer_value");
+        }
+
+        foreach (var field in validatedAnswers.ConflictedFields)
+        {
+            blocking.Add($"hard_requirement:conflicted_plan_answer:{field}");
+        }
+
+        warnings.AddRange(validatedAnswers.Warnings);
     }
 
     private static void AddHardFieldBlockers(
         VisionAgentPlanModeResult plan,
+        AiRequirementMaturityResult? maturity,
+        VisionAgentEffectiveRequirement? effectiveRequirement,
+        string requirementMode,
         List<string> blocking)
     {
-        var semantic = plan.SemanticExtraction;
-        if (semantic != null &&
-            semantic.IsVisionRequest &&
-            string.Equals(semantic.Source, VisionAgentSemanticSources.Model, StringComparison.OrdinalIgnoreCase))
+        if (effectiveRequirement != null)
         {
-            if (string.IsNullOrWhiteSpace(semantic.InspectionObject))
+            foreach (var field in effectiveRequirement.RemainingFields)
             {
-                blocking.Add("hard_requirement:inspection_object_missing");
-            }
+                if (field.Contains("image_source", StringComparison.OrdinalIgnoreCase) &&
+                    CanDraftWithPendingImageSource(plan))
+                {
+                    continue;
+                }
 
-            if (string.IsNullOrWhiteSpace(NormalizeTaskType(semantic.TaskType)))
-            {
-                blocking.Add("hard_requirement:task_type_missing");
-            }
-
-            if (string.IsNullOrWhiteSpace(semantic.ImageSource) &&
-                !CanDraftWithPendingImageSource(plan))
-            {
-                blocking.Add("hard_requirement:image_source_missing");
-            }
-
-            if (string.IsNullOrWhiteSpace(semantic.OkCondition) &&
-                string.IsNullOrWhiteSpace(semantic.NgCondition) &&
-                string.IsNullOrWhiteSpace(semantic.OutputTarget))
-            {
-                blocking.Add("hard_requirement:acceptance_criteria_missing");
+                var isBlocking = requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase)
+                    ? VisionAgentPlanFieldPolicy.IsDraftBlocking(field, maturity?.TaskType, maturity)
+                    : VisionAgentPlanFieldPolicy.IsStrictBlocking(field, maturity?.TaskType, maturity);
+                if (isBlocking)
+                {
+                    blocking.Add(ClassifyHardRequirement($"{field}_missing"));
+                }
             }
 
             return;
         }
 
-        var maturity = plan.RequirementMaturity;
         if (maturity == null)
         {
             blocking.Add("hard_requirement:requirement_maturity_missing");

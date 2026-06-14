@@ -214,7 +214,23 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         string source,
         string fallbackReason)
     {
-        var maturity = EvaluateMaturity(request);
+        var planAnswerUpdates = ExtractPlanAnswerUpdates(request);
+        var shouldResetPendingPlan = request.HasPendingPlan && LooksLikeExplicitNewPlanRequest(Clean(request.Description));
+        var shouldMergeIntoPendingPlan = request.HasPendingPlan &&
+                                         planAnswerUpdates.Count > 0 &&
+                                         !shouldResetPendingPlan;
+        var resolvedPlanFields = shouldMergeIntoPendingPlan
+            ? MergeResolvedPlanFields(request, planAnswerUpdates)
+            : NormalizePlanFields(request.ResolvedPlanFields.Concat(request.ConfirmedPlanAnswers.Select(answer => answer.Field)));
+        var remainingPlanFields = shouldMergeIntoPendingPlan
+            ? MergeRemainingPlanFields(request, planAnswerUpdates)
+            : NormalizePlanFields(request.RemainingPlanFields);
+        var effectiveRequest = request with
+        {
+            ResolvedPlanFields = resolvedPlanFields,
+            RemainingPlanFields = remainingPlanFields
+        };
+        var maturity = EvaluateMaturity(effectiveRequest);
         var intent = NormalizeIntent(candidate.Intent);
         var confidence = NormalizeConfidence(candidate.Confidence);
         var canBuild = intent is IntentActionableVisionPlan or IntentModifyExistingFlow or IntentBuildFromConfirmedPlan or IntentDirectBuildDebug;
@@ -250,7 +266,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         }
 
         ApplyMaturityGate(
-            request,
+            effectiveRequest,
             maturity,
             ref intent,
             ref confidence,
@@ -282,11 +298,16 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             SemanticExtraction = request.SemanticExtraction,
             RequirementMaturity = maturity,
             DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
-                ToMaturityRequest(request),
+                ToMaturityRequest(effectiveRequest),
                 maturity,
                 intent,
                 shouldBuildDirectly ? "build_ready" : shouldOpenPlan ? "planning" : needsClarification ? "clarifying" : "idle",
                 fallbackReason),
+            ShouldMergeIntoPendingPlan = shouldMergeIntoPendingPlan,
+            ShouldResetPendingPlan = shouldResetPendingPlan || !request.HasPendingPlan,
+            PlanAnswerUpdates = planAnswerUpdates,
+            ResolvedPlanFields = resolvedPlanFields,
+            RemainingPlanFields = remainingPlanFields,
             MetadataOnly = true
         };
     }
@@ -296,8 +317,24 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         string reason)
     {
         var text = Clean(request.Description);
-        var maturity = EvaluateMaturity(request);
-        var intent = ResolveRuleFallbackIntent(text, request, maturity);
+        var planAnswerUpdates = ExtractPlanAnswerUpdates(request);
+        var shouldResetPendingPlan = request.HasPendingPlan && LooksLikeExplicitNewPlanRequest(text);
+        var shouldMergeIntoPendingPlan = request.HasPendingPlan &&
+                                         planAnswerUpdates.Count > 0 &&
+                                         !shouldResetPendingPlan;
+        var resolvedPlanFields = shouldMergeIntoPendingPlan
+            ? MergeResolvedPlanFields(request, planAnswerUpdates)
+            : NormalizePlanFields(request.ResolvedPlanFields.Concat(request.ConfirmedPlanAnswers.Select(answer => answer.Field)));
+        var remainingPlanFields = shouldMergeIntoPendingPlan
+            ? MergeRemainingPlanFields(request, planAnswerUpdates)
+            : NormalizePlanFields(request.RemainingPlanFields);
+        var effectiveRequest = request with
+        {
+            ResolvedPlanFields = resolvedPlanFields,
+            RemainingPlanFields = remainingPlanFields
+        };
+        var maturity = EvaluateMaturity(effectiveRequest);
+        var intent = ResolveRuleFallbackIntent(text, effectiveRequest, maturity);
         var isCasual = intent == IntentCasualChat;
         var isHelp = intent == IntentHelp;
         var isActionable = intent == IntentActionableVisionPlan;
@@ -314,7 +351,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         var fallbackReason = reason;
 
         ApplyMaturityGate(
-            request,
+            effectiveRequest,
             maturity,
             ref intent,
             ref confidence,
@@ -344,11 +381,16 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             SemanticExtraction = request.SemanticExtraction,
             RequirementMaturity = maturity,
             DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
-                ToMaturityRequest(request),
+                ToMaturityRequest(effectiveRequest),
                 maturity,
                 intent,
                 shouldBuildDirectly ? "build_ready" : shouldOpenPlan ? "planning" : needsClarification ? "clarifying" : "idle",
                 fallbackReason),
+            ShouldMergeIntoPendingPlan = shouldMergeIntoPendingPlan,
+            ShouldResetPendingPlan = shouldResetPendingPlan || !request.HasPendingPlan,
+            PlanAnswerUpdates = planAnswerUpdates,
+            ResolvedPlanFields = resolvedPlanFields,
+            RemainingPlanFields = remainingPlanFields,
             MetadataOnly = true
         };
     }
@@ -391,6 +433,167 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         return VisionAgentRequirementMaturityGate.Evaluate(ToMaturityRequest(request), request.SemanticExtraction);
     }
 
+    private static List<VisionAgentPlanAnswer> ExtractPlanAnswerUpdates(VisionAgentIntentRouterRequest request)
+    {
+        if (!request.HasPendingPlan)
+        {
+            return [];
+        }
+
+        var remaining = NormalizePlanFields(request.RemainingPlanFields).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (remaining.Count == 0)
+        {
+            return [];
+        }
+
+        var semantic = request.SemanticExtraction;
+        var updates = new List<VisionAgentPlanAnswer>();
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.InspectionObject, semantic?.InspectionObject);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.ImageSource, semantic?.ImageSource);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.AcceptanceCriteria, FirstNonEmpty(semantic?.OkCondition, semantic?.NgCondition, semantic?.OutputTarget));
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.OutputTarget, semantic?.OutputTarget);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.TargetAttribute, semantic?.TargetAttribute);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.DefectType, semantic?.DefectType);
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.MeasurementTarget, semantic?.MeasurementTarget);
+
+        var taskType = Clean(semantic?.TaskType);
+        if (!string.IsNullOrWhiteSpace(taskType) &&
+            !string.Equals(taskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(taskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+        {
+            AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.TaskType, taskType);
+        }
+
+        if (updates.Count == 0 && remaining.Count == 1)
+        {
+            var field = remaining.First();
+            if (IsRequirementAnswerField(field))
+            {
+                AddRequirementAnswer(updates, remaining, field, request.Description);
+            }
+        }
+
+        return updates
+            .GroupBy(answer => answer.Field, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+    }
+
+    private static void AddRequirementAnswer(
+        List<VisionAgentPlanAnswer> updates,
+        ISet<string> remaining,
+        string field,
+        string? value)
+    {
+        var normalizedField = NormalizePlanField(field);
+        var text = SafeText(value);
+        if (string.IsNullOrWhiteSpace(normalizedField) ||
+            string.IsNullOrWhiteSpace(text) ||
+            !remaining.Contains(normalizedField) ||
+            !IsRequirementAnswerField(normalizedField))
+        {
+            return;
+        }
+
+        updates.Add(new VisionAgentPlanAnswer
+        {
+            Field = normalizedField,
+            Value = Truncate(text, 256),
+            Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+        });
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        return values.Select(Clean).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+    }
+
+    private static List<string> NormalizePlanFields(IEnumerable<string>? fields)
+    {
+        return (fields ?? [])
+            .Select(NormalizePlanField)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string NormalizePlanField(string? field)
+    {
+        var value = Clean(field).ToLowerInvariant();
+        return value switch
+        {
+            VisionAgentPlanAnswerFields.InspectionObject => VisionAgentPlanAnswerFields.InspectionObject,
+            VisionAgentPlanAnswerFields.TaskType => VisionAgentPlanAnswerFields.TaskType,
+            VisionAgentPlanAnswerFields.ImageSource => VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria => VisionAgentPlanAnswerFields.AcceptanceCriteria,
+            VisionAgentPlanAnswerFields.OutputTarget => VisionAgentPlanAnswerFields.OutputTarget,
+            VisionAgentPlanAnswerFields.TargetAttribute => VisionAgentPlanAnswerFields.TargetAttribute,
+            VisionAgentPlanAnswerFields.DefectType => VisionAgentPlanAnswerFields.DefectType,
+            VisionAgentPlanAnswerFields.MeasurementTarget => VisionAgentPlanAnswerFields.MeasurementTarget,
+            VisionAgentPlanAnswerFields.AlgorithmStrategy => VisionAgentPlanAnswerFields.AlgorithmStrategy,
+            VisionAgentPlanAnswerFields.RoiStrategy => VisionAgentPlanAnswerFields.RoiStrategy,
+            VisionAgentPlanAnswerFields.TemplateStrategy => VisionAgentPlanAnswerFields.TemplateStrategy,
+            "model_or_rule_strategy" or "classification_strategy" => VisionAgentPlanAnswerFields.AlgorithmStrategy,
+            _ when value.Contains("inspection_object", StringComparison.OrdinalIgnoreCase) => VisionAgentPlanAnswerFields.InspectionObject,
+            _ when value.Contains("task_type", StringComparison.OrdinalIgnoreCase) => VisionAgentPlanAnswerFields.TaskType,
+            _ when value.Contains("image_source", StringComparison.OrdinalIgnoreCase) => VisionAgentPlanAnswerFields.ImageSource,
+            _ when value.Contains("acceptance_criteria", StringComparison.OrdinalIgnoreCase) ||
+                   value.Contains("condition", StringComparison.OrdinalIgnoreCase) => VisionAgentPlanAnswerFields.AcceptanceCriteria,
+            _ when value.Contains("strategy", StringComparison.OrdinalIgnoreCase) => VisionAgentPlanAnswerFields.AlgorithmStrategy,
+            _ => string.Empty
+        };
+    }
+
+    private static bool IsRequirementAnswerField(string field)
+    {
+        return NormalizePlanField(field) is
+            VisionAgentPlanAnswerFields.InspectionObject or
+            VisionAgentPlanAnswerFields.TaskType or
+            VisionAgentPlanAnswerFields.ImageSource or
+            VisionAgentPlanAnswerFields.AcceptanceCriteria or
+            VisionAgentPlanAnswerFields.OutputTarget or
+            VisionAgentPlanAnswerFields.TargetAttribute or
+            VisionAgentPlanAnswerFields.DefectType or
+            VisionAgentPlanAnswerFields.MeasurementTarget;
+    }
+
+    private static bool IsStrictPlanBlockingField(string field)
+    {
+        return NormalizePlanField(field) is
+            VisionAgentPlanAnswerFields.InspectionObject or
+            VisionAgentPlanAnswerFields.TaskType or
+            VisionAgentPlanAnswerFields.ImageSource or
+            VisionAgentPlanAnswerFields.AcceptanceCriteria or
+            VisionAgentPlanAnswerFields.AlgorithmStrategy;
+    }
+
+    private static List<string> MergeResolvedPlanFields(
+        VisionAgentIntentRouterRequest request,
+        IReadOnlyList<VisionAgentPlanAnswer> updates)
+    {
+        return NormalizePlanFields(request.ResolvedPlanFields
+                .Concat(request.ConfirmedPlanAnswers.Select(answer => answer.Field))
+                .Concat(updates.Select(answer => answer.Field)))
+            .ToList();
+    }
+
+    private static List<string> MergeRemainingPlanFields(
+        VisionAgentIntentRouterRequest request,
+        IReadOnlyList<VisionAgentPlanAnswer> updates)
+    {
+        var updatedFields = updates.Select(answer => NormalizePlanField(answer.Field))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return NormalizePlanFields(request.RemainingPlanFields)
+            .Where(field => !updatedFields.Contains(field))
+            .ToList();
+    }
+
+    private static bool HasStrictRemainingPlanFields(VisionAgentIntentRouterRequest request)
+    {
+        return NormalizePlanFields(request.RemainingPlanFields).Any(IsStrictPlanBlockingField);
+    }
+
     private static VisionAgentRequirementMaturityRequest ToMaturityRequest(VisionAgentIntentRouterRequest request)
     {
         return new VisionAgentRequirementMaturityRequest
@@ -401,7 +604,8 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             HasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
             HasPendingPlan = request.HasPendingPlan,
             DeveloperDirectBuildDebug = request.DeveloperDirectBuildDebug,
-            TemplateSelection = request.TemplateSelection
+            TemplateSelection = request.TemplateSelection,
+            RequirementMode = request.RequirementMode
         };
     }
 
@@ -419,6 +623,19 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
     {
         if (intent == IntentBuildFromConfirmedPlan && request.HasPendingPlan)
         {
+            if (!HasStrictRemainingPlanFields(request))
+            {
+                return;
+            }
+
+            intent = IntentAmbiguousVisionRequirement;
+            confidence = confidence == "high" ? "medium" : confidence;
+            canBuild = false;
+            shouldOpenPlan = false;
+            shouldBuildDirectly = false;
+            needsClarification = true;
+            questions = questions.Count == 0 ? MaturityClarificationQuestions(maturity) : questions;
+            fallbackReason = AppendFallbackReason(fallbackReason, "pending_plan_answers_required");
             return;
         }
 
@@ -553,6 +770,11 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         builder.AppendLine($"templateSelectionId={SafeToken(request.TemplateSelection?.TemplateId)}");
         builder.AppendLine($"hasPendingPlan={request.HasPendingPlan.ToString().ToLowerInvariant()}");
         builder.AppendLine($"pendingPlanSummary={Truncate(SafeText(request.PendingPlanSummary), 1_500)}");
+        builder.AppendLine($"pendingPlanHash={SafeToken(request.PendingPlanHash)}");
+        builder.AppendLine($"requirementMode={SafeToken(request.RequirementMode)}");
+        builder.AppendLine($"confirmedPlanAnswerFields={string.Join(",", request.ConfirmedPlanAnswers.Select(answer => SafeToken(answer.Field)).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase))}");
+        builder.AppendLine($"resolvedPlanFields={string.Join(",", request.ResolvedPlanFields.Select(SafeToken).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase))}");
+        builder.AppendLine($"remainingPlanFields={string.Join(",", request.RemainingPlanFields.Select(SafeToken).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase))}");
         builder.AppendLine($"developerDirectBuildDebug={request.DeveloperDirectBuildDebug.ToString().ToLowerInvariant()}");
         return Truncate(builder.ToString(), maxChars);
     }
@@ -819,6 +1041,26 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
     private static bool LooksLikeConfirmedPlanBuild(string text)
     {
         return ContainsAny(text, ["开始构建", "按推荐方案", "确认计划", "确认规划", "就按这个", "开始 build", "build now"]);
+    }
+
+    private static bool LooksLikeExplicitNewPlanRequest(string text)
+    {
+        return ContainsAny(text,
+        [
+            "restart",
+            "reset plan",
+            "new plan",
+            "new task",
+            "start over",
+            "discard current plan",
+            "abandon current plan",
+            "重新规划",
+            "重新开始",
+            "新任务",
+            "新需求",
+            "放弃当前计划",
+            "清空当前计划"
+        ]);
     }
 
     private static bool LooksLikeModifyExistingFlow(string text)

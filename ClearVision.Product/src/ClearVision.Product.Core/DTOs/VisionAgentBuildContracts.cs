@@ -6,6 +6,9 @@ public sealed record VisionAgentBuildResult
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
     public string BuildIntent { get; init; } = string.Empty;
+    public string AnswerSetFingerprint { get; init; } = string.Empty;
+    public List<string> ResolvedFields { get; init; } = [];
+    public List<string> RemainingFields { get; init; } = [];
     public string SelectionSource { get; init; } = string.Empty;
     public string EffectiveRouteId { get; init; } = string.Empty;
     public List<string> EffectiveOperators { get; init; } = [];

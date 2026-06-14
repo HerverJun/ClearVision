@@ -313,6 +313,8 @@ function createPanel(AiPanel, overrides = {}) {
   panel.agentWorkspaceMode = 'plan';
   panel.pendingVisionPlan = null;
   panel.planQuestionSelections = {};
+  panel.planQuestionAnswers = {};
+  panel.planAnswerRevision = 0;
   panel.activeGenerateRequestId = null;
   panel.activeIntentRouterRequestId = null;
   panel.activePlanRequestId = null;
@@ -1174,6 +1176,7 @@ function createFakeFlowCanvas(initialFlow = { operators: [], connections: [] }) 
 function strategyConfirmationQuestion() {
   return {
     id: 'model_or_rule_strategy',
+    field: 'algorithm_strategy',
     title: 'Classification strategy',
     why: 'Changes the implementation route.',
     defaultValue: 'deep_learning',
@@ -2315,7 +2318,7 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
 
   assert.equal(panel.pendingVisionPlan.goal, 'streamed plan ready');
   assert.equal(panel.isGenerating, false);
-  assert.match(turn.replyBody.textContent, /规划已完成，推荐项已作为当前选择，可调整选项后开始构建/);
+  assert.match(turn.replyBody.textContent, /规划已完成，请确认推荐项或手动回答后开始构建/);
   assert.match(collectProcessText(turn), /收集上下文：完成/);
   assert.match(collectProcessText(turn), /模型规划：进行中|模型规划：完成/);
   assert.match(collectProcessText(turn), /契约校验：完成/);
@@ -2812,8 +2815,13 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
     canBuild: true,
     templateSelection: { mode: 'template_adapt', templateId: 'tmpl-plan', scenarioKey: 'scratch' }
   }));
-  panel.planQuestionSelections = Object.fromEntries(
-    panel.pendingVisionPlan.questions.map(question => [question.id, question.defaultValue])
+  panel.planQuestionAnswers = Object.fromEntries(
+    panel.pendingVisionPlan.questions.map(question => [question.id, {
+      questionId: question.id,
+      field: question.field || question.id,
+      value: question.defaultValue,
+      origin: 'explicit_user_selection'
+    }])
   );
   let captured = null;
   panel._dispatchGenerateRequest = args => {
@@ -2840,7 +2848,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   assert.deepEqual(captured.templateSelection, captured.buildFromPlan.templateSelection);
 });
 
-test('Recommended strategy is selected by default and submitted through unified Build button', async () => {
+test('Recommended strategy is not selected until accepted for Build', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const planWorkspace = createFakeElement();
@@ -2852,6 +2860,7 @@ test('Recommended strategy is selected by default and submitted through unified 
   });
   panel.pendingVisionPlan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult());
   panel.planQuestionSelections = {};
+  panel.planQuestionAnswers = {};
   let captured = null;
   panel._dispatchGenerateRequest = args => {
     captured = args;
@@ -2859,18 +2868,30 @@ test('Recommended strategy is selected by default and submitted through unified 
   };
 
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
-  assert.equal(panel.pendingVisionPlan.executable, true);
-  assert.deepEqual(panel.planQuestionSelections, { model_or_rule_strategy: 'deep_learning' });
-  assert.deepEqual(panel._buildPlanSelectionMap(panel.pendingVisionPlan), {
-    model_or_rule_strategy: 'deep_learning'
-  });
-  assert.match(planWorkspace.innerHTML, /aria-pressed="true"/);
+  assert.equal(panel.pendingVisionPlan.executable, false);
+  assert.deepEqual(panel.planQuestionSelections, {});
+  assert.deepEqual(panel.planQuestionAnswers, {});
+  assert.deepEqual(panel._buildPlanSelectionMap(panel.pendingVisionPlan), {});
+  assert.match(planWorkspace.innerHTML, /is-recommended/);
+  assert.match(planWorkspace.innerHTML, /aria-pressed="false"/);
 
   const started = panel._startBuildFromCurrentPlan();
-  assert.equal(started, true);
+  assert.equal(started, false);
+  assert.equal(captured, null);
+
+  const acceptedStarted = panel._startBuildFromCurrentPlan({ acceptedRecommended: true });
+  assert.equal(acceptedStarted, true);
   assert.equal(captured.skipPlan, true);
-  assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
+  assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, true);
   assert.equal(captured.buildFromPlan.userSelections.model_or_rule_strategy, 'deep_learning');
+  assert.deepEqual(captured.buildFromPlan.confirmedAnswers, [
+    {
+      questionId: 'model_or_rule_strategy',
+      field: 'algorithm_strategy',
+      value: 'deep_learning',
+      origin: 'accepted_recommended_default'
+    }
+  ]);
 });
 
 test('Explicit strategy switch is submitted through unified Build button', async () => {
@@ -2899,7 +2920,16 @@ test('Explicit strategy switch is submitted through unified Build button', async
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
   assert.equal(captured.buildFromPlan.userSelections.model_or_rule_strategy, 'traditional_rule');
+  assert.deepEqual(captured.buildFromPlan.confirmedAnswers, [
+    {
+      questionId: 'model_or_rule_strategy',
+      field: 'algorithm_strategy',
+      value: 'traditional_rule',
+      origin: 'explicit_user_selection'
+    }
+  ]);
   assert.deepEqual(panel.planQuestionSelections, { model_or_rule_strategy: 'traditional_rule' });
+  assert.equal(panel.planQuestionAnswers.model_or_rule_strategy.field, 'algorithm_strategy');
   assert.equal(panel.pendingVisionPlan.executable, true);
 });
 

@@ -42,6 +42,44 @@ public static class VisionAgentSemanticFailureCodes
     public const string UnknownError = "semantic_unknown_error";
 }
 
+public static class VisionAgentPlanContractVersions
+{
+    public const string V1 = "v1";
+    public const string V2 = "v2";
+}
+
+public static class VisionAgentPlanAnswerFields
+{
+    public const string InspectionObject = "inspection_object";
+    public const string TaskType = "task_type";
+    public const string ImageSource = "image_source";
+    public const string AcceptanceCriteria = "acceptance_criteria";
+    public const string OutputTarget = "output_target";
+    public const string TargetAttribute = "target_attribute";
+    public const string DefectType = "defect_type";
+    public const string MeasurementTarget = "measurement_target";
+
+    public const string AlgorithmStrategy = "algorithm_strategy";
+    public const string RoiStrategy = "roi_strategy";
+    public const string TemplateStrategy = "template_strategy";
+}
+
+public static class VisionAgentPlanAnswerOrigins
+{
+    public const string ExplicitUserSelection = "explicit_user_selection";
+    public const string AcceptedRecommendedDefault = "accepted_recommended_default";
+    public const string ExplicitUserText = "explicit_user_text";
+    public const string LegacyInferred = "legacy_inferred";
+}
+
+public sealed record VisionAgentPlanAnswer
+{
+    public string QuestionId { get; init; } = string.Empty;
+    public string Field { get; init; } = string.Empty;
+    public string Value { get; init; } = string.Empty;
+    public string Origin { get; init; } = string.Empty;
+}
+
 public sealed record VisionAgentSemanticExtractionRequest
 {
     public string Description { get; init; } = string.Empty;
@@ -135,6 +173,7 @@ public sealed record VisionAgentPlanModeRequest
     public VisionAgentAttachmentSummary AttachmentSummary { get; init; } = new();
     public string? HistorySummary { get; init; }
     public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
+    public string RequirementMode { get; init; } = AiRequirementModes.Strict;
 }
 
 public sealed record VisionAgentIntentRouterRequest
@@ -151,6 +190,11 @@ public sealed record VisionAgentIntentRouterRequest
     public string? HistorySummary { get; init; }
     public bool HasPendingPlan { get; init; }
     public string? PendingPlanSummary { get; init; }
+    public List<VisionAgentPlanAnswer> ConfirmedPlanAnswers { get; init; } = [];
+    public List<string> ResolvedPlanFields { get; init; } = [];
+    public List<string> RemainingPlanFields { get; init; } = [];
+    public string PendingPlanHash { get; init; } = string.Empty;
+    public string RequirementMode { get; init; } = AiRequirementModes.Strict;
     public bool DeveloperDirectBuildDebug { get; init; }
     public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
     public bool MetadataOnly { get; init; } = true;
@@ -173,11 +217,17 @@ public sealed record VisionAgentIntentRouterResult
     public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
     public AiRequirementMaturityResult? RequirementMaturity { get; init; }
     public AiDecisionTrace? DecisionTrace { get; init; }
+    public bool ShouldMergeIntoPendingPlan { get; init; }
+    public bool ShouldResetPendingPlan { get; init; }
+    public List<VisionAgentPlanAnswer> PlanAnswerUpdates { get; init; } = [];
+    public List<string> ResolvedPlanFields { get; init; } = [];
+    public List<string> RemainingPlanFields { get; init; } = [];
     public bool MetadataOnly { get; init; } = true;
 }
 
 public sealed record VisionAgentPlanModeResult
 {
+    public string PlanContractVersion { get; init; } = VisionAgentPlanContractVersions.V2;
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
     public string PlanSource { get; init; } = string.Empty;
@@ -256,6 +306,7 @@ public sealed record VisionAgentRecommendedRoute
 public sealed record VisionAgentClarificationQuestion
 {
     public string Id { get; init; } = string.Empty;
+    public string Field { get; init; } = string.Empty;
     public string Title { get; init; } = string.Empty;
     public string Why { get; init; } = string.Empty;
     public string DefaultValue { get; init; } = string.Empty;
@@ -304,6 +355,7 @@ public sealed record VisionAgentBuildFromPlanRequest
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
     public VisionAgentPlanModeResult? PlanSnapshot { get; init; }
+    public List<VisionAgentPlanAnswer> ConfirmedAnswers { get; init; } = [];
     public Dictionary<string, string> UserSelections { get; init; } =
         new(StringComparer.OrdinalIgnoreCase);
     public List<string> AcceptedDefaults { get; init; } = [];

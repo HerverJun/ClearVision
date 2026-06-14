@@ -79,10 +79,53 @@ const PLAN_PHASES = [
 
 const PLAN_PENDING_STATUS = 'waiting';
 
+const PLAN_ANSWER_FIELDS = Object.freeze({
+    INSPECTION_OBJECT: 'inspection_object',
+    TASK_TYPE: 'task_type',
+    IMAGE_SOURCE: 'image_source',
+    ACCEPTANCE_CRITERIA: 'acceptance_criteria',
+    OUTPUT_TARGET: 'output_target',
+    TARGET_ATTRIBUTE: 'target_attribute',
+    DEFECT_TYPE: 'defect_type',
+    MEASUREMENT_TARGET: 'measurement_target',
+    ALGORITHM_STRATEGY: 'algorithm_strategy',
+    ROI_STRATEGY: 'roi_strategy',
+    TEMPLATE_STRATEGY: 'template_strategy'
+});
+
+const PLAN_ANSWER_ORIGINS = Object.freeze({
+    EXPLICIT_USER_SELECTION: 'explicit_user_selection',
+    ACCEPTED_RECOMMENDED_DEFAULT: 'accepted_recommended_default',
+    EXPLICIT_USER_TEXT: 'explicit_user_text'
+});
+
+const PLAN_QUESTION_FIELD_BY_ID = Object.freeze({
+    classification_strategy: PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY,
+    model_or_rule_strategy: PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY,
+    algorithm_strategy: PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY,
+    defect_definition: PLAN_ANSWER_FIELDS.DEFECT_TYPE,
+    attribute_target: PLAN_ANSWER_FIELDS.TARGET_ATTRIBUTE,
+    ok_ng_rule: PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+    presence_judgment: PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+    decode_policy: PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+    sequence_rule: PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+    measurement_target: PLAN_ANSWER_FIELDS.MEASUREMENT_TARGET,
+    template_asset: PLAN_ANSWER_FIELDS.TEMPLATE_STRATEGY
+});
+
+const PLAN_CANONICAL_FIELDS = new Set(Object.values(PLAN_ANSWER_FIELDS));
+const PLAN_STRICT_BUILD_FIELDS = new Set([
+    PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+    PLAN_ANSWER_FIELDS.TASK_TYPE,
+    PLAN_ANSWER_FIELDS.IMAGE_SOURCE,
+    PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+    PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY
+]);
+
 const AI_DISPLAY_TEXT_MAP = {
-    'Accept recommended defaults, then start Build.': '推荐项已作为当前选择，可开始构建。',
-    'Accept recommended defaults or answer questions, then start Build.': '推荐项已作为当前选择，可调整选项后开始构建。',
-    'Accept recommended defaults and Build.': '按当前选择开始构建。',
+    'Accept recommended defaults, then start Build.': '可按推荐项确认后开始构建。',
+    'Accept recommended defaults or answer questions, then start Build.': '请确认推荐项或手动回答问题后开始构建。',
+    'Accept recommended defaults and Build.': '按推荐项确认并构建。',
     'Describe the inspection target before Build can start.': '请先描述检测目标，再开始构建。',
     'Surface defect inspection route': '表面缺陷检测路线',
     'Detect visible scratches and blobs.': '检测可见划痕、斑点等表面缺陷。',
@@ -328,7 +371,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!preservePlan) {
             this.pendingVisionPlan = null;
             this.pendingClarificationPayload = null;
-            this.planQuestionSelections = {};
+            this._clearPlanQuestionAnswers();
         }
 
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
@@ -336,6 +379,12 @@ export const aiPanelAgentWorkspaceMixin = {
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun();
         this._updatePlanBuildActionState();
+    },
+
+    _clearPlanQuestionAnswers() {
+        this.planQuestionSelections = {};
+        this.planQuestionAnswers = {};
+        this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
     },
 
     _shouldOpenPlanModeBeforeBuild(args = {}) {
@@ -416,17 +465,18 @@ export const aiPanelAgentWorkspaceMixin = {
     _updatePlanBuildActionState() {
         const busy = Boolean(this.isGenerating);
         const hasPlan = Boolean(this.pendingVisionPlan);
-        if (hasPlan) {
-            this._ensureRecommendedPlanQuestionSelections?.(this.pendingVisionPlan);
-            this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
-        }
-        const canBuild = hasPlan && this.pendingVisionPlan?.executable === true;
+        const actionState = this._getPlanBuildActionState(this.pendingVisionPlan);
+        const canBuild = hasPlan && actionState.canStart;
         const blockedTitle = hasPlan
-            ? this._getPlanBuildBlockedReason(this.pendingVisionPlan)
+            ? actionState.statusText
             : '请先完成规划';
         const inlineBuildBtn = this.container?.querySelector('#ai-btn-start-build-inline');
         if (inlineBuildBtn) {
             inlineBuildBtn.disabled = busy || !canBuild;
+            inlineBuildBtn.dataset.acceptRecommended = actionState.acceptedRecommended ? 'true' : 'false';
+            if (actionState.label) {
+                inlineBuildBtn.setAttribute?.('aria-label', actionState.label);
+            }
             inlineBuildBtn.title = !hasPlan
                 ? '请先完成规划'
                 : canBuild
@@ -447,11 +497,21 @@ export const aiPanelAgentWorkspaceMixin = {
                     : blockedTitle;
         }
 
+        const mainBuildBtn = this.container?.querySelector('#ai-btn-start-build');
+        if (mainBuildBtn) {
+            mainBuildBtn.disabled = busy || !canBuild;
+            mainBuildBtn.textContent = actionState.label || 'Start Build';
+            mainBuildBtn.dataset.acceptRecommended = actionState.acceptedRecommended ? 'true' : 'false';
+            mainBuildBtn.title = hasPlan ? actionState.statusText : 'Finish the plan first';
+            mainBuildBtn.setAttribute?.('aria-disabled', mainBuildBtn.disabled ? 'true' : 'false');
+        }
+
         this.container?.querySelectorAll?.('.ai-plan-action').forEach(button => {
             button.disabled = busy || !canBuild;
             if (!canBuild && hasPlan) {
                 button.title = blockedTitle;
             }
+            button.dataset.acceptRecommended = actionState.acceptedRecommended ? 'true' : 'false';
             button.setAttribute?.('aria-disabled', button.disabled ? 'true' : 'false');
         });
     },
@@ -508,6 +568,7 @@ export const aiPanelAgentWorkspaceMixin = {
             input.style.height = 'auto';
         }
 
+        const requestAnswerRevision = Number(this.planAnswerRevision) || 0;
         const routerRequest = this._buildIntentRouterRequest({
             description: normalizedDescription,
             hint,
@@ -531,7 +592,8 @@ export const aiPanelAgentWorkspaceMixin = {
                     attachmentPaths,
                     templateSelection,
                     explicitMode,
-                    hasCurrentFlowContext
+                    hasCurrentFlowContext,
+                    planAnswerRevision: requestAnswerRevision
                 });
             })
             .catch(error => {
@@ -547,7 +609,8 @@ export const aiPanelAgentWorkspaceMixin = {
                     attachmentPaths,
                     templateSelection,
                     explicitMode,
-                    hasCurrentFlowContext
+                    hasCurrentFlowContext,
+                    planAnswerRevision: requestAnswerRevision
                 });
             });
 
@@ -589,6 +652,11 @@ export const aiPanelAgentWorkspaceMixin = {
             mode: String(explicitMode || this.agentGenerateFlowMode || 'auto').trim() || 'auto',
             hasPendingPlan: Boolean(this.pendingVisionPlan),
             pendingPlanSummary: this._buildPendingPlanIntentSummary(),
+            pendingPlanHash: this.pendingVisionPlan?.planHash || '',
+            confirmedPlanAnswers: this._buildConfirmedPlanAnswers(this.pendingVisionPlan),
+            resolvedPlanFields: this._getResolvedPlanFields(this.pendingVisionPlan),
+            remainingPlanFields: this._getRemainingPlanFields(this.pendingVisionPlan),
+            requirementMode: this.requirementMode || 'strict',
             developerDirectBuildDebug: false,
             metadataOnly: true
         };
@@ -616,6 +684,13 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _handleIntentRouterResult(result, context) {
+        if (context?.planAnswerRevision !== undefined &&
+            Number(context.planAnswerRevision) !== (Number(this.planAnswerRevision) || 0)) {
+            this._setGeneratingState?.(false);
+            this.activeAssistantTurn = null;
+            return false;
+        }
+
         const route = this._normalizeIntentRouterResult(result);
         const isRuleFallback = /rule_fallback/i.test(String(route.routerSource || ''));
         const tone = route.needsClarification ? 'warning' : 'streaming';
@@ -635,6 +710,35 @@ export const aiPanelAgentWorkspaceMixin = {
                 ? (route.publicReason || '模型路由不可用，当前为规则降级解析。')
                 : route.publicReason);
 
+        if (route.shouldMergeIntoPendingPlan && this.pendingVisionPlan) {
+            this._mergePlanAnswerUpdates(this.pendingVisionPlan, route.planAnswerUpdates);
+            this.pendingVisionPlan.resolvedPlanFields = route.resolvedPlanFields.length
+                ? route.resolvedPlanFields
+                : this._getResolvedPlanFields(this.pendingVisionPlan);
+            this.pendingVisionPlan.remainingPlanFields = route.remainingPlanFields.length
+                ? route.remainingPlanFields
+                : this._getRemainingPlanFields(this.pendingVisionPlan);
+            this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
+
+            if (route.intent === 'build_from_confirmed_plan' && this.pendingVisionPlan.executable === true) {
+                this._setAssistantTurnStatus(context.turn, '进入构建', 'success');
+                this.activeAssistantTurn = null;
+                this._setGeneratingState?.(false);
+                return this._startBuildFromCurrentPlan();
+            }
+
+            this.pendingClarificationPayload = null;
+            this._setWorkbenchState(AiWorkbenchStates.IDLE);
+            this._setResultStatusNote(route.publicReason || 'Plan answers updated.', 'info');
+            this._setGeneratingState?.(false);
+            this._renderAgentWorkspaceOverview();
+            this._renderPlanWorkspace(this.pendingVisionPlan);
+            this._renderBuildWorkspaceFromAgentRun();
+            this._updatePlanBuildActionState();
+            this.activeAssistantTurn = null;
+            return true;
+        }
+
         if (route.shouldOpenPlan || route.intent === 'actionable_vision_plan') {
             return this._enterPlanModeFromPrompt({
                 description: context.description,
@@ -647,7 +751,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 input: null,
                 turn: context.turn,
                 addUserMessage: false,
-                clearPendingPlan: true
+                clearPendingPlan: route.shouldResetPendingPlan !== false
             });
         }
 
@@ -688,9 +792,12 @@ export const aiPanelAgentWorkspaceMixin = {
 
         if (route.needsClarification || route.intent === 'ambiguous_vision_requirement') {
             const clarificationPayload = this._buildIntentRouterClarificationPayload(route, context);
-            this.pendingVisionPlan = null;
+            const shouldClearPendingPlan = route.shouldResetPendingPlan === true || !this.pendingVisionPlan;
+            if (shouldClearPendingPlan) {
+                this.pendingVisionPlan = null;
+                this._clearPlanQuestionAnswers();
+            }
             this.pendingClarificationPayload = clarificationPayload;
-            this.planQuestionSelections = {};
             this._resetClarificationSelectionDraft?.();
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
@@ -735,11 +842,14 @@ export const aiPanelAgentWorkspaceMixin = {
             .slice(0, 5);
         const requirementMaturity = this._normalizeRequirementMaturity(item.requirementMaturity || item.RequirementMaturity);
         const semanticExtraction = this._normalizeSemanticExtraction(item.semanticExtraction || item.SemanticExtraction);
+        const rawShouldResetPendingPlan = item.shouldResetPendingPlan ?? item.ShouldResetPendingPlan;
         return {
             intent,
             confidence: String(item.confidence || item.Confidence || 'low').trim() || 'low',
             shouldOpenPlan: Boolean(item.shouldOpenPlan ?? item.ShouldOpenPlan),
             shouldBuildDirectly: Boolean(item.shouldBuildDirectly ?? item.ShouldBuildDirectly),
+            shouldMergeIntoPendingPlan: Boolean(item.shouldMergeIntoPendingPlan ?? item.ShouldMergeIntoPendingPlan),
+            shouldResetPendingPlan: rawShouldResetPendingPlan === undefined ? true : Boolean(rawShouldResetPendingPlan),
             canPlan: (item.canPlan ?? item.CanPlan ?? requirementMaturity?.canPlan) === true,
             canBuild: Boolean(item.canBuild ?? item.CanBuild),
             needsClarification: Boolean(item.needsClarification ?? item.NeedsClarification),
@@ -750,8 +860,55 @@ export const aiPanelAgentWorkspaceMixin = {
             routerSource: item.routerSource || item.RouterSource || '',
             semanticExtraction,
             requirementMaturity,
+            planAnswerUpdates: this._toArray(item.planAnswerUpdates || item.PlanAnswerUpdates)
+                .map(answer => this._normalizePlanAnswer(answer))
+                .filter(Boolean),
+            resolvedPlanFields: this._toArray(item.resolvedPlanFields || item.ResolvedPlanFields)
+                .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+                .filter(Boolean),
+            remainingPlanFields: this._toArray(item.remainingPlanFields || item.RemainingPlanFields)
+                .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+                .filter(Boolean),
             decisionTrace: this._normalizeDecisionTrace(item.decisionTrace || item.DecisionTrace)
         };
+    },
+
+    _mergePlanAnswerUpdates(plan, updates = []) {
+        if (!plan || !updates.length) return false;
+        const nextAnswers = { ...(this.planQuestionAnswers || {}) };
+        const nextSelections = { ...(this.planQuestionSelections || {}) };
+        let changed = false;
+        updates.forEach(update => {
+            const rawUpdate = this._asObject?.(update) || update || {};
+            const answer = this._normalizePlanAnswer({
+                origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT,
+                ...rawUpdate
+            });
+            if (!answer) return;
+            const question = this._toArray(plan.questions)
+                .find(item => String(item?.id || '').trim() === answer.questionId ||
+                    this._inferPlanQuestionField(item?.field || item?.id) === answer.field);
+            const merged = {
+                ...answer,
+                questionId: answer.questionId || String(question?.id || '').trim(),
+                origin: answer.origin || PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT
+            };
+            const key = merged.questionId || `field:${merged.field}`;
+            nextAnswers[key] = merged;
+            if (merged.questionId &&
+                this._toArray(question?.options).some(option => String(option?.value || '').trim() === merged.value)) {
+                nextSelections[merged.questionId] = merged.value;
+            }
+            changed = true;
+        });
+
+        if (changed) {
+            this.planQuestionAnswers = nextAnswers;
+            this.planQuestionSelections = nextSelections;
+            this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+        }
+
+        return changed;
     },
 
     _buildIntentRouterClarificationPayload(route = {}, context = {}) {
@@ -1082,7 +1239,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this.pendingClarificationPayload = null;
         if (clearPendingPlan) {
             this.pendingVisionPlan = null;
-            this.planQuestionSelections = {};
+            this._clearPlanQuestionAnswers();
         }
         this.activePlanRunId = null;
         this.activePlanRunRequestId = null;
@@ -1139,7 +1296,7 @@ export const aiPanelAgentWorkspaceMixin = {
             .then(result => {
                 if (!this._isActivePlanRequest(planRequestId)) return;
                 this.pendingVisionPlan = this._normalizeBackendPlanResult(result, normalizedDescription);
-                this.planQuestionSelections = {};
+                this._clearPlanQuestionAnswers();
                 this._clearActivePlanRequest(planRequestId);
                 this._setGeneratingState?.(false);
                 const timeoutFallback = this._isPlannerTimeoutFallback(this.pendingVisionPlan);
@@ -1151,8 +1308,8 @@ export const aiPanelAgentWorkspaceMixin = {
                     timeoutFallback
                         ? '模型规划超时，已使用规则兜底方案。可先按兜底方案构建，或稍后重试深度规划。'
                         : fallbackUsed
-                            ? '规划已完成，已使用规则兜底方案。推荐项已作为当前选择，可调整选项后开始构建。'
-                            : '规划已完成，推荐项已作为当前选择，可调整选项后开始构建。'
+                            ? '规划已完成，已使用规则兜底方案。请确认推荐项或手动回答后开始构建。'
+                            : '规划已完成，请确认推荐项或手动回答后开始构建。'
                 );
                 this._setResultStatusNote('规划模式等待确认，确认后进入构建模式。', 'info');
                 this._renderAgentWorkspaceOverview();
@@ -1214,6 +1371,7 @@ export const aiPanelAgentWorkspaceMixin = {
             additionalContext: String(hint || '').trim() || null,
             sessionId: this.sessionId || null,
             mode: 'plan',
+            requirementMode: this.requirementMode || 'strict',
             currentFlowSnapshot,
             currentResultSnapshot: this._buildCurrentResultPlanSnapshot(),
             templateSelection: normalizedTemplateSelection,
@@ -1753,6 +1911,7 @@ export const aiPanelAgentWorkspaceMixin = {
             nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
             canPlan: rawCanPlan === true || maturityCanPlan,
             executable: this._computeEffectivePlanBuildReadiness({
+                plan: null,
                 rawCanBuild,
                 requirementMaturity,
                 semanticExtraction,
@@ -1761,6 +1920,12 @@ export const aiPanelAgentWorkspaceMixin = {
                 questions: normalizedQuestions
             }),
             blockingReasons,
+            resolvedPlanFields: this._toArray(plan.resolvedPlanFields || plan.ResolvedPlanFields)
+                .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+                .filter(Boolean),
+            remainingPlanFields: this._toArray(plan.remainingPlanFields || plan.RemainingPlanFields)
+                .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+                .filter(Boolean),
             understanding: this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).length
                 ? this._toArray(plan.requirementUnderstanding || plan.RequirementUnderstanding).map(item => this._localizeDisplayText(item))
                 : [`用户目标：${fallbackDescription || '视觉流程草稿'}`],
@@ -1793,6 +1958,7 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _computeEffectivePlanBuildReadiness({
+        plan = null,
         rawCanBuild,
         requirementMaturity,
         semanticExtraction,
@@ -1801,6 +1967,11 @@ export const aiPanelAgentWorkspaceMixin = {
         questions = [],
         acceptedRecommended = false
     }) {
+        const answerPlan = plan || { questions, requirementMaturity, blockingReasons };
+        const resolvedFields = new Set(this._getResolvedPlanFields(answerPlan, {
+            acceptedRecommended,
+            questions
+        }));
         const unresolvedStrategyBlockers = this._getUnresolvedStrategyBlockers({
             blockingReasons,
             questions,
@@ -1811,26 +1982,255 @@ export const aiPanelAgentWorkspaceMixin = {
         const maturityCanBuild = requirementMaturity?.canBuild === true;
         if (rawCanBuild === true && maturityCanBuild) return true;
 
-        return this._planHardFactsReady(requirementMaturity, semanticExtraction, route) &&
+        const remainingFields = this._getRemainingPlanFields(answerPlan, {
+            acceptedRecommended,
+            requirementMaturity,
+            blockingReasons,
+            questions
+        })
+            .filter(field => PLAN_STRICT_BUILD_FIELDS.has(field))
+            .filter(field => !(field === PLAN_ANSWER_FIELDS.IMAGE_SOURCE && this._routeAllowsPendingImageSource(route)));
+        if (remainingFields.length) return false;
+
+        return this._planHardFactsReady(requirementMaturity, semanticExtraction, route, resolvedFields) &&
             this._planRouteSatisfiesBuildStrategy(route);
     },
 
     _ensureRecommendedPlanQuestionSelections(plan) {
+        return false;
+    },
+
+    _getPlanBuildActionState(plan) {
+        if (!plan) {
+            return {
+                canBuild: false,
+                canAcceptRecommended: false,
+                canStart: false,
+                acceptedRecommended: false,
+                label: '开始构建',
+                statusText: '请先完成规划'
+            };
+        }
+
+        const canBuild = this._refreshPlanEffectiveBuildReadiness?.(plan, { acceptedRecommended: false }) === true;
+        const canAcceptRecommended = !canBuild && this._canBuildPlanWithRecommendedAnswers(plan);
+        if (canBuild) {
+            return {
+                canBuild: true,
+                canAcceptRecommended: false,
+                canStart: true,
+                acceptedRecommended: false,
+                label: '开始构建',
+                statusText: '当前显式选择已满足构建条件'
+            };
+        }
+
+        if (canAcceptRecommended) {
+            return {
+                canBuild: false,
+                canAcceptRecommended: true,
+                canStart: true,
+                acceptedRecommended: true,
+                label: '按推荐项确认并构建',
+                statusText: '当前阻断问题均有推荐项，可批量确认后构建'
+            };
+        }
+
+        return {
+            canBuild: false,
+            canAcceptRecommended: false,
+            canStart: false,
+            acceptedRecommended: false,
+            label: '开始构建',
+            statusText: this._getPlanBuildBlockedReason(plan)
+        };
+    },
+
+    _canBuildPlanWithRecommendedAnswers(plan) {
+        if (!plan || !this._allBlockingPlanQuestionsHaveRecommendations(plan)) return false;
+        return this._computeEffectivePlanBuildReadiness({
+            plan,
+            rawCanBuild: plan.rawPlanSnapshot?.canBuild ?? plan.rawPlanSnapshot?.CanBuild ?? plan.executable,
+            requirementMaturity: plan.requirementMaturity,
+            semanticExtraction: plan.semanticExtraction,
+            route: plan.route || plan.recommendedRoute || plan.RecommendedRoute,
+            blockingReasons: plan.blockingReasons,
+            questions: plan.questions,
+            acceptedRecommended: true
+        }) === true;
+    },
+
+    _allBlockingPlanQuestionsHaveRecommendations(plan) {
+        const remainingFields = this._getRemainingPlanFields(plan, { acceptedRecommended: false })
+            .filter(field => PLAN_STRICT_BUILD_FIELDS.has(field));
+        if (!remainingFields.length) return false;
+        return remainingFields.every(field => this._toArray(plan?.questions)
+            .some(question => this._inferPlanQuestionField(question?.field || question?.id) === field &&
+                String(this._getQuestionRecommendedValue(question) || '').trim()));
+    },
+
+    _inferPlanQuestionField(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (!normalized) return '';
+        if (PLAN_CANONICAL_FIELDS.has(normalized)) return normalized;
+        return PLAN_QUESTION_FIELD_BY_ID[normalized] || '';
+    },
+
+    _normalizePlanAnswer(answer, fallbackQuestion = null) {
+        const item = this._asObject?.(answer) || answer || {};
+        const questionId = String(item.questionId || item.QuestionId || fallbackQuestion?.id || '').trim();
+        const field = this._inferPlanQuestionField(item.field || item.Field || fallbackQuestion?.field || questionId);
+        const value = String(item.value || item.Value || '').trim();
+        const origin = String(item.origin || item.Origin || PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION).trim().toLowerCase();
+        if (!field || !value) return null;
+        return {
+            questionId,
+            field,
+            value,
+            origin: Object.values(PLAN_ANSWER_ORIGINS).includes(origin)
+                ? origin
+                : PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION
+        };
+    },
+
+    _getPlanQuestionAnswerKey(answer, fallbackQuestion = null) {
+        const normalized = this._normalizePlanAnswer(answer, fallbackQuestion);
+        if (!normalized) return '';
+        return normalized.questionId || `field:${normalized.field}`;
+    },
+
+    _getPlanAnswerForQuestion(question) {
+        const id = String(question?.id || '').trim();
+        const field = this._inferPlanQuestionField(question?.field || id);
+        const answers = this.planQuestionAnswers || {};
+        const direct = id ? this._normalizePlanAnswer(answers[id], question) : null;
+        if (direct) return direct;
+
+        const fieldAnswer = Object.values(answers)
+            .map(answer => this._normalizePlanAnswer(answer))
+            .find(answer => answer?.field === field);
+        if (fieldAnswer) return fieldAnswer;
+
+        const legacyValue = id ? String((this.planQuestionSelections || {})[id] || '').trim() : '';
+        return legacyValue
+            ? this._normalizePlanAnswer({
+                questionId: id,
+                field,
+                value: legacyValue,
+                origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION
+            }, question)
+            : null;
+    },
+
+    _getPlanQuestionSelectedValue(question) {
+        const answer = this._getPlanAnswerForQuestion(question);
+        return answer?.value || '';
+    },
+
+    _buildConfirmedPlanAnswers(plan, { acceptedRecommended = false } = {}) {
+        const answers = Object.values(this.planQuestionAnswers || {})
+            .map(answer => this._normalizePlanAnswer(answer))
+            .filter(Boolean);
+        const resolvedFields = new Set(answers.map(answer => answer.field));
+        if (acceptedRecommended) {
+            this._toArray(plan?.questions).forEach(question => {
+                const field = this._inferPlanQuestionField(question?.field || question?.id);
+                if (!field || resolvedFields.has(field)) return;
+                const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
+                if (!recommended) return;
+                answers.push({
+                    questionId: String(question.id || '').trim(),
+                    field,
+                    value: recommended,
+                    origin: PLAN_ANSWER_ORIGINS.ACCEPTED_RECOMMENDED_DEFAULT
+                });
+                resolvedFields.add(field);
+            });
+        }
+
+        return answers
+            .filter(answer => answer.field && answer.value)
+            .sort((a, b) => a.field.localeCompare(b.field) || a.questionId.localeCompare(b.questionId));
+    },
+
+    _acceptRecommendedPlanAnswers(plan) {
         if (!plan) return false;
-        const current = { ...(this.planQuestionSelections || {}) };
+        const nextAnswers = { ...(this.planQuestionAnswers || {}) };
+        const nextSelections = { ...(this.planQuestionSelections || {}) };
         let changed = false;
+        const resolvedFields = new Set(Object.values(nextAnswers)
+            .map(answer => this._normalizePlanAnswer(answer))
+            .filter(Boolean)
+            .map(answer => answer.field));
+
         this._toArray(plan.questions).forEach(question => {
             const id = String(question?.id || '').trim();
-            if (!id || String(current[id] || '').trim()) return;
-            const recommended = this._getQuestionRecommendedValue(question);
+            const field = this._inferPlanQuestionField(question?.field || id);
+            if (!field || resolvedFields.has(field)) return;
+            const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
             if (!recommended) return;
-            current[id] = recommended;
+            const answer = {
+                questionId: id,
+                field,
+                value: recommended,
+                origin: PLAN_ANSWER_ORIGINS.ACCEPTED_RECOMMENDED_DEFAULT
+            };
+            nextAnswers[id || `field:${field}`] = answer;
+            if (id) nextSelections[id] = recommended;
+            resolvedFields.add(field);
             changed = true;
         });
+
         if (changed) {
-            this.planQuestionSelections = current;
+            this.planQuestionAnswers = nextAnswers;
+            this.planQuestionSelections = nextSelections;
+            this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
         }
+
         return changed;
+    },
+
+    _getResolvedPlanFields(plan, { acceptedRecommended = false, questions = null } = {}) {
+        return [...new Set(this._buildConfirmedPlanAnswers(
+            plan || { questions: questions || [] },
+            { acceptedRecommended }
+        ).map(answer => answer.field))];
+    },
+
+    _getRemainingPlanFields(plan, {
+        acceptedRecommended = false,
+        requirementMaturity = null,
+        blockingReasons = null,
+        questions = null
+    } = {}) {
+        const maturity = requirementMaturity || plan?.requirementMaturity || null;
+        const reasons = blockingReasons || plan?.blockingReasons || [];
+        const resolved = new Set(this._getResolvedPlanFields(plan, {
+            acceptedRecommended,
+            questions: questions || plan?.questions || []
+        }));
+        const fields = [
+            ...this._toArray(plan?.remainingPlanFields || plan?.RemainingPlanFields),
+            ...this._toArray(maturity?.missingFields || maturity?.MissingFields),
+            ...this._toArray(reasons).map(reason => this._normalizePlanBlockingField(reason))
+        ]
+            .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+            .filter(field => PLAN_CANONICAL_FIELDS.has(field))
+            .filter(field => !resolved.has(field));
+        return [...new Set(fields)];
+    },
+
+    _normalizePlanBlockingField(reason) {
+        const normalized = String(reason || '').trim().toLowerCase();
+        if (!normalized) return '';
+        if (normalized.includes('inspection_object')) return PLAN_ANSWER_FIELDS.INSPECTION_OBJECT;
+        if (normalized.includes('task_type')) return PLAN_ANSWER_FIELDS.TASK_TYPE;
+        if (normalized.includes('image_source')) return PLAN_ANSWER_FIELDS.IMAGE_SOURCE;
+        if (normalized.includes('acceptance_criteria') || normalized.includes('condition')) {
+            return PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA;
+        }
+        if (normalized.includes('strategy')) return PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY;
+        return this._inferPlanQuestionField(normalized);
     },
 
     _getPlanBuildBlockedReason(plan) {
@@ -1872,10 +2272,9 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!strategyBlockers.length) return [];
 
         const strategyQuestions = this._toArray(questions)
-            .filter(question => this._isPlanStrategyQuestionId(question?.id));
-        const selections = this.planQuestionSelections || {};
+            .filter(question => this._isPlanStrategyQuestion(question));
         const hasExplicitStrategySelection = strategyQuestions.some(question =>
-            this._normalizePlanStrategyChoice(selections[question.id]));
+            this._normalizePlanStrategyChoice(this._getPlanQuestionSelectedValue(question)));
         if (hasExplicitStrategySelection) return [];
 
         if (acceptedRecommended) {
@@ -1887,9 +2286,12 @@ export const aiPanelAgentWorkspaceMixin = {
         return strategyBlockers;
     },
 
+    _isPlanStrategyQuestion(question) {
+        return this._inferPlanQuestionField(question?.field || question?.id) === PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY;
+    },
+
     _isPlanStrategyQuestionId(id) {
-        return ['classification_strategy', 'model_or_rule_strategy', 'algorithm_strategy']
-            .includes(String(id || '').trim().toLowerCase());
+        return this._inferPlanQuestionField(id) === PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY;
     },
 
     _getQuestionRecommendedValue(question) {
@@ -1920,29 +2322,46 @@ export const aiPanelAgentWorkspaceMixin = {
         return '';
     },
 
-    _planHardFactsReady(requirementMaturity, semanticExtraction, route = null) {
+    _planHardFactsReady(requirementMaturity, semanticExtraction, route = null, resolvedFields = new Set()) {
         const semanticSource = String(semanticExtraction?.source || '').toLowerCase();
         if (semanticExtraction && semanticSource === 'model') {
-            const hasObject = Boolean(String(semanticExtraction.inspectionObject || '').trim());
+            const hasObject = Boolean(String(semanticExtraction.inspectionObject || '').trim()) ||
+                resolvedFields.has(PLAN_ANSWER_FIELDS.INSPECTION_OBJECT);
             const task = String(semanticExtraction.taskType || '').trim().toLowerCase();
-            const hasTask = Boolean(task && task !== 'unknown' && task !== 'abstract_goal');
+            const hasTask = Boolean(task && task !== 'unknown' && task !== 'abstract_goal') ||
+                resolvedFields.has(PLAN_ANSWER_FIELDS.TASK_TYPE);
             const hasInput = Boolean(String(semanticExtraction.imageSource || '').trim()) ||
+                resolvedFields.has(PLAN_ANSWER_FIELDS.IMAGE_SOURCE) ||
                 this._routeAllowsPendingImageSource(route);
             const hasJudgment = Boolean(String(
                 semanticExtraction.okCondition ||
                 semanticExtraction.ngCondition ||
                 semanticExtraction.outputTarget ||
                 ''
-            ).trim());
+            ).trim()) || resolvedFields.has(PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA);
             return hasObject && hasTask && hasInput && hasJudgment;
         }
 
         if (!requirementMaturity) return false;
-        const hardMissing = this._toArray(requirementMaturity.missingFields).some(field =>
-            /inspection_object|task_type|image_source|acceptance_criteria/i.test(String(field || '')));
-        const hardBlocked = this._toArray(requirementMaturity.blockingReasons).some(reason =>
-            /inspection_object|task_type|image_source|acceptance_criteria|abstract_goal|empty_requirement/i.test(String(reason || '')));
-        return requirementMaturity.canBuild === true && !hardMissing && !hardBlocked;
+        const hardMissing = this._toArray(requirementMaturity.missingFields).some(field => {
+            const normalized = this._normalizePlanBlockingField(field);
+            return PLAN_STRICT_BUILD_FIELDS.has(normalized) && !resolvedFields.has(normalized);
+        });
+        const hardBlocked = this._toArray(requirementMaturity.blockingReasons).some(reason => {
+            const normalized = this._normalizePlanBlockingField(reason);
+            if (/abstract_goal|empty_requirement/i.test(String(reason || ''))) return true;
+            return PLAN_STRICT_BUILD_FIELDS.has(normalized) && !resolvedFields.has(normalized);
+        });
+        const answeredHardFacts = [
+            PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+            PLAN_ANSWER_FIELDS.TASK_TYPE,
+            PLAN_ANSWER_FIELDS.IMAGE_SOURCE,
+            PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA
+        ].every(field => resolvedFields.has(field));
+        return (requirementMaturity.canBuild === true ||
+                (requirementMaturity.canPlan === true && answeredHardFacts)) &&
+            !hardMissing &&
+            !hardBlocked;
     },
 
     _routeAllowsPendingImageSource(route) {
@@ -1972,6 +2391,7 @@ export const aiPanelAgentWorkspaceMixin = {
     _refreshPlanEffectiveBuildReadiness(plan, { acceptedRecommended = false } = {}) {
         if (!plan) return false;
         plan.executable = this._computeEffectivePlanBuildReadiness({
+            plan,
             rawCanBuild: plan.rawPlanSnapshot?.canBuild ?? plan.rawPlanSnapshot?.CanBuild ?? plan.executable,
             requirementMaturity: plan.requirementMaturity,
             semanticExtraction: plan.semanticExtraction,
@@ -2190,6 +2610,7 @@ export const aiPanelAgentWorkspaceMixin = {
             .filter(Boolean);
         return {
             id: question.id || question.Id || '',
+            field: this._inferPlanQuestionField(question.field || question.Field || question.id || question.Id),
             title: this._localizeDisplayText(question.title || question.Title || ''),
             why: this._localizeDisplayText(question.why || question.Why || ''),
             defaultValue: question.defaultValue || question.DefaultValue || options.find(item => item.recommended)?.value || options[0]?.value || '',
@@ -3072,8 +3493,6 @@ export const aiPanelAgentWorkspaceMixin = {
             return;
         }
 
-        this._ensureRecommendedPlanQuestionSelections(plan);
-        const selections = this.planQuestionSelections || {};
         const semanticPanel = this._renderSemanticExtractionPanel(plan);
         const maturityPanel = this._renderRequirementMaturityPanel(plan);
         const routeOperators = this._toArray(plan.route?.operators);
@@ -3118,7 +3537,7 @@ export const aiPanelAgentWorkspaceMixin = {
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">关键问题</div>
                 <div class="ai-plan-question-list">
-                    ${plan.questions.map(question => this._renderPlanQuestion(question, selections[question.id])).join('')}
+                    ${plan.questions.map(question => this._renderPlanQuestion(question, this._getPlanQuestionSelectedValue(question))).join('')}
                 </div>
                 <div class="ai-build-note">资源补齐会在开始构建后出现。此阶段不会提前显示完整资源补齐卡。</div>
             </section>
@@ -3156,7 +3575,9 @@ export const aiPanelAgentWorkspaceMixin = {
                 );
             });
         });
-        el.querySelector('#ai-btn-start-build')?.addEventListener('click', () => this._startBuildFromCurrentPlan());
+        el.querySelector('#ai-btn-start-build')?.addEventListener('click', event => this._startBuildFromCurrentPlan({
+            acceptedRecommended: event.currentTarget?.dataset?.acceptRecommended === 'true'
+        }));
         this._updatePlanBuildActionState();
     },
 
@@ -3272,10 +3693,25 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _selectPlanQuestionOption(questionId, value) {
         if (!questionId || !value || !this.pendingVisionPlan) return;
+        const question = this._toArray(this.pendingVisionPlan.questions)
+            .find(item => String(item?.id || '').trim() === String(questionId || '').trim());
+        const field = this._inferPlanQuestionField(question?.field || questionId);
+        if (!field) return;
+        const answer = {
+            questionId,
+            field,
+            value,
+            origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION
+        };
         this.planQuestionSelections = {
             ...(this.planQuestionSelections || {}),
             [questionId]: value
         };
+        this.planQuestionAnswers = {
+            ...(this.planQuestionAnswers || {}),
+            [questionId]: answer
+        };
+        this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
         this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderAgentWorkspaceOverview();
@@ -3296,7 +3732,9 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const plan = this.pendingVisionPlan;
-        this._ensureRecommendedPlanQuestionSelections?.(plan);
+        if (acceptedRecommended) {
+            this._acceptRecommendedPlanAnswers(plan);
+        }
         this._refreshPlanEffectiveBuildReadiness?.(plan, { acceptedRecommended });
         if (plan.executable !== true) {
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
@@ -3357,6 +3795,7 @@ export const aiPanelAgentWorkspaceMixin = {
             planId: plan.planId || plan.id || '',
             planHash,
             planSnapshot: this._buildPlanSnapshotForBuild(plan),
+            confirmedAnswers: this._buildConfirmedPlanAnswers(plan, { acceptedRecommended }),
             userSelections: this._buildPlanSelectionMap(plan, { acceptedRecommended }),
             acceptedDefaults: this._collectAcceptedDefaultIds(plan, acceptedRecommended),
             currentFlowSnapshot,
@@ -3455,28 +3894,24 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _buildPlanSelectionMap(plan, { acceptedRecommended = false } = {}) {
-        const selections = this.planQuestionSelections || {};
         return Object.fromEntries(this._toArray(plan?.questions)
             .map(question => {
-                const selected = selections[question.id];
-                const value = String(
-                    selected !== undefined && selected !== null
-                        ? selected
-                        : acceptedRecommended
-                            ? this._getQuestionRecommendedValue(question)
-                            : ''
-                ).trim();
+                const value = String(this._getPlanQuestionSelectedValue(question) || '').trim();
                 return value ? [question.id, value] : null;
             })
             .filter(Boolean));
     },
 
     _collectAcceptedDefaultIds(plan, acceptedRecommended = false) {
-        const selected = this._buildPlanSelectionMap(plan);
+        const answers = this._buildConfirmedPlanAnswers(plan, { acceptedRecommended });
+        const answerByQuestion = new Map(answers.map(answer => [answer.questionId, answer]));
         return this._toArray(plan?.questions)
             .filter(question => {
                 const recommended = this._getQuestionRecommendedValue(question);
-                return acceptedRecommended || String(selected[question.id] || '') === String(recommended || '');
+                const answer = answerByQuestion.get(question.id);
+                return Boolean(recommended) &&
+                    answer &&
+                    String(answer.value || '') === String(recommended || '');
             })
             .map(question => question.id)
             .filter(Boolean);

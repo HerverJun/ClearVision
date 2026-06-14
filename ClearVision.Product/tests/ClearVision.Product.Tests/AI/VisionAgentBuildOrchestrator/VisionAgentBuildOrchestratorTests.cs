@@ -290,6 +290,55 @@ public sealed class VisionAgentBuildOrchestratorTests
             .Contain("strategy_confirmation:model_or_rule_strategy_missing");
     }
 
+    [Fact(DisplayName = "BuildFromPlan should block invalid confirmed answer values")]
+    public async Task BuildAsync_InvalidConfirmedAnswer_ShouldBlock()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var plan = PlanWithStrategyConfirmationBlocker();
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                confirmedAnswers:
+                [
+                    PlanAnswer(
+                        "model_or_rule_strategy",
+                        VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                        "unsupported_strategy")
+                ],
+                acceptedRecommendedDefaults: false),
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.DecisionTrace!.BlockingReasons.Should()
+            .Contain("hard_requirement:invalid_plan_answer_value");
+    }
+
+    [Fact(DisplayName = "Plan answers should change fingerprint without changing PlanHash")]
+    public void PlanAnswerValidator_ShouldFingerprintAnswersOutsidePlanHash()
+    {
+        var plan = PlanWithStrategyConfirmationBlocker();
+        var validator = new VisionAgentPlanAnswerValidator();
+
+        var deepLearning = validator.Validate(
+            plan,
+            [PlanAnswer("model_or_rule_strategy", VisionAgentPlanAnswerFields.AlgorithmStrategy, "deep_learning")],
+            null,
+            acceptedRecommendedDefaults: false);
+        var traditionalRule = validator.Validate(
+            plan,
+            [PlanAnswer("model_or_rule_strategy", VisionAgentPlanAnswerFields.AlgorithmStrategy, "traditional_rule")],
+            null,
+            acceptedRecommendedDefaults: false);
+
+        deepLearning.AnswerSetFingerprint.Should().StartWith("sha256:");
+        traditionalRule.AnswerSetFingerprint.Should().StartWith("sha256:");
+        deepLearning.AnswerSetFingerprint.Should().NotBe(traditionalRule.AnswerSetFingerprint);
+        VisionAgentOrchestrator.ComputePlanHash(plan).Should().Be(plan.PlanHash);
+    }
+
     [Fact(DisplayName = "BuildFromPlan should accept recommended strategy and emit confirmation metadata")]
     public async Task BuildAsync_AcceptedRecommendedStrategy_ShouldBuildDeepLearningDraft()
     {
@@ -308,6 +357,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         var build = result.BuildResult!;
         build.StrategyConfirmed.Should().BeTrue();
         build.StrategyConfirmationSource.Should().Be("accepted_recommended");
+        build.AnswerSetFingerprint.Should().StartWith("sha256:");
+        build.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.AlgorithmStrategy);
         build.UnresolvedStrategyBlockers.Should().BeEmpty();
         build.ParameterStrategy.Should().Be("deep_learning_classification");
         build.EffectiveRouteId.Should().Be("attribute_classification_deep_learning");
@@ -330,9 +381,15 @@ public sealed class VisionAgentBuildOrchestratorTests
                 plan,
                 userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["model_or_rule_strategy"] = "deep_learning",
                     ["classification_ok_label"] = "expected class"
                 },
+                confirmedAnswers:
+                [
+                    PlanAnswer(
+                        "model_or_rule_strategy",
+                        VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                        "deep_learning")
+                ],
                 acceptedRecommendedDefaults: false),
             CancellationToken.None);
 
@@ -341,6 +398,8 @@ public sealed class VisionAgentBuildOrchestratorTests
         build.SelectionSource.Should().Be("user_strategy");
         build.StrategyConfirmed.Should().BeTrue();
         build.StrategyConfirmationSource.Should().Be("user_selection");
+        build.AnswerSetFingerprint.Should().StartWith("sha256:");
+        build.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.AlgorithmStrategy);
         build.EffectiveRouteId.Should().Be("attribute_classification_deep_learning");
         build.ParameterStrategy.Should().Be("deep_learning_classification");
         build.ParameterMapping.Should().Contain(item =>
@@ -361,19 +420,23 @@ public sealed class VisionAgentBuildOrchestratorTests
     {
         var sink = new CapturingAgentRunEventSink();
         var orchestrator = CreateOrchestrator(sink);
-        var plan = Plan(
-            "attribute_classification",
-            ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
-            "classify object maturity from camera");
+        var plan = PlanWithStrategyConfirmationBlocker();
 
         var result = await orchestrator.BuildAsync(
             Request(
                 plan,
                 userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["model_or_rule_strategy"] = "traditional_rule",
                     ["classification_ok_label"] = "expected class"
-                }),
+                },
+                confirmedAnswers:
+                [
+                    PlanAnswer(
+                        "model_or_rule_strategy",
+                        VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                        "traditional_rule")
+                ],
+                acceptedRecommendedDefaults: false),
             CancellationToken.None);
 
         result.Success.Should().BeTrue();
@@ -981,6 +1044,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         string? planHashOverride = null,
         AiTemplateSelectionInfo? templateSelection = null,
         Dictionary<string, string>? userSelections = null,
+        List<VisionAgentPlanAnswer>? confirmedAnswers = null,
         bool acceptedRecommendedDefaults = true)
     {
         return new AiFlowGenerationRequest(plan.OriginalUserPrompt, Mode: GenerateFlowModeExtensions.ParseOrAuto(buildIntent))
@@ -992,6 +1056,7 @@ public sealed class VisionAgentBuildOrchestratorTests
                 PlanId = plan.PlanId,
                 PlanHash = planHashOverride ?? plan.PlanHash,
                 PlanSnapshot = plan,
+                ConfirmedAnswers = confirmedAnswers ?? [],
                 UserSelections = userSelections ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["defect_morphology"] = "scratch"
@@ -1007,6 +1072,21 @@ public sealed class VisionAgentBuildOrchestratorTests
                 AcceptedRecommendedDefaults = acceptedRecommendedDefaults,
                 MetadataOnly = true
             }
+        };
+    }
+
+    private static VisionAgentPlanAnswer PlanAnswer(
+        string questionId,
+        string field,
+        string value,
+        string origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection)
+    {
+        return new VisionAgentPlanAnswer
+        {
+            QuestionId = questionId,
+            Field = field,
+            Value = value,
+            Origin = origin
         };
     }
 
@@ -1084,6 +1164,7 @@ public sealed class VisionAgentBuildOrchestratorTests
                 new VisionAgentClarificationQuestion
                 {
                     Id = "model_or_rule_strategy",
+                    Field = VisionAgentPlanAnswerFields.AlgorithmStrategy,
                     Title = "Classification strategy",
                     Why = "The operator route changes between model classification and calibrated numeric rules.",
                     DefaultValue = "deep_learning",

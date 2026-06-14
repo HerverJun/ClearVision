@@ -41,7 +41,7 @@ public sealed class PlanSelectionResolver
                 [])
             : VisionAgentStrategyConfirmationSupport.Resolve(
                 load.Plan,
-                load.UserSelections,
+                load.BuildDecisions,
                 load.AcceptedRecommendedDefaults);
         var strategy = ResolveStrategy(confirmation, attributeClassification, templateExplicitlySelected);
         var evidence = new List<string>();

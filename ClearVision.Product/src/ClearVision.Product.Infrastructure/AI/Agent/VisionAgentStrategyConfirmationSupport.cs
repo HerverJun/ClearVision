@@ -24,27 +24,29 @@ internal static class VisionAgentStrategyConfirmationSupport
 
     public static VisionAgentStrategyConfirmationResolution Resolve(
         VisionAgentPlanModeResult? plan,
-        IReadOnlyDictionary<string, string>? userSelections,
+        IReadOnlyDictionary<string, string>? buildDecisions,
         bool acceptedRecommendedDefaults)
     {
         var blockers = ExtractStrategyBlockers(plan);
-        if (TryResolveExplicitChoice(userSelections, out var explicitStrategy))
-        {
-            return new VisionAgentStrategyConfirmationResolution(
-                true,
-                explicitStrategy,
-                UserSelectionSource,
-                blockers,
-                []);
-        }
-
+        var hasExplicitChoice = TryResolveExplicitChoice(buildDecisions, out var explicitStrategy);
         if (acceptedRecommendedDefaults &&
-            TryResolveRecommendedChoice(plan, out var recommendedStrategy))
+            TryResolveRecommendedChoice(plan, out var recommendedStrategy) &&
+            (!hasExplicitChoice || string.Equals(explicitStrategy, recommendedStrategy, StringComparison.OrdinalIgnoreCase)))
         {
             return new VisionAgentStrategyConfirmationResolution(
                 true,
                 recommendedStrategy,
                 AcceptedRecommendedSource,
+                blockers,
+                []);
+        }
+
+        if (hasExplicitChoice)
+        {
+            return new VisionAgentStrategyConfirmationResolution(
+                true,
+                explicitStrategy,
+                UserSelectionSource,
                 blockers,
                 []);
         }
@@ -129,22 +131,25 @@ internal static class VisionAgentStrategyConfirmationSupport
 
     public static bool IsStrategyQuestionId(string? value)
     {
-        return StrategyQuestionIds.Contains(Clean(value));
+        var clean = Clean(value);
+        return StrategyQuestionIds.Contains(clean) ||
+               clean.Equals(VisionAgentPlanAnswerFields.AlgorithmStrategy, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryResolveExplicitChoice(
-        IReadOnlyDictionary<string, string>? userSelections,
+        IReadOnlyDictionary<string, string>? buildDecisions,
         out string strategy)
     {
         strategy = string.Empty;
-        if (userSelections == null)
+        if (buildDecisions == null)
         {
             return false;
         }
 
-        foreach (var item in userSelections)
+        foreach (var item in buildDecisions)
         {
-            if (!IsStrategyQuestionId(item.Key))
+            if (!item.Key.Equals(VisionAgentPlanAnswerFields.AlgorithmStrategy, StringComparison.OrdinalIgnoreCase) &&
+                !IsStrategyQuestionId(item.Key))
             {
                 continue;
             }
@@ -167,7 +172,9 @@ internal static class VisionAgentStrategyConfirmationSupport
         strategy = string.Empty;
         foreach (var question in plan?.ClarificationQuestions ?? [])
         {
-            if (!IsStrategyQuestionId(question.Id))
+            var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(question);
+            if (!IsStrategyQuestionId(question.Id) &&
+                !field.Equals(VisionAgentPlanAnswerFields.AlgorithmStrategy, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
