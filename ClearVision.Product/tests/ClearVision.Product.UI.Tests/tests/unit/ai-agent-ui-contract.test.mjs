@@ -516,6 +516,7 @@ function backendPlanResult(overrides = {}) {
     goal: overrides.goal || 'detect metal scratches',
     intent: overrides.intent || 'surface_defect',
     confidence: overrides.confidence || 'high',
+    requirementMode: overrides.requirementMode || 'strict',
     planSource: overrides.planSource || 'rule_fallback',
     fallbackReason: overrides.fallbackReason || 'planner_failed',
     plannerFailureStage: overrides.plannerFailureStage || '',
@@ -3051,6 +3052,7 @@ test('Backend Plan can be plannable while Build remains disabled', async () => {
 test('Plan with pending image source and acquisition route can start editable draft', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.requirementMode = 'draft';
   const inlineBuildButton = createFakeButton();
   const planActionButton = createFakeButton();
   const buildStatus = createFakeElement();
@@ -3067,6 +3069,7 @@ test('Plan with pending image source and acquisition route can start editable dr
     { '.ai-plan-action': [planActionButton] }
   );
   const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    requirementMode: 'draft',
     goal: 'logo appearance defect workflow',
     canBuild: false,
     recommendedRoute: {
@@ -3104,14 +3107,198 @@ test('Plan with pending image source and acquisition route can start editable dr
   }));
 
   panel.pendingVisionPlan = plan;
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
   panel._renderPlanWorkspace(plan);
 
   assert.equal(plan.executable, true);
   assert.equal(inlineBuildButton.disabled, false);
   assert.equal(planActionButton.disabled, false);
+  assert.equal(panel._startBuildFromCurrentPlan(), true);
+  assert.equal(captured.skipPlan, true);
+  assert.equal(captured.buildFromPlan.planId, plan.planId);
+  assert.equal(captured.buildFromPlan.planHash, plan.planHash);
   assert.equal(buildStatus.textContent, '当前选择已满足构建条件');
   assert.match(planWorkspace.innerHTML, /开始构建/);
   assert.doesNotMatch(planWorkspace.innerHTML, /按推荐方案开始构建/);
+});
+
+test('Build clarification preserves pending Plan and confirmed answers', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-result-summary': createFakeElement()
+  });
+  panel._renderAgentRuntime = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderPlanWorkspace = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel._renderManualRetryBanner = () => {};
+  panel._renderAssistantClarification = () => {};
+  panel._setAssistantTurnStatus = (turn, status, tone) => {
+    turn.status = status;
+    turn.tone = tone;
+  };
+  panel._setAssistantSectionText = (turn, section, text) => {
+    turn[section] = text;
+  };
+  panel._saveSessionId = () => {};
+  panel._shouldHandleGenerateTerminalPayload = () => true;
+  panel.activeAssistantTurn = { clarificationSection: createFakeElement(), replyBody: createFakeElement() };
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult({
+    planId: 'plan_keep',
+    planHash: 'sha256:keep-plan'
+  }));
+  panel._selectPlanQuestionOption('model_or_rule_strategy', 'traditional_rule');
+  const planRef = panel.pendingVisionPlan;
+  const answerBefore = { ...panel.planQuestionAnswers.model_or_rule_strategy };
+
+  panel._handleResult({
+    payload: {
+      success: false,
+      status: 'clarification_required',
+      failureType: 'clarification_required',
+      clarificationRequired: true,
+      aiExplanation: 'Need one more field.',
+      shouldResetPendingPlan: false
+    }
+  });
+
+  assert.equal(panel.pendingVisionPlan, planRef);
+  assert.equal(panel.pendingVisionPlan.planId, 'plan_keep');
+  assert.equal(panel.pendingVisionPlan.planHash, 'sha256:keep-plan');
+  assert.deepEqual(panel.planQuestionAnswers.model_or_rule_strategy, answerBefore);
+  assert.equal(panel.pendingClarificationPayload?.status, 'clarification_required');
+});
+
+test('Router local HTTP fallback preserves Pending Plan by default', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._setAssistantTurnStatus = () => {};
+  panel._setAssistantSectionText = () => {};
+  panel._updateIntentRouterTimeline = () => {};
+  panel._renderAgentRuntime = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderPlanWorkspace = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(strategyConfirmationPlanResult({
+    planId: 'plan_fallback_keep',
+    planHash: 'sha256:fallback-keep'
+  }));
+  panel._selectPlanQuestionOption('model_or_rule_strategy', 'traditional_rule');
+  const planRef = panel.pendingVisionPlan;
+  const fallback = panel._buildLocalIntentRouterFallback('开始 build', new Error('router offline'));
+
+  panel._handleIntentRouterResult(fallback, {
+    routerRequestId: 'ir_fallback',
+    turn: {},
+    description: '开始 build',
+    hint: '',
+    userMessage: '开始 build',
+    attachmentPaths: [],
+    templateSelection: null
+  });
+
+  assert.equal(fallback.shouldResetPendingPlan, false);
+  assert.equal(panel.pendingVisionPlan, planRef);
+  assert.equal(panel.pendingVisionPlan.planHash, 'sha256:fallback-keep');
+  assert.equal(panel.planQuestionAnswers.model_or_rule_strategy.value, 'traditional_rule');
+});
+
+test('Draft chat start build can enter Build with legal pending fields', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.requirementMode = 'draft';
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._setAssistantTurnStatus = () => {};
+  panel._setAssistantSectionText = () => {};
+  panel._updateIntentRouterTimeline = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  panel._renderPlanWorkspace = () => {};
+  panel._renderBuildWorkspaceFromAgentRun = () => {};
+  let started = false;
+  panel._startBuildFromCurrentPlan = () => {
+    started = true;
+    return true;
+  };
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    requirementMode: 'draft',
+    goal: 'logo appearance defect workflow',
+    canBuild: false,
+    recommendedRoute: {
+      routeId: 'surface_defect_with_pending_camera',
+      title: 'Surface defect route',
+      summary: 'Acquisition placeholder plus defect judgment.',
+      operators: ['ImageAcquisition', 'SurfaceDefectDetection', 'ResultJudgment', 'ResultOutput']
+    },
+    blockingReasons: ['hard_requirement:image_source_missing'],
+    semanticExtraction: {
+      isVisionRequest: true,
+      source: 'model',
+      taskType: 'surface_defect',
+      confidence: 0.9,
+      taskTypeConfidence: 0.9,
+      inspectionObject: 'steering wheel logo area',
+      defectType: 'appearance defect',
+      imageSource: '',
+      okCondition: 'logo area has no visible defect',
+      outputTarget: '',
+      missingFields: ['image_source', 'acceptance_criteria']
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['logo area'],
+      taskSignals: ['appearance defect'],
+      missingFields: ['image_source', 'acceptance_criteria'],
+      blockingReasons: ['image_source_missing'],
+      publicReason: 'Image source and acceptance criteria can remain pending in draft.'
+    }
+  }));
+
+  panel._handleIntentRouterResult({
+    intent: 'build_from_confirmed_plan',
+    confidence: 'high',
+    shouldOpenPlan: false,
+    shouldBuildDirectly: true,
+    shouldResetPendingPlan: false,
+    canBuild: true,
+    needsClarification: false,
+    publicReason: 'Draft is ready.',
+    remainingPlanFields: ['image_source', 'acceptance_criteria'],
+    resolvedPlanFields: ['inspection_object', 'task_type']
+  }, {
+    routerRequestId: 'ir_build',
+    turn: {},
+    description: '开始 build',
+    hint: '',
+    userMessage: '开始 build',
+    attachmentPaths: [],
+    templateSelection: null
+  });
+
+  assert.equal(panel.pendingVisionPlan.executable, true);
+  assert.equal(started, true);
 });
 
 test('Backend Plan renders semantic extraction slots and keeps them in Build snapshot', async () => {

@@ -849,7 +849,7 @@ export const aiPanelAgentWorkspaceMixin = {
             shouldOpenPlan: Boolean(item.shouldOpenPlan ?? item.ShouldOpenPlan),
             shouldBuildDirectly: Boolean(item.shouldBuildDirectly ?? item.ShouldBuildDirectly),
             shouldMergeIntoPendingPlan: Boolean(item.shouldMergeIntoPendingPlan ?? item.ShouldMergeIntoPendingPlan),
-            shouldResetPendingPlan: rawShouldResetPendingPlan === undefined ? true : Boolean(rawShouldResetPendingPlan),
+            shouldResetPendingPlan: rawShouldResetPendingPlan === undefined ? false : Boolean(rawShouldResetPendingPlan),
             canPlan: (item.canPlan ?? item.CanPlan ?? requirementMaturity?.canPlan) === true,
             canBuild: Boolean(item.canBuild ?? item.CanBuild),
             needsClarification: Boolean(item.needsClarification ?? item.NeedsClarification),
@@ -1143,6 +1143,7 @@ export const aiPanelAgentWorkspaceMixin = {
             normalized === 'help' ||
             normalized === '帮助';
         const maturity = this._assessLocalRequirementMaturity(description);
+        const shouldResetPendingPlan = this._looksLikeExplicitNewPlanRequest?.(description) === true;
         const isActionable = maturity.canPlan === true;
         const ambiguousReply = /包装箱|纸箱|箱/.test(String(description || ''))
             ? '你想检测包装箱的哪一类问题？比如胶带贴歪、条码不可读、Logo 缺失、箱角破损，或外观污渍。'
@@ -1194,6 +1195,7 @@ export const aiPanelAgentWorkspaceMixin = {
             fallbackAllowed: true,
             routerSource: 'local_rule_fallback',
             fallbackReason: error?.message || 'router_unavailable',
+            shouldResetPendingPlan,
             requirementMaturity: routedMaturity,
             decisionTrace: {
                 rawUserText: String(description || ''),
@@ -1213,6 +1215,13 @@ export const aiPanelAgentWorkspaceMixin = {
             },
             metadataOnly: true
         };
+    },
+
+    _looksLikeExplicitNewPlanRequest(description) {
+        const text = String(description || '').trim().toLowerCase();
+        if (!text) return false;
+        return /\b(reset plan|restart plan|new task|new plan|replan|start over)\b/i.test(text) ||
+            /重新规划|重新开始|新会话|新任务|重置计划|换一个需求/.test(text);
     },
 
     _enterPlanModeFromPrompt({
@@ -1874,9 +1883,10 @@ export const aiPanelAgentWorkspaceMixin = {
         const rawCanBuild = plan.canBuild ?? plan.CanBuild;
         const rawCanPlan = plan.canPlan ?? plan.CanPlan;
         const maturityCanPlan = requirementMaturity?.canPlan === true;
+        const requirementMode = this._normalizeRequirementMode?.(plan.requirementMode ?? plan.RequirementMode ?? this.requirementMode ?? 'strict') || 'strict';
         const blockingReasons = this._toArray(plan.blockingReasons || plan.BlockingReasons)
             .map(item => this._localizeDisplayText(item))
-            .filter(reason => !this._isDraftableImageSourceBlockingReason(reason, route));
+            .filter(reason => !this._isDraftableImageSourceBlockingReason(reason, route, requirementMode));
         const publicEvents = this._toArray(plan.publicEvents || plan.PublicEvents)
             .map(evt => this._normalizePlanPublicEvent(evt));
         const rawFallbackReason = String(plan.fallbackReason || plan.FallbackReason || '').trim();
@@ -1892,6 +1902,7 @@ export const aiPanelAgentWorkspaceMixin = {
             goal: this._localizeDisplayText(plan.goal || plan.Goal || fallbackDescription || '视觉流程草稿'),
             intent: plan.intent || plan.Intent || '',
             confidence: plan.confidence || plan.Confidence || 'medium',
+            requirementMode,
             planSource: plan.planSource || plan.PlanSource || '',
             rawFallbackReason,
             fallbackReason: this._formatPlanFallbackReason(rawFallbackReason),
@@ -1917,7 +1928,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 semanticExtraction,
                 route,
                 blockingReasons,
-                questions: normalizedQuestions
+                questions: normalizedQuestions,
+                requirementMode
             }),
             blockingReasons,
             resolvedPlanFields: this._toArray(plan.resolvedPlanFields || plan.ResolvedPlanFields)
@@ -1965,9 +1977,11 @@ export const aiPanelAgentWorkspaceMixin = {
         route,
         blockingReasons = [],
         questions = [],
-        acceptedRecommended = false
+        acceptedRecommended = false,
+        requirementMode = null
     }) {
         const answerPlan = plan || { questions, requirementMaturity, blockingReasons };
+        const mode = this._normalizeRequirementMode?.(requirementMode || plan?.requirementMode || this.requirementMode || 'strict') || 'strict';
         const resolvedFields = new Set(this._getResolvedPlanFields(answerPlan, {
             acceptedRecommended,
             questions
@@ -1979,6 +1993,11 @@ export const aiPanelAgentWorkspaceMixin = {
         });
         if (unresolvedStrategyBlockers.length) return false;
 
+        if (mode === 'draft' &&
+            !this._planHasAnyObjectOrTaskFact(requirementMaturity, semanticExtraction, resolvedFields)) {
+            return false;
+        }
+
         const maturityCanBuild = requirementMaturity?.canBuild === true;
         if (rawCanBuild === true && maturityCanBuild) return true;
 
@@ -1988,12 +2007,50 @@ export const aiPanelAgentWorkspaceMixin = {
             blockingReasons,
             questions
         })
-            .filter(field => PLAN_STRICT_BUILD_FIELDS.has(field))
-            .filter(field => !(field === PLAN_ANSWER_FIELDS.IMAGE_SOURCE && this._routeAllowsPendingImageSource(route)));
+            .filter(field => this._isPlanBuildBlockingField(field, mode, requirementMaturity))
+            .filter(field => !(mode === 'draft' && field === PLAN_ANSWER_FIELDS.IMAGE_SOURCE && this._routeAllowsPendingImageSource(route)));
         if (remainingFields.length) return false;
 
-        return this._planHardFactsReady(requirementMaturity, semanticExtraction, route, resolvedFields) &&
+        return this._planHardFactsReady(requirementMaturity, semanticExtraction, route, resolvedFields, mode) &&
             this._planRouteSatisfiesBuildStrategy(route);
+    },
+
+    _isPlanBuildBlockingField(field, requirementMode, requirementMaturity = null) {
+        const normalized = this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase();
+        if (!normalized) return false;
+        const mode = this._normalizeRequirementMode?.(requirementMode || this.requirementMode || 'strict') || 'strict';
+        if (mode !== 'draft') {
+            return PLAN_STRICT_BUILD_FIELDS.has(normalized);
+        }
+
+        if (normalized === PLAN_ANSWER_FIELDS.INSPECTION_OBJECT ||
+            normalized === PLAN_ANSWER_FIELDS.TASK_TYPE ||
+            normalized === PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY) {
+            return requirementMaturity?.canPlan !== true;
+        }
+
+        return false;
+    },
+
+    _planHasAnyObjectOrTaskFact(requirementMaturity, semanticExtraction, resolvedFields = new Set()) {
+        if (resolvedFields.has(PLAN_ANSWER_FIELDS.INSPECTION_OBJECT) ||
+            resolvedFields.has(PLAN_ANSWER_FIELDS.TASK_TYPE)) {
+            return true;
+        }
+
+        const task = String(semanticExtraction?.taskType || requirementMaturity?.taskType || '')
+            .trim()
+            .toLowerCase();
+        if (task && task !== 'unknown' && task !== 'abstract_goal') {
+            return true;
+        }
+
+        if (String(semanticExtraction?.inspectionObject || '').trim()) {
+            return true;
+        }
+
+        return this._toArray(requirementMaturity?.objectSignals).some(value => String(value || '').trim()) ||
+            this._toArray(requirementMaturity?.taskSignals).some(value => String(value || '').trim());
     },
 
     _ensureRecommendedPlanQuestionSelections(plan) {
@@ -2061,8 +2118,9 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _allBlockingPlanQuestionsHaveRecommendations(plan) {
+        const mode = this._normalizeRequirementMode?.(plan?.requirementMode || this.requirementMode || 'strict') || 'strict';
         const remainingFields = this._getRemainingPlanFields(plan, { acceptedRecommended: false })
-            .filter(field => PLAN_STRICT_BUILD_FIELDS.has(field));
+            .filter(field => this._isPlanBuildBlockingField(field, mode, plan?.requirementMaturity));
         if (!remainingFields.length) return false;
         return remainingFields.every(field => this._toArray(plan?.questions)
             .some(question => this._inferPlanQuestionField(question?.field || question?.id) === field &&
@@ -2322,7 +2380,8 @@ export const aiPanelAgentWorkspaceMixin = {
         return '';
     },
 
-    _planHardFactsReady(requirementMaturity, semanticExtraction, route = null, resolvedFields = new Set()) {
+    _planHardFactsReady(requirementMaturity, semanticExtraction, route = null, resolvedFields = new Set(), requirementMode = 'strict') {
+        const mode = this._normalizeRequirementMode?.(requirementMode || this.requirementMode || 'strict') || 'strict';
         const semanticSource = String(semanticExtraction?.source || '').toLowerCase();
         if (semanticExtraction && semanticSource === 'model') {
             const hasObject = Boolean(String(semanticExtraction.inspectionObject || '').trim()) ||
@@ -2339,25 +2398,37 @@ export const aiPanelAgentWorkspaceMixin = {
                 semanticExtraction.outputTarget ||
                 ''
             ).trim()) || resolvedFields.has(PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA);
+            if (mode === 'draft') {
+                return (hasObject || hasTask) && this._planRouteSatisfiesBuildStrategy(route);
+            }
+
             return hasObject && hasTask && hasInput && hasJudgment;
         }
 
         if (!requirementMaturity) return false;
         const hardMissing = this._toArray(requirementMaturity.missingFields).some(field => {
             const normalized = this._normalizePlanBlockingField(field);
-            return PLAN_STRICT_BUILD_FIELDS.has(normalized) && !resolvedFields.has(normalized);
+            return this._isPlanBuildBlockingField(normalized, mode, requirementMaturity) && !resolvedFields.has(normalized);
         });
         const hardBlocked = this._toArray(requirementMaturity.blockingReasons).some(reason => {
             const normalized = this._normalizePlanBlockingField(reason);
             if (/abstract_goal|empty_requirement/i.test(String(reason || ''))) return true;
-            return PLAN_STRICT_BUILD_FIELDS.has(normalized) && !resolvedFields.has(normalized);
+            return this._isPlanBuildBlockingField(normalized, mode, requirementMaturity) && !resolvedFields.has(normalized);
         });
-        const answeredHardFacts = [
+        const hardFacts = mode === 'draft'
+            ? [
+                PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+                PLAN_ANSWER_FIELDS.TASK_TYPE
+            ]
+            : [
             PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
             PLAN_ANSWER_FIELDS.TASK_TYPE,
             PLAN_ANSWER_FIELDS.IMAGE_SOURCE,
             PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA
-        ].every(field => resolvedFields.has(field));
+        ];
+        const answeredHardFacts = mode === 'draft'
+            ? hardFacts.some(field => resolvedFields.has(field)) || requirementMaturity.canPlan === true
+            : hardFacts.every(field => resolvedFields.has(field));
         return (requirementMaturity.canBuild === true ||
                 (requirementMaturity.canPlan === true && answeredHardFacts)) &&
             !hardMissing &&
@@ -2369,8 +2440,9 @@ export const aiPanelAgentWorkspaceMixin = {
             .some(op => /^imageacquisition$/i.test(String(op || '').trim()));
     },
 
-    _isDraftableImageSourceBlockingReason(reason, route) {
+    _isDraftableImageSourceBlockingReason(reason, route, requirementMode = 'strict') {
         return /^hard_requirement:.*image_source/i.test(String(reason || '').trim()) &&
+            (this._normalizeRequirementMode?.(requirementMode || this.requirementMode || 'strict') || 'strict') === 'draft' &&
             this._routeAllowsPendingImageSource(route);
     },
 
@@ -2398,7 +2470,8 @@ export const aiPanelAgentWorkspaceMixin = {
             route: plan.route || plan.recommendedRoute || plan.RecommendedRoute,
             blockingReasons: plan.blockingReasons,
             questions: plan.questions,
-            acceptedRecommended
+            acceptedRecommended,
+            requirementMode: plan.requirementMode || this.requirementMode || 'strict'
         });
         return plan.executable === true;
     },

@@ -281,8 +281,17 @@ public sealed class PlanSelectionResolver
 
     private static bool IsAttributeClassification(BuildPlanLoad load)
     {
-        var taskType = load.Plan?.SemanticExtraction?.TaskType ?? string.Empty;
-        var text = $"{load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt} {load.Plan?.RecommendedRoute.RouteId}";
+        var taskType = FirstNonEmpty(
+            EffectiveValue(load, VisionAgentPlanAnswerFields.TaskType),
+            load.Plan?.SemanticExtraction?.TaskType ?? string.Empty);
+        var targetAttribute = FirstNonEmpty(
+            EffectiveValue(load, VisionAgentPlanAnswerFields.TargetAttribute),
+            load.Plan?.SemanticExtraction?.TargetAttribute ?? string.Empty);
+        var acceptance = FirstNonEmpty(
+            EffectiveValue(load, VisionAgentPlanAnswerFields.AcceptanceCriteria),
+            load.Plan?.SemanticExtraction?.OkCondition ?? string.Empty,
+            load.Plan?.SemanticExtraction?.NgCondition ?? string.Empty);
+        var text = $"{targetAttribute} {acceptance} {load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt} {load.Plan?.RecommendedRoute.RouteId}";
         return taskType.Equals(AiVisionTaskTypes.AttributeClassification, StringComparison.OrdinalIgnoreCase) ||
                taskType.Equals(AiVisionTaskTypes.Classification, StringComparison.OrdinalIgnoreCase) ||
                text.Contains("attribute_classification", StringComparison.OrdinalIgnoreCase) ||
@@ -315,6 +324,13 @@ public sealed class PlanSelectionResolver
     private static string FirstNonEmpty(params string[] values)
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+    }
+
+    private static string EffectiveValue(BuildPlanLoad load, string field)
+    {
+        return load.EffectiveRequirement.Values.TryGetValue(field, out var value)
+            ? VisionAgentBuildSupport.Clean(value)
+            : string.Empty;
     }
 
     private static IEnumerable<string> ReadOperatorTypes(object? templateSkeleton)

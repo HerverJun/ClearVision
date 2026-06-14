@@ -1304,9 +1304,19 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             return string.Empty;
         }
 
-        var payload = new
+        var payload = NormalizePlanContractVersion(plan) == VisionAgentPlanContractVersions.V2
+            ? BuildPlanHashPayloadV2(plan)
+            : BuildPlanHashPayloadV1(plan);
+
+        var json = JsonSerializer.Serialize(payload, PlanHashJsonOptions);
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
+        return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()}";
+    }
+
+    private static object BuildPlanHashPayloadV1(VisionAgentPlanModeResult plan)
+    {
+        return new
         {
-            planContractVersion = NormalizePlanContractVersion(plan),
             goal = Clean(plan.Goal),
             intent = Clean(plan.Intent),
             confidence = Clean(plan.Confidence),
@@ -1323,9 +1333,6 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 .Select(question => new
                 {
                     id = Clean(question.Id),
-                    field = NormalizePlanContractVersion(plan) == VisionAgentPlanContractVersions.V2
-                        ? Clean(question.Field)
-                        : string.Empty,
                     title = Clean(question.Title),
                     why = Clean(question.Why),
                     defaultValue = Clean(question.DefaultValue),
@@ -1383,10 +1390,87 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             plcOutputPolicy = Clean(plan.PlcOutputPolicy),
             metadataOnly = plan.MetadataOnly
         };
+    }
 
-        var json = JsonSerializer.Serialize(payload, PlanHashJsonOptions);
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
-        return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()}";
+    private static object BuildPlanHashPayloadV2(VisionAgentPlanModeResult plan)
+    {
+        return new
+        {
+            planContractVersion = VisionAgentPlanContractVersions.V2,
+            goal = Clean(plan.Goal),
+            intent = Clean(plan.Intent),
+            confidence = Clean(plan.Confidence),
+            requirementUnderstanding = NormalizeList(plan.RequirementUnderstanding),
+            recommendedRoute = new
+            {
+                routeId = Clean(plan.RecommendedRoute.RouteId),
+                title = Clean(plan.RecommendedRoute.Title),
+                summary = Clean(plan.RecommendedRoute.Summary),
+                operators = NormalizeList(plan.RecommendedRoute.Operators),
+                templateDecision = Clean(plan.RecommendedRoute.TemplateDecision)
+            },
+            clarificationQuestions = plan.ClarificationQuestions
+                .Select(question => new
+                {
+                    id = Clean(question.Id),
+                    field = Clean(question.Field),
+                    title = Clean(question.Title),
+                    why = Clean(question.Why),
+                    defaultValue = Clean(question.DefaultValue),
+                    defaultAssumption = Clean(question.DefaultAssumption),
+                    impact = Clean(question.Impact),
+                    options = question.Options.Select(option => new
+                    {
+                        value = Clean(option.Value),
+                        label = Clean(option.Label),
+                        recommended = option.Recommended,
+                        description = Clean(option.Description),
+                        impact = Clean(option.Impact)
+                    }).ToList()
+                })
+                .ToList(),
+            recommendedDefaults = plan.RecommendedDefaults
+                .Select(item => new
+                {
+                    id = Clean(item.Id),
+                    label = Clean(item.Label),
+                    value = Clean(item.Value),
+                    impact = Clean(item.Impact)
+                })
+                .ToList(),
+            risks = NormalizeList(plan.Risks),
+            acceptanceCriteria = NormalizeList(plan.AcceptanceCriteria),
+            executablePlan = NormalizeList(plan.ExecutablePlan),
+            canBuild = plan.CanBuild,
+            blockingReasons = NormalizeList(plan.BlockingReasons),
+            requirementMaturity = plan.RequirementMaturity == null
+                ? null
+                : new
+                {
+                    maturity = Clean(plan.RequirementMaturity.Maturity),
+                    taskType = Clean(plan.RequirementMaturity.TaskType),
+                    canBuild = plan.RequirementMaturity.CanBuild,
+                    missingFields = NormalizeList(plan.RequirementMaturity.MissingFields),
+                    blockingReasons = NormalizeList(plan.RequirementMaturity.BlockingReasons)
+                },
+            nextAction = Clean(plan.NextAction),
+            contextSummary = new
+            {
+                hasCurrentFlow = plan.ContextSummary.HasCurrentFlow,
+                hasCurrentResult = plan.ContextSummary.HasCurrentResult,
+                attachmentCount = Math.Max(plan.ContextSummary.AttachmentCount, 0),
+                templateSelectionMode = Clean(plan.ContextSummary.TemplateSelectionMode),
+                templateId = Clean(plan.ContextSummary.TemplateId),
+                contextKinds = NormalizeList(plan.ContextSummary.ContextKinds),
+                operatorCatalogTools = NormalizeList(plan.ContextSummary.OperatorCatalogTools)
+            },
+            operatorCatalogVersion = Clean(plan.OperatorCatalogVersion),
+            templateCatalogVersion = Clean(plan.TemplateCatalogVersion),
+            templateSelection = NormalizeTemplateSelectionForHash(plan.TemplateSelection),
+            stationBoundarySummary = Clean(plan.StationBoundarySummary),
+            plcOutputPolicy = Clean(plan.PlcOutputPolicy),
+            metadataOnly = plan.MetadataOnly
+        };
     }
 
     private static string NormalizePlanContractVersion(VisionAgentPlanModeResult plan)

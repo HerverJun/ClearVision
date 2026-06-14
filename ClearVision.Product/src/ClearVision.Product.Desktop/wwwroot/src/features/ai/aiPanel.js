@@ -838,8 +838,12 @@ export class AiPanel {
 
         if (isClarification) {
             this.pendingClarificationPayload = payload;
-            this.pendingVisionPlan = null;
-            this._clearPlanQuestionAnswers?.();
+            const shouldResetPendingPlan = (payload.shouldResetPendingPlan ?? payload.ShouldResetPendingPlan) === true ||
+                (payload.resetPendingPlan ?? payload.ResetPendingPlan) === true;
+            if (shouldResetPendingPlan) {
+                this.pendingVisionPlan = null;
+                this._clearPlanQuestionAnswers?.();
+            }
             this._resetClarificationSelectionDraft();
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);

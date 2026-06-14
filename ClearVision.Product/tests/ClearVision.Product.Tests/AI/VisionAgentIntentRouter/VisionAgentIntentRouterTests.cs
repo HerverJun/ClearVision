@@ -233,6 +233,67 @@ public sealed class VisionAgentIntentRouterTests
         result.FallbackReason.Should().Be("router_unauthorized");
     }
 
+    [Fact(DisplayName = "Intent Router draft pending fields should not block confirmed Plan Build")]
+    public async Task RouteAsync_DraftPendingFields_ShouldBuildFromConfirmedPlan()
+    {
+        var service = CreateService(_ => Json(new
+        {
+            intent = "build_from_confirmed_plan",
+            confidence = "high",
+            shouldOpenPlan = false,
+            shouldBuildDirectly = true,
+            canBuild = true,
+            needsClarification = false,
+            publicReason = "Pending draft fields are allowed in draft mode.",
+            assistantReply = "进入构建。",
+            clarificationQuestions = Array.Empty<string>(),
+            fallbackAllowed = true
+        }));
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "开始 build",
+                HasPendingPlan = true,
+                RequirementMode = AiRequirementModes.Draft,
+                ResolvedPlanFields = [VisionAgentPlanAnswerFields.InspectionObject, VisionAgentPlanAnswerFields.TaskType],
+                RemainingPlanFields = [VisionAgentPlanAnswerFields.ImageSource, VisionAgentPlanAnswerFields.AcceptanceCriteria],
+                SemanticExtraction = PendingDraftSemantic()
+            },
+            CancellationToken.None);
+
+        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentBuildFromConfirmedPlan);
+        result.ShouldBuildDirectly.Should().BeTrue();
+        result.NeedsClarification.Should().BeFalse();
+        result.ShouldResetPendingPlan.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "Intent Router HTTP fallback should preserve Pending Plan")]
+    public async Task RouteAsync_HttpFallbackWithPendingPlan_ShouldNotResetPlan()
+    {
+        var service = CreateService(_ => throw new HttpRequestException(
+            "401 unauthorized",
+            null,
+            HttpStatusCode.Unauthorized));
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "开始 build",
+                HasPendingPlan = true,
+                RequirementMode = AiRequirementModes.Draft,
+                PendingPlanHash = "sha256:pending",
+                ResolvedPlanFields = [VisionAgentPlanAnswerFields.InspectionObject, VisionAgentPlanAnswerFields.TaskType],
+                RemainingPlanFields = [VisionAgentPlanAnswerFields.ImageSource],
+                SemanticExtraction = PendingDraftSemantic()
+            },
+            CancellationToken.None);
+
+        result.RouterSource.Should().Be("rule_fallback");
+        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentBuildFromConfirmedPlan);
+        result.ShouldResetPendingPlan.Should().BeFalse();
+    }
+
     [Fact(DisplayName = "Intent Router should redact unsafe public text")]
     public async Task RouteAsync_ShouldRedactUnsafePublicText()
     {
@@ -283,6 +344,30 @@ public sealed class VisionAgentIntentRouterTests
     private static string Json(object value)
     {
         return JsonSerializer.Serialize(value);
+    }
+
+    private static VisionAgentSemanticExtractionResult PendingDraftSemantic()
+    {
+        return new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.SurfaceDefect,
+            Confidence = 0.82,
+            TaskTypeConfidence = 0.8,
+            InspectionObject = "logo area",
+            DefectType = "appearance defect",
+            ImageSource = string.Empty,
+            OkCondition = string.Empty,
+            NgCondition = string.Empty,
+            OutputTarget = string.Empty,
+            CanPlanCandidate = true,
+            CanBuildCandidate = false,
+            ObjectSignals = ["logo area"],
+            TaskSignals = ["appearance defect"],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
     }
 
     private sealed class DelegateCompletionSource : IVisionAgentIntentRouterCompletionSource

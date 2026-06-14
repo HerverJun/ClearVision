@@ -356,8 +356,10 @@ public sealed class ParameterMappingService
 
     private static bool IsWireSequenceScenario(BuildPlanLoad load)
     {
-        var text = $"{load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt}";
-        return text.Contains("wire", StringComparison.OrdinalIgnoreCase) ||
+        var taskType = EffectiveTaskType(load);
+        var text = $"{EffectiveValue(load, VisionAgentPlanAnswerFields.AcceptanceCriteria)} {load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt}";
+        return taskType.Equals(AiVisionTaskTypes.WireSequence, StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("wire", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("sequence", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("terminal", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("line order", StringComparison.OrdinalIgnoreCase);
@@ -365,8 +367,10 @@ public sealed class ParameterMappingService
 
     private static bool IsMeasurementScenario(BuildPlanLoad load)
     {
-        var text = $"{load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt}";
-        return text.Contains("measurement", StringComparison.OrdinalIgnoreCase) ||
+        var taskType = EffectiveTaskType(load);
+        var text = $"{EffectiveValue(load, VisionAgentPlanAnswerFields.MeasurementTarget)} {EffectiveValue(load, VisionAgentPlanAnswerFields.AcceptanceCriteria)} {load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt}";
+        return taskType.Equals(AiVisionTaskTypes.GeometryMeasurement, StringComparison.OrdinalIgnoreCase) ||
+               text.Contains("measurement", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("distance", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("spacing", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("hole", StringComparison.OrdinalIgnoreCase) ||
@@ -375,8 +379,10 @@ public sealed class ParameterMappingService
 
     private static bool IsAttributeClassificationScenario(BuildPlanLoad load)
     {
-        var taskType = load.Plan?.SemanticExtraction?.TaskType ?? string.Empty;
-        var text = $"{load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt} {load.Plan?.RecommendedRoute?.RouteId}";
+        var taskType = EffectiveTaskType(load);
+        var targetAttribute = EffectiveValue(load, VisionAgentPlanAnswerFields.TargetAttribute);
+        var acceptance = EffectiveValue(load, VisionAgentPlanAnswerFields.AcceptanceCriteria);
+        var text = $"{targetAttribute} {acceptance} {load.Plan?.Intent} {load.Plan?.Goal} {load.OriginalUserPrompt} {load.Plan?.RecommendedRoute?.RouteId}";
         return taskType.Equals(AiVisionTaskTypes.AttributeClassification, StringComparison.OrdinalIgnoreCase) ||
                taskType.Equals(AiVisionTaskTypes.Classification, StringComparison.OrdinalIgnoreCase) ||
                text.Contains("attribute_classification", StringComparison.OrdinalIgnoreCase) ||
@@ -409,14 +415,36 @@ public sealed class ParameterMappingService
         }
 
         var semantic = load.Plan?.SemanticExtraction;
-        var fromOkCondition = ExtractOkClassLabel(semantic?.OkCondition);
+        var fromOkCondition = ExtractOkClassLabel(EffectiveValue(load, VisionAgentPlanAnswerFields.AcceptanceCriteria));
         if (!string.IsNullOrWhiteSpace(fromOkCondition))
         {
             return fromOkCondition;
         }
 
-        var target = VisionAgentBuildSupport.CleanValue(semantic?.TargetAttribute);
+        fromOkCondition = ExtractOkClassLabel(semantic?.OkCondition);
+        if (!string.IsNullOrWhiteSpace(fromOkCondition))
+        {
+            return fromOkCondition;
+        }
+
+        var target = VisionAgentBuildSupport.FirstNonEmpty(
+            EffectiveValue(load, VisionAgentPlanAnswerFields.TargetAttribute),
+            semantic?.TargetAttribute);
         return string.IsNullOrWhiteSpace(target) ? "<pending-ok-class-label>" : target;
+    }
+
+    private static string EffectiveTaskType(BuildPlanLoad load)
+    {
+        return VisionAgentBuildSupport.FirstNonEmpty(
+            EffectiveValue(load, VisionAgentPlanAnswerFields.TaskType),
+            load.Plan?.SemanticExtraction?.TaskType);
+    }
+
+    private static string EffectiveValue(BuildPlanLoad load, string field)
+    {
+        return load.EffectiveRequirement.Values.TryGetValue(field, out var value)
+            ? VisionAgentBuildSupport.CleanValue(value)
+            : string.Empty;
     }
 
     private static string ExtractOkClassLabel(string? okCondition)

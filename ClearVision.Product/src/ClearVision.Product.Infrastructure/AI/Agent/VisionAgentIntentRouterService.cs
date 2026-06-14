@@ -557,16 +557,6 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             VisionAgentPlanAnswerFields.MeasurementTarget;
     }
 
-    private static bool IsStrictPlanBlockingField(string field)
-    {
-        return NormalizePlanField(field) is
-            VisionAgentPlanAnswerFields.InspectionObject or
-            VisionAgentPlanAnswerFields.TaskType or
-            VisionAgentPlanAnswerFields.ImageSource or
-            VisionAgentPlanAnswerFields.AcceptanceCriteria or
-            VisionAgentPlanAnswerFields.AlgorithmStrategy;
-    }
-
     private static List<string> MergeResolvedPlanFields(
         VisionAgentIntentRouterRequest request,
         IReadOnlyList<VisionAgentPlanAnswer> updates)
@@ -589,9 +579,14 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             .ToList();
     }
 
-    private static bool HasStrictRemainingPlanFields(VisionAgentIntentRouterRequest request)
+    private static bool HasBlockingRemainingPlanFields(
+        VisionAgentIntentRouterRequest request,
+        AiRequirementMaturityResult maturity)
     {
-        return NormalizePlanFields(request.RemainingPlanFields).Any(IsStrictPlanBlockingField);
+        return NormalizePlanFields(request.RemainingPlanFields).Any(field =>
+            string.Equals(request.RequirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase)
+                ? VisionAgentPlanFieldPolicy.IsDraftBlocking(field, maturity.TaskType, maturity)
+                : VisionAgentPlanFieldPolicy.IsStrictBlocking(field, maturity.TaskType, maturity));
     }
 
     private static VisionAgentRequirementMaturityRequest ToMaturityRequest(VisionAgentIntentRouterRequest request)
@@ -623,7 +618,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
     {
         if (intent == IntentBuildFromConfirmedPlan && request.HasPendingPlan)
         {
-            if (!HasStrictRemainingPlanFields(request))
+            if (!HasBlockingRemainingPlanFields(request, maturity))
             {
                 return;
             }

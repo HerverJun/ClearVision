@@ -71,7 +71,7 @@ public sealed class VisionAgentBuildOrchestratorTests
     }
 
     [Fact(DisplayName = "BuildFromPlan should allow editable draft when image source is pending but acquisition route exists")]
-    public async Task BuildAsync_PendingImageSourceWithAcquisitionRoute_ShouldBuildEditableDraft()
+    public async Task BuildAsync_DraftPendingImageSourceWithAcquisitionRoute_ShouldBuildEditableDraft()
     {
         var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
         var baseline = Plan(
@@ -100,7 +100,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         };
 
         var result = await orchestrator.BuildAsync(
-            Request(plan, acceptedRecommendedDefaults: false),
+            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Draft),
             CancellationToken.None);
 
         result.Success.Should().BeTrue();
@@ -113,6 +113,58 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ResourceKey == "op_cam.CameraId");
         build.ApplyGate.CanvasApplyReady.Should().BeTrue();
         build.ApplyGate.DeploymentReady.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "BuildFromPlan draft should block when object and task are both empty")]
+    public async Task BuildAsync_DraftWithEmptyObjectAndTask_ShouldBlock()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "safe editable draft");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            SemanticExtraction = baseline.SemanticExtraction! with
+            {
+                TaskType = AiVisionTaskTypes.Unknown,
+                InspectionObject = string.Empty,
+                TargetAttribute = string.Empty,
+                DefectType = string.Empty,
+                MeasurementTarget = string.Empty,
+                ObjectSignals = [],
+                TaskSignals = [],
+                CanPlanCandidate = true,
+                CanBuildCandidate = false
+            },
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanPlan = true,
+                CanBuild = false,
+                ObjectSignals = [],
+                TaskSignals = [],
+                MissingFields = ["inspection_object", "task_type"],
+                BlockingReasons = ["inspection_object_missing", "task_type_missing"]
+            }
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Draft),
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.RequirementMaturity.Should().NotBeNull();
+        result.RequirementMaturity!.CanPlan.Should().BeFalse();
+        result.DecisionTrace!.BlockingReasons.Should()
+            .Contain(reason => reason.Contains("inspection_object", StringComparison.OrdinalIgnoreCase))
+            .And
+            .Contain(reason => reason.Contains("task_type", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact(DisplayName = "Black-box scenario: metal scratch Build quality")]
@@ -339,6 +391,19 @@ public sealed class VisionAgentBuildOrchestratorTests
         VisionAgentOrchestrator.ComputePlanHash(plan).Should().Be(plan.PlanHash);
     }
 
+    [Fact(DisplayName = "PlanHash v1 should preserve the c9b2e871 payload exactly")]
+    public void ComputePlanHash_V1_ShouldMatchLegacyGolden()
+    {
+        var plan = PlanWithStrategyConfirmationBlocker() with
+        {
+            PlanContractVersion = VisionAgentPlanContractVersions.V1
+        };
+
+        VisionAgentOrchestrator.ComputePlanHash(plan)
+            .Should()
+            .Be("sha256:eb244c0ca53982c4943e791adc9ae2cf725ade4a030a97e22465a9632ced335b");
+    }
+
     [Fact(DisplayName = "BuildFromPlan should accept recommended strategy and emit confirmation metadata")]
     public async Task BuildAsync_AcceptedRecommendedStrategy_ShouldBuildDeepLearningDraft()
     {
@@ -481,6 +546,75 @@ public sealed class VisionAgentBuildOrchestratorTests
         build.ToolEvidenceTimeline.Should().Contain(item =>
             item.Stage == "plan_selection" &&
             item.ToolName == "plan_selection_resolver");
+    }
+
+    [Theory(DisplayName = "Confirmed task_type should drive attribute classification strategy routes")]
+    [InlineData("deep_learning", "attribute_classification_deep_learning", "deep_learning_classification", "DeepLearning")]
+    [InlineData("traditional_rule", "attribute_classification_traditional_rule", "traditional_numeric_rule", "Thresholding")]
+    public async Task BuildAsync_ConfirmedTaskTypeAttributeClassification_ShouldDriveStrategyRoutes(
+        string strategy,
+        string expectedRouteId,
+        string expectedParameterStrategy,
+        string expectedOperator)
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var plan = PlanWithStrategyConfirmationBlocker(
+            intent: "surface_defect",
+            originalUserPrompt: "inspect fruit",
+            routeId: "planner_route",
+            taskType: AiVisionTaskTypes.SurfaceDefect,
+            targetAttribute: string.Empty,
+            okCondition: string.Empty);
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                confirmedAnswers:
+                [
+                    PlanAnswer(
+                        string.Empty,
+                        VisionAgentPlanAnswerFields.TaskType,
+                        AiVisionTaskTypes.AttributeClassification,
+                        VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                    PlanAnswer(
+                        string.Empty,
+                        VisionAgentPlanAnswerFields.TargetAttribute,
+                        "ripe",
+                        VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                    PlanAnswer(
+                        string.Empty,
+                        VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                        "ripe is OK",
+                        VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                    PlanAnswer(
+                        "model_or_rule_strategy",
+                        VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                        strategy)
+                ],
+                acceptedRecommendedDefaults: false),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var build = result.BuildResult!;
+        build.EffectiveRouteId.Should().Be(expectedRouteId);
+        build.ParameterStrategy.Should().Be(expectedParameterStrategy);
+        build.OperatorPipeline.Select(item => item.OperatorType).Should().Contain(expectedOperator);
+        build.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.TaskType);
+        if (strategy == "deep_learning")
+        {
+            build.ParameterMapping.Should().Contain(item =>
+                item.OperatorType == "ResultJudgment" &&
+                item.ParameterName == "ExpectValue" &&
+                item.ValueSummary == "ripe");
+        }
+        else
+        {
+            build.ParameterMapping.Should().Contain(item =>
+                item.OperatorType == "ResultJudgment" &&
+                item.ParameterName == "FieldName" &&
+                item.ValueSummary == "BlobCount");
+        }
     }
 
     [Fact(DisplayName = "Non-attribute tasks should not switch routes from incidental model or rule values")]
@@ -1045,12 +1179,14 @@ public sealed class VisionAgentBuildOrchestratorTests
         AiTemplateSelectionInfo? templateSelection = null,
         Dictionary<string, string>? userSelections = null,
         List<VisionAgentPlanAnswer>? confirmedAnswers = null,
-        bool acceptedRecommendedDefaults = true)
+        bool acceptedRecommendedDefaults = true,
+        string requirementMode = AiRequirementModes.Strict)
     {
         return new AiFlowGenerationRequest(plan.OriginalUserPrompt, Mode: GenerateFlowModeExtensions.ParseOrAuto(buildIntent))
         {
             AgentRunId = "ar_build_test",
             UseVisionAgentGenerateFlow = true,
+            RequirementMode = requirementMode,
             BuildFromPlan = new VisionAgentBuildFromPlanRequest
             {
                 PlanId = plan.PlanId,
@@ -1149,15 +1285,43 @@ public sealed class VisionAgentBuildOrchestratorTests
         };
     }
 
-    private static VisionAgentPlanModeResult PlanWithStrategyConfirmationBlocker()
+    private static VisionAgentPlanModeResult PlanWithStrategyConfirmationBlocker(
+        string intent = "attribute_classification",
+        string originalUserPrompt = "classify object maturity from camera",
+        string? routeId = null,
+        string taskType = AiVisionTaskTypes.AttributeClassification,
+        string targetAttribute = "attribute",
+        string okCondition = "expected class is OK")
     {
         var plan = Plan(
-            "attribute_classification",
+            intent,
             ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
-            "classify object maturity from camera");
+            originalUserPrompt);
+        var semantic = plan.SemanticExtraction! with
+        {
+            TaskType = taskType,
+            TargetAttribute = targetAttribute,
+            OkCondition = okCondition,
+            TaskSignals = string.IsNullOrWhiteSpace(targetAttribute)
+                ? [taskType]
+                : [taskType, targetAttribute]
+        };
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest
+            {
+                Description = originalUserPrompt
+            },
+            semantic);
         var blocked = plan with
         {
             CanBuild = false,
+            Intent = intent,
+            SemanticExtraction = semantic,
+            RequirementMaturity = maturity,
+            RecommendedRoute = plan.RecommendedRoute with
+            {
+                RouteId = routeId ?? $"{intent}_route"
+            },
             BlockingReasons = ["strategy_confirmation:model_or_rule_strategy_missing"],
             ClarificationQuestions =
             [

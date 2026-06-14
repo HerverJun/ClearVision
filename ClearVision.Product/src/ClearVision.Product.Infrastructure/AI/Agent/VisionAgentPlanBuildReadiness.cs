@@ -36,7 +36,7 @@ internal static class VisionAgentPlanBuildReadiness
         }
 
         blocking.AddRange(VisionAgentStrategyConfirmationSupport.ExtractHardBlockers(plan)
-            .Where(reason => !IsDraftableImageSourceBlocker(plan, reason)));
+            .Where(reason => !IsDraftableImageSourceBlocker(plan, reason, requirementMode)));
 
         var maturity = effectiveRequirement?.Maturity ?? plan.RequirementMaturity;
         if (maturity is { CanPlan: false } ||
@@ -118,6 +118,7 @@ internal static class VisionAgentPlanBuildReadiness
             foreach (var field in effectiveRequirement.RemainingFields)
             {
                 if (field.Contains("image_source", StringComparison.OrdinalIgnoreCase) &&
+                    requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
                     CanDraftWithPendingImageSource(plan))
                 {
                     continue;
@@ -176,9 +177,11 @@ internal static class VisionAgentPlanBuildReadiness
 
     private static bool IsDraftableImageSourceBlocker(
         VisionAgentPlanModeResult plan,
-        string reason)
+        string reason,
+        string requirementMode)
     {
         return reason.Contains("image_source", StringComparison.OrdinalIgnoreCase) &&
+               requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
                CanDraftWithPendingImageSource(plan);
     }
 

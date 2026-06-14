@@ -21,7 +21,7 @@ public sealed class VisionAgentPlanRequirementOverlay
             values[item.Key] = item.Value;
         }
 
-        var semantic = BuildSemantic(plan?.SemanticExtraction, values);
+        var semantic = BuildSemantic(plan?.SemanticExtraction, values, maturityRequest.RequirementMode);
         var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
         var resolved = values
             .Where(item => !string.IsNullOrWhiteSpace(item.Value) &&
@@ -59,7 +59,8 @@ public sealed class VisionAgentPlanRequirementOverlay
 
     private static VisionAgentSemanticExtractionResult BuildSemantic(
         VisionAgentSemanticExtractionResult? semantic,
-        IReadOnlyDictionary<string, string> values)
+        IReadOnlyDictionary<string, string> values,
+        string requirementMode)
     {
         var taskType = Read(values, VisionAgentPlanAnswerFields.TaskType);
         var inspectionObject = Read(values, VisionAgentPlanAnswerFields.InspectionObject);
@@ -69,30 +70,40 @@ public sealed class VisionAgentPlanRequirementOverlay
         var imageSource = Read(values, VisionAgentPlanAnswerFields.ImageSource);
         var outputTarget = Read(values, VisionAgentPlanAnswerFields.OutputTarget);
         var acceptance = Read(values, VisionAgentPlanAnswerFields.AcceptanceCriteria);
+        var hasObjectOrTask = !string.IsNullOrWhiteSpace(inspectionObject) ||
+                              (!string.IsNullOrWhiteSpace(taskType) &&
+                               !string.Equals(taskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
+                               !string.Equals(taskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase));
+        var canPlanCandidate = semantic?.CanPlanCandidate == true;
+        if (string.Equals(requirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
+            !hasObjectOrTask)
+        {
+            canPlanCandidate = false;
+        }
 
         return new VisionAgentSemanticExtractionResult
         {
             IsVisionRequest = semantic?.IsVisionRequest ?? true,
             Intent = FirstNonEmpty(semantic?.Intent, "new_flow"),
             TaskType = string.IsNullOrWhiteSpace(taskType) ? AiVisionTaskTypes.Unknown : taskType,
-            Confidence = Math.Max(semantic?.Confidence ?? 0.8, 0.8),
-            TaskTypeConfidence = Math.Max(semantic?.TaskTypeConfidence ?? 0.8, 0.8),
+            Confidence = semantic?.Confidence ?? 0,
+            TaskTypeConfidence = semantic?.TaskTypeConfidence ?? 0,
             InspectionObject = inspectionObject,
             TargetAttribute = targetAttribute,
             DefectType = defectType,
             MeasurementTarget = measurementTarget,
             ImageSource = imageSource,
-            OkCondition = FirstNonEmpty(semantic?.OkCondition, acceptance),
+            OkCondition = FirstNonEmpty(acceptance, semantic?.OkCondition),
             NgCondition = semantic?.NgCondition ?? string.Empty,
             OutputTarget = outputTarget,
             SuggestedRoute = semantic?.SuggestedRoute ?? string.Empty,
-            CanPlanCandidate = true,
-            CanBuildCandidate = true,
-            ObjectSignals = SplitSignals(inspectionObject),
-            TaskSignals = SplitSignals(FirstNonEmpty(targetAttribute, defectType, measurementTarget, taskType, acceptance)),
+            CanPlanCandidate = canPlanCandidate,
+            CanBuildCandidate = semantic?.CanBuildCandidate == true,
+            ObjectSignals = MergeSignals(semantic?.ObjectSignals, inspectionObject),
+            TaskSignals = MergeSignals(semantic?.TaskSignals, FirstNonEmpty(targetAttribute, defectType, measurementTarget, taskType, acceptance)),
             MissingFields = [],
             ClarificationQuestions = [],
-            Source = VisionAgentSemanticSources.Model,
+            Source = semantic?.Source ?? VisionAgentSemanticSources.RuleFallback,
             MetadataOnly = true
         };
     }
@@ -111,10 +122,16 @@ public sealed class VisionAgentPlanRequirementOverlay
         return values.TryGetValue(field, out var value) ? Clean(value) : string.Empty;
     }
 
-    private static List<string> SplitSignals(string? value)
+    private static List<string> MergeSignals(IEnumerable<string>? existing, string? value)
     {
         var text = Clean(value);
-        return string.IsNullOrWhiteSpace(text) ? [] : [text];
+        return (existing ?? [])
+            .Concat(string.IsNullOrWhiteSpace(text) ? [] : [text])
+            .Select(Clean)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(12)
+            .ToList();
     }
 
     private static string NormalizeTaskType(string? taskType)
