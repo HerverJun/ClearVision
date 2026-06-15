@@ -121,8 +121,9 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
         AssertPlanQuality(plan);
         AssertBuildRequestPreservesPlanContext(request);
         AssertCommonBuildQuality(result, sink);
+        var routeDiagnostic = $"plan={string.Join(",", plan.RecommendedRoute.Operators)}; effective={string.Join(",", result.BuildResult!.EffectiveOperators)}; source={result.BuildResult.SelectionSource}; strategy={result.BuildResult.StrategyConfirmationSource}";
         result.BuildResult!.OperatorPipeline.Select(item => item.OperatorType)
-            .Should().Contain(["ImageAcquisition", "TemplateMatching", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput"]);
+            .Should().Contain(["ImageAcquisition", "TemplateMatching", "RoiManager", "DeepLearning", "ResultJudgment", "ResultOutput"], routeDiagnostic);
         result.BuildResult.MissingResources.Should().Contain(item => item.ResourceType == "template_artifact");
         result.BuildResult.MissingResources.Should().Contain(item => item.ResourceType == "model_resource");
     }
@@ -278,7 +279,16 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
         AiFlowGenerationResult result,
         CapturingAgentRunEventSink sink)
     {
-        result.Success.Should().BeTrue();
+        var failureMessage = string.Join(
+            " | ",
+            new[]
+            {
+                result.ErrorMessage,
+                result.FailureSummary?.Message,
+                string.Join(",", result.DecisionTrace?.BlockingReasons ?? []),
+                result.CompletionStatus
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        result.Success.Should().BeTrue(failureMessage);
         result.BuildResult.Should().NotBeNull();
         result.BuildResult!.ValidationPreview.Should().NotBeNull();
         result.BuildResult.WorkflowDiff.ValidationFailures.Should().BeEmpty();

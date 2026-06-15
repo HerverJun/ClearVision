@@ -1101,6 +1101,20 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             MetadataOnly = true
         };
 
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(result);
+        result = result with
+        {
+            CanBuild = readiness.CanBuild,
+            BlockingReasons = readiness.Blockers
+                .Where(blocker => blocker.BlocksBuild)
+                .Select(blocker => blocker.Id)
+                .Where(reason => !string.IsNullOrWhiteSpace(reason))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(12)
+                .ToList(),
+            BuildReadiness = readiness
+        };
+
         return result with
         {
             PlanHash = ComputePlanHash(result)

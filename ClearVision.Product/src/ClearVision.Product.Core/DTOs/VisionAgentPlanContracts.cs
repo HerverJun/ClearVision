@@ -72,12 +72,50 @@ public static class VisionAgentPlanAnswerOrigins
     public const string LegacyInferred = "legacy_inferred";
 }
 
+public static class VisionAgentBuildBlockerCategories
+{
+    public const string HardRequirement = "hard_requirement";
+    public const string StrategyConfirmation = "strategy_confirmation";
+    public const string ResourcePending = "resource_pending";
+    public const string ContractWarning = "contract_warning";
+    public const string SafetyBlocker = "safety_blocker";
+}
+
+public static class VisionAgentBuildBlockerResolutionModes
+{
+    public const string AnswerQuestion = "answer_question";
+    public const string AcceptRecommended = "accept_recommended";
+    public const string ProvideResource = "provide_resource";
+    public const string NonBlocking = "non_blocking";
+}
+
 public sealed record VisionAgentPlanAnswer
 {
     public string QuestionId { get; init; } = string.Empty;
     public string Field { get; init; } = string.Empty;
     public string Value { get; init; } = string.Empty;
     public string Origin { get; init; } = string.Empty;
+}
+
+public sealed record VisionAgentBuildBlocker
+{
+    public string Id { get; init; } = string.Empty;
+    public string Category { get; init; } = string.Empty;
+    public string Field { get; init; } = string.Empty;
+    public string QuestionId { get; init; } = string.Empty;
+    public bool BlocksBuild { get; init; }
+    public string ResolutionMode { get; init; } = string.Empty;
+    public string PublicLabel { get; init; } = string.Empty;
+}
+
+public sealed record VisionAgentBuildReadinessSnapshot
+{
+    public bool CanBuild { get; init; }
+    public List<VisionAgentBuildBlocker> Blockers { get; init; } = [];
+    public List<string> ResolvedFields { get; init; } = [];
+    public List<string> RemainingFields { get; init; } = [];
+    public string PrimaryMessage { get; init; } = string.Empty;
+    public string ContractVersion { get; init; } = VisionAgentPlanContractVersions.V2;
 }
 
 public sealed record VisionAgentSemanticExtractionRequest
@@ -249,6 +287,7 @@ public sealed record VisionAgentPlanModeResult
     public List<string> ExecutablePlan { get; init; } = [];
     public bool CanBuild { get; init; }
     public List<string> BlockingReasons { get; init; } = [];
+    public VisionAgentBuildReadinessSnapshot BuildReadiness { get; init; } = new();
     public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
     public AiRequirementMaturityResult? RequirementMaturity { get; init; }
     public AiDecisionTrace? DecisionTrace { get; init; }

@@ -532,6 +532,22 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
     private static string NormalizeBlockingField(string reason)
     {
         var value = (reason ?? string.Empty).Trim();
+        var tail = value
+            .Replace("hard_requirement:", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("strategy_confirmation:", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("resource_pending:", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("_missing", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Trim(':');
+        var tailField = VisionAgentPlanFieldPolicy.ResolveQuestionField(new VisionAgentClarificationQuestion
+        {
+            Id = tail,
+            Field = tail
+        });
+        if (!string.IsNullOrWhiteSpace(tailField))
+        {
+            return tailField;
+        }
+
         if (value.Contains("strategy_confirmation", StringComparison.OrdinalIgnoreCase) ||
             value.Contains("model_or_rule_strategy", StringComparison.OrdinalIgnoreCase) ||
             value.Contains("classification_strategy", StringComparison.OrdinalIgnoreCase) ||
@@ -548,10 +564,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             }
         }
 
-        return value
-            .Replace("hard_requirement:", string.Empty, StringComparison.OrdinalIgnoreCase)
-            .Replace("_missing", string.Empty, StringComparison.OrdinalIgnoreCase)
-            .Trim(':');
+        return tail;
     }
 
     private static bool ShouldAttemptRepair(

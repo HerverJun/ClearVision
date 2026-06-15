@@ -99,7 +99,50 @@ const PLAN_ANSWER_ORIGINS = Object.freeze({
     EXPLICIT_USER_TEXT: 'explicit_user_text'
 });
 
+const PLAN_BUILD_BLOCKER_CATEGORIES = Object.freeze({
+    HARD_REQUIREMENT: 'hard_requirement',
+    STRATEGY_CONFIRMATION: 'strategy_confirmation',
+    RESOURCE_PENDING: 'resource_pending',
+    CONTRACT_WARNING: 'contract_warning',
+    SAFETY_BLOCKER: 'safety_blocker'
+});
+
+const PLAN_BUILD_RESOLUTION_MODES = Object.freeze({
+    ANSWER_QUESTION: 'answer_question',
+    ACCEPT_RECOMMENDED: 'accept_recommended',
+    PROVIDE_RESOURCE: 'provide_resource',
+    NON_BLOCKING: 'non_blocking'
+});
+
 const PLAN_QUESTION_FIELD_BY_ID = Object.freeze({
+    object_type: PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+    product_type: PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+    part_type: PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+    inspection_target: PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+    detection_target: PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
+    task_category: PLAN_ANSWER_FIELDS.TASK_TYPE,
+    detection_task: PLAN_ANSWER_FIELDS.TASK_TYPE,
+    inspection_task: PLAN_ANSWER_FIELDS.TASK_TYPE,
+    visual_task: PLAN_ANSWER_FIELDS.TASK_TYPE,
+    medical_modality: PLAN_ANSWER_FIELDS.TASK_TYPE,
+    lesion_type: PLAN_ANSWER_FIELDS.TASK_TYPE,
+    medical_modality_and_lesion_type: PLAN_ANSWER_FIELDS.TASK_TYPE,
+    image_input: PLAN_ANSWER_FIELDS.IMAGE_SOURCE,
+    input_source: PLAN_ANSWER_FIELDS.IMAGE_SOURCE,
+    source_image: PLAN_ANSWER_FIELDS.IMAGE_SOURCE,
+    camera_source: PLAN_ANSWER_FIELDS.IMAGE_SOURCE,
+    image_source_roi: PLAN_ANSWER_FIELDS.IMAGE_SOURCE,
+    ok_condition: PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+    ng_condition: PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+    judgment_rule: PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+    result_rule: PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA,
+    output_target: PLAN_ANSWER_FIELDS.OUTPUT_TARGET,
+    output_goal: PLAN_ANSWER_FIELDS.OUTPUT_TARGET,
+    output_destination: PLAN_ANSWER_FIELDS.OUTPUT_TARGET,
+    result_output: PLAN_ANSWER_FIELDS.OUTPUT_TARGET,
+    local_result_payload: PLAN_ANSWER_FIELDS.OUTPUT_TARGET,
+    structured_result_output: PLAN_ANSWER_FIELDS.OUTPUT_TARGET,
+    business_system_output: PLAN_ANSWER_FIELDS.OUTPUT_TARGET,
     classification_strategy: PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY,
     model_or_rule_strategy: PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY,
     algorithm_strategy: PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY,
@@ -888,7 +931,7 @@ export const aiPanelAgentWorkspaceMixin = {
             if (!answer) return;
             const question = this._toArray(plan.questions)
                 .find(item => String(item?.id || '').trim() === answer.questionId ||
-                    this._inferPlanQuestionField(item?.field || item?.id) === answer.field);
+                    this._inferPlanQuestionFieldForQuestion(item, plan) === answer.field);
             const merged = {
                 ...answer,
                 questionId: answer.questionId || String(question?.id || '').trim(),
@@ -1892,6 +1935,18 @@ export const aiPanelAgentWorkspaceMixin = {
             .map(evt => this._normalizePlanPublicEvent(evt));
         const rawFallbackReason = String(plan.fallbackReason || plan.FallbackReason || '').trim();
         const plannerFailure = this._normalizePlannerFailureDiagnostics(plan, publicEvents);
+        const authoritativeBuildReadiness = this._normalizePlanBuildReadiness(plan.buildReadiness || plan.BuildReadiness);
+        const buildReadiness = authoritativeBuildReadiness ||
+            this._buildLegacyPlanReadinessSnapshot({
+                plan: null,
+                rawCanBuild,
+                requirementMaturity,
+                semanticExtraction,
+                route,
+                blockingReasons,
+                questions: normalizedQuestions,
+                requirementMode
+            });
 
         return {
             id: plan.planId || plan.PlanId || `plan-${Date.now()}`,
@@ -1922,16 +1977,9 @@ export const aiPanelAgentWorkspaceMixin = {
             blockerCount: blockingReasons.length,
             nextAction: this._localizeDisplayText(plan.nextAction || plan.NextAction || '复核计划后开始构建。'),
             canPlan: rawCanPlan === true || maturityCanPlan,
-            executable: this._computeEffectivePlanBuildReadiness({
-                plan: null,
-                rawCanBuild,
-                requirementMaturity,
-                semanticExtraction,
-                route,
-                blockingReasons,
-                questions: normalizedQuestions,
-                requirementMode
-            }),
+            executable: buildReadiness.canBuild === true,
+            buildReadiness,
+            authoritativeBuildReadiness,
             blockingReasons,
             resolvedPlanFields: this._toArray(plan.resolvedPlanFields || plan.ResolvedPlanFields)
                 .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
@@ -1970,6 +2018,201 @@ export const aiPanelAgentWorkspaceMixin = {
         };
     },
 
+    _normalizePlanBuildReadiness(value) {
+        if (!value || typeof value !== 'object') return null;
+        const item = this._asObject?.(value) || value;
+        const blockers = this._toArray(item.blockers || item.Blockers)
+            .map(blocker => this._normalizePlanBuildBlocker(blocker))
+            .filter(Boolean);
+        return {
+            canBuild: (item.canBuild ?? item.CanBuild) === true,
+            blockers,
+            resolvedFields: this._toArray(item.resolvedFields || item.ResolvedFields)
+                .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+                .filter(Boolean),
+            remainingFields: this._toArray(item.remainingFields || item.RemainingFields)
+                .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+                .filter(Boolean),
+            primaryMessage: this._localizeDisplayText(item.primaryMessage || item.PrimaryMessage || ''),
+            contractVersion: String(item.contractVersion || item.ContractVersion || 'v2').trim()
+        };
+    },
+
+    _normalizePlanBuildBlocker(value) {
+        if (!value || typeof value !== 'object') return null;
+        const item = this._asObject?.(value) || value;
+        const id = String(item.id || item.Id || '').trim();
+        const category = String(item.category || item.Category || '').trim().toLowerCase();
+        const field = this._inferPlanQuestionField(item.field || item.Field || '') ||
+            String(item.field || item.Field || '').trim().toLowerCase();
+        const publicLabel = this._localizeDisplayText(item.publicLabel || item.PublicLabel || '');
+        if (!id && !category && !field && !publicLabel) return null;
+        return {
+            id,
+            category,
+            field,
+            questionId: String(item.questionId || item.QuestionId || '').trim(),
+            blocksBuild: (item.blocksBuild ?? item.BlocksBuild) === true,
+            resolutionMode: String(item.resolutionMode || item.ResolutionMode || '').trim().toLowerCase(),
+            publicLabel
+        };
+    },
+
+    _buildLegacyPlanReadinessSnapshot({
+        plan = null,
+        rawCanBuild,
+        requirementMaturity,
+        semanticExtraction,
+        route,
+        blockingReasons = [],
+        questions = [],
+        acceptedRecommended = false,
+        requirementMode = null
+    }) {
+        const mode = this._normalizeRequirementMode?.(requirementMode || plan?.requirementMode || this.requirementMode || 'strict') || 'strict';
+        const legacyBuildBlockerPresent = this._toArray(blockingReasons)
+            .some(reason => /^(hard_requirement|strategy_confirmation):/i.test(String(reason || '').trim()));
+        let canBuild = this._computeEffectivePlanBuildReadiness({
+            plan,
+            rawCanBuild,
+            requirementMaturity,
+            semanticExtraction,
+            route,
+            blockingReasons,
+            questions,
+            acceptedRecommended,
+            requirementMode: mode
+        });
+        if (rawCanBuild === true &&
+            requirementMaturity?.canBuild === true &&
+            !legacyBuildBlockerPresent) {
+            canBuild = true;
+        }
+        const resolvedFields = this._getResolvedPlanFields(plan || { questions }, {
+            acceptedRecommended,
+            questions
+        });
+        const remainingFields = this._getRemainingPlanFields(plan || { questions, blockingReasons, requirementMaturity }, {
+            acceptedRecommended,
+            requirementMaturity,
+            blockingReasons,
+            questions
+        });
+        const blockers = [];
+        const addBlocker = blocker => {
+            if (!blocker?.id) return;
+            if (blockers.some(item => item.id.toLowerCase() === blocker.id.toLowerCase())) return;
+            blockers.push(blocker);
+        };
+
+        for (const field of remainingFields.filter(field => this._isPlanBuildBlockingField(field, mode, requirementMaturity, {
+            plan,
+            semanticExtraction,
+            route
+        }))) {
+            addBlocker(this._makePlanBuildBlocker({
+                id: `hard_requirement:${field}_missing`,
+                category: PLAN_BUILD_BLOCKER_CATEGORIES.HARD_REQUIREMENT,
+                field,
+                blocksBuild: !canBuild,
+                resolutionMode: PLAN_BUILD_RESOLUTION_MODES.ANSWER_QUESTION,
+                publicLabel: `还缺：${this._formatRequirementFieldLabel(field)}`
+            }));
+        }
+
+        for (const reason of this._toArray(blockingReasons)) {
+            const parsed = this._parsePlanBlockingReason(reason);
+            const field = parsed.field || this._normalizePlanBlockingField(reason);
+            const isOutputTarget = field === PLAN_ANSWER_FIELDS.OUTPUT_TARGET;
+            const outputTargetBlocksBuild = isOutputTarget &&
+                this._planRequestsExternalOutput(plan, reason, semanticExtraction, route);
+            const question = this._toArray(questions).find(item => {
+                const id = String(item?.id || '').trim().toLowerCase();
+                const qField = this._inferPlanQuestionFieldForQuestion(item, { blockingReasons: [reason] });
+                return id === parsed.key || (field && qField === field);
+            });
+            const isResource = parsed.kind === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING;
+            const isWarning = parsed.kind === PLAN_BUILD_BLOCKER_CATEGORIES.CONTRACT_WARNING ||
+                (isOutputTarget && !outputTargetBlocksBuild) ||
+                (!field && !question && parsed.kind !== PLAN_BUILD_BLOCKER_CATEGORIES.STRATEGY_CONFIRMATION &&
+                    parsed.kind !== PLAN_BUILD_BLOCKER_CATEGORIES.HARD_REQUIREMENT);
+            const category = isResource
+                ? PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING
+                : isWarning
+                    ? PLAN_BUILD_BLOCKER_CATEGORIES.CONTRACT_WARNING
+                    : isOutputTarget
+                        ? PLAN_BUILD_BLOCKER_CATEGORIES.HARD_REQUIREMENT
+                    : field === PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY || this._isRealStrategyConfirmationReason(reason, questions)
+                        ? PLAN_BUILD_BLOCKER_CATEGORIES.STRATEGY_CONFIRMATION
+                        : PLAN_BUILD_BLOCKER_CATEGORIES.HARD_REQUIREMENT;
+            const blocksBuild = !canBuild && !isResource && !isWarning;
+            const label = isResource
+                ? '资源可在开始构建后补齐。'
+                : category === PLAN_BUILD_BLOCKER_CATEGORIES.STRATEGY_CONFIRMATION
+                    ? '请选择构建策略。'
+                    : isOutputTarget && outputTargetBlocksBuild
+                        ? '请选择输出目标。'
+                    : isOutputTarget
+                        ? '默认使用本地结构化结果输出。'
+                    : field
+                        ? `还缺：${this._formatRequirementFieldLabel(field)}`
+                        : question?.title
+                            ? `请确认“${question.title}”。`
+                            : '规划返回了无法映射的阻断项，已作为诊断保留。';
+            addBlocker(this._makePlanBuildBlocker({
+                id: this._normalizeLegacyBuildBlockerId(reason, category),
+                category,
+                field,
+                questionId: String(question?.id || '').trim(),
+                blocksBuild,
+                resolutionMode: blocksBuild ? PLAN_BUILD_RESOLUTION_MODES.ANSWER_QUESTION : PLAN_BUILD_RESOLUTION_MODES.NON_BLOCKING,
+                publicLabel: label
+            }));
+        }
+
+        const blocking = blockers.find(blocker => blocker.blocksBuild);
+        return {
+            canBuild,
+            blockers,
+            resolvedFields,
+            remainingFields,
+            primaryMessage: canBuild
+                ? '规划已完成，可以开始构建。'
+                : blocking?.publicLabel || requirementMaturity?.publicReason || '当前规划仍需澄清，暂不可构建。',
+            contractVersion: 'v2'
+        };
+    },
+
+    _makePlanBuildBlocker({ id, category, field = '', questionId = '', blocksBuild = false, resolutionMode = '', publicLabel = '' }) {
+        return {
+            id: String(id || '').trim(),
+            category: String(category || '').trim().toLowerCase(),
+            field: this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase(),
+            questionId: String(questionId || '').trim(),
+            blocksBuild: blocksBuild === true,
+            resolutionMode: String(resolutionMode || '').trim().toLowerCase(),
+            publicLabel: this._localizeDisplayText(publicLabel || '')
+        };
+    },
+
+    _normalizeLegacyBuildBlockerId(reason, category) {
+        const parsed = this._parsePlanBlockingReason(reason);
+        const key = parsed.key || String(reason || '').trim().toLowerCase() || 'planner_blocker';
+        const prefix = category || parsed.kind || PLAN_BUILD_BLOCKER_CATEGORIES.CONTRACT_WARNING;
+        const normalizedReason = String(reason || '').trim().toLowerCase();
+        const reasonKind = normalizedReason.match(/^(hard_requirement|strategy_confirmation|resource_pending|contract_warning|safety_blocker):/i)?.[1] || '';
+        if (reasonKind && (!category || reasonKind === String(category).toLowerCase())) {
+            return normalizedReason;
+        }
+        const idKey = [
+            PLAN_BUILD_BLOCKER_CATEGORIES.HARD_REQUIREMENT,
+            PLAN_BUILD_BLOCKER_CATEGORIES.STRATEGY_CONFIRMATION
+        ].includes(prefix) && !/_missing$/i.test(key)
+            ? `${key}_missing`
+            : key;
+        return `${prefix}:${idKey}`;
+    },
+
     _computeEffectivePlanBuildReadiness({
         plan = null,
         rawCanBuild,
@@ -1992,6 +2235,14 @@ export const aiPanelAgentWorkspaceMixin = {
             questions,
             acceptedRecommended
         });
+        const unresolvedQuestionBlockers = this._getUnresolvedPlanQuestionBlockers({
+            blockingReasons,
+            questions,
+            acceptedRecommended,
+            plan,
+            semanticExtraction,
+            route
+        });
 
         if (mode === 'draft' &&
             !this._planHasAnyObjectOrTaskFact(requirementMaturity, semanticExtraction, resolvedFields)) {
@@ -2004,6 +2255,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 !this._planRouteSatisfiesBuildStrategy(route))) {
             return false;
         }
+        if (unresolvedQuestionBlockers.length) return false;
 
         const maturityCanBuild = requirementMaturity?.canBuild === true;
         if (rawCanBuild === true && maturityCanBuild) return true;
@@ -2014,7 +2266,11 @@ export const aiPanelAgentWorkspaceMixin = {
             blockingReasons,
             questions
         })
-            .filter(field => this._isPlanBuildBlockingField(field, mode, requirementMaturity))
+            .filter(field => this._isPlanBuildBlockingField(field, mode, requirementMaturity, {
+                plan,
+                semanticExtraction,
+                route
+            }))
             .filter(field => !(mode === 'draft' && field === PLAN_ANSWER_FIELDS.IMAGE_SOURCE && this._routeAllowsPendingImageSource(route)));
         if (remainingFields.length) return false;
 
@@ -2022,9 +2278,17 @@ export const aiPanelAgentWorkspaceMixin = {
             this._planRouteSatisfiesBuildStrategy(route);
     },
 
-    _isPlanBuildBlockingField(field, requirementMode, requirementMaturity = null) {
+    _isPlanBuildBlockingField(field, requirementMode, requirementMaturity = null, context = null) {
         const normalized = this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase();
         if (!normalized) return false;
+        if (normalized === PLAN_ANSWER_FIELDS.OUTPUT_TARGET) {
+            return this._planRequestsExternalOutput(
+                context?.plan || null,
+                context?.reason || '',
+                context?.semanticExtraction || null,
+                context?.route || null
+            );
+        }
         const mode = this._normalizeRequirementMode?.(requirementMode || this.requirementMode || 'strict') || 'strict';
         if (mode !== 'draft') {
             return PLAN_STRICT_BUILD_FIELDS.has(normalized);
@@ -2037,6 +2301,36 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         return false;
+    },
+
+    _planRequestsExternalOutput(plan = null, reason = '', semanticExtraction = null, route = null) {
+        const semantic = semanticExtraction || plan?.semanticExtraction || plan?.SemanticExtraction || {};
+        const routeInfo = route || plan?.route || plan?.recommendedRoute || plan?.RecommendedRoute || {};
+        const text = [
+            reason,
+            plan?.goal,
+            plan?.Goal,
+            plan?.originalDescription,
+            plan?.OriginalUserPrompt,
+            plan?.buildPrompt,
+            plan?.intent,
+            plan?.Intent,
+            plan?.plcOutputPolicy,
+            plan?.PlcOutputPolicy,
+            routeInfo?.routeId,
+            routeInfo?.RouteId,
+            routeInfo?.summary,
+            routeInfo?.Summary,
+            semantic?.outputTarget,
+            semantic?.OutputTarget
+        ]
+            .map(value => String(value || '').trim())
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+        if (!text) return false;
+        return /\b(plc|mes|erp|http|api|webhook|network|external)\b/i.test(text) ||
+            /plc_output|business_system|external_system|对接|外部|业务系统/i.test(text);
     },
 
     _planHasAnyObjectOrTaskFact(requirementMaturity, semanticExtraction, resolvedFields = new Set()) {
@@ -2112,7 +2406,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _canBuildPlanWithRecommendedAnswers(plan) {
         if (!plan || !this._allBlockingPlanQuestionsHaveRecommendations(plan)) return false;
-        return this._computeEffectivePlanBuildReadiness({
+        return this._buildLegacyPlanReadinessSnapshot({
             plan,
             rawCanBuild: plan.rawPlanSnapshot?.canBuild ?? plan.rawPlanSnapshot?.CanBuild ?? plan.executable,
             requirementMaturity: plan.requirementMaturity,
@@ -2121,16 +2415,34 @@ export const aiPanelAgentWorkspaceMixin = {
             blockingReasons: plan.blockingReasons,
             questions: plan.questions,
             acceptedRecommended: true
-        }) === true;
+        }).canBuild === true;
     },
 
     _allBlockingPlanQuestionsHaveRecommendations(plan) {
+        const readinessBlockers = this._toArray(plan?.buildReadiness?.blockers)
+            .filter(blocker => blocker?.blocksBuild === true);
+        if (readinessBlockers.length) {
+            return readinessBlockers.every(blocker => this._toArray(plan?.questions)
+                .some(question => {
+                    const id = String(question?.id || '').trim();
+                    const field = this._inferPlanQuestionFieldForQuestion(question, plan) ||
+                        this._fallbackPlanQuestionField(question, id);
+                    const matches = (blocker.questionId && id === blocker.questionId) ||
+                        (blocker.field && field === blocker.field);
+                    return matches && String(this._getQuestionRecommendedValue(question) || '').trim();
+                }));
+        }
+
         const mode = this._normalizeRequirementMode?.(plan?.requirementMode || this.requirementMode || 'strict') || 'strict';
         const remainingFields = this._getRemainingPlanFields(plan, { acceptedRecommended: false })
-            .filter(field => this._isPlanBuildBlockingField(field, mode, plan?.requirementMaturity));
+            .filter(field => this._isPlanBuildBlockingField(field, mode, plan?.requirementMaturity, {
+                plan,
+                semanticExtraction: plan?.semanticExtraction,
+                route: plan?.route || plan?.recommendedRoute || plan?.RecommendedRoute
+            }));
         if (!remainingFields.length) return false;
         return remainingFields.every(field => this._toArray(plan?.questions)
-            .some(question => this._inferPlanQuestionField(question?.field || question?.id) === field &&
+            .some(question => this._inferPlanQuestionFieldForQuestion(question, plan) === field &&
                 String(this._getQuestionRecommendedValue(question) || '').trim()));
     },
 
@@ -2138,13 +2450,89 @@ export const aiPanelAgentWorkspaceMixin = {
         const normalized = String(value || '').trim().toLowerCase();
         if (!normalized) return '';
         if (PLAN_CANONICAL_FIELDS.has(normalized)) return normalized;
+        if (normalized.includes('inspection_object') ||
+            normalized.includes('object_type') ||
+            normalized.includes('inspection_target') ||
+            normalized.includes('detection_target')) return PLAN_ANSWER_FIELDS.INSPECTION_OBJECT;
+        if (normalized.includes('task_type') ||
+            normalized.includes('task_category') ||
+            normalized.includes('inspection_task') ||
+            normalized.includes('detection_task') ||
+            normalized.includes('visual_task') ||
+            normalized.includes('medical_modality') ||
+            normalized.includes('lesion_type')) return PLAN_ANSWER_FIELDS.TASK_TYPE;
+        if (normalized.includes('image_source') ||
+            normalized.includes('image_input') ||
+            normalized.includes('input_source') ||
+            normalized.includes('source_image') ||
+            normalized.includes('camera_source')) return PLAN_ANSWER_FIELDS.IMAGE_SOURCE;
+        if (normalized.includes('acceptance_criteria') ||
+            normalized.includes('ok_ng') ||
+            normalized.includes('ok_condition') ||
+            normalized.includes('ng_condition') ||
+            normalized.includes('judgment_rule') ||
+            normalized.includes('result_rule')) return PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA;
+        if (normalized.includes('output_target') ||
+            normalized.includes('output_goal') ||
+            normalized.includes('output_destination') ||
+            normalized.includes('result_output') ||
+            normalized.includes('local_result_payload') ||
+            normalized.includes('structured_result') ||
+            normalized.includes('business_system')) return PLAN_ANSWER_FIELDS.OUTPUT_TARGET;
+        if (normalized.includes('algorithm_strategy') ||
+            normalized.includes('model_or_rule_strategy') ||
+            normalized.includes('classification_strategy')) return PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY;
         return PLAN_QUESTION_FIELD_BY_ID[normalized] || '';
+    },
+
+    _parsePlanBlockingReason(reason) {
+        const normalized = String(reason || '').trim().toLowerCase();
+        if (!normalized) return { kind: '', key: '', field: '' };
+        const match = normalized.match(/^(hard_requirement|strategy_confirmation|resource_pending):(.+)$/i);
+        const kind = match?.[1]?.toLowerCase() || '';
+        const rawKey = match?.[2] || normalized;
+        const key = rawKey.replace(/_missing$/i, '').trim();
+        return {
+            kind,
+            key,
+            field: this._inferPlanQuestionField(key)
+        };
+    },
+
+    _inferPlanQuestionFieldForQuestion(question, plan = this.pendingVisionPlan) {
+        const id = String(question?.id || question?.Id || '').trim().toLowerCase();
+        const field = String(question?.field || question?.Field || '').trim().toLowerCase();
+        const direct = this._inferPlanQuestionField(field || id);
+        if (direct) return direct;
+
+        const ids = new Set([id, field].filter(Boolean));
+        if (!ids.size) return '';
+
+        const blockers = [
+            ...this._toArray(plan?.blockingReasons || plan?.BlockingReasons),
+            ...this._toArray(plan?.requirementMaturity?.blockingReasons || plan?.requirementMaturity?.BlockingReasons)
+        ];
+        for (const reason of blockers) {
+            const parsed = this._parsePlanBlockingReason(reason);
+            if (!parsed.key || !ids.has(parsed.key)) continue;
+            if (parsed.field) return parsed.field;
+        }
+
+        return '';
+    },
+
+    _fallbackPlanQuestionField(question, questionId = '') {
+        const rawField = String(question?.field || question?.Field || '').trim().toLowerCase();
+        if (rawField) return rawField;
+        return String(question?.id || question?.Id || questionId || '').trim().toLowerCase();
     },
 
     _normalizePlanAnswer(answer, fallbackQuestion = null) {
         const item = this._asObject?.(answer) || answer || {};
         const questionId = String(item.questionId || item.QuestionId || fallbackQuestion?.id || '').trim();
-        const field = this._inferPlanQuestionField(item.field || item.Field || fallbackQuestion?.field || questionId);
+        const field = this._inferPlanQuestionField(item.field || item.Field || fallbackQuestion?.field || questionId) ||
+            this._inferPlanQuestionFieldForQuestion(fallbackQuestion || { id: questionId, field: item.field || item.Field }, this.pendingVisionPlan) ||
+            this._fallbackPlanQuestionField(fallbackQuestion || { id: questionId, field: item.field || item.Field }, questionId);
         const value = String(item.value || item.Value || '').trim();
         const origin = String(item.origin || item.Origin || PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION).trim().toLowerCase();
         if (!field || !value) return null;
@@ -2166,7 +2554,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _getPlanAnswerForQuestion(question) {
         const id = String(question?.id || '').trim();
-        const field = this._inferPlanQuestionField(question?.field || id);
+        const field = this._inferPlanQuestionFieldForQuestion(question);
         const answers = this.planQuestionAnswers || {};
         const direct = id ? this._normalizePlanAnswer(answers[id], question) : null;
         if (direct) return direct;
@@ -2199,7 +2587,8 @@ export const aiPanelAgentWorkspaceMixin = {
         const resolvedFields = new Set(answers.map(answer => answer.field));
         if (acceptedRecommended) {
             this._toArray(plan?.questions).forEach(question => {
-                const field = this._inferPlanQuestionField(question?.field || question?.id);
+                const field = this._inferPlanQuestionFieldForQuestion(question, plan) ||
+                    this._fallbackPlanQuestionField(question);
                 if (!field || resolvedFields.has(field)) return;
                 const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
                 if (!recommended) return;
@@ -2230,7 +2619,8 @@ export const aiPanelAgentWorkspaceMixin = {
 
         this._toArray(plan.questions).forEach(question => {
             const id = String(question?.id || '').trim();
-            const field = this._inferPlanQuestionField(question?.field || id);
+            const field = this._inferPlanQuestionFieldForQuestion(question, plan) ||
+                this._fallbackPlanQuestionField(question, id);
             if (!field || resolvedFields.has(field)) return;
             const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
             if (!recommended) return;
@@ -2288,18 +2678,31 @@ export const aiPanelAgentWorkspaceMixin = {
     _normalizePlanBlockingField(reason) {
         const normalized = String(reason || '').trim().toLowerCase();
         if (!normalized) return '';
-        if (normalized.includes('inspection_object')) return PLAN_ANSWER_FIELDS.INSPECTION_OBJECT;
-        if (normalized.includes('task_type')) return PLAN_ANSWER_FIELDS.TASK_TYPE;
-        if (normalized.includes('image_source')) return PLAN_ANSWER_FIELDS.IMAGE_SOURCE;
-        if (normalized.includes('acceptance_criteria') || normalized.includes('condition')) {
+        const parsed = this._parsePlanBlockingReason(reason);
+        if (parsed.field) return parsed.field;
+        const key = parsed.key || normalized;
+        if (key.includes('inspection_object')) return PLAN_ANSWER_FIELDS.INSPECTION_OBJECT;
+        if (key.includes('task_type')) return PLAN_ANSWER_FIELDS.TASK_TYPE;
+        if (key.includes('image_source')) return PLAN_ANSWER_FIELDS.IMAGE_SOURCE;
+        if (key.includes('acceptance_criteria') || key.includes('condition')) {
             return PLAN_ANSWER_FIELDS.ACCEPTANCE_CRITERIA;
         }
-        if (normalized.includes('strategy')) return PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY;
-        return this._inferPlanQuestionField(normalized);
+        if (key.includes('strategy')) return PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY;
+        return this._inferPlanQuestionField(key);
     },
 
     _getPlanBuildBlockedReason(plan) {
         if (!plan) return '请先完成规划';
+        const readiness = plan.buildReadiness || null;
+        const readinessBlocker = this._toArray(readiness?.blockers)
+            .find(blocker => blocker?.blocksBuild === true);
+        if (readinessBlocker?.publicLabel) {
+            return readinessBlocker.publicLabel;
+        }
+        if (readiness?.primaryMessage) {
+            return readiness.primaryMessage;
+        }
+
         const strategyBlockers = this._getUnresolvedStrategyBlockers({
             blockingReasons: plan.blockingReasons,
             questions: plan.questions
@@ -2333,7 +2736,7 @@ export const aiPanelAgentWorkspaceMixin = {
     _getUnresolvedStrategyBlockers({ blockingReasons = [], questions = [], acceptedRecommended = false } = {}) {
         const strategyBlockers = this._toArray(blockingReasons)
             .map(reason => String(reason || '').trim())
-            .filter(reason => /^strategy_confirmation:/i.test(reason));
+            .filter(reason => this._isRealStrategyConfirmationReason(reason, questions));
         if (!strategyBlockers.length) return [];
 
         const strategyQuestions = this._toArray(questions)
@@ -2348,11 +2751,131 @@ export const aiPanelAgentWorkspaceMixin = {
             if (hasRecommendedStrategy) return [];
         }
 
-        return strategyBlockers;
+        return strategyBlockers.filter(reason => !this._isStrategyBlockerResolvedByQuestionAnswer(reason, {
+            questions,
+            acceptedRecommended
+        }));
+    },
+
+    _isRealStrategyConfirmationReason(reason, questions = []) {
+        const parsed = this._parsePlanBlockingReason(reason);
+        if (parsed.kind !== PLAN_BUILD_BLOCKER_CATEGORIES.STRATEGY_CONFIRMATION) return false;
+        if (parsed.field === PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY) return true;
+        return this._toArray(questions).some(question => {
+            const id = String(question?.id || question?.Id || '').trim().toLowerCase();
+            if (id !== parsed.key) return false;
+            const direct = this._inferPlanQuestionField(question?.field || question?.Field || id);
+            return direct === PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY;
+        });
+    },
+
+    _getUnresolvedPlanQuestionBlockers({
+        blockingReasons = [],
+        questions = [],
+        acceptedRecommended = false,
+        plan = null,
+        semanticExtraction = null,
+        route = null
+    } = {}) {
+        const questionList = this._toArray(questions);
+        if (!questionList.length) return [];
+
+        return this._toArray(blockingReasons)
+            .map(reason => String(reason || '').trim())
+            .filter(Boolean)
+            .filter(reason => {
+                const parsed = this._parsePlanBlockingReason(reason);
+                if (![
+                    PLAN_BUILD_BLOCKER_CATEGORIES.HARD_REQUIREMENT,
+                    PLAN_BUILD_BLOCKER_CATEGORIES.STRATEGY_CONFIRMATION,
+                    ''
+                ].includes(parsed.kind)) {
+                    return false;
+                }
+                if (parsed.key === 'planner_candidate_not_buildable') return false;
+                if (this._isRealStrategyConfirmationReason(reason, questionList)) return false;
+
+                const field = parsed.field || this._normalizePlanBlockingField(reason);
+                if (field === PLAN_ANSWER_FIELDS.OUTPUT_TARGET &&
+                    !this._planRequestsExternalOutput(plan, reason, semanticExtraction, route)) {
+                    return false;
+                }
+
+                const question = this._findPlanQuestionForBlocker(reason, questionList);
+                if (!question) return false;
+                return !this._isPlanQuestionBlockerResolved(reason, question, { acceptedRecommended });
+            });
+    },
+
+    _findPlanQuestionForBlocker(reason, questions = []) {
+        const parsed = this._parsePlanBlockingReason(reason);
+        const field = parsed.field || this._normalizePlanBlockingField(reason);
+        return this._toArray(questions).find(question => {
+            const id = String(question?.id || question?.Id || '').trim().toLowerCase();
+            const qField = this._inferPlanQuestionFieldForQuestion(question, { blockingReasons: [] }) ||
+                this._fallbackPlanQuestionField(question, id);
+            return id === parsed.key || (field && qField === field);
+        }) || null;
+    },
+
+    _isPlanQuestionBlockerResolved(reason, question, { acceptedRecommended = false } = {}) {
+        const parsed = this._parsePlanBlockingReason(reason);
+        const key = parsed.key;
+        const blockerField = parsed.field || this._normalizePlanBlockingField(reason);
+        const questionId = String(question?.id || question?.Id || '').trim().toLowerCase();
+        const questionField = this._inferPlanQuestionFieldForQuestion(question, { blockingReasons: [] }) ||
+            this._fallbackPlanQuestionField(question, questionId);
+        const answers = Object.values(this.planQuestionAnswers || {})
+            .map(answer => this._normalizePlanAnswer(answer, question))
+            .filter(Boolean);
+        if (answers.some(answer =>
+            String(answer.questionId || '').trim().toLowerCase() === key ||
+            String(answer.questionId || '').trim().toLowerCase() === questionId ||
+            (blockerField && answer.field === blockerField) ||
+            (questionField && answer.field === questionField))) {
+            return true;
+        }
+
+        if (this._normalizePlanAnswer(this._getPlanAnswerForQuestion(question), question)) {
+            return true;
+        }
+
+        return acceptedRecommended &&
+            Boolean(String(this._getQuestionRecommendedValue(question) || '').trim());
+    },
+
+    _isStrategyBlockerResolvedByQuestionAnswer(reason, { questions = [], acceptedRecommended = false } = {}) {
+        const key = this._parsePlanBlockingReason(reason).key;
+        if (!key) return false;
+
+        const blockerField = this._inferPlanQuestionField(key);
+        const answers = Object.values(this.planQuestionAnswers || {})
+            .map(answer => this._normalizePlanAnswer(answer))
+            .filter(Boolean);
+        if (answers.some(answer =>
+            String(answer.questionId || '').trim().toLowerCase() === key ||
+            (blockerField && answer.field === blockerField))) {
+            return true;
+        }
+
+        const matchingQuestion = this._toArray(questions)
+            .find(question => {
+                const id = String(question?.id || '').trim().toLowerCase();
+                const field = this._inferPlanQuestionFieldForQuestion(question, { blockingReasons: [reason] });
+                return id === key || (blockerField && field === blockerField);
+            });
+        if (!matchingQuestion) return false;
+
+        if (this._normalizePlanAnswer(this._getPlanAnswerForQuestion(matchingQuestion), matchingQuestion)) {
+            return true;
+        }
+
+        return acceptedRecommended &&
+            Boolean(String(this._getQuestionRecommendedValue(matchingQuestion) || '').trim());
     },
 
     _isPlanStrategyQuestion(question) {
-        return this._inferPlanQuestionField(question?.field || question?.id) === PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY;
+        return this._inferPlanQuestionFieldForQuestion(question) === PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY;
     },
 
     _isPlanStrategyQuestionId(id) {
@@ -2415,12 +2938,19 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!requirementMaturity) return false;
         const hardMissing = this._toArray(requirementMaturity.missingFields).some(field => {
             const normalized = this._normalizePlanBlockingField(field);
-            return this._isPlanBuildBlockingField(normalized, mode, requirementMaturity) && !resolvedFields.has(normalized);
+            return this._isPlanBuildBlockingField(normalized, mode, requirementMaturity, {
+                semanticExtraction,
+                route
+            }) && !resolvedFields.has(normalized);
         });
         const hardBlocked = this._toArray(requirementMaturity.blockingReasons).some(reason => {
             const normalized = this._normalizePlanBlockingField(reason);
             if (/abstract_goal|empty_requirement/i.test(String(reason || ''))) return true;
-            return this._isPlanBuildBlockingField(normalized, mode, requirementMaturity) && !resolvedFields.has(normalized);
+            return this._isPlanBuildBlockingField(normalized, mode, requirementMaturity, {
+                reason,
+                semanticExtraction,
+                route
+            }) && !resolvedFields.has(normalized);
         });
         const hardFacts = mode === 'draft'
             ? [
@@ -2469,9 +2999,39 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _refreshPlanEffectiveBuildReadiness(plan, { acceptedRecommended = false } = {}) {
         if (!plan) return false;
-        plan.executable = this._computeEffectivePlanBuildReadiness({
+        const hasLocalAnswers = Object.values(this.planQuestionAnswers || {})
+            .some(answer => this._normalizePlanAnswer(answer));
+        if (!acceptedRecommended &&
+            !hasLocalAnswers &&
+            plan.authoritativeBuildReadiness) {
+            plan.buildReadiness = plan.authoritativeBuildReadiness;
+            plan.executable = plan.buildReadiness.canBuild === true;
+            return plan.executable === true;
+        }
+
+        const rawCanBuild = plan.rawPlanSnapshot?.canBuild ?? plan.rawPlanSnapshot?.CanBuild ?? plan.executable;
+        const hasLegacyBuildBlocker = this._toArray(plan.blockingReasons)
+            .some(reason => /^(hard_requirement|strategy_confirmation):/i.test(String(reason || '').trim()));
+        if (!acceptedRecommended &&
+            !hasLocalAnswers &&
+            rawCanBuild === true &&
+            plan.requirementMaturity?.canBuild === true &&
+            !hasLegacyBuildBlocker) {
+            plan.buildReadiness = {
+                canBuild: true,
+                blockers: [],
+                resolvedFields: this._getResolvedPlanFields(plan),
+                remainingFields: this._toArray(plan.remainingPlanFields),
+                primaryMessage: '规划已完成，可以开始构建。',
+                contractVersion: 'v2'
+            };
+            plan.executable = true;
+            return true;
+        }
+
+        plan.buildReadiness = this._buildLegacyPlanReadinessSnapshot({
             plan,
-            rawCanBuild: plan.rawPlanSnapshot?.canBuild ?? plan.rawPlanSnapshot?.CanBuild ?? plan.executable,
+            rawCanBuild,
             requirementMaturity: plan.requirementMaturity,
             semanticExtraction: plan.semanticExtraction,
             route: plan.route || plan.recommendedRoute || plan.RecommendedRoute,
@@ -2480,6 +3040,7 @@ export const aiPanelAgentWorkspaceMixin = {
             acceptedRecommended,
             requirementMode: plan.requirementMode || this.requirementMode || 'strict'
         });
+        plan.executable = plan.buildReadiness.canBuild === true;
         return plan.executable === true;
     },
 
@@ -3775,7 +4336,8 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!questionId || !value || !this.pendingVisionPlan) return;
         const question = this._toArray(this.pendingVisionPlan.questions)
             .find(item => String(item?.id || '').trim() === String(questionId || '').trim());
-        const field = this._inferPlanQuestionField(question?.field || questionId);
+        const field = this._inferPlanQuestionFieldForQuestion(question || { id: questionId }, this.pendingVisionPlan) ||
+            this._fallbackPlanQuestionField(question || { id: questionId }, questionId);
         if (!field) return;
         const answer = {
             questionId,
@@ -3818,6 +4380,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this._refreshPlanEffectiveBuildReadiness?.(plan, { acceptedRecommended });
         if (plan.executable !== true) {
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            const readinessReason = this._getPlanBuildBlockedReason(plan);
             const strategyBlockers = this._getUnresolvedStrategyBlockers({
                 blockingReasons: plan.blockingReasons,
                 questions: plan.questions,
@@ -3826,8 +4389,8 @@ export const aiPanelAgentWorkspaceMixin = {
             const reason = strategyBlockers.length
                 ? '需确认策略后才能开始构建。'
                 : plan.requirementMaturity?.publicReason || '当前计划仍需澄清，暂不可构建。';
-            this._addMessage?.('system', reason);
-            this._setResultStatusNote?.(reason, 'warning');
+            this._addMessage?.('system', readinessReason);
+            this._setResultStatusNote?.(readinessReason, 'warning');
             this._renderAgentWorkspaceOverview();
             this._renderPlanWorkspace(plan);
             this._renderBuildWorkspaceFromAgentRun();
@@ -3936,6 +4499,7 @@ export const aiPanelAgentWorkspaceMixin = {
             if (snapshot.canBuild === undefined && snapshot.CanBuild === undefined) {
                 snapshot.canBuild = plan?.executable === true;
             }
+            snapshot.buildReadiness = plan?.buildReadiness || snapshot.buildReadiness || snapshot.BuildReadiness || null;
             return snapshot;
         }
         return {
@@ -3956,6 +4520,7 @@ export const aiPanelAgentWorkspaceMixin = {
             executablePlan: this._toArray(plan?.steps),
             canBuild: plan?.executable === true,
             blockingReasons: this._toArray(plan?.blockingReasons),
+            buildReadiness: plan?.buildReadiness || null,
             nextAction: plan?.nextAction || '',
             contextSummary: plan?.contextSummary || {},
             operatorCatalogVersion: plan?.operatorCatalogVersion || '',

@@ -42,7 +42,8 @@ public sealed class PlanSelectionResolver
             : VisionAgentStrategyConfirmationSupport.Resolve(
                 load.Plan,
                 load.BuildDecisions,
-                load.AcceptedRecommendedDefaults);
+                load.AcceptedRecommendedDefaults,
+                load.ValidatedPlanAnswers.AcceptedAnswers);
         var strategy = ResolveStrategy(confirmation, attributeClassification, templateExplicitlySelected);
         var evidence = new List<string>();
         var blocking = new List<string>();
@@ -104,6 +105,7 @@ public sealed class PlanSelectionResolver
             evidence.Add("planner_recommended_route");
         }
 
+        route = EnsureTemplateStrategyRoute(load, route, evidence);
         var validRoute = ValidateRoute(route, out var invalidOperators);
         if (confirmation.UnresolvedBlockers.Count > 0)
         {
@@ -314,8 +316,74 @@ public sealed class PlanSelectionResolver
         };
     }
 
+    private static VisionAgentRecommendedRoute EnsureTemplateStrategyRoute(
+        BuildPlanLoad load,
+        VisionAgentRecommendedRoute route,
+        List<string> evidence)
+    {
+        if (!HasTemplateStrategyAnswer(load) &&
+            !HasTemplateLayoutIntent(load))
+        {
+            return route;
+        }
+
+        var operators = route.Operators
+            .Select(VisionAgentBuildSupport.Clean)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+        if (operators.Any(op => op.Equals("TemplateMatching", StringComparison.OrdinalIgnoreCase)) ||
+            !operators.Any(op => op.Equals("RoiManager", StringComparison.OrdinalIgnoreCase) ||
+                                 op.Equals("DeepLearning", StringComparison.OrdinalIgnoreCase)))
+        {
+            return route;
+        }
+
+        var insertAt = operators.FindIndex(op => op.Equals("ImageAcquisition", StringComparison.OrdinalIgnoreCase));
+        operators.Insert(insertAt >= 0 ? insertAt + 1 : 0, "TemplateMatching");
+        evidence.Add("template_strategy_route_augmented");
+        return route with
+        {
+            Operators = operators,
+            Summary = string.IsNullOrWhiteSpace(route.Summary)
+                ? "模板定位后进入 ROI 或模型检测链。"
+                : $"{route.Summary} 已按模板策略加入模板定位。"
+        };
+    }
+
+    private static bool HasTemplateStrategyAnswer(BuildPlanLoad load)
+    {
+        if (load.BuildDecisions.TryGetValue(VisionAgentPlanAnswerFields.TemplateStrategy, out var decision) &&
+            ContainsTemplateSignal(decision))
+        {
+            return true;
+        }
+
+        return load.ValidatedPlanAnswers.AcceptedAnswers.Any(answer =>
+            answer.Field.Equals(VisionAgentPlanAnswerFields.TemplateStrategy, StringComparison.OrdinalIgnoreCase) &&
+            ContainsTemplateSignal(answer.Value));
+    }
+
+    private static bool ContainsTemplateSignal(string? value)
+    {
+        var clean = VisionAgentBuildSupport.Clean(value);
+        return clean.Contains("template", StringComparison.OrdinalIgnoreCase) ||
+               clean.Contains("模板", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasTemplateLayoutIntent(BuildPlanLoad load)
+    {
+        var text = $"{load.OriginalUserPrompt} {load.Plan?.Goal} {load.Plan?.RecommendedRoute.RouteId} {load.Plan?.RecommendedRoute.Summary}";
+        return ContainsAny(text, "remote", "button", "keypad", "key press", "layout", "panel", "遥控器", "按键", "按钮", "键盘", "面板", "布局");
+    }
+
     private static bool IsAttributeClassification(BuildPlanLoad load)
     {
+        if ((load.Plan?.RecommendedRoute.Operators ?? [])
+            .Any(op => op.Equals("TemplateMatching", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
         var taskType = FirstNonEmpty(
             EffectiveValue(load, VisionAgentPlanAnswerFields.TaskType),
             load.Plan?.SemanticExtraction?.TaskType ?? string.Empty);
@@ -331,6 +399,11 @@ public sealed class PlanSelectionResolver
                taskType.Equals(AiVisionTaskTypes.Classification, StringComparison.OrdinalIgnoreCase) ||
                text.Contains("attribute_classification", StringComparison.OrdinalIgnoreCase) ||
                text.Contains("classification", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsAny(string text, params string[] values)
+    {
+        return values.Any(value => text.Contains(value, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string ResolveParameterStrategy(

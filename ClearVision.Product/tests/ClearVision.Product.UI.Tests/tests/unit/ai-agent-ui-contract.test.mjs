@@ -577,6 +577,7 @@ function backendPlanResult(overrides = {}) {
     executablePlan: ['Map parameters and run readiness checks.'],
     canPlan,
     canBuild,
+    buildReadiness: overrides.buildReadiness,
     blockingReasons: overrides.blockingReasons ?? [],
     nextAction: 'Accept recommended defaults, then start Build.',
     requirementMaturity: overrides.requirementMaturity ?? {
@@ -2973,6 +2974,469 @@ test('Explicit strategy switch is submitted through unified Build button', async
   assert.equal(panel.pendingVisionPlan.executable, true);
 });
 
+test('Aliased medical requirement answers unblock Plan Build button', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  const planActionButton = createFakeButton();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': createFakeElement(),
+      '#ai-plan-workspace': createFakeElement(),
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': inlineBuildButton
+    },
+    { '.ai-plan-action': [planActionButton] }
+  );
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    goal: 'medical lesion detection workflow',
+    intent: 'medical_lesion_detection',
+    canPlan: true,
+    canBuild: false,
+    recommendedRoute: {
+      routeId: 'medical_lesion_detection_route',
+      title: 'Medical lesion detection route',
+      summary: 'Segment suspected lesions and output structured findings.',
+      operators: ['ImageAcquisition', 'SemanticSegmentation', 'ResultJudgment', 'ResultOutput']
+    },
+    clarificationQuestions: [
+      {
+        id: 'medical_modality_and_lesion_type',
+        field: 'medical_modality_and_lesion_type',
+        title: 'Medical modality and lesion type',
+        why: 'Determines the task type and model family.',
+        defaultValue: 'ct_lung_nodule_detection',
+        defaultAssumption: 'Use CT lung nodule detection as the editable draft task.',
+        impact: 'Model resources remain pending.',
+        options: [
+          {
+            value: 'ct_lung_nodule_detection',
+            label: 'CT lung nodule',
+            recommended: true,
+            description: 'Detect suspected lung nodules.',
+            impact: 'Draft can continue with pending resources.'
+          },
+          {
+            value: 'mri_brain_lesion_segmentation',
+            label: 'MRI brain lesion',
+            recommended: false,
+            description: 'Segment suspected brain lesions.',
+            impact: 'Model resource assumptions change.'
+          }
+        ]
+      },
+      {
+        id: 'input_source',
+        field: 'input_source',
+        title: 'Image source',
+        why: 'Build needs a source slot.',
+        defaultValue: 'offline_image_dataset',
+        defaultAssumption: 'Use an offline image dataset placeholder.',
+        impact: 'Dataset path remains pending.',
+        options: [
+          {
+            value: 'offline_image_dataset',
+            label: 'Offline dataset',
+            recommended: true,
+            description: 'Use metadata-only dataset input.',
+            impact: 'No local path is guessed.'
+          },
+          {
+            value: 'camera_stream',
+            label: 'Camera stream',
+            recommended: false,
+            description: 'Use camera acquisition placeholder.',
+            impact: 'Camera binding remains pending.'
+          }
+        ]
+      }
+    ],
+    blockingReasons: [
+      'hard_requirement:task_type_missing',
+      'hard_requirement:image_source_missing',
+      'strategy_confirmation:medical_modality_and_lesion_type_missing'
+    ],
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'unknown',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['medical image lesion'],
+      taskSignals: [],
+      missingFields: ['task_type', 'image_source'],
+      blockingReasons: ['task_type_missing', 'image_source_missing'],
+      publicReason: 'Task type and image source need confirmation.'
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      intent: 'new_flow',
+      source: 'model',
+      taskType: 'unknown',
+      confidence: 0.8,
+      taskTypeConfidence: 0.2,
+      inspectionObject: 'medical image lesion',
+      targetAttribute: '',
+      defectType: '',
+      measurementTarget: '',
+      imageSource: '',
+      okCondition: 'no suspected lesion',
+      ngCondition: 'suspected lesion detected',
+      outputTarget: 'structured lesion findings',
+      missingFields: ['task_type', 'image_source']
+    }
+  }));
+  panel.pendingVisionPlan = plan;
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
+
+  panel._updatePlanBuildActionState();
+  assert.equal(plan.executable, false);
+  assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, true);
+
+  panel._selectPlanQuestionOption('medical_modality_and_lesion_type', 'ct_lung_nodule_detection');
+  assert.equal(panel.planQuestionAnswers.medical_modality_and_lesion_type.field, 'task_type');
+  assert.equal(panel.pendingVisionPlan.executable, false);
+
+  panel._selectPlanQuestionOption('input_source', 'offline_image_dataset');
+  assert.equal(panel.planQuestionAnswers.input_source.field, 'image_source');
+  assert.equal(panel.pendingVisionPlan.executable, true);
+  assert.equal(inlineBuildButton.disabled, false);
+  assert.equal(planActionButton.disabled, false);
+
+  const started = panel._startBuildFromCurrentPlan();
+  assert.equal(started, true);
+  assert.equal(captured.skipPlan, true);
+  assert.deepEqual(captured.buildFromPlan.confirmedAnswers, [
+    {
+      questionId: 'input_source',
+      field: 'image_source',
+      value: 'offline_image_dataset',
+      origin: 'explicit_user_selection'
+    },
+    {
+      questionId: 'medical_modality_and_lesion_type',
+      field: 'task_type',
+      value: 'ct_lung_nodule_detection',
+      origin: 'explicit_user_selection'
+    }
+  ]);
+});
+
+test('Unknown strategy confirmation question id is resolved from matching blocker', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-btn-start-build-inline': inlineBuildButton
+  });
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    goal: 'custom line guidance inspection workflow',
+    canPlan: true,
+    canBuild: false,
+    blockingReasons: ['strategy_confirmation:line_guidance_profile_missing'],
+    clarificationQuestions: [
+      {
+        id: 'line_guidance_profile',
+        field: 'line_guidance_profile',
+        title: 'Line guidance profile',
+        why: 'A new industry-specific profile gates the planner route.',
+        defaultValue: 'profile_a',
+        defaultAssumption: 'Use profile A for the first editable draft.',
+        impact: 'Parameters remain editable.',
+        options: [
+          {
+            value: 'profile_a',
+            label: 'Profile A',
+            recommended: true,
+            description: 'Use the new profile A.',
+            impact: 'Editable draft can continue.'
+          },
+          {
+            value: 'profile_b',
+            label: 'Profile B',
+            recommended: false,
+            description: 'Use the new profile B.',
+            impact: 'Different parameters are selected.'
+          }
+        ]
+      }
+    ],
+    requirementMaturity: {
+      maturity: 'actionable',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: true,
+      objectSignals: ['custom part'],
+      taskSignals: ['line guidance'],
+      missingFields: [],
+      blockingReasons: [],
+      publicReason: 'Hard facts are ready; one planner-specific confirmation remains.'
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      intent: 'new_flow',
+      source: 'model',
+      taskType: 'surface_defect',
+      confidence: 0.8,
+      taskTypeConfidence: 0.8,
+      inspectionObject: 'custom part',
+      imageSource: 'camera',
+      okCondition: 'line guidance is OK',
+      ngCondition: 'line guidance is NG',
+      outputTarget: 'OK/NG result',
+      missingFields: []
+    }
+  }));
+  panel.pendingVisionPlan = plan;
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
+
+  panel._updatePlanBuildActionState();
+  assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, true);
+
+  panel._selectPlanQuestionOption('line_guidance_profile', 'profile_a');
+  assert.equal(panel.planQuestionAnswers.line_guidance_profile.field, 'line_guidance_profile');
+  assert.equal(panel.pendingVisionPlan.executable, true);
+  assert.equal(inlineBuildButton.disabled, false);
+
+  assert.equal(panel._startBuildFromCurrentPlan(), true);
+  assert.equal(captured.buildFromPlan.confirmedAnswers[0].questionId, 'line_guidance_profile');
+  assert.equal(captured.buildFromPlan.confirmedAnswers[0].field, 'line_guidance_profile');
+  assert.equal(captured.buildFromPlan.confirmedAnswers[0].value, 'profile_a');
+});
+
+test('Authoritative buildReadiness enables Build despite legacy strategy blocker', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-btn-start-build-inline': inlineBuildButton
+  });
+
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    blockingReasons: ['strategy_confirmation:planner_candidate_not_buildable'],
+    requirementMaturity: {
+      maturity: 'actionable',
+      taskType: 'classification',
+      canPlan: true,
+      canBuild: true,
+      missingFields: [],
+      blockingReasons: [],
+      publicReason: 'Requirement is actionable.'
+    },
+    buildReadiness: {
+      canBuild: true,
+      blockers: [
+        {
+          id: 'contract_warning:planner_candidate_not_buildable',
+          category: 'contract_warning',
+          blocksBuild: false,
+          resolutionMode: 'non_blocking',
+          publicLabel: 'Planner candidate warning retained.'
+        }
+      ],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: [],
+      primaryMessage: '规划已完成，可以开始构建。',
+      contractVersion: 'v2'
+    }
+  }));
+
+  panel.pendingVisionPlan = plan;
+  panel._updatePlanBuildActionState();
+
+  assert.equal(plan.executable, true);
+  assert.equal(inlineBuildButton.disabled, false);
+});
+
+test('Local output target legacy blocker does not disable Build', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-btn-start-build-inline': inlineBuildButton
+  });
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    goal: '构建用于超市苹果类别识别的视觉分类流程',
+    intent: 'classification',
+    canBuild: false,
+    blockingReasons: ['strategy_confirmation:output_target_missing'],
+    clarificationQuestions: [
+      {
+        id: 'output_target',
+        field: 'output_target',
+        title: '输出目标',
+        defaultValue: 'local_result_payload',
+        options: [
+          {
+            value: 'local_result_payload',
+            label: '本地结构化结果输出',
+            recommended: true
+          }
+        ]
+      }
+    ],
+    requirementMaturity: {
+      maturity: 'actionable',
+      taskType: 'classification',
+      canPlan: true,
+      canBuild: true,
+      objectSignals: ['apple'],
+      taskSignals: ['classification'],
+      missingFields: [],
+      blockingReasons: [],
+      publicReason: 'Hard facts are ready.'
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      intent: 'new_flow',
+      source: 'model',
+      taskType: 'classification',
+      confidence: 0.8,
+      taskTypeConfidence: 0.8,
+      inspectionObject: 'apple',
+      imageSource: 'camera',
+      okCondition: 'apple category identified',
+      ngCondition: '',
+      outputTarget: '',
+      missingFields: []
+    }
+  }));
+  panel.pendingVisionPlan = plan;
+
+  panel._updatePlanBuildActionState();
+
+  assert.equal(plan.executable, true);
+  assert.equal(inlineBuildButton.disabled, false);
+  assert.equal(plan.buildReadiness.canBuild, true);
+  assert.equal(plan.buildReadiness.blockers[0].category, 'contract_warning');
+  assert.equal(plan.buildReadiness.blockers[0].blocksBuild, false);
+});
+
+test('External output target blocker shows concrete label and recommended output enables Build', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement(),
+    '#ai-btn-start-build-inline': inlineBuildButton
+  });
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    goal: '构建用于超市苹果类别识别并对接 MES 的视觉分类流程',
+    intent: 'classification',
+    canBuild: false,
+    blockingReasons: ['strategy_confirmation:output_target_missing'],
+    clarificationQuestions: [
+      {
+        id: 'output_target',
+        field: 'output_target',
+        title: '输出目标',
+        why: '选择结果输出目标。',
+        defaultValue: 'business_system_output',
+        defaultAssumption: '输出到业务系统。',
+        impact: '接口信息保持待配置。',
+        options: [
+          {
+            value: 'local_result_payload',
+            label: '本地结构化结果输出',
+            recommended: false,
+            description: '输出类别标签、置信度和判定结果。',
+            impact: '适合作为流程草案输出目标。'
+          },
+          {
+            value: 'business_system_output',
+            label: '对接业务系统',
+            recommended: true,
+            description: '后续对接 MES/ERP。',
+            impact: '接口信息保持待配置。'
+          }
+        ]
+      }
+    ],
+    requirementMaturity: {
+      maturity: 'actionable',
+      taskType: 'classification',
+      canPlan: true,
+      canBuild: true,
+      objectSignals: ['apple'],
+      taskSignals: ['classification'],
+      missingFields: [],
+      blockingReasons: [],
+      publicReason: 'Hard facts are ready; output target remains.'
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      intent: 'new_flow',
+      source: 'model',
+      taskType: 'classification',
+      confidence: 0.8,
+      taskTypeConfidence: 0.8,
+      inspectionObject: 'apple',
+      imageSource: 'camera',
+      okCondition: 'apple category identified',
+      ngCondition: '',
+      outputTarget: '',
+      missingFields: []
+    },
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        {
+          id: 'hard_requirement:output_target_missing',
+          category: 'hard_requirement',
+          field: 'output_target',
+          questionId: 'output_target',
+          blocksBuild: true,
+          resolutionMode: 'answer_question',
+          publicLabel: '请选择输出目标。'
+        }
+      ],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: ['output_target'],
+      primaryMessage: '请选择输出目标。',
+      contractVersion: 'v2'
+    }
+  }));
+  panel.pendingVisionPlan = plan;
+  let captured = null;
+  panel._dispatchGenerateRequest = args => {
+    captured = args;
+    return true;
+  };
+
+  panel._updatePlanBuildActionState();
+  assert.equal(plan.executable, false);
+  assert.match(panel._getPlanBuildBlockedReason(plan), /请选择输出目标/);
+  assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, true);
+
+  assert.equal(panel._startBuildFromCurrentPlan({ acceptedRecommended: true }), true);
+  assert.equal(captured.buildFromPlan.confirmedAnswers[0].field, 'output_target');
+  assert.equal(captured.buildFromPlan.confirmedAnswers[0].value, 'business_system_output');
+});
+
 test('Backend Plan without explicit canBuild is not executable by default', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -3475,7 +3939,7 @@ test('Start Build from non-executable Plan is blocked before dispatch', async ()
   assert.equal(started, false);
   assert.equal(panel.agentWorkspaceMode, 'plan');
   assert.equal(panel.lastResultStatusNote.tone, 'warning');
-  assert.match(panel.lastResultStatusNote.text, /方案愿景|暂不可构建/);
+  assert.match(panel.lastResultStatusNote.text, /还缺：检测对象|方案愿景|暂不可构建/);
   assert.match(panel.container.querySelector('#ai-plan-workspace').innerHTML, /需求成熟度/);
 });
 

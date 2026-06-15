@@ -25,7 +25,8 @@ internal static class VisionAgentStrategyConfirmationSupport
     public static VisionAgentStrategyConfirmationResolution Resolve(
         VisionAgentPlanModeResult? plan,
         IReadOnlyDictionary<string, string>? buildDecisions,
-        bool acceptedRecommendedDefaults)
+        bool acceptedRecommendedDefaults,
+        IReadOnlyList<VisionAgentPlanAnswer>? confirmedAnswers = null)
     {
         var blockers = ExtractStrategyBlockers(plan);
         var hasExplicitChoice = TryResolveExplicitChoice(buildDecisions, out var explicitStrategy);
@@ -51,13 +52,16 @@ internal static class VisionAgentStrategyConfirmationSupport
                 []);
         }
 
-        if (blockers.Count == 0)
+        var unresolvedBlockers = ResolveUnresolvedBlockers(plan, blockers, confirmedAnswers);
+        if (unresolvedBlockers.Count == 0)
         {
             return new VisionAgentStrategyConfirmationResolution(
                 true,
                 "planner_route",
-                PlannerNoConfirmationRequiredSource,
-                [],
+                blockers.Count > 0 && confirmedAnswers?.Count > 0
+                    ? UserSelectionSource
+                    : PlannerNoConfirmationRequiredSource,
+                blockers,
                 []);
         }
 
@@ -66,7 +70,7 @@ internal static class VisionAgentStrategyConfirmationSupport
             string.Empty,
             string.Empty,
             blockers,
-            blockers);
+            unresolvedBlockers);
     }
 
     public static List<string> ExtractStrategyBlockers(VisionAgentPlanModeResult? plan)
@@ -194,6 +198,98 @@ internal static class VisionAgentStrategyConfirmationSupport
         }
 
         return false;
+    }
+
+    private static List<string> ResolveUnresolvedBlockers(
+        VisionAgentPlanModeResult? plan,
+        IReadOnlyList<string> blockers,
+        IReadOnlyList<VisionAgentPlanAnswer>? confirmedAnswers)
+    {
+        if (blockers.Count == 0)
+        {
+            return [];
+        }
+
+        var answers = confirmedAnswers?
+            .Where(answer => !string.IsNullOrWhiteSpace(answer.Value))
+            .ToList() ?? [];
+        if (answers.Count == 0)
+        {
+            return blockers.ToList();
+        }
+
+        return blockers
+            .Where(blocker => !IsBlockerSatisfiedByAnswer(plan, blocker, answers))
+            .ToList();
+    }
+
+    private static bool IsBlockerSatisfiedByAnswer(
+        VisionAgentPlanModeResult? plan,
+        string blocker,
+        IReadOnlyList<VisionAgentPlanAnswer> answers)
+    {
+        var key = StrategyBlockerKey(blocker);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return false;
+        }
+
+        var keyField = ResolveIdentifierField(key);
+        foreach (var answer in answers)
+        {
+            var answerQuestionId = Clean(answer.QuestionId);
+            var answerField = VisionAgentPlanFieldPolicy.NormalizeField(answer.Field);
+            if (answerQuestionId.Equals(key, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(keyField) &&
+                 answerField.Equals(keyField, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            var question = (plan?.ClarificationQuestions ?? [])
+                .FirstOrDefault(item => Clean(item.Id).Equals(answerQuestionId, StringComparison.OrdinalIgnoreCase));
+            if (question == null)
+            {
+                continue;
+            }
+
+            var questionField = VisionAgentPlanFieldPolicy.ResolveQuestionField(question, [blocker]);
+            if (Clean(question.Id).Equals(key, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(keyField) &&
+                 questionField.Equals(keyField, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string StrategyBlockerKey(string blocker)
+    {
+        var key = Clean(blocker);
+        const string prefix = "strategy_confirmation:";
+        if (key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            key = key[prefix.Length..];
+        }
+
+        const string missingSuffix = "_missing";
+        if (key.EndsWith(missingSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            key = key[..^missingSuffix.Length];
+        }
+
+        return key;
+    }
+
+    private static string ResolveIdentifierField(string value)
+    {
+        return VisionAgentPlanFieldPolicy.ResolveQuestionField(new VisionAgentClarificationQuestion
+        {
+            Id = value,
+            Field = value
+        });
     }
 
     private static string Clean(string? value)

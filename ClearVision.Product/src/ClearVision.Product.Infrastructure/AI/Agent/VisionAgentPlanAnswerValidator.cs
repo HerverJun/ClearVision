@@ -44,6 +44,7 @@ public sealed class VisionAgentPlanAnswerValidator
             .Where(question => !string.IsNullOrWhiteSpace(question.Id))
             .GroupBy(question => Clean(question.Id), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var blockingReasons = plan?.BlockingReasons ?? [];
         var candidates = new List<CandidateAnswer>();
         var invalidQuestionIds = new List<string>();
         var invalidValues = new List<string>();
@@ -52,7 +53,7 @@ public sealed class VisionAgentPlanAnswerValidator
 
         foreach (var answer in confirmedAnswers ?? [])
         {
-            if (TryValidateAnswer(answer, questions, false, candidates, invalidQuestionIds, invalidValues, warnings))
+            if (TryValidateAnswer(answer, questions, blockingReasons, false, candidates, invalidQuestionIds, invalidValues, warnings))
             {
                 continue;
             }
@@ -62,10 +63,10 @@ public sealed class VisionAgentPlanAnswerValidator
         {
             foreach (var question in questions.Values)
             {
-                var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(question);
+                var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(question, blockingReasons);
                 if (string.IsNullOrWhiteSpace(field))
                 {
-                    continue;
+                    field = FallbackQuestionField(question);
                 }
 
                 var recommended = RecommendedValue(question);
@@ -90,6 +91,7 @@ public sealed class VisionAgentPlanAnswerValidator
                         Origin = VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault
                     },
                     questions,
+                    blockingReasons,
                     true,
                     candidates,
                     invalidQuestionIds,
@@ -149,7 +151,8 @@ public sealed class VisionAgentPlanAnswerValidator
             requirementAnswers,
             buildDecisions,
             parameterSelections,
-            accepted.Select(answer => answer.Field)
+            accepted.Select(answer => VisionAgentPlanFieldPolicy.NormalizeField(answer.Field))
+                .Where(field => !string.IsNullOrWhiteSpace(field))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                 .ToList(),
@@ -163,6 +166,7 @@ public sealed class VisionAgentPlanAnswerValidator
     private static bool TryValidateAnswer(
         VisionAgentPlanAnswer answer,
         IReadOnlyDictionary<string, VisionAgentClarificationQuestion> questions,
+        IReadOnlyList<string> blockingReasons,
         bool generatedRecommended,
         List<CandidateAnswer> candidates,
         List<string> invalidQuestionIds,
@@ -176,14 +180,27 @@ public sealed class VisionAgentPlanAnswerValidator
             return false;
         }
 
+        var questionId = Clean(answer.QuestionId);
+        var knownQuestion = !string.IsNullOrWhiteSpace(questionId) &&
+                            questions.TryGetValue(questionId, out var questionForField)
+            ? questionForField
+            : null;
         var field = VisionAgentPlanFieldPolicy.NormalizeField(answer.Field);
+        if (string.IsNullOrWhiteSpace(field) && knownQuestion != null)
+        {
+            field = VisionAgentPlanFieldPolicy.ResolveQuestionField(knownQuestion, blockingReasons);
+            if (string.IsNullOrWhiteSpace(field))
+            {
+                field = FallbackQuestionField(knownQuestion);
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(field))
         {
             invalidValues.Add($"{Clean(answer.QuestionId)}:invalid_field");
             return false;
         }
 
-        var questionId = Clean(answer.QuestionId);
         var value = CleanValue(answer.Value);
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -198,6 +215,7 @@ public sealed class VisionAgentPlanAnswerValidator
                 field,
                 value,
                 questions,
+                blockingReasons,
                 candidates,
                 invalidQuestionIds,
                 invalidValues);
@@ -210,8 +228,9 @@ public sealed class VisionAgentPlanAnswerValidator
             return false;
         }
 
-        var questionField = VisionAgentPlanFieldPolicy.ResolveQuestionField(question);
-        if (!string.Equals(field, questionField, StringComparison.OrdinalIgnoreCase))
+        var questionField = VisionAgentPlanFieldPolicy.ResolveQuestionField(question, blockingReasons);
+        if (!string.IsNullOrWhiteSpace(questionField) &&
+            !string.Equals(field, questionField, StringComparison.OrdinalIgnoreCase))
         {
             invalidValues.Add($"{questionId}:field_mismatch");
             return false;
@@ -229,7 +248,7 @@ public sealed class VisionAgentPlanAnswerValidator
 
         if (origin == VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault)
         {
-            if (!VisionAgentPlanFieldPolicy.TryGet(field, out var rule) ||
+            if (VisionAgentPlanFieldPolicy.TryGet(field, out var rule) &&
                 !rule.AllowRecommendedConfirmation)
             {
                 invalidValues.Add($"{questionId}:recommended_not_allowed");
@@ -262,6 +281,7 @@ public sealed class VisionAgentPlanAnswerValidator
         string field,
         string value,
         IReadOnlyDictionary<string, VisionAgentClarificationQuestion> questions,
+        IReadOnlyList<string> blockingReasons,
         List<CandidateAnswer> candidates,
         List<string> invalidQuestionIds,
         List<string> invalidValues)
@@ -282,8 +302,9 @@ public sealed class VisionAgentPlanAnswerValidator
                 return false;
             }
 
-            var questionField = VisionAgentPlanFieldPolicy.ResolveQuestionField(question);
-            if (!string.Equals(field, questionField, StringComparison.OrdinalIgnoreCase))
+            var questionField = VisionAgentPlanFieldPolicy.ResolveQuestionField(question, blockingReasons);
+            if (!string.IsNullOrWhiteSpace(questionField) &&
+                !string.Equals(field, questionField, StringComparison.OrdinalIgnoreCase))
             {
                 invalidValues.Add($"{questionId}:field_mismatch");
                 return false;
@@ -368,6 +389,13 @@ public sealed class VisionAgentPlanAnswerValidator
         return ParameterSelectionKeys.Contains(key) ||
                key.Contains('.', StringComparison.Ordinal) ||
                (!string.IsNullOrWhiteSpace(key) && char.IsUpper(key[0]));
+    }
+
+    private static string FallbackQuestionField(VisionAgentClarificationQuestion question)
+    {
+        return Clean(question.Field) is { Length: > 0 } field
+            ? field
+            : Clean(question.Id);
     }
 
     private static string NormalizeOrigin(string? origin)

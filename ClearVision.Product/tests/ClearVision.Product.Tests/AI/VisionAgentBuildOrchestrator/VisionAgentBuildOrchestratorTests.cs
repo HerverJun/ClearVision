@@ -186,6 +186,151 @@ public sealed class VisionAgentBuildOrchestratorTests
             item.ToolName == "plan_snapshot_loader");
     }
 
+    [Fact(DisplayName = "BuildFromPlan should clear aliased strategy blocker with confirmed requirement answer")]
+    public async Task BuildAsync_AliasedStrategyBlockerWithRequirementAnswer_ShouldBuild()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "medical lesion inspection workflow");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["strategy_confirmation:medical_modality_and_lesion_type_missing"],
+            ClarificationQuestions =
+            [
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "medical_modality_and_lesion_type",
+                    Field = "medical_modality_and_lesion_type",
+                    Title = "Medical modality and lesion type",
+                    Why = "This determines the executable task type.",
+                    DefaultValue = AiVisionTaskTypes.SurfaceDefect,
+                    DefaultAssumption = "Treat suspicious lesions as a surface defect style inspection draft.",
+                    Impact = "Model resources remain pending metadata.",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = AiVisionTaskTypes.SurfaceDefect,
+                            Label = "Lesion defect detection",
+                            Recommended = true,
+                            Description = "Build a suspected lesion detection draft.",
+                            Impact = "Editable draft can continue."
+                        },
+                        new VisionAgentClarificationOption
+                        {
+                            Value = AiVisionTaskTypes.AttributeClassification,
+                            Label = "Attribute classification",
+                            Recommended = false,
+                            Description = "Classify image-level lesion attributes.",
+                            Impact = "Operator strategy changes."
+                        }
+                    ]
+                }
+            ]
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                confirmedAnswers:
+                [
+                    PlanAnswer(
+                        "medical_modality_and_lesion_type",
+                        VisionAgentPlanAnswerFields.TaskType,
+                        AiVisionTaskTypes.SurfaceDefect)
+                ],
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                acceptedRecommendedDefaults: false,
+                requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var build = result.BuildResult!;
+        build.UnresolvedStrategyBlockers.Should().BeEmpty();
+        build.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.TaskType);
+        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "BuildFromPlan should clear unknown strategy blocker when matching question is answered")]
+    public async Task BuildAsync_UnknownStrategyBlockerWithMatchingQuestionAnswer_ShouldBuild()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "custom line guidance inspection workflow");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["strategy_confirmation:line_guidance_profile_missing"],
+            ClarificationQuestions =
+            [
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "line_guidance_profile",
+                    Field = "line_guidance_profile",
+                    Title = "Line guidance profile",
+                    Why = "A new industry-specific profile gates the planner route.",
+                    DefaultValue = "profile_a",
+                    DefaultAssumption = "Use profile A for the first editable draft.",
+                    Impact = "Parameters remain editable.",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "profile_a",
+                            Label = "Profile A",
+                            Recommended = true,
+                            Description = "Use profile A.",
+                            Impact = "Editable draft can continue."
+                        },
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "profile_b",
+                            Label = "Profile B",
+                            Recommended = false,
+                            Description = "Use profile B.",
+                            Impact = "Different parameters are selected."
+                        }
+                    ]
+                }
+            ]
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                confirmedAnswers:
+                [
+                    PlanAnswer(
+                        "line_guidance_profile",
+                        VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                        "profile_a")
+                ],
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                acceptedRecommendedDefaults: false,
+                requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        var build = result.BuildResult!;
+        build.UnresolvedStrategyBlockers.Should().BeEmpty();
+        build.StrategyConfirmed.Should().BeTrue();
+        build.StrategyConfirmationSource.Should().Be("user_selection");
+        build.ApplyGate.CanvasApplyReady.Should().BeTrue();
+    }
+
     [Fact(DisplayName = "BuildFromPlan draft should block when object and task are both empty")]
     public async Task BuildAsync_DraftWithEmptyObjectAndTask_ShouldBlock()
     {

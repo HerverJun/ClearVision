@@ -651,6 +651,7 @@ public static class AgentRunEndpoints
             AcceptanceCriteria = SanitizePlanList(result.AcceptanceCriteria),
             ExecutablePlan = SanitizePlanList(result.ExecutablePlan),
             BlockingReasons = SanitizePlanList(result.BlockingReasons).Select(SanitizePlanToken).ToList(),
+            BuildReadiness = SanitizeBuildReadiness(result.BuildReadiness),
             RequirementMaturity = result.RequirementMaturity == null
                 ? null
                 : result.RequirementMaturity with
@@ -713,6 +714,31 @@ public static class AgentRunEndpoints
                     StringComparer.OrdinalIgnoreCase)
             }).ToList(),
             MetadataOnly = true
+        };
+    }
+
+    private static VisionAgentBuildReadinessSnapshot SanitizeBuildReadiness(VisionAgentBuildReadinessSnapshot? readiness)
+    {
+        if (readiness == null)
+        {
+            return new VisionAgentBuildReadinessSnapshot();
+        }
+
+        return readiness with
+        {
+            Blockers = readiness.Blockers.Select(blocker => blocker with
+            {
+                Id = SanitizePlanToken(blocker.Id),
+                Category = SanitizePlanToken(blocker.Category),
+                Field = SanitizePlanToken(blocker.Field),
+                QuestionId = SanitizePlanToken(blocker.QuestionId),
+                ResolutionMode = SanitizePlanToken(blocker.ResolutionMode),
+                PublicLabel = SanitizePlanText(blocker.PublicLabel)
+            }).ToList(),
+            ResolvedFields = SanitizePlanList(readiness.ResolvedFields).Select(SanitizePlanToken).ToList(),
+            RemainingFields = SanitizePlanList(readiness.RemainingFields).Select(SanitizePlanToken).ToList(),
+            PrimaryMessage = SanitizePlanText(readiness.PrimaryMessage),
+            ContractVersion = SanitizePlanToken(readiness.ContractVersion)
         };
     }
 

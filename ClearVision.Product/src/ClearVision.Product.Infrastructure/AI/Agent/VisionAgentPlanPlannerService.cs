@@ -490,14 +490,26 @@ PlannerCandidateParsed:
         var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
         if (!maturity.CanPlan)
         {
+            var blockedReadiness = VisionAgentPlanReadinessEvaluator.Evaluate(result with
+            {
+                RequirementMaturity = maturity,
+                BlockingReasons = maturity.BlockingReasons.Count > 0
+                    ? maturity.BlockingReasons.ToList()
+                    : baseline.BlockingReasons.ToList()
+            });
             result = result with
             {
                 Intent = maturity.Maturity,
                 CanBuild = false,
                 RecommendedRoute = baseline.RecommendedRoute,
-                BlockingReasons = maturity.BlockingReasons.Count > 0
-                    ? maturity.BlockingReasons.ToList()
-                    : baseline.BlockingReasons.ToList(),
+                BlockingReasons = blockedReadiness.Blockers
+                    .Where(blocker => blocker.BlocksBuild)
+                    .Select(blocker => blocker.Id)
+                    .DefaultIfEmpty("hard_requirement:inspection_goal_missing")
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(12)
+                    .ToList(),
+                BuildReadiness = blockedReadiness,
                 RequirementMaturity = maturity,
                 DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
                     maturityRequest,
@@ -510,27 +522,26 @@ PlannerCandidateParsed:
         }
         else
         {
-            var readiness = VisionAgentPlanBuildReadiness.Evaluate(result with { RequirementMaturity = maturity });
-            var buildBlockingReasons = readiness.BlockingReasons
-                .Concat(result.BlockingReasons.Where(reason =>
-                    IsBuildBlockingReason(reason) &&
-                    !IsDraftableImageSourceBlocker(result, reason)))
+            var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(result with { RequirementMaturity = maturity });
+            var buildBlockingReasons = readiness.Blockers
+                .Where(blocker => blocker.BlocksBuild)
+                .Select(blocker => blocker.Id)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(12)
                 .ToList();
-            var canBuild = readiness.CanBuild && buildBlockingReasons.Count == 0;
+            var canBuild = readiness.CanBuild;
             result = result with
             {
                 CanBuild = canBuild,
-                BlockingReasons = canBuild
-                    ? result.BlockingReasons.Where(reason => !IsBuildBlockingReason(reason)).ToList()
-                    : buildBlockingReasons.Count > 0
+                BlockingReasons = buildBlockingReasons.Count > 0
                         ? buildBlockingReasons
-                        : readiness.BlockingReasons.Count > 0
-                        ? readiness.BlockingReasons.ToList()
-                        : maturity.BlockingReasons.Count > 0
-                        ? maturity.BlockingReasons.ToList()
-                        : baseline.BlockingReasons.ToList(),
+                        : readiness.Blockers
+                            .Where(blocker => !blocker.BlocksBuild)
+                            .Select(blocker => blocker.Id)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .Take(12)
+                            .ToList(),
+                BuildReadiness = readiness,
                 RequirementMaturity = maturity,
                 DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
                     maturityRequest,
@@ -547,7 +558,7 @@ PlannerCandidateParsed:
 
         if (!result.CanBuild && result.BlockingReasons.Count == 0)
         {
-            result.BlockingReasons.Add(maturity.CanPlan ? "build_requirement_missing" : "inspection_goal_missing");
+            result.BlockingReasons.Add(maturity.CanPlan ? "contract_warning:build_requirement_missing" : "hard_requirement:inspection_goal_missing");
             repairNotes.Add("blocking_reason_added");
         }
 
@@ -1004,7 +1015,7 @@ PlannerCandidateParsed:
                     VisionAgentStrategyConfirmationSupport.IsStrategyQuestionId(question.Field))
                 ?.Id;
             classified.Add(string.IsNullOrWhiteSpace(strategyQuestionId)
-                ? "strategy_confirmation:planner_candidate_not_buildable"
+                ? "contract_warning:planner_candidate_not_buildable"
                 : $"strategy_confirmation:{strategyQuestionId}_missing");
         }
 
@@ -1014,7 +1025,7 @@ PlannerCandidateParsed:
     private static string ClassifyPlannerBlockingReason(string reason)
     {
         var raw = Clean(reason);
-        foreach (var prefix in new[] { "hard_requirement:", "strategy_confirmation:", "resource_pending:" })
+        foreach (var prefix in new[] { "hard_requirement:", "strategy_confirmation:", "resource_pending:", "contract_warning:" })
         {
             if (raw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
@@ -1039,12 +1050,12 @@ PlannerCandidateParsed:
             return $"resource_pending:{clean}";
         }
 
-        if (ContainsAny(clean, "inspection_object", "task_type", "image_source", "acceptance_criteria", "condition"))
+        if (ContainsAny(clean, "inspection_object", "task_type", "image_source", "acceptance_criteria", "output_target", "condition"))
         {
             return $"hard_requirement:{clean}";
         }
 
-        return $"strategy_confirmation:{clean}";
+        return $"contract_warning:{clean}";
     }
 
     private static bool IsBuildBlockingReason(string reason)
