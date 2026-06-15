@@ -361,6 +361,41 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
     }
 
     [Fact]
+    public void Evaluate_AcceptedLocalOutputTarget_ShouldOverrideStaleExternalText()
+    {
+        var plan = ExternalOutputPlan("classify apples and send result to MES") with
+        {
+            ClarificationQuestions =
+            [
+                Question(
+                    "output_target",
+                    VisionAgentPlanAnswerFields.OutputTarget,
+                    "local_result_payload",
+                    "Local structured output")
+            ]
+        };
+        var validation = new VisionAgentPlanAnswerValidator().Validate(
+            plan,
+            [
+                new VisionAgentPlanAnswer
+                {
+                    QuestionId = "output_target",
+                    Field = VisionAgentPlanAnswerFields.OutputTarget,
+                    Value = "local_result_payload",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                }
+            ],
+            null,
+            false);
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(plan, validatedAnswers: validation);
+
+        readiness.CanBuild.Should().BeTrue();
+        readiness.Blockers.Should().NotContain(blocker => blocker.BlocksBuild);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
     public void Evaluate_ExplicitPlcOutput_ShouldBlockUntilAnswered()
     {
         var plan = ExternalOutputPlan("write inspection result to PLC") with
@@ -411,6 +446,115 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
         readiness.CanBuild.Should().BeTrue();
         readiness.Blockers.Should().ContainSingle(blocker =>
             blocker.Category == VisionAgentBuildBlockerCategories.ContractWarning &&
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild == false);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_ConnectorMatingInspection_ShouldRemainLocal()
+    {
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(LocalOutputPlan("检测连接器对接到位"));
+
+        readiness.CanBuild.Should().BeTrue();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild == false);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_ExternalHousingInspection_ShouldRemainLocal()
+    {
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(LocalOutputPlan("external housing scratch inspection"));
+
+        readiness.CanBuild.Should().BeTrue();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild == false);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_ExternalLabelInspection_ShouldRemainLocal()
+    {
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(LocalOutputPlan("外部标签缺失检测"));
+
+        readiness.CanBuild.Should().BeTrue();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild == false);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_LocalOutputWithAmbiguousObjectWords_ShouldRemainLocal()
+    {
+        var baseline = LocalOutputPlan("外部壳体连接器对接到位检测") with
+        {
+            SemanticExtraction = LocalOutputPlan("外部壳体连接器对接到位检测").SemanticExtraction! with
+            {
+                OutputTarget = "local_result_payload"
+            }
+        };
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(baseline);
+
+        readiness.CanBuild.Should().BeTrue();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild == false);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_ExplicitMesOutput_ShouldRemainExternal()
+    {
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(ExternalOutputPlan("检测结果输出到 MES"));
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_ExplicitPlcWrite_ShouldRemainExternal()
+    {
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(ExternalOutputPlan("OK NG 结果写入 PLC"));
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_ExplicitHttpApiOutput_ShouldRemainExternal()
+    {
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(ExternalOutputPlan("调用 HTTP API 推送检测结果"));
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_DisabledPlcPolicy_ShouldRemainLocal()
+    {
+        var plan = LocalOutputPlan("classify apples") with
+        {
+            PlcOutputPolicy = "PLC disabled; local ResultOutput first; 不写入 PLC; 不对接业务系统"
+        };
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(plan);
+
+        readiness.CanBuild.Should().BeTrue();
+        readiness.Blockers.Should().ContainSingle(blocker =>
             blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
             blocker.BlocksBuild == false);
         AssertCanBuildInvariant(readiness);

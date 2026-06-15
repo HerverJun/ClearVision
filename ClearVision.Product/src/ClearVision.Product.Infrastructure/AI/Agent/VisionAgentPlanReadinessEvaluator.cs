@@ -66,7 +66,7 @@ public static class VisionAgentPlanReadinessEvaluator
         {
             AddIfUnresolved(
                 blockers,
-                UpgradeLegacyBlocker(plan, reason, questionIndex, requirementMode, maturity, hasSupportedRoute),
+                UpgradeLegacyBlocker(plan, reason, questionIndex, requirementMode, maturity, hasSupportedRoute, validatedAnswers),
                 answers,
                 resolvedFields,
                 acceptedRecommendedDefaults,
@@ -84,7 +84,7 @@ public static class VisionAgentPlanReadinessEvaluator
             {
                 AddIfUnresolved(
                     blockers,
-                    UpgradeLegacyBlocker(plan, $"hard_requirement:{reason}", questionIndex, requirementMode, maturity, hasSupportedRoute),
+                    UpgradeLegacyBlocker(plan, $"hard_requirement:{reason}", questionIndex, requirementMode, maturity, hasSupportedRoute, validatedAnswers),
                     answers,
                     resolvedFields,
                     acceptedRecommendedDefaults,
@@ -355,7 +355,8 @@ public static class VisionAgentPlanReadinessEvaluator
         IReadOnlyDictionary<string, VisionAgentClarificationQuestion> questionIndex,
         string requirementMode,
         AiRequirementMaturityResult? maturity,
-        bool hasSupportedRoute)
+        bool hasSupportedRoute,
+        VisionAgentPlanAnswerValidationResult? validatedAnswers)
     {
         var parsed = ParseLegacyReason(reason);
         if (string.IsNullOrWhiteSpace(parsed.Key))
@@ -421,7 +422,7 @@ public static class VisionAgentPlanReadinessEvaluator
 
         if (field.Equals(VisionAgentPlanAnswerFields.OutputTarget, StringComparison.OrdinalIgnoreCase))
         {
-            var blocksOutput = !AllowsDefaultLocalOutput(plan);
+            var blocksOutput = !AllowsDefaultLocalOutput(plan, validatedAnswers);
             return Blocker(
                 blocksOutput ? $"hard_requirement:{idKey}_missing" : $"contract_warning:{idKey}",
                 blocksOutput
@@ -713,8 +714,17 @@ public static class VisionAgentPlanReadinessEvaluator
         return false;
     }
 
-    private static bool AllowsDefaultLocalOutput(VisionAgentPlanModeResult plan)
+    private static bool AllowsDefaultLocalOutput(
+        VisionAgentPlanModeResult plan,
+        VisionAgentPlanAnswerValidationResult? validatedAnswers = null)
     {
+        var selectedOutputTarget = ReadAcceptedOutputTarget(validatedAnswers);
+        if (!string.IsNullOrWhiteSpace(selectedOutputTarget))
+        {
+            return !ContainsExternalOutputTarget(selectedOutputTarget) &&
+                   !ContainsExternalOutputAction(selectedOutputTarget);
+        }
+
         if (RequestsExternalOutput(plan, string.Empty))
         {
             return false;
@@ -722,6 +732,14 @@ public static class VisionAgentPlanReadinessEvaluator
 
         var taskType = FirstNonEmpty(plan.SemanticExtraction?.TaskType, plan.RequirementMaturity?.TaskType);
         return !taskType.Equals(AiVisionTaskTypes.PlcOutput, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ReadAcceptedOutputTarget(VisionAgentPlanAnswerValidationResult? validation)
+    {
+        return validation?.AcceptedAnswers
+            .FirstOrDefault(answer =>
+                answer.Field.Equals(VisionAgentPlanAnswerFields.OutputTarget, StringComparison.OrdinalIgnoreCase))
+            ?.Value ?? string.Empty;
     }
 
     private static bool RequestsExternalOutput(VisionAgentPlanModeResult plan, string reason)
@@ -732,7 +750,7 @@ public static class VisionAgentPlanReadinessEvaluator
             return true;
         }
 
-        if (ContainsExternalOutputSignal(plan.SemanticExtraction?.OutputTarget))
+        if (ContainsExternalOutputTarget(plan.SemanticExtraction?.OutputTarget))
         {
             return true;
         }
@@ -742,15 +760,15 @@ public static class VisionAgentPlanReadinessEvaluator
             return true;
         }
 
-        if (ContainsExternalOutputSignal(plan.RecommendedRoute?.RouteId) ||
-            ContainsExternalOutputSignal(plan.RecommendedRoute?.Summary))
+        if (ContainsExternalOutputTarget(plan.RecommendedRoute?.RouteId) ||
+            ContainsExternalOutputAction(plan.RecommendedRoute?.Summary))
         {
             return true;
         }
 
-        return ContainsExternalOutputSignal(reason) ||
-               ContainsExternalOutputSignal(plan.Goal) ||
-               ContainsExternalOutputSignal(plan.OriginalUserPrompt);
+        return ContainsExternalOutputAction(reason) ||
+               ContainsExternalOutputAction(plan.Goal) ||
+               ContainsExternalOutputAction(plan.OriginalUserPrompt);
     }
 
     private static bool PolicyRequestsExternalOutput(string? policy)
@@ -767,10 +785,10 @@ public static class VisionAgentPlanReadinessEvaluator
             return false;
         }
 
-        return ContainsExternalOutputSignal(text);
+        return ContainsExternalOutputTarget(text) || ContainsExternalOutputAction(text);
     }
 
-    private static bool ContainsExternalOutputSignal(string? value)
+    private static bool ContainsExternalOutputTarget(string? value)
     {
         var text = Clean(value);
         if (string.IsNullOrWhiteSpace(text))
@@ -778,9 +796,14 @@ public static class VisionAgentPlanReadinessEvaluator
             return false;
         }
 
+        if (IsLocalOrDisabledOutput(text))
+        {
+            return false;
+        }
+
         if (Regex.IsMatch(
                 text,
-                @"(^|[^A-Za-z0-9])(plc|mes|erp|http|api|webhook|network|external)([^A-Za-z0-9]|$)",
+                @"(^|[^A-Za-z0-9])(plc|mes|erp|api|webhook)([^A-Za-z0-9]|$)",
                 RegexOptions.IgnoreCase))
         {
             return true;
@@ -789,20 +812,80 @@ public static class VisionAgentPlanReadinessEvaluator
         return ContainsAny(
             text,
             "plc_output",
-            "business_system",
-            "external_system",
+            "business_system_output",
+            "external_system_output",
             "对接MES",
             "写入PLC",
+            "发送到ERP",
             "发送ERP",
-            "外部系统",
             "业务系统接口",
             "网络接口",
             "HTTP接口",
             "API接口",
-            "Webhook",
-            "对接",
-            "外部",
-            "业务系统");
+            "Webhook");
+    }
+
+    private static bool ContainsExternalOutputAction(string? value)
+    {
+        var text = Clean(value);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        if (IsLocalOrDisabledOutput(text) &&
+            !Regex.IsMatch(text, @"\b(mes|erp|api|webhook)\b", RegexOptions.IgnoreCase) &&
+            !ContainsAny(text, "输出到 MES", "发送到 ERP", "调用 HTTP API", "推送 Webhook", "对接业务系统"))
+        {
+            return false;
+        }
+
+        return Regex.IsMatch(
+                   text,
+                   @"\b(send|write|output|push|post|call|publish|emit)\b.{0,32}\b(plc|mes|erp|http|api|webhook)\b",
+                   RegexOptions.IgnoreCase) ||
+               Regex.IsMatch(
+                   text,
+                   @"\b(plc|mes|erp|http|api|webhook)\b.{0,32}\b(output|endpoint|write|push|post|call)\b",
+                   RegexOptions.IgnoreCase) ||
+               Regex.IsMatch(
+                   text,
+                   @"(输出|发送|发|写入|推送|调用|对接).{0,16}(MES|PLC|ERP|HTTP|API|Webhook|业务系统)",
+                   RegexOptions.IgnoreCase) ||
+               ContainsAny(
+                   text,
+                   "输出到MES",
+                   "输出到 MES",
+                   "写入PLC",
+                   "写入 PLC",
+                   "发送到ERP",
+                   "发送到 ERP",
+                   "调用HTTP API",
+                   "调用 HTTP API",
+                   "推送Webhook",
+                   "推送 Webhook",
+                   "对接业务系统",
+                   "业务系统接口");
+    }
+
+    private static bool IsLocalOrDisabledOutput(string value)
+    {
+        return ContainsAny(
+            value,
+            "local_result_payload",
+            "structured_result_output",
+            "local ResultOutput",
+            "本地 ResultOutput",
+            "本地输出",
+            "本地结果",
+            "PLC disabled",
+            "PLC writes disabled",
+            "PLC write disabled",
+            "不写入 PLC",
+            "不写入PLC",
+            "不对接",
+            "禁用 PLC",
+            "禁用PLC");
     }
 
     private static Dictionary<string, VisionAgentClarificationQuestion> BuildQuestionIndex(VisionAgentPlanModeResult plan)

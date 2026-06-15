@@ -3537,8 +3537,24 @@ test('Plan external output matching treats rapid and capital as local fragments'
   assert.equal(panel._planRequestsExternalOutput({ goal: 'rapid inspection of capital letters' }), false);
   assert.equal(panel._planRequestsExternalOutput({ goal: 'capital letter OCR inspection' }), false);
   assert.equal(panel._planRequestsExternalOutput({ goal: 'ApiInspection local OCR workflow' }), false);
+  assert.equal(panel._planRequestsExternalOutput({ goal: '检测连接器对接到位' }), false);
+  assert.equal(panel._planRequestsExternalOutput({ goal: 'external housing scratch inspection' }), false);
+  assert.equal(panel._planRequestsExternalOutput({ goal: '外部标签缺失检测' }), false);
+  assert.equal(panel._planRequestsExternalOutput(
+    { goal: '外部壳体连接器对接到位检测' },
+    '',
+    { outputTarget: 'local_result_payload' }
+  ), false);
   assert.equal(panel._planRequestsExternalOutput({ goal: 'send result to MES' }), true);
   assert.equal(panel._planRequestsExternalOutput({ goal: 'send result to HTTP API endpoint' }), true);
+  assert.equal(panel._planRequestsExternalOutput({ goal: '检测结果输出到 MES' }), true);
+  assert.equal(panel._planRequestsExternalOutput({ goal: 'OK NG 结果写入 PLC' }), true);
+  assert.equal(panel._planRequestsExternalOutput({ goal: '调用 HTTP API 推送检测结果' }), true);
+  assert.equal(panel._planRequestsExternalOutput({ intent: 'classification' }, '', { taskType: 'plc_output' }), true);
+  assert.equal(panel._planRequestsExternalOutput({
+    goal: 'classify apples',
+    plcOutputPolicy: 'PLC disabled; local ResultOutput first; 不写入 PLC; 不对接业务系统'
+  }), false);
 });
 
 test('Local output target legacy blocker does not disable Build', async () => {

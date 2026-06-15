@@ -292,6 +292,11 @@ internal static class VisionAgentStrategyConfirmationSupport
             return false;
         }
 
+        if (key.Equals("planner_candidate_not_buildable", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         if (IsStrategyQuestionId(key))
         {
             return true;

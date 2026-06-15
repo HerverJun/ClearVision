@@ -267,6 +267,120 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult!.ApplyGate.CanvasApplyReady.Should().BeTrue();
     }
 
+    [Fact(DisplayName = "BuildFromPlan old planner candidate marker should not be reblocked by PlanSelection")]
+    public async Task BuildAsync_LegacyPlannerCandidateNotBuildableWarning_ShouldBuild()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "metal scratch inspection workflow");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["strategy_confirmation:planner_candidate_not_buildable"],
+            ClarificationQuestions = [],
+            BuildReadiness = new VisionAgentBuildReadinessSnapshot
+            {
+                CanBuild = true,
+                Blockers =
+                [
+                    new VisionAgentBuildBlocker
+                    {
+                        Id = "contract_warning:planner_candidate_not_buildable",
+                        Category = VisionAgentBuildBlockerCategories.ContractWarning,
+                        BlocksBuild = false,
+                        ResolutionMode = VisionAgentBuildBlockerResolutionModes.NonBlocking,
+                        PublicLabel = "Planner candidate warning retained."
+                    }
+                ],
+                ResolvedFields =
+                [
+                    VisionAgentPlanAnswerFields.InspectionObject,
+                    VisionAgentPlanAnswerFields.TaskType,
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    VisionAgentPlanAnswerFields.AcceptanceCriteria
+                ],
+                RemainingFields = [],
+                PrimaryMessage = "Plan ready.",
+                ContractVersion = VisionAgentPlanContractVersions.V2
+            },
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                Maturity = AiRequirementMaturity.Actionable,
+                CanPlan = true,
+                CanBuild = true,
+                MissingFields = [],
+                BlockingReasons = [],
+                PublicReason = "Requirement is actionable."
+            }
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.UnresolvedStrategyBlockers.Should().BeEmpty();
+        result.BuildResult.OperatorPipeline.Select(item => item.OperatorType)
+            .Should()
+            .Contain(["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"]);
+        result.BuildResult.ApplyGate.CanvasApplyReady.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "BuildFromPlan local connector mating wording should not require output target")]
+    public async Task BuildAsync_LocalConnectorMatingInspection_ShouldNotRequireOutputTarget()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "检测连接器对接到位和外部标签缺失");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["strategy_confirmation:output_target_missing"],
+            ClarificationQuestions =
+            [
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "output_target",
+                    Field = VisionAgentPlanAnswerFields.OutputTarget,
+                    Title = "Output target",
+                    DefaultValue = "local_result_payload",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "local_result_payload",
+                            Label = "Local structured output",
+                            Recommended = true
+                        }
+                    ]
+                }
+            ],
+            SemanticExtraction = baseline.SemanticExtraction! with
+            {
+                OutputTarget = string.Empty
+            }
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.ApplyGate.CanvasApplyReady.Should().BeTrue();
+    }
+
     [Fact(DisplayName = "BuildFromPlan explicit MES output should block until answered")]
     public async Task BuildAsync_ExplicitMesOutputWithoutAnswer_ShouldBlock()
     {

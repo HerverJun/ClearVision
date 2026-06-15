@@ -2449,31 +2449,53 @@ export const aiPanelAgentWorkspaceMixin = {
     _planRequestsExternalOutput(plan = null, reason = '', semanticExtraction = null, route = null) {
         const semantic = semanticExtraction || plan?.semanticExtraction || plan?.SemanticExtraction || {};
         const routeInfo = route || plan?.route || plan?.recommendedRoute || plan?.RecommendedRoute || {};
-        const text = [
-            reason,
-            plan?.goal,
-            plan?.Goal,
-            plan?.originalDescription,
-            plan?.OriginalUserPrompt,
-            plan?.buildPrompt,
-            plan?.intent,
-            plan?.Intent,
-            plan?.plcOutputPolicy,
-            plan?.PlcOutputPolicy,
-            routeInfo?.routeId,
-            routeInfo?.RouteId,
-            routeInfo?.summary,
-            routeInfo?.Summary,
-            semantic?.outputTarget,
-            semantic?.OutputTarget
-        ]
-            .map(value => String(value || '').trim())
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
+        const taskTypes = [plan?.intent, plan?.Intent, semantic?.taskType, semantic?.TaskType]
+            .map(value => String(value || '').trim().toLowerCase())
+            .filter(Boolean);
+        if (taskTypes.includes('plc_output')) return true;
+        if (this._planExternalOutputTarget(semantic?.outputTarget || semantic?.OutputTarget)) return true;
+        if (this._planExternalOutputPolicy(plan?.plcOutputPolicy || plan?.PlcOutputPolicy)) return true;
+        if (this._planExternalOutputTarget(routeInfo?.routeId || routeInfo?.RouteId) ||
+            this._planExternalOutputAction(routeInfo?.summary || routeInfo?.Summary)) {
+            return true;
+        }
+
+        return this._planExternalOutputAction(reason) ||
+            this._planExternalOutputAction(plan?.goal || plan?.Goal) ||
+            this._planExternalOutputAction(plan?.originalDescription || plan?.OriginalUserPrompt || plan?.buildPrompt);
+    },
+
+    _planExternalOutputPolicy(value) {
+        const text = String(value || '').trim();
         if (!text) return false;
-        return /\b(plc|mes|erp|http|api|webhook|network|external)\b/i.test(text) ||
-            /plc_output|business_system|external_system|对接|外部|业务系统/i.test(text);
+        if (this._planLocalOrDisabledOutput(text)) return false;
+        return this._planExternalOutputTarget(text) || this._planExternalOutputAction(text);
+    },
+
+    _planExternalOutputTarget(value) {
+        const text = String(value || '').trim();
+        if (!text) return false;
+        if (this._planLocalOrDisabledOutput(text)) return false;
+        return /(^|[^A-Za-z0-9])(plc|mes|erp|api|webhook)([^A-Za-z0-9]|$)/i.test(text) ||
+            /plc_output|business_system_output|external_system_output|对接MES|写入PLC|发送到ERP|发送ERP|业务系统接口|网络接口|HTTP接口|API接口|Webhook/i.test(text);
+    },
+
+    _planExternalOutputAction(value) {
+        const text = String(value || '').trim();
+        if (!text) return false;
+        const hasExplicitExternalTarget = /\b(mes|erp|api|webhook)\b/i.test(text) ||
+            /输出到\s*MES|发送到\s*ERP|调用\s*HTTP\s*API|推送\s*Webhook|对接业务系统/i.test(text);
+        if (this._planLocalOrDisabledOutput(text) && !hasExplicitExternalTarget) return false;
+        return /\b(send|write|output|push|post|call|publish|emit)\b.{0,32}\b(plc|mes|erp|http|api|webhook)\b/i.test(text) ||
+            /\b(plc|mes|erp|http|api|webhook)\b.{0,32}\b(output|endpoint|write|push|post|call)\b/i.test(text) ||
+            /(输出|发送|发|写入|推送|调用|对接).{0,16}(MES|PLC|ERP|HTTP|API|Webhook|业务系统)/i.test(text) ||
+            /输出到\s*MES|写入\s*PLC|发送到\s*ERP|调用\s*HTTP\s*API|推送\s*Webhook|对接业务系统|业务系统接口/i.test(text);
+    },
+
+    _planLocalOrDisabledOutput(value) {
+        const text = String(value || '').trim();
+        if (!text) return false;
+        return /local_result_payload|structured_result_output|local\s+ResultOutput|本地\s*ResultOutput|本地输出|本地结果|PLC\s+disabled|PLC\s+writes?\s+disabled|PLC\s+write\s+disabled|不写入\s*PLC|不对接|禁用\s*PLC/i.test(text);
     },
 
     _planHasAnyObjectOrTaskFact(requirementMaturity, semanticExtraction, resolvedFields = new Set()) {
