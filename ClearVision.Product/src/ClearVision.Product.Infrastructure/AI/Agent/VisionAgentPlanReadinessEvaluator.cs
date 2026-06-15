@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI.Tools;
+using System.Text.RegularExpressions;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
@@ -392,6 +393,18 @@ public static class VisionAgentPlanReadinessEvaluator
                 "资源可在开始构建后补齐。");
         }
 
+        if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.SafetyBlocker, StringComparison.OrdinalIgnoreCase))
+        {
+            return Blocker(
+                $"safety_blocker:{idKey}",
+                VisionAgentBuildBlockerCategories.SafetyBlocker,
+                field,
+                questionId,
+                true,
+                VisionAgentBuildBlockerResolutionModes.NonBlocking,
+                "存在安全阻断，需要重新生成安全快照或明确安全决策。");
+        }
+
         if (parsed.Key.Equals("planner_candidate_not_buildable", StringComparison.OrdinalIgnoreCase) &&
             question == null &&
             string.IsNullOrWhiteSpace(field))
@@ -460,6 +473,21 @@ public static class VisionAgentPlanReadinessEvaluator
                 "规划返回了无法映射到问题的策略确认项，已作为诊断保留。");
         }
 
+        if ((parsed.Kind.Equals(VisionAgentBuildBlockerCategories.HardRequirement, StringComparison.OrdinalIgnoreCase) ||
+             string.IsNullOrWhiteSpace(parsed.Kind)) &&
+            field.Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase) &&
+            !ShouldBlockField(plan, field, requirementMode, maturity, explicitOutputTargetBlocker: true))
+        {
+            return Blocker(
+                $"resource_pending:{idKey}_missing",
+                VisionAgentBuildBlockerCategories.ResourcePending,
+                field,
+                questionId,
+                false,
+                VisionAgentBuildBlockerResolutionModes.ProvideResource,
+                "资源可在开始构建后补齐。");
+        }
+
         if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.HardRequirement, StringComparison.OrdinalIgnoreCase) ||
             string.IsNullOrWhiteSpace(parsed.Kind))
         {
@@ -502,18 +530,6 @@ public static class VisionAgentPlanReadinessEvaluator
     {
         var normalized = VisionAgentPlanFieldPolicy.NormalizeField(field);
         var id = string.IsNullOrWhiteSpace(normalized) ? SafeKey(field) : normalized;
-        if (normalized.Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase))
-        {
-            return Blocker(
-                $"resource_pending:{id}_missing",
-                VisionAgentBuildBlockerCategories.ResourcePending,
-                normalized,
-                string.Empty,
-                false,
-                VisionAgentBuildBlockerResolutionModes.ProvideResource,
-                "资源可在开始构建后补齐。");
-        }
-
         return Blocker(
             $"hard_requirement:{id}_missing",
             VisionAgentBuildBlockerCategories.HardRequirement,
@@ -555,6 +571,11 @@ public static class VisionAgentPlanReadinessEvaluator
         IReadOnlyDictionary<string, VisionAgentClarificationQuestion> questionIndex,
         IReadOnlyDictionary<string, string>? buildDecisions)
     {
+        if (blocker.Category.Equals(VisionAgentBuildBlockerCategories.SafetyBlocker, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         if (!string.IsNullOrWhiteSpace(blocker.Field) &&
             resolvedFields.Contains(blocker.Field, StringComparer.OrdinalIgnoreCase))
         {
@@ -705,18 +726,83 @@ public static class VisionAgentPlanReadinessEvaluator
 
     private static bool RequestsExternalOutput(VisionAgentPlanModeResult plan, string reason)
     {
-        var text = string.Join(' ', new[]
+        if (plan.Intent.Equals(AiVisionTaskTypes.PlcOutput, StringComparison.OrdinalIgnoreCase) ||
+            plan.SemanticExtraction?.TaskType.Equals(AiVisionTaskTypes.PlcOutput, StringComparison.OrdinalIgnoreCase) == true)
         {
-            reason,
-            plan.Intent,
-            plan.Goal,
-            plan.OriginalUserPrompt,
-            plan.PlcOutputPolicy,
-            plan.RecommendedRoute?.RouteId,
-            plan.RecommendedRoute?.Summary,
-            plan.SemanticExtraction?.OutputTarget
-        }).ToLowerInvariant();
-        return ContainsAny(text, "plc", "mes", "erp", "http", "api", "webhook", "network", "external", "business_system", "external_system", "对接", "外部", "业务系统");
+            return true;
+        }
+
+        if (ContainsExternalOutputSignal(plan.SemanticExtraction?.OutputTarget))
+        {
+            return true;
+        }
+
+        if (PolicyRequestsExternalOutput(plan.PlcOutputPolicy))
+        {
+            return true;
+        }
+
+        if (ContainsExternalOutputSignal(plan.RecommendedRoute?.RouteId) ||
+            ContainsExternalOutputSignal(plan.RecommendedRoute?.Summary))
+        {
+            return true;
+        }
+
+        return ContainsExternalOutputSignal(reason) ||
+               ContainsExternalOutputSignal(plan.Goal) ||
+               ContainsExternalOutputSignal(plan.OriginalUserPrompt);
+    }
+
+    private static bool PolicyRequestsExternalOutput(string? policy)
+    {
+        var text = Clean(policy);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        if (Regex.IsMatch(text, @"\b(disabled|disable|off|forbidden|denied)\b", RegexOptions.IgnoreCase) ||
+            ContainsAny(text, "禁用", "关闭", "不写入", "不对接", "本地 ResultOutput"))
+        {
+            return false;
+        }
+
+        return ContainsExternalOutputSignal(text);
+    }
+
+    private static bool ContainsExternalOutputSignal(string? value)
+    {
+        var text = Clean(value);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        if (Regex.IsMatch(
+                text,
+                @"(^|[^A-Za-z0-9])(plc|mes|erp|http|api|webhook|network|external)([^A-Za-z0-9]|$)",
+                RegexOptions.IgnoreCase))
+        {
+            return true;
+        }
+
+        return ContainsAny(
+            text,
+            "plc_output",
+            "business_system",
+            "external_system",
+            "对接MES",
+            "写入PLC",
+            "发送ERP",
+            "外部系统",
+            "业务系统接口",
+            "网络接口",
+            "HTTP接口",
+            "API接口",
+            "Webhook",
+            "对接",
+            "外部",
+            "业务系统");
     }
 
     private static Dictionary<string, VisionAgentClarificationQuestion> BuildQuestionIndex(VisionAgentPlanModeResult plan)

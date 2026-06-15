@@ -78,6 +78,7 @@ internal static class VisionAgentStrategyConfirmationSupport
         return (plan?.BlockingReasons ?? [])
             .Select(Clean)
             .Where(reason => reason.StartsWith("strategy_confirmation:", StringComparison.OrdinalIgnoreCase))
+            .Where(reason => IsRealStrategyBlocker(plan, reason))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(12)
             .ToList();
@@ -281,6 +282,37 @@ internal static class VisionAgentStrategyConfirmationSupport
         }
 
         return key;
+    }
+
+    private static bool IsRealStrategyBlocker(VisionAgentPlanModeResult? plan, string blocker)
+    {
+        var key = StrategyBlockerKey(blocker);
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return false;
+        }
+
+        if (IsStrategyQuestionId(key))
+        {
+            return true;
+        }
+
+        var keyField = ResolveIdentifierField(key);
+        if (!string.IsNullOrWhiteSpace(keyField))
+        {
+            return keyField.Equals(VisionAgentPlanAnswerFields.AlgorithmStrategy, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var question = (plan?.ClarificationQuestions ?? [])
+            .FirstOrDefault(item => Clean(item.Id).Equals(key, StringComparison.OrdinalIgnoreCase));
+        if (question == null)
+        {
+            return true;
+        }
+
+        var questionField = VisionAgentPlanFieldPolicy.ResolveQuestionField(question);
+        return string.IsNullOrWhiteSpace(questionField) ||
+               questionField.Equals(VisionAgentPlanAnswerFields.AlgorithmStrategy, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveIdentifierField(string value)

@@ -115,6 +115,197 @@ public sealed class VisionAgentBuildOrchestratorTests
         build.ApplyGate.DeploymentReady.Should().BeFalse();
     }
 
+    [Fact(DisplayName = "BuildFromPlan strict missing image source should block at final evaluator gate")]
+    public async Task BuildAsync_StrictMissingImageSource_ShouldBlock()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "metal scratch inspection workflow");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["hard_requirement:image_source_missing"],
+            SemanticExtraction = baseline.SemanticExtraction! with
+            {
+                ImageSource = string.Empty
+            },
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"],
+                PublicReason = "Image source is required before strict Build."
+            }
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.RequirementBrief!.BlockingClarificationFields.Should()
+            .Contain(VisionAgentPlanAnswerFields.ImageSource);
+    }
+
+    [Fact(DisplayName = "BuildFromPlan strict answered image source should build")]
+    public async Task BuildAsync_StrictImageSourceAnswered_ShouldBuild()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "metal scratch inspection workflow");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["hard_requirement:image_source_missing"],
+            ClarificationQuestions =
+            [
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "image_source",
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Title = "Image source",
+                    DefaultValue = "camera",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "camera",
+                            Label = "Camera",
+                            Recommended = true
+                        }
+                    ]
+                }
+            ],
+            SemanticExtraction = baseline.SemanticExtraction! with
+            {
+                ImageSource = string.Empty
+            },
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                confirmedAnswers:
+                [
+                    PlanAnswer("image_source", VisionAgentPlanAnswerFields.ImageSource, "camera")
+                ],
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                acceptedRecommendedDefaults: false,
+                requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.ImageSource);
+        result.BuildResult.ApplyGate.CanvasApplyReady.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "BuildFromPlan local rapid inspection should not require output target confirmation")]
+    public async Task BuildAsync_LocalRapidInspection_ShouldNotRequireOutputTarget()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "classification",
+            ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
+            "rapid inspection of capital letters");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["strategy_confirmation:output_target_missing"],
+            ClarificationQuestions =
+            [
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "output_target",
+                    Field = VisionAgentPlanAnswerFields.OutputTarget,
+                    Title = "Output target",
+                    DefaultValue = "local_result_payload",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "local_result_payload",
+                            Label = "Local structured output",
+                            Recommended = true
+                        }
+                    ]
+                }
+            ],
+            SemanticExtraction = baseline.SemanticExtraction! with
+            {
+                OutputTarget = string.Empty
+            }
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.ApplyGate.CanvasApplyReady.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "BuildFromPlan explicit MES output should block until answered")]
+    public async Task BuildAsync_ExplicitMesOutputWithoutAnswer_ShouldBlock()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var plan = ExternalMesOutputPlan();
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.ClarificationRequired.Should().BeTrue();
+        result.RequirementBrief!.BlockingClarificationFields.Should()
+            .Contain(VisionAgentPlanAnswerFields.OutputTarget);
+    }
+
+    [Fact(DisplayName = "BuildFromPlan explicit MES output should build after answer")]
+    public async Task BuildAsync_ExplicitMesOutputAnswered_ShouldBuild()
+    {
+        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var plan = ExternalMesOutputPlan();
+
+        var result = await orchestrator.BuildAsync(
+            Request(
+                plan,
+                confirmedAnswers:
+                [
+                    PlanAnswer("output_target", VisionAgentPlanAnswerFields.OutputTarget, "business_system_output")
+                ],
+                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                acceptedRecommendedDefaults: false,
+                requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.BuildResult!.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.OutputTarget);
+        result.BuildResult.ApplyGate.CanvasApplyReady.Should().BeTrue();
+    }
+
     [Fact(DisplayName = "BuildFromPlan should synthesize EffectiveRequirement from rule fallback semantic and confirmed answers")]
     public async Task BuildAsync_RuleFallbackSemanticWithConfirmedAnswers_ShouldBuildFromEffectiveRequirement()
     {
@@ -1467,6 +1658,61 @@ public sealed class VisionAgentBuildOrchestratorTests
             Field = field,
             Value = value,
             Origin = origin
+        };
+    }
+
+    private static VisionAgentPlanModeResult ExternalMesOutputPlan()
+    {
+        var baseline = Plan(
+            "classification",
+            ["ImageAcquisition", "DeepLearning", "ResultJudgment", "ResultOutput"],
+            "classify apples and send result to MES");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["strategy_confirmation:output_target_missing"],
+            ClarificationQuestions =
+            [
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "output_target",
+                    Field = VisionAgentPlanAnswerFields.OutputTarget,
+                    Title = "Output target",
+                    DefaultValue = "business_system_output",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "business_system_output",
+                            Label = "MES output",
+                            Recommended = true
+                        },
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "local_result_payload",
+                            Label = "Local structured output",
+                            Recommended = false
+                        }
+                    ]
+                }
+            ],
+            SemanticExtraction = baseline.SemanticExtraction! with
+            {
+                OutputTarget = string.Empty
+            },
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanPlan = true,
+                CanBuild = true,
+                MissingFields = [],
+                BlockingReasons = [],
+                PublicReason = "Hard facts are ready; output target remains."
+            }
+        };
+
+        return plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
         };
     }
 

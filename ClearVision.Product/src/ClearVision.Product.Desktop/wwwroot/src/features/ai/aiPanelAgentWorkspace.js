@@ -1935,7 +1935,10 @@ export const aiPanelAgentWorkspaceMixin = {
             .map(evt => this._normalizePlanPublicEvent(evt));
         const rawFallbackReason = String(plan.fallbackReason || plan.FallbackReason || '').trim();
         const plannerFailure = this._normalizePlannerFailureDiagnostics(plan, publicEvents);
-        const authoritativeBuildReadiness = this._normalizePlanBuildReadiness(plan.buildReadiness || plan.BuildReadiness);
+        const normalizedBuildReadiness = this._normalizePlanBuildReadiness(plan.buildReadiness || plan.BuildReadiness);
+        const authoritativeBuildReadiness = this._isUsableAuthoritativeReadiness(normalizedBuildReadiness, plan)
+            ? normalizedBuildReadiness
+            : null;
         const buildReadiness = authoritativeBuildReadiness ||
             this._buildLegacyPlanReadinessSnapshot({
                 plan: null,
@@ -2038,6 +2041,30 @@ export const aiPanelAgentWorkspaceMixin = {
         };
     },
 
+    _isUsableAuthoritativeReadiness(snapshot) {
+        if (!snapshot || typeof snapshot !== 'object') return false;
+        const version = String(snapshot.contractVersion || '').trim().toLowerCase();
+        if (version !== 'v2') return false;
+
+        const blockers = this._toArray(snapshot.blockers).filter(Boolean);
+        const blocking = blockers.filter(blocker => blocker?.blocksBuild === true);
+        if (snapshot.canBuild === true && blocking.length > 0) return false;
+
+        const hasContent = blockers.length > 0 ||
+            this._toArray(snapshot.resolvedFields).length > 0 ||
+            this._toArray(snapshot.remainingFields).length > 0 ||
+            Boolean(String(snapshot.primaryMessage || '').trim());
+        if (!hasContent) return false;
+
+        if (snapshot.canBuild !== true &&
+            blocking.length === 0 &&
+            !String(snapshot.primaryMessage || '').trim()) {
+            return false;
+        }
+
+        return true;
+    },
+
     _normalizePlanBuildBlocker(value) {
         if (!value || typeof value !== 'object') return null;
         const item = this._asObject?.(value) || value;
@@ -2132,12 +2159,16 @@ export const aiPanelAgentWorkspaceMixin = {
                 return id === parsed.key || (field && qField === field);
             });
             const isResource = parsed.kind === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING;
+            const isSafety = parsed.kind === PLAN_BUILD_BLOCKER_CATEGORIES.SAFETY_BLOCKER;
             const isWarning = parsed.kind === PLAN_BUILD_BLOCKER_CATEGORIES.CONTRACT_WARNING ||
                 (isOutputTarget && !outputTargetBlocksBuild) ||
                 (!field && !question && parsed.kind !== PLAN_BUILD_BLOCKER_CATEGORIES.STRATEGY_CONFIRMATION &&
-                    parsed.kind !== PLAN_BUILD_BLOCKER_CATEGORIES.HARD_REQUIREMENT);
+                    parsed.kind !== PLAN_BUILD_BLOCKER_CATEGORIES.HARD_REQUIREMENT &&
+                    parsed.kind !== PLAN_BUILD_BLOCKER_CATEGORIES.SAFETY_BLOCKER);
             const category = isResource
                 ? PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING
+                : isSafety
+                    ? PLAN_BUILD_BLOCKER_CATEGORIES.SAFETY_BLOCKER
                 : isWarning
                     ? PLAN_BUILD_BLOCKER_CATEGORIES.CONTRACT_WARNING
                     : isOutputTarget
@@ -2145,9 +2176,11 @@ export const aiPanelAgentWorkspaceMixin = {
                     : field === PLAN_ANSWER_FIELDS.ALGORITHM_STRATEGY || this._isRealStrategyConfirmationReason(reason, questions)
                         ? PLAN_BUILD_BLOCKER_CATEGORIES.STRATEGY_CONFIRMATION
                         : PLAN_BUILD_BLOCKER_CATEGORIES.HARD_REQUIREMENT;
-            const blocksBuild = !canBuild && !isResource && !isWarning;
+            const blocksBuild = isSafety || (!canBuild && !isResource && !isWarning);
             const label = isResource
                 ? '资源可在开始构建后补齐。'
+                : isSafety
+                    ? '安全阻断需后端复核。'
                 : category === PLAN_BUILD_BLOCKER_CATEGORIES.STRATEGY_CONFIRMATION
                     ? '请选择构建策略。'
                     : isOutputTarget && outputTargetBlocksBuild
@@ -2165,18 +2198,21 @@ export const aiPanelAgentWorkspaceMixin = {
                 field,
                 questionId: String(question?.id || '').trim(),
                 blocksBuild,
-                resolutionMode: blocksBuild ? PLAN_BUILD_RESOLUTION_MODES.ANSWER_QUESTION : PLAN_BUILD_RESOLUTION_MODES.NON_BLOCKING,
+                resolutionMode: isSafety
+                    ? PLAN_BUILD_RESOLUTION_MODES.NON_BLOCKING
+                    : blocksBuild ? PLAN_BUILD_RESOLUTION_MODES.ANSWER_QUESTION : PLAN_BUILD_RESOLUTION_MODES.NON_BLOCKING,
                 publicLabel: label
             }));
         }
 
         const blocking = blockers.find(blocker => blocker.blocksBuild);
+        const effectiveCanBuild = canBuild && !blocking;
         return {
-            canBuild,
+            canBuild: effectiveCanBuild,
             blockers,
             resolvedFields,
             remainingFields,
-            primaryMessage: canBuild
+            primaryMessage: effectiveCanBuild
                 ? '规划已完成，可以开始构建。'
                 : blocking?.publicLabel || requirementMaturity?.publicReason || '当前规划仍需澄清，暂不可构建。',
             contractVersion: 'v2'
@@ -2193,6 +2229,113 @@ export const aiPanelAgentWorkspaceMixin = {
             resolutionMode: String(resolutionMode || '').trim().toLowerCase(),
             publicLabel: this._localizeDisplayText(publicLabel || '')
         };
+    },
+
+    _applyAnswersToAuthoritativeReadiness(authoritative, questions = [], answers = {}, { acceptedRecommended = false } = {}) {
+        const baseline = this._isUsableAuthoritativeReadiness(authoritative)
+            ? authoritative
+            : null;
+        if (!baseline) return null;
+
+        const questionList = this._toArray(questions);
+        const answerList = this._buildAuthoritativeReadinessAnswerList(questionList, answers, { acceptedRecommended });
+        const resolvedFields = new Set(this._toArray(baseline.resolvedFields)
+            .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+            .filter(Boolean));
+        const remainingBlockers = [];
+
+        for (const blocker of this._toArray(baseline.blockers)) {
+            const normalizedBlocker = this._makePlanBuildBlocker(blocker);
+            const resolved = answerList.some(answer =>
+                this._doesAnswerResolveAuthoritativeBlocker(normalizedBlocker, answer, questionList));
+            if (resolved) {
+                if (normalizedBlocker.field) resolvedFields.add(normalizedBlocker.field);
+                continue;
+            }
+
+            remainingBlockers.push(normalizedBlocker);
+        }
+
+        const canBuild = !remainingBlockers.some(blocker => blocker.blocksBuild === true);
+        const remainingFields = this._toArray(baseline.remainingFields)
+            .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+            .filter(field => field && !resolvedFields.has(field));
+        const blocking = remainingBlockers.find(blocker => blocker.blocksBuild === true);
+        return {
+            canBuild,
+            blockers: remainingBlockers,
+            resolvedFields: [...resolvedFields].sort(),
+            remainingFields: [...new Set(remainingFields)].sort(),
+            primaryMessage: canBuild
+                ? '规划已完成，可以开始构建。'
+                : blocking?.publicLabel || baseline.primaryMessage || '当前规划仍需澄清，暂不可构建。',
+            contractVersion: baseline.contractVersion || 'v2'
+        };
+    },
+
+    _buildAuthoritativeReadinessAnswerList(questions = [], answers = {}, { acceptedRecommended = false } = {}) {
+        const byId = new Map(this._toArray(questions)
+            .map(question => [String(question?.id || question?.Id || '').trim(), question])
+            .filter(([id]) => id));
+        const answerList = Object.values(answers || {})
+            .map(answer => {
+                const questionId = String(answer?.questionId || answer?.QuestionId || '').trim();
+                return this._normalizePlanAnswer(answer, byId.get(questionId) || null);
+            })
+            .filter(answer => this._isAuthoritativeReadinessAnswerAllowed(answer, byId.get(answer?.questionId || '')));
+        const answeredKeys = new Set(answerList.map(answer => answer.questionId || `field:${answer.field}`));
+
+        if (acceptedRecommended) {
+            for (const question of this._toArray(questions)) {
+                const questionId = String(question?.id || question?.Id || '').trim();
+                const field = this._inferPlanQuestionFieldForQuestion(question, { blockingReasons: [] }) ||
+                    this._fallbackPlanQuestionField(question, questionId);
+                const key = questionId || `field:${field}`;
+                if (!field || answeredKeys.has(key)) continue;
+                const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
+                if (!recommended) continue;
+                const answer = {
+                    questionId,
+                    field,
+                    value: recommended,
+                    origin: PLAN_ANSWER_ORIGINS.ACCEPTED_RECOMMENDED_DEFAULT
+                };
+                if (!this._isAuthoritativeReadinessAnswerAllowed(answer, question, { requireRecommended: true })) {
+                    continue;
+                }
+                answerList.push(answer);
+                answeredKeys.add(key);
+            }
+        }
+
+        return answerList;
+    },
+
+    _doesAnswerResolveAuthoritativeBlocker(blocker, answer, questions = []) {
+        if (!blocker || !answer) return false;
+        if (blocker.category === PLAN_BUILD_BLOCKER_CATEGORIES.SAFETY_BLOCKER) return false;
+        const question = this._toArray(questions)
+            .find(item => String(item?.id || item?.Id || '').trim() === String(answer.questionId || '').trim()) || null;
+        if (!this._isAuthoritativeReadinessAnswerAllowed(answer, question)) return false;
+        const blockerQuestionId = String(blocker.questionId || '').trim();
+        if (blockerQuestionId && blockerQuestionId === String(answer.questionId || '').trim()) return true;
+        return Boolean(blocker.field && answer.field === blocker.field);
+    },
+
+    _isAuthoritativeReadinessAnswerAllowed(answer, question = null, { requireRecommended = false } = {}) {
+        if (!answer || !String(answer.value || '').trim() || !String(answer.field || '').trim()) return false;
+        const options = this._toArray(question?.options || question?.Options);
+        const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
+        if (requireRecommended || answer.origin === PLAN_ANSWER_ORIGINS.ACCEPTED_RECOMMENDED_DEFAULT) {
+            return Boolean(recommended && String(answer.value || '').trim() === recommended);
+        }
+
+        if (options.length > 0) {
+            return options.some(option => String(option?.value || option?.Value || '').trim() === String(answer.value || '').trim());
+        }
+
+        return answer.origin === PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT ||
+            Boolean(String(answer.questionId || '').trim());
     },
 
     _normalizeLegacyBuildBlockerId(reason, category) {
@@ -2406,6 +2549,16 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _canBuildPlanWithRecommendedAnswers(plan) {
         if (!plan || !this._allBlockingPlanQuestionsHaveRecommendations(plan)) return false;
+        if (this._isUsableAuthoritativeReadiness(plan.authoritativeBuildReadiness)) {
+            const preview = this._applyAnswersToAuthoritativeReadiness(
+                plan.authoritativeBuildReadiness,
+                plan.questions,
+                this.planQuestionAnswers || {},
+                { acceptedRecommended: true }
+            );
+            return preview?.canBuild === true;
+        }
+
         return this._buildLegacyPlanReadinessSnapshot({
             plan,
             rawCanBuild: plan.rawPlanSnapshot?.canBuild ?? plan.rawPlanSnapshot?.CanBuild ?? plan.executable,
@@ -2488,7 +2641,7 @@ export const aiPanelAgentWorkspaceMixin = {
     _parsePlanBlockingReason(reason) {
         const normalized = String(reason || '').trim().toLowerCase();
         if (!normalized) return { kind: '', key: '', field: '' };
-        const match = normalized.match(/^(hard_requirement|strategy_confirmation|resource_pending):(.+)$/i);
+        const match = normalized.match(/^(hard_requirement|strategy_confirmation|resource_pending|contract_warning|safety_blocker):(.+)$/i);
         const kind = match?.[1]?.toLowerCase() || '';
         const rawKey = match?.[2] || normalized;
         const key = rawKey.replace(/_missing$/i, '').trim();
@@ -2999,6 +3152,18 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _refreshPlanEffectiveBuildReadiness(plan, { acceptedRecommended = false } = {}) {
         if (!plan) return false;
+        if (this._isUsableAuthoritativeReadiness(plan.authoritativeBuildReadiness)) {
+            const preview = this._applyAnswersToAuthoritativeReadiness(
+                plan.authoritativeBuildReadiness,
+                plan.questions,
+                this.planQuestionAnswers || {},
+                { acceptedRecommended }
+            );
+            plan.buildReadiness = preview || plan.authoritativeBuildReadiness;
+            plan.executable = plan.buildReadiness.canBuild === true;
+            return plan.executable === true;
+        }
+
         const hasLocalAnswers = Object.values(this.planQuestionAnswers || {})
             .some(answer => this._normalizePlanAnswer(answer));
         if (!acceptedRecommended &&

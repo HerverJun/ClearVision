@@ -3265,6 +3265,282 @@ test('Authoritative buildReadiness enables Build despite legacy strategy blocker
   assert.equal(inlineBuildButton.disabled, false);
 });
 
+test('Empty default buildReadiness falls back to legacy compatibility', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    blockingReasons: ['hard_requirement:image_source_missing'],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [],
+      resolvedFields: [],
+      remainingFields: [],
+      primaryMessage: '',
+      contractVersion: 'v2'
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      missingFields: ['image_source'],
+      blockingReasons: ['image_source_missing'],
+      publicReason: 'Image source is required.'
+    },
+    semanticExtraction: {
+      isVisionRequest: true,
+      intent: 'new_flow',
+      taskType: 'surface_defect',
+      inspectionObject: 'metal part',
+      imageSource: '',
+      okCondition: 'no defect',
+      outputTarget: 'local_result_payload',
+      missingFields: ['image_source']
+    }
+  }));
+
+  assert.equal(plan.authoritativeBuildReadiness, null);
+  assert.equal(plan.executable, false);
+  assert.equal(plan.buildReadiness.blockers.some(blocker =>
+    blocker.id === 'hard_requirement:image_source_missing' &&
+    blocker.blocksBuild === true), true);
+});
+
+test('V2 answer overlay resolves authoritative blocker by exact questionId', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel._renderPlanWorkspace = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [
+      {
+        id: 'medical_modality_and_lesion_type',
+        field: 'medical_modality_and_lesion_type',
+        title: 'Medical modality',
+        defaultValue: 'ct_lung_nodule_detection',
+        options: [
+          { value: 'ct_lung_nodule_detection', label: 'CT lung nodule', recommended: true }
+        ]
+      }
+    ],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        {
+          id: 'hard_requirement:medical_modality_and_lesion_type_missing',
+          category: 'hard_requirement',
+          field: 'task_type',
+          questionId: 'medical_modality_and_lesion_type',
+          blocksBuild: true,
+          resolutionMode: 'answer_question',
+          publicLabel: 'Confirm task type.'
+        }
+      ],
+      resolvedFields: ['inspection_object', 'image_source', 'acceptance_criteria'],
+      remainingFields: ['task_type'],
+      primaryMessage: 'Confirm task type.',
+      contractVersion: 'v2'
+    }
+  }));
+  panel.pendingVisionPlan = plan;
+
+  panel._selectPlanQuestionOption('medical_modality_and_lesion_type', 'ct_lung_nodule_detection');
+
+  assert.equal(plan.authoritativeBuildReadiness.canBuild, false);
+  assert.equal(plan.executable, true);
+  assert.deepEqual(plan.buildReadiness.blockers.filter(blocker => blocker.blocksBuild), []);
+  assert.equal(plan.buildReadiness.resolvedFields.includes('task_type'), true);
+});
+
+test('V2 answer overlay resolves authoritative blocker by canonical field alias', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel._renderPlanWorkspace = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [
+      {
+        id: 'input_source',
+        field: 'input_source',
+        title: 'Image source',
+        defaultValue: 'camera',
+        options: [
+          { value: 'camera', label: 'Camera', recommended: true }
+        ]
+      }
+    ],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        {
+          id: 'hard_requirement:image_source_missing',
+          category: 'hard_requirement',
+          field: 'image_source',
+          questionId: '',
+          blocksBuild: true,
+          resolutionMode: 'answer_question',
+          publicLabel: 'Image source required.'
+        }
+      ],
+      resolvedFields: ['inspection_object', 'task_type', 'acceptance_criteria'],
+      remainingFields: ['image_source'],
+      primaryMessage: 'Image source required.',
+      contractVersion: 'v2'
+    }
+  }));
+  panel.pendingVisionPlan = plan;
+
+  panel._selectPlanQuestionOption('input_source', 'camera');
+
+  assert.equal(panel.planQuestionAnswers.input_source.field, 'image_source');
+  assert.equal(plan.executable, true);
+  assert.equal(plan.buildReadiness.remainingFields.includes('image_source'), false);
+});
+
+test('V2 answer overlay does not invent blockers from stale legacy strings', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    blockingReasons: ['hard_requirement:image_source_missing'],
+    buildReadiness: {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: [],
+      primaryMessage: 'Plan ready.',
+      contractVersion: 'v2'
+    }
+  }));
+
+  panel.pendingVisionPlan = plan;
+  panel._refreshPlanEffectiveBuildReadiness(plan);
+
+  assert.equal(plan.executable, true);
+  assert.deepEqual(plan.buildReadiness.blockers, []);
+});
+
+test('V2 answer overlay does not downgrade unmatched blocker', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel._renderPlanWorkspace = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [
+      {
+        id: 'input_source',
+        field: 'input_source',
+        title: 'Image source',
+        defaultValue: 'camera',
+        options: [{ value: 'camera', label: 'Camera', recommended: true }]
+      },
+      {
+        id: 'output_target',
+        field: 'output_target',
+        title: 'Output target',
+        defaultValue: 'business_system_output',
+        options: [{ value: 'business_system_output', label: 'MES', recommended: true }]
+      }
+    ],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        {
+          id: 'hard_requirement:image_source_missing',
+          category: 'hard_requirement',
+          field: 'image_source',
+          questionId: 'input_source',
+          blocksBuild: true,
+          resolutionMode: 'answer_question',
+          publicLabel: 'Image source required.'
+        },
+        {
+          id: 'hard_requirement:output_target_missing',
+          category: 'hard_requirement',
+          field: 'output_target',
+          questionId: 'output_target',
+          blocksBuild: true,
+          resolutionMode: 'answer_question',
+          publicLabel: 'Output target required.'
+        }
+      ],
+      resolvedFields: ['inspection_object', 'task_type', 'acceptance_criteria'],
+      remainingFields: ['image_source', 'output_target'],
+      primaryMessage: 'Two blockers remain.',
+      contractVersion: 'v2'
+    }
+  }));
+  panel.pendingVisionPlan = plan;
+
+  panel._selectPlanQuestionOption('input_source', 'camera');
+
+  assert.equal(plan.executable, false);
+  assert.deepEqual(
+    plan.buildReadiness.blockers.filter(blocker => blocker.blocksBuild).map(blocker => blocker.id),
+    ['hard_requirement:output_target_missing']
+  );
+});
+
+test('V2 answer overlay cannot resolve safety blocker', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel._renderPlanWorkspace = () => {};
+  panel._renderAgentWorkspaceOverview = () => {};
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [
+      {
+        id: 'safety_ack',
+        field: 'safety_ack',
+        title: 'Safety acknowledgement',
+        defaultValue: 'acknowledged',
+        options: [{ value: 'acknowledged', label: 'Acknowledge', recommended: true }]
+      }
+    ],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        {
+          id: 'safety_blocker:unsafe_operation',
+          category: 'safety_blocker',
+          field: '',
+          questionId: 'safety_ack',
+          blocksBuild: true,
+          resolutionMode: 'non_blocking',
+          publicLabel: 'Safety review required.'
+        }
+      ],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: [],
+      primaryMessage: 'Safety review required.',
+      contractVersion: 'v2'
+    }
+  }));
+  panel.pendingVisionPlan = plan;
+
+  assert.equal(panel._canBuildPlanWithRecommendedAnswers(plan), false);
+  panel._selectPlanQuestionOption('safety_ack', 'acknowledged');
+
+  assert.equal(plan.executable, false);
+  assert.equal(plan.buildReadiness.blockers[0].category, 'safety_blocker');
+  assert.equal(plan.buildReadiness.blockers[0].blocksBuild, true);
+});
+
+test('Plan external output matching treats rapid and capital as local fragments', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+
+  assert.equal(panel._planRequestsExternalOutput({ goal: 'rapid inspection of capital letters' }), false);
+  assert.equal(panel._planRequestsExternalOutput({ goal: 'capital letter OCR inspection' }), false);
+  assert.equal(panel._planRequestsExternalOutput({ goal: 'ApiInspection local OCR workflow' }), false);
+  assert.equal(panel._planRequestsExternalOutput({ goal: 'send result to MES' }), true);
+  assert.equal(panel._planRequestsExternalOutput({ goal: 'send result to HTTP API endpoint' }), true);
+});
+
 test('Local output target legacy blocker does not disable Build', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
