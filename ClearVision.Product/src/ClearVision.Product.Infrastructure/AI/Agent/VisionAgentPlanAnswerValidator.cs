@@ -406,6 +406,9 @@ public sealed class VisionAgentPlanAnswerValidator
             VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault => VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault,
             VisionAgentPlanAnswerOrigins.ExplicitUserText => VisionAgentPlanAnswerOrigins.ExplicitUserText,
             VisionAgentPlanAnswerOrigins.LegacyInferred => VisionAgentPlanAnswerOrigins.LegacyInferred,
+            VisionAgentPlanAnswerOrigins.ResourceBound => VisionAgentPlanAnswerOrigins.ResourceBound,
+            VisionAgentPlanAnswerOrigins.ModelInferred => VisionAgentPlanAnswerOrigins.ModelInferred,
+            VisionAgentPlanAnswerOrigins.DefaultAssumption => VisionAgentPlanAnswerOrigins.DefaultAssumption,
             _ => string.Empty
         };
     }
@@ -414,10 +417,13 @@ public sealed class VisionAgentPlanAnswerValidator
     {
         return origin switch
         {
-            VisionAgentPlanAnswerOrigins.ExplicitUserText => 4,
-            VisionAgentPlanAnswerOrigins.ExplicitUserSelection => 3,
-            VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault => 2,
-            VisionAgentPlanAnswerOrigins.LegacyInferred => 1,
+            VisionAgentPlanAnswerOrigins.ExplicitUserText => 6,
+            VisionAgentPlanAnswerOrigins.ExplicitUserSelection => 6,
+            VisionAgentPlanAnswerOrigins.ResourceBound => 5,
+            VisionAgentPlanAnswerOrigins.ModelInferred => 4,
+            VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault => 3,
+            VisionAgentPlanAnswerOrigins.LegacyInferred => 2,
+            VisionAgentPlanAnswerOrigins.DefaultAssumption => 1,
             _ => 0
         };
     }

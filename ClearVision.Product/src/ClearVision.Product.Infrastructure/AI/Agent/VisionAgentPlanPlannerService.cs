@@ -428,7 +428,7 @@ PlannerCandidateParsed:
             baseline.TemplateSelection,
             repairNotes);
         var route = RepairRoute(candidate.RecommendedRoute, baseline.RecommendedRoute, repairNotes);
-        var questions = RepairQuestions(candidate.ClarificationQuestions, baseline.ClarificationQuestions, repairNotes);
+        var questions = RepairQuestions(candidate.ClarificationQuestions, baseline.ClarificationQuestions, request, repairNotes);
         var defaults = RepairDefaults(candidate.RecommendedDefaults, baseline.RecommendedDefaults, repairNotes);
         var understanding = NormalizeList(candidate.RequirementUnderstanding, baseline.RequirementUnderstanding);
         var risks = NormalizeList(candidate.Risks, baseline.Risks);
@@ -805,23 +805,85 @@ PlannerCandidateParsed:
     private static List<VisionAgentClarificationQuestion> RepairQuestions(
         List<VisionAgentClarificationQuestion>? candidate,
         List<VisionAgentClarificationQuestion> baseline,
+        VisionAgentPlanModeRequest request,
         List<string> repairNotes)
     {
-        var questions = (candidate ?? [])
-            .Where(question => !string.IsNullOrWhiteSpace(question.Id) &&
-                               !string.IsNullOrWhiteSpace(question.Title))
-            .Take(5)
-            .Select(question => RepairQuestion(question))
-            .Where(question => question.Options.Count is >= 2 and <= 5)
-            .ToList();
+        var resolvedSet = (request.ConfirmedPlanAnswers ?? []).Select(a => a.Field)
+            .Concat(request.ResolvedPlanFields ?? [])
+            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        if (questions.Count < 2)
+        var questionsCandidate = new List<VisionAgentClarificationQuestion>();
+        if (candidate != null)
         {
-            repairNotes.Add("clarification_questions_repaired_to_baseline");
-            questions = baseline.Take(5).Select(RepairQuestion).ToList();
+            foreach (var question in candidate)
+            {
+                if (string.IsNullOrWhiteSpace(question.Id) || string.IsNullOrWhiteSpace(question.Title))
+                {
+                    continue;
+                }
+                var repairedQ = RepairQuestion(question);
+                if (repairedQ.Options.Count is >= 2 and <= 5)
+                {
+                    questionsCandidate.Add(repairedQ);
+                }
+            }
         }
 
-        return questions.Take(5).ToList();
+        var seenFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var filteredQuestions = new List<VisionAgentClarificationQuestion>();
+        var shouldRepairToBaseline = candidate == null || (candidate.Count > 0 && questionsCandidate.Count == 0);
+
+        if (!shouldRepairToBaseline)
+        {
+            foreach (var q in questionsCandidate)
+            {
+                var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(q);
+                if (string.IsNullOrWhiteSpace(field))
+                {
+                    field = !string.IsNullOrWhiteSpace(q.Field) ? q.Field : q.Id;
+                }
+                if (string.IsNullOrWhiteSpace(field))
+                {
+                    continue;
+                }
+                if (resolvedSet.Contains(field))
+                {
+                    continue; //已解决字段必须从问题列表中移除
+                }
+                if (seenFields.Add(field))
+                {
+                    filteredQuestions.Add(q);
+                }
+            }
+        }
+        else
+        {
+            repairNotes.Add("clarification_questions_repaired_to_baseline");
+            foreach (var q in baseline.Select(RepairQuestion))
+            {
+                var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(q);
+                if (string.IsNullOrWhiteSpace(field))
+                {
+                    field = !string.IsNullOrWhiteSpace(q.Field) ? q.Field : q.Id;
+                }
+                if (string.IsNullOrWhiteSpace(field))
+                {
+                    continue;
+                }
+                if (resolvedSet.Contains(field))
+                {
+                    continue;
+                }
+                if (seenFields.Add(field))
+                {
+                    filteredQuestions.Add(q);
+                }
+            }
+        }
+
+        return filteredQuestions.Take(5).ToList();
     }
 
     private static VisionAgentClarificationQuestion RepairQuestion(VisionAgentClarificationQuestion question)
@@ -1275,7 +1337,7 @@ public sealed class VisionAgentPlanPromptComposer
             "You are ClearVision Plan Mode, an industrial vision engineering planner.",
             "Return exactly one JSON object that matches PlannerCandidate. No prose, markdown, comments, raw prompt, system prompt, reasoning, or chain-of-thought.",
             "You must plan from public metadata only. Do not include local paths, image bytes/base64, tokens, secrets, PLC addresses, Station IPs, camera resource paths, or hidden reasoning.",
-            "Generate 2 to 5 high-value clarification questions. Each question needs id, field, title, why, defaultValue, defaultAssumption, impact, and 2 to 5 options. The field must be one of inspection_object, task_type, image_source, acceptance_criteria, output_target, target_attribute, defect_type, measurement_target, algorithm_strategy, roi_strategy, template_strategy. Exactly one or more options must have recommended=true.",
+            "Generate 0 to 5 high-value clarification questions targeting ONLY fields listed in [remaining_fields] and NEVER fields in [resolved_fields] or [confirmed_plan_answers]. Each question needs id, field, title, why, defaultValue, defaultAssumption, impact, and 2 to 5 options. The field must be one of inspection_object, task_type, image_source, acceptance_criteria, output_target, target_attribute, defect_type, measurement_target, algorithm_strategy, roi_strategy, template_strategy. Exactly one or more options must have recommended=true.",
             "Use only operator types from the provided operator catalog. Missing camera/model/template/calibration/PLC resources must stay pending metadata.",
             "If a templateSelection is provided, respect it and do not replace it.",
             "Required top-level fields: goal, intent, confidence, requirementUnderstanding, recommendedRoute, clarificationQuestions, recommendedDefaults, risks, acceptanceCriteria, executablePlan, canBuildCandidate, blockingReasons, nextAction.",
@@ -1358,6 +1420,16 @@ public sealed class VisionAgentPlanPromptComposer
         AppendSemanticContext(semanticContext, semantic);
         semanticContext.AppendLine("[maturity_summary]");
         AppendMaturityContext(semanticContext, ruleBaseline.RequirementMaturity);
+        
+        semanticContext.AppendLine("[confirmed_plan_answers]");
+        foreach (var answer in request.ConfirmedPlanAnswers ?? [])
+        {
+            semanticContext.AppendLine($"- field={answer.Field} value={answer.Value} origin={answer.Origin}");
+        }
+        semanticContext.AppendLine("[resolved_fields]");
+        semanticContext.AppendLine(string.Join(",", request.ResolvedPlanFields ?? []));
+        semanticContext.AppendLine("[remaining_fields]");
+        semanticContext.AppendLine(string.Join(",", request.RemainingPlanFields ?? []));
         var safetyAndContract = new StringBuilder();
         safetyAndContract.AppendLine("[safety_boundary]");
         safetyAndContract.AppendLine($"stationBoundarySummary={Truncate(VisionAgentSemanticExtractionSafety.SafeText(ruleBaseline.StationBoundarySummary), 300)}");

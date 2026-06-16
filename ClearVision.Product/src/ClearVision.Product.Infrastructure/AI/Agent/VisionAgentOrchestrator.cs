@@ -990,15 +990,55 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         };
         var semantic = request.SemanticExtraction;
         var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
-        var scenario = maturity.CanPlan
-            ? VisionAgentRequirementMaturityGate.ToPlanIntent(maturity)
-            : maturity.TaskType == AiVisionTaskTypes.AbstractGoal ? "abstract_goal" : "requirement_clarification";
-        var route = maturity.CanPlan
+
+        // Filter missing fields by removing resolved fields and confirmed plan answers
+        var resolvedSet = (request.ConfirmedPlanAnswers ?? []).Select(a => a.Field)
+            .Concat(request.ResolvedPlanFields ?? [])
+            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var filteredMissing = maturity.MissingFields
+            .Where(f => {
+                var normalized = VisionAgentPlanFieldPolicy.NormalizeField(f);
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    if (VisionAgentPlanFieldPolicy.LegacyQuestionFieldMap.TryGetValue(f, out var mapped))
+                    {
+                        normalized = mapped;
+                    }
+                    else
+                    {
+                        normalized = f;
+                    }
+                }
+                return !resolvedSet.Contains(normalized);
+            })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var hasBlockingMissing = filteredMissing.Any(field =>
+            string.Equals(request.RequirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase)
+                ? VisionAgentPlanFieldPolicy.IsDraftBlocking(field, maturity.TaskType, maturity)
+                : VisionAgentPlanFieldPolicy.IsStrictBlocking(field, maturity.TaskType, maturity));
+
+        var canBuild = !hasBlockingMissing && (maturity.CanPlan || maturity.CanBuild);
+
+        var updatedMaturity = maturity with
+        {
+            MissingFields = filteredMissing,
+            CanBuild = canBuild
+        };
+
+        var scenario = updatedMaturity.CanPlan
+            ? VisionAgentRequirementMaturityGate.ToPlanIntent(updatedMaturity)
+            : updatedMaturity.TaskType == AiVisionTaskTypes.AbstractGoal ? "abstract_goal" : "requirement_clarification";
+        var route = updatedMaturity.CanPlan
             ? BuildRoute(scenario, templateSelection)
-            : BuildClarificationRoute(maturity);
+            : BuildClarificationRoute(updatedMaturity);
         var questions = maturity.CanBuild
             ? BuildQuestions(scenario)
-            : BuildMaturityQuestions(maturity);
+            : BuildMaturityQuestions(updatedMaturity);
         var defaults = BuildDefaults(scenario, request);
         var toolNames = _toolRegistry.ListTools()
             .Select(tool => tool.Name)
@@ -1010,11 +1050,10 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var hasFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot);
         var hasResult = !string.IsNullOrWhiteSpace(request.CurrentResultSnapshot);
         var attachmentCount = Math.Max(request.AttachmentSummary.Count, 0);
-        var canBuild = maturity.CanBuild;
         var blockingReasons = canBuild
             ? new List<string>()
-            : maturity.BlockingReasons.Count > 0
-                ? maturity.BlockingReasons.ToList()
+            : updatedMaturity.BlockingReasons.Count > 0
+                ? updatedMaturity.BlockingReasons.ToList()
                 : ["inspection_goal_missing"];
 
         var result = new VisionAgentPlanModeResult
@@ -1023,15 +1062,15 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             OriginalUserPrompt = originalPrompt,
             PlanSource = "rule_baseline",
             Goal = description.Length > 160 ? description[..160] : description,
-            Intent = maturity.CanPlan ? scenario : maturity.Maturity,
-            Confidence = canBuild && scenario != "general_inspection" ? "high" : maturity.CanPlan ? "low" : "medium",
+            Intent = updatedMaturity.CanPlan ? scenario : updatedMaturity.Maturity,
+            Confidence = canBuild && scenario != "general_inspection" ? "high" : updatedMaturity.CanPlan ? "low" : "medium",
             RequirementUnderstanding =
             [
-                maturity.PublicReason,
+                updatedMaturity.PublicReason,
                 .. BuildSemanticUnderstanding(semantic),
-                $"taskType={maturity.TaskType}",
-                maturity.ObjectSignals.Count > 0 ? $"objectSignals={string.Join(",", maturity.ObjectSignals)}" : "objectSignals=missing",
-                maturity.TaskSignals.Count > 0 ? $"taskSignals={string.Join(",", maturity.TaskSignals)}" : "taskSignals=missing",
+                $"taskType={updatedMaturity.TaskType}",
+                updatedMaturity.ObjectSignals.Count > 0 ? $"objectSignals={string.Join(",", updatedMaturity.ObjectSignals)}" : "objectSignals=missing",
+                updatedMaturity.TaskSignals.Count > 0 ? $"taskSignals={string.Join(",", updatedMaturity.TaskSignals)}" : "taskSignals=missing",
                 $"检测意图：{ToScenarioTitle(scenario)}。",
                 hasFlow ? "当前画布摘要可用于构建。" : "可作为新的流程草稿开始构建。",
                 templateSelection != null
@@ -1041,6 +1080,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                     ? $"已有 {attachmentCount} 个附件作为脱敏元数据可用。"
                     : "未提供附件元数据。"
             ],
+            ConfirmedPlanAnswers = request.ConfirmedPlanAnswers ?? [],
+            ResolvedPlanFields = request.ResolvedPlanFields ?? [],
+            RemainingPlanFields = request.RemainingPlanFields ?? [],
             RecommendedRoute = route,
             ClarificationQuestions = questions,
             RecommendedDefaults = defaults,
@@ -1058,16 +1100,16 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             CanBuild = canBuild,
             BlockingReasons = blockingReasons,
             SemanticExtraction = semantic,
-            RequirementMaturity = maturity,
+            RequirementMaturity = updatedMaturity,
             DecisionTrace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
                 maturityRequest,
-                maturity,
-                maturity.CanPlan ? "actionable_vision_plan" : "ambiguous_vision_requirement",
-                maturity.CanPlan ? "planning" : "clarifying",
+                updatedMaturity,
+                updatedMaturity.CanPlan ? "actionable_vision_plan" : "ambiguous_vision_requirement",
+                updatedMaturity.CanPlan ? "planning" : "clarifying",
                 string.Empty),
             NextAction = canBuild
                 ? "可接受推荐默认值或回答关键问题，然后开始构建。"
-                : maturity.CanPlan
+                : updatedMaturity.CanPlan
                     ? "可先复核低置信规划草案；开始构建前需补齐缺失槽位。"
                     : "请先描述检测目标，再开始构建。",
             ContextSummary = new VisionAgentPlanContextSummary
@@ -1810,9 +1852,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 "先补充一个明确产品或部件对象。",
                 "没有对象时不能生成可靠流程。",
                 [
-                    Option("package_box", "包装箱/标签", true, "适合外观、贴附、读码或缺失检查。", "会引导到包装类视觉路线。"),
-                    Option("hole_part", "圆孔/孔位", false, "适合孔距、直径、圆心距测量。", "会引导到几何测量路线。"),
-                    Option("terminal_harness", "端子/线束", false, "适合线序或插线检查。", "会引导到线序路线。")
+                    Option("custom_object", "自定义检测目标", true, "请输入您具体的检测对象（如病灶、零件、外观等）。", "将根据您输入的检测对象进行规划。"),
+                    Option("generic_part", "常规工件/零件", false, "适合几何尺寸、有无或缺陷检查。", "适合常见工业零件检测。"),
+                    Option("other_object", "其他目标", false, "其他特殊检测目标。", "可作为草稿继续。")
                 ]));
         }
 
@@ -1826,10 +1868,10 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 "先选择一个可落地任务类型。",
                 "任务未明确时不能开始构建。",
                 [
-                    Option("surface_or_pose_defect", "缺陷/贴附/姿态", true, "检查破损、脏污、贴正、偏斜等。", "会使用外观或定位相关路线。"),
-                    Option("geometry_measurement", "尺寸测量", false, "测量孔距、直径、宽度、距离或角度。", "会使用几何测量路线。"),
-                    Option("wire_sequence", "线序", false, "检查端子颜色或线束顺序是否正确。", "会使用线序路线。"),
-                    Option("barcode_qr", "OCR/读码", false, "识别文字、二维码、条码或 DataMatrix。", "会使用读码识别路线。")
+                    Option("surface_or_pose_defect", "缺陷/外观/姿态检测", true, "检查破损、脏污、外观缺陷或装配姿态等。", "适合外观质量检测。"),
+                    Option("geometry_measurement", "尺寸/几何测量", false, "测量孔距、直径、宽度、距离或角度。", "适合精密尺寸检测。"),
+                    Option("presence_absence", "有无/漏装检查", false, "检查特定目标是否存在或漏装。", "适合组装检查。"),
+                    Option("code_recognition", "OCR/条码识别", false, "识别文字、二维码、条码或 DataMatrix。", "适合追溯性读取。")
                 ]));
         }
 

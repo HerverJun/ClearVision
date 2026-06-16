@@ -1349,7 +1349,6 @@ export const aiPanelAgentWorkspaceMixin = {
             .then(result => {
                 if (!this._isActivePlanRequest(planRequestId)) return;
                 this.pendingVisionPlan = this._normalizeBackendPlanResult(result, normalizedDescription);
-                this._clearPlanQuestionAnswers();
                 this._clearActivePlanRequest(planRequestId);
                 this._setGeneratingState?.(false);
                 const timeoutFallback = this._isPlannerTimeoutFallback(this.pendingVisionPlan);
@@ -1430,7 +1429,10 @@ export const aiPanelAgentWorkspaceMixin = {
             templateSelection: normalizedTemplateSelection,
             attachmentSummary: this._buildPlanAttachmentSummary(attachmentPaths),
             historySummary: this._buildPlanHistorySummary(),
-            semanticExtraction: semanticExtraction || null
+            semanticExtraction: semanticExtraction || null,
+            confirmedPlanAnswers: this._buildConfirmedPlanAnswers(this.pendingVisionPlan),
+            resolvedPlanFields: this._getResolvedPlanFields(this.pendingVisionPlan),
+            remainingPlanFields: this._getRemainingPlanFields(this.pendingVisionPlan)
         };
     },
 
@@ -4403,6 +4405,25 @@ export const aiPanelAgentWorkspaceMixin = {
                 );
             });
         });
+        el.querySelectorAll('.ai-plan-custom-input-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const questionId = button.getAttribute('data-plan-question') || '';
+                const inputField = Array.from(el.querySelectorAll('.ai-plan-custom-input-field'))
+                    .find(input => input.getAttribute('data-plan-question') === questionId);
+                if (inputField) {
+                    this._customInputPlanQuestion(questionId, inputField.value);
+                }
+            });
+        });
+        el.querySelectorAll('.ai-plan-custom-input-field').forEach(input => {
+            input.addEventListener('keydown', event => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const questionId = input.getAttribute('data-plan-question') || '';
+                    this._customInputPlanQuestion(questionId, input.value);
+                }
+            });
+        });
         el.querySelector('#ai-btn-start-build')?.addEventListener('click', event => this._startBuildFromCurrentPlan({
             acceptedRecommended: event.currentTarget?.dataset?.acceptRecommended === 'true'
         }));
@@ -4487,6 +4508,7 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _renderPlanQuestion(question, selectedValue) {
+        const isCustomValue = selectedValue && !question.options.some(opt => opt.value === selectedValue);
         return `
             <article class="ai-plan-question">
                 <div class="ai-plan-question-head">
@@ -4514,9 +4536,54 @@ export const aiPanelAgentWorkspaceMixin = {
                         `;
                     }).join('')}
                 </div>
+                <div class="ai-plan-question-custom-input">
+                    <input
+                        class="ai-plan-custom-input-field"
+                        type="text"
+                        placeholder="输入自定义回答..."
+                        value="${isCustomValue ? this._escapeHtml(selectedValue) : ''}"
+                        data-plan-question="${this._escapeHtml(question.id)}" />
+                    <button
+                        class="ai-plan-custom-input-btn"
+                        type="button"
+                        data-plan-question="${this._escapeHtml(question.id)}">
+                        确定
+                    </button>
+                </div>
                 <div class="ai-plan-question-impact">${this._escapeHtml(question.impact)}</div>
             </article>
         `;
+    },
+
+    _customInputPlanQuestion(questionId, value) {
+        if (!questionId || !this.pendingVisionPlan) return;
+        const cleanedValue = String(value || '').trim();
+        if (!cleanedValue) return;
+
+        const question = this._toArray(this.pendingVisionPlan.questions)
+            .find(item => String(item?.id || '').trim() === String(questionId || '').trim());
+        const field = this._inferPlanQuestionFieldForQuestion(question || { id: questionId }, this.pendingVisionPlan) ||
+            this._fallbackPlanQuestionField(question || { id: questionId }, questionId);
+        if (!field) return;
+
+        const answer = {
+            questionId,
+            field,
+            value: cleanedValue,
+            origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT
+        };
+        this.planQuestionSelections = {
+            ...(this.planQuestionSelections || {}),
+            [questionId]: cleanedValue
+        };
+        this.planQuestionAnswers = {
+            ...(this.planQuestionAnswers || {}),
+            [questionId]: answer
+        };
+        this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+        this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
+        this._renderPlanWorkspace(this.pendingVisionPlan);
+        this._renderAgentWorkspaceOverview();
     },
 
     _selectPlanQuestionOption(questionId, value) {

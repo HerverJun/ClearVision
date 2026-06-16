@@ -185,7 +185,7 @@ public static class VisionAgentRequirementMaturityGate
         var hasAbstractGoal = ContainsAny(text, AbstractGoalSignals);
         var hasTaskType = taskType != AiVisionTaskTypes.Unknown;
         var hasObject = objectHits.Count > 0;
-        var canPlan = hasObject || hasTaskType || request.TemplateSelection != null;
+        var canPlan = (hasObject || hasTaskType || request.TemplateSelection != null) && !hasAbstractGoal;
 
         if (hasAbstractGoal && !canPlan)
         {
@@ -338,6 +338,8 @@ public static class VisionAgentRequirementMaturityGate
                 [],
                 "语义抽取判断这是在当前流程基础上修改。");
         }
+
+        var isVisionRequest = semantic.IsVisionRequest || request.TemplateSelection != null;
 
         if (taskType == AiVisionTaskTypes.AbstractGoal)
         {

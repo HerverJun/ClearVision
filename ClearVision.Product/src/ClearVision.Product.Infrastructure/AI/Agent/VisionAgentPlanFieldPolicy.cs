@@ -32,7 +32,7 @@ public static class VisionAgentPlanFieldPolicy
         [VisionAgentPlanAnswerFields.TemplateStrategy] = BuildDecision(VisionAgentPlanAnswerFields.TemplateStrategy)
     };
 
-    private static readonly Dictionary<string, string> LegacyQuestionFieldMap = new(StringComparer.OrdinalIgnoreCase)
+    public static readonly Dictionary<string, string> LegacyQuestionFieldMap = new(StringComparer.OrdinalIgnoreCase)
     {
         ["object_type"] = VisionAgentPlanAnswerFields.InspectionObject,
         ["product_type"] = VisionAgentPlanAnswerFields.InspectionObject,

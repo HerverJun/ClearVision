@@ -70,6 +70,9 @@ public static class VisionAgentPlanAnswerOrigins
     public const string AcceptedRecommendedDefault = "accepted_recommended_default";
     public const string ExplicitUserText = "explicit_user_text";
     public const string LegacyInferred = "legacy_inferred";
+    public const string ResourceBound = "resource_bound";
+    public const string ModelInferred = "model_inferred";
+    public const string DefaultAssumption = "default_assumption";
 }
 
 public static class VisionAgentBuildBlockerCategories
@@ -95,6 +98,8 @@ public sealed record VisionAgentPlanAnswer
     public string Field { get; init; } = string.Empty;
     public string Value { get; init; } = string.Empty;
     public string Origin { get; init; } = string.Empty;
+    public double Confidence { get; init; } = 1.0;
+    public bool Resolved { get; init; } = true;
 }
 
 public sealed record VisionAgentBuildBlocker
@@ -212,6 +217,9 @@ public sealed record VisionAgentPlanModeRequest
     public string? HistorySummary { get; init; }
     public VisionAgentSemanticExtractionResult? SemanticExtraction { get; init; }
     public string RequirementMode { get; init; } = AiRequirementModes.Strict;
+    public List<VisionAgentPlanAnswer> ConfirmedPlanAnswers { get; init; } = [];
+    public List<string> ResolvedPlanFields { get; init; } = [];
+    public List<string> RemainingPlanFields { get; init; } = [];
 }
 
 public sealed record VisionAgentIntentRouterRequest
@@ -279,6 +287,9 @@ public sealed record VisionAgentPlanModeResult
     public string Intent { get; init; } = string.Empty;
     public string Confidence { get; init; } = "medium";
     public List<string> RequirementUnderstanding { get; init; } = [];
+    public List<VisionAgentPlanAnswer> ConfirmedPlanAnswers { get; init; } = [];
+    public List<string> ResolvedPlanFields { get; init; } = [];
+    public List<string> RemainingPlanFields { get; init; } = [];
     public VisionAgentRecommendedRoute RecommendedRoute { get; init; } = new();
     public List<VisionAgentClarificationQuestion> ClarificationQuestions { get; init; } = [];
     public List<VisionAgentDefaultAssumption> RecommendedDefaults { get; init; } = [];

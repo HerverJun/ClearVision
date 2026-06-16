@@ -161,6 +161,14 @@ public static class VisionAgentPlanReadinessEvaluator
         VisionAgentEffectiveRequirement? effectiveRequirement)
     {
         var fields = new List<string>();
+        if (plan.ResolvedPlanFields != null)
+        {
+            fields.AddRange(plan.ResolvedPlanFields);
+        }
+        if (plan.ConfirmedPlanAnswers != null)
+        {
+            fields.AddRange(plan.ConfirmedPlanAnswers.Select(a => a.Field));
+        }
         if (effectiveRequirement != null)
         {
             fields.AddRange(effectiveRequirement.ResolvedFields);
@@ -381,6 +389,19 @@ public static class VisionAgentPlanReadinessEvaluator
             })
             : VisionAgentPlanFieldPolicy.ResolveQuestionField(question, [reason]);
         var idKey = SafeKey(parsed.Key);
+
+        if (idKey.Equals("abstract_goal_needs_decomposition", StringComparison.OrdinalIgnoreCase) ||
+            idKey.Equals("requirement_not_plannable", StringComparison.OrdinalIgnoreCase))
+        {
+            return Blocker(
+                idKey,
+                VisionAgentBuildBlockerCategories.HardRequirement,
+                string.Empty,
+                questionId,
+                true,
+                VisionAgentBuildBlockerResolutionModes.AnswerQuestion,
+                "方案愿景，不是可直接构建的检测流程。");
+        }
 
         if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase))
         {
