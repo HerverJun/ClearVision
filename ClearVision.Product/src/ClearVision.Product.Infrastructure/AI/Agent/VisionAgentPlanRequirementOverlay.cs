@@ -52,7 +52,7 @@ public sealed class VisionAgentPlanRequirementOverlay
         Add(values, VisionAgentPlanAnswerFields.TargetAttribute, semantic?.TargetAttribute);
         Add(values, VisionAgentPlanAnswerFields.DefectType, semantic?.DefectType);
         Add(values, VisionAgentPlanAnswerFields.MeasurementTarget, semantic?.MeasurementTarget);
-        var acceptance = FirstNonEmpty(semantic?.OkCondition, semantic?.NgCondition);
+        var acceptance = VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(semantic?.OkCondition, semantic?.NgCondition);
         Add(values, VisionAgentPlanAnswerFields.AcceptanceCriteria, acceptance);
         return values;
     }
@@ -81,6 +81,10 @@ public sealed class VisionAgentPlanRequirementOverlay
             canPlanCandidate = false;
         }
 
+        var parsed = VisionAgentPlanFieldPolicy.ParseAcceptanceCriteria(acceptance);
+        var okCondition = !string.IsNullOrWhiteSpace(parsed.Ok) ? parsed.Ok : (semantic?.OkCondition ?? string.Empty);
+        var ngCondition = !string.IsNullOrWhiteSpace(parsed.Ng) ? parsed.Ng : (semantic?.NgCondition ?? string.Empty);
+
         return new VisionAgentSemanticExtractionResult
         {
             IsVisionRequest = semantic?.IsVisionRequest ?? true,
@@ -93,8 +97,8 @@ public sealed class VisionAgentPlanRequirementOverlay
             DefectType = defectType,
             MeasurementTarget = measurementTarget,
             ImageSource = imageSource,
-            OkCondition = FirstNonEmpty(acceptance, semantic?.OkCondition),
-            NgCondition = semantic?.NgCondition ?? string.Empty,
+            OkCondition = okCondition,
+            NgCondition = ngCondition,
             OutputTarget = outputTarget,
             SuggestedRoute = semantic?.SuggestedRoute ?? string.Empty,
             CanPlanCandidate = canPlanCandidate,

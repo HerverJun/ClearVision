@@ -355,7 +355,16 @@ public static class VisionAgentRequirementMaturityGate
                 "语义抽取判断这是方案愿景，不是可直接构建的检测流程。");
         }
 
-        var canPlan = hasObject || hasTaskType || semantic.CanPlanCandidate || request.TemplateSelection != null;
+        var hasSemanticObject = !string.IsNullOrWhiteSpace(semantic.InspectionObject);
+        var hasSemanticTaskType = !string.IsNullOrWhiteSpace(semantic.TaskType) &&
+                                  !string.Equals(semantic.TaskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
+                                  !string.Equals(semantic.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase);
+
+        var canPlan = hasObject ||
+                      hasTaskType ||
+                      semantic.CanPlanCandidate ||
+                      request.TemplateSelection != null ||
+                      (semantic.IsVisionRequest && (hasSemanticObject || hasSemanticTaskType));
         if (!canPlan)
         {
             var semanticMissingFields = BuildMissingFields(hasObject, hasTaskType, hasImageSource, hasAcceptance);

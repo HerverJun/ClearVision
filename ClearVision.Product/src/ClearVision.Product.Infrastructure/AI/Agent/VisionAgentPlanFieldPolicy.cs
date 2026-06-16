@@ -84,8 +84,77 @@ public static class VisionAgentPlanFieldPolicy
 
     public static string NormalizeField(string? field)
     {
-        return TryGet(field, out var rule) ? rule.Field : string.Empty;
+        var cleaned = Clean(field);
+        if (string.IsNullOrWhiteSpace(cleaned))
+        {
+            return string.Empty;
+        }
+        if (TryGet(cleaned, out var rule))
+        {
+            return rule.Field;
+        }
+        if (LegacyQuestionFieldMap.TryGetValue(cleaned, out var mapped))
+        {
+            return mapped;
+        }
+        var inferred = InferFieldFromIdentifier(cleaned);
+        if (!string.IsNullOrWhiteSpace(inferred))
+        {
+            return inferred;
+        }
+        return string.Empty;
     }
+
+    public static string FormatAcceptanceCriteria(string? ok, string? ng, string? output = null)
+    {
+        var hasOk = !string.IsNullOrWhiteSpace(ok);
+        var hasNg = !string.IsNullOrWhiteSpace(ng);
+        if (hasOk && hasNg)
+        {
+            return $"OK: {ok.Trim()}；NG: {ng.Trim()}";
+        }
+        if (hasOk)
+        {
+            return ok.Trim();
+        }
+        if (hasNg)
+        {
+            return ng.Trim();
+        }
+        return !string.IsNullOrWhiteSpace(output) ? output.Trim() : string.Empty;
+    }
+
+    public static (string Ok, string Ng) ParseAcceptanceCriteria(string? acceptance)
+    {
+        if (string.IsNullOrWhiteSpace(acceptance))
+        {
+            return (string.Empty, string.Empty);
+        }
+        
+        var clean = acceptance.Trim();
+        if (clean.Contains("OK:", StringComparison.OrdinalIgnoreCase) && 
+            clean.Contains("NG:", StringComparison.OrdinalIgnoreCase))
+        {
+            var okIdx = clean.IndexOf("OK:", StringComparison.OrdinalIgnoreCase);
+            var ngIdx = clean.IndexOf("NG:", StringComparison.OrdinalIgnoreCase);
+            if (okIdx >= 0 && ngIdx > okIdx)
+            {
+                var okPart = clean[(okIdx + 3)..ngIdx].Trim();
+                var ngPart = clean[(ngIdx + 3)..].Trim();
+                okPart = okPart.TrimEnd('；', ';', ' ', '\t', ',');
+                return (okPart, ngPart);
+            }
+            else if (ngIdx >= 0 && okIdx > ngIdx)
+            {
+                var ngPart = clean[(ngIdx + 3)..okIdx].Trim();
+                var okPart = clean[(okIdx + 3)..].Trim();
+                ngPart = ngPart.TrimEnd('；', ';', ' ', '\t', ',');
+                return (okPart, ngPart);
+            }
+        }
+        return (clean, string.Empty);
+    }
+
 
     public static string ResolveQuestionField(VisionAgentClarificationQuestion question)
     {

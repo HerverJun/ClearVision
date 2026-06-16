@@ -430,6 +430,43 @@ export const aiPanelAgentWorkspaceMixin = {
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
     },
 
+    _mergeBackendPlanAnswers(plan) {
+        if (!plan) return;
+        const backendAnswers = this._toArray(
+            plan.rawPlanSnapshot?.confirmedPlanAnswers ??
+            plan.rawPlanSnapshot?.ConfirmedPlanAnswers ?? []
+        ).map(a => this._normalizePlanAnswer(a)).filter(Boolean);
+        if (!backendAnswers.length) return;
+
+        const nextAnswers = { ...(this.planQuestionAnswers || {}) };
+        const nextSelections = { ...(this.planQuestionSelections || {}) };
+        let changed = false;
+
+        backendAnswers.forEach(answer => {
+            const key = answer.questionId || `field:${answer.field}`;
+            const existing = nextAnswers[key]
+                ? this._normalizePlanAnswer(nextAnswers[key])
+                : null;
+            // Explicit user inputs always take priority over backend answers
+            if (existing &&
+                (existing.origin === PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT ||
+                 existing.origin === PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION)) {
+                return;
+            }
+            nextAnswers[key] = answer;
+            if (answer.questionId) {
+                nextSelections[answer.questionId] = answer.value;
+            }
+            changed = true;
+        });
+
+        if (changed) {
+            this.planQuestionAnswers = nextAnswers;
+            this.planQuestionSelections = nextSelections;
+            this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+        }
+    },
+
     _shouldOpenPlanModeBeforeBuild(args = {}) {
         if (this._isAllowedSkipPlanRequest(args)) return false;
         if (this.isGenerating) return false;
@@ -1349,6 +1386,7 @@ export const aiPanelAgentWorkspaceMixin = {
             .then(result => {
                 if (!this._isActivePlanRequest(planRequestId)) return;
                 this.pendingVisionPlan = this._normalizeBackendPlanResult(result, normalizedDescription);
+                this._mergeBackendPlanAnswers(this.pendingVisionPlan);
                 this._clearActivePlanRequest(planRequestId);
                 this._setGeneratingState?.(false);
                 const timeoutFallback = this._isPlannerTimeoutFallback(this.pendingVisionPlan);
@@ -4367,7 +4405,12 @@ export const aiPanelAgentWorkspaceMixin = {
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">关键问题</div>
                 <div class="ai-plan-question-list">
-                    ${plan.questions.map(question => this._renderPlanQuestion(question, this._getPlanQuestionSelectedValue(question))).join('')}
+                    ${plan.questions
+                        .filter(question => {
+                            const field = this._inferPlanQuestionFieldForQuestion(question, plan) || '';
+                            return !field || !(plan.resolvedPlanFields || []).includes(field);
+                        })
+                        .map(question => this._renderPlanQuestion(question, this._getPlanQuestionSelectedValue(question))).join('')}
                 </div>
                 <div class="ai-build-note">资源补齐会在开始构建后出现。此阶段不会提前显示完整资源补齐卡。</div>
             </section>

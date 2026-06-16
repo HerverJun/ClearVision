@@ -970,7 +970,6 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             RedactionPass = true
         });
     }
-
     private VisionAgentPlanModeResult BuildPlan(
         VisionAgentPlanModeRequest request,
         IReadOnlyList<VisionAgentPlanPublicEvent>? semanticEvents = null)
@@ -991,33 +990,49 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var semantic = request.SemanticExtraction;
         var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
 
-        // Filter missing fields by removing resolved fields and confirmed plan answers
-        var resolvedSet = (request.ConfirmedPlanAnswers ?? []).Select(a => a.Field)
-            .Concat(request.ResolvedPlanFields ?? [])
+        // 1. ConfirmedPlanAnswers: Normalized, and deduped by canonical field
+        var rawConfirmed = request.ConfirmedPlanAnswers ?? [];
+        var normalizedConfirmed = new List<VisionAgentPlanAnswer>();
+        var groupedAnswers = rawConfirmed
+            .Select(a => {
+                var normField = VisionAgentPlanFieldPolicy.NormalizeField(a.Field);
+                return a with { Field = normField };
+            })
+            .Where(a => !string.IsNullOrWhiteSpace(a.Field))
+            .GroupBy(a => a.Field, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var group in groupedAnswers)
+        {
+            var bestAnswer = group.OrderBy(a => GetOriginPriority(a.Origin)).First();
+            normalizedConfirmed.Add(bestAnswer);
+        }
+
+        var confirmedSet = normalizedConfirmed.Select(a => a.Field).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // 2. ResolvedPlanFields: Union of ConfirmedPlanAnswers, request fields, and SemanticExtraction confirmed slots
+        var requestResolvedFields = (request.ResolvedPlanFields ?? [])
             .Select(VisionAgentPlanFieldPolicy.NormalizeField)
-            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Where(f => !string.IsNullOrWhiteSpace(f));
+
+        var semanticConfirmedFields = GetSemanticConfirmedFields(semantic)
+            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
+            .Where(f => !string.IsNullOrWhiteSpace(f));
+
+        var resolvedSet = confirmedSet
+            .Concat(requestResolvedFields)
+            .Concat(semanticConfirmedFields)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var filteredMissing = maturity.MissingFields
-            .Where(f => {
-                var normalized = VisionAgentPlanFieldPolicy.NormalizeField(f);
-                if (string.IsNullOrWhiteSpace(normalized))
-                {
-                    if (VisionAgentPlanFieldPolicy.LegacyQuestionFieldMap.TryGetValue(f, out var mapped))
-                    {
-                        normalized = mapped;
-                    }
-                    else
-                    {
-                        normalized = f;
-                    }
-                }
-                return !resolvedSet.Contains(normalized);
-            })
+        var resolvedPlanFields = resolvedSet.ToList();
+
+        // 3. RemainingPlanFields：RequirementMaturity.MissingFields 减去 ResolvedPlanFields
+        var remainingPlanFields = maturity.MissingFields
+            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
+            .Where(f => !string.IsNullOrWhiteSpace(f) && !resolvedSet.Contains(f))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var hasBlockingMissing = filteredMissing.Any(field =>
+        var hasBlockingMissing = remainingPlanFields.Any(field =>
             string.Equals(request.RequirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase)
                 ? VisionAgentPlanFieldPolicy.IsDraftBlocking(field, maturity.TaskType, maturity)
                 : VisionAgentPlanFieldPolicy.IsStrictBlocking(field, maturity.TaskType, maturity));
@@ -1026,7 +1041,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
         var updatedMaturity = maturity with
         {
-            MissingFields = filteredMissing,
+            MissingFields = remainingPlanFields,
             CanBuild = canBuild
         };
 
@@ -1080,9 +1095,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                     ? $"已有 {attachmentCount} 个附件作为脱敏元数据可用。"
                     : "未提供附件元数据。"
             ],
-            ConfirmedPlanAnswers = request.ConfirmedPlanAnswers ?? [],
-            ResolvedPlanFields = request.ResolvedPlanFields ?? [],
-            RemainingPlanFields = request.RemainingPlanFields ?? [],
+            ConfirmedPlanAnswers = normalizedConfirmed,
+            ResolvedPlanFields = resolvedPlanFields,
+            RemainingPlanFields = remainingPlanFields,
             RecommendedRoute = route,
             ClarificationQuestions = questions,
             RecommendedDefaults = defaults,
@@ -1447,6 +1462,25 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         return new
         {
             planContractVersion = VisionAgentPlanContractVersions.V2,
+            confirmedPlanAnswers = (plan.ConfirmedPlanAnswers ?? [])
+                .OrderBy(a => a.Field, StringComparer.OrdinalIgnoreCase)
+                .Select(a => new
+                {
+                    field = Clean(a.Field),
+                    value = Clean(a.Value),
+                    origin = Clean(a.Origin),
+                    confidence = a.Confidence,
+                    resolved = a.Resolved
+                })
+                .ToList(),
+            resolvedPlanFields = (plan.ResolvedPlanFields ?? [])
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .Select(Clean)
+                .ToList(),
+            remainingPlanFields = (plan.RemainingPlanFields ?? [])
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .Select(Clean)
+                .ToList(),
             goal = Clean(plan.Goal),
             intent = Clean(plan.Intent),
             confidence = Clean(plan.Confidence),
@@ -1526,8 +1560,11 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private static string NormalizePlanContractVersion(VisionAgentPlanModeResult plan)
     {
         var version = Clean(plan.PlanContractVersion);
-        if (version.Equals(VisionAgentPlanContractVersions.V2, StringComparison.OrdinalIgnoreCase) &&
-            plan.ClarificationQuestions.Any(question => !string.IsNullOrWhiteSpace(question.Field)))
+        if (version.Equals(VisionAgentPlanContractVersions.V2, StringComparison.OrdinalIgnoreCase))
+        {
+            return VisionAgentPlanContractVersions.V2;
+        }
+        if (plan.ClarificationQuestions.Any(question => !string.IsNullOrWhiteSpace(question.Field)))
         {
             return VisionAgentPlanContractVersions.V2;
         }
@@ -1907,7 +1944,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 ]));
         }
 
-        if (missing.Contains("model_or_rule_strategy"))
+        if (missing.Contains("model_or_rule_strategy") || missing.Contains(VisionAgentPlanAnswerFields.AlgorithmStrategy))
         {
             questions.Add(Question(
                 "model_or_rule_strategy",
@@ -2173,5 +2210,37 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         return string.IsNullOrWhiteSpace(Clean(value))
             ? string.Empty
             : SafeTemplateToken(value, unsafeFallback);
+    }
+
+    private static int GetOriginPriority(string? origin)
+    {
+        if (string.IsNullOrWhiteSpace(origin)) return 99;
+        var clean = origin.Trim().ToLowerInvariant();
+        if (clean == "explicit_user_text" || clean == "explicit_user_selection" || clean == "user_explicit") return 1;
+        if (clean == "resource_bound") return 2;
+        if (clean == "model_inferred") return 3;
+        if (clean == "accepted_recommended_default" || clean == "accepted_default") return 4;
+        return 5;
+    }
+
+    private static IEnumerable<string> GetSemanticConfirmedFields(VisionAgentSemanticExtractionResult? semantic)
+    {
+        if (semantic == null) yield break;
+        if (!string.IsNullOrWhiteSpace(semantic.InspectionObject)) yield return VisionAgentPlanAnswerFields.InspectionObject;
+        if (!string.IsNullOrWhiteSpace(semantic.TaskType) && 
+            !string.Equals(semantic.TaskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) && 
+            !string.Equals(semantic.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return VisionAgentPlanAnswerFields.TaskType;
+        }
+        if (!string.IsNullOrWhiteSpace(semantic.ImageSource)) yield return VisionAgentPlanAnswerFields.ImageSource;
+        if (!string.IsNullOrWhiteSpace(semantic.OkCondition) || !string.IsNullOrWhiteSpace(semantic.NgCondition))
+        {
+            yield return VisionAgentPlanAnswerFields.AcceptanceCriteria;
+        }
+        if (!string.IsNullOrWhiteSpace(semantic.OutputTarget)) yield return VisionAgentPlanAnswerFields.OutputTarget;
+        if (!string.IsNullOrWhiteSpace(semantic.TargetAttribute)) yield return VisionAgentPlanAnswerFields.TargetAttribute;
+        if (!string.IsNullOrWhiteSpace(semantic.DefectType)) yield return VisionAgentPlanAnswerFields.DefectType;
+        if (!string.IsNullOrWhiteSpace(semantic.MeasurementTarget)) yield return VisionAgentPlanAnswerFields.MeasurementTarget;
     }
 }

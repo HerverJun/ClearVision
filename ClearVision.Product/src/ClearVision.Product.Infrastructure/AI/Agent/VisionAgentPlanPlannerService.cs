@@ -428,7 +428,7 @@ PlannerCandidateParsed:
             baseline.TemplateSelection,
             repairNotes);
         var route = RepairRoute(candidate.RecommendedRoute, baseline.RecommendedRoute, repairNotes);
-        var questions = RepairQuestions(candidate.ClarificationQuestions, baseline.ClarificationQuestions, request, repairNotes);
+        var questions = RepairQuestions(candidate.ClarificationQuestions, baseline, request, repairNotes);
         var defaults = RepairDefaults(candidate.RecommendedDefaults, baseline.RecommendedDefaults, repairNotes);
         var understanding = NormalizeList(candidate.RequirementUnderstanding, baseline.RequirementUnderstanding);
         var risks = NormalizeList(candidate.Risks, baseline.Risks);
@@ -467,6 +467,9 @@ PlannerCandidateParsed:
             CanBuild = false,
             BlockingReasons = SanitizeList(classifiedPlannerBlocking, redactionNotes),
             SemanticExtraction = semantic,
+            ConfirmedPlanAnswers = baseline.ConfirmedPlanAnswers ?? [],
+            ResolvedPlanFields = baseline.ResolvedPlanFields ?? [],
+            RemainingPlanFields = baseline.RemainingPlanFields ?? [],
             NextAction = SafeText(
                 string.IsNullOrWhiteSpace(candidate.NextAction) ? baseline.NextAction : candidate.NextAction,
                 redactionNotes),
@@ -479,6 +482,31 @@ PlannerCandidateParsed:
             MetadataOnly = true
         };
 
+        // Alignment: update RemainingPlanFields by removing fields covered by questions or resolved
+        var resolvedSet = (result.ResolvedPlanFields ?? [])
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var alignedRemaining = (result.RemainingPlanFields ?? [])
+            .Where(f => !resolvedSet.Contains(f))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        // Only filter questions if there are resolved fields to exclude;
+        // preserve backward compatibility when baseline has no resolved/remaining fields
+        var alignedQuestions = resolvedSet.Count > 0
+            ? result.ClarificationQuestions
+                .Where(q =>
+                {
+                    var f = VisionAgentPlanFieldPolicy.NormalizeField(q.Field);
+                    // Keep questions with no canonical field (legacy), or whose field is not resolved
+                    return string.IsNullOrWhiteSpace(f) || !resolvedSet.Contains(f);
+                })
+                .ToList()
+            : result.ClarificationQuestions;
+        result = result with
+        {
+            RemainingPlanFields = alignedRemaining,
+            ClarificationQuestions = alignedQuestions
+        };
+
         var maturityRequest = new VisionAgentRequirementMaturityRequest
         {
             Description = request.Description,
@@ -487,7 +515,11 @@ PlannerCandidateParsed:
             HasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
             TemplateSelection = baseline.TemplateSelection
         };
-        var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
+        var updatedMaturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic) with
+        {
+            MissingFields = alignedRemaining
+        };
+        var maturity = updatedMaturity;
         if (!maturity.CanPlan)
         {
             var blockedReadiness = VisionAgentPlanReadinessEvaluator.Evaluate(result with
@@ -804,86 +836,127 @@ PlannerCandidateParsed:
 
     private static List<VisionAgentClarificationQuestion> RepairQuestions(
         List<VisionAgentClarificationQuestion>? candidate,
-        List<VisionAgentClarificationQuestion> baseline,
+        VisionAgentPlanModeResult baselinePlan,
         VisionAgentPlanModeRequest request,
         List<string> repairNotes)
     {
-        var resolvedSet = (request.ConfirmedPlanAnswers ?? []).Select(a => a.Field)
-            .Concat(request.ResolvedPlanFields ?? [])
+        var confirmedSet = (baselinePlan.ConfirmedPlanAnswers ?? [])
+            .Select(a => VisionAgentPlanFieldPolicy.NormalizeField(a.Field))
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var resolvedSet = (baselinePlan.ResolvedPlanFields ?? [])
             .Select(VisionAgentPlanFieldPolicy.NormalizeField)
             .Where(f => !string.IsNullOrWhiteSpace(f))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var questionsCandidate = new List<VisionAgentClarificationQuestion>();
-        if (candidate != null)
-        {
-            foreach (var question in candidate)
-            {
-                if (string.IsNullOrWhiteSpace(question.Id) || string.IsNullOrWhiteSpace(question.Title))
-                {
-                    continue;
-                }
-                var repairedQ = RepairQuestion(question);
-                if (repairedQ.Options.Count is >= 2 and <= 5)
-                {
-                    questionsCandidate.Add(repairedQ);
-                }
-            }
-        }
+        var remainingSet = (baselinePlan.RemainingPlanFields ?? [])
+            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // allowedQuestionFields = RemainingPlanFields - ResolvedPlanFields - ConfirmedPlanAnswers.Fields
+        var allowedSet = remainingSet
+            .Except(resolvedSet)
+            .Except(confirmedSet)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var seenFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var filteredQuestions = new List<VisionAgentClarificationQuestion>();
-        var shouldRepairToBaseline = candidate == null || (candidate.Count > 0 && questionsCandidate.Count == 0);
 
-        if (!shouldRepairToBaseline)
+        if (candidate != null && candidate.Count > 0)
         {
-            foreach (var q in questionsCandidate)
+            foreach (var q in candidate)
             {
-                var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(q);
-                if (string.IsNullOrWhiteSpace(field))
-                {
-                    field = !string.IsNullOrWhiteSpace(q.Field) ? q.Field : q.Id;
-                }
-                if (string.IsNullOrWhiteSpace(field))
+                if (string.IsNullOrWhiteSpace(q.Id) || string.IsNullOrWhiteSpace(q.Title))
                 {
                     continue;
                 }
-                if (resolvedSet.Contains(field))
+                var repairedQ = RepairQuestion(q);
+                var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(repairedQ);
+                if (string.IsNullOrWhiteSpace(field))
                 {
-                    continue; //已解决字段必须从问题列表中移除
+                    field = !string.IsNullOrWhiteSpace(repairedQ.Field) ? repairedQ.Field : repairedQ.Id;
                 }
-                if (seenFields.Add(field))
+                
+                // Canonicalize
+                var canonicalField = VisionAgentPlanFieldPolicy.NormalizeField(field);
+                if (string.IsNullOrWhiteSpace(canonicalField))
                 {
-                    filteredQuestions.Add(q);
+                    continue; // 必须是 canonical field
+                }
+
+                if (!allowedSet.Contains(canonicalField))
+                {
+                    continue; // 必须属于 allowedSet
+                }
+
+                if (seenFields.Add(canonicalField))
+                {
+                    filteredQuestions.Add(repairedQ with { Field = canonicalField });
                 }
             }
         }
-        else
+
+        // If candidate is empty/invalid but allowedSet is not empty, fallback to custom inputs
+        if (filteredQuestions.Count == 0 && allowedSet.Count > 0)
         {
-            repairNotes.Add("clarification_questions_repaired_to_baseline");
-            foreach (var q in baseline.Select(RepairQuestion))
-            {
-                var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(q);
-                if (string.IsNullOrWhiteSpace(field))
-                {
-                    field = !string.IsNullOrWhiteSpace(q.Field) ? q.Field : q.Id;
-                }
-                if (string.IsNullOrWhiteSpace(field))
-                {
-                    continue;
-                }
-                if (resolvedSet.Contains(field))
-                {
-                    continue;
-                }
-                if (seenFields.Add(field))
-                {
-                    filteredQuestions.Add(q);
-                }
-            }
+            repairNotes.Add("clarification_questions_repaired_to_fallback_inputs");
+            filteredQuestions = BuildFallbackQuestionsForRemaining(allowedSet);
         }
 
         return filteredQuestions.Take(5).ToList();
+    }
+
+    private static List<VisionAgentClarificationQuestion> BuildFallbackQuestionsForRemaining(
+        HashSet<string> allowedSet)
+    {
+        var list = new List<VisionAgentClarificationQuestion>();
+        foreach (var field in allowedSet)
+        {
+            var title = field switch
+            {
+                VisionAgentPlanAnswerFields.InspectionObject => "检测对象说明",
+                VisionAgentPlanAnswerFields.TaskType => "检测任务说明",
+                VisionAgentPlanAnswerFields.ImageSource => "图像来源说明",
+                VisionAgentPlanAnswerFields.AcceptanceCriteria => "合格判定标准说明",
+                VisionAgentPlanAnswerFields.OutputTarget => "结果输出目标说明",
+                VisionAgentPlanAnswerFields.TargetAttribute => "检测目标属性说明",
+                VisionAgentPlanAnswerFields.DefectType => "缺陷类型说明",
+                VisionAgentPlanAnswerFields.MeasurementTarget => "测量目标说明",
+                VisionAgentPlanAnswerFields.AlgorithmStrategy => "算法策略说明",
+                VisionAgentPlanAnswerFields.RoiStrategy => "ROI策略说明",
+                VisionAgentPlanAnswerFields.TemplateStrategy => "模板策略说明",
+                _ => $"{field} 属性说明"
+            };
+
+            var why = $"流程规划需要明确 {title}。";
+            var defaultAssumption = $"暂无默认假设，请手动输入以补齐槽位。";
+            var impact = "缺少此字段将阻碍流程的自动构建。";
+
+            list.Add(new VisionAgentClarificationQuestion
+            {
+                Id = $"q_fallback_{field}",
+                Field = field,
+                Title = title,
+                Why = why,
+                DefaultValue = string.Empty,
+                DefaultAssumption = defaultAssumption,
+                Impact = impact,
+                Options =
+                [
+                    new VisionAgentClarificationOption
+                    {
+                        Value = "custom_input",
+                        Label = "自定义输入",
+                        Recommended = true,
+                        Description = "输入您的实际需求",
+                        Impact = "基于输入内容重新规划"
+                    }
+                ]
+            });
+        }
+        return list;
     }
 
     private static VisionAgentClarificationQuestion RepairQuestion(VisionAgentClarificationQuestion question)

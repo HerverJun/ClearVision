@@ -284,7 +284,7 @@ public static class VisionAgentPlanReadinessEvaluator
         AddIfValue(fields, VisionAgentPlanAnswerFields.DefectType, semantic?.DefectType);
         AddIfValue(fields, VisionAgentPlanAnswerFields.MeasurementTarget, semantic?.MeasurementTarget);
         AddIfValue(fields, VisionAgentPlanAnswerFields.OutputTarget, semantic?.OutputTarget);
-        AddIfValue(fields, VisionAgentPlanAnswerFields.AcceptanceCriteria, FirstNonEmpty(semantic?.OkCondition, semantic?.NgCondition));
+        AddIfValue(fields, VisionAgentPlanAnswerFields.AcceptanceCriteria, VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(semantic?.OkCondition, semantic?.NgCondition));
         return fields;
     }
 
