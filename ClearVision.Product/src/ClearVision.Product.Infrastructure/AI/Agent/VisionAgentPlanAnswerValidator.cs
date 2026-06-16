@@ -224,6 +224,20 @@ public sealed class VisionAgentPlanAnswerValidator
         if (string.IsNullOrWhiteSpace(questionId) ||
             !questions.TryGetValue(questionId, out var question))
         {
+            if (VisionAgentPlanFieldPolicy.TryGet(field, out var rule))
+            {
+                candidates.Add(new CandidateAnswer(
+                    new VisionAgentPlanAnswer
+                    {
+                        QuestionId = questionId,
+                        Field = field,
+                        Value = value,
+                        Origin = origin
+                    },
+                    Priority(origin),
+                    generatedRecommended));
+                return true;
+            }
             invalidQuestionIds.Add(string.IsNullOrWhiteSpace(questionId) ? "<empty>" : questionId);
             return false;
         }

@@ -185,7 +185,8 @@ public static class VisionAgentRequirementMaturityGate
         var hasAbstractGoal = ContainsAny(text, AbstractGoalSignals);
         var hasTaskType = taskType != AiVisionTaskTypes.Unknown;
         var hasObject = objectHits.Count > 0;
-        var canPlan = (hasObject || hasTaskType || request.TemplateSelection != null) && !hasAbstractGoal;
+        var isReliable = IsReliablePlannable(request, null, hasObject, hasTaskType);
+        var canPlan = isReliable && !hasAbstractGoal;
 
         if (hasAbstractGoal && !canPlan)
         {
@@ -360,11 +361,8 @@ public static class VisionAgentRequirementMaturityGate
                                   !string.Equals(semantic.TaskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
                                   !string.Equals(semantic.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase);
 
-        var canPlan = hasObject ||
-                      hasTaskType ||
-                      semantic.CanPlanCandidate ||
-                      request.TemplateSelection != null ||
-                      (semantic.IsVisionRequest && (hasSemanticObject || hasSemanticTaskType));
+        var isReliable = IsReliablePlannable(request, semantic, hasObject, hasTaskType);
+        var canPlan = isReliable;
         if (!canPlan)
         {
             var semanticMissingFields = BuildMissingFields(hasObject, hasTaskType, hasImageSource, hasAcceptance);
@@ -568,6 +566,28 @@ public static class VisionAgentRequirementMaturityGate
             taskTypeHint ??= AiVisionTaskTypes.Classification;
         }
 
+        foreach (Match match in Regex.Matches(text, @"检测\s*(?<object>[^包装箱|纸箱|箱体|胶带|金属件|金属表面|端子|线束|连接器|标签|二维码|条码|圆孔|圆形孔位|孔位|铜孔|产品|零件|遥控器|按键|面板|瓶盖|螺丝|pin|hole|terminal|connector|label|package|carton|part|product|button|wire|harness|metal|surface|，。；;,.!?！？\s]{2,10}?)\s*(?<task>缺陷|异常|有无|漏装|尺寸|排线)"))
+        {
+            var obj = match.Groups["object"].Value.Trim();
+            if (!ContainsAny(obj, new[] { "个", "做", "行", "次", "下", "种", "类", "一", "进行" }))
+            {
+                AddSlot(objects, obj);
+                AddSlot(tasks, match.Groups["task"].Value);
+                taskTypeHint ??= AiVisionTaskTypes.SurfaceOrPoseDefect;
+            }
+        }
+
+        foreach (Match match in Regex.Matches(text, @"(?<object>[^检测|识别|视觉|流程|问题|，。；;,.!?！？\s]{2,10}?)\s*检测"))
+        {
+            var obj = match.Groups["object"].Value.Trim();
+            if (!ContainsAny(obj, new[] { "进行", "做个", "做一", "的一", "点", "个", "次", "下", "种", "类", "一", "外观", "视觉" }))
+            {
+                AddSlot(objects, obj);
+                AddSlot(tasks, "检测");
+                taskTypeHint ??= AiVisionTaskTypes.SurfaceOrPoseDefect;
+            }
+        }
+
         foreach (Match match in Regex.Matches(text, @"检测\s*(?<object>[^，。；;,.!?！？]+?)上的(?<target>[^，。；;,.!?！？]+)"))
         {
             AddSlot(objects, match.Groups["object"].Value);
@@ -580,6 +600,13 @@ public static class VisionAgentRequirementMaturityGate
             AddSlot(objects, match.Groups["object"].Value);
             AddSlot(tasks, "是否存在");
             taskTypeHint ??= AiVisionTaskTypes.PresenceAbsence;
+        }
+
+        foreach (Match match in Regex.Matches(text, @"判断\s*(?<object>[^，。；;,.!?！？\s]+?)\s*是否\s*(?<target>[^，。；;,.!?！？\s]+)"))
+        {
+            AddSlot(objects, match.Groups["object"].Value);
+            AddSlot(tasks, match.Groups["target"].Value);
+            taskTypeHint ??= AiVisionTaskTypes.Classification;
         }
 
         return new VisionAgentRequirementSemanticSlots(
@@ -720,5 +747,42 @@ public static class VisionAgentRequirementMaturityGate
     private static string Clean(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+    }
+
+    private static bool IsReliablePlannable(
+        VisionAgentRequirementMaturityRequest request,
+        VisionAgentSemanticExtractionResult? semantic,
+        bool hasObject,
+        bool hasTaskType)
+    {
+        if (semantic != null && !string.IsNullOrWhiteSpace(semantic.InspectionObject))
+        {
+            return true;
+        }
+
+        if (semantic != null &&
+            !string.IsNullOrWhiteSpace(semantic.TaskType) &&
+            !string.Equals(semantic.TaskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(semantic.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (hasObject || hasTaskType)
+        {
+            return true;
+        }
+
+        if (request.TemplateSelection != null)
+        {
+            return true;
+        }
+
+        if (request.HasPendingPlan)
+        {
+            return true;
+        }
+
+        return false;
     }
 }

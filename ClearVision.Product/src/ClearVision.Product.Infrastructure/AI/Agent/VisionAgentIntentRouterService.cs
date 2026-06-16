@@ -666,28 +666,8 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
 
         if (!maturity.CanPlan)
         {
-            var isVision = (request.SemanticExtraction?.IsVisionRequest == true) || 
-                           (maturity.TaskType != AiVisionTaskTypes.Unknown && 
-                            maturity.TaskType != AiVisionTaskTypes.AbstractGoal && 
-                            !string.Equals(maturity.TaskType, "casual_chat", StringComparison.OrdinalIgnoreCase) && 
-                            !string.Equals(maturity.TaskType, "help", StringComparison.OrdinalIgnoreCase)) ||
-                           (maturity.Maturity != AiRequirementMaturity.ChatOrHelp && 
-                            maturity.Maturity != AiRequirementMaturity.AbstractGoal);
-
-            if (isVision && !string.IsNullOrWhiteSpace(request.Description))
-            {
-                intent = IntentActionableVisionPlan;
-                confidence = "low";
-                canBuild = false;
-                shouldOpenPlan = true;
-                shouldBuildDirectly = false;
-                needsClarification = false;
-                questions = [];
-                return;
-            }
-
             intent = IntentAmbiguousVisionRequirement;
-            confidence = confidence == "high" ? "medium" : confidence;
+            confidence = "medium";
             canBuild = false;
             shouldOpenPlan = false;
             shouldBuildDirectly = false;

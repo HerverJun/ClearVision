@@ -153,3 +153,7 @@ __pycache__/
 /quality/production_datasets/
 /quality/field_datasets/
 .claude/settings.local.json
+pyinstxtractor.py
+.tmp/inspect_pyc.py
+.gitignore
+.tmp/inspection_report.txt

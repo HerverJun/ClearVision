@@ -28,6 +28,7 @@ public sealed class VisionAgentPlanRequirementOverlay
                            VisionAgentPlanFieldPolicy.TryGet(item.Key, out var rule) &&
                            rule.Category == VisionAgentPlanFieldCategories.Requirement)
             .Select(item => item.Key)
+            .Concat(plan?.ResolvedPlanFields ?? [])
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
             .ToList();

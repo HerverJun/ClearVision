@@ -42,9 +42,22 @@ public static class VisionAgentPlanReadinessEvaluator
                 "缺少规划快照，无法开始构建。");
         }
 
-        var effectiveForReadiness = ShouldUseEffectiveRequirement(plan, effectiveRequirement, requirementMode)
-            ? effectiveRequirement
-            : null;
+        if (effectiveRequirement == null && plan != null)
+        {
+            var initialAnswers = validatedAnswers?.AcceptedAnswers ?? plan.ConfirmedPlanAnswers ?? [];
+            var validated = validatedAnswers ?? new VisionAgentPlanAnswerValidator().Validate(plan, initialAnswers, null, false);
+            var maturityRequest = new VisionAgentRequirementMaturityRequest
+            {
+                Description = plan.OriginalUserPrompt ?? plan.Goal ?? string.Empty,
+                RequirementMode = requirementMode,
+                HasCurrentFlow = false,
+                TemplateSelection = plan.TemplateSelection
+            };
+            var overlay = new VisionAgentPlanRequirementOverlay();
+            effectiveRequirement = overlay.Build(plan, validated, maturityRequest);
+        }
+
+        var effectiveForReadiness = effectiveRequirement;
         var maturity = effectiveForReadiness?.Maturity ?? plan.RequirementMaturity;
         var resolvedFields = BuildResolvedFields(plan, validatedAnswers, effectiveForReadiness);
         if (requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
@@ -145,7 +158,8 @@ public static class VisionAgentPlanReadinessEvaluator
             .Select(group => group.OrderByDescending(item => item.BlocksBuild).First())
             .Take(16)
             .ToList();
-        var canBuild = distinctBlockers.All(blocker => !blocker.BlocksBuild);
+        var hasBlockingRemaining = remainingFields.Any(field => ShouldBlockField(plan, field, requirementMode, maturity, explicitOutputTargetBlocker: false));
+        var canBuild = !hasBlockingRemaining && distinctBlockers.All(blocker => !blocker.BlocksBuild);
         return Snapshot(
             canBuild,
             distinctBlockers,
@@ -176,16 +190,6 @@ public static class VisionAgentPlanReadinessEvaluator
         else
         {
             fields.AddRange(ReadSemanticResolvedFields(plan.SemanticExtraction));
-        }
-
-        if (PlanHasTaskRoute(plan))
-        {
-            fields.Add(VisionAgentPlanAnswerFields.TaskType);
-        }
-
-        if (plan.AcceptanceCriteria.Count > 0)
-        {
-            fields.Add(VisionAgentPlanAnswerFields.AcceptanceCriteria);
         }
 
         if (validatedAnswers != null)

@@ -1051,7 +1051,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var route = updatedMaturity.CanPlan
             ? BuildRoute(scenario, templateSelection)
             : BuildClarificationRoute(updatedMaturity);
-        var questions = maturity.CanBuild
+        var questions = updatedMaturity.CanBuild
             ? BuildQuestions(scenario)
             : BuildMaturityQuestions(updatedMaturity);
         var defaults = BuildDefaults(scenario, request);
@@ -1099,7 +1099,11 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             ResolvedPlanFields = resolvedPlanFields,
             RemainingPlanFields = remainingPlanFields,
             RecommendedRoute = route,
-            ClarificationQuestions = questions,
+            ClarificationQuestions = VisionAgentPlanFieldPolicy.NormalizeQuestions(
+                questions,
+                remainingPlanFields,
+                resolvedPlanFields,
+                normalizedConfirmed),
             RecommendedDefaults = defaults,
             Risks = BuildRisks(scenario),
             AcceptanceCriteria = BuildAcceptanceCriteria(scenario),
@@ -1159,9 +1163,10 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         };
 
         var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(result);
+        var finalCanBuild = canBuild && readiness.CanBuild;
         result = result with
         {
-            CanBuild = readiness.CanBuild,
+            CanBuild = finalCanBuild,
             BlockingReasons = readiness.Blockers
                 .Where(blocker => blocker.BlocksBuild)
                 .Select(blocker => blocker.Id)
@@ -1169,7 +1174,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(12)
                 .ToList(),
-            BuildReadiness = readiness
+            BuildReadiness = readiness with { CanBuild = finalCanBuild }
         };
 
         return result with
@@ -1560,10 +1565,23 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private static string NormalizePlanContractVersion(VisionAgentPlanModeResult plan)
     {
         var version = Clean(plan.PlanContractVersion);
+        if (version.Equals(VisionAgentPlanContractVersions.V1, StringComparison.OrdinalIgnoreCase))
+        {
+            return VisionAgentPlanContractVersions.V1;
+        }
         if (version.Equals(VisionAgentPlanContractVersions.V2, StringComparison.OrdinalIgnoreCase))
         {
+            var hasV2Fields = (plan.ConfirmedPlanAnswers != null && plan.ConfirmedPlanAnswers.Count > 0) ||
+                               (plan.ResolvedPlanFields != null && plan.ResolvedPlanFields.Count > 0) ||
+                               (plan.RemainingPlanFields != null && plan.RemainingPlanFields.Count > 0) ||
+                               (plan.ClarificationQuestions != null && plan.ClarificationQuestions.Any(q => !string.IsNullOrWhiteSpace(q.Field)));
+            if (!hasV2Fields)
+            {
+                return VisionAgentPlanContractVersions.V1;
+            }
             return VisionAgentPlanContractVersions.V2;
         }
+
         if (plan.ClarificationQuestions.Any(question => !string.IsNullOrWhiteSpace(question.Field)))
         {
             return VisionAgentPlanContractVersions.V2;
@@ -1876,91 +1894,12 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
     private static List<VisionAgentClarificationQuestion> BuildMaturityQuestions(AiRequirementMaturityResult maturity)
     {
-        var missing = maturity.MissingFields.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var questions = new List<VisionAgentClarificationQuestion>();
-
-        if (missing.Count == 0 || missing.Contains("inspection_object"))
-        {
-            questions.Add(Question(
-                "inspection_object",
-                "检测对象是什么？",
-                "对象决定相机视野、ROI、模板和算子链。",
-                "object_pending",
-                "先补充一个明确产品或部件对象。",
-                "没有对象时不能生成可靠流程。",
-                [
-                    Option("custom_object", "自定义检测目标", true, "请输入您具体的检测对象（如病灶、零件、外观等）。", "将根据您输入的检测对象进行规划。"),
-                    Option("generic_part", "常规工件/零件", false, "适合几何尺寸、有无或缺陷检查。", "适合常见工业零件检测。"),
-                    Option("other_object", "其他目标", false, "其他特殊检测目标。", "可作为草稿继续。")
-                ]));
-        }
-
-        if (missing.Count == 0 || missing.Contains("task_type"))
-        {
-            questions.Add(Question(
-                "task_type",
-                "要解决哪一类视觉任务？",
-                "任务类型决定是否走缺陷、测量、线序、OCR、漏装或分类路线。",
-                "task_pending",
-                "先选择一个可落地任务类型。",
-                "任务未明确时不能开始构建。",
-                [
-                    Option("surface_or_pose_defect", "缺陷/外观/姿态检测", true, "检查破损、脏污、外观缺陷或装配姿态等。", "适合外观质量检测。"),
-                    Option("geometry_measurement", "尺寸/几何测量", false, "测量孔距、直径、宽度、距离或角度。", "适合精密尺寸检测。"),
-                    Option("presence_absence", "有无/漏装检查", false, "检查特定目标是否存在或漏装。", "适合组装检查。"),
-                    Option("code_recognition", "OCR/条码识别", false, "识别文字、二维码、条码或 DataMatrix。", "适合追溯性读取。")
-                ]));
-        }
-
-        if (missing.Contains("image_source"))
-        {
-            questions.Add(Question(
-                "image_source",
-                "图像来源是什么？",
-                "图像来源影响采集节点、资源占位和部署就绪。",
-                "camera_or_file_pending",
-                "先按相机或文件源保留为待确认元数据。",
-                "来源未确认时可以规划，但不能构建低成熟度需求。",
-                [
-                    Option("camera", "相机采集", true, "产线相机或工站相机输入。", "后续需要绑定相机元数据。"),
-                    Option("file", "图片文件", false, "先用样张或文件目录验证。", "适合离线验证。"),
-                    Option("metadata_only", "先不指定", false, "仅补充需求，不绑定真实资源。", "不会进入 Build。")
-                ]));
-        }
-
-        if (missing.Contains("acceptance_criteria"))
-        {
-            questions.Add(Question(
-                "acceptance_criteria",
-                "OK/NG 判定标准是什么？",
-                "判定标准决定阈值、公差、输出字段和验收方式。",
-                "criteria_pending",
-                "先补充一个可检查的判定规则。",
-                "没有判定标准时不能可靠落地。",
-                [
-                    Option("ok_ng_rule", "OK/NG 规则", true, "说明通过和不通过的边界。", "会映射到结果判定节点。"),
-                    Option("numeric_tolerance", "数值公差", false, "适合尺寸测量。", "会映射到测量阈值。"),
-                    Option("report_only", "仅输出报告", false, "先输出结构化结果，不直接判定。", "适合探索阶段。")
-                ]));
-        }
-
-        if (missing.Contains("model_or_rule_strategy") || missing.Contains(VisionAgentPlanAnswerFields.AlgorithmStrategy))
-        {
-            questions.Add(Question(
-                "model_or_rule_strategy",
-                "实现方式倾向是什么？",
-                "未知对象或未知识别内容需要先确认使用规则、传统算法、模板还是模型策略。",
-                "strategy_pending",
-                "先按可替换策略占位，Build 前再确认实现方式。",
-                "实现方式未确认时可以规划低置信草案，但不能直接构建。",
-                [
-                    Option("rule_first", "规则/传统算法优先", true, "先用阈值、几何、形态学或规则判断构成草案。", "适合可解释、低风险的初始方案。"),
-                    Option("template_first", "模板/定位优先", false, "先定位目标区域，再按目标内容做检测。", "适合目标姿态稳定的场景。"),
-                    Option("model_first", "模型识别优先", false, "保留模型资源为待确认占位。", "适合未知外观或语义识别，但需要后续模型资源。")
-                ]));
-        }
-
-        return questions.Take(5).ToList();
+        var missing = maturity.MissingFields
+            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return VisionAgentPlanFieldPolicy.BuildFallbackQuestionsForRemaining(missing).Take(5).ToList();
     }
 
     private static List<VisionAgentDefaultAssumption> BuildDefaults(

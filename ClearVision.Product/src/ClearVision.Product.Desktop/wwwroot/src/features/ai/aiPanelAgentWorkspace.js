@@ -403,6 +403,38 @@ const AI_PARAMETER_LABELS = {
 };
 
 export const aiPanelAgentWorkspaceMixin = {
+    get planQuestionAnswers() {
+        if (!this._proxyPlanQuestionAnswers) {
+            this._rawPlanQuestionAnswers = {};
+            this._proxyPlanQuestionAnswers = this._createAnswersProxy(this._rawPlanQuestionAnswers);
+        }
+        return this._proxyPlanQuestionAnswers;
+    },
+    set planQuestionAnswers(val) {
+        this._rawPlanQuestionAnswers = val || {};
+        this._proxyPlanQuestionAnswers = this._createAnswersProxy(this._rawPlanQuestionAnswers);
+    },
+
+    _createAnswersProxy(target) {
+        return new Proxy(target, {
+            get(obj, prop) {
+                if (prop in obj) {
+                    return obj[prop];
+                }
+                if (typeof prop === 'string') {
+                    // Try to find by questionId
+                    for (const key in obj) {
+                        const answer = obj[key];
+                        if (answer && (answer.questionId === prop || answer.QuestionId === prop)) {
+                            return answer;
+                        }
+                    }
+                }
+                return undefined;
+            }
+        });
+    },
+
     _resetAgentWorkspace({ preservePlan = false } = {}) {
         this.activeIntentRouterRequestId = null;
         this.activePlanRequestId = null;
@@ -442,16 +474,25 @@ export const aiPanelAgentWorkspaceMixin = {
         const nextSelections = { ...(this.planQuestionSelections || {}) };
         let changed = false;
 
+        const originPriority = {
+            'explicit_user_text': 4,
+            'explicit_user_selection': 4,
+            'resource_bound': 3,
+            'model_inferred': 2,
+            'accepted_recommended_default': 1
+        };
+
         backendAnswers.forEach(answer => {
-            const key = answer.questionId || `field:${answer.field}`;
+            const key = answer.field;
             const existing = nextAnswers[key]
                 ? this._normalizePlanAnswer(nextAnswers[key])
                 : null;
-            // Explicit user inputs always take priority over backend answers
-            if (existing &&
-                (existing.origin === PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT ||
-                 existing.origin === PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION)) {
-                return;
+            if (existing) {
+                const existingPri = originPriority[existing.origin] || 0;
+                const backendPri = originPriority[answer.origin] || 0;
+                if (existingPri > backendPri) {
+                    return;
+                }
             }
             nextAnswers[key] = answer;
             if (answer.questionId) {
@@ -959,6 +1000,15 @@ export const aiPanelAgentWorkspaceMixin = {
         const nextAnswers = { ...(this.planQuestionAnswers || {}) };
         const nextSelections = { ...(this.planQuestionSelections || {}) };
         let changed = false;
+
+        const originPriority = {
+            'explicit_user_text': 4,
+            'explicit_user_selection': 4,
+            'resource_bound': 3,
+            'model_inferred': 2,
+            'accepted_recommended_default': 1
+        };
+
         updates.forEach(update => {
             const rawUpdate = this._asObject?.(update) || update || {};
             const answer = this._normalizePlanAnswer({
@@ -974,7 +1024,17 @@ export const aiPanelAgentWorkspaceMixin = {
                 questionId: answer.questionId || String(question?.id || '').trim(),
                 origin: answer.origin || PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT
             };
-            const key = merged.questionId || `field:${merged.field}`;
+            const key = merged.field;
+            const existing = nextAnswers[key]
+                ? this._normalizePlanAnswer(nextAnswers[key])
+                : null;
+            if (existing) {
+                const existingPri = originPriority[existing.origin] || 0;
+                const newPri = originPriority[merged.origin] || 0;
+                if (existingPri > newPri) {
+                    return;
+                }
+            }
             nextAnswers[key] = merged;
             if (merged.questionId &&
                 this._toArray(question?.options).some(option => String(option?.value || '').trim() === merged.value)) {
@@ -2323,15 +2383,14 @@ export const aiPanelAgentWorkspaceMixin = {
                 return this._normalizePlanAnswer(answer, byId.get(questionId) || null);
             })
             .filter(answer => this._isAuthoritativeReadinessAnswerAllowed(answer, byId.get(answer?.questionId || '')));
-        const answeredKeys = new Set(answerList.map(answer => answer.questionId || `field:${answer.field}`));
+        const answeredKeys = new Set(answerList.map(answer => answer.field));
 
         if (acceptedRecommended) {
             for (const question of this._toArray(questions)) {
                 const questionId = String(question?.id || question?.Id || '').trim();
                 const field = this._inferPlanQuestionFieldForQuestion(question, { blockingReasons: [] }) ||
                     this._fallbackPlanQuestionField(question, questionId);
-                const key = questionId || `field:${field}`;
-                if (!field || answeredKeys.has(key)) continue;
+                if (!field || answeredKeys.has(field)) continue;
                 const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
                 if (!recommended) continue;
                 const answer = {
@@ -2344,7 +2403,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     continue;
                 }
                 answerList.push(answer);
-                answeredKeys.add(key);
+                answeredKeys.add(field);
             }
         }
 
@@ -2769,11 +2828,14 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _getPlanAnswerForQuestion(question) {
         const id = String(question?.id || '').trim();
-        const field = this._inferPlanQuestionFieldForQuestion(question);
+        const field = this._inferPlanQuestionFieldForQuestion(question) || this._fallbackPlanQuestionField(question, id);
         const answers = this.planQuestionAnswers || {};
-        const direct = id ? this._normalizePlanAnswer(answers[id], question) : null;
-        if (direct) return direct;
-
+        if (field && answers[field]) {
+            return this._normalizePlanAnswer(answers[field], question);
+        }
+        if (id && answers[id]) {
+            return this._normalizePlanAnswer(answers[id], question);
+        }
         const fieldAnswer = Object.values(answers)
             .map(answer => this._normalizePlanAnswer(answer))
             .find(answer => answer?.field === field);
@@ -2845,7 +2907,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 value: recommended,
                 origin: PLAN_ANSWER_ORIGINS.ACCEPTED_RECOMMENDED_DEFAULT
             };
-            nextAnswers[id || `field:${field}`] = answer;
+            nextAnswers[field] = answer;
             if (id) nextSelections[id] = recommended;
             resolvedFields.add(field);
             changed = true;
@@ -4063,18 +4125,40 @@ export const aiPanelAgentWorkspaceMixin = {
             brief.clarificationQuestions = this._getDefaultClarificationQuestions();
         }
 
+        const resolvedSet = new Set([
+            ...this._toArray(this.pendingVisionPlan?.resolvedPlanFields || this.pendingVisionPlan?.ResolvedPlanFields || []),
+            ...Object.values(this.planQuestionAnswers || {})
+                .map(answer => this._normalizePlanAnswer(answer))
+                .filter(Boolean)
+                .map(answer => answer.field)
+        ].map(f => String(f || '').trim().toLowerCase()).filter(Boolean));
+
+        if (brief.clarificationQuestions) {
+            brief.clarificationQuestions = brief.clarificationQuestions
+                .filter(q => {
+                    const field = String(q.field || q.Field || '').trim().toLowerCase();
+                    return !resolvedSet.has(field);
+                });
+        }
+
+        brief.blockingClarificationFields = (brief.blockingClarificationFields || [])
+            .filter(field => !resolvedSet.has(String(field || '').trim().toLowerCase()));
+
+        brief.nonBlockingMissingFields = (brief.nonBlockingMissingFields || [])
+            .filter(field => !resolvedSet.has(String(field || '').trim().toLowerCase()));
+
         const requiredQuestionFields = brief.clarificationQuestions
             .filter(question => question.required !== false)
             .map(question => String(question.field || '').trim())
             .filter(Boolean);
+
         if (brief.blockingClarificationFields.length === 0) {
             brief.blockingClarificationFields = [...new Set(requiredQuestionFields)];
         }
-        if (brief.missingFacts.length === 0) {
-            brief.missingFacts = brief.blockingClarificationFields
-                .slice(0, 6)
-                .map(field => `请确认${this._getRequirementFieldLabel?.(field) || field}`);
-        }
+
+        brief.missingFacts = brief.blockingClarificationFields
+            .slice(0, 6)
+            .map(field => `请确认${this._getRequirementFieldLabel?.(field) || field}`);
 
         brief.clarificationRequired = true;
         brief.hasOpenQuestions = true;
@@ -4621,7 +4705,7 @@ export const aiPanelAgentWorkspaceMixin = {
         };
         this.planQuestionAnswers = {
             ...(this.planQuestionAnswers || {}),
-            [questionId]: answer
+            [field]: answer
         };
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
         this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
@@ -4648,7 +4732,7 @@ export const aiPanelAgentWorkspaceMixin = {
         };
         this.planQuestionAnswers = {
             ...(this.planQuestionAnswers || {}),
-            [questionId]: answer
+            [field]: answer
         };
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
         this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);

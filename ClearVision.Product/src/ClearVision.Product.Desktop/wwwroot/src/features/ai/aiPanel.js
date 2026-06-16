@@ -1,4 +1,4 @@
-﻿import webMessageBridge from '../../core/messaging/webMessageBridge.js';
+import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
 import { buildWireSequenceFollowupHint } from '../flow-editor/wireSequenceAssist.js';
@@ -2346,3 +2346,18 @@ Object.assign(
     aiPanelTopologySummaryMixin
 );
 
+Object.defineProperty(AiPanel.prototype, 'planQuestionAnswers', {
+    get() {
+        if (!this._proxyPlanQuestionAnswers) {
+            this._rawPlanQuestionAnswers = {};
+            this._proxyPlanQuestionAnswers = this._createAnswersProxy(this._rawPlanQuestionAnswers);
+        }
+        return this._proxyPlanQuestionAnswers;
+    },
+    set(val) {
+        this._rawPlanQuestionAnswers = val || {};
+        this._proxyPlanQuestionAnswers = this._createAnswersProxy(this._rawPlanQuestionAnswers);
+    },
+    configurable: true,
+    enumerable: true
+});

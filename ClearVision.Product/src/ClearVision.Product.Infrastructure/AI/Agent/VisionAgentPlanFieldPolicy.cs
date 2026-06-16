@@ -363,4 +363,148 @@ public static class VisionAgentPlanFieldPolicy
 
         return string.Empty;
     }
+
+    public static List<VisionAgentClarificationQuestion> NormalizeQuestions(
+        IEnumerable<VisionAgentClarificationQuestion>? questions,
+        IReadOnlyList<string> remainingPlanFields,
+        IReadOnlyList<string> resolvedPlanFields,
+        IReadOnlyList<VisionAgentPlanAnswer> confirmedPlanAnswers)
+    {
+        if (remainingPlanFields == null || remainingPlanFields.Count == 0)
+        {
+            return new List<VisionAgentClarificationQuestion>();
+        }
+
+        var remainingSet = remainingPlanFields
+            .Select(NormalizeField)
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var resolvedSet = (resolvedPlanFields ?? Array.Empty<string>())
+            .Select(NormalizeField)
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var confirmedSet = (confirmedPlanAnswers ?? Array.Empty<VisionAgentPlanAnswer>())
+            .Select(a => NormalizeField(a.Field))
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var allowedSet = remainingSet
+            .Except(resolvedSet)
+            .Except(confirmedSet)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var result = new List<VisionAgentClarificationQuestion>();
+        var seenFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (questions != null)
+        {
+            foreach (var q in questions)
+            {
+                if (string.IsNullOrWhiteSpace(q.Id) || string.IsNullOrWhiteSpace(q.Title))
+                {
+                    continue;
+                }
+
+                var field = ResolveQuestionField(q);
+                if (string.IsNullOrWhiteSpace(field))
+                {
+                    field = !string.IsNullOrWhiteSpace(q.Field) ? q.Field : q.Id;
+                }
+
+                var canonicalField = NormalizeField(field);
+                if (string.IsNullOrWhiteSpace(canonicalField))
+                {
+                    continue;
+                }
+
+                if (!allowedSet.Contains(canonicalField))
+                {
+                    continue;
+                }
+
+                if (seenFields.Add(canonicalField))
+                {
+                    var options = (q.Options ?? [])
+                        .Where(option => !string.IsNullOrWhiteSpace(option.Value) &&
+                                         !string.IsNullOrWhiteSpace(option.Label))
+                        .Take(5)
+                        .ToList();
+                    if (options.Count > 0 && options.All(option => !option.Recommended))
+                    {
+                        options[0] = options[0] with { Recommended = true };
+                    }
+                    var recommended = options.FirstOrDefault(option => option.Recommended)?.Value ??
+                                      options.FirstOrDefault()?.Value ??
+                                      q.DefaultValue;
+
+                    result.Add(q with
+                    {
+                        Id = string.IsNullOrWhiteSpace(q.Id) ? $"q_{canonicalField}" : q.Id,
+                        Field = canonicalField,
+                        Title = string.IsNullOrWhiteSpace(q.Title) ? $"请确认 {canonicalField}" : q.Title,
+                        Why = string.IsNullOrWhiteSpace(q.Why) ? "这会影响流程规划。" : q.Why,
+                        DefaultValue = string.IsNullOrWhiteSpace(q.DefaultValue) ? recommended : q.DefaultValue,
+                        DefaultAssumption = string.IsNullOrWhiteSpace(q.DefaultAssumption) ? "使用推荐选项。" : q.DefaultAssumption,
+                        Impact = string.IsNullOrWhiteSpace(q.Impact) ? "修改该选项会改变构建假设。" : q.Impact,
+                        Options = options
+                    });
+                }
+            }
+        }
+
+        return result.Take(5).ToList();
+    }
+
+    public static List<VisionAgentClarificationQuestion> BuildFallbackQuestionsForRemaining(
+        IEnumerable<string> allowedFields)
+    {
+        var list = new List<VisionAgentClarificationQuestion>();
+        foreach (var field in allowedFields)
+        {
+            var title = field switch
+            {
+                VisionAgentPlanAnswerFields.InspectionObject => "检测对象说明",
+                VisionAgentPlanAnswerFields.TaskType => "检测任务说明",
+                VisionAgentPlanAnswerFields.ImageSource => "图像来源说明",
+                VisionAgentPlanAnswerFields.AcceptanceCriteria => "合格判定标准说明",
+                VisionAgentPlanAnswerFields.OutputTarget => "结果输出目标说明",
+                VisionAgentPlanAnswerFields.TargetAttribute => "检测目标属性说明",
+                VisionAgentPlanAnswerFields.DefectType => "缺陷类型说明",
+                VisionAgentPlanAnswerFields.MeasurementTarget => "测量目标说明",
+                VisionAgentPlanAnswerFields.AlgorithmStrategy => "算法策略说明",
+                VisionAgentPlanAnswerFields.RoiStrategy => "ROI策略说明",
+                VisionAgentPlanAnswerFields.TemplateStrategy => "模板策略说明",
+                _ => $"{field} 属性说明"
+            };
+
+            var why = $"流程规划需要明确 {title}。";
+            var defaultAssumption = "暂无默认假设，请手动输入以补齐槽位。";
+            var impact = "缺少此字段将阻碍流程的自动构建。";
+
+            list.Add(new VisionAgentClarificationQuestion
+            {
+                Id = $"q_fallback_{field}",
+                Field = field,
+                Title = title,
+                Why = why,
+                DefaultValue = string.Empty,
+                DefaultAssumption = defaultAssumption,
+                Impact = impact,
+                Options =
+                [
+                    new VisionAgentClarificationOption
+                    {
+                        Value = "custom_input",
+                        Label = "自定义输入",
+                        Recommended = true,
+                        Description = "输入您的实际需求",
+                        Impact = "基于输入内容重新规划"
+                    }
+                ]
+            });
+        }
+        return list;
+    }
 }
