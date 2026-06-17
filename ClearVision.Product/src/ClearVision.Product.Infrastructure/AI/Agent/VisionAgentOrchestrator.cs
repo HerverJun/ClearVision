@@ -998,7 +998,9 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 var normField = VisionAgentPlanFieldPolicy.NormalizeField(a.Field);
                 return a with { Field = normField };
             })
-            .Where(a => !string.IsNullOrWhiteSpace(a.Field))
+            .Where(a => !string.IsNullOrWhiteSpace(a.Field) &&
+                        !string.IsNullOrWhiteSpace(a.Value) &&
+                        !VisionAgentPlanFieldPolicy.IsPlaceholderValue(a.Value))
             .GroupBy(a => a.Field, StringComparer.OrdinalIgnoreCase);
 
         foreach (var group in groupedAnswers)
@@ -1009,17 +1011,12 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
         var confirmedSet = normalizedConfirmed.Select(a => a.Field).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // 2. ResolvedPlanFields: Union of ConfirmedPlanAnswers, request fields, and SemanticExtraction confirmed slots
-        var requestResolvedFields = (request.ResolvedPlanFields ?? [])
-            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
-            .Where(f => !string.IsNullOrWhiteSpace(f));
-
+        // 2. ResolvedPlanFields: only concrete answers and SemanticExtraction confirmed slots.
         var semanticConfirmedFields = GetSemanticConfirmedFields(semantic)
             .Select(VisionAgentPlanFieldPolicy.NormalizeField)
             .Where(f => !string.IsNullOrWhiteSpace(f));
 
         var resolvedSet = confirmedSet
-            .Concat(requestResolvedFields)
             .Concat(semanticConfirmedFields)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

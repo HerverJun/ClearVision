@@ -82,6 +82,46 @@ public sealed class VisionAgentRequirementMaturityGateTests
             .NotContain(["inspection_object", "task_type"]);
     }
 
+    [Fact(DisplayName = "Create Plan should not trust stale resolved fields without value evidence")]
+    public async Task CreatePlanAsync_StaleResolvedFieldsWithoutEvidence_ShouldRebuildRemainingFields()
+    {
+        var orchestrator = CreateOrchestrator(Substitute.For<IAiFlowGenerationService>());
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "\u75c5\u7076\u68c0\u6d4b",
+                OriginalUserPrompt = "\u75c5\u7076\u68c0\u6d4b",
+                ResolvedPlanFields =
+                [
+                    VisionAgentPlanAnswerFields.InspectionObject,
+                    VisionAgentPlanAnswerFields.TaskType,
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    VisionAgentPlanAnswerFields.AcceptanceCriteria
+                ],
+                RemainingPlanFields = [],
+                SemanticExtraction = new VisionAgentSemanticExtractionResult
+                {
+                    IsVisionRequest = true,
+                    Intent = "new_flow",
+                    InspectionObject = "\u75c5\u7076",
+                    TaskType = AiVisionTaskTypes.Unknown,
+                    Source = VisionAgentSemanticSources.RuleFallback,
+                    MetadataOnly = true
+                }
+            },
+            CancellationToken.None);
+
+        plan.ResolvedPlanFields.Should().BeEquivalentTo([VisionAgentPlanAnswerFields.InspectionObject]);
+        plan.RemainingPlanFields.Should().Contain([
+            VisionAgentPlanAnswerFields.TaskType,
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria
+        ]);
+        plan.CanBuild.Should().BeFalse();
+        plan.ClarificationQuestions.Should().OnlyContain(question => question.Options.Count == 0);
+    }
+
     [Fact(DisplayName = "Maturity gate should use model semantic task type without rule term hit")]
     public void Evaluate_WithModelSemantic_ShouldTrustSemanticTaskTypeForPlanning()
     {

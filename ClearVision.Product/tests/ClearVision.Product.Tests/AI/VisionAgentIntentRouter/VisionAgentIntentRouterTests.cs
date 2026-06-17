@@ -357,6 +357,51 @@ public sealed class VisionAgentIntentRouterTests
         result.ShouldResetPendingPlan.Should().BeFalse();
     }
 
+    [Fact(DisplayName = "Intent Router should not trust stale resolved fields without value evidence")]
+    public async Task RouteAsync_StaleResolvedFieldsWithoutEvidence_ShouldReturnRemainingBlockers()
+    {
+        var service = CreateService(_ => throw new HttpRequestException(
+            "401 unauthorized",
+            null,
+            HttpStatusCode.Unauthorized));
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "\u75c5\u7076\u68c0\u6d4b",
+                HasPendingPlan = true,
+                RequirementMode = AiRequirementModes.Strict,
+                ResolvedPlanFields =
+                [
+                    VisionAgentPlanAnswerFields.InspectionObject,
+                    VisionAgentPlanAnswerFields.TaskType,
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    VisionAgentPlanAnswerFields.AcceptanceCriteria
+                ],
+                RemainingPlanFields = [],
+                SemanticExtraction = new VisionAgentSemanticExtractionResult
+                {
+                    IsVisionRequest = true,
+                    Intent = "new_flow",
+                    InspectionObject = "\u75c5\u7076",
+                    TaskType = AiVisionTaskTypes.Unknown,
+                    Source = VisionAgentSemanticSources.RuleFallback,
+                    MetadataOnly = true
+                }
+            },
+            CancellationToken.None);
+
+        result.RouterSource.Should().Be("rule_fallback");
+        result.ResolvedPlanFields.Should().BeEquivalentTo([VisionAgentPlanAnswerFields.InspectionObject]);
+        result.RemainingPlanFields.Should().Contain([
+            VisionAgentPlanAnswerFields.TaskType,
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria
+        ]);
+        result.CanBuild.Should().BeFalse();
+        result.ShouldBuildDirectly.Should().BeFalse();
+    }
+
     [Fact(DisplayName = "Intent Router should redact unsafe public text")]
     public async Task RouteAsync_ShouldRedactUnsafePublicText()
     {
