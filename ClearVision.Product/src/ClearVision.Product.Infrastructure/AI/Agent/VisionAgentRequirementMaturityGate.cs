@@ -555,36 +555,35 @@ public static class VisionAgentRequirementMaturityGate
         var tasks = new List<string>();
         string? taskTypeHint = null;
 
-        foreach (Match match in Regex.Matches(text, @"检测(?:目标|对象)\s*(?:是|为|:|：)\s*(?<value>[^，。；;,.!?！？]+)"))
+        foreach (Match match in Regex.Matches(text, @"(?:检测目标|检测对象)\s*(?:是|为|:|：)?\s*(?<value>[^，。；;,.!?！？]+)"))
         {
             AddSlot(objects, match.Groups["value"].Value);
         }
 
-        foreach (Match match in Regex.Matches(text, @"识别内容\s*(?:是|为|:|：)\s*(?<value>[^，。；;,.!?！？]+)"))
+        foreach (Match match in Regex.Matches(text, @"识别内容\s*(?:是|为|:|：)?\s*(?<value>[^，。；;,.!?！？]+)"))
         {
             AddSlot(tasks, match.Groups["value"].Value);
             taskTypeHint ??= AiVisionTaskTypes.Classification;
         }
 
-        foreach (Match match in Regex.Matches(text, @"检测\s*(?<object>[^包装箱|纸箱|箱体|胶带|金属件|金属表面|端子|线束|连接器|标签|二维码|条码|圆孔|圆形孔位|孔位|铜孔|产品|零件|遥控器|按键|面板|瓶盖|螺丝|pin|hole|terminal|connector|label|package|carton|part|product|button|wire|harness|metal|surface|，。；;,.!?！？\s]{2,10}?)\s*(?<task>缺陷|异常|有无|漏装|尺寸|排线)"))
+        foreach (Match match in Regex.Matches(text, @"检测\s*(?<object>[^，。；;,.!?！？\s]{1,24}?)\s*(?<task>缺陷|异常|有无|漏装|缺失|少装|测量|尺寸|分类|OCR|字符|条码|二维码)"))
         {
             var obj = match.Groups["object"].Value.Trim();
-            if (!ContainsAny(obj, new[] { "个", "做", "行", "次", "下", "种", "类", "一", "进行" }))
+            if (!IsGenericObjectCandidate(obj))
             {
                 AddSlot(objects, obj);
-                AddSlot(tasks, match.Groups["task"].Value);
-                taskTypeHint ??= AiVisionTaskTypes.SurfaceOrPoseDefect;
             }
+            var task = match.Groups["task"].Value;
+            AddSlot(tasks, task);
+            taskTypeHint ??= TaskTypeFromExplicitTask(task);
         }
 
-        foreach (Match match in Regex.Matches(text, @"(?<object>[^检测|识别|视觉|流程|问题|，。；;,.!?！？\s]{2,10}?)\s*检测"))
+        foreach (Match match in Regex.Matches(text, @"(?<object>[^检测识别视觉流程问题，。；;,.!?！？\s]{1,24}?)\s*检测"))
         {
             var obj = match.Groups["object"].Value.Trim();
-            if (!ContainsAny(obj, new[] { "进行", "做个", "做一", "的一", "点", "个", "次", "下", "种", "类", "一", "外观", "视觉" }))
+            if (!IsGenericObjectCandidate(obj))
             {
                 AddSlot(objects, obj);
-                AddSlot(tasks, "检测");
-                taskTypeHint ??= AiVisionTaskTypes.SurfaceOrPoseDefect;
             }
         }
 
@@ -606,7 +605,7 @@ public static class VisionAgentRequirementMaturityGate
         {
             AddSlot(objects, match.Groups["object"].Value);
             AddSlot(tasks, match.Groups["target"].Value);
-            taskTypeHint ??= AiVisionTaskTypes.Classification;
+            taskTypeHint ??= AiVisionTaskTypes.AttributeClassification;
         }
 
         return new VisionAgentRequirementSemanticSlots(
@@ -630,6 +629,44 @@ public static class VisionAgentRequirementMaturityGate
         cleaned = Regex.Replace(cleaned, @"^(一个|一条|一种|某个|这个|那个|的)+", string.Empty);
         cleaned = Regex.Replace(cleaned, @"(这个|那个|方案|流程)$", string.Empty);
         return cleaned.Trim();
+    }
+
+    private static bool IsGenericObjectCandidate(string value)
+    {
+        var cleaned = Clean(value);
+        return string.IsNullOrWhiteSpace(cleaned) ||
+               ContainsAny(cleaned, ["进行", "做个", "做一个", "帮我", "问题", "流程", "视觉", "检测", "识别", "外观"]);
+    }
+
+    private static string TaskTypeFromExplicitTask(string value)
+    {
+        var task = Clean(value);
+        if (ContainsAny(task, ["缺陷", "异常"]))
+        {
+            return AiVisionTaskTypes.SurfaceOrPoseDefect;
+        }
+
+        if (ContainsAny(task, ["有无", "漏装", "缺失", "少装"]))
+        {
+            return AiVisionTaskTypes.PresenceAbsence;
+        }
+
+        if (ContainsAny(task, ["测量", "尺寸"]))
+        {
+            return AiVisionTaskTypes.GeometryMeasurement;
+        }
+
+        if (ContainsAny(task, ["OCR", "字符", "条码", "二维码"]))
+        {
+            return AiVisionTaskTypes.CodeRecognition;
+        }
+
+        if (ContainsAny(task, ["分类"]))
+        {
+            return AiVisionTaskTypes.Classification;
+        }
+
+        return AiVisionTaskTypes.Unknown;
     }
 
     private static List<string> HitTaskTerms(string text, out string taskType)

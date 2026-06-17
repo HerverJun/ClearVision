@@ -444,6 +444,7 @@ PlannerCandidateParsed:
         var redactionNotes = new List<string>();
         var result = new VisionAgentPlanModeResult
         {
+            PlanContractVersion = VisionAgentPlanContractVersions.V2,
             PlanId = baseline.PlanId,
             OriginalUserPrompt = SafeText(
                 string.IsNullOrWhiteSpace(baseline.OriginalUserPrompt)
@@ -482,24 +483,13 @@ PlannerCandidateParsed:
             MetadataOnly = true
         };
 
-        // Alignment: update RemainingPlanFields by removing fields covered by questions or resolved
-        var resolvedSet = (result.ResolvedPlanFields ?? [])
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var alignedRemaining = (result.RemainingPlanFields ?? [])
-            .Where(f => !resolvedSet.Contains(f))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var alignedQuestions = VisionAgentPlanFieldPolicy.NormalizeQuestions(
-            result.ClarificationQuestions,
-            alignedRemaining,
-            result.ResolvedPlanFields,
-            result.ConfirmedPlanAnswers);
-
         result = result with
         {
-            RemainingPlanFields = alignedRemaining,
-            ClarificationQuestions = alignedQuestions
+            RemainingPlanFields = alignedRemaining
         };
 
         var maturityRequest = new VisionAgentRequirementMaturityRequest
@@ -838,6 +828,29 @@ PlannerCandidateParsed:
         var confirmedAnswers = baselinePlan.ConfirmedPlanAnswers ?? [];
         var resolvedFields = baselinePlan.ResolvedPlanFields ?? [];
         var remainingFields = baselinePlan.RemainingPlanFields ?? [];
+        var rawCandidate = candidate ?? [];
+        var repairedPlannerQuestions = rawCandidate
+            .Select(RepairQuestion)
+            .Where(question => !string.IsNullOrWhiteSpace(question.Id) &&
+                               !string.IsNullOrWhiteSpace(question.Title) &&
+                               question.Options.Count > 0)
+            .Take(5)
+            .ToList();
+        if (repairedPlannerQuestions.Count > 0)
+        {
+            return repairedPlannerQuestions;
+        }
+
+        if (baselinePlan.ClarificationQuestions.Count > 0)
+        {
+            repairNotes.Add("clarification_questions_repaired_to_baseline");
+            return baselinePlan.ClarificationQuestions
+                .Select(RepairQuestion)
+                .Where(question => !string.IsNullOrWhiteSpace(question.Id) &&
+                                   !string.IsNullOrWhiteSpace(question.Title))
+                .Take(5)
+                .ToList();
+        }
 
         var filteredQuestions = VisionAgentPlanFieldPolicy.NormalizeQuestions(
             candidate,

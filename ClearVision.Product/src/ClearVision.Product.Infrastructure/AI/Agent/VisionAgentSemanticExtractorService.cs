@@ -446,17 +446,22 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
             ContainsAny(text, ["图片", "图像", "照片", "image", "photo"]) ? "图片" : string.Empty;
         var targetAttribute = string.Empty;
         var suggestedRoute = string.Empty;
-
-        if (ContainsAny(text, ["熟透", "成熟", "成熟度"]))
+        var attributeObject = FirstRegex(text, @"判断\s*(?<object>[^，。；;,.!?！？\s]+?)\s*是否\s*(?<value>[^，。；;,.!?！？\s]+)", "object");
+        var attributeTarget = FirstRegex(text, @"判断\s*(?<object>[^，。；;,.!?！？\s]+?)\s*是否\s*(?<value>[^，。；;,.!?！？\s]+)");
+        if (ContainsAny(text, ["成熟", "熟透", "成熟度"]))
         {
             taskType = AiVisionTaskTypes.AttributeClassification;
             targetAttribute = ContainsAny(text, ["熟透"]) ? "成熟度/熟透" : "成熟度";
             suggestedRoute = "属性分类 / OK-NG 判别路线";
         }
-        else if (ContainsAny(text, ["颜色", "红色", "色差", "表面颜色"]))
+        else if (!string.IsNullOrWhiteSpace(attributeTarget))
         {
             taskType = AiVisionTaskTypes.AttributeClassification;
-            targetAttribute = ContainsAny(text, ["红色"]) ? "表面颜色/红色" : "表面颜色";
+            targetAttribute = attributeTarget;
+            if (string.IsNullOrWhiteSpace(inspectionObject))
+            {
+                inspectionObject = attributeObject;
+            }
             suggestedRoute = "属性分类 / OK-NG 判别路线";
         }
         else if (taskType == AiVisionTaskTypes.Classification)
@@ -526,8 +531,7 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
         }
 
         if (string.IsNullOrWhiteSpace(slots.OkCondition) &&
-            string.IsNullOrWhiteSpace(slots.NgCondition) &&
-            string.IsNullOrWhiteSpace(slots.OutputTarget))
+            string.IsNullOrWhiteSpace(slots.NgCondition))
         {
             missing.Add("acceptance_criteria");
         }
@@ -633,8 +637,13 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
 
     private static string FirstRegex(string text, string pattern)
     {
+        return FirstRegex(text, pattern, "value");
+    }
+
+    private static string FirstRegex(string text, string pattern, string groupName)
+    {
         var match = Regex.Match(text, pattern, RegexOptions.CultureInvariant);
-        return match.Success ? SafeText(match.Groups["value"].Value) : string.Empty;
+        return match.Success ? SafeText(match.Groups[groupName].Value) : string.Empty;
     }
 
     private static string NormalizeText(string? description, string? additionalContext)

@@ -175,13 +175,12 @@ public static class VisionAgentPlanReadinessEvaluator
         VisionAgentEffectiveRequirement? effectiveRequirement)
     {
         var fields = new List<string>();
-        if (plan.ResolvedPlanFields != null)
-        {
-            fields.AddRange(plan.ResolvedPlanFields);
-        }
         if (plan.ConfirmedPlanAnswers != null)
         {
-            fields.AddRange(plan.ConfirmedPlanAnswers.Select(a => a.Field));
+            fields.AddRange(plan.ConfirmedPlanAnswers
+                .Where(a => !string.IsNullOrWhiteSpace(a.Value) &&
+                            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(a.Value))
+                .Select(a => a.Field));
         }
         if (effectiveRequirement != null)
         {
@@ -294,7 +293,8 @@ public static class VisionAgentPlanReadinessEvaluator
 
     private static void AddIfValue(List<string> fields, string field, string? value)
     {
-        if (!string.IsNullOrWhiteSpace(value))
+        if (!string.IsNullOrWhiteSpace(value) &&
+            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(value))
         {
             fields.Add(field);
         }
@@ -614,7 +614,8 @@ public static class VisionAgentPlanReadinessEvaluator
             return true;
         }
 
-        foreach (var answer in answers.Where(answer => !string.IsNullOrWhiteSpace(answer.Value)))
+        foreach (var answer in answers.Where(answer => !string.IsNullOrWhiteSpace(answer.Value) &&
+                                                       !VisionAgentPlanFieldPolicy.IsPlaceholderValue(answer.Value)))
         {
             if (!string.IsNullOrWhiteSpace(blocker.QuestionId) &&
                 answer.QuestionId.Equals(blocker.QuestionId, StringComparison.OrdinalIgnoreCase))
@@ -632,7 +633,8 @@ public static class VisionAgentPlanReadinessEvaluator
         if (acceptedRecommendedDefaults &&
             !string.IsNullOrWhiteSpace(blocker.QuestionId) &&
             questionIndex.TryGetValue(blocker.QuestionId, out var question) &&
-            !string.IsNullOrWhiteSpace(RecommendedValue(question)))
+            !string.IsNullOrWhiteSpace(RecommendedValue(question)) &&
+            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(RecommendedValue(question)))
         {
             return true;
         }
@@ -1045,9 +1047,10 @@ public static class VisionAgentPlanReadinessEvaluator
 
     private static string RecommendedValue(VisionAgentClarificationQuestion question)
     {
-        return Clean(question.Options.FirstOrDefault(option => option.Recommended)?.Value) is { Length: > 0 } recommended
+        var value = Clean(question.Options.FirstOrDefault(option => option.Recommended)?.Value) is { Length: > 0 } recommended
             ? recommended
             : Clean(question.DefaultValue);
+        return VisionAgentPlanFieldPolicy.IsPlaceholderValue(value) ? string.Empty : value;
     }
 
     private static string FirstNonEmpty(params string?[] values)

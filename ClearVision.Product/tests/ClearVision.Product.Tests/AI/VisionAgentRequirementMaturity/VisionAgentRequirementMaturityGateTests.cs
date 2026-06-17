@@ -75,7 +75,8 @@ public sealed class VisionAgentRequirementMaturityGateTests
         plan.RecommendedRoute.Operators.Should().NotBeEmpty();
         plan.ClarificationQuestions.Select(question => question.Id)
             .Should()
-            .Contain(["image_source", "acceptance_criteria", "model_or_rule_strategy"]);
+            .Contain(["q_fallback_image_source", "q_fallback_acceptance_criteria", "q_fallback_algorithm_strategy"]);
+        plan.ClarificationQuestions.Should().OnlyContain(question => question.Options.Count == 0);
         plan.ClarificationQuestions.Select(question => question.Id)
             .Should()
             .NotContain(["inspection_object", "task_type"]);

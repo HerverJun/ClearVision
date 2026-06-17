@@ -110,16 +110,23 @@ public sealed class AgentRunEndpointsTests
         scratch.GetProperty("clarificationQuestions").EnumerateArray()
             .Select(question => question.GetProperty("id").GetString())
             .Should()
-            .Contain("defect_definition")
+            .Contain("q_fallback_image_source")
+            .And.Contain("q_fallback_acceptance_criteria")
             .And.NotContain("sequence_rule");
+        scratch.GetProperty("clarificationQuestions").EnumerateArray()
+            .Should()
+            .OnlyContain(question => question.GetProperty("options").GetArrayLength() == 0);
         scratch.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
 
         wire.GetProperty("intent").GetString().Should().Be("wire_sequence");
         wire.GetProperty("clarificationQuestions").EnumerateArray()
             .Select(question => question.GetProperty("id").GetString())
             .Should()
-            .Contain("inspection_object")
+            .Contain("q_fallback_inspection_object")
             .And.NotContain("defect_definition");
+        wire.GetProperty("clarificationQuestions").EnumerateArray()
+            .Should()
+            .OnlyContain(question => question.GetProperty("options").GetArrayLength() == 0);
     }
 
     [Fact(DisplayName = "POST Agent intent router returns public route decision")]

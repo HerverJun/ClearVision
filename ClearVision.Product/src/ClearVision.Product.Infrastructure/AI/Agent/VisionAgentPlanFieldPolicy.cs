@@ -105,23 +105,23 @@ public static class VisionAgentPlanFieldPolicy
         return string.Empty;
     }
 
-    public static string FormatAcceptanceCriteria(string? ok, string? ng, string? output = null)
+    public static string FormatAcceptanceCriteria(string? ok, string? ng)
     {
         var hasOk = !string.IsNullOrWhiteSpace(ok);
         var hasNg = !string.IsNullOrWhiteSpace(ng);
         if (hasOk && hasNg)
         {
-            return $"OK: {ok.Trim()}；NG: {ng.Trim()}";
+            return $"OK: {ok!.Trim()}; NG: {ng!.Trim()}";
         }
         if (hasOk)
         {
-            return ok.Trim();
+            return ok!.Trim();
         }
         if (hasNg)
         {
-            return ng.Trim();
+            return ng!.Trim();
         }
-        return !string.IsNullOrWhiteSpace(output) ? output.Trim() : string.Empty;
+        return string.Empty;
     }
 
     public static (string Ok, string Ng) ParseAcceptanceCriteria(string? acceptance)
@@ -242,7 +242,7 @@ public static class VisionAgentPlanFieldPolicy
         if (string.Equals(normalized, VisionAgentPlanAnswerFields.InspectionObject, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(normalized, VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase))
         {
-            return maturity?.CanPlan != true;
+            return true;
         }
 
         return string.Equals(normalized, VisionAgentPlanAnswerFields.AlgorithmStrategy, StringComparison.OrdinalIgnoreCase) &&
@@ -428,16 +428,18 @@ public static class VisionAgentPlanFieldPolicy
                 {
                     var options = (q.Options ?? [])
                         .Where(option => !string.IsNullOrWhiteSpace(option.Value) &&
-                                         !string.IsNullOrWhiteSpace(option.Label))
+                                         !string.IsNullOrWhiteSpace(option.Label) &&
+                                         !IsPlaceholderValue(option.Value))
                         .Take(5)
                         .ToList();
                     if (options.Count > 0 && options.All(option => !option.Recommended))
                     {
                         options[0] = options[0] with { Recommended = true };
                     }
+                    var rawDefault = IsPlaceholderValue(q.DefaultValue) ? string.Empty : q.DefaultValue;
                     var recommended = options.FirstOrDefault(option => option.Recommended)?.Value ??
                                       options.FirstOrDefault()?.Value ??
-                                      q.DefaultValue;
+                                      rawDefault;
 
                     result.Add(q with
                     {
@@ -445,7 +447,7 @@ public static class VisionAgentPlanFieldPolicy
                         Field = canonicalField,
                         Title = string.IsNullOrWhiteSpace(q.Title) ? $"请确认 {canonicalField}" : q.Title,
                         Why = string.IsNullOrWhiteSpace(q.Why) ? "这会影响流程规划。" : q.Why,
-                        DefaultValue = string.IsNullOrWhiteSpace(q.DefaultValue) ? recommended : q.DefaultValue,
+                        DefaultValue = string.IsNullOrWhiteSpace(rawDefault) ? recommended : rawDefault,
                         DefaultAssumption = string.IsNullOrWhiteSpace(q.DefaultAssumption) ? "使用推荐选项。" : q.DefaultAssumption,
                         Impact = string.IsNullOrWhiteSpace(q.Impact) ? "修改该选项会改变构建假设。" : q.Impact,
                         Options = options
@@ -492,19 +494,25 @@ public static class VisionAgentPlanFieldPolicy
                 DefaultValue = string.Empty,
                 DefaultAssumption = defaultAssumption,
                 Impact = impact,
-                Options =
-                [
-                    new VisionAgentClarificationOption
-                    {
-                        Value = "custom_input",
-                        Label = "自定义输入",
-                        Recommended = true,
-                        Description = "输入您的实际需求",
-                        Impact = "基于输入内容重新规划"
-                    }
-                ]
+                Options = []
             });
         }
         return list;
+    }
+
+    public static bool IsPlaceholderValue(string? value)
+    {
+        var normalized = Clean(value).ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+
+        if (normalized is "custom_input" or "unknown" or "unspecified" or "metadata_only" or "pending")
+        {
+            return true;
+        }
+
+        return normalized.EndsWith("_pending", StringComparison.OrdinalIgnoreCase);
     }
 }

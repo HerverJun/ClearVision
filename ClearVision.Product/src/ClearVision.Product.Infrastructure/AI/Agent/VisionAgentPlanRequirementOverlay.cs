@@ -23,12 +23,34 @@ public sealed class VisionAgentPlanRequirementOverlay
 
         var semantic = BuildSemantic(plan?.SemanticExtraction, values, maturityRequest.RequirementMode);
         var maturity = VisionAgentRequirementMaturityGate.Evaluate(maturityRequest, semantic);
+        if (string.Equals(maturityRequest.RequirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(Read(values, VisionAgentPlanAnswerFields.InspectionObject)) &&
+            string.IsNullOrWhiteSpace(Read(values, VisionAgentPlanAnswerFields.TaskType)))
+        {
+            var missing = maturity.MissingFields
+                .Concat([VisionAgentPlanAnswerFields.InspectionObject, VisionAgentPlanAnswerFields.TaskType])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var blockers = maturity.BlockingReasons
+                .Concat(["inspection_object_missing", "task_type_missing"])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            maturity = maturity with
+            {
+                Maturity = AiRequirementMaturity.Ambiguous,
+                TaskType = AiVisionTaskTypes.Unknown,
+                CanPlan = false,
+                CanBuild = false,
+                MissingFields = missing,
+                BlockingReasons = blockers
+            };
+        }
         var resolved = values
             .Where(item => !string.IsNullOrWhiteSpace(item.Value) &&
+                           !VisionAgentPlanFieldPolicy.IsPlaceholderValue(item.Value) &&
                            VisionAgentPlanFieldPolicy.TryGet(item.Key, out var rule) &&
                            rule.Category == VisionAgentPlanFieldCategories.Requirement)
             .Select(item => item.Key)
-            .Concat(plan?.ResolvedPlanFields ?? [])
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -116,7 +138,8 @@ public sealed class VisionAgentPlanRequirementOverlay
     private static void Add(Dictionary<string, string> values, string field, string? value)
     {
         var clean = Clean(value);
-        if (!string.IsNullOrWhiteSpace(clean))
+        if (!string.IsNullOrWhiteSpace(clean) &&
+            !VisionAgentPlanFieldPolicy.IsPlaceholderValue(clean))
         {
             values[field] = clean;
         }

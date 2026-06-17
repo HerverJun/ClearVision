@@ -450,7 +450,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         var updates = new List<VisionAgentPlanAnswer>();
         AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.InspectionObject, semantic?.InspectionObject);
         AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.ImageSource, semantic?.ImageSource);
-        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.AcceptanceCriteria, VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(semantic?.OkCondition, semantic?.NgCondition, semantic?.OutputTarget));
+        AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.AcceptanceCriteria, VisionAgentPlanFieldPolicy.FormatAcceptanceCriteria(semantic?.OkCondition, semantic?.NgCondition));
         AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.OutputTarget, semantic?.OutputTarget);
         AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.TargetAttribute, semantic?.TargetAttribute);
         AddRequirementAnswer(updates, remaining, VisionAgentPlanAnswerFields.DefectType, semantic?.DefectType);

@@ -3,6 +3,7 @@ using ClearVision.Product.Infrastructure.AI.Agent;
 using FluentAssertions;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Xunit;
 
 namespace ClearVision.Product.Tests.AI;
@@ -51,7 +52,8 @@ public sealed class VisionAgentConsolidationTests
         questions.Should().NotBeEmpty();
         foreach (var q in questions)
         {
-            q.Options.Should().ContainSingle(opt => opt.Value == "custom_input" && opt.Label == "自定义输入");
+            q.Options.Should().BeEmpty();
+            q.DefaultValue.Should().BeEmpty();
             q.Options.Any(opt => opt.Label.Contains("病灶") || opt.Label.Contains("包装箱") || opt.Label.Contains("零件")).Should().BeFalse();
         }
     }
@@ -153,11 +155,64 @@ public sealed class VisionAgentConsolidationTests
         questions.Select(q => q.Field).Should().BeEquivalentTo(allowed);
         questions.Any(q => q.Field == "inspection_object" || q.Field == "task_type").Should().BeFalse();
         
-        // options 不包含固定业务枚举（仅包含 custom_input）
+        // fallback 只提供自由输入，不包含推荐占位选项。
         foreach (var q in questions)
         {
-            q.Options.Should().ContainSingle(opt => opt.Value == "custom_input");
+            q.Options.Should().BeEmpty();
+            q.DefaultValue.Should().BeEmpty();
         }
+    }
+
+    [Fact]
+    public void PlaceholderValues_ShouldNotResolveAnswersOrRecommendedFallback()
+    {
+        var plan = new VisionAgentPlanModeResult
+        {
+            PlanContractVersion = "v2",
+            PlanId = "placeholder_plan",
+            ClarificationQuestions =
+            [
+                new()
+                {
+                    Id = "q_strategy",
+                    Field = "algorithm_strategy",
+                    Title = "strategy",
+                    DefaultValue = "custom_input",
+                    Options =
+                    [
+                        new()
+                        {
+                            Value = "custom_input",
+                            Label = "custom",
+                            Recommended = true
+                        }
+                    ]
+                }
+            ],
+            RemainingPlanFields = ["algorithm_strategy"],
+            BlockingReasons = ["strategy_confirmation:algorithm_strategy_missing"]
+        };
+
+        var validation = new VisionAgentPlanAnswerValidator().Validate(
+            plan,
+            [new() { QuestionId = "q_strategy", Field = "algorithm_strategy", Value = "custom_input", Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection }],
+            new Dictionary<string, string> { ["q_strategy"] = "metadata_only" },
+            acceptedRecommendedDefaults: true);
+
+        validation.AcceptedAnswers.Should().BeEmpty();
+        validation.ResolvedFields.Should().BeEmpty();
+        validation.InvalidValues.Should().Contain(item => item.Contains("placeholder_value"));
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            acceptedRecommendedDefaults: true,
+            validatedAnswers: validation);
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.ResolvedFields.Should().NotContain("algorithm_strategy");
+        readiness.Blockers.Should().Contain(blocker =>
+            blocker.Field == "algorithm_strategy" &&
+            blocker.BlocksBuild);
     }
 
     // 6. Planner 越权过滤
@@ -223,22 +278,38 @@ public sealed class VisionAgentConsolidationTests
         var hash3 = VisionAgentOrchestrator.ComputePlanHash(plan3);
         hash1.Should().NotBe(hash3);
 
-        // 无版本旧快照 (PlanContractVersion=V2 默认)
-        var planLegacy = new VisionAgentPlanModeResult
+        var explicitV2Empty = new VisionAgentPlanModeResult
         {
-            PlanId = "p_legacy", Goal = "goal", Intent = "intent",
-            PlanContractVersion = "v2", // defaults to V2
-            // No V2 fields
-            ResolvedPlanFields = [], ConfirmedPlanAnswers = [], RemainingPlanFields = [],
-            ClarificationQuestions = [
-                new() { Id = "q1", Title = "Q1", Field = "" } // questions have no fields
-            ]
+            PlanContractVersion = "v2",
+            PlanId = "p_v2_empty",
+            Goal = "goal",
+            Intent = "intent",
+            ResolvedPlanFields = [],
+            ConfirmedPlanAnswers = [],
+            RemainingPlanFields = []
         };
+        VisionAgentOrchestrator.ComputePlanHash(explicitV2Empty)
+            .Should().NotBe(VisionAgentOrchestrator.ComputePlanHash(explicitV2Empty with { PlanContractVersion = "v1" }));
+
+        var legacyJson = """
+            {
+              "planId": "p_legacy",
+              "goal": "goal",
+              "intent": "intent",
+              "clarificationQuestions": [
+                { "id": "q1", "title": "Q1" }
+              ]
+            }
+            """;
+        var planLegacy = JsonSerializer.Deserialize<VisionAgentPlanModeResult>(
+            legacyJson,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+        planLegacy.PlanContractVersion.Should().BeEmpty();
         var hashLegacy = VisionAgentOrchestrator.ComputePlanHash(planLegacy);
 
         var planV1 = planLegacy with { PlanContractVersion = "v1" };
         var hashV1 = VisionAgentOrchestrator.ComputePlanHash(planV1);
-        hashLegacy.Should().Be(hashV1); // must fall back to V1 hash because there are no V2 fields
+        hashLegacy.Should().Be(hashV1);
     }
 
     // 10. 完整病灶补充
@@ -250,6 +321,11 @@ public sealed class VisionAgentConsolidationTests
             PlanId = "lesion_plan", Goal = "病灶检测", Intent = "presence_absence",
             ResolvedPlanFields = ["inspection_object"], // object is resolved ("病灶")
             RemainingPlanFields = ["image_source", "task_type", "acceptance_criteria"],
+            SemanticExtraction = new VisionAgentSemanticExtractionResult
+            {
+                IsVisionRequest = true,
+                InspectionObject = "病灶"
+            },
             ConfirmedPlanAnswers = [],
             RecommendedRoute = new VisionAgentRecommendedRoute
             {

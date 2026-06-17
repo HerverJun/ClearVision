@@ -108,6 +108,11 @@ public sealed class VisionAgentPlanAnswerValidator
             {
                 continue;
             }
+            if (VisionAgentPlanFieldPolicy.IsPlaceholderValue(value))
+            {
+                warnings.Add($"placeholder_selection_ignored:{key}");
+                continue;
+            }
 
             if (questions.ContainsKey(key) ||
                 VisionAgentPlanFieldPolicy.TryGet(key, out _))
@@ -205,6 +210,11 @@ public sealed class VisionAgentPlanAnswerValidator
         if (string.IsNullOrWhiteSpace(value))
         {
             invalidValues.Add($"{questionId}:{field}:empty_value");
+            return false;
+        }
+        if (VisionAgentPlanFieldPolicy.IsPlaceholderValue(value))
+        {
+            invalidValues.Add($"{questionId}:{field}:placeholder_value");
             return false;
         }
 
@@ -393,9 +403,10 @@ public sealed class VisionAgentPlanAnswerValidator
 
     private static string RecommendedValue(VisionAgentClarificationQuestion question)
     {
-        return Clean(question.Options.FirstOrDefault(option => option.Recommended)?.Value) is { Length: > 0 } recommended
+        var value = Clean(question.Options.FirstOrDefault(option => option.Recommended)?.Value) is { Length: > 0 } recommended
             ? recommended
             : Clean(question.DefaultValue);
+        return VisionAgentPlanFieldPolicy.IsPlaceholderValue(value) ? string.Empty : value;
     }
 
     private static bool IsParameterSelectionKey(string key)

@@ -2897,6 +2897,74 @@ test('Recommended strategy is not selected until accepted for Build', async () =
   ]);
 });
 
+test('Fallback questions with empty options stay free-text and clean stale selections', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': planWorkspace,
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult({
+    planContractVersion: 'v2',
+    planId: 'fallback-free-text',
+    planHash: 'sha256:fallback-free-text',
+    goal: '病灶检测',
+    canBuild: false,
+    clarificationQuestions: [
+      {
+        id: 'q_old_task',
+        field: 'task_type',
+        title: '任务类型',
+        defaultValue: 'custom_input',
+        options: [{ value: 'custom_input', label: '自定义输入', recommended: true }]
+      },
+      {
+        id: 'q_new_task',
+        field: 'task_type',
+        title: '任务类型补充',
+        defaultValue: '',
+        options: []
+      }
+    ],
+    buildReadiness: {
+      canBuild: false,
+      resolvedFields: ['inspection_object'],
+      remainingFields: ['task_type'],
+      blockers: [{ id: 'hard_requirement:task_type_missing', field: 'task_type', blocksBuild: true }]
+    },
+    requirementMaturity: {
+      canPlan: true,
+      canBuild: false,
+      missingFields: ['task_type']
+    }
+  });
+  panel.planQuestionSelections = { q_old_task: 'custom_input' };
+  panel.planQuestionAnswers = {};
+
+  panel._renderPlanWorkspace(panel.pendingVisionPlan);
+  assert.match(planWorkspace.innerHTML, /ai-plan-custom-input-field/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /data-plan-question-option="custom_input"/);
+
+  const acceptedAnswers = panel._buildConfirmedPlanAnswers(panel.pendingVisionPlan, { acceptedRecommended: true });
+  assert.deepEqual(acceptedAnswers, []);
+
+  panel._customInputPlanQuestion('q_new_task', 'presence_absence');
+  assert.deepEqual(panel.planQuestionSelections, { q_new_task: 'presence_absence' });
+
+  const answers = panel._buildConfirmedPlanAnswers(panel.pendingVisionPlan);
+  assert.deepEqual(answers, [
+    {
+      questionId: 'q_new_task',
+      field: 'task_type',
+      value: 'presence_absence',
+      origin: 'explicit_user_text'
+    }
+  ]);
+});
+
 test('Draft Plan can start Build with legal Planner route without accepting strategy', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });

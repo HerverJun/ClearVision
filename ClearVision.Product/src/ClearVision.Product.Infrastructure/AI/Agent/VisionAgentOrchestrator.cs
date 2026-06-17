@@ -1073,6 +1073,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
         var result = new VisionAgentPlanModeResult
         {
+            PlanContractVersion = VisionAgentPlanContractVersions.V2,
             PlanId = $"plan_{Guid.NewGuid():N}",
             OriginalUserPrompt = originalPrompt,
             PlanSource = "rule_baseline",
@@ -1571,14 +1572,6 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         }
         if (version.Equals(VisionAgentPlanContractVersions.V2, StringComparison.OrdinalIgnoreCase))
         {
-            var hasV2Fields = (plan.ConfirmedPlanAnswers != null && plan.ConfirmedPlanAnswers.Count > 0) ||
-                               (plan.ResolvedPlanFields != null && plan.ResolvedPlanFields.Count > 0) ||
-                               (plan.RemainingPlanFields != null && plan.RemainingPlanFields.Count > 0) ||
-                               (plan.ClarificationQuestions != null && plan.ClarificationQuestions.Any(q => !string.IsNullOrWhiteSpace(q.Field)));
-            if (!hasV2Fields)
-            {
-                return VisionAgentPlanContractVersions.V1;
-            }
             return VisionAgentPlanContractVersions.V2;
         }
 

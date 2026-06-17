@@ -155,5 +155,4 @@ __pycache__/
 .claude/settings.local.json
 pyinstxtractor.py
 .tmp/inspect_pyc.py
-.gitignore
 .tmp/inspection_report.txt

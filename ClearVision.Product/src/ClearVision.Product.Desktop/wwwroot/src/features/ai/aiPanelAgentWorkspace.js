@@ -2392,7 +2392,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     this._fallbackPlanQuestionField(question, questionId);
                 if (!field || answeredKeys.has(field)) continue;
                 const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
-                if (!recommended) continue;
+                if (!recommended || this._isPlanPlaceholderValue(recommended)) continue;
                 const answer = {
                     questionId,
                     field,
@@ -2423,10 +2423,11 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _isAuthoritativeReadinessAnswerAllowed(answer, question = null, { requireRecommended = false } = {}) {
         if (!answer || !String(answer.value || '').trim() || !String(answer.field || '').trim()) return false;
+        if (this._isPlanPlaceholderValue(answer.value)) return false;
         const options = this._toArray(question?.options || question?.Options);
         const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
         if (requireRecommended || answer.origin === PLAN_ANSWER_ORIGINS.ACCEPTED_RECOMMENDED_DEFAULT) {
-            return Boolean(recommended && String(answer.value || '').trim() === recommended);
+            return Boolean(recommended && !this._isPlanPlaceholderValue(recommended) && String(answer.value || '').trim() === recommended);
         }
 
         if (options.length > 0) {
@@ -2809,7 +2810,7 @@ export const aiPanelAgentWorkspaceMixin = {
             this._fallbackPlanQuestionField(fallbackQuestion || { id: questionId, field: item.field || item.Field }, questionId);
         const value = String(item.value || item.Value || '').trim();
         const origin = String(item.origin || item.Origin || PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION).trim().toLowerCase();
-        if (!field || !value) return null;
+        if (!field || !value || this._isPlanPlaceholderValue(value)) return null;
         return {
             questionId,
             field,
@@ -2868,7 +2869,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     this._fallbackPlanQuestionField(question);
                 if (!field || resolvedFields.has(field)) return;
                 const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
-                if (!recommended) return;
+                if (!recommended || this._isPlanPlaceholderValue(recommended)) return;
                 answers.push({
                     questionId: String(question.id || '').trim(),
                     field,
@@ -2900,7 +2901,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._fallbackPlanQuestionField(question, id);
             if (!field || resolvedFields.has(field)) return;
             const recommended = String(this._getQuestionRecommendedValue(question) || '').trim();
-            if (!recommended) return;
+            if (!recommended || this._isPlanPlaceholderValue(recommended)) return;
             const answer = {
                 questionId: id,
                 field,
@@ -3161,8 +3162,9 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _getQuestionRecommendedValue(question) {
         const recommendedOption = this._toArray(question?.options)
-            .find(option => option?.recommended === true);
-        return recommendedOption?.value || question?.defaultValue || '';
+            .find(option => option?.recommended === true && !this._isPlanPlaceholderValue(option?.value));
+        const value = recommendedOption?.value || question?.defaultValue || '';
+        return this._isPlanPlaceholderValue(value) ? '' : value;
     },
 
     _normalizePlanStrategyChoice(value) {
@@ -3537,13 +3539,15 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!question) return null;
         const options = this._toArray(question.options || question.Options)
             .map(option => this._normalizePlanOption(option))
-            .filter(Boolean);
+            .filter(option => option && !this._isPlanPlaceholderValue(option.value));
+        const rawDefault = String(question.defaultValue || question.DefaultValue || '').trim();
+        const defaultValue = this._isPlanPlaceholderValue(rawDefault) ? '' : rawDefault;
         return {
             id: question.id || question.Id || '',
             field: this._inferPlanQuestionField(question.field || question.Field || question.id || question.Id),
             title: this._localizeDisplayText(question.title || question.Title || ''),
             why: this._localizeDisplayText(question.why || question.Why || ''),
-            defaultValue: question.defaultValue || question.DefaultValue || options.find(item => item.recommended)?.value || options[0]?.value || '',
+            defaultValue: defaultValue || options.find(item => item.recommended)?.value || options[0]?.value || '',
             defaultAssumption: this._localizeDisplayText(question.defaultAssumption || question.DefaultAssumption || ''),
             impact: this._localizeDisplayText(question.impact || question.Impact || ''),
             options
@@ -3573,6 +3577,13 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _toArray(value) {
         return Array.isArray(value) ? value : [];
+    },
+
+    _isPlanPlaceholderValue(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (!normalized) return false;
+        return ['custom_input', 'unknown', 'unspecified', 'metadata_only', 'pending'].includes(normalized) ||
+            normalized.endsWith('_pending');
     },
 
     _localizeDisplayText(value) {
@@ -4699,8 +4710,9 @@ export const aiPanelAgentWorkspaceMixin = {
             value: cleanedValue,
             origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_TEXT
         };
+        const cleanedSelections = this._clearPlanQuestionSelectionsForField(field, questionId);
         this.planQuestionSelections = {
-            ...(this.planQuestionSelections || {}),
+            ...cleanedSelections,
             [questionId]: cleanedValue
         };
         this.planQuestionAnswers = {
@@ -4726,8 +4738,9 @@ export const aiPanelAgentWorkspaceMixin = {
             value,
             origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION
         };
+        const cleanedSelections = this._clearPlanQuestionSelectionsForField(field, questionId);
         this.planQuestionSelections = {
-            ...(this.planQuestionSelections || {}),
+            ...cleanedSelections,
             [questionId]: value
         };
         this.planQuestionAnswers = {
@@ -4738,6 +4751,22 @@ export const aiPanelAgentWorkspaceMixin = {
         this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderAgentWorkspaceOverview();
+    },
+
+    _clearPlanQuestionSelectionsForField(field, keepQuestionId = '') {
+        const selections = { ...(this.planQuestionSelections || {}) };
+        const normalizedField = String(field || '').trim();
+        if (!normalizedField || !this.pendingVisionPlan) return selections;
+        for (const question of this._toArray(this.pendingVisionPlan.questions)) {
+            const id = String(question?.id || '').trim();
+            if (!id || id === keepQuestionId) continue;
+            const questionField = this._inferPlanQuestionFieldForQuestion(question, this.pendingVisionPlan) ||
+                this._fallbackPlanQuestionField(question, id);
+            if (questionField === normalizedField) {
+                delete selections[id];
+            }
+        }
+        return selections;
     },
 
     _startBuildFromCurrentPlan({ acceptedRecommended = false } = {}) {

@@ -273,7 +273,7 @@ public sealed record VisionAgentIntentRouterResult
 
 public sealed record VisionAgentPlanModeResult
 {
-    public string PlanContractVersion { get; init; } = VisionAgentPlanContractVersions.V2;
+    public string PlanContractVersion { get; init; } = string.Empty;
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
     public string PlanSource { get; init; } = string.Empty;

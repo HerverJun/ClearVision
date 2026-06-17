@@ -168,7 +168,8 @@ public sealed class VisionAgentGenerateFlowTests
         plan.RecommendedRoute.RouteId.Should().Be("surface_defect_detection");
         plan.ClarificationQuestions.Select(question => question.Id)
             .Should()
-            .Contain("defect_definition");
+            .Contain(["q_fallback_image_source", "q_fallback_acceptance_criteria"]);
+        plan.ClarificationQuestions.Should().OnlyContain(question => question.Options.Count == 0);
         sink.Events.Select(evt => evt.Stage).Should().ContainInOrder([
             "understand_requirement",
             "understand_requirement",
