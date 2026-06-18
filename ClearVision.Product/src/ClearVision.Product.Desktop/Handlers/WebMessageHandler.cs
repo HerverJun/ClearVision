@@ -156,6 +156,10 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
         // 【架构修复 v2】订阅事件总线
         InitializeEventSubscriptions();
+        if (Volatile.Read(ref _pendingWebMessageCount) > 0)
+        {
+            SchedulePendingWebMessageDrain(webViewControl);
+        }
     }
 
     /// <summary>
@@ -354,17 +358,22 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             catch (JsonException ex)
             {
                 _logger.LogWarning(ex, "Invalid BuildFromPlan payload received from WebView2.");
-                PostWebMessageJson(JsonSerializer.Serialize(new GenerateFlowResponse
+                var response = new GenerateFlowResponse
                 {
                     Success = false,
                     Status = AiFlowGenerationResult.CompletionStatusFailed,
                     ErrorMessage = "BuildFromPlan payload is invalid.",
                     FailureSummary = "build_from_plan_payload_invalid: BuildFromPlan payload is invalid.",
+                    SessionId = sessionId,
                     RequestId = requestId,
+                    ClarificationRequired = false,
                     CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
                     InteractionState = AiInteractionStates.Failed,
                     FirstFixRecommendation = "请回到左侧 Plan 工作台重新确认计划后再开始构建。"
-                }, _jsonOptions));
+                };
+                PostWebMessageJson(SerializeGenerateFlowResponse(
+                    response,
+                    AiFlowGenerationResult.FailureTypeSystemError));
                 return;
             }
             var useVisionAgentGenerateFlow = TryGetBoolean(payload, "useVisionAgentGenerateFlow") ?? false;
@@ -460,6 +469,27 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 UnregisterGenerateFlowRequest(activeRequest);
             }
         }
+    }
+
+    private static string SerializeGenerateFlowResponse(
+        GenerateFlowResponse response,
+        string? failureType)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            response.Type,
+            response.Success,
+            response.Status,
+            response.ErrorMessage,
+            response.FailureSummary,
+            response.ClarificationRequired,
+            response.SessionId,
+            response.RequestId,
+            response.FirstFixRecommendation,
+            response.CompletionStatus,
+            response.InteractionState,
+            FailureType = failureType
+        }, _jsonOptions);
     }
 
     private static AiTemplateSelectionInfo? TryGetTemplateSelection(JsonElement payload)
@@ -891,8 +921,16 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
     {
         var webViewControl = _webViewControl;
         var webView = _webView;
-        if (webViewControl == null || webView == null || webViewControl.IsDisposed)
+        if (webViewControl == null || webView == null)
+        {
+            TryEnqueuePendingWebMessage(json);
             return;
+        }
+
+        if (webViewControl.IsDisposed)
+        {
+            return;
+        }
 
         if (webViewControl.InvokeRequired)
         {

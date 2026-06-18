@@ -1500,6 +1500,60 @@ public sealed class VisionAgentBuildOrchestratorTests
         Flow(result).Operators.Count.Should().BeGreaterThanOrEqualTo(existing.Operators.Count + 1);
     }
 
+    [Fact(DisplayName = "Build orchestrator failure should return controlled system error contract")]
+    public async Task BuildAsync_Failure_ShouldReturnControlledSystemErrorContract()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var redactor = new AgentRunEventRedactor();
+        var toolRunner = new BuildToolRunner(CreateToolRegistry(), redactor, sink);
+        var orchestrator = new VisionAgentBuildOrchestrator(
+            new BuildPlanContextLoader(sink),
+            null!,
+            new TemplateStrategyResolver(toolRunner),
+            new PlanSelectionResolver(),
+            new OperatorPipelineSelector(),
+            new ParameterMappingService(),
+            new WorkflowDraftBuilder(),
+            toolRunner,
+            new BuildReadinessReviewService(),
+            new WorkflowDiffService(),
+            new ApplyGateResolver(),
+            new BuildResultAssembler(redactor, sink),
+            NullLogger<VisionAgentBuildOrchestrator>.Instance,
+            sink);
+        var plan = Plan("surface_defect", ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"]);
+
+        var result = await orchestrator.BuildAsync(
+            Request(plan, planHashOverride: "stale_plan_hash"),
+            CancellationToken.None);
+
+        result.Success.Should().BeFalse();
+        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
+        result.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeSystemError);
+        result.ClarificationRequired.Should().BeFalse();
+        result.RequirementBrief.Should().BeNull();
+        result.BuildReadiness.Should().BeNull();
+        result.InteractionState.Should().Be(AiInteractionStates.Failed);
+        result.FailureSummary.Should().NotBeNull();
+        result.FailureSummary!.Category.Should().Be("vision_agent_build_from_plan");
+        result.FailureSummary.Code.Should().Be("build_orchestrator_failed");
+        result.FailureSummary.Message.Should().NotBeNullOrWhiteSpace();
+        result.FailureSummary.RepairTarget.Should().Contain("公开工具证据");
+        result.BuildResult.Should().NotBeNull();
+        result.BuildResult!.ToolEvidenceTimeline.Should().Contain(item => item.ToolName == "plan_snapshot_loader");
+        result.BuildResult.ToolEvidenceTimeline.Should().OnlyContain(item => item.MetadataOnly);
+        result.BuildResult.PublicWarnings.Should().Contain("plan_hash_mismatch");
+        result.BuildResult.ApplyGate.Blocked.Should().BeTrue();
+        result.BuildResult.ApplyGate.ApplyBlockers.Should().Contain("build_orchestrator_failed");
+        var publicJson = JsonSerializer.Serialize(new { result, sink.Events }, AgentRunEventJson.Options);
+        publicJson.Should().NotContain("C:\\factory");
+        publicJson.Should().NotContain("sk-secret");
+        publicJson.Should().NotContain("192.168.1.10");
+        publicJson.Should().NotContain("systemPrompt");
+        publicJson.Should().NotContain("rawPrompt");
+        publicJson.Should().NotContain("rawModelResponse");
+    }
+
     [Fact(DisplayName = "Build orchestrator replay payload should redact unsafe metadata")]
     public async Task BuildAsync_ShouldRedactUnsafeEvidenceAndBuildResult()
     {
@@ -1718,7 +1772,7 @@ public sealed class VisionAgentBuildOrchestratorTests
                     missingResources = Array.Empty<object>(),
                     pendingActions = Array.Empty<object>(),
                     metadataOnly = true
-                }))
+            }))
         ]);
     }
 

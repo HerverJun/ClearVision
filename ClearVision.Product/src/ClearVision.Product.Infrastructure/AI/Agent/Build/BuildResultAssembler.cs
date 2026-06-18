@@ -171,9 +171,17 @@ public sealed class BuildResultAssembler
             CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
             FailureType = AiFlowGenerationResult.FailureTypeSystemError,
             ErrorMessage = "Vision Agent Build failed before completion.",
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "vision_agent_build_from_plan",
+                Code = "build_orchestrator_failed",
+                Message = "Vision Agent Build failed before completion.",
+                RepairTarget = "请查看公开工具证据和后端日志，修复 BuildFromPlan 构建异常后重试。"
+            },
             ClarificationRequired = false,
             RequirementBrief = null,
             BuildReadiness = null,
+            InteractionState = AiInteractionStates.Failed,
             BuildResult = new VisionAgentBuildResult
             {
                 BuildId = buildId,

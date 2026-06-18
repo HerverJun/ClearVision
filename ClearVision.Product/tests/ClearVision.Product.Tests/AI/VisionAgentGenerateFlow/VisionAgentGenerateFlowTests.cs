@@ -90,6 +90,45 @@ public sealed class VisionAgentGenerateFlowTests
         agent.CallCount.Should().Be(0);
     }
 
+    [Fact(DisplayName = "BuildFromPlan service chain should build confirmed plan without legacy RequirementBrief")]
+    public async Task BuildFromPlanGenerateFlow_RealBuildChain_ShouldBuildConfirmedPlanWithoutLegacyBrief()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var extractor = Substitute.For<IRequirementBriefExtractor>();
+        var agent = new FakeAgentGenerateFlowService(_ => throw new InvalidOperationException("agent generate should not run"));
+        var buildOrchestrator = CreateRealBuildOrchestrator(sink);
+        var service = CreateAiFlowGenerationService(
+            agent,
+            new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = true },
+            requirementBriefExtractor: extractor,
+            serviceProvider: ServiceProviderFor(buildOrchestrator));
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("病灶检测")
+        {
+            AgentRunId = "ar_real_build_chain",
+            UseVisionAgentGenerateFlow = false,
+            RequirementMode = AiRequirementModes.Strict,
+            BuildFromPlan = BuildableLesionBuildFromPlanRequest()
+        });
+
+        result.Success.Should().BeTrue(
+            $"{result.ErrorMessage} | {result.FailureSummary?.Code} | {result.FailureSummary?.Message} | {result.RequirementMaturity?.PublicReason}");
+        Flow(result).Operators.Should().NotBeEmpty();
+        Flow(result).Operators.Select(item => item.Type).Should().Contain(OperatorType.SurfaceDefectDetection);
+        result.BuildResult.Should().NotBeNull();
+        result.BuildReadiness.Should().NotBeNull();
+        result.BuildReadiness!.CanBuild.Should().BeTrue();
+        result.ClarificationRequired.Should().BeFalse();
+        result.RequirementBrief.Should().BeNull();
+        result.FailureType.Should().BeNull();
+        result.FailureSummary.Should().BeNull();
+        result.ErrorMessage.Should().BeNull();
+        agent.CallCount.Should().Be(0);
+        extractor.DidNotReceiveWithAnyArgs().Extract(default, default, default);
+        var publicJson = JsonSerializer.Serialize(new { result, sink.Events }, AgentRunEventJson.Options);
+        publicJson.Should().NotContain("请确认这是外观缺陷、漏装有无、线序判定还是尺寸测量场景");
+    }
+
     [Fact(DisplayName = "BuildFromPlan PlanId mismatch should fail before Build orchestrator")]
     public async Task BuildFromPlanGenerateFlow_PlanIdMismatch_ShouldFailBeforeBuildOrchestrator()
     {
@@ -688,6 +727,36 @@ public sealed class VisionAgentGenerateFlowTests
             eventSink: eventSink);
     }
 
+    private static VisionAgentBuildOrchestrator CreateRealBuildOrchestrator(
+        IAgentRunEventSink? eventSink = null)
+    {
+        var redactor = new AgentRunEventRedactor();
+        var registry = new VisionAgentToolRegistry(
+        [
+            new FlowTemplateMatchTool(),
+            new FlowTemplateSkeletonTool(),
+            new FlowValidationTool(),
+            new DryRunFlowTool(),
+            new RuntimePackagePrecheckTool()
+        ]);
+        var toolRunner = new BuildToolRunner(registry, redactor, eventSink);
+        return new VisionAgentBuildOrchestrator(
+            new BuildPlanContextLoader(eventSink),
+            new BuildIntentResolver(),
+            new TemplateStrategyResolver(toolRunner),
+            new PlanSelectionResolver(),
+            new OperatorPipelineSelector(),
+            new ParameterMappingService(),
+            new WorkflowDraftBuilder(),
+            toolRunner,
+            new BuildReadinessReviewService(),
+            new WorkflowDiffService(),
+            new ApplyGateResolver(),
+            new BuildResultAssembler(redactor, eventSink),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildOrchestrator>>(),
+            eventSink);
+    }
+
     private static AiFlowGenerationService CreateAiFlowGenerationService(
         IVisionAgentGenerateFlowService agentGenerateFlowService,
         AgentGenerateFlowOptions agentOptions,
@@ -743,6 +812,174 @@ public sealed class VisionAgentGenerateFlowTests
             Options.Create(agentOptions),
             agentGenerateFlowService,
             serviceProvider);
+    }
+
+    private static VisionAgentBuildFromPlanRequest BuildableLesionBuildFromPlanRequest()
+    {
+        var semantic = new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.SurfaceDefect,
+            Confidence = 0.94,
+            TaskTypeConfidence = 0.92,
+            InspectionObject = "病灶",
+            DefectType = "lesion",
+            ImageSource = "camera",
+            OkCondition = "无病灶为 OK",
+            NgCondition = "检出病灶为 NG",
+            OutputTarget = "local report",
+            CanPlanCandidate = true,
+            CanBuildCandidate = true,
+            ObjectSignals = ["病灶"],
+            TaskSignals = [AiVisionTaskTypes.SurfaceDefect],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest
+            {
+                Description = "病灶检测"
+            },
+            semantic);
+        var plan = new VisionAgentPlanModeResult
+        {
+            PlanId = "plan-lesion-build",
+            PlanContractVersion = VisionAgentPlanContractVersions.V2,
+            OriginalUserPrompt = "病灶检测",
+            Goal = "病灶检测",
+            Intent = "surface_defect",
+            Confidence = "high",
+            RequirementUnderstanding = ["Use confirmed metadata to detect lesion-like defects."],
+            RecommendedRoute = new VisionAgentRecommendedRoute
+            {
+                RouteId = "surface_defect_route",
+                Title = "Surface defect route",
+                Summary = "Acquisition, defect detection, judgment, and output.",
+                Operators = ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+                TemplateDecision = "planner_route"
+            },
+            ClarificationQuestions = [],
+            RecommendedDefaults =
+            [
+                new VisionAgentDefaultAssumption
+                {
+                    Id = "metadata_only",
+                    Label = "Metadata only",
+                    Value = "pending_resources",
+                    Impact = "No raw resources are guessed."
+                }
+            ],
+            Risks = ["Model resource remains pending before deployment."],
+            AcceptanceCriteria = ["OK means no lesion is detected; NG means lesion is detected."],
+            ExecutablePlan = ["Build editable draft", "Bind resources", "Review release gates"],
+            CanBuild = true,
+            BuildReadiness = new VisionAgentBuildReadinessSnapshot
+            {
+                CanBuild = true,
+                ResolvedFields = ["inspection_object", "task_type", "image_source", "acceptance_criteria", "algorithm_strategy"],
+                RemainingFields = [],
+                PrimaryMessage = "Ready",
+                ContractVersion = VisionAgentPlanContractVersions.V2
+            },
+            ConfirmedPlanAnswers =
+            [
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.InspectionObject,
+                    Value = "lesion",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.TaskType,
+                    Value = AiVisionTaskTypes.SurfaceDefect,
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Value = "camera",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                    Value = "OK means no lesion is detected; NG means lesion is detected.",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                    Value = "surface_defect_rule",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                }
+            ],
+            SemanticExtraction = semantic,
+            RequirementMaturity = maturity,
+            NextAction = "Build",
+            OperatorCatalogVersion = "catalog.v1",
+            TemplateCatalogVersion = "template.v1",
+            StationBoundarySummary = "metadata-only Station boundary",
+            PlcOutputPolicy = "local ResultOutput first; PLC writes disabled",
+            MetadataOnly = true
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+        return new VisionAgentBuildFromPlanRequest
+        {
+            PlanId = plan.PlanId,
+            PlanHash = plan.PlanHash,
+            PlanSnapshot = plan,
+            ConfirmedAnswers =
+            [
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.InspectionObject,
+                    Value = "病灶",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.TaskType,
+                    Value = AiVisionTaskTypes.SurfaceDefect,
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Value = "camera",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                    Value = "OK means no lesion is detected; NG means lesion is detected.",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                    Value = "surface_defect_rule",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                }
+            ],
+            UserSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["defect_definition"] = "lesion",
+                ["algorithm_strategy"] = "surface_defect_rule"
+            },
+            AcceptedDefaults = ["metadata_only"],
+            AcceptedRecommendedDefaults = true,
+            OperatorCatalogVersion = plan.OperatorCatalogVersion,
+            StationBoundarySummary = plan.StationBoundarySummary,
+            PlcOutputPolicy = plan.PlcOutputPolicy,
+            BuildIntent = "new",
+            OriginalUserPrompt = plan.OriginalUserPrompt,
+            MetadataOnly = true
+        };
     }
 
     private static VisionAgentBuildFromPlanRequest BuildFromPlanRequest()
