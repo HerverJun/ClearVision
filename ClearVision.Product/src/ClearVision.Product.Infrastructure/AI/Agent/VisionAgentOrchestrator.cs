@@ -360,7 +360,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 Category = "requirement_maturity",
                 Code = "maturity_gate_blocked",
                 Message = maturity.PublicReason,
-                RepairTarget = "请补充检测对象、任务类型、图像来源、判定标准和输出目标后再构建。"
+                RepairTarget = "请按缺失字段分别补充信息后再构建。"
             },
             RequirementBrief = new AiRequirementBrief
             {
@@ -383,7 +383,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                         "inspection_object" => "请说明要检测的产品或部件对象。",
                         "task_type" => "请说明任务类型：缺陷、测量、线序、OCR/读码、有无/漏装或分类。",
                         "image_source" => "请说明图像来源是相机、图片文件还是先只做元数据规划。",
-                        "acceptance_criteria" => "请说明 OK/NG 判定标准或输出目标。",
+                        "acceptance_criteria" => "请说明 OK/NG 判定标准。",
                         _ => "请补充该字段后再构建。"
                     },
                     Required = true,
@@ -1018,6 +1018,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
         var resolvedSet = confirmedSet
             .Concat(semanticConfirmedFields)
+            .Concat(GetMaturityConfirmedFields(maturity))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var resolvedPlanFields = resolvedSet.ToList();
@@ -1664,7 +1665,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 : "requirement_clarification",
             Title = "需求拆解与澄清路线",
             Summary = string.IsNullOrWhiteSpace(maturity.PublicReason)
-                ? "需求信息不足，先补充对象、任务类型、图像来源、判定标准和输出目标。"
+                ? "需求信息不足，先按缺失字段分别补充信息。"
                 : maturity.PublicReason,
             Operators = [],
             TemplateDecision = "需求成熟度不足时不选择算子链或模板。"
@@ -2171,5 +2172,26 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         if (!string.IsNullOrWhiteSpace(semantic.TargetAttribute)) yield return VisionAgentPlanAnswerFields.TargetAttribute;
         if (!string.IsNullOrWhiteSpace(semantic.DefectType)) yield return VisionAgentPlanAnswerFields.DefectType;
         if (!string.IsNullOrWhiteSpace(semantic.MeasurementTarget)) yield return VisionAgentPlanAnswerFields.MeasurementTarget;
+    }
+
+    private static IEnumerable<string> GetMaturityConfirmedFields(AiRequirementMaturityResult maturity)
+    {
+        var missing = maturity.MissingFields
+            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
+            .Where(field => !string.IsNullOrWhiteSpace(field))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!missing.Contains(VisionAgentPlanAnswerFields.InspectionObject) &&
+            maturity.ObjectSignals.Any(signal => !string.IsNullOrWhiteSpace(signal)))
+        {
+            yield return VisionAgentPlanAnswerFields.InspectionObject;
+        }
+
+        if (!missing.Contains(VisionAgentPlanAnswerFields.TaskType) &&
+            !string.IsNullOrWhiteSpace(maturity.TaskType) &&
+            !maturity.TaskType.Equals(AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
+            !maturity.TaskType.Equals(AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return VisionAgentPlanAnswerFields.TaskType;
+        }
     }
 }

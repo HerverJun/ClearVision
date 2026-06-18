@@ -487,7 +487,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 Category = "requirement_maturity",
                 Code = "maturity_gate_blocked",
                 Message = maturity.PublicReason,
-                RepairTarget = "请补充检测对象、任务类型、图像来源、判定标准和输出目标后再构建。"
+                RepairTarget = "请按缺失字段分别补充信息后再构建。"
             },
             RequirementBrief = new AiRequirementBrief
             {
@@ -510,7 +510,7 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                         "inspection_object" => "请说明要检测的产品或部件对象。",
                         "task_type" => "请说明任务类型：缺陷、测量、线序、OCR/读码、有无/漏装或分类。",
                         "image_source" => "请说明图像来源是相机、图片文件还是先只做元数据规划。",
-                        "acceptance_criteria" => "请说明 OK/NG 判定标准或输出目标。",
+                        "acceptance_criteria" => "请说明 OK/NG 判定标准。",
                         _ => "请补充该字段后再构建。"
                     },
                     Required = true,

@@ -251,18 +251,19 @@ public static class VisionAgentRequirementMaturityGate
             missingFields.Add("image_source");
         }
 
-        if (!ContainsAny(text, ["OK", "NG", "判定", "标准", "阈值", "公差", "输出", "report", "tolerance", "criteria"]))
+        if (!HasAcceptanceCriteriaText(text))
         {
             missingFields.Add("acceptance_criteria");
         }
 
-        var hasKnownObject = knownObjectSignals.Count > 0 || request.TemplateSelection != null;
-        var hasKnownTask = knownTaskSignals.Count > 0;
-        var canBuild = hasObject && hasTaskType && hasKnownObject && hasKnownTask;
-        if (!canBuild && !ContainsAny(text, StrategySignals))
+        missingFields = CanonicalMissingFields(missingFields);
+        var canBuild = CanBuildFromMissingFields(missingFields, taskType);
+        if (!canBuild && hasObject && hasTaskType && !ContainsAny(text, StrategySignals))
         {
             missingFields.Add("model_or_rule_strategy");
             blockingReasons.Add("model_or_rule_strategy_missing");
+            missingFields = CanonicalMissingFields(missingFields);
+            canBuild = CanBuildFromMissingFields(missingFields, taskType);
         }
 
         if (!canBuild)
@@ -286,7 +287,7 @@ public static class VisionAgentRequirementMaturityGate
             canBuild: true,
             objectHits,
             taskHits,
-            BuildNonBlockingMissingFields(text),
+            CanonicalMissingFields(BuildNonBlockingMissingFields(text)),
             [],
             "需求已明确到可规划视觉流程。");
     }
@@ -309,8 +310,7 @@ public static class VisionAgentRequirementMaturityGate
                           taskType != AiVisionTaskTypes.AbstractGoal;
         var hasImageSource = !string.IsNullOrWhiteSpace(semantic.ImageSource);
         var hasAcceptance = !string.IsNullOrWhiteSpace(semantic.OkCondition) ||
-                            !string.IsNullOrWhiteSpace(semantic.NgCondition) ||
-                            !string.IsNullOrWhiteSpace(semantic.OutputTarget);
+                            !string.IsNullOrWhiteSpace(semantic.NgCondition);
 
         if (normalizedIntent is "help" or "chat")
         {
@@ -402,10 +402,8 @@ public static class VisionAgentRequirementMaturityGate
             missingFields.Add("acceptance_criteria");
         }
 
-        var canBuild = hasObject &&
-                       hasTaskType &&
-                       hasImageSource &&
-                       hasAcceptance;
+        missingFields = CanonicalMissingFields(missingFields);
+        var canBuild = CanBuildFromMissingFields(missingFields, taskType);
         return Result(
             canBuild ? AiRequirementMaturity.Actionable : AiRequirementMaturity.Ambiguous,
             hasTaskType ? taskType : AiVisionTaskTypes.Unknown,
@@ -511,12 +509,12 @@ public static class VisionAgentRequirementMaturityGate
             missing.Add("image_source");
         }
 
-        if (!ContainsAny(text, ["OK", "NG", "判定", "标准", "阈值", "公差", "输出", "report", "tolerance", "criteria"]))
+        if (!HasAcceptanceCriteriaText(text))
         {
             missing.Add("acceptance_criteria");
         }
 
-        return missing;
+        return CanonicalMissingFields(missing);
     }
 
     private static List<string> BuildMissingFields(
@@ -546,7 +544,29 @@ public static class VisionAgentRequirementMaturityGate
             missing.Add("acceptance_criteria");
         }
 
-        return missing;
+        return CanonicalMissingFields(missing);
+    }
+
+    private static bool HasAcceptanceCriteriaText(string text)
+    {
+        return ContainsAny(text, ["OK", "NG", "判定", "标准", "阈值", "公差", "criteria", "tolerance"]);
+    }
+
+    private static List<string> CanonicalMissingFields(IEnumerable<string> fields)
+    {
+        return fields
+            .Select(VisionAgentPlanFieldPolicy.NormalizeField)
+            .Where(field => !string.IsNullOrWhiteSpace(field))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static bool CanBuildFromMissingFields(
+        IReadOnlyList<string> missingFields,
+        string taskType)
+    {
+        return !missingFields.Any(field =>
+            VisionAgentPlanFieldPolicy.IsStrictBlocking(field, taskType, null));
     }
 
     private static VisionAgentRequirementSemanticSlots ExtractSemanticSlots(string text)

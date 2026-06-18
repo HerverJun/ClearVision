@@ -548,7 +548,7 @@ public sealed class VisionAgentSemanticExtractorService : IVisionAgentSemanticEx
                 "inspection_object" => "请补充检测目标或产品对象。",
                 "task_type" => "请说明视觉任务类型或判断内容。",
                 "image_source" => "请说明输入来源是相机、文件还是仅做元数据草稿。",
-                "acceptance_criteria" => "请说明 OK/NG 判定规则或输出目标。",
+                "acceptance_criteria" => "请说明 OK/NG 判定规则。",
                 "model_or_rule_strategy" => "请说明倾向使用规则、模板、传统算法还是模型策略。",
                 _ => $"请补充 {field}。"
             })

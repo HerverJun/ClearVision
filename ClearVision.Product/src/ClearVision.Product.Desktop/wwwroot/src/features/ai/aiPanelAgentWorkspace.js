@@ -1204,6 +1204,7 @@ export const aiPanelAgentWorkspaceMixin = {
             ['template_location', ['定位', '对位', '找正', '模板', '匹配', '位姿', 'locate', 'position', 'align', 'template', 'matching', 'pose']],
             ['surface_or_pose_defect', ['缺陷', '外观', '划痕', '刮伤', '裂纹', '破损', '凹坑', '压痕', '脏污', '污渍', '贴正', '贴歪', '贴附', '胶带', '偏斜', 'surface', 'defect', 'scratch', 'crack', 'damage', 'dent', 'stain', 'tape']]
         ];
+        const strategyTerms = ['规则', '模型', '深度学习', '传统算法', '模板', '阈值', 'AI', 'rule', 'model', 'deep learning', 'template', 'threshold'];
         const knownObjectSignals = collect(objectTerms).slice(0, 12);
         const objectSignals = [...new Set([...knownObjectSignals, ...explicitObject.filter(Boolean)])].slice(0, 12);
         const matchedTask = taskGroups
@@ -1245,9 +1246,13 @@ export const aiPanelAgentWorkspaceMixin = {
             };
         }
 
-        const hasKnownObject = knownObjectSignals.length > 0;
-        const hasKnownTask = (matchedTask.signals || []).length > 0;
-        const canBuild = hasObject && hasTask && hasKnownObject && hasKnownTask;
+        const missingFields = [!hasObject ? 'inspection_object' : '', !hasTask ? 'task_type' : '', 'image_source', 'acceptance_criteria']
+            .filter(Boolean);
+        if (hasObject && hasTask && !collect(strategyTerms).length) {
+            missingFields.push('model_or_rule_strategy');
+        }
+        const strictBlockingFields = new Set(['inspection_object', 'task_type', 'image_source', 'acceptance_criteria', 'model_or_rule_strategy']);
+        const canBuild = !missingFields.some(field => strictBlockingFields.has(field));
         if (!canBuild) {
             return {
                 maturity: 'ambiguous',
@@ -1256,8 +1261,8 @@ export const aiPanelAgentWorkspaceMixin = {
                 canBuild: false,
                 objectSignals,
                 taskSignals,
-                missingFields: [!hasObject ? 'inspection_object' : '', !hasTask ? 'task_type' : '', 'image_source', 'acceptance_criteria', 'model_or_rule_strategy'].filter(Boolean),
-                blockingReasons: [!hasObject ? 'inspection_object_missing' : '', !hasTask ? 'task_type_missing' : '', 'model_or_rule_strategy_missing'].filter(Boolean),
+                missingFields,
+                blockingReasons: [!hasObject ? 'inspection_object_missing' : '', !hasTask ? 'task_type_missing' : '', missingFields.includes('model_or_rule_strategy') ? 'model_or_rule_strategy_missing' : ''].filter(Boolean),
                 publicReason: '需求已足够进入规划，但构建前仍需补充图像来源、判定标准或实现策略。'
             };
         }

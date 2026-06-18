@@ -315,7 +315,7 @@ public sealed class VisionAgentPlannerTests
             Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>());
 
         var json = await handler.HandleAsync(
-            "检测端子线序是否正确",
+            "Check wire order on the harness terminal from camera. OK when order is correct, NG otherwise. Use model strategy.",
             useVisionAgentGenerateFlow: true,
             agentGenerateFlowMode: AiAgentGenerateFlowModes.Planner);
 

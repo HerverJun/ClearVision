@@ -159,7 +159,7 @@ public sealed class VisionAgentIntentRouterTests
         result.Intent.Should().Be(VisionAgentIntentRouterService.IntentActionableVisionPlan);
         result.ShouldOpenPlan.Should().BeTrue();
         result.ShouldBuildDirectly.Should().BeFalse();
-        result.CanBuild.Should().BeTrue();
+        result.CanBuild.Should().BeFalse();
         result.RouterSource.Should().Be("model_router");
     }
 
@@ -228,9 +228,10 @@ public sealed class VisionAgentIntentRouterTests
         result.Intent.Should().Be(VisionAgentIntentRouterService.IntentActionableVisionPlan);
         result.ShouldOpenPlan.Should().BeTrue();
         result.ShouldBuildDirectly.Should().BeFalse();
-        result.CanBuild.Should().BeTrue();
+        result.CanBuild.Should().BeFalse();
         result.RouterSource.Should().Be("rule_fallback");
-        result.FallbackReason.Should().Be("router_unauthorized");
+        result.FallbackReason.Should().Contain("router_unauthorized");
+        result.FallbackReason.Should().Contain("planning_allowed_build_blocked");
     }
 
     [Fact(DisplayName = "Intent Router draft pending fields should not block confirmed Plan Build")]

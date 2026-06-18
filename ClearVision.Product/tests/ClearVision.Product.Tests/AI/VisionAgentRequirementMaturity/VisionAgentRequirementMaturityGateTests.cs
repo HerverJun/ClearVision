@@ -57,7 +57,7 @@ public sealed class VisionAgentRequirementMaturityGateTests
         maturity.CanBuild.Should().BeFalse();
         maturity.MissingFields.Should().NotContain("inspection_object");
         maturity.MissingFields.Should().NotContain("task_type");
-        maturity.MissingFields.Should().Contain(["image_source", "acceptance_criteria", "model_or_rule_strategy"]);
+        maturity.MissingFields.Should().Contain(["image_source", "acceptance_criteria", "algorithm_strategy"]);
 
         var orchestrator = CreateOrchestrator(Substitute.For<IAiFlowGenerationService>());
         var plan = await orchestrator.CreatePlanAsync(
@@ -120,6 +120,158 @@ public sealed class VisionAgentRequirementMaturityGateTests
         ]);
         plan.CanBuild.Should().BeFalse();
         plan.ClarificationQuestions.Should().OnlyContain(question => question.Options.Count == 0);
+    }
+
+    [Fact(DisplayName = "Create Plan rule fallback should keep lesion detection task type remaining")]
+    public async Task CreatePlanAsync_LesionDetectionRuleFallback_ShouldKeepTaskTypeRemaining()
+    {
+        var semanticExtractor = new FakeSemanticExtractor(new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            FailureCode = "semantic_model_failed",
+            Source = VisionAgentSemanticSources.RuleFallback,
+            MetadataOnly = true
+        });
+        var orchestrator = CreateOrchestrator(
+            Substitute.For<IAiFlowGenerationService>(),
+            semanticExtractor);
+
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "病灶检测",
+                OriginalUserPrompt = "病灶检测"
+            },
+            CancellationToken.None);
+
+        plan.RequirementMaturity.Should().NotBeNull();
+        plan.RequirementMaturity!.CanPlan.Should().BeTrue();
+        plan.CanBuild.Should().BeFalse();
+        plan.ResolvedPlanFields.Should().Contain(VisionAgentPlanAnswerFields.InspectionObject);
+        plan.ResolvedPlanFields.Should().NotContain(VisionAgentPlanAnswerFields.TaskType);
+        plan.RemainingPlanFields.Should().Contain([
+            VisionAgentPlanAnswerFields.TaskType,
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria
+        ]);
+        plan.RemainingPlanFields.Should().NotContain(VisionAgentPlanAnswerFields.AlgorithmStrategy);
+    }
+
+    [Fact(DisplayName = "Semantic output target alone should not satisfy acceptance criteria")]
+    public void Evaluate_OutputTargetOnly_ShouldLeaveAcceptanceRemaining()
+    {
+        var semantic = new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.SurfaceDefect,
+            InspectionObject = "part",
+            ImageSource = "camera",
+            OutputTarget = "local",
+            CanPlanCandidate = true,
+            CanBuildCandidate = true,
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
+
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest { Description = "part defect inspection" },
+            semantic);
+
+        maturity.CanPlan.Should().BeTrue();
+        maturity.CanBuild.Should().BeFalse();
+        maturity.MissingFields.Should().Contain(VisionAgentPlanAnswerFields.AcceptanceCriteria);
+        maturity.MissingFields.Should().NotContain(VisionAgentPlanAnswerFields.OutputTarget);
+    }
+
+    [Fact(DisplayName = "Output destination text should not satisfy acceptance criteria")]
+    public void Evaluate_OutputDestinationText_ShouldNotResolveAcceptanceCriteria()
+    {
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest
+            {
+                Description = "检测零件表面缺陷，图像来自相机，结果输出到本地"
+            });
+
+        maturity.CanPlan.Should().BeTrue();
+        maturity.CanBuild.Should().BeFalse();
+        maturity.MissingFields.Should().Contain(VisionAgentPlanAnswerFields.AcceptanceCriteria);
+    }
+
+    [Fact(DisplayName = "Strict blocking fields should keep Maturity Plan and Readiness aligned")]
+    public async Task StrictBlockingFields_ShouldKeepMaturityPlanAndReadinessAligned()
+    {
+        var semantic = new VisionAgentSemanticExtractionResult
+        {
+            IsVisionRequest = true,
+            Intent = "new_flow",
+            TaskType = AiVisionTaskTypes.SurfaceDefect,
+            InspectionObject = "part surface",
+            DefectType = "surface defect",
+            CanPlanCandidate = true,
+            CanBuildCandidate = true,
+            ObjectSignals = ["part surface"],
+            TaskSignals = ["surface defect"],
+            Source = VisionAgentSemanticSources.Model,
+            MetadataOnly = true
+        };
+        var request = new VisionAgentRequirementMaturityRequest
+        {
+            Description = "检测零件表面缺陷",
+            RequirementMode = AiRequirementModes.Strict
+        };
+
+        var maturity = VisionAgentRequirementMaturityGate.Evaluate(request, semantic);
+        var orchestrator = CreateOrchestrator(
+            Substitute.For<IAiFlowGenerationService>(),
+            new FakeSemanticExtractor(semantic));
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "检测零件表面缺陷",
+                OriginalUserPrompt = "检测零件表面缺陷",
+                RequirementMode = AiRequirementModes.Strict
+            },
+            CancellationToken.None);
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(plan);
+
+        maturity.CanBuild.Should().BeFalse();
+        plan.CanBuild.Should().BeFalse();
+        readiness.CanBuild.Should().BeFalse();
+        maturity.MissingFields.Should().Contain([
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria
+        ]);
+        plan.RemainingPlanFields.Should().Contain([
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria
+        ]);
+
+        var completeSemantic = semantic with
+        {
+            ImageSource = "camera",
+            OkCondition = "OK when no visible defect",
+            NgCondition = "NG when scratch or dent is present"
+        };
+        var completeMaturity = VisionAgentRequirementMaturityGate.Evaluate(request, completeSemantic);
+        var completePlan = await CreateOrchestrator(
+                Substitute.For<IAiFlowGenerationService>(),
+                new FakeSemanticExtractor(completeSemantic))
+            .CreatePlanAsync(
+                new VisionAgentPlanModeRequest
+                {
+                    Description = "检测零件表面缺陷，图像来自相机，OK 无可见缺陷，NG 有划痕或凹陷",
+                    OriginalUserPrompt = "检测零件表面缺陷，图像来自相机，OK 无可见缺陷，NG 有划痕或凹陷",
+                    RequirementMode = AiRequirementModes.Strict
+                },
+                CancellationToken.None);
+        var completeReadiness = VisionAgentPlanReadinessEvaluator.Evaluate(completePlan);
+
+        completeMaturity.CanBuild.Should().BeTrue();
+        completePlan.CanBuild.Should().BeTrue();
+        completeReadiness.CanBuild.Should().BeTrue();
+        completeMaturity.MissingFields.Should().BeEmpty();
+        completePlan.RemainingPlanFields.Should().BeEmpty();
     }
 
     [Fact(DisplayName = "Maturity gate should use model semantic task type without rule term hit")]
@@ -445,6 +597,50 @@ public sealed class VisionAgentRequirementMaturityGateTests
         result.RequirementMaturity!.CanPlan.Should().BeTrue();
         result.RequirementMaturity.MissingFields.Should().NotContain("inspection_object");
         result.RequirementMaturity.MissingFields.Should().NotContain("task_type");
+    }
+
+    [Fact(DisplayName = "Intent Router lesion detection should match final Plan remaining fields")]
+    public async Task RouteThenPlan_LesionDetectionRuleFallback_ShouldKeepStateConsistent()
+    {
+        var router = new VisionAgentIntentRouterService(
+            new DelegateIntentCompletionSource((_, _) => throw new InvalidOperationException("router unavailable")),
+            Microsoft.Extensions.Options.Options.Create(new VisionAgentIntentRouterOptions { Enabled = true }),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<VisionAgentIntentRouterService>.Instance);
+
+        var routerResult = await router.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "病灶检测",
+                OriginalUserPrompt = "病灶检测"
+            },
+            CancellationToken.None);
+
+        var orchestrator = CreateOrchestrator(Substitute.For<IAiFlowGenerationService>());
+        var plan = await orchestrator.CreatePlanAsync(
+            new VisionAgentPlanModeRequest
+            {
+                Description = "病灶检测",
+                OriginalUserPrompt = "病灶检测",
+                SemanticExtraction = routerResult.SemanticExtraction
+            },
+            CancellationToken.None);
+
+        routerResult.Intent.Should().Be(VisionAgentIntentRouterService.IntentActionableVisionPlan);
+        routerResult.ShouldOpenPlan.Should().BeTrue();
+        routerResult.CanBuild.Should().BeFalse();
+        routerResult.ResolvedPlanFields.Should().Contain(VisionAgentPlanAnswerFields.InspectionObject);
+        routerResult.ResolvedPlanFields.Should().NotContain(VisionAgentPlanAnswerFields.TaskType);
+        routerResult.RemainingPlanFields.Should().Contain([
+            VisionAgentPlanAnswerFields.TaskType,
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria
+        ]);
+
+        plan.CanBuild.Should().BeFalse();
+        plan.ResolvedPlanFields.Should().BeEquivalentTo(routerResult.ResolvedPlanFields);
+        plan.RemainingPlanFields.Should().Contain(routerResult.RemainingPlanFields);
+        plan.RequirementMaturity.Should().NotBeNull();
+        plan.RequirementMaturity!.CanBuild.Should().Be(routerResult.RequirementMaturity!.CanBuild);
     }
 
     [Fact(DisplayName = "Intent Router should downgrade over-confident abstract build intents")]

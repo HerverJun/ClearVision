@@ -231,9 +231,11 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             RemainingPlanFields = remainingPlanFields
         };
         var maturity = EvaluateMaturity(effectiveRequest);
+        resolvedPlanFields = MergeMaturityResolvedFields(resolvedPlanFields, maturity);
         remainingPlanFields = BuildRemainingPlanFields(remainingPlanFields, maturity, resolvedPlanFields);
         effectiveRequest = effectiveRequest with
         {
+            ResolvedPlanFields = resolvedPlanFields,
             RemainingPlanFields = remainingPlanFields
         };
         var intent = NormalizeIntent(candidate.Intent);
@@ -339,9 +341,11 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             RemainingPlanFields = remainingPlanFields
         };
         var maturity = EvaluateMaturity(effectiveRequest);
+        resolvedPlanFields = MergeMaturityResolvedFields(resolvedPlanFields, maturity);
         remainingPlanFields = BuildRemainingPlanFields(remainingPlanFields, maturity, resolvedPlanFields);
         effectiveRequest = effectiveRequest with
         {
+            ResolvedPlanFields = resolvedPlanFields,
             RemainingPlanFields = remainingPlanFields
         };
         var intent = ResolveRuleFallbackIntent(text, effectiveRequest, maturity);
@@ -667,6 +671,32 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             .Where(field => !resolved.Contains(field))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static List<string> MergeMaturityResolvedFields(
+        IEnumerable<string> existingResolved,
+        AiRequirementMaturityResult maturity)
+    {
+        var fields = NormalizePlanFields(existingResolved).ToList();
+        var missing = maturity.MissingFields
+            .Select(NormalizePlanField)
+            .Where(field => !string.IsNullOrWhiteSpace(field))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!missing.Contains(VisionAgentPlanAnswerFields.InspectionObject) &&
+            maturity.ObjectSignals.Any(signal => !string.IsNullOrWhiteSpace(signal)))
+        {
+            fields.Add(VisionAgentPlanAnswerFields.InspectionObject);
+        }
+
+        if (!missing.Contains(VisionAgentPlanAnswerFields.TaskType) &&
+            !string.IsNullOrWhiteSpace(maturity.TaskType) &&
+            !maturity.TaskType.Equals(AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
+            !maturity.TaskType.Equals(AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+        {
+            fields.Add(VisionAgentPlanAnswerFields.TaskType);
+        }
+
+        return NormalizePlanFields(fields);
     }
 
     private static bool HasBlockingRemainingPlanFields(
@@ -1079,7 +1109,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             "请补充检测目标或产品对象。",
             "请说明要判断的缺陷、测量项或识别内容。",
             "请说明输入来源是相机、文件还是仅先做元数据草稿。",
-            "请说明 OK/NG 判定规则或输出目标。"
+            "请说明 OK/NG 判定规则。"
         ];
     }
 
@@ -1095,7 +1125,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
                 "inspection_object" => "请补充检测目标或产品对象。",
                 "task_type" => "请说明要判断的缺陷、测量项或识别内容。",
                 "image_source" => "请说明输入来源是相机、文件还是仅先做元数据草稿。",
-                "acceptance_criteria" => "请说明 OK/NG 判定规则或输出目标。",
+                "acceptance_criteria" => "请说明 OK/NG 判定规则。",
                 "model_or_rule_strategy" => "请说明倾向使用规则、传统算法、模板还是模型策略。",
                 "output_target" => "请说明输出目标或验收结果字段。",
                 _ => $"请补充 {field}。"
