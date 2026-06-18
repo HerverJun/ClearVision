@@ -2153,9 +2153,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const planSnapshot = data.planSnapshot || data.PlanSnapshot || buildReplay.planSnapshot || buildReplay.PlanSnapshot || null;
         const readiness = this._normalizePlanBuildReadiness(
             data.buildReadiness ||
-            data.BuildReadiness ||
-            planSnapshot?.buildReadiness ||
-            planSnapshot?.BuildReadiness
+            data.BuildReadiness
         );
         if (!this._isUsableAuthoritativeReadiness(readiness)) return false;
 
@@ -2163,14 +2161,16 @@ export const aiPanelAgentWorkspaceMixin = {
         const incomingPlanId = String(
             data.planId ||
             data.PlanId ||
-            buildReplay.planId ||
-            buildReplay.PlanId ||
-            planSnapshot?.planId ||
-            planSnapshot?.PlanId ||
             ''
         ).trim();
         const currentPlanId = String(plan.planId || plan.id || '').trim();
-        if (incomingPlanId && currentPlanId && incomingPlanId !== currentPlanId) {
+        if (!incomingPlanId || !currentPlanId || incomingPlanId !== currentPlanId) {
+            return false;
+        }
+
+        const incomingPlanHash = String(data.planHash || data.PlanHash || '').trim();
+        const currentPlanHash = String(plan.planHash || '').trim();
+        if (incomingPlanHash && currentPlanHash && incomingPlanHash !== currentPlanHash) {
             return false;
         }
 
@@ -2194,12 +2194,13 @@ export const aiPanelAgentWorkspaceMixin = {
         plan.resolvedPlanFields = this._toArray(readiness.resolvedFields);
         plan.remainingPlanFields = this._toArray(readiness.remainingFields);
         const blockingFields = this._toArray(data.blockingClarificationFields || data.BlockingClarificationFields);
-        plan.blockingReasons = blockingFields.length
-            ? blockingFields
-            : this._toArray(readiness.blockers)
+        const readinessBlockers = this._toArray(readiness.blockers)
                 .filter(blocker => blocker?.blocksBuild === true)
                 .map(blocker => blocker.id || blocker.field)
                 .filter(Boolean);
+        plan.blockingReasons = readinessBlockers.length
+            ? readinessBlockers
+            : blockingFields;
         return true;
     },
 

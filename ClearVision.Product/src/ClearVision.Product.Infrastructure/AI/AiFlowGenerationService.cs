@@ -935,12 +935,12 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         CancellationToken cancellationToken)
     {
         var contractError = ValidateBuildFromPlanContract(request.BuildFromPlan);
-        if (!string.IsNullOrWhiteSpace(contractError))
+        if (contractError != null)
         {
             return BuildFromPlanControlledFailure(
-                "build_from_plan_contract_invalid",
-                contractError,
-                "请回到左侧 Plan 工作台重新确认计划后再开始构建。",
+                contractError.Code,
+                contractError.Message,
+                contractError.RepairTarget,
                 AiFlowGenerationResult.FailureTypeSystemError);
         }
 
@@ -979,28 +979,40 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             _logger.LogWarning(ex, "Vision Agent BuildFromPlan failed with controlled error mode.");
             return BuildFromPlanControlledFailure(
                 "build_from_plan_system_exception",
-                $"Vision Agent BuildFromPlan failed: {ex.Message}",
+                "Vision Agent BuildFromPlan failed before completion.",
                 "请检查公开诊断和后端日志，修复 BuildFromPlan 专用构建异常后重试。",
                 AiFlowGenerationResult.FailureTypeSystemError);
         }
     }
 
-    private static string? ValidateBuildFromPlanContract(VisionAgentBuildFromPlanRequest? build)
+    private static BuildFromPlanContractValidationError? ValidateBuildFromPlanContract(VisionAgentBuildFromPlanRequest? build)
     {
         if (build == null)
         {
-            return "BuildFromPlan payload is required.";
+            return ContractInvalid("BuildFromPlan payload is required.");
         }
 
         if (build.PlanSnapshot == null)
         {
-            return "BuildFromPlan.PlanSnapshot is required.";
+            return ContractInvalid("BuildFromPlan.PlanSnapshot is required.");
         }
 
         var planId = FirstNonBlank(build.PlanId, build.PlanSnapshot.PlanId);
         if (string.IsNullOrWhiteSpace(planId))
         {
-            return "BuildFromPlan requires a plan id.";
+            return ContractInvalid("BuildFromPlan requires a plan id.");
+        }
+
+        var topLevelPlanId = (build.PlanId ?? string.Empty).Trim();
+        var snapshotPlanId = (build.PlanSnapshot.PlanId ?? string.Empty).Trim();
+        if (!string.IsNullOrWhiteSpace(topLevelPlanId) &&
+            !string.IsNullOrWhiteSpace(snapshotPlanId) &&
+            !string.Equals(topLevelPlanId, snapshotPlanId, StringComparison.OrdinalIgnoreCase))
+        {
+            return new BuildFromPlanContractValidationError(
+                "build_from_plan_plan_id_mismatch",
+                "Plan context is stale. Please rebuild from the current Plan before starting Build.",
+                "请回到左侧 Plan 工作台，使用当前 Plan 重新发起构建。");
         }
 
         var version = (build.PlanSnapshot.PlanContractVersion ?? string.Empty).Trim();
@@ -1008,18 +1020,31 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             !version.Equals(VisionAgentPlanContractVersions.V1, StringComparison.OrdinalIgnoreCase) &&
             !version.Equals(VisionAgentPlanContractVersions.V2, StringComparison.OrdinalIgnoreCase))
         {
-            return $"Unsupported Plan contract version: {version}.";
+            return ContractInvalid($"Unsupported Plan contract version: {version}.");
         }
 
         if (build.ConfirmedAnswers.Any(answer =>
                 string.IsNullOrWhiteSpace(answer.Field) &&
                 string.IsNullOrWhiteSpace(answer.QuestionId)))
         {
-            return "BuildFromPlan confirmed answers must include a field or question id.";
+            return ContractInvalid("BuildFromPlan confirmed answers must include a field or question id.");
         }
 
         return null;
     }
+
+    private static BuildFromPlanContractValidationError ContractInvalid(string message)
+    {
+        return new BuildFromPlanContractValidationError(
+            "build_from_plan_contract_invalid",
+            message,
+            "请回到左侧 Plan 工作台重新确认计划后再开始构建。");
+    }
+
+    private sealed record BuildFromPlanContractValidationError(
+        string Code,
+        string Message,
+        string RepairTarget);
 
     private static string FirstNonBlank(params string?[] values)
     {

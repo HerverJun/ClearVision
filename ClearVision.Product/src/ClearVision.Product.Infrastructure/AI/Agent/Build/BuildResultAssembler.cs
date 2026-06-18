@@ -34,7 +34,7 @@ public sealed class BuildResultAssembler
             missingResources,
             pendingParameters);
         var result = input.CurrentDraft.GenerationResult;
-        result.Success = result.Success || input.CurrentDraft.CanvasFlow.Operators.Count > 0;
+        result.Success = input.CurrentDraft.CanvasFlow.Operators.Count > 0;
         result.CompletionStatus = result.Success
             ? AiFlowGenerationResult.CompletionStatusCompleted
             : AiFlowGenerationResult.CompletionStatusFailed;
@@ -44,6 +44,13 @@ public sealed class BuildResultAssembler
             result.Flow = input.CurrentDraft.CanvasFlow;
         }
 
+        result.ClarificationRequired = false;
+        result.RequirementBrief = null;
+        result.FailureType = null;
+        result.FailureSummary = null;
+        result.ErrorMessage = null;
+        result.BlockingClarificationFields.Clear();
+        result.NonBlockingMissingFields.Clear();
         result.ValidationPreview = input.Validation.Data ?? result.ValidationPreview;
         result.DryRunResult = input.DryRun.Data ?? result.DryRunResult;
         result.PendingParameters = pendingParameters;
@@ -109,6 +116,17 @@ public sealed class BuildResultAssembler
             PublicWarnings = input.PublicWarnings.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
             MetadataOnly = true
         };
+        result.BuildReadiness = result.Success
+            ? new VisionAgentBuildReadinessSnapshot
+            {
+                CanBuild = true,
+                Blockers = [],
+                ResolvedFields = input.LoadPlan.ResolvedFields.ToList(),
+                RemainingFields = [],
+                PrimaryMessage = "已基于确认计划生成可编辑草稿",
+                ContractVersion = VisionAgentPlanContractVersions.V2
+            }
+            : null;
         result.AiExplanation = string.IsNullOrWhiteSpace(result.AiExplanation)
             ? "构建模式已基于确认计划执行仅元数据工具链，并生成可编辑流程草稿。"
             : _redactor.RedactText(result.AiExplanation);
@@ -152,7 +170,10 @@ public sealed class BuildResultAssembler
             Success = false,
             CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
             FailureType = AiFlowGenerationResult.FailureTypeSystemError,
-            ErrorMessage = "Vision Agent 构建模式在执行仅元数据工具链时失败。",
+            ErrorMessage = "Vision Agent Build failed before completion.",
+            ClarificationRequired = false,
+            RequirementBrief = null,
+            BuildReadiness = null,
             BuildResult = new VisionAgentBuildResult
             {
                 BuildId = buildId,

@@ -848,10 +848,6 @@ export class AiPanel {
             this._resetClarificationSelectionDraft();
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
-        } else if (appliedBuildFromPlanCanonical && payload.success === false) {
-            this.pendingClarificationPayload = payload;
-            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
-            this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
         } else {
             this.pendingClarificationPayload = null;
             this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;

@@ -44,7 +44,7 @@ public sealed class BuildPlanContextLoader
                 new
                 {
                     warningCode = "plan_hash_mismatch",
-                    planId = build?.PlanId ?? plan?.PlanId ?? string.Empty,
+                    planId = plan?.PlanId ?? build?.PlanId ?? string.Empty,
                     providedPlanHash = provided,
                     computedPlanHash = computed,
                     publicDiagnosticsOnly = true,
@@ -75,12 +75,12 @@ public sealed class BuildPlanContextLoader
         var effectiveRequirement = _requirementOverlay.Build(plan, validatedAnswers, maturityRequest);
         var payload = new BuildPlanLoad
         {
-            PlanId = VisionAgentBuildSupport.Clean(build?.PlanId) is { Length: > 0 } planId
+            PlanId = VisionAgentBuildSupport.Clean(plan?.PlanId) is { Length: > 0 } planId
                 ? planId
-                : VisionAgentBuildSupport.Clean(plan?.PlanId),
-            PlanHash = string.IsNullOrWhiteSpace(provided)
+                : VisionAgentBuildSupport.Clean(build?.PlanId),
+            PlanHash = string.IsNullOrWhiteSpace(computed)
                 ? VisionAgentBuildSupport.Clean(plan?.PlanHash)
-                : provided,
+                : computed,
             ComputedPlanHash = computed,
             Plan = plan,
             UserSelections = build?.UserSelections ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),

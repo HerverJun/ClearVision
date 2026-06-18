@@ -10,30 +10,24 @@ namespace ClearVision.Product.Infrastructure.AI.Agent;
 
 public sealed class WorkflowDraftBuilder
 {
-    private readonly IAiFlowGenerationService _generationService;
     private readonly IVisionAgentOperatorContractCatalog _contractCatalog;
 
-    public WorkflowDraftBuilder(IAiFlowGenerationService generationService)
-        : this(generationService, new VisionAgentOperatorContractCatalog())
+    public WorkflowDraftBuilder()
+        : this(new VisionAgentOperatorContractCatalog())
     {
     }
 
-    public WorkflowDraftBuilder(
-        IAiFlowGenerationService generationService,
-        IOperatorFactory operatorFactory)
-        : this(generationService, new VisionAgentOperatorContractCatalog(operatorFactory))
+    public WorkflowDraftBuilder(IOperatorFactory operatorFactory)
+        : this(new VisionAgentOperatorContractCatalog(operatorFactory))
     {
     }
 
-    internal WorkflowDraftBuilder(
-        IAiFlowGenerationService generationService,
-        IVisionAgentOperatorContractCatalog contractCatalog)
+    internal WorkflowDraftBuilder(IVisionAgentOperatorContractCatalog contractCatalog)
     {
-        _generationService = generationService;
         _contractCatalog = contractCatalog;
     }
 
-    internal async Task<BuildStepResult<DraftWorkflowResolution>> DraftAsync(
+    internal Task<BuildStepResult<DraftWorkflowResolution>> DraftAsync(
         AiFlowGenerationRequest request,
         BuildPlanLoad load,
         BuildIntentResolution intent,
@@ -41,24 +35,10 @@ public sealed class WorkflowDraftBuilder
         ParameterMappingResolution parameters,
         CancellationToken cancellationToken)
     {
-        var generationRequest = request with
-        {
-            ExistingFlowJson = load.CurrentFlowSnapshot,
-            Mode = ToGenerateFlowMode(intent.BuildIntent),
-            TemplateSelection = load.TemplateSelection,
-            BuildFromPlan = null,
-            UseVisionAgentGenerateFlow = false
-        };
-        var generation = await _generationService.GenerateFlowAsync(
-            generationRequest,
-            cancellationToken: cancellationToken);
-
         var connectionSpecs = BuildConnectionSpecs(pipeline.Steps);
         var canonical = BuildCanonicalDraft(pipeline, parameters, connectionSpecs);
-        var canvasFlow = VisionAgentBuildSupport.FlowOperatorCount(generation.Flow) > 0
-            ? generation.Flow as OperatorFlowDto ?? BuildCanvasFlow(load, intent, pipeline, parameters, connectionSpecs)
-            : BuildCanvasFlow(load, intent, pipeline, parameters, connectionSpecs);
-        generation.Flow ??= canvasFlow;
+        var canvasFlow = BuildCanvasFlow(load, intent, pipeline, parameters, connectionSpecs);
+        var generation = BuildDraftGenerationResult(canvasFlow);
 
         var resolution = new DraftWorkflowResolution(
             generation,
@@ -66,7 +46,7 @@ public sealed class WorkflowDraftBuilder
             canonical.EntryOperatorTempId,
             canvasFlow,
             canonical.AddedNodeIds);
-        return VisionAgentBuildSupport.StepResult(
+        var result = VisionAgentBuildSupport.StepResult(
             resolution,
             $"工作流草稿已生成，包含 {pipeline.Steps.Count} 个计划算子。",
             generation.Success || canvasFlow.Operators.Count > 0
@@ -84,6 +64,28 @@ public sealed class WorkflowDraftBuilder
             },
             applyImpact: canvasFlow.Operators.Count > 0 ? "editable_draft_allowed" : "blocked",
             deploymentImpact: "requires_readiness_checks");
+        return Task.FromResult(result);
+    }
+
+    private static AiFlowGenerationResult BuildDraftGenerationResult(OperatorFlowDto canvasFlow)
+    {
+        var hasOperators = canvasFlow.Operators.Count > 0;
+        return new AiFlowGenerationResult
+        {
+            Success = hasOperators,
+            CompletionStatus = hasOperators
+                ? AiFlowGenerationResult.CompletionStatusCompleted
+                : AiFlowGenerationResult.CompletionStatusFailed,
+            Flow = canvasFlow,
+            ClarificationRequired = false,
+            RequirementBrief = null,
+            FailureType = null,
+            FailureSummary = null,
+            ErrorMessage = null,
+            InteractionState = hasOperators
+                ? AiInteractionStates.Completed
+                : AiInteractionStates.Failed
+        };
     }
 
     internal BuildStepResult<RepairDraftResolution> Repair(
@@ -531,17 +533,6 @@ public sealed class WorkflowDraftBuilder
                 TargetPortId = targetPort.Id
             });
         }
-    }
-
-    private static GenerateFlowMode ToGenerateFlowMode(string buildIntent)
-    {
-        return buildIntent switch
-        {
-            "modify" or "refactor" => GenerateFlowMode.Modify,
-            "explain" => GenerateFlowMode.Explain,
-            "review_pending_parameters" => GenerateFlowMode.ReviewPendingParameters,
-            _ => GenerateFlowMode.New
-        };
     }
 
     private OperatorType ToOperatorType(string operatorType)

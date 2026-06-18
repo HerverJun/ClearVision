@@ -153,6 +153,8 @@ public class GenerateFlowMessageHandler
                 ToolTrace = result.ToolTrace,
                 BuildResult = result.BuildResult,
                 BuildReadiness = result.BuildReadiness,
+                PlanId = ResolveResponsePlanId(result, buildFromPlan),
+                PlanHash = ResolveResponsePlanHash(result, buildFromPlan),
                 WorkflowDiff = result.BuildResult?.WorkflowDiff,
                 ApplyGate = result.BuildResult?.ApplyGate,
                 ToolEvidenceTimeline = result.BuildResult?.ToolEvidenceTimeline,
@@ -222,8 +224,8 @@ public class GenerateFlowMessageHandler
             {
                 Success = false,
                 Status = AiFlowGenerationResult.CompletionStatusFailed,
-                ErrorMessage = $"服务内部错误：{ex.Message}",
-                FailureSummary = $"服务内部错误：{ex.Message}",
+                ErrorMessage = "服务内部错误，请查看后端日志。",
+                FailureSummary = "服务内部错误，请查看后端日志。",
                 LastAttemptDiagnostics = Array.Empty<AiAttemptDiagnostic>(),
                 SessionId = sessionId,
                 RequestId = requestId
@@ -399,6 +401,8 @@ public class GenerateFlowMessageHandler
             response.ToolTrace,
             response.BuildResult,
             response.BuildReadiness,
+            response.PlanId,
+            response.PlanHash,
             response.WorkflowDiff,
             response.ApplyGate,
             response.ToolEvidenceTimeline,
@@ -445,6 +449,31 @@ public class GenerateFlowMessageHandler
         return string.IsNullOrWhiteSpace(fallbackMessage)
             ? null
             : fallbackMessage;
+    }
+
+    private static string? ResolveResponsePlanId(
+        AiFlowGenerationResult result,
+        VisionAgentBuildFromPlanRequest? buildFromPlan)
+    {
+        return FirstNonBlank(
+            result.BuildResult?.PlanId,
+            buildFromPlan?.PlanSnapshot?.PlanId,
+            buildFromPlan?.PlanId);
+    }
+
+    private static string? ResolveResponsePlanHash(
+        AiFlowGenerationResult result,
+        VisionAgentBuildFromPlanRequest? buildFromPlan)
+    {
+        return FirstNonBlank(
+            result.BuildResult?.PlanHash,
+            buildFromPlan?.PlanSnapshot?.PlanHash,
+            buildFromPlan?.PlanHash);
+    }
+
+    private static string? FirstNonBlank(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
     }
 
     private static string InferProgressPhase(string? message)

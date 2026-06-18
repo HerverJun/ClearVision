@@ -346,7 +346,27 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var requirementMode = TryGetMessageString(payload, "requirementMode")
                 ?? TryGetMessageString(doc.RootElement, "requirementMode");
             var templateSelection = TryGetTemplateSelection(payload);
-            var buildFromPlan = TryGetPayloadObject<VisionAgentBuildFromPlanRequest>(payload, "buildFromPlan");
+            VisionAgentBuildFromPlanRequest? buildFromPlan;
+            try
+            {
+                buildFromPlan = TryGetBuildFromPlan(payload);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Invalid BuildFromPlan payload received from WebView2.");
+                PostWebMessageJson(JsonSerializer.Serialize(new GenerateFlowResponse
+                {
+                    Success = false,
+                    Status = AiFlowGenerationResult.CompletionStatusFailed,
+                    ErrorMessage = "BuildFromPlan payload is invalid.",
+                    FailureSummary = "build_from_plan_payload_invalid: BuildFromPlan payload is invalid.",
+                    RequestId = requestId,
+                    CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+                    InteractionState = AiInteractionStates.Failed,
+                    FirstFixRecommendation = "请回到左侧 Plan 工作台重新确认计划后再开始构建。"
+                }, _jsonOptions));
+                return;
+            }
             var useVisionAgentGenerateFlow = TryGetBoolean(payload, "useVisionAgentGenerateFlow") ?? false;
             var agentGenerateFlowMode = TryGetMessageString(payload, "agentGenerateFlowMode")
                 ?? TryGetMessageString(doc.RootElement, "agentGenerateFlowMode");
@@ -420,7 +440,10 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             var errorResponse = new GenerateFlowResponse
             {
                 Success = false,
-                ErrorMessage = $"系统错误：{ex.Message}"
+                Status = AiFlowGenerationResult.CompletionStatusFailed,
+                ErrorMessage = "系统错误，请查看后端日志。",
+                FailureSummary = "系统错误，请查看后端日志。",
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed
             };
 
             var json = JsonSerializer.Serialize(errorResponse, new JsonSerializerOptions
@@ -507,6 +530,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
             return null;
 
         return property.Deserialize<T>(_jsonOptions);
+    }
+
+    private static VisionAgentBuildFromPlanRequest? TryGetBuildFromPlan(JsonElement payload)
+    {
+        return TryGetPayloadObject<VisionAgentBuildFromPlanRequest>(payload, "buildFromPlan");
     }
 
     /// <summary>

@@ -5640,6 +5640,8 @@ test('AgentRun BuildFromPlan run.failed applies canonical readiness without lega
     payload: {
       status: 'clarification_required',
       failureType: 'clarification_required',
+      planId: 'plan_build_from_plan_blocked',
+      planHash: 'sha256:block-me',
       buildFromPlan: { planId: 'plan_build_from_plan_blocked', planHash: 'sha256:block-me' },
       planSnapshot: {
         planId: 'plan_build_from_plan_blocked',
@@ -5682,6 +5684,102 @@ test('AgentRun BuildFromPlan run.failed applies canonical readiness without lega
   assert.equal(turn.statusEl.textContent, '待澄清');
   const renderedText = `${turn.failureBody.innerHTML} ${panel.container.querySelector('#ai-plan-workspace').innerHTML}`;
   assert.doesNotMatch(renderedText, /请确认这是外观缺陷、漏装有无、线序判定还是尺寸测量场景/);
+});
+
+test('AgentRun BuildFromPlan system_error without authoritative readiness stays failed', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.activeAgentRunId = 'ar_build_system_error';
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    planId: 'plan_system_error',
+    planHash: 'sha256:system-error',
+    canBuild: true,
+    buildReadiness: {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: [],
+      primaryMessage: 'Ready',
+      contractVersion: 'v2'
+    }
+  }));
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_build_system_error',
+    sequence: 8,
+    eventType: 'run.failed',
+    stage: 'run',
+    title: 'Run failed',
+    summary: 'Build failed before completion.',
+    status: 'failed',
+    payload: {
+      status: 'failed',
+      failureType: 'system_error',
+      planId: 'plan_system_error',
+      planHash: 'sha256:system-error',
+      planSnapshot: {
+        planId: 'plan_system_error',
+        planHash: 'sha256:system-error',
+        buildReadiness: {
+          canBuild: true,
+          blockers: [],
+          resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+          remainingFields: [],
+          primaryMessage: 'Snapshot should not drive failure state',
+          contractVersion: 'v2'
+        }
+      },
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(panel.lastWorkbenchState, 'failed');
+  assert.notEqual(panel.agentWorkspaceMode, 'plan');
+  assert.equal(turn.statusEl.textContent, '构建失败');
+});
+
+test('BuildFromPlan canonical state rejects stale PlanId and PlanHash responses', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    planId: 'plan_current',
+    planHash: 'sha256:current',
+    canBuild: true
+  }));
+
+  const readiness = {
+    canBuild: false,
+    blockers: [
+      {
+        id: 'hard_requirement:image_source',
+        category: 'hard_requirement',
+        field: 'image_source',
+        blocksBuild: true,
+        resolutionMode: 'answer_question'
+      }
+    ],
+    resolvedFields: ['inspection_object'],
+    remainingFields: ['image_source'],
+    primaryMessage: 'Blocked',
+    contractVersion: 'v2'
+  };
+
+  assert.equal(panel._applyBuildFromPlanCanonicalState({
+    planId: 'plan_stale',
+    planHash: 'sha256:current',
+    buildReadiness: readiness
+  }), false);
+  assert.equal(panel.pendingVisionPlan.executable, true);
+
+  assert.equal(panel._applyBuildFromPlanCanonicalState({
+    planId: 'plan_current',
+    planHash: 'sha256:stale',
+    buildReadiness: readiness
+  }), false);
+  assert.equal(panel.pendingVisionPlan.executable, true);
 });
 
 test('AgentRun non-Planner blockers render unified failure reason and next action', async () => {

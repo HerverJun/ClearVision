@@ -1339,6 +1339,8 @@ public sealed class VisionAgentBuildOrchestratorTests
 
         result.Success.Should().BeTrue();
         result.BuildResult!.PublicWarnings.Should().Contain("plan_hash_mismatch");
+        result.BuildResult.PlanHash.Should().Be(VisionAgentOrchestrator.ComputePlanHash(plan));
+        result.BuildResult.PlanHash.Should().NotBe("stale_plan_hash");
         result.BuildResult.ToolEvidenceTimeline.Should().Contain(item =>
             item.Stage == "plan_generation" &&
             item.WarningCode == "plan_hash_mismatch");
@@ -1533,7 +1535,7 @@ public sealed class VisionAgentBuildOrchestratorTests
             new PlanSelectionResolver(),
             new OperatorPipelineSelector(),
             new ParameterMappingService(),
-            new WorkflowDraftBuilder(new FakeAiFlowGenerationService()),
+            new WorkflowDraftBuilder(),
             toolRunner,
             new BuildReadinessReviewService(),
             new WorkflowDiffService(),

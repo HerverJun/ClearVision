@@ -90,6 +90,39 @@ public sealed class VisionAgentGenerateFlowTests
         agent.CallCount.Should().Be(0);
     }
 
+    [Fact(DisplayName = "BuildFromPlan PlanId mismatch should fail before Build orchestrator")]
+    public async Task BuildFromPlanGenerateFlow_PlanIdMismatch_ShouldFailBeforeBuildOrchestrator()
+    {
+        var agent = new FakeAgentGenerateFlowService(_ => throw new InvalidOperationException("agent generate should not run"));
+        var build = new FakeBuildOrchestrator(_ => throw new InvalidOperationException("build should not run"));
+        var service = CreateAiFlowGenerationService(
+            agent,
+            new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = true },
+            serviceProvider: ServiceProviderFor(build));
+        var buildFromPlan = BuildFromPlanRequest();
+        buildFromPlan = buildFromPlan with
+        {
+            PlanId = "plan-top-level",
+            PlanSnapshot = buildFromPlan.PlanSnapshot! with
+            {
+                PlanId = "plan-snapshot"
+            }
+        };
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("start from plan")
+        {
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = buildFromPlan
+        });
+
+        result.Success.Should().BeFalse();
+        result.FailureSummary.Should().NotBeNull();
+        result.FailureSummary!.Code.Should().Be("build_from_plan_plan_id_mismatch");
+        result.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeSystemError);
+        build.CallCount.Should().Be(0);
+        agent.CallCount.Should().Be(0);
+    }
+
     [Fact(DisplayName = "BuildFromPlan controlled blocker should not fall back to legacy RequirementBriefExtractor")]
     public async Task BuildFromPlanGenerateFlow_ControlledBlocker_ShouldNotFallbackToLegacy()
     {
@@ -171,6 +204,9 @@ public sealed class VisionAgentGenerateFlowTests
         result.FailureSummary.Should().NotBeNull();
         result.FailureSummary!.Category.Should().Be("vision_agent_build_from_plan");
         result.FailureSummary.Code.Should().Be("build_from_plan_system_exception");
+        result.ErrorMessage.Should().NotContain("boom");
+        result.ClarificationRequired.Should().BeFalse();
+        result.BuildReadiness.Should().BeNull();
         build.CallCount.Should().Be(1);
         agent.CallCount.Should().Be(0);
         extractor.DidNotReceiveWithAnyArgs().Extract(default, default, default);

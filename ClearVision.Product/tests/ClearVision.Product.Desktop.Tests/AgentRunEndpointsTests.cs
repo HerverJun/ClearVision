@@ -806,6 +806,8 @@ public sealed class AgentRunEndpointsTests
         failedJson.Should().Contain("\"remainingFields\":[\"image_source\",\"acceptance_criteria\"]");
         failedJson.Should().Contain("\"buildFromPlan\"");
         failedJson.Should().Contain("\"planSnapshot\"");
+        failedJson.Should().Contain($"\"planId\":\"{plan.PlanId}\"");
+        failedJson.Should().Contain($"\"planHash\":\"{plan.PlanHash}\"");
     }
 
     [Fact(DisplayName = "GET AgentRun replay returns final summary and events")]

@@ -461,6 +461,8 @@ public static class AgentRunEndpoints
                         toolTrace = result.ToolTrace,
                         buildResult = result.BuildResult,
                         buildReadiness = result.BuildReadiness,
+                        planId = ResolveResultPlanId(result, request.BuildFromPlan),
+                        planHash = ResolveResultPlanHash(result, request.BuildFromPlan),
                         toolEvidenceTimeline = result.BuildResult?.ToolEvidenceTimeline,
                         workflowDiff = result.BuildResult?.WorkflowDiff,
                         applyGate = result.BuildResult?.ApplyGate,
@@ -499,6 +501,8 @@ public static class AgentRunEndpoints
                     failureSummary = result.FailureSummary,
                     diagnostics = result.LastAttemptDiagnostics,
                     buildReadiness = result.BuildReadiness,
+                    planId = ResolveResultPlanId(result, request.BuildFromPlan),
+                    planHash = ResolveResultPlanHash(result, request.BuildFromPlan),
                     planSnapshot = request.BuildFromPlan?.PlanSnapshot,
                     buildFromPlan = BuildReplayPayload(request.BuildFromPlan),
                     blockingClarificationFields = result.BlockingClarificationFields,
@@ -521,7 +525,16 @@ public static class AgentRunEndpoints
                 "请重试本轮请求；如果后台任务持续失败，再检查后端日志。",
                 new
                 {
-                    error = ex.Message,
+                    failureType = AiFlowGenerationResult.FailureTypeSystemError,
+                    failureSummary = new AiFailureSummary
+                    {
+                        Category = "vision_agent_build_from_plan",
+                        Code = "build_from_plan_system_exception",
+                        Message = "Vision Agent BuildFromPlan failed before completion.",
+                        RepairTarget = "请查看后端日志，修复 BuildFromPlan 专用构建异常后重试。"
+                    },
+                    planId = request.BuildFromPlan?.PlanSnapshot?.PlanId ?? request.BuildFromPlan?.PlanId ?? string.Empty,
+                    planHash = request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? request.BuildFromPlan?.PlanHash ?? string.Empty,
                     metadataOnly = true
                 });
         }
@@ -1101,6 +1114,31 @@ public static class AgentRunEndpoints
             plcOutputPolicy = build?.PlcOutputPolicy ?? string.Empty,
             metadataOnly = true
         };
+    }
+
+    private static string ResolveResultPlanId(
+        AiFlowGenerationResult result,
+        VisionAgentBuildFromPlanRequest? buildFromPlan)
+    {
+        return FirstNonBlank(
+            result.BuildResult?.PlanId,
+            buildFromPlan?.PlanSnapshot?.PlanId,
+            buildFromPlan?.PlanId);
+    }
+
+    private static string ResolveResultPlanHash(
+        AiFlowGenerationResult result,
+        VisionAgentBuildFromPlanRequest? buildFromPlan)
+    {
+        return FirstNonBlank(
+            result.BuildResult?.PlanHash,
+            buildFromPlan?.PlanSnapshot?.PlanHash,
+            buildFromPlan?.PlanHash);
+    }
+
+    private static string FirstNonBlank(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
     }
 
     private static long ParseLastEventId(HttpRequest request)

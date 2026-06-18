@@ -717,6 +717,8 @@ public class GenerateFlowMessageHandlerTests
         doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
         doc.RootElement.GetProperty("status").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusCompleted);
         doc.RootElement.GetProperty("generationMode").GetString().Should().Be("build_from_plan_entry_reached");
+        doc.RootElement.GetProperty("planId").GetString().Should().Be(plan.PlanId);
+        doc.RootElement.GetProperty("planHash").GetString().Should().Be(plan.PlanHash);
         capturedRequest.Should().NotBeNull();
         capturedRequest!.BuildFromPlan.Should().NotBeNull();
         capturedRequest.BuildFromPlan!.PlanSnapshot!.CanBuild.Should().BeFalse();
@@ -798,6 +800,8 @@ public class GenerateFlowMessageHandlerTests
         var root = doc.RootElement;
         root.GetProperty("success").GetBoolean().Should().BeFalse();
         root.GetProperty("status").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
+        root.GetProperty("planId").GetString().Should().Be(plan.PlanId);
+        root.GetProperty("planHash").GetString().Should().Be(plan.PlanHash);
         var serializedReadiness = root.GetProperty("buildReadiness");
         serializedReadiness.GetProperty("canBuild").GetBoolean().Should().BeFalse();
         serializedReadiness.GetProperty("remainingFields").EnumerateArray()
