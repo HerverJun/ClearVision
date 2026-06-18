@@ -62,6 +62,120 @@ public sealed class VisionAgentGenerateFlowTests
         result.ToolTrace.Should().NotBeEmpty();
     }
 
+    [Fact(DisplayName = "BuildFromPlan GenerateFlow should use dedicated Build pipeline even when use flag is false")]
+    public async Task BuildFromPlanGenerateFlow_ShouldUseDedicatedBuildPipeline_WhenUseFlagIsFalse()
+    {
+        var agent = new FakeAgentGenerateFlowService(_ => throw new InvalidOperationException("agent generate should not run"));
+        var build = new FakeBuildOrchestrator(_ => Task.FromResult(new AiFlowGenerationResult
+        {
+            Success = true,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+            GenerationMode = "dedicated_build",
+            Flow = new OperatorFlowDto()
+        }));
+        var service = CreateAiFlowGenerationService(
+            agent,
+            new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = true },
+            serviceProvider: ServiceProviderFor(build));
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("start from plan")
+        {
+            UseVisionAgentGenerateFlow = false,
+            BuildFromPlan = BuildFromPlanRequest()
+        });
+
+        result.Success.Should().BeTrue();
+        result.GenerationMode.Should().Be("dedicated_build");
+        build.CallCount.Should().Be(1);
+        agent.CallCount.Should().Be(0);
+    }
+
+    [Fact(DisplayName = "BuildFromPlan controlled blocker should not fall back to legacy RequirementBriefExtractor")]
+    public async Task BuildFromPlanGenerateFlow_ControlledBlocker_ShouldNotFallbackToLegacy()
+    {
+        var agent = new FakeAgentGenerateFlowService(_ => throw new InvalidOperationException("agent generate should not run"));
+        var extractor = Substitute.For<IRequirementBriefExtractor>();
+        var readiness = new VisionAgentBuildReadinessSnapshot
+        {
+            CanBuild = false,
+            RemainingFields = ["image_source", "acceptance_criteria"],
+            Blockers =
+            [
+                new VisionAgentBuildBlocker
+                {
+                    Id = "hard_requirement:image_source",
+                    Category = VisionAgentBuildBlockerCategories.HardRequirement,
+                    Field = "image_source",
+                    BlocksBuild = true,
+                    ResolutionMode = VisionAgentBuildBlockerResolutionModes.AnswerQuestion
+                }
+            ],
+            PrimaryMessage = "Need canonical fields before Build.",
+            ContractVersion = VisionAgentPlanContractVersions.V2
+        };
+        var build = new FakeBuildOrchestrator(_ => Task.FromResult(new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            FailureType = AiFlowGenerationResult.FailureTypeClarificationRequired,
+            ClarificationRequired = true,
+            BuildReadiness = readiness,
+            BlockingClarificationFields = ["image_source", "acceptance_criteria"],
+            RequirementMaturity = new AiRequirementMaturityResult
+            {
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = ["image_source", "acceptance_criteria"],
+                PublicReason = "Need canonical fields before Build."
+            }
+        }));
+        var service = CreateAiFlowGenerationService(
+            agent,
+            new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = true },
+            requirementBriefExtractor: extractor,
+            serviceProvider: ServiceProviderFor(build));
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("start from plan")
+        {
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = BuildFromPlanRequest()
+        });
+
+        result.Success.Should().BeFalse();
+        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
+        result.BuildReadiness.Should().BeSameAs(readiness);
+        build.CallCount.Should().Be(1);
+        agent.CallCount.Should().Be(0);
+        extractor.DidNotReceiveWithAnyArgs().Extract(default, default, default);
+    }
+
+    [Fact(DisplayName = "BuildFromPlan system exception should return controlled new-pipeline failure without legacy fallback")]
+    public async Task BuildFromPlanGenerateFlow_SystemException_ShouldNotFallbackToLegacy()
+    {
+        var agent = new FakeAgentGenerateFlowService(_ => throw new InvalidOperationException("agent generate should not run"));
+        var extractor = Substitute.For<IRequirementBriefExtractor>();
+        var build = new FakeBuildOrchestrator(_ => throw new InvalidOperationException("boom"));
+        var service = CreateAiFlowGenerationService(
+            agent,
+            new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = true },
+            requirementBriefExtractor: extractor,
+            serviceProvider: ServiceProviderFor(build));
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("start from plan")
+        {
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = BuildFromPlanRequest()
+        });
+
+        result.Success.Should().BeFalse();
+        result.FailureSummary.Should().NotBeNull();
+        result.FailureSummary!.Category.Should().Be("vision_agent_build_from_plan");
+        result.FailureSummary.Code.Should().Be("build_from_plan_system_exception");
+        build.CallCount.Should().Be(1);
+        agent.CallCount.Should().Be(0);
+        extractor.DidNotReceiveWithAnyArgs().Extract(default, default, default);
+    }
+
     [Fact(DisplayName = "Controlled agent should call ReadOnly Simulation and Precheck tools")]
     public async Task AgentGenerateFlow_ShouldCallToolChain()
     {
@@ -540,7 +654,9 @@ public sealed class VisionAgentGenerateFlowTests
 
     private static AiFlowGenerationService CreateAiFlowGenerationService(
         IVisionAgentGenerateFlowService agentGenerateFlowService,
-        AgentGenerateFlowOptions agentOptions)
+        AgentGenerateFlowOptions agentOptions,
+        IRequirementBriefExtractor? requirementBriefExtractor = null,
+        IServiceProvider? serviceProvider = null)
     {
         var conversationService = Substitute.For<IConversationalFlowService>();
         conversationService.PrepareContext(Arg.Any<AiFlowGenerationRequest>())
@@ -580,7 +696,7 @@ public sealed class VisionAgentGenerateFlowTests
             operatorFactory,
             Substitute.For<IFlowTemplateService>(),
             Substitute.For<IScenarioMatcher>(),
-            Substitute.For<IRequirementBriefExtractor>(),
+            requirementBriefExtractor ?? Substitute.For<IRequirementBriefExtractor>(),
             turnRouter,
             Substitute.For<ITemplateConstraintValidator>(),
             new AiFlowResponseParser(),
@@ -589,7 +705,63 @@ public sealed class VisionAgentGenerateFlowTests
             promptVersionManager,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>(),
             Options.Create(agentOptions),
-            agentGenerateFlowService);
+            agentGenerateFlowService,
+            serviceProvider);
+    }
+
+    private static VisionAgentBuildFromPlanRequest BuildFromPlanRequest()
+    {
+        return new VisionAgentBuildFromPlanRequest
+        {
+            PlanId = "plan-build-from-plan",
+            PlanHash = "sha256:test",
+            PlanSnapshot = new VisionAgentPlanModeResult
+            {
+                PlanId = "plan-build-from-plan",
+                PlanHash = "sha256:test",
+                PlanContractVersion = VisionAgentPlanContractVersions.V2,
+                OriginalUserPrompt = "detect circular hole offset",
+                Goal = "detect circular hole offset",
+                Intent = AiVisionTaskTypes.GeometryMeasurement,
+                Confidence = "high",
+                RequirementUnderstanding = ["Measure circular hole center offset."],
+                RecommendedRoute = new VisionAgentRecommendedRoute
+                {
+                    RouteId = "measurement",
+                    Title = "Measurement",
+                    Summary = "Measure center offset.",
+                    Operators = ["ImageAcquisition", "CircleDetection", "Measurement", "ResultOutput"],
+                    TemplateDecision = "planner_route"
+                },
+                CanBuild = true,
+                BuildReadiness = new VisionAgentBuildReadinessSnapshot
+                {
+                    CanBuild = true,
+                    ResolvedFields = ["inspection_object", "task_type", "image_source", "acceptance_criteria"],
+                    PrimaryMessage = "Ready",
+                    ContractVersion = VisionAgentPlanContractVersions.V2
+                },
+                MetadataOnly = true
+            },
+            ConfirmedAnswers =
+            [
+                new VisionAgentPlanAnswer
+                {
+                    Field = "image_source",
+                    Value = "camera",
+                    QuestionId = "image_source",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                }
+            ],
+            MetadataOnly = true
+        };
+    }
+
+    private static IServiceProvider ServiceProviderFor(IVisionAgentBuildOrchestrator buildOrchestrator)
+    {
+        var provider = Substitute.For<IServiceProvider>();
+        provider.GetService(typeof(IVisionAgentBuildOrchestrator)).Returns(buildOrchestrator);
+        return provider;
     }
 
     private static object BrokenConnectionFlow()
@@ -695,6 +867,26 @@ public sealed class VisionAgentGenerateFlowTests
         public int CallCount { get; private set; }
 
         public Task<AiFlowGenerationResult> GenerateFlowAsync(
+            AiFlowGenerationRequest request,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            return _handler(request);
+        }
+    }
+
+    private sealed class FakeBuildOrchestrator : IVisionAgentBuildOrchestrator
+    {
+        private readonly Func<AiFlowGenerationRequest, Task<AiFlowGenerationResult>> _handler;
+
+        public FakeBuildOrchestrator(Func<AiFlowGenerationRequest, Task<AiFlowGenerationResult>> handler)
+        {
+            _handler = handler;
+        }
+
+        public int CallCount { get; private set; }
+
+        public Task<AiFlowGenerationResult> BuildAsync(
             AiFlowGenerationRequest request,
             CancellationToken cancellationToken)
         {

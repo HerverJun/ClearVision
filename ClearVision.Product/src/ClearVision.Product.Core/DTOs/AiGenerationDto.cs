@@ -225,6 +225,8 @@ public class AiFlowGenerationResult
 
     public VisionAgentBuildResult? BuildResult { get; set; }
 
+    public VisionAgentBuildReadinessSnapshot? BuildReadiness { get; set; }
+
     /// <summary>
     /// 本次失败的结构化摘要（成功时为空）
     /// </summary>

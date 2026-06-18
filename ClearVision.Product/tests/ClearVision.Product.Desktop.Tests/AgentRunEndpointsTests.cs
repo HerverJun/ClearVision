@@ -730,6 +730,84 @@ public sealed class AgentRunEndpointsTests
         completedJson.Should().NotContain("C:\\");
     }
 
+    [Fact(DisplayName = "POST AgentRun BuildFromPlan failure replays canonical BuildReadiness payload")]
+    public async Task CreateRun_BuildFromPlanFailure_ShouldReplayBuildReadiness()
+    {
+        var readiness = new VisionAgentBuildReadinessSnapshot
+        {
+            CanBuild = false,
+            RemainingFields = ["image_source", "acceptance_criteria"],
+            ResolvedFields = ["inspection_object", "task_type"],
+            Blockers =
+            [
+                new VisionAgentBuildBlocker
+                {
+                    Id = "hard_requirement:image_source",
+                    Category = VisionAgentBuildBlockerCategories.HardRequirement,
+                    Field = "image_source",
+                    BlocksBuild = true,
+                    ResolutionMode = VisionAgentBuildBlockerResolutionModes.AnswerQuestion
+                }
+            ],
+            PrimaryMessage = "Canonical readiness blocked Build.",
+            ContractVersion = VisionAgentPlanContractVersions.V2
+        };
+        await using var host = await AgentRunEndpointTestHost.CreateAsync((_, _) => Task.FromResult(new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            FailureType = AiFlowGenerationResult.FailureTypeClarificationRequired,
+            ClarificationRequired = true,
+            ErrorMessage = "Canonical readiness blocked Build.",
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "requirement_maturity",
+                Code = "maturity_gate_blocked",
+                Message = "Canonical readiness blocked Build.",
+                RepairTarget = "Answer canonical fields."
+            },
+            BuildReadiness = readiness,
+            BlockingClarificationFields = ["image_source", "acceptance_criteria"],
+            RequirementMaturity = new AiRequirementMaturityResult
+            {
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = ["image_source", "acceptance_criteria"],
+                PublicReason = "Canonical readiness blocked Build."
+            }
+        }));
+
+        var plan = LegacyBlockedAgentRunBuildFromPlanSnapshot();
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "start build from blocked canonical plan",
+            BuildFromPlan = new VisionAgentBuildFromPlanRequest
+            {
+                PlanId = plan.PlanId,
+                PlanHash = plan.PlanHash,
+                PlanSnapshot = plan,
+                ConfirmedAnswers = ConfirmedAgentRunBuildFromPlanAnswers(),
+                MetadataOnly = true
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = createDoc.RootElement.GetProperty("runId").GetString()!;
+        await host.Generation.WaitForCallAsync();
+        await host.WaitForTerminalAsync(runId);
+
+        var replay = host.StreamService.Replay(runId)!;
+        replay.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
+        var failed = replay.Events.Single(evt => evt.EventType == AgentRunEventTypes.RunFailed);
+        var failedJson = JsonSerializer.Serialize(failed, AgentRunEventJson.Options);
+        failedJson.Should().Contain("\"buildReadiness\"");
+        failedJson.Should().Contain("\"canBuild\":false");
+        failedJson.Should().Contain("\"remainingFields\":[\"image_source\",\"acceptance_criteria\"]");
+        failedJson.Should().Contain("\"buildFromPlan\"");
+        failedJson.Should().Contain("\"planSnapshot\"");
+    }
+
     [Fact(DisplayName = "GET AgentRun replay returns final summary and events")]
     public async Task Replay_ShouldReturnSummaryAndEvents()
     {

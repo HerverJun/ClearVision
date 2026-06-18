@@ -19,6 +19,7 @@ using ClearVision.Product.Infrastructure.AI.Runtime;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using OpenCvSharp;
 
 namespace ClearVision.Product.Infrastructure.AI;
@@ -44,6 +45,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
     private readonly AgentGenerateFlowOptions _agentGenerateFlowOptions;
     private readonly IVisionAgentGenerateFlowService? _agentGenerateFlowService;
+    private readonly IServiceProvider? _serviceProvider;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -72,7 +74,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         IPromptVersionManager promptVersionManager,
         Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger,
         IOptions<AgentGenerateFlowOptions>? agentGenerateFlowOptions = null,
-        IVisionAgentGenerateFlowService? agentGenerateFlowService = null)
+        IVisionAgentGenerateFlowService? agentGenerateFlowService = null,
+        IServiceProvider? serviceProvider = null)
     {
         _aiOrchestrator = aiOrchestrator;
         _promptBuilder = promptBuilder;
@@ -92,6 +95,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _logger = logger;
         _agentGenerateFlowOptions = agentGenerateFlowOptions?.Value ?? new AgentGenerateFlowOptions();
         _agentGenerateFlowService = agentGenerateFlowService;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task<AiFlowGenerationResult> GenerateFlowAsync(
@@ -109,6 +113,11 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
             progressMessages.Add(message);
             onProgress?.Invoke(message);
+        }
+
+        if (request.BuildFromPlan != null)
+        {
+            return await GenerateFlowFromPlanAsync(request, ReportProgress, cancellationToken);
         }
 
         if (ShouldRunAgentGenerateFlow(request))
@@ -918,6 +927,128 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     {
         return _agentGenerateFlowOptions.Enabled &&
                request.UseVisionAgentGenerateFlow;
+    }
+
+    private async Task<AiFlowGenerationResult> GenerateFlowFromPlanAsync(
+        AiFlowGenerationRequest request,
+        Action<string> reportProgress,
+        CancellationToken cancellationToken)
+    {
+        var contractError = ValidateBuildFromPlanContract(request.BuildFromPlan);
+        if (!string.IsNullOrWhiteSpace(contractError))
+        {
+            return BuildFromPlanControlledFailure(
+                "build_from_plan_contract_invalid",
+                contractError,
+                "请回到左侧 Plan 工作台重新确认计划后再开始构建。",
+                AiFlowGenerationResult.FailureTypeSystemError);
+        }
+
+        if (!_agentGenerateFlowOptions.Enabled)
+        {
+            return BuildFromPlanControlledFailure(
+                "build_from_plan_disabled",
+                "Vision Agent BuildFromPlan is disabled by configuration.",
+                "请启用 Vision Agent GenerateFlow 配置，或在左侧 Plan 工作台重新发起构建。",
+                AiFlowGenerationResult.FailureTypeSystemError);
+        }
+
+        var buildOrchestrator = _serviceProvider?.GetService<IVisionAgentBuildOrchestrator>();
+        if (buildOrchestrator == null)
+        {
+            return BuildFromPlanControlledFailure(
+                "build_orchestrator_not_registered",
+                "Vision Agent Build orchestrator is not registered.",
+                "请检查后端 Vision Agent BuildOrchestrator 注册后重试。",
+                AiFlowGenerationResult.FailureTypeSystemError);
+        }
+
+        try
+        {
+            reportProgress("Vision Agent BuildFromPlan request is using the dedicated Build pipeline.");
+            var result = await buildOrchestrator.BuildAsync(request, cancellationToken);
+            TryPersistAgentGenerateFlowResult(request, result, ["BuildFromPlan dedicated pipeline"]);
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Vision Agent BuildFromPlan failed with controlled error mode.");
+            return BuildFromPlanControlledFailure(
+                "build_from_plan_system_exception",
+                $"Vision Agent BuildFromPlan failed: {ex.Message}",
+                "请检查公开诊断和后端日志，修复 BuildFromPlan 专用构建异常后重试。",
+                AiFlowGenerationResult.FailureTypeSystemError);
+        }
+    }
+
+    private static string? ValidateBuildFromPlanContract(VisionAgentBuildFromPlanRequest? build)
+    {
+        if (build == null)
+        {
+            return "BuildFromPlan payload is required.";
+        }
+
+        if (build.PlanSnapshot == null)
+        {
+            return "BuildFromPlan.PlanSnapshot is required.";
+        }
+
+        var planId = FirstNonBlank(build.PlanId, build.PlanSnapshot.PlanId);
+        if (string.IsNullOrWhiteSpace(planId))
+        {
+            return "BuildFromPlan requires a plan id.";
+        }
+
+        var version = (build.PlanSnapshot.PlanContractVersion ?? string.Empty).Trim();
+        if (!string.IsNullOrWhiteSpace(version) &&
+            !version.Equals(VisionAgentPlanContractVersions.V1, StringComparison.OrdinalIgnoreCase) &&
+            !version.Equals(VisionAgentPlanContractVersions.V2, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Unsupported Plan contract version: {version}.";
+        }
+
+        if (build.ConfirmedAnswers.Any(answer =>
+                string.IsNullOrWhiteSpace(answer.Field) &&
+                string.IsNullOrWhiteSpace(answer.QuestionId)))
+        {
+            return "BuildFromPlan confirmed answers must include a field or question id.";
+        }
+
+        return null;
+    }
+
+    private static string FirstNonBlank(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? string.Empty;
+    }
+
+    private static AiFlowGenerationResult BuildFromPlanControlledFailure(
+        string code,
+        string message,
+        string repairTarget,
+        string failureType)
+    {
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            FailureType = failureType,
+            ErrorMessage = message,
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "vision_agent_build_from_plan",
+                Code = code,
+                Message = message,
+                RepairTarget = repairTarget
+            },
+            InteractionState = AiInteractionStates.Failed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High
+        };
     }
 
     private void PersistAgentGenerateFlowResult(

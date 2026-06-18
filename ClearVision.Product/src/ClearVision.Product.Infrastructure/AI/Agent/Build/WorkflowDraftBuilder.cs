@@ -45,7 +45,9 @@ public sealed class WorkflowDraftBuilder
         {
             ExistingFlowJson = load.CurrentFlowSnapshot,
             Mode = ToGenerateFlowMode(intent.BuildIntent),
-            TemplateSelection = load.TemplateSelection
+            TemplateSelection = load.TemplateSelection,
+            BuildFromPlan = null,
+            UseVisionAgentGenerateFlow = false
         };
         var generation = await _generationService.GenerateFlowAsync(
             generationRequest,

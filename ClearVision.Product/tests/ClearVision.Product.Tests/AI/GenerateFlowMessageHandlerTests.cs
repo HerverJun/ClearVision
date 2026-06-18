@@ -729,6 +729,83 @@ public class GenerateFlowMessageHandlerTests
             Arg.Any<Action<ClearVision.Product.Contracts.Messages.GenerateFlowAttachmentReport>>());
     }
 
+    [Fact(DisplayName = "GenerateFlowMessageHandler BuildFromPlan failure should serialize canonical BuildReadiness")]
+    public async Task HandleAsync_BuildFromPlanFailure_ShouldSerializeBuildReadiness()
+    {
+        var generationService = Substitute.For<IAiFlowGenerationService>();
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
+        var handler = new GenerateFlowMessageHandler(generationService, logger);
+        var readiness = new VisionAgentBuildReadinessSnapshot
+        {
+            CanBuild = false,
+            RemainingFields = ["image_source", "acceptance_criteria"],
+            ResolvedFields = ["inspection_object", "task_type"],
+            Blockers =
+            [
+                new VisionAgentBuildBlocker
+                {
+                    Id = "hard_requirement:image_source",
+                    Category = VisionAgentBuildBlockerCategories.HardRequirement,
+                    Field = "image_source",
+                    BlocksBuild = true,
+                    ResolutionMode = VisionAgentBuildBlockerResolutionModes.AnswerQuestion
+                }
+            ],
+            PrimaryMessage = "Need canonical fields before Build.",
+            ContractVersion = VisionAgentPlanContractVersions.V2
+        };
+
+        generationService.GenerateFlowAsync(
+                Arg.Any<AiFlowGenerationRequest>(),
+                Arg.Any<Action<string>>(),
+                Arg.Any<Action<ClearVision.Product.Contracts.Messages.AiStreamChunk>>(),
+                Arg.Any<CancellationToken>(),
+                Arg.Any<Action<ClearVision.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
+            .Returns(Task.FromResult(new AiFlowGenerationResult
+            {
+                Success = false,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+                FailureType = AiFlowGenerationResult.FailureTypeClarificationRequired,
+                ClarificationRequired = true,
+                BuildReadiness = readiness,
+                BlockingClarificationFields = ["image_source", "acceptance_criteria"],
+                RequirementMaturity = new AiRequirementMaturityResult
+                {
+                    CanPlan = true,
+                    CanBuild = false,
+                    MissingFields = ["image_source", "acceptance_criteria"],
+                    PublicReason = "Need canonical fields before Build."
+                }
+            }));
+
+        var plan = LegacyBlockedBuildFromPlanSnapshot();
+        var resultJson = await handler.HandleAsync(
+            description: "start build from confirmed plan",
+            mode: GenerateFlowMode.New,
+            requirementMode: AiRequirementModes.Strict,
+            buildFromPlan: new VisionAgentBuildFromPlanRequest
+            {
+                PlanId = plan.PlanId,
+                PlanHash = plan.PlanHash,
+                PlanSnapshot = plan,
+                ConfirmedAnswers = ConfirmedRequirementAnswers(),
+                OriginalUserPrompt = "start build from confirmed plan",
+                MetadataOnly = true
+            },
+            useVisionAgentGenerateFlow: false);
+
+        using var doc = JsonDocument.Parse(resultJson);
+        var root = doc.RootElement;
+        root.GetProperty("success").GetBoolean().Should().BeFalse();
+        root.GetProperty("status").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
+        var serializedReadiness = root.GetProperty("buildReadiness");
+        serializedReadiness.GetProperty("canBuild").GetBoolean().Should().BeFalse();
+        serializedReadiness.GetProperty("remainingFields").EnumerateArray()
+            .Select(item => item.GetString()).Should().Equal("image_source", "acceptance_criteria");
+        root.GetProperty("blockingClarificationFields").EnumerateArray()
+            .Select(item => item.GetString()).Should().Equal("image_source", "acceptance_criteria");
+    }
+
     private static VisionAgentPlanModeResult LegacyBlockedBuildFromPlanSnapshot()
     {
         var result = new VisionAgentPlanModeResult

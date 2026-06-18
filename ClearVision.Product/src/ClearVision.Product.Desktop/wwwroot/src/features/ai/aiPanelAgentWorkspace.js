@@ -2146,6 +2146,63 @@ export const aiPanelAgentWorkspaceMixin = {
         };
     },
 
+    _applyBuildFromPlanCanonicalState(payload) {
+        if (!this.pendingVisionPlan || !payload || typeof payload !== 'object') return false;
+        const data = this._asObject?.(payload) || payload;
+        const buildReplay = this._asObject?.(data.buildFromPlan || data.BuildFromPlan) || {};
+        const planSnapshot = data.planSnapshot || data.PlanSnapshot || buildReplay.planSnapshot || buildReplay.PlanSnapshot || null;
+        const readiness = this._normalizePlanBuildReadiness(
+            data.buildReadiness ||
+            data.BuildReadiness ||
+            planSnapshot?.buildReadiness ||
+            planSnapshot?.BuildReadiness
+        );
+        if (!this._isUsableAuthoritativeReadiness(readiness)) return false;
+
+        const plan = this.pendingVisionPlan;
+        const incomingPlanId = String(
+            data.planId ||
+            data.PlanId ||
+            buildReplay.planId ||
+            buildReplay.PlanId ||
+            planSnapshot?.planId ||
+            planSnapshot?.PlanId ||
+            ''
+        ).trim();
+        const currentPlanId = String(plan.planId || plan.id || '').trim();
+        if (incomingPlanId && currentPlanId && incomingPlanId !== currentPlanId) {
+            return false;
+        }
+
+        if (planSnapshot && typeof planSnapshot === 'object') {
+            plan.rawPlanSnapshot = planSnapshot;
+        }
+
+        const maturity = this._normalizeRequirementMaturity(data.requirementMaturity || data.RequirementMaturity || planSnapshot?.requirementMaturity || planSnapshot?.RequirementMaturity);
+        if (maturity) {
+            plan.requirementMaturity = maturity;
+        }
+
+        const trace = this._normalizeDecisionTrace(data.decisionTrace || data.DecisionTrace || planSnapshot?.decisionTrace || planSnapshot?.DecisionTrace);
+        if (trace) {
+            plan.decisionTrace = trace;
+        }
+
+        plan.authoritativeBuildReadiness = readiness;
+        plan.buildReadiness = readiness;
+        plan.executable = readiness.canBuild === true;
+        plan.resolvedPlanFields = this._toArray(readiness.resolvedFields);
+        plan.remainingPlanFields = this._toArray(readiness.remainingFields);
+        const blockingFields = this._toArray(data.blockingClarificationFields || data.BlockingClarificationFields);
+        plan.blockingReasons = blockingFields.length
+            ? blockingFields
+            : this._toArray(readiness.blockers)
+                .filter(blocker => blocker?.blocksBuild === true)
+                .map(blocker => blocker.id || blocker.field)
+                .filter(Boolean);
+        return true;
+    },
+
     _isUsableAuthoritativeReadiness(snapshot) {
         if (!snapshot || typeof snapshot !== 'object') return false;
         const version = String(snapshot.contractVersion || '').trim().toLowerCase();

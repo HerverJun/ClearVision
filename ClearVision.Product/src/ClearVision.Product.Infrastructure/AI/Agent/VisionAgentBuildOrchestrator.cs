@@ -407,7 +407,8 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                 request,
                 maturityRequest,
                 planMaturity,
-                readiness.BlockingReasons);
+                readiness.BlockingReasons,
+                readiness);
         }
 
         if (plan?.CanBuild == true &&
@@ -455,7 +456,8 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
         AiFlowGenerationRequest request,
         VisionAgentRequirementMaturityRequest maturityRequest,
         AiRequirementMaturityResult maturity,
-        IReadOnlyList<string>? overrideBlockingReasons)
+        IReadOnlyList<string>? overrideBlockingReasons,
+        VisionAgentPlanBuildReadinessResult? readiness = null)
     {
         var trace = VisionAgentRequirementMaturityGate.BuildDecisionTrace(
             maturityRequest,
@@ -474,6 +476,15 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
         var blockingReasons = overrideBlockingReasons?.Count > 0
             ? overrideBlockingReasons.ToList()
             : maturity.BlockingReasons;
+        var buildReadiness = readiness == null
+            ? BuildReadinessSnapshot(fields, blockingReasons, maturity.PublicReason)
+            : BuildReadinessSnapshot(
+                readiness.RemainingFields.Count > 0 ? readiness.RemainingFields : fields,
+                readiness.BlockingReasons.Count > 0 ? readiness.BlockingReasons : blockingReasons,
+                maturity.PublicReason) with
+            {
+                ResolvedFields = readiness.ResolvedFields
+            };
         return new AiFlowGenerationResult
         {
             Success = false,
@@ -523,9 +534,54 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
             NonBlockingMissingFields = maturity.MissingFields.Except(fields, StringComparer.OrdinalIgnoreCase).ToList(),
             RequirementMaturity = maturity,
             DecisionTrace = trace with { BlockingReasons = blockingReasons.ToList() },
+            BuildReadiness = buildReadiness,
             TurnIntent = AiTurnIntents.NewFlow,
             InteractionState = AiInteractionStates.Clarifying,
             RouterConfidence = AiRouterConfidence.High
+        };
+    }
+
+    private static VisionAgentBuildReadinessSnapshot BuildReadinessSnapshot(
+        IReadOnlyList<string> fields,
+        IReadOnlyList<string> blockingReasons,
+        string primaryMessage)
+    {
+        var remainingFields = fields
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var blockers = (blockingReasons.Count > 0 ? blockingReasons : remainingFields)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(reason =>
+            {
+                var field = NormalizeBlockingField(reason);
+                var isResourcePending = reason.StartsWith("resource_pending:", StringComparison.OrdinalIgnoreCase);
+                var isStrategyConfirmation = reason.StartsWith("strategy_confirmation:", StringComparison.OrdinalIgnoreCase);
+                return new VisionAgentBuildBlocker
+                {
+                    Id = reason,
+                    Category = isResourcePending
+                        ? VisionAgentBuildBlockerCategories.ResourcePending
+                        : isStrategyConfirmation
+                            ? VisionAgentBuildBlockerCategories.StrategyConfirmation
+                            : VisionAgentBuildBlockerCategories.HardRequirement,
+                    Field = field,
+                    BlocksBuild = true,
+                    ResolutionMode = isResourcePending
+                        ? VisionAgentBuildBlockerResolutionModes.ProvideResource
+                        : VisionAgentBuildBlockerResolutionModes.AnswerQuestion,
+                    PublicLabel = field
+                };
+            })
+            .ToList();
+
+        return new VisionAgentBuildReadinessSnapshot
+        {
+            CanBuild = false,
+            Blockers = blockers,
+            RemainingFields = remainingFields,
+            PrimaryMessage = primaryMessage,
+            ContractVersion = VisionAgentPlanContractVersions.V2
         };
     }
 

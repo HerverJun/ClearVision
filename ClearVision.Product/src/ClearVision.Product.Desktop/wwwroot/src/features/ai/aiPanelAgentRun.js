@@ -948,6 +948,16 @@ export const aiPanelAgentRunMixin = {
     },
 
     _renderAgentRunFailure(evt) {
+        const appliedCanonical = this._applyBuildFromPlanCanonicalState?.(evt.payload) === true;
+        if (appliedCanonical) {
+            this.pendingClarificationPayload = evt.payload;
+            this.agentWorkspaceMode = 'plan';
+            this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
+            this._renderAgentWorkspaceOverview?.();
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+            this._renderBuildWorkspaceFromAgentRun?.();
+            this._updatePlanBuildActionState?.();
+        }
         const firstFix = this._payloadString(evt.payload, 'firstFixRecommendation') ||
             this._payloadString(this._asObject(evt.payload)?.diagnostic, 'firstFixRecommendation') ||
             '请复核公开诊断，补齐缺失元数据后重试。';
@@ -985,8 +995,22 @@ export const aiPanelAgentRunMixin = {
             this._setAssistantTurnStatus(this.activeAssistantTurn, '已取消', 'cancelled');
             this._setResultStatusNote('', '');
         } else {
-            this._setWorkbenchState(AiWorkbenchStates.FAILED);
-            this._setAssistantTurnStatus(this.activeAssistantTurn, '构建失败', 'failed');
+            const appliedCanonical = this._applyBuildFromPlanCanonicalState?.(evt.payload) === true;
+            if (appliedCanonical) {
+                this.pendingClarificationPayload = evt.payload;
+                this.agentWorkspaceMode = 'plan';
+                this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
+                this._renderAgentWorkspaceOverview?.();
+                this._renderPlanWorkspace?.(this.pendingVisionPlan);
+                this._updatePlanBuildActionState?.();
+            } else {
+                this._setWorkbenchState(AiWorkbenchStates.FAILED);
+            }
+            if (appliedCanonical) {
+                this._setAssistantTurnStatus(this.activeAssistantTurn, '待澄清', 'warning');
+            } else {
+                this._setAssistantTurnStatus(this.activeAssistantTurn, '构建失败', 'failed');
+            }
             if (evt.summary) {
                 this._setResultStatusNote(evt.summary, 'warning');
             }

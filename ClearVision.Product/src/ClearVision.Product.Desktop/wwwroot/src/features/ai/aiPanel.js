@@ -794,6 +794,7 @@ export class AiPanel {
             || this._startAssistantTurn({ activate: false, statusText: '处理中', statusTone: 'streaming' });
         const isClarification = this._isClarificationResult(payload);
         const isInteractionOnly = this._isInteractionOnlyResult(payload);
+        const appliedBuildFromPlanCanonical = this._applyBuildFromPlanCanonicalState?.(payload) === true;
         this._renderAgentRuntime(payload);
 
         if (isCancelled) {
@@ -845,6 +846,10 @@ export class AiPanel {
                 this._clearPlanQuestionAnswers?.();
             }
             this._resetClarificationSelectionDraft();
+            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
+        } else if (appliedBuildFromPlanCanonical && payload.success === false) {
+            this.pendingClarificationPayload = payload;
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
         } else {

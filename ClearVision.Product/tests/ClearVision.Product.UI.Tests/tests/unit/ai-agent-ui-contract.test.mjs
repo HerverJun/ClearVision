@@ -2842,6 +2842,10 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   assert.match(captured.userMessage, /从计划开始构建/);
   assert.equal(captured.buildFromPlan.planHash, 'sha256:plan-build-1');
   assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
+  assert.equal(captured.buildFromPlan.planSnapshot.planHash, 'sha256:plan-build-1');
+  assert.equal(captured.buildFromPlan.planSnapshot.canBuild, true);
+  assert.equal(captured.buildFromPlan.planSnapshot.buildReadiness.canBuild, true);
+  assert.equal(captured.buildFromPlan.requirementMaturity.canBuild, true);
   assert.deepEqual(captured.buildFromPlan.templateSelection, {
     mode: 'template_adapt',
     templateId: 'tmpl-plan',
@@ -5598,6 +5602,86 @@ test('AgentRun run.failed renders failure diagnosis and first fix only', async (
   assert.doesNotMatch(turn.failureBody.innerHTML, /chain.?of.?thought|raw prompt|system prompt/i);
   assert.equal(panel.lastWorkbenchState, 'failed');
   assert.equal(turn.statusEl.textContent, '构建失败');
+});
+
+test('AgentRun BuildFromPlan run.failed applies canonical readiness without legacy scene clarification', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: true, enabled: true });
+  const turn = attachAgentRunTurn(panel);
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.activeAgentRunId = 'ar_build_from_plan_blocked';
+  panel.pendingVisionPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    planId: 'plan_build_from_plan_blocked',
+    planHash: 'sha256:block-me',
+    canBuild: true,
+    buildReadiness: {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: [],
+      primaryMessage: 'Ready',
+      contractVersion: 'v2'
+    }
+  }));
+
+  panel._handleAgentRunEvent({
+    runId: 'ar_build_from_plan_blocked',
+    sequence: 8,
+    eventType: 'run.failed',
+    stage: 'run',
+    title: 'Run failed',
+    summary: 'Canonical readiness blocked Build.',
+    status: 'failed',
+    payload: {
+      status: 'clarification_required',
+      failureType: 'clarification_required',
+      buildFromPlan: { planId: 'plan_build_from_plan_blocked', planHash: 'sha256:block-me' },
+      planSnapshot: {
+        planId: 'plan_build_from_plan_blocked',
+        planHash: 'sha256:block-me'
+      },
+      buildReadiness: {
+        canBuild: false,
+        blockers: [
+          {
+            id: 'hard_requirement:image_source',
+            category: 'hard_requirement',
+            field: 'image_source',
+            blocksBuild: true,
+            resolutionMode: 'answer_question'
+          }
+        ],
+        resolvedFields: ['inspection_object', 'task_type'],
+        remainingFields: ['image_source', 'acceptance_criteria'],
+        primaryMessage: 'Canonical readiness blocked Build.',
+        contractVersion: 'v2'
+      },
+      blockingClarificationFields: ['image_source', 'acceptance_criteria'],
+      requirementMaturity: {
+        canPlan: true,
+        canBuild: false,
+        missingFields: ['image_source', 'acceptance_criteria'],
+        publicReason: 'Canonical readiness blocked Build.'
+      },
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  });
+
+  assert.equal(panel.pendingVisionPlan.executable, false);
+  assert.equal(panel.pendingVisionPlan.buildReadiness.canBuild, false);
+  assert.deepEqual(panel.pendingVisionPlan.remainingPlanFields, ['image_source', 'acceptance_criteria']);
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.equal(panel.lastWorkbenchState, 'clarifying');
+  assert.equal(turn.statusEl.textContent, '待澄清');
+  const renderedText = `${turn.failureBody.innerHTML} ${panel.container.querySelector('#ai-plan-workspace').innerHTML}`;
+  assert.doesNotMatch(renderedText, /请确认这是外观缺陷、漏装有无、线序判定还是尺寸测量场景/);
 });
 
 test('AgentRun non-Planner blockers render unified failure reason and next action', async () => {
