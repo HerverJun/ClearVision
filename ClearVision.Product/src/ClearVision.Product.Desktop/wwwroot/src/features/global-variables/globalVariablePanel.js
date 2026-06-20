@@ -30,6 +30,7 @@ export default class GlobalVariablePanel {
     constructor(containerId, options = {}) {
         this.container = document.getElementById(containerId);
         this.project = null;
+        this.baselineSchema = createEmptyGlobalVariableSchema();
         this.schema = createEmptyGlobalVariableSchema();
         this.values = [];
         this.isOpen = false;
@@ -44,12 +45,15 @@ export default class GlobalVariablePanel {
         this.requestSerial = 0;
         this.dialog = null;
         this.options = options;
+        this.runtimeState = options.getRuntimeState?.() || inspectionController.getState?.() || {};
+        this.unsubscribeInspectionState = null;
+        this.subscribeRuntimeState();
     }
 
     async setProject(project) {
         const requestId = ++this.requestSerial;
         this.project = project || null;
-        this.schema = normalizeGlobalVariableSchema(project?.globalVariables || project?.GlobalVariables);
+        this.rebuildBaseline(project?.globalVariables || project?.GlobalVariables);
         this.values = [];
         this.errorMessage = '';
         this.selectedVariableId = this.schema.variables[0]?.id || '';
@@ -124,6 +128,7 @@ export default class GlobalVariablePanel {
         }
 
         this.isOpen = true;
+        this.rebuildBaseline(this.project?.globalVariables || this.project?.GlobalVariables);
         if (!this.selectedVariableId && this.schema.variables.length > 0) {
             this.selectedVariableId = this.schema.variables[0].id;
         }
@@ -226,11 +231,47 @@ export default class GlobalVariablePanel {
         `;
     }
 
+    renderVariableListHtml() {
+        if (this.loading) {
+            return '<div class="gv-loading">姝ｅ湪鍔犺浇鍙橀噺...</div>';
+        }
+
+        const valuesById = new Map(this.values.map(item => [String(item.variableId).toLowerCase(), item]));
+        const filteredVariables = this.getFilteredVariables();
+        if (filteredVariables.length === 0) {
+            return '<div class="gv-empty">娌℃湁绗﹀悎鏉′欢鐨勫彉閲忋€?/div>';
+        }
+
+        return filteredVariables.map(variable => {
+            const current = valuesById.get(String(variable.id).toLowerCase());
+            const source = this.getSourceBinding(variable.id);
+            return `
+                    <button type="button" class="gv-variable-row ${sameId(variable.id, this.selectedVariableId) ? 'selected' : ''}" data-action="select" data-variable-id="${escapeHtml(variable.id)}">
+                        <span class="gv-variable-name">${escapeHtml(variable.displayName || variable.name)}</span>
+                        <span class="gv-variable-meta">${escapeHtml(variable.name)} 路 ${escapeHtml(getTypeLabel(variable.valueType))}</span>
+                        <span class="gv-variable-value">${escapeHtml(formatGlobalVariableValue(current?.value ?? variable.initialValue))}</span>
+                    <span class="gv-variable-source">${source ? '\u7b97\u5b50\u8f93\u51fa' : '\u56fa\u5b9a\u521d\u59cb\u503c'}</span>
+                    </button>
+                `;
+        }).join('');
+    }
+
+    renderVariableList() {
+        const list = this.dialog?.querySelector?.('.gv-variable-list');
+        if (list) {
+            list.innerHTML = this.renderVariableListHtml();
+        }
+    }
+
     renderEmptyDetailHtml() {
         return `
             <div class="gv-empty gv-empty-detail">
                 <h3>暂无变量</h3>
                 <p>点击“新建变量”创建第一个全局变量。</p>
+                <div class="gv-actions">
+                    <button type="button" class="btn btn-secondary" data-action="discard" ${this.dirty ? '' : 'disabled'}>\u653e\u5f03</button>
+                    <button type="button" class="btn btn-primary" data-action="save" ${this.isRuntimeLocked() || this.pendingAction === 'save' ? 'disabled' : ''}>${this.pendingAction === 'save' ? '\u4fdd\u5b58\u4e2d...' : '\u4fdd\u5b58'}</button>
+                </div>
             </div>
         `;
     }
@@ -456,18 +497,25 @@ export default class GlobalVariablePanel {
     handleInput(event) {
         const target = event.target;
         if (target.id === 'gv-search') {
+            const selectionStart = target.selectionStart;
+            const selectionEnd = target.selectionEnd;
             this.filters.search = target.value || '';
-            this.renderDialog();
+            this.renderVariableList();
+            const search = this.dialog?.querySelector?.('#gv-search');
+            if (search) {
+                search.focus?.();
+                search.setSelectionRange?.(selectionStart ?? search.value.length, selectionEnd ?? search.value.length);
+            }
             return;
         }
         if (target.id === 'gv-type-filter') {
             this.filters.type = target.value || '全部类型';
-            this.renderDialog();
+            this.renderVariableList();
             return;
         }
         if (target.id === 'gv-source-filter') {
             this.filters.source = target.value || '全部来源';
-            this.renderDialog();
+            this.renderVariableList();
             return;
         }
         if (!target.dataset?.field || !this.draft) {
@@ -475,6 +523,7 @@ export default class GlobalVariablePanel {
         }
 
         const field = target.dataset.field;
+        let shouldRender = false;
         if (target.type === 'checkbox') {
             this.draft[field] = target.checked;
         } else if (field === 'valueType') {
@@ -484,15 +533,18 @@ export default class GlobalVariablePanel {
                 this.draft.minText = '';
                 this.draft.maxText = '';
             }
-            this.renderDialog();
+            shouldRender = true;
         } else if (field === 'order') {
             this.draft.order = Number.parseInt(target.value || '0', 10) || 0;
         } else {
             this.draft[field] = target.value;
         }
 
-        this.dirty = true;
+        this.updateDirtyState();
         this.fieldErrors = {};
+        if (shouldRender) {
+            this.renderDialog();
+        }
     }
 
     async handleAction(action, target) {
@@ -501,8 +553,9 @@ export default class GlobalVariablePanel {
                 await this.closeManager();
                 break;
             case 'new':
-                await this.selectVariable('');
-                this.createNewDraft();
+                if (await this.selectVariable('')) {
+                    this.createNewDraft();
+                }
                 break;
             case 'select':
                 await this.selectVariable(target.dataset.variableId);
@@ -567,7 +620,7 @@ export default class GlobalVariablePanel {
 
         this.selectedVariableId = variableId || '';
         this.draft = variableId ? createVariableDraft(this.getSelectedVariable()) : null;
-        this.dirty = false;
+        this.updateDirtyState();
         this.fieldErrors = {};
         this.renderDialog();
         return true;
@@ -576,15 +629,22 @@ export default class GlobalVariablePanel {
     createNewDraft() {
         this.selectedVariableId = '';
         this.draft = createVariableDraft(null, this.schema.variables.length);
-        this.dirty = true;
+        this.updateDirtyState();
         this.fieldErrors = {};
         this.renderDialog();
     }
 
     discardDraft() {
+        const selectedVariableId = this.selectedVariableId;
+        this.schema = cloneSchema(this.baselineSchema);
+        this.selectedVariableId = this.schema.variables.some(item => sameId(item.id, selectedVariableId))
+            ? selectedVariableId
+            : (this.schema.variables[0]?.id || '');
         this.draft = this.selectedVariableId ? createVariableDraft(this.getSelectedVariable()) : null;
         this.dirty = false;
         this.fieldErrors = {};
+        this.errorMessage = '';
+        this.syncSchemaToProject();
         this.renderDialog();
     }
 
@@ -593,21 +653,17 @@ export default class GlobalVariablePanel {
             this.toast('工程运行中，变量结构和值不可修改。', 'warning');
             return false;
         }
-        if (!this.draft) {
-            return false;
-        }
-
         const original = this.getSelectedVariable();
-        const serialized = serializeVariableDraft(this.draft, this.schema, original);
-        if (!serialized.ok) {
-            this.fieldErrors = serialized.errors;
+        const prepared = this.prepareSchemaForSave();
+        if (!prepared.ok) {
+            this.fieldErrors = prepared.errors;
             this.errorMessage = '请先修正表单中的错误。';
             this.renderDialog();
             return false;
         }
 
-        const impact = original && normalizeValueType(original.valueType) !== normalizeValueType(serialized.variable.valueType)
-            ? this.getIncompatibleBindings(original, serialized.variable.valueType)
+        const impact = original && prepared.variable && normalizeValueType(original.valueType) !== normalizeValueType(prepared.variable.valueType)
+            ? this.getIncompatibleBindings(original, prepared.variable.valueType)
             : [];
         if (impact.length) {
             const choice = await this.requestChoice('类型变更影响绑定', this.describeBindingImpact(impact), [
@@ -619,14 +675,7 @@ export default class GlobalVariablePanel {
             }
         }
 
-        const nextSchema = normalizeGlobalVariableSchema(this.schema);
-        const index = nextSchema.variables.findIndex(item => sameId(item.id, serialized.variable.id));
-        if (index >= 0) {
-            nextSchema.variables[index] = serialized.variable;
-        } else {
-            nextSchema.variables.push(serialized.variable);
-        }
-        nextSchema.variables.sort((left, right) => Number(left.order ?? 0) - Number(right.order ?? 0));
+        const nextSchema = prepared.schema;
 
         return await this.runMutation('save', async () => {
             const projectId = this.project.id;
@@ -634,7 +683,7 @@ export default class GlobalVariablePanel {
             if (this.project?.id !== projectId) {
                 return false;
             }
-            this.applySchema(saved, serialized.variable.id);
+            this.applySchema(saved, prepared.selectedVariableId, { rebuildBaseline: true, sync: true });
             this.dirty = false;
             await this.refreshValues({ requestId: this.requestSerial, render: false });
             this.toast('全局变量已保存。', 'success');
@@ -669,8 +718,7 @@ export default class GlobalVariablePanel {
         this.schema.targetBindings = this.schema.targetBindings.filter(item => !sameId(item.variableId, variable.id));
         this.selectedVariableId = this.schema.variables[0]?.id || '';
         this.draft = this.selectedVariableId ? createVariableDraft(this.getSelectedVariable()) : null;
-        this.dirty = true;
-        this.syncSchemaToProject();
+        this.updateDirtyState();
         this.render();
         return true;
     }
@@ -810,8 +858,7 @@ export default class GlobalVariablePanel {
             operatorName: output.operatorName,
             outputPortName: output.outputPortName
         });
-        this.dirty = true;
-        this.syncSchemaToProject();
+        this.updateDirtyState();
         this.render();
     }
 
@@ -821,8 +868,7 @@ export default class GlobalVariablePanel {
             return;
         }
         this.schema.sourceBindings = this.schema.sourceBindings.filter(item => !sameId(item.variableId, variable.id));
-        this.dirty = true;
-        this.syncSchemaToProject();
+        this.updateDirtyState();
         this.render();
     }
 
@@ -831,8 +877,7 @@ export default class GlobalVariablePanel {
             return;
         }
         this.schema.targetBindings = this.schema.targetBindings.filter(item => !sameId(item.id, bindingId));
-        this.dirty = true;
-        this.syncSchemaToProject();
+        this.updateDirtyState();
         this.render();
     }
 
@@ -874,13 +919,10 @@ export default class GlobalVariablePanel {
         } catch (error) {
             if (this.isConflict(error)) {
                 this.errorMessage = '工程正在运行，变量结构和值不可修改。已重新获取当前状态和值。';
+                this.syncRuntimeStateAfterConflict();
                 await this.refreshValues({ requestId: this.requestSerial, render: false }).catch(() => {});
             } else {
                 this.errorMessage = this.toUserMessage(error, '操作失败。');
-            }
-            if (!options.preserveDraftOnError && this.selectedVariableId) {
-                this.draft = createVariableDraft(this.getSelectedVariable());
-                this.dirty = false;
             }
             this.render();
             return false;
@@ -892,11 +934,17 @@ export default class GlobalVariablePanel {
         }
     }
 
-    applySchema(schema, selectedVariableId = this.selectedVariableId) {
+    applySchema(schema, selectedVariableId = this.selectedVariableId, options = {}) {
         this.schema = normalizeGlobalVariableSchema(schema);
+        if (options.rebuildBaseline) {
+            this.baselineSchema = cloneSchema(this.schema);
+        }
         this.selectedVariableId = selectedVariableId || this.schema.variables[0]?.id || '';
         this.draft = this.selectedVariableId ? createVariableDraft(this.getSelectedVariable()) : null;
-        this.syncSchemaToProject();
+        this.updateDirtyState();
+        if (options.sync !== false) {
+            this.syncSchemaToProject();
+        }
     }
 
     setSchemaFromExternal(schema) {
@@ -907,7 +955,80 @@ export default class GlobalVariablePanel {
         if (!this.dirty) {
             this.draft = this.selectedVariableId ? createVariableDraft(this.getSelectedVariable()) : null;
         }
+        this.updateDirtyState();
         this.render();
+    }
+
+    rebuildBaseline(schema) {
+        this.baselineSchema = normalizeGlobalVariableSchema(schema);
+        this.schema = cloneSchema(this.baselineSchema);
+        this.dirty = false;
+    }
+
+    prepareSchemaForSave() {
+        const nextSchema = normalizeGlobalVariableSchema(this.schema);
+        if (!this.draft) {
+            return {
+                ok: true,
+                errors: {},
+                schema: nextSchema,
+                variable: null,
+                selectedVariableId: this.selectedVariableId || nextSchema.variables[0]?.id || ''
+            };
+        }
+
+        const original = this.getSelectedVariable();
+        const serialized = serializeVariableDraft(this.draft, nextSchema, original);
+        if (!serialized.ok) {
+            return {
+                ok: false,
+                errors: serialized.errors,
+                schema: nextSchema,
+                variable: null,
+                selectedVariableId: this.selectedVariableId
+            };
+        }
+
+        const index = nextSchema.variables.findIndex(item => sameId(item.id, serialized.variable.id));
+        if (index >= 0) {
+            nextSchema.variables[index] = serialized.variable;
+        } else {
+            nextSchema.variables.push(serialized.variable);
+        }
+        nextSchema.variables.sort((left, right) => Number(left.order ?? 0) - Number(right.order ?? 0));
+
+        return {
+            ok: true,
+            errors: {},
+            schema: nextSchema,
+            variable: serialized.variable,
+            selectedVariableId: serialized.variable.id
+        };
+    }
+
+    isDraftChanged() {
+        if (!this.draft) {
+            return false;
+        }
+        if (this.draft.isNew) {
+            return true;
+        }
+        const original = this.getSelectedVariable();
+        if (!original) {
+            return true;
+        }
+        const serialized = serializeVariableDraft(this.draft, this.schema, original);
+        if (!serialized.ok) {
+            return true;
+        }
+        return !schemaEquals(
+            { schemaVersion: '1.0', variables: [serialized.variable], sourceBindings: [], targetBindings: [] },
+            { schemaVersion: '1.0', variables: [original], sourceBindings: [], targetBindings: [] }
+        );
+    }
+
+    updateDirtyState() {
+        this.dirty = !schemaEquals(this.schema, this.baselineSchema) || this.isDraftChanged();
     }
 
     syncSchemaToProject() {
@@ -1022,11 +1143,42 @@ export default class GlobalVariablePanel {
     }
 
     isRuntimeLocked() {
-        const state = this.options.getRuntimeState?.() || inspectionController.getState?.() || {};
+        const state = this.options.getRuntimeState?.() || this.runtimeState || inspectionController.getState?.() || {};
         const status = String(state.status || state.Status || '').toLowerCase();
         return state.isRunning === true ||
             state.isRealtime === true ||
             LOCKED_RUNTIME_STATES.has(status);
+    }
+
+    subscribeRuntimeState() {
+        const subscribe = this.options.subscribeRuntimeState || inspectionController.subscribeState?.bind(inspectionController);
+        if (typeof subscribe !== 'function') {
+            return;
+        }
+
+        this.unsubscribeInspectionState = subscribe(state => {
+            const wasLocked = this.isRuntimeLocked();
+            this.runtimeState = state || {};
+            const isLocked = this.isRuntimeLocked();
+            if (wasLocked !== isLocked || this.isOpen) {
+                this.render();
+            }
+        });
+    }
+
+    syncRuntimeStateAfterConflict() {
+        const current = inspectionController.getState?.() || this.runtimeState || {};
+        this.runtimeState = {
+            ...current,
+            isRunning: true,
+            status: String(current.status || '').toLowerCase() || 'running'
+        };
+    }
+
+    destroy() {
+        this.unsubscribeInspectionState?.();
+        this.unsubscribeInspectionState = null;
+        this.removeDialog();
     }
 
     isConflict(error) {
@@ -1142,6 +1294,14 @@ export default class GlobalVariablePanel {
         }
         showSharedToast(message, type);
     }
+}
+
+function cloneSchema(schema) {
+    return normalizeGlobalVariableSchema(JSON.parse(JSON.stringify(normalizeGlobalVariableSchema(schema))));
+}
+
+function schemaEquals(left, right) {
+    return JSON.stringify(normalizeGlobalVariableSchema(left)) === JSON.stringify(normalizeGlobalVariableSchema(right));
 }
 
 function normalizeArray(value) {

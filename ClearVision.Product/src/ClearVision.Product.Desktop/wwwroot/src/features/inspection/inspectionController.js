@@ -631,7 +631,7 @@ class InspectionController {
                 setInspectionState({
                     ...getInspectionState(),
                     isRealtime: payload.status === 'Running' || payload.status === 'Starting',
-                    status: payload.status === 'Running' ? 'running' : 'idle'
+                    status: this.normalizeRuntimeState(payload.status)
                 });
                 break;
             case 'stateChanged':
@@ -678,18 +678,10 @@ class InspectionController {
      * 【架构修复 v2】处理状态变更
      */
     handleStateChanged(data) {
-        const statusMap = {
-            'Starting': 'running',
-            'Running': 'running',
-            'Stopping': 'running',
-            'Stopped': 'idle',
-            'Faulted': 'error'
-        };
-
         setInspectionState({
             ...getInspectionState(),
             isRealtime: data.newState === 'Running' || data.newState === 'Starting',
-            status: statusMap[data.newState] || 'idle'
+            status: this.normalizeRuntimeState(data.newState)
         });
 
         if (data.newState === 'Faulted') {
@@ -1158,6 +1150,10 @@ class InspectionController {
         return getInspectionState();
     }
 
+    subscribeState(callback) {
+        return subscribeInspectionState(callback);
+    }
+
     /**
      * 获取最新结果
      */
@@ -1185,6 +1181,29 @@ class InspectionController {
      */
     isRealtime() {
         return getInspectionState().isRealtime;
+    }
+
+    normalizeRuntimeState(status) {
+        const normalized = String(status || '').trim().toLowerCase();
+        switch (normalized) {
+            case 'starting':
+                return 'starting';
+            case 'running':
+                return 'running';
+            case 'stopping':
+                return 'stopping';
+            case 'completed':
+                return 'completed';
+            case 'faulted':
+            case 'error':
+                return 'error';
+            case 'stopped':
+            case 'idle':
+            case '':
+                return 'idle';
+            default:
+                return normalized;
+        }
     }
 
     normalizeResultPayload(result) {

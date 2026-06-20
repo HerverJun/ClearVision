@@ -1,6 +1,10 @@
 import httpClient from '../../core/messaging/httpClient.js';
 
 export const GLOBAL_VARIABLE_TYPES = Object.freeze(['String', 'Int64', 'Double', 'Boolean']);
+const MAX_SAFE_INT64_TEXT = String(Number.MAX_SAFE_INTEGER);
+const SAFE_INTEGER_RANGE_ERROR = '超出前端安全整数范围';
+const INTEGER_ERROR = '\u8bf7\u8f93\u5165\u6574\u6570\u3002';
+const NUMBER_ERROR = '\u8bf7\u8f93\u5165\u6570\u5b57\u3002';
 
 export function createEmptyGlobalVariableSchema() {
     return {
@@ -30,8 +34,8 @@ export function normalizeGlobalVariableDefinition(variable = {}) {
         description: String(variable.description ?? variable.Description ?? ''),
         valueType,
         initialValue: coerceGlobalVariableValue(valueType, initialValue).value,
-        min: normalizeNullableNumber(variable.min ?? variable.Min),
-        max: normalizeNullableNumber(variable.max ?? variable.Max),
+        min: normalizeNullableNumber(variable.min ?? variable.Min, valueType),
+        max: normalizeNullableNumber(variable.max ?? variable.Max, valueType),
         manualWriteAllowed: Boolean(variable.manualWriteAllowed ?? variable.ManualWriteAllowed ?? true),
         includeInResultMetadata: Boolean(variable.includeInResultMetadata ?? variable.IncludeInResultMetadata ?? false),
         order: Number.isFinite(Number(variable.order ?? variable.Order)) ? Number(variable.order ?? variable.Order) : 0
@@ -115,8 +119,8 @@ export function createGlobalVariableDefinition({
         description: String(description || ''),
         valueType: normalizedType,
         initialValue: coerceGlobalVariableValue(normalizedType, initialValue).value,
-        min: normalizeNullableNumber(min),
-        max: normalizeNullableNumber(max),
+        min: normalizeNullableNumber(min, normalizedType),
+        max: normalizeNullableNumber(max, normalizedType),
         manualWriteAllowed: Boolean(manualWriteAllowed),
         includeInResultMetadata: Boolean(includeInResultMetadata),
         order: Number.isFinite(Number(order)) ? Number(order) : 0
@@ -186,13 +190,15 @@ export function validateVariableDraft(draft, schema, originalVariable = null) {
         errors.valueType = '类型不受支持。';
     }
 
-    const min = normalizeNullableNumber(draft?.minText);
-    const max = normalizeNullableNumber(draft?.maxText);
-    if (draft?.minText !== '' && min == null) {
-        errors.min = '最小值必须是数字。';
+    const minResult = coerceNullableNumber(valueType, draft?.minText);
+    const maxResult = coerceNullableNumber(valueType, draft?.maxText);
+    const min = minResult.value;
+    const max = maxResult.value;
+    if (!minResult.ok) {
+        errors.min = minResult.error;
     }
-    if (draft?.maxText !== '' && max == null) {
-        errors.max = '最大值必须是数字。';
+    if (!maxResult.ok) {
+        errors.max = maxResult.error;
     }
     if (min != null && max != null && min > max) {
         errors.max = '最大值必须大于或等于最小值。';
@@ -227,11 +233,7 @@ export function coerceGlobalVariableValue(valueType, rawValue) {
             if (rawValue === '') {
                 return { ok: true, value: null, error: '' };
             }
-            const value = Number(String(rawValue).trim());
-            if (!Number.isFinite(value) || !Number.isInteger(value)) {
-                return { ok: false, value: null, error: '请输入整数。' };
-            }
-            return { ok: true, value, error: '' };
+            return coerceSafeInteger(rawValue);
         }
         case 'Double': {
             if (rawValue === '') {
@@ -354,9 +356,68 @@ function normalizeArray(value) {
     return Array.isArray(value) ? value : [];
 }
 
-function normalizeNullableNumber(value) {
+function coerceNullableNumber(valueType, value) {
+    if (value === null || value === undefined || value === '') {
+        return { ok: true, value: null, error: '' };
+    }
+    if (normalizeValueType(valueType) === 'Int64') {
+        return coerceSafeInteger(value);
+    }
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+        return { ok: false, value: null, error: NUMBER_ERROR };
+    }
+    return { ok: true, value: parsed, error: '' };
+}
+
+function coerceSafeInteger(rawValue) {
+    if (typeof rawValue === 'number') {
+        if (!Number.isFinite(rawValue) || !Number.isInteger(rawValue)) {
+            return { ok: false, value: null, error: INTEGER_ERROR };
+        }
+        if (!Number.isSafeInteger(rawValue)) {
+            return { ok: false, value: null, error: SAFE_INTEGER_RANGE_ERROR };
+        }
+        return { ok: true, value: rawValue, error: '' };
+    }
+
+    const text = String(rawValue).trim();
+    if (text === '') {
+        return { ok: true, value: null, error: '' };
+    }
+    if (!/^[+-]?\d+$/.test(text)) {
+        const numeric = Number(text);
+        if (Number.isFinite(numeric) && Number.isInteger(numeric) && (/e/i.test(text) || !Number.isSafeInteger(numeric))) {
+            return { ok: false, value: null, error: SAFE_INTEGER_RANGE_ERROR };
+        }
+        return { ok: false, value: null, error: INTEGER_ERROR };
+    }
+
+    const sign = text.startsWith('-') ? -1 : 1;
+    const digits = text.replace(/^[+-]/, '').replace(/^0+(?=\d)/, '');
+    if (compareIntegerText(digits, MAX_SAFE_INT64_TEXT) > 0) {
+        return { ok: false, value: null, error: SAFE_INTEGER_RANGE_ERROR };
+    }
+    return { ok: true, value: sign * Number(digits || '0'), error: '' };
+}
+
+function compareIntegerText(left, right) {
+    if (left.length !== right.length) {
+        return left.length > right.length ? 1 : -1;
+    }
+    if (left === right) {
+        return 0;
+    }
+    return left > right ? 1 : -1;
+}
+
+function normalizeNullableNumber(value, valueType = 'Double') {
     if (value === null || value === undefined || value === '') {
         return null;
+    }
+    if (normalizeValueType(valueType) === 'Int64') {
+        const coerced = coerceSafeInteger(value);
+        return coerced.ok ? coerced.value : null;
     }
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;

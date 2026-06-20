@@ -742,6 +742,9 @@ class PropertyPanel {
             String(item.operatorId || '').toLowerCase() === String(this.currentOperator.id).toLowerCase() &&
             String(item.parameterId || '').toLowerCase() === String(param.id).toLowerCase());
         const compatibleVariables = schema.variables.filter(variable => this.isVariableCompatibleWithParameter(variable, param));
+        const boundVariable = binding
+            ? schema.variables.find(variable => String(variable.id || '').toLowerCase() === String(binding.variableId || '').toLowerCase())
+            : null;
 
         return `
             <div class="global-variable-source-control">
@@ -750,10 +753,12 @@ class PropertyPanel {
                     <option value="">固定值</option>
                     ${compatibleVariables.map(variable => `
                         <option value="${this.escapeAttribute(variable.id)}" ${binding && String(binding.variableId).toLowerCase() === String(variable.id).toLowerCase() ? 'selected' : ''}>
-                            ${this.escapeHtml(variable.name)}
+                            ${this.escapeHtml(variable.displayName || variable.name)} (${this.escapeHtml(variable.name)})
                         </option>
                     `).join('')}
                 </select>
+                ${binding && !boundVariable ? '<p class="form-description error">\u5df2\u7ed1\u5b9a\u7684\u5168\u5c40\u53d8\u91cf\u4e0d\u5b58\u5728\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9\u3002</p>' : ''}
+                ${binding && boundVariable ? '<p class="form-description">\u5df2\u7ed1\u5b9a\u5168\u5c40\u53d8\u91cf\uff0c\u56fa\u5b9a\u503c\u63a7\u4ef6\u7531\u5168\u5c40\u53d8\u91cf\u63d0\u4f9b\u3002</p>' : ''}
             </div>
         `;
     }
@@ -768,25 +773,10 @@ class PropertyPanel {
     }
 
     isVariableCompatibleWithParameter(variable, param) {
-        const valueType = String(variable?.valueType || variable?.ValueType || '').toLowerCase();
-        const dataType = String(param?.dataType || param?.DataType || '').toLowerCase();
-        if (!valueType || !dataType) {
-            return false;
-        }
-
-        if (valueType === 'int64') {
-            return ['int', 'integer', 'long', 'int64', 'double', 'float', 'number'].includes(dataType);
-        }
-
-        if (valueType === 'double') {
-            return ['double', 'float', 'number'].includes(dataType);
-        }
-
-        if (valueType === 'boolean') {
-            return ['bool', 'boolean'].includes(dataType);
-        }
-
-        return ['string', 'enum', 'select'].includes(dataType);
+        return isVariableCompatibleWithDataType(
+            variable?.valueType || variable?.ValueType,
+            param?.dataType || param?.DataType || param?.type || param?.Type
+        );
     }
 
     /**
@@ -1451,68 +1441,6 @@ class PropertyPanel {
             projectManager.updateGlobalVariables(schema);
             serviceRegistry.get('globalVariablePanel')?.setSchemaFromExternal?.(schema);
         }
-    }
-
-    applyGlobalVariableInputState() {
-        const form = document.getElementById('property-form');
-        if (!form) {
-            return;
-        }
-
-        form.querySelectorAll('.gv-binding-select[data-parameter-name]').forEach(select => {
-            const parameterName = select.dataset.parameterName || '';
-            const escapedName = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
-                ? CSS.escape(parameterName)
-                : parameterName;
-            const input = form.querySelector(`[name="${escapedName}"]`);
-            if (input) {
-                input.disabled = Boolean(select.value);
-                input.title = select.value ? '由全局变量提供' : '';
-                input.title = select.value ? '由全局变量提供' : '';
-            }
-        });
-    }
-
-    /**
-     * 初始化预览面板
-     */
-    renderGlobalVariableBindingControl(param) {
-        const project = projectManager.getCurrentProject?.();
-        const schema = this.normalizeGlobalVariableSchema(project?.globalVariables || project?.GlobalVariables);
-        if (!schema.variables.length || !this.currentOperator?.id || !param?.id) {
-            return '';
-        }
-
-        const binding = schema.targetBindings.find(item =>
-            String(item.operatorId || '').toLowerCase() === String(this.currentOperator.id).toLowerCase() &&
-            String(item.parameterId || '').toLowerCase() === String(param.id).toLowerCase());
-        const compatibleVariables = schema.variables.filter(variable => this.isVariableCompatibleWithParameter(variable, param));
-        const boundVariable = binding
-            ? schema.variables.find(variable => String(variable.id || '').toLowerCase() === String(binding.variableId || '').toLowerCase())
-            : null;
-
-        return `
-            <div class="global-variable-source-control">
-                <label class="form-label compact">参数来源</label>
-                <select class="form-input gv-binding-select" data-parameter-id="${this.escapeAttribute(param.id)}" data-parameter-name="${this.escapeAttribute(param.name)}">
-                    <option value="">固定值</option>
-                    ${compatibleVariables.map(variable => `
-                        <option value="${this.escapeAttribute(variable.id)}" ${binding && String(binding.variableId).toLowerCase() === String(variable.id).toLowerCase() ? 'selected' : ''}>
-                            ${this.escapeHtml(variable.displayName || variable.name)}（${this.escapeHtml(variable.name)}）
-                        </option>
-                    `).join('')}
-                </select>
-                ${binding && !boundVariable ? '<p class="form-description error">已绑定的全局变量不存在，请重新选择。</p>' : ''}
-                ${binding && boundVariable ? '<p class="form-description">已绑定全局变量，固定值控件由全局变量提供。</p>' : ''}
-            </div>
-        `;
-    }
-
-    isVariableCompatibleWithParameter(variable, param) {
-        return isVariableCompatibleWithDataType(
-            variable?.valueType || variable?.ValueType,
-            param?.dataType || param?.DataType || param?.type || param?.Type
-        );
     }
 
     initPreviewPanel() {

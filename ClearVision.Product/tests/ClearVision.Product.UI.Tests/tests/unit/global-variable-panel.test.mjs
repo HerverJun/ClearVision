@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
+import { chromium } from 'playwright';
 
 function createElementStub() {
   return {
@@ -157,6 +159,20 @@ test('global variable drafts validate type, range, duplicate names and serialize
   assert.equal(result.variable.manualWriteAllowed, false);
   assert.equal(result.variable.includeInResultMetadata, true);
   assert.equal(result.variable.order, 5);
+
+  assert.deepEqual(store.coerceGlobalVariableValue('Int64', '9007199254740991'), {
+    ok: true,
+    value: 9007199254740991,
+    error: ''
+  });
+  assert.deepEqual(store.coerceGlobalVariableValue('Int64', '-9007199254740991'), {
+    ok: true,
+    value: -9007199254740991,
+    error: ''
+  });
+  assert.equal(store.coerceGlobalVariableValue('Int64', '9007199254740992').ok, false);
+  assert.match(store.coerceGlobalVariableValue('Int64', '9.007199254740992e15').error, /超出前端安全整数范围/);
+  assert.equal(store.coerceGlobalVariableValue('Double', '9.007199254740992e15').value, 9007199254740992);
 });
 
 test('global variable panel saves edited schema, keeps id and preserves dirty draft after backend failure', async () => {
@@ -402,4 +418,450 @@ test('global variable UI has no browser prompt, alert or confirm calls and Stati
   assert.match(stationSource, /Columns\.Add\("名称"/);
   assert.match(stationSource, /ConfigureButton\(_editProjectVariableButton, "编辑"/);
   assert.doesNotMatch(stationSource, /Global Variables|Edit global variable failed|Reset global variable failed/);
+});
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function createInteractiveProject({ single = false } = {}) {
+  const project = createProject();
+  project.flow.operators[0].outputPorts.push({ id: 'out-alt', name: 'AltCount', dataType: 'Integer' });
+  project.globalVariables.sourceBindings.push({
+    id: 'source-count',
+    variableId: 'var-count',
+    operatorId: 'op-counter',
+    outputPortId: 'out-count',
+    operatorName: 'Counter',
+    outputPortName: 'Count'
+  });
+  project.globalVariables.targetBindings.push({
+    id: 'target-count',
+    variableId: 'var-count',
+    operatorId: 'op-counter',
+    parameterId: 'param-threshold',
+    operatorName: 'Counter',
+    parameterName: 'Threshold'
+  });
+  if (single) {
+    project.globalVariables.sourceBindings = [];
+    project.globalVariables.targetBindings = [];
+  } else {
+    project.globalVariables.variables.push({
+      id: 'var-temp',
+      name: 'temp.value',
+      displayName: 'Temp',
+      description: '',
+      valueType: 'String',
+      initialValue: 'x',
+      min: null,
+      max: null,
+      manualWriteAllowed: true,
+      includeInResultMetadata: false,
+      order: 2
+    });
+  }
+  return project;
+}
+
+async function startBrowserHarness(initialState = {}) {
+  const root = path.resolve(process.cwd(), '../../..');
+  const wwwroot = path.join(root, 'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot');
+  const state = {
+    values: [{ variableId: 'var-count', value: 4, version: 1 }],
+    savedSchemas: [],
+    failSave: false,
+    failValues: false,
+    failWrite: false,
+    failResetOne: false,
+    failResetAll: false,
+    conflictSave: false,
+    ...initialState
+  };
+
+  async function readBody(request) {
+    const chunks = [];
+    for await (const chunk of request) {
+      chunks.push(chunk);
+    }
+    const text = Buffer.concat(chunks).toString('utf8');
+    return text ? JSON.parse(text) : null;
+  }
+
+  function sendJson(response, status, payload) {
+    response.writeHead(status, { 'content-type': 'application/json' });
+    response.end(JSON.stringify(payload));
+  }
+
+  const server = http.createServer(async (request, response) => {
+    const url = new URL(request.url, 'http://localhost');
+    if (url.pathname.startsWith('/api/projects/')) {
+      if (url.pathname.endsWith('/global-variable-values') && request.method === 'GET') {
+        return state.failValues ? sendJson(response, 500, { error: 'values failed' }) : sendJson(response, 200, state.values);
+      }
+      if (url.pathname.endsWith('/global-variables') && request.method === 'PUT') {
+        const body = await readBody(request);
+        state.savedSchemas.push(body);
+        if (state.conflictSave) {
+          return sendJson(response, 409, { error: 'Project is currently running.' });
+        }
+        return state.failSave ? sendJson(response, 500, { error: 'save failed' }) : sendJson(response, 200, body);
+      }
+      if (url.pathname.includes('/global-variable-values/') && url.pathname.endsWith('/reset') && request.method === 'POST') {
+        return state.failResetOne ? sendJson(response, 500, { error: 'reset one failed' }) : sendJson(response, 200, state.values);
+      }
+      if (url.pathname.endsWith('/global-variable-values/reset') && request.method === 'POST') {
+        return state.failResetAll ? sendJson(response, 500, { error: 'reset all failed' }) : sendJson(response, 200, state.values);
+      }
+      if (url.pathname.includes('/global-variable-values/') && request.method === 'PUT') {
+        await readBody(request);
+        return state.failWrite ? sendJson(response, 500, { error: 'write failed' }) : sendJson(response, 200, state.values);
+      }
+    }
+
+    if (url.pathname === '/' || url.pathname === '/harness.html') {
+      response.writeHead(200, { 'content-type': 'text/html' });
+      response.end('<!doctype html><meta charset="utf-8"><script>window.__API_BASE_URL__=location.origin+"/api";</script><div id="global-variables-root"></div><div id="property-root"></div>');
+      return;
+    }
+
+    const relativePath = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+    const filePath = path.resolve(wwwroot, relativePath);
+    if (!filePath.startsWith(wwwroot) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+      response.writeHead(404);
+      response.end('not found');
+      return;
+    }
+    response.writeHead(200, { 'content-type': filePath.endsWith('.js') || filePath.endsWith('.mjs') ? 'text/javascript' : 'text/plain' });
+    fs.createReadStream(filePath).pipe(response);
+  });
+
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.goto(`${baseUrl}/harness.html`);
+  return {
+    page,
+    state,
+    async close() {
+      await browser.close();
+      await new Promise(resolve => server.close(resolve));
+    }
+  };
+}
+
+async function setupGlobalVariablePanel(page, project, { choices = [], runtime = false } = {}) {
+  await page.evaluate(async ({ project, choices, runtime }) => {
+    const [panelModule, projectModule, serviceModule] = await Promise.all([
+      import('/src/features/global-variables/globalVariablePanel.js'),
+      import('/src/features/project/projectManager.js'),
+      import('/src/core/app/serviceRegistry.js')
+    ]);
+    const projectManager = projectModule.default;
+    projectManager.currentProject = structuredClone(project);
+    window.__projectManager = projectManager;
+    window.__choices = [...choices];
+    window.__runtimeSubscribers = [];
+    window.__toasts = [];
+    const serviceRegistry = serviceModule.default;
+    serviceRegistry.register('flowCanvas', { schemas: [], setGlobalVariableSchema(schema) { this.schemas.push(structuredClone(schema)); } });
+    serviceRegistry.register('propertyPanel', { renders: 0, render() { this.renders += 1; } });
+    const options = {
+      requestChoice() {
+        return window.__choices.length ? window.__choices.shift() : 'cancel';
+      },
+      showToast(message, type) {
+        window.__toasts.push({ message, type });
+      }
+    };
+    if (runtime) {
+      options.subscribeRuntimeState = callback => {
+        window.__runtimeSubscribers.push(callback);
+        callback({ status: 'idle', isRunning: false, isRealtime: false });
+        return () => {
+          window.__runtimeSubscribers = window.__runtimeSubscribers.filter(item => item !== callback);
+        };
+      };
+    }
+    const panel = new panelModule.default('global-variables-root', options);
+    window.__panel = panel;
+    await panel.setProject(projectManager.currentProject);
+    panel.openManager();
+  }, { project, choices, runtime });
+}
+
+async function getBrowserPanelState(page) {
+  return await page.evaluate(() => ({
+    selectedVariableId: window.__panel.selectedVariableId,
+    draft: structuredClone(window.__panel.draft),
+    schema: structuredClone(window.__panel.schema),
+    baselineSchema: structuredClone(window.__panel.baselineSchema),
+    values: structuredClone(window.__panel.values),
+    dirty: window.__panel.dirty,
+    locked: window.__panel.isRuntimeLocked(),
+    projectSchema: structuredClone(window.__projectManager.currentProject.globalVariables),
+    activeId: document.activeElement?.id || '',
+    searchValue: document.querySelector('#gv-search')?.value || '',
+    searchSelectionStart: document.querySelector('#gv-search')?.selectionStart ?? -1
+  }));
+}
+
+test('browser interaction keeps original draft, schema and selection when new variable is cancelled', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject();
+    await setupGlobalVariablePanel(harness.page, project, { choices: ['cancel'] });
+    await harness.page.fill('input[data-field="displayName"]', 'Edited Count');
+    await harness.page.click('[data-action="new"]');
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.selectedVariableId, 'var-count');
+    assert.equal(state.draft.displayName, 'Edited Count');
+    assert.equal(state.schema.variables.find(item => item.id === 'var-count').displayName, project.globalVariables.variables[0].displayName);
+    assert.equal(state.dirty, true);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction preserves draft and dirty state after save, refresh, write and reset failures', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project, { choices: ['reset'] });
+    await harness.page.fill('input[data-field="displayName"]', 'Failure Draft');
+
+    harness.state.failSave = true;
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => window.__panel.errorMessage);
+
+    harness.state.failValues = true;
+    await harness.page.click('.gv-toolbar [data-action="refresh"]');
+    await harness.page.waitForFunction(() => window.__panel.pendingAction === '');
+
+    harness.state.failValues = false;
+    harness.state.failWrite = true;
+    await harness.page.fill('#gv-write-value', '5');
+    await harness.page.click('[data-action="write"]');
+    await harness.page.waitForFunction(() => window.__panel.pendingAction === '');
+
+    harness.state.failResetOne = true;
+    await harness.page.click('[data-action="reset-one"]');
+    await harness.page.waitForFunction(() => window.__panel.pendingAction === '');
+
+    harness.state.failResetAll = true;
+    await harness.page.click('.gv-toolbar [data-action="reset-all"]');
+    await harness.page.waitForFunction(() => window.__panel.pendingAction === '');
+
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.draft.displayName, 'Failure Draft');
+    assert.equal(state.dirty, true);
+    assert.equal(state.schema.variables[0].displayName, project.globalVariables.variables[0].displayName);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction restores deleted variables, source changes and removed targets on discard', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject();
+    const expected = clone(project.globalVariables);
+    await setupGlobalVariablePanel(harness.page, project, { choices: ['delete'] });
+
+    await harness.page.click('[data-variable-id="var-temp"]');
+    await harness.page.click('[data-action="delete"]');
+    await harness.page.click('[data-action="source-dialog"]');
+    await harness.page.click('.gv-source-option[data-output-port-id="out-alt"]');
+    await harness.page.click('[data-action="remove-target"]');
+    await harness.page.click('[data-action="discard"]');
+
+    const state = await getBrowserPanelState(harness.page);
+    assert.deepEqual(state.schema, expected);
+    assert.deepEqual(state.projectSchema, expected);
+    assert.equal(state.dirty, false);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction deletes the last variable and saves an empty schema', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project, { choices: ['delete'] });
+
+    await harness.page.click('[data-action="delete"]');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => window.__panel.dirty === false);
+
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(harness.state.savedSchemas.length, 1);
+    assert.deepEqual(harness.state.savedSchemas[0].variables, []);
+    assert.deepEqual(state.baselineSchema.variables, []);
+    assert.deepEqual(state.projectSchema.variables, []);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction keeps search focus and toggles runtime readonly state without dropping draft', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject();
+    await setupGlobalVariablePanel(harness.page, project, { runtime: true });
+
+    await harness.page.focus('#gv-search');
+    await harness.page.keyboard.type('exp');
+    let state = await getBrowserPanelState(harness.page);
+    assert.equal(state.activeId, 'gv-search');
+    assert.equal(state.searchValue, 'exp');
+    assert.equal(state.searchSelectionStart, 3);
+    assert.equal(state.selectedVariableId, 'var-count');
+
+    await harness.page.fill('input[data-field="displayName"]', 'Runtime Draft');
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({ status: 'running', isRunning: true, isRealtime: false }));
+    });
+    await harness.page.waitForFunction(() => document.querySelector('input[data-field="displayName"]')?.disabled === true);
+    state = await getBrowserPanelState(harness.page);
+    assert.equal(state.draft.displayName, 'Runtime Draft');
+    assert.equal(state.locked, true);
+
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({ status: 'idle', isRunning: false, isRealtime: false }));
+    });
+    await harness.page.waitForFunction(() => document.querySelector('input[data-field="displayName"]')?.disabled === false);
+    state = await getBrowserPanelState(harness.page);
+    assert.equal(state.draft.displayName, 'Runtime Draft');
+    assert.equal(state.locked, false);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction refreshes values and locks after a 409 without dropping draft', async () => {
+  const harness = await startBrowserHarness({
+    values: [{ variableId: 'var-count', value: 9, version: 9 }]
+  });
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project);
+    harness.state.conflictSave = true;
+
+    await harness.page.fill('input[data-field="displayName"]', 'Conflict Draft');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => window.__panel.values.some(item => item.version === 9));
+
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.draft.displayName, 'Conflict Draft');
+    assert.equal(state.dirty, true);
+    assert.equal(state.values[0].version, 9);
+    assert.equal(state.locked, true);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction syncs PropertyPanel global-variable binding change and disables fixed input', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject();
+    project.globalVariables.targetBindings = [];
+    await setupGlobalVariablePanel(harness.page, project);
+    await harness.page.evaluate(async project => {
+      const { PropertyPanel } = await import('/src/features/flow-editor/propertyPanel.js');
+      const serviceRegistry = (await import('/src/core/app/serviceRegistry.js')).default;
+      window.__externalSchema = null;
+      serviceRegistry.register('globalVariablePanel', {
+        setSchemaFromExternal(schema) {
+          window.__externalSchema = structuredClone(schema);
+        }
+      });
+      const panel = new PropertyPanel('property-root', {});
+      panel.showToast = () => {};
+      panel.setOperator(structuredClone(project.flow.operators[0]));
+      window.__propertyPanel = panel;
+    }, project);
+
+    await harness.page.selectOption('.gv-binding-select', 'var-count');
+    await harness.page.waitForFunction(() => window.__externalSchema?.targetBindings?.length === 1);
+
+    const result = await harness.page.evaluate(() => {
+      const input = document.querySelector('[name="Threshold"]');
+      const select = document.querySelector('.gv-binding-select');
+      return {
+        binding: window.__projectManager.currentProject.globalVariables.targetBindings[0],
+        externalBinding: window.__externalSchema.targetBindings[0],
+        inputDisabled: input.disabled,
+        inputTitle: input.title,
+        ariaDisabled: input.getAttribute('aria-disabled'),
+        selected: select.value
+      };
+    });
+    assert.equal(result.selected, 'var-count');
+    assert.equal(result.binding.variableId, 'var-count');
+    assert.equal(result.externalBinding.variableId, 'var-count');
+    assert.equal(result.inputDisabled, true);
+    assert.ok(result.inputTitle.length > 0);
+    assert.equal(result.ariaDisabled, 'true');
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction validates Int64 safe integer boundaries before saving', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project);
+
+    await harness.page.fill('input[data-field="initialValueText"]', '9007199254740991');
+    await harness.page.fill('input[data-field="minText"]', '-9007199254740991');
+    await harness.page.fill('input[data-field="maxText"]', '9007199254740991');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => window.__panel.dirty === false);
+    assert.equal(harness.state.savedSchemas.at(-1).variables[0].initialValue, 9007199254740991);
+    assert.equal(harness.state.savedSchemas.at(-1).variables[0].min, -9007199254740991);
+    assert.equal(harness.state.savedSchemas.at(-1).variables[0].max, 9007199254740991);
+
+    await harness.page.fill('input[data-field="initialValueText"]', '9007199254740992');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => Boolean(window.__panel.fieldErrors.initialValue));
+    const state = await harness.page.evaluate(() => ({
+      error: window.__panel.fieldErrors.initialValue,
+      savedCount: window.__panel.dirty
+    }));
+    assert.match(state.error, /瓒呭嚭鍓嶇瀹夊叏鏁存暟鑼冨洿|超出前端安全整数范围/);
+    assert.equal(harness.state.savedSchemas.length, 1);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction closes the manager with Escape when there are no pending edits', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project);
+    await harness.page.press('.gv-manager', 'Escape');
+    await harness.page.waitForFunction(() => window.__panel.isOpen === false);
+    const isOpen = await harness.page.evaluate(() => ({
+      panelOpen: window.__panel.isOpen,
+      overlays: document.querySelectorAll('.gv-manager-overlay').length
+    }));
+    assert.equal(isOpen.panelOpen, false);
+    assert.equal(isOpen.overlays, 0);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('property panel keeps one global-variable helper implementation per method', () => {
+  const root = path.resolve(process.cwd(), '../../..');
+  const source = fs.readFileSync(path.join(root, 'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/flow-editor/propertyPanel.js'), 'utf8');
+  assert.equal((source.match(/\n\s+applyGlobalVariableInputState\(\)/g) || []).length, 1);
+  assert.equal((source.match(/\n\s+renderGlobalVariableBindingControl\(/g) || []).length, 1);
+  assert.equal((source.match(/\n\s+isVariableCompatibleWithParameter\(/g) || []).length, 1);
+  assert.doesNotMatch(source, /input\.title[\s\S]{0,120}input\.title/);
 });
