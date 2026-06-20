@@ -2132,13 +2132,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
                 var normalizedInputSnapshot = ConvertImageWrappersToBytes(inputs);
                 var cacheKey = (options.DebugSessionId, op.Id);
+                var cacheEnabledForOperator = options.EnableIntermediateCache &&
+                    CanUseDebugIntermediateCache(op, _projectVariableContextAccessor.Current);
                 string? cacheFingerprint = null;
-                if (options.EnableIntermediateCache)
+                if (cacheEnabledForOperator)
                 {
                     cacheFingerprint = CreateDebugCacheFingerprint(op, normalizedInputSnapshot);
                 }
+                else if (options.EnableIntermediateCache)
+                {
+                    RemoveDebugCacheEntry(cacheKey);
+                }
 
-                if (options.EnableIntermediateCache &&
+                if (cacheEnabledForOperator &&
                     _debugCache.TryGetValue(cacheKey, out var cachedOutputs) &&
                     _debugCacheFingerprints.TryGetValue(cacheKey, out var cachedFingerprint) &&
                     string.Equals(cachedFingerprint, cacheFingerprint, StringComparison.Ordinal))
@@ -2211,6 +2217,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
                 result.DebugOperatorResults.Add(debugOpResult);
                 result.OperatorResults.Add(debugOpResult);
+                result.IntermediateResults[op.Id] = CloneNormalizedDictionary(normalizedOutputData);
 
                 if (!opResult.IsSuccess)
                 {
@@ -2233,10 +2240,9 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 }
 
                 // Encoding cleanup: previous comment text was unreadable.
-                if (options.EnableIntermediateCache && normalizedOutputData.Count > 0)
+                if (cacheEnabledForOperator && normalizedOutputData.Count > 0)
                 {
                     SetDebugCacheEntry(cacheKey, normalizedOutputData, cacheFingerprint!);
-                    result.IntermediateResults[op.Id] = CloneNormalizedDictionary(normalizedOutputData);
                     TouchDebugSession(options.DebugSessionId);
                 }
 
@@ -2408,6 +2414,39 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             TrimDebugCacheUnderLock(cacheKey);
         }
+    }
+
+    private void RemoveDebugCacheEntry((Guid DebugSessionId, Guid OperatorId) cacheKey)
+    {
+        lock (_debugCacheEvictionGate)
+        {
+            RemoveDebugCacheEntryUnderLock(cacheKey);
+        }
+    }
+
+    private static bool CanUseDebugIntermediateCache(Operator op, ProjectVariableExecutionContext? context)
+    {
+        if (context == null)
+        {
+            return true;
+        }
+
+        return op.Type switch
+        {
+            OperatorType.VariableRead or OperatorType.VariableWrite or OperatorType.VariableIncrement
+                => !IsProjectVariableScope(op),
+            _ => true
+        };
+    }
+
+    private static bool IsProjectVariableScope(Operator op)
+    {
+        var scope = op.Parameters
+            .FirstOrDefault(parameter => string.Equals(parameter.Name, "Scope", StringComparison.OrdinalIgnoreCase))
+            ?.GetValue()
+            ?.ToString();
+
+        return string.Equals(scope, "Project", StringComparison.OrdinalIgnoreCase);
     }
 
     private void TrimDebugCacheUnderLock((Guid DebugSessionId, Guid OperatorId) protectedKey)

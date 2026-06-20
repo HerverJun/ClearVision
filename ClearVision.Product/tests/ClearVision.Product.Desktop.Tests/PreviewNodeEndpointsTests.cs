@@ -320,6 +320,56 @@ public class PreviewNodeEndpointsTests
     }
 
     [Fact]
+    public async Task PreviewNode_WithVariableReadAndSameDebugSession_ShouldReturnFreshProjectVariableValue()
+    {
+        var variableId = Guid.NewGuid();
+        var debugSessionId = Guid.NewGuid();
+        var read = CreateOperatorDto(
+            Guid.NewGuid(),
+            "Read",
+            OperatorType.VariableRead,
+            parameters: new Dictionary<string, object>
+            {
+                ["Scope"] = "Project",
+                ["VariableId"] = variableId.ToString(),
+                ["VariableName"] = "stats.count",
+                ["DefaultValue"] = "0",
+                ["DataType"] = "Int"
+            });
+
+        var schema = CreatePreviewVariableSchema(variableId, 1L);
+        var project = new Project("preview-read-cache");
+        project.UpdateGlobalVariables(schema);
+        var registry = new ProjectVariableSessionRegistry();
+        var formalSession = registry.GetOrCreate(project.Id, schema);
+        formalSession.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        var readExecutor = new CountingOperatorExecutor(new VariableReadOperator(
+            NullLogger<VariableReadOperator>.Instance,
+            new VariableContext(),
+            accessor));
+
+        await using var host = await PreviewNodeTestHost.CreateWithRealFlowExecutionAsync(
+            project,
+            registry,
+            [readExecutor],
+            accessor);
+
+        var first = await PostPreviewReadAsync(host, project.Id, read, debugSessionId);
+        formalSession.SetValue(variableId, 10L, ProjectVariableUpdatedBy.StudioManual);
+        var second = await PostPreviewReadAsync(host, project.Id, read, debugSessionId);
+
+        first.GetProperty("success").GetBoolean().Should().BeTrue(first.ToString());
+        second.GetProperty("success").GetBoolean().Should().BeTrue(second.ToString());
+        first.GetProperty("outputData").GetProperty("Value").GetInt64().Should().Be(4L);
+        second.GetProperty("outputData").GetProperty("Value").GetInt64().Should().Be(10L);
+        readExecutor.ExecuteCount.Should().Be(2, "Project-scope VariableRead must not reuse PreviewNode debug cache");
+        formalSession.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(10L);
+        formal.UpdatedBy.Should().Be(ProjectVariableUpdatedBy.StudioManual);
+    }
+
+    [Fact]
     public async Task PreviewNode_WhenProjectHasNoGlobalVariables_ShouldUseExistingExecutionPath()
     {
         var project = new Project("no-global-variables");
@@ -1379,6 +1429,25 @@ public class PreviewNodeEndpointsTests
         };
     }
 
+    private static async Task<JsonElement> PostPreviewReadAsync(
+        PreviewNodeTestHost host,
+        Guid projectId,
+        OperatorDto read,
+        Guid debugSessionId)
+    {
+        using var response = await host.Client.PostAsJsonAsync("/api/flows/preview-node", new PreviewNodeRequest
+        {
+            ProjectId = projectId,
+            TargetNodeId = read.Id,
+            DebugSessionId = debugSessionId,
+            FlowData = CreateUpdateFlowRequest(read)
+        });
+        var payload = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK, payload);
+        using var document = JsonDocument.Parse(payload);
+        return document.RootElement.Clone();
+    }
+
     private static OperatorDto CreateOperatorDto(
         Guid id,
         string name,
@@ -1550,6 +1619,34 @@ public class PreviewNodeEndpointsTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+        }
+    }
+
+    private sealed class CountingOperatorExecutor : IOperatorExecutor
+    {
+        private readonly IOperatorExecutor _inner;
+
+        public CountingOperatorExecutor(IOperatorExecutor inner)
+        {
+            _inner = inner;
+        }
+
+        public OperatorType OperatorType => _inner.OperatorType;
+
+        public int ExecuteCount { get; private set; }
+
+        public Task<OperatorExecutionOutput> ExecuteAsync(
+            Operator @operator,
+            Dictionary<string, object>? inputs = null,
+            CancellationToken cancellationToken = default)
+        {
+            ExecuteCount++;
+            return _inner.ExecuteAsync(@operator, inputs, cancellationToken);
+        }
+
+        public ValidationResult ValidateParameters(Operator @operator)
+        {
+            return _inner.ValidateParameters(@operator);
         }
     }
 }
