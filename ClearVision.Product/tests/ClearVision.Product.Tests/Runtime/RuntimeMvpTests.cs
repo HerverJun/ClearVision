@@ -367,31 +367,29 @@ public class RuntimeMvpTests
                 TargetRootDirectory = Path.Combine(root, "new")
             });
 
-            var calls = 0;
-            var preparedResourceDisposed = false;
+            var imageFactoryCalls = 0;
+            var resultWriters = new List<TrackingRuntimeResultWriter>();
             await using var runtimeHost = new RuntimeHost(
                 CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
                 new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
                 new RuntimeResultNormalizer(),
                 NullLogger<RuntimeHost>.Instance,
-                profile =>
+                writerFactory: null,
+                resultWriterFactory: (_, _) =>
                 {
-                    calls++;
-                    if (calls == 2)
+                    var writer = new TrackingRuntimeResultWriter();
+                    resultWriters.Add(writer);
+                    return writer;
+                },
+                imageWriterFactory: (_, _) =>
+                {
+                    imageFactoryCalls++;
+                    if (imageFactoryCalls == 2)
                     {
-                        var dataRoot = Path.Combine(root, "prepared-failure");
-                        Directory.CreateDirectory(dataRoot);
-                        var prepared = new RuntimeResultRecordWriter(dataRoot, profile.ResultRecordQueueCapacity, NullLogger.Instance);
-                        prepared.DisposeAsync().AsTask().GetAwaiter().GetResult();
-                        preparedResourceDisposed = true;
                         throw new IOException("writer preparation failed");
                     }
 
-                    var defaultRoot = RuntimePathGuard.GetDefaultStationDataRoot();
-                    Directory.CreateDirectory(defaultRoot);
-                    return ValueTask.FromResult(new RuntimePreparedWriters(
-                        new RuntimeResultRecordWriter(defaultRoot, profile.ResultRecordQueueCapacity, NullLogger.Instance),
-                        new RuntimeImageWriter(defaultRoot, profile, NullLogger.Instance)));
+                    return new TrackingRuntimeImageWriter();
                 });
 
             await runtimeHost.LoadPackageAsync(oldExport.PackageRootPath);
@@ -400,7 +398,8 @@ public class RuntimeMvpTests
             var reload = async () => await runtimeHost.LoadPackageAsync(newExport.PackageRootPath);
 
             await reload.Should().ThrowAsync<IOException>().WithMessage("*writer preparation failed*");
-            preparedResourceDisposed.Should().BeTrue();
+            resultWriters.Should().HaveCount(2);
+            resultWriters[1].DisposeCount.Should().Be(1);
             runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Loaded);
             runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
                 snapshot.VariableId == variableId &&
@@ -453,6 +452,76 @@ public class RuntimeMvpTests
             runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
                 snapshot.VariableId == variableId &&
                 Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 6L);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_LoadPackageAsync_WhenOldWriterDisposeFailsAfterCommit_ShouldKeepNewPackageLoaded()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var oldProject = CreateProjectDto("cleanup-old");
+            oldProject.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 4L, manualWriteAllowed: true);
+            var newProject = CreateProjectDto("cleanup-new");
+            newProject.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 6L, manualWriteAllowed: true);
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var oldExport = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = oldProject,
+                TargetRootDirectory = Path.Combine(root, "old-cleanup")
+            });
+            var newExport = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = newProject,
+                TargetRootDirectory = Path.Combine(root, "new-cleanup")
+            });
+            var resultWriters = new List<TrackingRuntimeResultWriter>();
+            var imageWriters = new List<TrackingRuntimeImageWriter>();
+
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                writerFactory: null,
+                resultWriterFactory: (_, _) =>
+                {
+                    var writer = new TrackingRuntimeResultWriter();
+                    resultWriters.Add(writer);
+                    return writer;
+                },
+                imageWriterFactory: (_, _) =>
+                {
+                    var writer = new TrackingRuntimeImageWriter();
+                    imageWriters.Add(writer);
+                    return writer;
+                });
+
+            await runtimeHost.LoadPackageAsync(oldExport.PackageRootPath);
+            resultWriters[0].ThrowOnDispose = true;
+
+            await runtimeHost.LoadPackageAsync(newExport.PackageRootPath);
+
+            runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Loaded);
+            runtimeHost.GetSnapshot().PackageName.Should().Be(newProject.Name);
+            runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
+                snapshot.VariableId == variableId &&
+                Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 6L);
+            resultWriters[0].DisposeCount.Should().Be(1);
+            imageWriters[0].DisposeCount.Should().Be(1);
+
+            var imagePath = Path.Combine(root, "new-package-input.png");
+            await File.WriteAllBytesAsync(imagePath, new byte[] { 2, 4, 6, 8 });
+            var run = await runtimeHost.RunSingleAsync(imagePath);
+            run.Outcome.Should().Be(RuntimeRunOutcome.Ok);
+            resultWriters[1].EnqueueCount.Should().BeGreaterThan(0);
+            resultWriters[0].EnqueueCount.Should().Be(0);
         }
         finally
         {
@@ -1000,6 +1069,72 @@ public class RuntimeMvpTests
         public ValidationResult ValidateParameters(Operator @operator)
         {
             return ValidationResult.Valid();
+        }
+    }
+
+    private sealed class TrackingRuntimeResultWriter : IRuntimeResultRecordWriter
+    {
+        public int DroppedCount { get; private set; }
+
+        public int DisposeCount { get; private set; }
+
+        public int EnqueueCount { get; private set; }
+
+        public bool ThrowOnDispose { get; set; }
+
+        public ValueTask<bool> EnqueueAsync(RuntimeNormalizedResult result, CancellationToken cancellationToken)
+        {
+            EnqueueCount++;
+            return ValueTask.FromResult(true);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            if (ThrowOnDispose)
+            {
+                throw new IOException("old result writer cleanup failed");
+            }
+
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class TrackingRuntimeImageWriter : IRuntimeImageWriter
+    {
+        public int DroppedCount { get; private set; }
+
+        public int DisposeCount { get; private set; }
+
+        public int EnqueueCount { get; private set; }
+
+        public bool ThrowOnDispose { get; set; }
+
+        public bool ShouldPersist(RuntimeNormalizedResult result)
+        {
+            return false;
+        }
+
+        public string PlanPath(RuntimeNormalizedResult result)
+        {
+            return Path.Combine(Path.GetTempPath(), $"{result.RunId:N}.png");
+        }
+
+        public ValueTask<bool> EnqueueAsync(RuntimeNormalizedResult result, CancellationToken cancellationToken)
+        {
+            EnqueueCount++;
+            return ValueTask.FromResult(true);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            if (ThrowOnDispose)
+            {
+                throw new IOException("old image writer cleanup failed");
+            }
+
+            return ValueTask.CompletedTask;
         }
     }
 }

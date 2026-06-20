@@ -129,6 +129,88 @@ public sealed class ProjectGlobalVariableEndpointsTests
         ProjectVariableValueConverter.ToObject(current).Should().Be(1L);
     }
 
+    [Theory]
+    [InlineData(RuntimeStatus.Starting)]
+    [InlineData(RuntimeStatus.Running)]
+    [InlineData(RuntimeStatus.Stopping)]
+    public async Task ProjectPut_WhenRuntimeBusyAndGlobalVariablesProvided_ShouldRejectWithoutPartialUpdate(RuntimeStatus status)
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            status: status);
+        var oldSession = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
+        oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}",
+            new UpdateProjectRequest
+            {
+                Name = "renamed",
+                Description = "changed",
+                GlobalVariables = CreateSchema(variableId, 5, manualWriteAllowed: true)
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        host.Project.Name.Should().Be("demo");
+        host.Project.Description.Should().BeNull();
+        host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).Should().BeSameAs(oldSession);
+        oldSession.TryGetValue(variableId, out var current).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(current).Should().Be(9L);
+        await host.Repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
+    [Fact]
+    public async Task ProjectPut_WhenRuntimeRunningAndGlobalVariablesOmitted_ShouldAllowMetadataUpdate()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            status: RuntimeStatus.Running);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}",
+            new UpdateProjectRequest
+            {
+                Name = "renamed",
+                Description = "changed"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.Project.Name.Should().Be("renamed");
+        host.Project.Description.Should().Be("changed");
+        await host.Repository.Received(1).UpdateAsync(host.Project);
+    }
+
+    [Fact]
+    public async Task ProjectPut_WhenIdleAndGlobalVariablesProvided_ShouldUpdateAndRefreshSession()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+        var oldSession = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
+        oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}",
+            new UpdateProjectRequest
+            {
+                Name = "renamed",
+                Description = "changed",
+                GlobalVariables = CreateSchema(variableId, 5, manualWriteAllowed: true)
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.Project.Name.Should().Be("renamed");
+        host.Project.Description.Should().Be("changed");
+        host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(5L);
+        var newSession = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
+        newSession.Should().NotBeSameAs(oldSession);
+        newSession.TryGetValue(variableId, out var current).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(current).Should().Be(5L);
+    }
+
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, bool manualWriteAllowed)
     {
         return new ProjectGlobalVariableSchema
@@ -152,11 +234,16 @@ public sealed class ProjectGlobalVariableEndpointsTests
     {
         private readonly WebApplication _app;
 
-        private ProjectGlobalVariableEndpointHost(WebApplication app, Project project, ProjectVariableSessionRegistry registry)
+        private ProjectGlobalVariableEndpointHost(
+            WebApplication app,
+            Project project,
+            ProjectVariableSessionRegistry registry,
+            IProjectRepository repository)
         {
             _app = app;
             Project = project;
             Registry = registry;
+            Repository = repository;
             Client = app.GetTestClient();
         }
 
@@ -165,6 +252,8 @@ public sealed class ProjectGlobalVariableEndpointsTests
         public Project Project { get; }
 
         public ProjectVariableSessionRegistry Registry { get; }
+
+        public IProjectRepository Repository { get; }
 
         public static async Task<ProjectGlobalVariableEndpointHost> CreateAsync(
             ProjectGlobalVariableSchema schema,
@@ -214,7 +303,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             var app = builder.Build();
             MapProjectEndpoints(app);
             await app.StartAsync();
-            return new ProjectGlobalVariableEndpointHost(app, project, registry);
+            return new ProjectGlobalVariableEndpointHost(app, project, registry, repository);
         }
 
         public async ValueTask DisposeAsync()

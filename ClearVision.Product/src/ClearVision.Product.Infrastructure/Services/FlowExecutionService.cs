@@ -1973,6 +1973,28 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     public async Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(
         OperatorFlow flow,
         DebugOptions options,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        CancellationToken cancellationToken = default)
+    {
+        using var previewSession = projectVariables.IsPreview
+            ? projectVariables.Session.CreateSnapshotClone()
+            : null;
+        var effectiveContext = previewSession == null
+            ? projectVariables
+            : new ProjectVariableExecutionContext(
+                previewSession,
+                projectVariables.BindingIndex,
+                projectVariables.RunId,
+                isPreview: true);
+
+        using var scope = _projectVariableContextAccessor.BeginScope(effectiveContext);
+        return await ExecuteFlowDebugAsync(flow, options, inputData, cancellationToken);
+    }
+
+    public async Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(
+        OperatorFlow flow,
+        DebugOptions options,
         Dictionary<string, object>? inputData = null,
         CancellationToken cancellationToken = default)
     {
@@ -1996,7 +2018,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         {
             // 获取执行顺序（拓扑排序）
             var plan = GetFlowExecutionPlan(flow);
-            var executionOrder = plan.ExecutionOrder;
+            var executionOrder = CreateProjectVariableExecutionOrder(plan, _projectVariableContextAccessor.Current);
             var inputPreparationIndex = plan.CreateInputPreparationIndex();
 
             // 鍒濆鍖栨墽琛岀姸鎬?
@@ -2089,6 +2111,25 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
                 // 鍑嗗杈撳叆鏁版嵁
                 var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+                if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
+                {
+                    var debugResult = new OperatorDebugResult
+                    {
+                        OperatorId = op.Id,
+                        OperatorName = op.Name,
+                        IsSuccess = false,
+                        ErrorMessage = targetBindingError,
+                        ExecutionOrder = completedCount,
+                        IsBreakpoint = options.Breakpoints.Contains(op.Id),
+                        InputSnapshot = CloneNormalizedDictionary(ConvertImageWrappersToBytes(inputs))
+                    };
+                    result.DebugOperatorResults.Add(debugResult);
+                    result.OperatorResults.Add(debugResult);
+                    result.IsSuccess = false;
+                    result.ErrorMessage = $"Operator '{op.Name}' project variable target binding failed: {targetBindingError}";
+                    break;
+                }
+
                 var normalizedInputSnapshot = ConvertImageWrappersToBytes(inputs);
                 var cacheKey = (options.DebugSessionId, op.Id);
                 string? cacheFingerprint = null;
@@ -2124,6 +2165,15 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     result.OperatorResults.Add(cachedDebugResult);
                     result.IntermediateResults[op.Id] = CloneNormalizedDictionary(cachedCopy);
                     TouchDebugSession(options.DebugSessionId);
+                    if (!TryCommitProjectVariableSourceBindings(op, cachedCopy, out var cachedSourceBindingError))
+                    {
+                        cachedDebugResult.IsSuccess = false;
+                        cachedDebugResult.ErrorMessage = cachedSourceBindingError;
+                        result.IsSuccess = false;
+                        result.ErrorMessage = $"Operator '{op.Name}' project variable source binding failed: {cachedSourceBindingError}";
+                        break;
+                    }
+
                     completedCount++;
 
                     if (options.BreakAtOperatorId.HasValue && op.Id == options.BreakAtOperatorId.Value)
@@ -2173,6 +2223,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 var outputs = opResult.OutputData ?? new Dictionary<string, object>();
                 operatorOutputs[op.Id] = outputs;
                 ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
+                if (!TryCommitProjectVariableSourceBindings(op, outputs, out var sourceBindingError))
+                {
+                    debugOpResult.IsSuccess = false;
+                    debugOpResult.ErrorMessage = sourceBindingError;
+                    result.IsSuccess = false;
+                    result.ErrorMessage = $"Operator '{op.Name}' project variable source binding failed: {sourceBindingError}";
+                    break;
+                }
 
                 // Encoding cleanup: previous comment text was unreadable.
                 if (options.EnableIntermediateCache && normalizedOutputData.Count > 0)

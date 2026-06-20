@@ -4,6 +4,7 @@
 // 作者：蘅芜君
 
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 
 namespace ClearVision.Product.Infrastructure.AI.DryRun;
@@ -35,6 +36,16 @@ public class DryRunService
         DryRunStubRegistry stubRegistry,
         CancellationToken cancellationToken = default)
     {
+        return await RunAsync(flow, testInputs, stubRegistry, null, cancellationToken);
+    }
+
+    public async Task<DryRunResult> RunAsync(
+        OperatorFlow flow,
+        Dictionary<string, object> testInputs,
+        DryRunStubRegistry stubRegistry,
+        ProjectVariableExecutionContext? projectVariables,
+        CancellationToken cancellationToken = default)
+    {
         var result = new DryRunResult
         {
             StartTime = DateTime.UtcNow,
@@ -53,11 +64,22 @@ public class DryRunService
         try
         {
             // 执行流程
-            var flowResult = await _flowExecutionService.ExecuteFlowAsync(
-                flow,
-                testInputs,
-                enableParallel: false,
-                cancellationToken);
+            var flowResult = projectVariables == null
+                ? await _flowExecutionService.ExecuteFlowAsync(
+                    flow,
+                    testInputs,
+                    enableParallel: false,
+                    cancellationToken)
+                : await _flowExecutionService.ExecuteFlowAsync(
+                    flow,
+                    testInputs,
+                    new ProjectVariableExecutionContext(
+                        projectVariables.Session,
+                        projectVariables.BindingIndex,
+                        projectVariables.RunId,
+                        isPreview: true),
+                    enableParallel: false,
+                    cancellationToken);
 
             result.FlowResult = flowResult;
             result.IsSuccess = flowResult.IsSuccess;

@@ -137,8 +137,17 @@ public static class ApiEndpoints
         });
 
         // 更新工程
-        app.MapPut("/api/projects/{id:guid}", async (Guid id, UpdateProjectRequest request, ProjectService service) =>
+        app.MapPut("/api/projects/{id:guid}", async (
+            Guid id,
+            UpdateProjectRequest request,
+            ProjectService service,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
+            if (request.GlobalVariables != null && IsProjectRuntimeBusy(id, runtimeCoordinator))
+            {
+                return Results.Conflict(new { Error = "Project is currently running." });
+            }
+
             try
             {
                 var project = await service.UpdateAsync(id, request);

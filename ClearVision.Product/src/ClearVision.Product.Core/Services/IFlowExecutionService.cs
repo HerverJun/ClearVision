@@ -91,6 +91,16 @@ public interface IFlowExecutionService
         Dictionary<string, object>? inputData = null,
         CancellationToken cancellationToken = default);
 
+    Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(
+        OperatorFlow flow,
+        DebugOptions options,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        CancellationToken cancellationToken = default)
+    {
+        return ExecuteFlowDebugAsync(flow, options, inputData, cancellationToken);
+    }
+
     /// <summary>
     /// 获取调试中间结果
     /// </summary>

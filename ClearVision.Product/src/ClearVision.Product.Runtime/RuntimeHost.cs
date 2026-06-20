@@ -35,10 +35,12 @@ public sealed class RuntimeHost : IAsyncDisposable
     private int _sessionNgCount;
     private int _sessionErrorCount;
     private int _pendingCount;
-    private RuntimeResultRecordWriter? _resultWriter;
-    private RuntimeImageWriter? _imageWriter;
+    private IRuntimeResultRecordWriter? _resultWriter;
+    private IRuntimeImageWriter? _imageWriter;
     private ProjectVariableSession? _projectVariableSession;
     private readonly Func<RuntimeProfile, ValueTask<RuntimePreparedWriters>> _writerFactory;
+    private readonly Func<string, RuntimeProfile, IRuntimeResultRecordWriter> _resultWriterFactory;
+    private readonly Func<string, RuntimeProfile, IRuntimeImageWriter> _imageWriterFactory;
     private int _disposeStarted;
 
     public RuntimeHost(
@@ -55,12 +57,18 @@ public sealed class RuntimeHost : IAsyncDisposable
         RuntimePackageLoader packageLoader,
         RuntimeResultNormalizer resultNormalizer,
         ILogger<RuntimeHost> logger,
-        Func<RuntimeProfile, ValueTask<RuntimePreparedWriters>>? writerFactory)
+        Func<RuntimeProfile, ValueTask<RuntimePreparedWriters>>? writerFactory,
+        Func<string, RuntimeProfile, IRuntimeResultRecordWriter>? resultWriterFactory = null,
+        Func<string, RuntimeProfile, IRuntimeImageWriter>? imageWriterFactory = null)
     {
         _flowExecutionService = flowExecutionService;
         _packageLoader = packageLoader;
         _resultNormalizer = resultNormalizer;
         _logger = logger;
+        _resultWriterFactory = resultWriterFactory ?? ((dataRoot, profile) =>
+            new RuntimeResultRecordWriter(dataRoot, profile.ResultRecordQueueCapacity, _logger));
+        _imageWriterFactory = imageWriterFactory ?? ((dataRoot, profile) =>
+            new RuntimeImageWriter(dataRoot, profile, _logger));
         _writerFactory = writerFactory ?? CreateWritersAsync;
     }
 
@@ -168,8 +176,8 @@ public sealed class RuntimeHost : IAsyncDisposable
         var nextSiteProfile = RuntimeParameterOverrideApplier.CloneProfile(package.DefaultSiteProfile);
         RuntimePreparedWriters? preparedWriters = null;
         ProjectVariableSession? oldProjectVariableSession = null;
-        RuntimeResultRecordWriter? oldResultWriter = null;
-        RuntimeImageWriter? oldImageWriter = null;
+        IRuntimeResultRecordWriter? oldResultWriter = null;
+        IRuntimeImageWriter? oldImageWriter = null;
 
         try
         {
@@ -208,22 +216,15 @@ public sealed class RuntimeHost : IAsyncDisposable
             projectVariableSession?.Dispose();
             if (preparedWriters != null)
             {
-                await preparedWriters.DisposeAsync();
+                await DisposePreparedWritersAfterPrepareFailureAsync(preparedWriters);
             }
 
             throw;
         }
 
-        oldProjectVariableSession?.Dispose();
-        if (oldResultWriter != null)
-        {
-            await oldResultWriter.DisposeAsync();
-        }
-
-        if (oldImageWriter != null)
-        {
-            await oldImageWriter.DisposeAsync();
-        }
+        DisposeOldProjectVariableSession(oldProjectVariableSession);
+        await DisposeOldWriterAfterCommitAsync(oldResultWriter, "runtime result record writer");
+        await DisposeOldWriterAfterCommitAsync(oldImageWriter, "runtime image writer");
 
         EmitSnapshot();
         EmitLog($"已加载运行包：{package.Manifest.PackageName}（{package.Manifest.FlowHash}）");
@@ -795,13 +796,85 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
     }
 
-    private ValueTask<RuntimePreparedWriters> CreateWritersAsync(RuntimeProfile profile)
+    private async ValueTask<RuntimePreparedWriters> CreateWritersAsync(RuntimeProfile profile)
     {
         var dataRoot = RuntimePathGuard.GetDefaultStationDataRoot();
         Directory.CreateDirectory(dataRoot);
-        return ValueTask.FromResult(new RuntimePreparedWriters(
-            new RuntimeResultRecordWriter(dataRoot, profile.ResultRecordQueueCapacity, _logger),
-            new RuntimeImageWriter(dataRoot, profile, _logger)));
+        IRuntimeResultRecordWriter? resultWriter = null;
+
+        try
+        {
+            resultWriter = _resultWriterFactory(dataRoot, profile);
+            var imageWriter = _imageWriterFactory(dataRoot, profile);
+            return new RuntimePreparedWriters(resultWriter, imageWriter);
+        }
+        catch
+        {
+            if (resultWriter != null)
+            {
+                await DisposePreparedWriterAfterCreateFailureAsync(resultWriter, "runtime result record writer");
+            }
+
+            throw;
+        }
+    }
+
+    private async ValueTask DisposePreparedWriterAfterCreateFailureAsync(IAsyncDisposable writer, string resourceName)
+    {
+        try
+        {
+            await writer.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose prepared {ResourceName} after writer creation failed.", resourceName);
+        }
+    }
+
+    private async ValueTask DisposePreparedWritersAfterPrepareFailureAsync(RuntimePreparedWriters preparedWriters)
+    {
+        try
+        {
+            await preparedWriters.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose prepared runtime writers after package load prepare failed.");
+        }
+    }
+
+    private void DisposeOldProjectVariableSession(ProjectVariableSession? session)
+    {
+        if (session == null)
+        {
+            return;
+        }
+
+        try
+        {
+            session.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose old project variable session after runtime package commit.");
+        }
+    }
+
+    private async ValueTask DisposeOldWriterAfterCommitAsync(IAsyncDisposable? writer, string resourceName)
+    {
+        if (writer == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await writer.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to dispose old {ResourceName} after runtime package commit.", resourceName);
+        }
     }
 
     private static string BuildImageId(string imagePath)
@@ -1207,22 +1280,62 @@ public sealed class RuntimeResultNormalizer
     }
 }
 
+internal interface IRuntimeResultRecordWriter : IAsyncDisposable
+{
+    int DroppedCount { get; }
+
+    ValueTask<bool> EnqueueAsync(RuntimeNormalizedResult result, CancellationToken cancellationToken);
+}
+
+internal interface IRuntimeImageWriter : IAsyncDisposable
+{
+    int DroppedCount { get; }
+
+    bool ShouldPersist(RuntimeNormalizedResult result);
+
+    string PlanPath(RuntimeNormalizedResult result);
+
+    ValueTask<bool> EnqueueAsync(RuntimeNormalizedResult result, CancellationToken cancellationToken);
+}
+
 internal sealed class RuntimePreparedWriters : IAsyncDisposable
 {
-    public RuntimePreparedWriters(RuntimeResultRecordWriter resultWriter, RuntimeImageWriter imageWriter)
+    public RuntimePreparedWriters(IRuntimeResultRecordWriter resultWriter, IRuntimeImageWriter imageWriter)
     {
         ResultWriter = resultWriter;
         ImageWriter = imageWriter;
     }
 
-    public RuntimeResultRecordWriter ResultWriter { get; }
+    public IRuntimeResultRecordWriter ResultWriter { get; }
 
-    public RuntimeImageWriter ImageWriter { get; }
+    public IRuntimeImageWriter ImageWriter { get; }
 
     public async ValueTask DisposeAsync()
     {
-        await ResultWriter.DisposeAsync();
-        await ImageWriter.DisposeAsync();
+        Exception? firstException = null;
+
+        try
+        {
+            await ResultWriter.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            firstException = ex;
+        }
+
+        try
+        {
+            await ImageWriter.DisposeAsync();
+        }
+        catch (Exception ex) when (firstException == null)
+        {
+            firstException = ex;
+        }
+
+        if (firstException != null)
+        {
+            throw firstException;
+        }
     }
 }
 
@@ -1281,7 +1394,7 @@ internal static class RuntimeResultSnapshot
     }
 }
 
-internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
+internal sealed class RuntimeResultRecordWriter : IRuntimeResultRecordWriter
 {
     private readonly Channel<RuntimeNormalizedResult> _channel;
     private readonly CancellationTokenSource _disposeCts = new();
@@ -1441,7 +1554,7 @@ internal sealed class RuntimeResultRecordWriter : IAsyncDisposable
     }
 }
 
-internal sealed class RuntimeImageWriter : IAsyncDisposable
+internal sealed class RuntimeImageWriter : IRuntimeImageWriter
 {
     private readonly Channel<RuntimeNormalizedResult> _channel;
     private readonly CancellationTokenSource _disposeCts = new();

@@ -9,6 +9,7 @@ using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
@@ -49,6 +50,7 @@ public static class PreviewNodeEndpoints
             IFlowExecutionService flowService,
             IProjectRepository projectRepository,
             IProjectFlowStorage flowStorage,
+            ProjectVariableSessionRegistry projectVariableSessions,
             ILogger<object> logger) =>
         {
             try
@@ -125,13 +127,25 @@ public static class PreviewNodeEndpoints
                 var timeoutMs = NormalizePreviewTimeoutMs(request.TimeoutMs);
                 using var previewCancellation = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
                 previewCancellation.CancelAfter(TimeSpan.FromMilliseconds(timeoutMs));
+                var projectVariables = await CreatePreviewProjectVariableContextAsync(
+                    request.ProjectId,
+                    flow,
+                    projectRepository,
+                    projectVariableSessions);
 
                 // 执行调试流程（自动执行上游子图到目标节点）
-                var result = await flowService.ExecuteFlowDebugAsync(
-                    flow,
-                    debugOptions,
-                    inputData,
-                    previewCancellation.Token);
+                var result = projectVariables == null
+                    ? await flowService.ExecuteFlowDebugAsync(
+                        flow,
+                        debugOptions,
+                        inputData,
+                        previewCancellation.Token)
+                    : await flowService.ExecuteFlowDebugAsync(
+                        flow,
+                        debugOptions,
+                        inputData,
+                        projectVariables,
+                        previewCancellation.Token);
 
                 // 获取目标节点的输出
                 if (!result.IntermediateResults.TryGetValue(request.TargetNodeId, out var nodeOutput))
@@ -240,6 +254,56 @@ public static class PreviewNodeEndpoints
         }
 
         return HasExecutableFlow(project.Flow) ? project.Flow : null;
+    }
+
+    private static async Task<ProjectVariableExecutionContext?> CreatePreviewProjectVariableContextAsync(
+        Guid projectId,
+        ClearVision.Product.Core.Entities.OperatorFlow flow,
+        IProjectRepository projectRepository,
+        ProjectVariableSessionRegistry projectVariableSessions)
+    {
+        if (projectId == Guid.Empty)
+        {
+            return null;
+        }
+
+        var project = await projectRepository.GetByIdAsync(projectId);
+        var schema = project?.GlobalVariables;
+        if (schema == null ||
+            (schema.Variables.Count == 0 && schema.SourceBindings.Count == 0 && schema.TargetBindings.Count == 0))
+        {
+            return null;
+        }
+
+        var previewSchema = CreatePreviewExecutionSchema(schema, flow);
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(previewSchema, flow);
+        var session = projectVariableSessions.GetOrCreate(projectId, schema);
+        return new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(previewSchema),
+            Guid.NewGuid(),
+            isPreview: true);
+    }
+
+    private static ProjectGlobalVariableSchema CreatePreviewExecutionSchema(
+        ProjectGlobalVariableSchema schema,
+        ClearVision.Product.Core.Entities.OperatorFlow previewFlow)
+    {
+        var previewOperatorIds = previewFlow.Operators
+            .Select(@operator => @operator.Id)
+            .ToHashSet();
+
+        return new ProjectGlobalVariableSchema
+        {
+            SchemaVersion = schema.SchemaVersion,
+            Variables = schema.Variables,
+            SourceBindings = schema.SourceBindings
+                .Where(binding => previewOperatorIds.Contains(binding.OperatorId))
+                .ToList(),
+            TargetBindings = schema.TargetBindings
+                .Where(binding => previewOperatorIds.Contains(binding.OperatorId))
+                .ToList()
+        };
     }
 
     private static async Task<ClearVision.Product.Core.Entities.OperatorFlow?> LoadFlowFromStorageAsync(
