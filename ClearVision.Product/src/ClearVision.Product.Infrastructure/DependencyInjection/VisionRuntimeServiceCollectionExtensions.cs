@@ -5,6 +5,7 @@ using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Cameras;
 using ClearVision.Product.Infrastructure.Data;
@@ -82,6 +83,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IOperatorExecutor, ImageSubtractOperator>();
         services.AddSingleton<IOperatorExecutor, ImageBlendOperator>();
         services.AddSingleton<IVariableContext, VariableContext>();
+        services.AddSingleton<IProjectVariableExecutionContextAccessor, ProjectVariableExecutionContextAccessor>();
         services.AddSingleton<IOperatorExecutor, VariableReadOperator>();
         services.AddSingleton<IOperatorExecutor, VariableWriteOperator>();
         services.AddSingleton<IOperatorExecutor, VariableIncrementOperator>();
@@ -237,6 +239,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IAutoTuneService, AutoTuneService>();
 
         services.AddScoped<ProjectService>();
+        services.AddSingleton<ProjectVariableSessionRegistry>();
         services.AddSingleton<IAnalysisDataBuilder, AnalysisDataBuilder>();
         services.AddScoped<IInspectionService, InspectionService>();
 

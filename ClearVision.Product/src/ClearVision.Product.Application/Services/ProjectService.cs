@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -23,6 +24,7 @@ public class ProjectService
     private readonly IProjectFlowStorage _flowStorage;
     private readonly IOperatorFactory _operatorFactory;
     private readonly ILogger<ProjectService>? _logger;
+    private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -42,11 +44,22 @@ public class ProjectService
         IProjectFlowStorage flowStorage,
         IOperatorFactory operatorFactory,
         ILogger<ProjectService>? logger)
+        : this(projectRepository, flowStorage, operatorFactory, logger, null)
+    {
+    }
+
+    public ProjectService(
+        IProjectRepository projectRepository,
+        IProjectFlowStorage flowStorage,
+        IOperatorFactory operatorFactory,
+        ILogger<ProjectService>? logger,
+        ProjectVariableSessionRegistry? projectVariableSessions)
     {
         _projectRepository = projectRepository;
         _flowStorage = flowStorage;
         _operatorFactory = operatorFactory;
         _logger = logger;
+        _projectVariableSessions = projectVariableSessions;
     }
 
     /// <summary>
@@ -55,6 +68,9 @@ public class ProjectService
     public async Task<ProjectDto> CreateAsync(CreateProjectRequest request)
     {
         var project = new Project(request.Name, request.Description);
+        var globalVariables = request.GlobalVariables ?? new ProjectGlobalVariableSchema();
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(globalVariables, request.Flow?.ToEntity());
+        project.UpdateGlobalVariables(globalVariables);
         await _projectRepository.AddAsync(project);
 
         // 如果创建时带有流程（通常是空的，但为了完整性）
@@ -159,17 +175,31 @@ public class ProjectService
             throw new ProjectNotFoundException(id);
 
         project.UpdateInfo(request.Name, request.Description);
+        var requestFlow = request.Flow?.ToEntity();
+        if (request.GlobalVariables != null)
+        {
+            var validationFlow = requestFlow ?? await LoadStoredFlowEntityAsync(id);
+            ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(request.GlobalVariables, validationFlow);
+            project.UpdateGlobalVariables(request.GlobalVariables);
+        }
 
         // 如果有流程数据，更新到文件
         if (request.Flow != null)
         {
             MigrateFlowDto(request.Flow);
             EnrichFlowDtoWithMetadata(request.Flow);
+            requestFlow = request.Flow.ToEntity();
+            ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(project.GlobalVariables, requestFlow);
             var json = JsonSerializer.Serialize(request.Flow, _jsonOptions);
             await _flowStorage.SaveFlowJsonAsync(id, json);
         }
 
         await _projectRepository.UpdateAsync(project);
+        if (request.GlobalVariables != null)
+        {
+            _projectVariableSessions?.Replace(id, project.GlobalVariables);
+        }
+
         return MapToDto(project);
     }
 
@@ -193,6 +223,7 @@ public class ProjectService
 
         MigrateFlowDto(flowDto);
         EnrichFlowDtoWithMetadata(flowDto);
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(project.GlobalVariables, flowDto.ToEntity());
 
         // 3. 序列化并保存到文件
         var json = JsonSerializer.Serialize(flowDto, _jsonOptions);
@@ -331,6 +362,39 @@ public class ProjectService
         return projects.Select(MapToDto);
     }
 
+    public async Task<ProjectGlobalVariableSchema> UpdateGlobalVariablesAsync(Guid id, ProjectGlobalVariableSchema schema)
+    {
+        var project = await _projectRepository.GetByIdAsync(id);
+        if (project == null)
+            throw new ProjectNotFoundException(id);
+
+        OperatorFlow? flow = null;
+        var flowJson = await _flowStorage.LoadFlowJsonAsync(id);
+        if (!string.IsNullOrWhiteSpace(flowJson))
+        {
+            var flowDto = JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, _jsonOptions);
+            flow = flowDto?.ToEntity();
+        }
+
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(schema, flow);
+        project.UpdateGlobalVariables(schema);
+        await _projectRepository.UpdateAsync(project);
+        _projectVariableSessions?.Replace(id, project.GlobalVariables);
+        return project.GlobalVariables;
+    }
+
+    private async Task<OperatorFlow?> LoadStoredFlowEntityAsync(Guid projectId)
+    {
+        var flowJson = await _flowStorage.LoadFlowJsonAsync(projectId);
+        if (string.IsNullOrWhiteSpace(flowJson))
+        {
+            return null;
+        }
+
+        var flowDto = JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, _jsonOptions);
+        return flowDto?.ToEntity();
+    }
+
     private ProjectDto MapToDto(Project project)
     {
         return new ProjectDto
@@ -343,6 +407,7 @@ public class ProjectService
             ModifiedAt = project.ModifiedAt,
             LastOpenedAt = project.LastOpenedAt,
             GlobalSettings = project.GlobalSettings,
+            GlobalVariables = project.GlobalVariables,
             // 修复：添加 Flow 字段映射
             Flow = project.Flow != null ? MapFlowToDto(project.Flow) : null
         };

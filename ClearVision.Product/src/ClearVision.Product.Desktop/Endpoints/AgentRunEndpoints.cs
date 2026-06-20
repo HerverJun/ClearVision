@@ -455,6 +455,10 @@ public static class AgentRunEndpoints
                         parametersNeedingReview = result.ParametersNeedingReview,
                         pendingParameters = result.PendingParameters,
                         missingResources = result.MissingResources,
+                        globalVariableDrafts = result.GlobalVariableDrafts,
+                        globalVariableSourceBindingDrafts = result.GlobalVariableSourceBindingDrafts,
+                        globalVariableTargetBindingDrafts = result.GlobalVariableTargetBindingDrafts,
+                        globalVariableDiagnostics = result.GlobalVariableDiagnostics,
                         pendingActions = result.PendingActions,
                         validationPreview = result.ValidationPreview,
                         dryRunResult = result.DryRunResult,
@@ -483,6 +487,8 @@ public static class AgentRunEndpoints
                         toolTraceCount = result.ToolTrace.Count,
                         pendingParameterCount = result.PendingParameters.Count,
                         missingResourceCount = result.MissingResources.Count,
+                        globalVariableDraftCount = result.GlobalVariableDrafts.Count,
+                        globalVariableDiagnosticCount = result.GlobalVariableDiagnostics.Count,
                         reportId = $"agent-report-{runId}",
                         metadataOnly = true
                     });

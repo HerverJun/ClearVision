@@ -1,5 +1,6 @@
 using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Runtime;
 using ClearVision.Product.Runtime.Abstractions;
@@ -40,6 +41,9 @@ public sealed class MainForm : Form
     private readonly Label _taskValueLabel = new();
     private readonly Label _taskDetailLabel = new();
     private readonly RuntimeParameterPanel _runtimeParameterPanel = new();
+    private readonly ListView _projectVariableView = new();
+    private readonly Button _editProjectVariableButton = new();
+    private readonly Button _resetProjectVariableButton = new();
     private readonly TextBox _stationIdTextBox = new();
     private readonly TextBox _lineNameTextBox = new();
     private readonly Button _loadPackageButton = new();
@@ -558,11 +562,12 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 5,
+            RowCount = 6,
             BackColor = BackColor,
             AutoScroll = true
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -574,6 +579,8 @@ public sealed class MainForm : Form
         layout.Controls.Add(CreateSidebarCard("PLC 连接状态", _plcStatusValueLabel, _plcStatusDetailLabel, Color.DarkOrange), 0, 2);
         layout.Controls.Add(CreateSidebarCard("运行包流程", BuildPackageSummaryContent(), Color.SteelBlue), 0, 3);
         layout.Controls.Add(CreateSidebarCard("现场参数", _runtimeParameterPanel, Color.DarkCyan), 0, 4);
+
+        layout.Controls.Add(CreateSidebarCard("Global Variables", BuildProjectVariableMonitor(), Color.MediumPurple), 0, 5);
 
         return layout;
     }
@@ -650,6 +657,285 @@ public sealed class MainForm : Form
         layout.Controls.Add(CreatePaneShell("运行日志", _logTextBox), 0, 3);
 
         return layout;
+    }
+
+    private Control BuildProjectVariableMonitor()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = new Padding(0)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        _projectVariableView.Dock = DockStyle.Fill;
+        _projectVariableView.Height = 132;
+        _projectVariableView.View = View.Details;
+        _projectVariableView.FullRowSelect = true;
+        _projectVariableView.GridLines = true;
+        _projectVariableView.MultiSelect = false;
+        _projectVariableView.Columns.Clear();
+        _projectVariableView.Columns.Add("Name", 92);
+        _projectVariableView.Columns.Add("Value", 70);
+        _projectVariableView.Columns.Add("Source", 58);
+        _projectVariableView.Columns.Add("Ver", 42);
+        _projectVariableView.Columns.Add("Updated", 72);
+        _projectVariableView.SelectedIndexChanged += (_, _) => UpdateButtonStates();
+        _projectVariableView.DoubleClick += async (_, _) => await EditSelectedProjectVariableAsync();
+
+        var buttonPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = new Padding(0, 6, 0, 0)
+        };
+        ConfigureButton(_editProjectVariableButton, "Edit", async (_, _) => await EditSelectedProjectVariableAsync());
+        ConfigureButton(_resetProjectVariableButton, "Reset", async (_, _) => await ResetSelectedProjectVariableAsync());
+        buttonPanel.Controls.AddRange([_editProjectVariableButton, _resetProjectVariableButton]);
+
+        layout.Controls.Add(_projectVariableView, 0, 0);
+        layout.Controls.Add(buttonPanel, 0, 1);
+        return layout;
+    }
+
+    private void RefreshProjectVariableMonitor()
+    {
+        _projectVariableView.Items.Clear();
+        var package = _loadedPackage;
+        if (package == null || package.GlobalVariables.Variables.Count == 0)
+        {
+            return;
+        }
+
+        var definitions = package.GlobalVariables.Variables.ToDictionary(item => item.Id);
+        foreach (var snapshot in _runtimeHost.GetProjectVariableSnapshots())
+        {
+            if (!definitions.TryGetValue(snapshot.VariableId, out var definition))
+            {
+                continue;
+            }
+
+            var item = new ListViewItem(string.IsNullOrWhiteSpace(definition.DisplayName) ? definition.Name : definition.DisplayName);
+            item.Tag = definition.Id;
+            item.SubItems.Add(FormatProjectVariableValue(snapshot.Value));
+            item.SubItems.Add(snapshot.UpdatedBy.ToString());
+            item.SubItems.Add(snapshot.Version.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            item.SubItems.Add(snapshot.UpdatedAtUtc.ToLocalTime().ToString("HH:mm:ss"));
+            _projectVariableView.Items.Add(item);
+        }
+    }
+
+    private static string FormatProjectVariableValue(System.Text.Json.JsonElement value)
+    {
+        return ProjectVariableValueConverter.ToObject(value)?.ToString() ?? string.Empty;
+    }
+
+    private bool TryGetSelectedProjectVariable(out ProjectGlobalVariableDefinition definition, out ProjectVariableValueSnapshot snapshot)
+    {
+        definition = default!;
+        snapshot = default!;
+        if (_projectVariableView.SelectedItems.Count == 0 ||
+            _projectVariableView.SelectedItems[0].Tag is not Guid variableId ||
+            _loadedPackage == null)
+        {
+            return false;
+        }
+
+        var selectedDefinition = _loadedPackage.GlobalVariables.Variables.FirstOrDefault(item => item.Id == variableId);
+        var selectedSnapshot = _runtimeHost.GetProjectVariableSnapshots().FirstOrDefault(item => item.VariableId == variableId);
+        if (selectedDefinition == null || selectedSnapshot == null)
+        {
+            return false;
+        }
+
+        definition = selectedDefinition;
+        snapshot = selectedSnapshot;
+        return true;
+    }
+
+    private async Task EditSelectedProjectVariableAsync()
+    {
+        if (!TryGetSelectedProjectVariable(out var definition, out var snapshot))
+        {
+            return;
+        }
+
+        if (!CanEditProjectVariable(definition))
+        {
+            return;
+        }
+
+        var currentText = FormatProjectVariableValue(snapshot.Value);
+        var title = $"Edit {definition.Name}";
+        var entered = PromptForProjectVariableValue(title, definition, currentText);
+        if (entered == null)
+        {
+            return;
+        }
+
+        if (!TryParseProjectVariableValue(entered, definition.ValueType, out var typedValue, out var error))
+        {
+            MessageBox.Show(this, error, "Invalid value", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            await _runtimeHost.SetProjectVariableValueAsync(definition.Id, typedValue);
+            RefreshProjectVariableMonitor();
+            UpdateButtonStates();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Edit global variable failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task ResetSelectedProjectVariableAsync()
+    {
+        if (!TryGetSelectedProjectVariable(out var definition, out _))
+        {
+            return;
+        }
+
+        if (!CanResetProjectVariables())
+        {
+            return;
+        }
+
+        var result = MessageBox.Show(
+            this,
+            $"Reset '{definition.Name}' to its initial value?",
+            "Reset global variable",
+            MessageBoxButtons.OKCancel,
+            MessageBoxIcon.Question);
+        if (result != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            await _runtimeHost.ResetProjectVariableAsync(definition.Id);
+            RefreshProjectVariableMonitor();
+            UpdateButtonStates();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Reset global variable failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private bool CanEditProjectVariable(ProjectGlobalVariableDefinition definition)
+    {
+        return CanResetProjectVariables() && definition.ManualWriteAllowed;
+    }
+
+    private bool CanResetProjectVariables()
+    {
+        var snapshot = _runtimeHost.GetSnapshot();
+        return _loadedPackage != null &&
+               snapshot.State is not (RuntimeHostState.Running or RuntimeHostState.Stopping);
+    }
+
+    private static bool TryParseProjectVariableValue(
+        string text,
+        ProjectGlobalVariableValueType valueType,
+        out object? value,
+        out string error)
+    {
+        value = null;
+        error = string.Empty;
+        switch (valueType)
+        {
+            case ProjectGlobalVariableValueType.String:
+                value = text;
+                return true;
+            case ProjectGlobalVariableValueType.Int64:
+                if (long.TryParse(text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var longValue))
+                {
+                    value = longValue;
+                    return true;
+                }
+
+                error = "Enter a whole number.";
+                return false;
+            case ProjectGlobalVariableValueType.Double:
+                if (double.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var doubleValue))
+                {
+                    value = doubleValue;
+                    return true;
+                }
+
+                error = "Enter a number.";
+                return false;
+            case ProjectGlobalVariableValueType.Boolean:
+                if (bool.TryParse(text, out var boolValue))
+                {
+                    value = boolValue;
+                    return true;
+                }
+
+                error = "Enter true or false.";
+                return false;
+            default:
+                error = $"Unsupported global variable type '{valueType}'.";
+                return false;
+        }
+    }
+
+    private string? PromptForProjectVariableValue(
+        string title,
+        ProjectGlobalVariableDefinition definition,
+        string currentValue)
+    {
+        using var dialog = new Form
+        {
+            Text = title,
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ClientSize = new Size(360, 132)
+        };
+
+        var label = new Label
+        {
+            Text = $"{(string.IsNullOrWhiteSpace(definition.DisplayName) ? definition.Name : definition.DisplayName)} ({definition.ValueType})",
+            Dock = DockStyle.Top,
+            Height = 28,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(10, 0, 10, 0)
+        };
+        var textBox = new TextBox
+        {
+            Dock = DockStyle.Top,
+            Text = currentValue,
+            Margin = new Padding(10)
+        };
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            FlowDirection = FlowDirection.RightToLeft,
+            Height = 44,
+            Padding = new Padding(10)
+        };
+        var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Width = 76 };
+        var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Width = 76 };
+        buttons.Controls.AddRange([ok, cancel]);
+        dialog.Controls.Add(buttons);
+        dialog.Controls.Add(textBox);
+        dialog.Controls.Add(label);
+        dialog.AcceptButton = ok;
+        dialog.CancelButton = cancel;
+        textBox.SelectAll();
+
+        return dialog.ShowDialog(this) == DialogResult.OK ? textBox.Text : null;
     }
 
     private Control BuildPackageSummaryContent()
@@ -800,6 +1086,7 @@ public sealed class MainForm : Form
             _activeSiteProfile = _siteProfileStore.LoadOrCreate(_loadedPackage);
             _runtimeHost.SetActiveSiteProfile(_activeSiteProfile);
             _runtimeParameterPanel.LoadPackage(_loadedPackage, _activeSiteProfile);
+            RefreshProjectVariableMonitor();
             _settingsStore.UpdateLastGoodPackage(resolvedPackagePath);
             _selectedPathLabel.Text = $"当前选择：{resolvedPackagePath}";
             AppendLog($"运行包加载成功：{_loadedPackage.Manifest.PackageName}");
@@ -1086,6 +1373,7 @@ public sealed class MainForm : Form
 
     private void ApplyResult(RuntimeNormalizedResult result)
     {
+        RefreshProjectVariableMonitor();
         _recentResults.Insert(0, result);
         while (_recentResults.Count > (_loadedPackage?.RuntimeProfile.RecentResultsLimit ?? 50))
         {
@@ -1142,6 +1430,9 @@ public sealed class MainForm : Form
         _stopButton.Enabled = running;
         _hardwareSettingsButton.Enabled = !running;
         _runtimeParameterPanel.SetEditingEnabled(hasPackage && !running);
+        var hasSelectedVariable = TryGetSelectedProjectVariable(out var selectedVariable, out _);
+        _resetProjectVariableButton.Enabled = hasSelectedVariable && hasPackage && !running;
+        _editProjectVariableButton.Enabled = hasSelectedVariable && hasPackage && !running && selectedVariable.ManualWriteAllowed;
     }
 
     private void AppendLog(string message)

@@ -21,6 +21,10 @@ public sealed record VisionAgentBuildResult
     public List<VisionAgentParameterMapping> ParameterMapping { get; init; } = [];
     public List<AiPendingParameterInfo> PendingParameters { get; init; } = [];
     public List<AiMissingResourceInfo> MissingResources { get; init; } = [];
+    public List<VisionAgentGlobalVariableDraft> GlobalVariableDrafts { get; init; } = [];
+    public List<VisionAgentGlobalVariableSourceBindingDraft> GlobalVariableSourceBindingDrafts { get; init; } = [];
+    public List<VisionAgentGlobalVariableTargetBindingDraft> GlobalVariableTargetBindingDrafts { get; init; } = [];
+    public List<VisionAgentGlobalVariableDiagnostic> GlobalVariableDiagnostics { get; init; } = [];
     public object? ValidationPreview { get; init; }
     public object? DryRunResult { get; init; }
     public object? ReadinessReport { get; init; }
@@ -72,6 +76,49 @@ public sealed record VisionAgentParameterMapping
     public string Source { get; init; } = string.Empty;
     public bool Pending { get; init; }
     public string Impact { get; init; } = string.Empty;
+}
+
+public sealed record VisionAgentGlobalVariableDraft
+{
+    public string Name { get; init; } = string.Empty;
+    public string DisplayName { get; init; } = string.Empty;
+    public string ValueType { get; init; } = "String";
+    public string InitialValueSummary { get; init; } = string.Empty;
+    public bool ManualWriteAllowed { get; init; } = true;
+    public bool IncludeInResultMetadata { get; init; }
+    public string Source { get; init; } = "agent_suggestion";
+    public string Rationale { get; init; } = string.Empty;
+    public bool RequiresHumanConfirmation { get; init; } = true;
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentGlobalVariableSourceBindingDraft
+{
+    public string VariableName { get; init; } = string.Empty;
+    public string OperatorHint { get; init; } = string.Empty;
+    public string OutputPortHint { get; init; } = string.Empty;
+    public string Rationale { get; init; } = string.Empty;
+    public bool RequiresHumanConfirmation { get; init; } = true;
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentGlobalVariableTargetBindingDraft
+{
+    public string VariableName { get; init; } = string.Empty;
+    public string OperatorHint { get; init; } = string.Empty;
+    public string ParameterHint { get; init; } = string.Empty;
+    public string Rationale { get; init; } = string.Empty;
+    public bool RequiresHumanConfirmation { get; init; } = true;
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentGlobalVariableDiagnostic
+{
+    public string Code { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
+    public string Severity { get; init; } = "info";
+    public string VariableName { get; init; } = string.Empty;
+    public bool MetadataOnly { get; init; } = true;
 }
 
 public sealed record VisionAgentWorkflowDiff

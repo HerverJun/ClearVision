@@ -6,6 +6,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Runtime;
@@ -159,6 +160,185 @@ public class RuntimeMvpTests
             result.PrimaryOutputs["DecisionByte"]?.ToString().Should().Be("4");
             result.SourceImageBytes.Should().BeNull();
             result.OutputImageBytes.Should().Equal([4, 2, 1]);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_ProjectVariables_ShouldAllowIdleStationEditAndReset()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var editableId = Guid.NewGuid();
+            var lockedId = Guid.NewGuid();
+            var project = CreateProjectDto("station-global-variable-edit");
+            project.GlobalVariables = new ProjectGlobalVariableSchema
+            {
+                Variables =
+                [
+                    new ProjectGlobalVariableDefinition
+                    {
+                        Id = editableId,
+                        Name = "judge.expected_count",
+                        DisplayName = "Expected count",
+                        ValueType = ProjectGlobalVariableValueType.Int64,
+                        InitialValue = JsonSerializer.SerializeToElement(4L),
+                        ManualWriteAllowed = true
+                    },
+                    new ProjectGlobalVariableDefinition
+                    {
+                        Id = lockedId,
+                        Name = "stats.locked_count",
+                        DisplayName = "Locked count",
+                        ValueType = ProjectGlobalVariableValueType.Int64,
+                        InitialValue = JsonSerializer.SerializeToElement(1L),
+                        ManualWriteAllowed = false
+                    }
+                ]
+            };
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+
+            runtimeHost.GetProjectVariableSnapshots().Should().Contain(item =>
+                item.VariableId == editableId &&
+                Convert.ToInt64(ProjectVariableValueConverter.ToObject(item.Value)) == 4L &&
+                item.UpdatedBy == ProjectVariableUpdatedBy.Initial);
+
+            var edited = await runtimeHost.SetProjectVariableValueAsync(editableId, 6L);
+            Convert.ToInt64(ProjectVariableValueConverter.ToObject(edited.Value)).Should().Be(6L);
+            edited.UpdatedBy.Should().Be(ProjectVariableUpdatedBy.StationManual);
+
+            var reset = await runtimeHost.ResetProjectVariableAsync(editableId);
+            Convert.ToInt64(ProjectVariableValueConverter.ToObject(reset.Value)).Should().Be(4L);
+            reset.UpdatedBy.Should().Be(ProjectVariableUpdatedBy.Reset);
+
+            var lockedEdit = async () => await runtimeHost.SetProjectVariableValueAsync(lockedId, 2L);
+            await lockedEdit.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*does not allow manual Station writes*");
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_ProjectVariables_ShouldRejectStationEditAndResetWhileRunning()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var project = CreateProjectDto("station-global-variable-running-guard");
+            project.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 4L, manualWriteAllowed: true);
+
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            var replayRoot = Path.Combine(root, "replay");
+            Directory.CreateDirectory(replayRoot);
+            await File.WriteAllBytesAsync(Path.Combine(replayRoot, "input.png"), new byte[] { 2, 4, 6, 8 });
+
+            var started = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new BlockingResultOutputExecutor(started, release)),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            await runtimeHost.StartFolderRunAsync(replayRoot);
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+            var edit = async () => await runtimeHost.SetProjectVariableValueAsync(variableId, 8L);
+            var reset = async () => await runtimeHost.ResetProjectVariableAsync(variableId);
+
+            await edit.Should().ThrowAsync<RuntimePackageException>();
+            await reset.Should().ThrowAsync<RuntimePackageException>();
+
+            release.TrySetResult(null);
+            await WaitForStateAsync(runtimeHost, RuntimeHostState.Loaded, TimeSpan.FromSeconds(2));
+            runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
+                snapshot.VariableId == variableId &&
+                Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 4L);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_LoadPackageAsync_WhenReloadFails_ShouldKeepExistingPackageAndProjectVariableSession()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var project = CreateProjectDto("station-global-variable-reload-failure");
+            project.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 4L, manualWriteAllowed: true);
+
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            await runtimeHost.SetProjectVariableValueAsync(variableId, 9L);
+
+            var invalidExport = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = CreateProjectDto("station-global-variable-invalid-reload"),
+                TargetRootDirectory = Path.Combine(root, "invalid")
+            });
+            var manifestPath = Path.Combine(invalidExport.PackageRootPath, "package.json");
+            var manifest = JsonSerializer.Deserialize<RuntimePackageManifest>(
+                await File.ReadAllTextAsync(manifestPath),
+                CreateJsonOptions())!;
+            manifest.FlowHash = "sha256:invalid";
+            await File.WriteAllTextAsync(manifestPath, JsonSerializer.Serialize(manifest, CreateJsonOptions()));
+
+            var reload = async () => await runtimeHost.LoadPackageAsync(invalidExport.PackageRootPath);
+            await reload.Should().ThrowAsync<RuntimePackageException>();
+
+            runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Loaded);
+            runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
+                snapshot.VariableId == variableId &&
+                Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 9L);
+
+            var imagePath = Path.Combine(root, "old-package-input.png");
+            await File.WriteAllBytesAsync(imagePath, new byte[] { 2, 4, 6, 8 });
+            var runResult = await runtimeHost.RunSingleAsync(imagePath);
+            runResult.Outcome.Should().Be(RuntimeRunOutcome.Ok);
         }
         finally
         {
@@ -512,6 +692,28 @@ public class RuntimeMvpTests
                     }
                 ]
             }
+        };
+    }
+
+    private static ProjectGlobalVariableSchema CreateSingleInt64GlobalVariableSchema(
+        Guid variableId,
+        long initialValue,
+        bool manualWriteAllowed)
+    {
+        return new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "stats.count",
+                    DisplayName = "Count",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(initialValue),
+                    ManualWriteAllowed = manualWriteAllowed
+                }
+            ]
         };
     }
 

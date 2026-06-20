@@ -4,6 +4,8 @@
 
 namespace ClearVision.Product.Application.DTOs;
 
+using ClearVision.Product.Core.ProjectVariables;
+
 /// <summary>
 /// 工程数据传输对象
 /// </summary>
@@ -39,6 +41,8 @@ public class ProjectDto
     /// </summary>
     public Dictionary<string, string> GlobalSettings { get; set; } = new();
 
+    public ProjectGlobalVariableSchema GlobalVariables { get; set; } = new();
+
     /// <summary>
     /// 创建时间
     /// </summary>
@@ -67,6 +71,8 @@ public class CreateProjectRequest
     /// 算子流程（可选）
     /// </summary>
     public OperatorFlowDto? Flow { get; set; }
+
+    public ProjectGlobalVariableSchema? GlobalVariables { get; set; }
 }
 
 /// <summary>
@@ -81,4 +87,6 @@ public class UpdateProjectRequest
     /// 算子流程（可选）
     /// </summary>
     public OperatorFlowDto? Flow { get; set; }
+
+    public ProjectGlobalVariableSchema? GlobalVariables { get; set; }
 }

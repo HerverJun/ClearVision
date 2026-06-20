@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Runtime;
 using ClearVision.Product.Runtime.Abstractions;
 using ClearVision.Product.Station;
@@ -107,6 +108,77 @@ public sealed class RuntimePackageExporterTests
             defaultProfile.PackageId.Should().Be(export.Manifest.PackageId);
             defaultProfile.FlowHash.Should().Be(export.Manifest.FlowHash);
             defaultProfile.Overrides.Should().BeEmpty();
+        }
+        finally
+        {
+            RuntimeParameterTestData.SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task ExportAsync_WhenGlobalVariableTargetsSiteProfileParameter_ShouldRejectConflict()
+    {
+        var root = RuntimeParameterTestData.CreateTempDirectory("ClearVisionRuntimeParameterConflictTests");
+        try
+        {
+            var modelPath = Path.Combine(root, "model.onnx");
+            await File.WriteAllBytesAsync(modelPath, [1, 2, 3, 4]);
+            var operatorId = Guid.NewGuid();
+            var deepLearning = RuntimeParameterTestData.CreateDeepLearningOperator(
+                operatorId,
+                "wire-sequence",
+                modelPath,
+                confidence: 0.62d);
+            var confidenceParameter = deepLearning.Parameters.Single(parameter => parameter.Name == "Confidence");
+            var variableId = Guid.NewGuid();
+            var exporter = new RuntimePackageExporter(
+                new ClearVision.Product.Infrastructure.Services.OperatorFactory(),
+                NullLogger<RuntimePackageExporter>.Instance);
+
+            var act = () => exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                TargetRootDirectory = root,
+                Project = new ProjectDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "runtime-parameters-conflict",
+                    Flow = new OperatorFlowDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "main",
+                        Operators = [deepLearning]
+                    },
+                    GlobalVariables = new ProjectGlobalVariableSchema
+                    {
+                        Variables =
+                        [
+                            new ProjectGlobalVariableDefinition
+                            {
+                                Id = variableId,
+                                Name = "dl.confidence",
+                                DisplayName = "dl.confidence",
+                                ValueType = ProjectGlobalVariableValueType.Double,
+                                InitialValue = JsonSerializer.SerializeToElement(0.5d)
+                            }
+                        ],
+                        TargetBindings =
+                        [
+                            new ProjectGlobalVariableTargetBinding
+                            {
+                                Id = Guid.NewGuid(),
+                                VariableId = variableId,
+                                OperatorId = operatorId,
+                                ParameterId = confidenceParameter.Id,
+                                OperatorName = deepLearning.Name,
+                                ParameterName = confidenceParameter.Name
+                            }
+                        ]
+                    }
+                }
+            });
+
+            await act.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*GV016*");
         }
         finally
         {
@@ -614,7 +686,8 @@ internal static class RuntimeParameterTestData
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
                 UpdatedBy = "ClearVision Studio",
                 Overrides = []
-            }
+            },
+            GlobalVariables = new ProjectGlobalVariableSchema()
         };
     }
 

@@ -1,44 +1,42 @@
-// VariableWriteOperator.cs
-// 变量写入算子 - 写入值到全局变量表
-// 作者：蘅芜君
-
 using ClearVision.Product.Core.Attributes;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
+
 namespace ClearVision.Product.Infrastructure.Operators;
 
-/// <summary>
-/// 变量写入算子 - 写入值到全局变量表
-/// 【第三优先级】变量表/全局上下文功能
-/// </summary>
 [OperatorMeta(
     DisplayName = "变量写入",
-    Description = "写入值到全局变量表",
+    Description = "写入单次运行变量或项目全局变量",
     Category = "变量",
-    IconName = "variable-write"
-)]
+    IconName = "variable-write")]
 [InputPort("Value", "值", PortDataType.Any, IsRequired = false)]
 [OutputPort("VariableName", "变量名", PortDataType.String)]
 [OutputPort("Value", "写入的值", PortDataType.Any)]
 [OutputPort("CycleCount", "循环计数", PortDataType.Integer)]
+[OperatorParam("Scope", "作用域", "enum", DefaultValue = "Run", Options = new[] { "Run|单次运行", "Project|项目全局" })]
+[OperatorParam("VariableId", "变量ID", "string", Description = "Project 作用域变量的稳定 ID", DefaultValue = "")]
 [OperatorParam("VariableName", "变量名", "string", Description = "要写入的变量名称", DefaultValue = "")]
 [OperatorParam("DataType", "数据类型", "enum", DefaultValue = "String", Options = new[] { "String|字符串", "Int|整数", "Double|浮点数", "Bool|布尔值" })]
-[OperatorParam("UseInputValue", "使用输入值", "bool", Description = "优先使用上游输入的值，否则使用下方静态值", DefaultValue = true)]
-[OperatorParam("StaticValue", "静态值", "string", Description = "当没有上游输入时使用的值", DefaultValue = "0")]
+[OperatorParam("UseInputValue", "使用输入值", "bool", Description = "优先使用上游输入值，否则使用静态值", DefaultValue = true)]
+[OperatorParam("StaticValue", "静态值", "string", Description = "没有上游输入时使用的值", DefaultValue = "0")]
 public class VariableWriteOperator : OperatorBase
 {
     private readonly IVariableContext _variableContext;
+    private readonly IProjectVariableExecutionContextAccessor _projectVariableContextAccessor;
 
     public override OperatorType OperatorType => OperatorType.VariableWrite;
 
     public VariableWriteOperator(
         ILogger<VariableWriteOperator> logger,
-        IVariableContext variableContext) : base(logger)
+        IVariableContext variableContext,
+        IProjectVariableExecutionContextAccessor? projectVariableContextAccessor = null) : base(logger)
     {
         _variableContext = variableContext;
+        _projectVariableContextAccessor = projectVariableContextAccessor ?? new ProjectVariableExecutionContextAccessor();
     }
 
     protected override Task<OperatorExecutionOutput> ExecuteCoreAsync(
@@ -46,101 +44,139 @@ public class VariableWriteOperator : OperatorBase
         Dictionary<string, object>? inputs,
         CancellationToken cancellationToken)
     {
+        var scope = GetStringParam(@operator, "Scope", "Run");
+        var variableIdText = GetStringParam(@operator, "VariableId", "");
         var variableName = GetStringParam(@operator, "VariableName", "");
         var dataType = GetStringParam(@operator, "DataType", "String");
-        var useInputValue = GetBoolParam(@operator, "UseInputValue", true);
+        var value = ResolveWriteValue(@operator, inputs, variableName, dataType);
+
+        if (scope.Equals("Project", StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult(WriteProjectVariable(@operator.Id, variableIdText, variableName, value));
+        }
 
         if (string.IsNullOrWhiteSpace(variableName))
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("变量名不能为空"));
         }
 
-        object value;
+        var converted = ConvertRunValue(value, dataType);
+        _variableContext.SetValue(variableName, converted);
 
-        if (useInputValue && inputs != null)
-        {
-            // 优先使用上游输入
-            if (inputs.TryGetValue("Value", out var inputValue))
-            {
-                value = inputValue;
-            }
-            else if (inputs.TryGetValue(variableName, out var namedValue))
-            {
-                value = namedValue;
-            }
-            else
-            {
-                // 使用参数面板中的静态值
-                value = GetStaticValue(@operator, dataType);
-            }
-        }
-        else
-        {
-            // 使用参数面板中的静态值
-            value = GetStaticValue(@operator, dataType);
-        }
-
-        // 写入变量
-        switch (dataType.ToLower())
-        {
-            case "int":
-            case "integer":
-                _variableContext.SetValue(variableName, Convert.ToInt64(value));
-                break;
-            case "double":
-            case "float":
-                _variableContext.SetValue(variableName, Convert.ToDouble(value));
-                break;
-            case "bool":
-            case "boolean":
-                _variableContext.SetValue(variableName, Convert.ToBoolean(value));
-                break;
-            default:
-                _variableContext.SetValue(variableName, value?.ToString() ?? "");
-                break;
-        }
-
-        Logger.LogInformation("[VariableWrite] 写入变量 {VariableName} = {Value}", variableName, value);
+        Logger.LogInformation("[VariableWrite] Write {VariableName} = {Value}", variableName, converted);
 
         return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
         {
-            { "VariableName", variableName },
-            { "Value", value! },
-            { "CycleCount", _variableContext.CycleCount }
+            ["VariableName"] = variableName,
+            ["Value"] = converted,
+            ["CycleCount"] = _variableContext.CycleCount
         }));
+    }
+
+    public override ValidationResult ValidateParameters(Operator @operator)
+    {
+        var scope = GetStringParam(@operator, "Scope", "Run");
+        var variableName = GetStringParam(@operator, "VariableName", "");
+        var variableIdText = GetStringParam(@operator, "VariableId", "");
+
+        if (scope.Equals("Project", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(variableIdText) && string.IsNullOrWhiteSpace(variableName))
+            {
+                return ValidationResult.Invalid("Project 作用域必须配置 VariableId 或 VariableName");
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(variableName))
+        {
+            return ValidationResult.Invalid("变量名不能为空");
+        }
+
+        var validTypes = new[] { "string", "int", "integer", "double", "float", "bool", "boolean" };
+        var dataType = GetStringParam(@operator, "DataType", "String").ToLowerInvariant();
+        if (!validTypes.Contains(dataType))
+        {
+            return ValidationResult.Invalid($"不支持的数据类型: {dataType}");
+        }
+
+        return ValidationResult.Valid();
+    }
+
+    private object ResolveWriteValue(Operator @operator, Dictionary<string, object>? inputs, string variableName, string dataType)
+    {
+        var useInputValue = GetBoolParam(@operator, "UseInputValue", true);
+        if (useInputValue && inputs != null)
+        {
+            if (inputs.TryGetValue("Value", out var inputValue))
+            {
+                return inputValue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(variableName) && inputs.TryGetValue(variableName, out var namedValue))
+            {
+                return namedValue;
+            }
+        }
+
+        return GetStaticValue(@operator, dataType);
+    }
+
+    private OperatorExecutionOutput WriteProjectVariable(Guid operatorId, string variableIdText, string variableName, object value)
+    {
+        var context = _projectVariableContextAccessor.Current;
+        if (context == null)
+        {
+            return OperatorExecutionOutput.Failure("Project variable session is not available.");
+        }
+
+        ProjectGlobalVariableDefinition definition;
+        if (Guid.TryParse(variableIdText, out var variableId) &&
+            context.Session.TryGetDefinition(variableId, out definition!))
+        {
+        }
+        else if (!string.IsNullOrWhiteSpace(variableName) &&
+            context.Session.TryGetDefinitionByName(variableName, out definition!))
+        {
+        }
+        else
+        {
+            return OperatorExecutionOutput.Failure($"Project variable '{variableIdText}'/'{variableName}' does not exist.");
+        }
+
+        try
+        {
+            var snapshot = context.Session.SetValue(
+                definition.Id,
+                value,
+                ProjectVariableUpdatedBy.VariableWrite,
+                context.RunId,
+                operatorId);
+            return OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["VariableName"] = definition.Name,
+                ["Value"] = ProjectVariableValueConverter.ToObject(snapshot.Value)!,
+                ["CycleCount"] = _variableContext.CycleCount
+            });
+        }
+        catch (Exception ex)
+        {
+            return OperatorExecutionOutput.Failure(ex.Message);
+        }
     }
 
     private object GetStaticValue(Operator @operator, string dataType)
     {
         var staticValue = GetStringParam(@operator, "StaticValue", "");
-
-        switch (dataType.ToLower())
-        {
-            case "int":
-            case "integer":
-                return long.TryParse(staticValue, out var intVal) ? intVal : 0L;
-            case "double":
-            case "float":
-                return double.TryParse(staticValue, out var doubleVal) ? doubleVal : 0.0;
-            case "bool":
-            case "boolean":
-                return bool.TryParse(staticValue, out var boolVal) ? boolVal : false;
-            default:
-                return staticValue;
-        }
+        return ConvertRunValue(staticValue, dataType);
     }
 
-    public override ValidationResult ValidateParameters(Operator @operator)
+    private static object ConvertRunValue(object value, string dataType)
     {
-        var variableName = GetStringParam(@operator, "VariableName", "");
-        if (string.IsNullOrWhiteSpace(variableName))
-            return ValidationResult.Invalid("变量名不能为空");
-
-        var validTypes = new[] { "string", "int", "integer", "double", "float", "bool", "boolean" };
-        var dataType = GetStringParam(@operator, "DataType", "String").ToLower();
-        if (!validTypes.Contains(dataType))
-            return ValidationResult.Invalid($"不支持的数据类型: {dataType}");
-
-        return ValidationResult.Valid();
+        return dataType.ToLowerInvariant() switch
+        {
+            "int" or "integer" => Convert.ToInt64(value),
+            "double" or "float" => Convert.ToDouble(value),
+            "bool" or "boolean" => Convert.ToBoolean(value),
+            _ => value?.ToString() ?? string.Empty
+        };
     }
 }

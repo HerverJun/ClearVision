@@ -6,6 +6,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -105,6 +106,8 @@ public sealed class RuntimePackageExporter
 
         var packagedFlow = CloneFlow(flow);
         var bundledAssets = await BundleFlowResourcesAsync(packagedFlow, packageRoot, cancellationToken);
+        var packagedFlowEntity = packagedFlow.ToEntity();
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(project.GlobalVariables, packagedFlowEntity);
         var flowBytes = JsonSerializer.SerializeToUtf8Bytes(packagedFlow, RuntimeJson.StableSerializerOptions);
         var flowHash = RuntimePathGuard.ComputeSha256(flowBytes);
         var profile = new RuntimeProfile();
@@ -130,10 +133,15 @@ public sealed class RuntimePackageExporter
                 ResultMappingProfile = "field/result-mapping-profile.json",
                 ModelAssets = "field/model-assets.json",
                 RuntimeParameters = "field/runtime-parameters.json",
-                DefaultSiteProfile = "field/station-profile.default.json"
+                DefaultSiteProfile = "field/station-profile.default.json",
+                GlobalVariables = "field/global-variables.json"
             }
         };
         var parameterSchema = BuildRuntimeParameterSchema(packageId, flowHash, packagedFlow);
+        RuntimeProjectVariableConflictValidator.ThrowIfAnySiteProfileConflicts(
+            project.GlobalVariables,
+            parameterSchema,
+            packagedFlow);
         var defaultSiteProfile = new RuntimeSiteProfile
         {
             ProfileId = "package-default",
@@ -175,6 +183,7 @@ public sealed class RuntimePackageExporter
             bundledAssets,
             parameterSchema,
             defaultSiteProfile,
+            project.GlobalVariables,
             cancellationToken);
 
         var readmePath = Path.Combine(packageRoot, "README.runtime.md");
@@ -963,6 +972,7 @@ public sealed class RuntimePackageExporter
         IReadOnlyList<RuntimeBundledAsset> bundledAssets,
         RuntimeParameterSchema parameterSchema,
         RuntimeSiteProfile defaultSiteProfile,
+        ProjectGlobalVariableSchema globalVariables,
         CancellationToken cancellationToken)
     {
         var fieldRoot = Path.Combine(packageRoot, "field");
@@ -992,7 +1002,8 @@ public sealed class RuntimePackageExporter
                 Assets = bundledAssets.ToList()
             },
             ["runtime-parameters.json"] = parameterSchema,
-            ["station-profile.default.json"] = defaultSiteProfile
+            ["station-profile.default.json"] = defaultSiteProfile,
+            ["global-variables.json"] = globalVariables
         };
 
         foreach (var (fileName, payload) in drafts)

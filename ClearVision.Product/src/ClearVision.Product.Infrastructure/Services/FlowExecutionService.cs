@@ -12,6 +12,7 @@ using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Logging;
@@ -75,6 +76,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private readonly ILogger<FlowExecutionService> _logger;
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _executionCancellations = new();
     private readonly IVariableContext _variableContext;
+    private readonly IProjectVariableExecutionContextAccessor _projectVariableContextAccessor;
 
     // Encoding cleanup: previous comment text was unreadable.
     private readonly ConcurrentDictionary<(Guid DebugSessionId, Guid OperatorId), Dictionary<string, object>> _debugCache = new();
@@ -452,6 +454,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         IEnumerable<IOperatorExecutor> executors,
         ILogger<FlowExecutionService> logger,
         IVariableContext variableContext,
+        IProjectVariableExecutionContextAccessor? projectVariableContextAccessor = null,
         long? debugCacheMaxBytes = null,
         int? debugCacheMaxEntries = null,
         long? debugCacheMaxEntryBytes = null)
@@ -459,6 +462,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         _executors = executors.ToDictionary(e => e.OperatorType);
         _logger = logger;
         _variableContext = variableContext;
+        _projectVariableContextAccessor = projectVariableContextAccessor ?? new ProjectVariableExecutionContextAccessor();
         _debugCacheMaxBytes = Math.Max(0, debugCacheMaxBytes ?? DefaultDebugCacheMaxBytes);
         _debugCacheMaxEntries = Math.Max(0, debugCacheMaxEntries ?? DefaultDebugCacheMaxEntries);
         _debugCacheMaxEntryBytes = Math.Min(
@@ -492,9 +496,18 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         bool enableParallel = false,
         CancellationToken cancellationToken = default)
     {
+        var projectVariableContext = _projectVariableContextAccessor.Current;
+        if (projectVariableContext != null && enableParallel)
+        {
+            enableParallel = false;
+            _logger.LogDebug(
+                "[FlowExecution] Project global variables are active for flow {FlowId}; falling back to sequential execution.",
+                flow.Id);
+        }
+
         using var variableScope = _variableContext.BeginScope(new VariableContextScope(
             flow.Id,
-            Guid.NewGuid(),
+            projectVariableContext?.RunId ?? Guid.NewGuid(),
             enableParallel ? "parallel-flow-run" : "sequential-flow-run"));
 
         // Encoding cleanup: previous comment text was unreadable.
@@ -516,7 +529,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             var plan = GetFlowExecutionPlan(flow);
 
             // 获取执行顺序（拓扑排序）
-            var executionOrder = plan.ExecutionOrder;
+            var executionOrder = CreateProjectVariableExecutionOrder(plan, _projectVariableContextAccessor.Current);
             var inputPreparationIndex = plan.CreateInputPreparationIndex();
 
             // 鍒濆鍖栨墽琛岀姸鎬?
@@ -623,6 +636,17 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
     }
 
+    public async Task<FlowExecutionResult> ExecuteFlowAsync(
+        OperatorFlow flow,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        bool enableParallel = false,
+        CancellationToken cancellationToken = default)
+    {
+        using var scope = _projectVariableContextAccessor.BeginScope(projectVariables);
+        return await ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
+    }
+
     /// <summary>
     /// 顺序执行流程
     /// </summary>
@@ -635,7 +659,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         CancellationToken cancellationToken,
         FlowInputPreparationIndex inputPreparationIndex)
     {
-        var executionOrder = plan.ExecutionOrder;
+        var executionOrder = CreateProjectVariableExecutionOrder(plan, _projectVariableContextAccessor.Current);
         int completedCount = 0;
         foreach (var op in executionOrder)
         {
@@ -673,6 +697,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             // 鍑嗗杈撳叆鏁版嵁
             var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
+            if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
+            {
+                result.OperatorResults.Add(new OperatorExecutionResult
+                {
+                    OperatorId = op.Id,
+                    OperatorName = op.Name,
+                    IsSuccess = false,
+                    ErrorMessage = targetBindingError
+                });
+                result.IsSuccess = false;
+                result.ErrorMessage = $"绠楀瓙 '{op.Name}' 鎵ц澶辫触: {targetBindingError}";
+                break;
+            }
 
             // 执行算子
             var opResult = await ExecuteOperatorInternalAsync(op, executor, inputs, cancellationToken);
@@ -690,6 +727,19 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             // Sprint 1 Task 1.1: 应用扇出引用计数
             ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
+            if (!TryCommitProjectVariableSourceBindings(op, outputs, out var sourceBindingError))
+            {
+                result.OperatorResults.Add(new OperatorExecutionResult
+                {
+                    OperatorId = op.Id,
+                    OperatorName = op.Name,
+                    IsSuccess = false,
+                    ErrorMessage = sourceBindingError
+                });
+                result.IsSuccess = false;
+                result.ErrorMessage = $"绠楀瓙 '{op.Name}' 鎵ц澶辫触: {sourceBindingError}";
+                break;
+            }
 
             completedCount++;
 
@@ -701,6 +751,197 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 break;
             }
         }
+    }
+
+    private static List<Operator> CreateProjectVariableExecutionOrder(
+        FlowExecutionPlan plan,
+        ProjectVariableExecutionContext? projectVariables)
+    {
+        var baseOrder = plan.ExecutionOrder;
+        if (projectVariables == null || !projectVariables.BindingIndex.HasBindings)
+        {
+            return baseOrder.ToList();
+        }
+
+        var schema = projectVariables.Session.Schema;
+        var orderByOperatorId = baseOrder
+            .Select((op, index) => (op.Id, Index: index))
+            .ToDictionary(item => item.Id, item => item.Index);
+        var operatorsById = baseOrder.ToDictionary(op => op.Id);
+        var outgoing = baseOrder.ToDictionary(op => op.Id, _ => new HashSet<Guid>());
+        var indegree = baseOrder.ToDictionary(op => op.Id, _ => 0);
+
+        foreach (var op in baseOrder)
+        {
+            foreach (var connection in plan.Topology.GetOutgoingConnections(op.Id))
+            {
+                if (operatorsById.ContainsKey(connection.TargetOperatorId) &&
+                    outgoing[op.Id].Add(connection.TargetOperatorId))
+                {
+                    indegree[connection.TargetOperatorId]++;
+                }
+            }
+        }
+
+        foreach (var edge in projectVariables.BindingIndex.GetImplicitEdges(schema))
+        {
+            if (!operatorsById.ContainsKey(edge.SourceOperatorId) ||
+                !operatorsById.ContainsKey(edge.TargetOperatorId))
+            {
+                continue;
+            }
+
+            if (outgoing[edge.SourceOperatorId].Add(edge.TargetOperatorId))
+            {
+                indegree[edge.TargetOperatorId]++;
+            }
+        }
+
+        var ready = new SortedSet<Guid>(Comparer<Guid>.Create((left, right) =>
+        {
+            var byIndex = orderByOperatorId[left].CompareTo(orderByOperatorId[right]);
+            return byIndex != 0 ? byIndex : left.CompareTo(right);
+        }));
+
+        foreach (var (operatorId, count) in indegree)
+        {
+            if (count == 0)
+            {
+                ready.Add(operatorId);
+            }
+        }
+
+        var ordered = new List<Operator>(baseOrder.Count);
+        while (ready.Count > 0)
+        {
+            var operatorId = ready.Min;
+            ready.Remove(operatorId);
+            ordered.Add(operatorsById[operatorId]);
+
+            foreach (var next in outgoing[operatorId])
+            {
+                indegree[next]--;
+                if (indegree[next] == 0)
+                {
+                    ready.Add(next);
+                }
+            }
+        }
+
+        if (ordered.Count != baseOrder.Count)
+        {
+            throw new InvalidOperationException("Project global variable bindings create an implicit execution cycle.");
+        }
+
+        return ordered;
+    }
+
+    private bool TryApplyProjectVariableTargetBindings(
+        Operator op,
+        Dictionary<string, object> inputs,
+        out string? error)
+    {
+        error = null;
+        var context = _projectVariableContextAccessor.Current;
+        if (context == null)
+        {
+            return true;
+        }
+
+        foreach (var binding in context.BindingIndex.GetTargets(op.Id))
+        {
+            if (!context.Session.TryGetDefinition(binding.VariableId, out var definition))
+            {
+                error = $"GV008: project global variable '{binding.VariableId}' does not exist.";
+                return false;
+            }
+
+            if (!context.Session.TryGetValue(binding.VariableId, out var value))
+            {
+                error = $"GV021: project global variable '{definition.Name}' has no current value.";
+                return false;
+            }
+
+            var parameter = op.Parameters.FirstOrDefault(item => item.Id == binding.ParameterId);
+            if (parameter == null)
+            {
+                error = $"GV011: target parameter '{binding.ParameterId}' does not exist on operator '{op.Name}'.";
+                return false;
+            }
+
+            if (!ProjectVariableValueConverter.TryConvertForParameter(value, definition.ValueType, parameter.DataType, out var converted, out var convertError))
+            {
+                error = $"GV022: project global variable '{definition.Name}' cannot be applied to parameter '{parameter.Name}' ({parameter.DataType}): {convertError}";
+                return false;
+            }
+
+            inputs[parameter.Name] = converted!;
+        }
+
+        return true;
+    }
+
+    private bool TryCommitProjectVariableSourceBindings(
+        Operator op,
+        IReadOnlyDictionary<string, object> outputs,
+        out string? error)
+    {
+        error = null;
+        var context = _projectVariableContextAccessor.Current;
+        if (context == null)
+        {
+            return true;
+        }
+
+        if (context.IsPreview)
+        {
+            return true;
+        }
+
+        foreach (var binding in context.BindingIndex.GetSources(op.Id))
+        {
+            if (!context.Session.TryGetDefinition(binding.VariableId, out var definition))
+            {
+                error = $"GV008: project global variable '{binding.VariableId}' does not exist.";
+                return false;
+            }
+
+            var port = op.OutputPorts.FirstOrDefault(item => item.Id == binding.OutputPortId);
+            if (port == null)
+            {
+                error = $"GV010: source output port '{binding.OutputPortId}' does not exist on operator '{op.Name}'.";
+                return false;
+            }
+
+            if (!outputs.TryGetValue(port.Name, out var value) &&
+                !string.IsNullOrWhiteSpace(binding.OutputPortName))
+            {
+                outputs.TryGetValue(binding.OutputPortName, out value);
+            }
+
+            if (value == null)
+            {
+                error = $"GV023: source output '{port.Name}' did not produce a value for project global variable '{definition.Name}'.";
+                return false;
+            }
+
+            try
+            {
+                context.Session.SetValue(
+                    binding.VariableId,
+                    value,
+                    ProjectVariableUpdatedBy.OperatorOutput,
+                    context.RunId,
+                    op.Id);
+            }
+            catch (Exception ex)
+            {
+                error = $"GV024: source output '{port.Name}' cannot update project global variable '{definition.Name}': {ex.Message}";
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

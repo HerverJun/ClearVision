@@ -1,6 +1,7 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import httpClient from '../../core/messaging/httpClient.js';
 import serviceRegistry from '../../core/app/serviceRegistry.js';
+import projectManager from '../project/projectManager.js';
 import inspectionController, {
     getResultImageUrl,
     loadImageUrlAsBase64
@@ -620,6 +621,7 @@ class PropertyPanel {
                 <label for="param-${name}" class="form-label">
                     ${displayName || name} ${requiredMark}
                 </label>
+                ${this.renderGlobalVariableBindingControl(param)}
                 ${inputHtml}
                 ${description ? `<p class="form-description">${description}</p>` : ''}
                 ${disabledHint}
@@ -700,11 +702,70 @@ class PropertyPanel {
                 <label for="param-${name}" class="form-label">
                     ${displayName || name} ${requiredMark}
                 </label>
+                ${this.renderGlobalVariableBindingControl(param)}
                 ${inputHtml}
                 ${description ? `<p class="form-description">${description}</p>` : ''}
                 ${disabledHint}
             </div>
         `;
+    }
+
+    renderGlobalVariableBindingControl(param) {
+        const project = projectManager.getCurrentProject?.();
+        const schema = this.normalizeGlobalVariableSchema(project?.globalVariables || project?.GlobalVariables);
+        if (!schema.variables.length || !this.currentOperator?.id || !param?.id) {
+            return '';
+        }
+
+        const binding = schema.targetBindings.find(item =>
+            String(item.operatorId || '').toLowerCase() === String(this.currentOperator.id).toLowerCase() &&
+            String(item.parameterId || '').toLowerCase() === String(param.id).toLowerCase());
+        const compatibleVariables = schema.variables.filter(variable => this.isVariableCompatibleWithParameter(variable, param));
+
+        return `
+            <div class="global-variable-source-control">
+                <label class="form-label compact">参数来源</label>
+                <select class="form-input gv-binding-select" data-parameter-id="${this.escapeAttribute(param.id)}" data-parameter-name="${this.escapeAttribute(param.name)}">
+                    <option value="">固定值</option>
+                    ${compatibleVariables.map(variable => `
+                        <option value="${this.escapeAttribute(variable.id)}" ${binding && String(binding.variableId).toLowerCase() === String(variable.id).toLowerCase() ? 'selected' : ''}>
+                            ${this.escapeHtml(variable.name)}
+                        </option>
+                    `).join('')}
+                </select>
+            </div>
+        `;
+    }
+
+    normalizeGlobalVariableSchema(schema) {
+        return {
+            schemaVersion: schema?.schemaVersion || schema?.SchemaVersion || '1.0',
+            variables: Array.isArray(schema?.variables) ? schema.variables : (schema?.Variables || []),
+            sourceBindings: Array.isArray(schema?.sourceBindings) ? schema.sourceBindings : (schema?.SourceBindings || []),
+            targetBindings: Array.isArray(schema?.targetBindings) ? schema.targetBindings : (schema?.TargetBindings || [])
+        };
+    }
+
+    isVariableCompatibleWithParameter(variable, param) {
+        const valueType = String(variable?.valueType || variable?.ValueType || '').toLowerCase();
+        const dataType = String(param?.dataType || param?.DataType || '').toLowerCase();
+        if (!valueType || !dataType) {
+            return false;
+        }
+
+        if (valueType === 'int64') {
+            return ['int', 'integer', 'long', 'int64', 'double', 'float', 'number'].includes(dataType);
+        }
+
+        if (valueType === 'double') {
+            return ['double', 'float', 'number'].includes(dataType);
+        }
+
+        if (valueType === 'boolean') {
+            return ['bool', 'boolean'].includes(dataType);
+        }
+
+        return ['string', 'enum', 'select'].includes(dataType);
     }
 
     /**
@@ -777,6 +838,11 @@ class PropertyPanel {
 
         inputs.forEach(input => {
             input.addEventListener('change', () => {
+                if (input.classList.contains('gv-binding-select')) {
+                    this.applyGlobalVariableInputState();
+                    return;
+                }
+
                 this._notifyValueChanged();
             });
         });
@@ -798,6 +864,7 @@ class PropertyPanel {
         });
 
         this.syncImageAcquisitionSourceControls();
+        this.applyGlobalVariableInputState();
         this.loadCameraBindingsForSelects(true);
     }
 
@@ -1291,6 +1358,7 @@ class PropertyPanel {
             return false;
         }
 
+        this.syncGlobalVariableTargetBindings();
         this._notifyValueChanged();
 
         // 显示成功提示
@@ -1305,6 +1373,7 @@ class PropertyPanel {
             return true;
         }
 
+        this.syncGlobalVariableTargetBindings();
         this._notifyValueChanged({
             schedulePreview: options.schedulePreview === true,
             forcePreview: false,
@@ -1312,6 +1381,72 @@ class PropertyPanel {
         });
 
         return true;
+    }
+
+    syncGlobalVariableTargetBindings() {
+        const project = projectManager.getCurrentProject?.();
+        if (!project || !this.currentOperator?.id) {
+            return;
+        }
+
+        const form = document.getElementById('property-form');
+        if (!form) {
+            return;
+        }
+
+        const schema = this.normalizeGlobalVariableSchema(project.globalVariables || project.GlobalVariables);
+        const operatorId = this.currentOperator.id;
+        const selects = Array.from(form.querySelectorAll('.gv-binding-select[data-parameter-id]'));
+        let changed = false;
+
+        selects.forEach(select => {
+            const parameterId = select.dataset.parameterId;
+            const parameterName = select.dataset.parameterName || '';
+            const selectedVariableId = select.value || '';
+            const previousCount = schema.targetBindings.length;
+            schema.targetBindings = schema.targetBindings.filter(binding =>
+                !(String(binding.operatorId || '').toLowerCase() === String(operatorId).toLowerCase() &&
+                  String(binding.parameterId || '').toLowerCase() === String(parameterId).toLowerCase()));
+
+            if (schema.targetBindings.length !== previousCount) {
+                changed = true;
+            }
+
+            if (selectedVariableId) {
+                schema.targetBindings.push({
+                    id: crypto.randomUUID(),
+                    variableId: selectedVariableId,
+                    operatorId,
+                    parameterId,
+                    operatorName: this.currentOperator.name || this.currentOperator.title || this.currentOperator.type || '',
+                    parameterName
+                });
+                changed = true;
+            }
+        });
+
+        if (changed) {
+            projectManager.updateGlobalVariables(schema);
+        }
+    }
+
+    applyGlobalVariableInputState() {
+        const form = document.getElementById('property-form');
+        if (!form) {
+            return;
+        }
+
+        form.querySelectorAll('.gv-binding-select[data-parameter-name]').forEach(select => {
+            const parameterName = select.dataset.parameterName || '';
+            const escapedName = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
+                ? CSS.escape(parameterName)
+                : parameterName;
+            const input = form.querySelector(`[name="${escapedName}"]`);
+            if (input) {
+                input.disabled = Boolean(select.value);
+                input.title = select.value ? '由全局变量提供' : '';
+            }
+        });
     }
 
     /**

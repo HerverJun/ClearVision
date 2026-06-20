@@ -120,6 +120,7 @@ let resultPanel = null;
 let inspectionPanel = null;
 let stationMonitorView = null;
 let aiPanel = null;
+let globalVariablePanel = null;
 let viewManager = null;
 let toolbarCommandDisposer = null;
 let aiGenerationController = null;
@@ -136,6 +137,7 @@ let projectViewModulePromise = null;
 let resultPanelModulePromise = null;
 let inspectionPanelModulePromise = null;
 let stationMonitorModulePromise = null;
+let globalVariablePanelModulePromise = null;
 let resultPanelAnalyticsRefreshTimer = null;
 let resultPanelAnalyticsRefreshProjectId = null;
 const RESULT_PANEL_ANALYTICS_REFRESH_DELAY_MS = 5000;
@@ -253,6 +255,14 @@ function loadStationMonitorModule() {
     }
 
     return stationMonitorModulePromise;
+}
+
+function loadGlobalVariablePanelModule() {
+    if (!globalVariablePanelModulePromise) {
+        globalVariablePanelModulePromise = import('./features/global-variables/globalVariablePanel.js');
+    }
+
+    return globalVariablePanelModulePromise;
 }
 
 function loadInspectionPanelModule() {
@@ -1023,6 +1033,18 @@ function initializePropertySidebarController() {
     });
 }
 
+async function initializeGlobalVariablePanel() {
+    const container = document.getElementById('global-variable-panel');
+    if (!container) {
+        return;
+    }
+
+    const module = await loadGlobalVariablePanelModule();
+    globalVariablePanel = new module.default('global-variable-panel');
+    serviceRegistry.register('globalVariablePanel', globalVariablePanel);
+    await globalVariablePanel.setProject(getCurrentProject());
+}
+
 async function loadInspectionHistory({
     pageIndex = 0,
     pageSize = resultPanel?.pageSize ?? 12,
@@ -1601,11 +1623,18 @@ async function initializeApp() {
     initializeInspectionController();
     initializePropertyPanel();
     initializePropertySidebarController();
+    await initializeGlobalVariablePanel();
     initializeTheme();
     initializeToolbar();
     startStatusBarUpdates();
     initializeStudioPerformanceGuards();
     trackedSubscribe(subscribeProject, (project) => {
+        if (globalVariablePanel) {
+            void globalVariablePanel.setProject(project).catch(error => {
+                handleFeatureLoadError('全局变量', error);
+            });
+        }
+
         window.setTimeout(() => {
             void handleProjectChange(project).catch(error => {
                 handleFeatureLoadError('工程切换', error);
@@ -1646,6 +1675,7 @@ async function bootstrapApp() {
 async function handleProjectChange(project) {
     eventBus.emit('project:changed', { project });
     if (!project?.id) {
+        flowCanvas?.setGlobalVariableSchema?.(null);
         inspectionController.setProject(null);
         inspectionPanel?.setProjectContext?.(null);
         resultPanel?.setProjectContext?.(null);
@@ -1655,6 +1685,7 @@ async function handleProjectChange(project) {
 
     inspectionController.setProject(project.id);
     inspectionPanel?.setProjectContext?.(project.id);
+    flowCanvas?.setGlobalVariableSchema?.(project.globalVariables || project.GlobalVariables);
 
     if (flowCanvas) {
         withProjectFlowSyncSuppressed(() => {

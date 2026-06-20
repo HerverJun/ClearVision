@@ -5,6 +5,7 @@
 
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Calibration;
 
@@ -45,13 +46,48 @@ public class FlowLinter
         // 第三层：参数值合理性
         issues.AddRange(CheckParameterValidity(flow));
 
-        result.Issues = issues;
-        result.HasErrors = issues.Any(i => i.Severity == LintSeverity.Error);
-        result.HasWarnings = issues.Any(i => i.Severity == LintSeverity.Warning);
-        result.ErrorCount = issues.Count(i => i.Severity == LintSeverity.Error);
-        result.WarningCount = issues.Count(i => i.Severity == LintSeverity.Warning);
+        return BuildResult(issues);
+    }
 
-        return result;
+    public LintResult Lint(OperatorFlow flow, ProjectGlobalVariableSchema? globalVariables)
+    {
+        var result = Lint(flow);
+        var issues = result.Issues.ToList();
+        issues.AddRange(ProjectGlobalVariableSchemaValidator
+            .Validate(globalVariables, flow)
+            .Select(ToLintIssue));
+
+        return BuildResult(issues);
+    }
+
+    private static LintResult BuildResult(List<LintIssue> issues)
+    {
+        return new LintResult
+        {
+            Issues = issues,
+            HasErrors = issues.Any(i => i.Severity == LintSeverity.Error),
+            HasWarnings = issues.Any(i => i.Severity == LintSeverity.Warning),
+            ErrorCount = issues.Count(i => i.Severity == LintSeverity.Error),
+            WarningCount = issues.Count(i => i.Severity == LintSeverity.Warning)
+        };
+    }
+
+    private static LintIssue ToLintIssue(ProjectGlobalVariableDiagnostic diagnostic)
+    {
+        return new LintIssue
+        {
+            Code = diagnostic.Code,
+            Severity = diagnostic.Code is "GV012" or "GV020" ? LintSeverity.Warning : LintSeverity.Error,
+            OperatorId = diagnostic.OperatorId ?? Guid.Empty,
+            Message = diagnostic.Message,
+            Suggestion = diagnostic.Code switch
+            {
+                "GV016" => "Remove either the SiteProfile exposure or the global-variable target binding for this parameter.",
+                "GV017" => "Bind only scalar output ports to project global variables.",
+                "GV020" => "Enable the referenced operator or remove the global-variable binding.",
+                _ => "Check the project global variable definition and binding references."
+            }
+        };
     }
 
     #region 第一层：结构合法性

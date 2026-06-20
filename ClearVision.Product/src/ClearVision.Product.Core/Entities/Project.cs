@@ -5,6 +5,7 @@
 using ClearVision.Product.Core.Entities.Base;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ValueObjects;
 
 namespace ClearVision.Product.Core.Entities;
@@ -39,6 +40,8 @@ public class Project : AggregateRoot
     /// </summary>
     public Dictionary<string, string> GlobalSettings { get; private set; }
 
+    public ProjectGlobalVariableSchema GlobalVariables { get; private set; }
+
     /// <summary>
     /// 最后打开时间
     /// </summary>
@@ -51,6 +54,7 @@ public class Project : AggregateRoot
         // 使用相同 ID 以满足 Table Splitting 要求
         Flow = new OperatorFlow(Id, "默认流程");
         GlobalSettings = new Dictionary<string, string>();
+        GlobalVariables = new ProjectGlobalVariableSchema();
     }
 
     public Project(string name, string? description = null) : this()
@@ -113,6 +117,12 @@ public class Project : AggregateRoot
     public string? GetGlobalSetting(string key)
     {
         return GlobalSettings.TryGetValue(key, out var value) ? value : null;
+    }
+
+    public void UpdateGlobalVariables(ProjectGlobalVariableSchema? globalVariables)
+    {
+        GlobalVariables = globalVariables ?? new ProjectGlobalVariableSchema();
+        MarkAsModified();
     }
 
     /// <summary>

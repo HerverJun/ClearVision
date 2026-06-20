@@ -217,6 +217,14 @@ public class AiFlowGenerationResult
     /// </summary>
     public List<AiMissingResourceInfo> MissingResources { get; set; } = new();
 
+    public List<VisionAgentGlobalVariableDraft> GlobalVariableDrafts { get; set; } = new();
+
+    public List<VisionAgentGlobalVariableSourceBindingDraft> GlobalVariableSourceBindingDrafts { get; set; } = new();
+
+    public List<VisionAgentGlobalVariableTargetBindingDraft> GlobalVariableTargetBindingDrafts { get; set; } = new();
+
+    public List<VisionAgentGlobalVariableDiagnostic> GlobalVariableDiagnostics { get; set; } = new();
+
     public List<object> PendingActions { get; set; } = new();
 
     public object? ValidationPreview { get; set; }

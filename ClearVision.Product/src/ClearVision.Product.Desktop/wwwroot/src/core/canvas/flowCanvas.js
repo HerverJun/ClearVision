@@ -79,6 +79,7 @@ class FlowCanvas {
         this.flowRevision = 0;
         this.viewStateListeners = new Set();
         this.structureStateListeners = new Set();
+        this.globalVariableSchema = { sourceBindings: [], targetBindings: [] };
 
         // Encoding cleanup: previous comment text was unreadable.
         this._dpr = 1;
@@ -576,6 +577,14 @@ class FlowCanvas {
         };
     }
 
+    setGlobalVariableSchema(schema) {
+        this.globalVariableSchema = {
+            sourceBindings: Array.isArray(schema?.sourceBindings) ? schema.sourceBindings : (schema?.SourceBindings || []),
+            targetBindings: Array.isArray(schema?.targetBindings) ? schema.targetBindings : (schema?.TargetBindings || [])
+        };
+        this.invalidate?.();
+    }
+
     subscribeViewState(listener) {
         if (typeof listener !== 'function') {
             return () => {};
@@ -865,6 +874,7 @@ class FlowCanvas {
         }
 
         // 缂佹ê鍩楃粩顖氬經
+        this.drawGlobalVariableBadges(node, x, y, w);
         this.drawPorts(node, x, y, w, h);
 
         // === Sprint 4 Task 4.3: 缂佹ê鍩楃€瑰鍙忛弽鍥唶 ===
@@ -881,6 +891,54 @@ class FlowCanvas {
     /**
      * Encoding cleanup: previous comment text was unreadable.
      */
+    drawGlobalVariableBadges(node, x, y, w) {
+        const operatorId = String(node.id || '').toLowerCase();
+        if (!operatorId || !this.globalVariableSchema) {
+            return;
+        }
+
+        const sourceCount = (this.globalVariableSchema.sourceBindings || [])
+            .filter(binding => String(binding.operatorId || binding.OperatorId || '').toLowerCase() === operatorId)
+            .length;
+        const targetCount = (this.globalVariableSchema.targetBindings || [])
+            .filter(binding => String(binding.operatorId || binding.OperatorId || '').toLowerCase() === operatorId)
+            .length;
+        const badges = [];
+        if (sourceCount > 0) {
+            badges.push({ text: `G^${sourceCount}`, color: '#13c2c2' });
+        }
+        if (targetCount > 0) {
+            badges.push({ text: `Gv${targetCount}`, color: '#fa8c16' });
+        }
+        if (badges.length === 0) {
+            return;
+        }
+
+        this.ctx.save();
+        this.ctx.font = `bold ${9 * this.scale}px sans-serif`;
+        this.ctx.textAlign = 'right';
+        this.ctx.textBaseline = 'middle';
+
+        let right = x + w - 6 * this.scale;
+        const top = y + 30 * this.scale;
+        for (const badge of badges) {
+            const badgeWidth = Math.max(26 * this.scale, this.ctx.measureText(badge.text).width + 10 * this.scale);
+            const badgeHeight = 16 * this.scale;
+            const left = right - badgeWidth;
+            this.ctx.fillStyle = 'rgba(13, 27, 42, 0.86)';
+            this.roundRect(left, top, badgeWidth, badgeHeight, 6 * this.scale);
+            this.ctx.fill();
+            this.ctx.strokeStyle = badge.color;
+            this.ctx.lineWidth = Math.max(1, this.scale);
+            this.ctx.stroke();
+            this.ctx.fillStyle = badge.color;
+            this.ctx.fillText(badge.text, right - 5 * this.scale, top + badgeHeight / 2);
+            right = left - 4 * this.scale;
+        }
+
+        this.ctx.restore();
+    }
+
     adjustColor(color, amount) {
         const hex = color.replace('#', '');
         const r = Math.max(0, Math.min(255, parseInt(hex.substr(0, 2), 16) + amount));

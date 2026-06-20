@@ -33,6 +33,8 @@ public sealed class BuildResultAssembler
             input.ApplyGate,
             missingResources,
             pendingParameters);
+        var globalVariableDrafts = BuildGlobalVariableDrafts(input);
+        var globalVariableDiagnostics = BuildGlobalVariableDiagnostics(globalVariableDrafts, input);
         var result = input.CurrentDraft.GenerationResult;
         result.Success = input.CurrentDraft.CanvasFlow.Operators.Count > 0;
         result.CompletionStatus = result.Success
@@ -55,6 +57,10 @@ public sealed class BuildResultAssembler
         result.DryRunResult = input.DryRun.Data ?? result.DryRunResult;
         result.PendingParameters = pendingParameters;
         result.MissingResources = missingResources;
+        result.GlobalVariableDrafts = globalVariableDrafts;
+        result.GlobalVariableSourceBindingDrafts = [];
+        result.GlobalVariableTargetBindingDrafts = BuildGlobalVariableTargetBindingDrafts(globalVariableDrafts, input);
+        result.GlobalVariableDiagnostics = globalVariableDiagnostics;
         result.GenerationMode = input.Template.GenerationMode;
         result.TemplateLockLevel = input.Template.TemplateLockLevel;
         result.DetectedIntent = input.Intent.BuildIntent;
@@ -99,6 +105,10 @@ public sealed class BuildResultAssembler
             ParameterMapping = input.ParameterMapping.Mappings,
             PendingParameters = pendingParameters,
             MissingResources = missingResources,
+            GlobalVariableDrafts = globalVariableDrafts,
+            GlobalVariableSourceBindingDrafts = result.GlobalVariableSourceBindingDrafts,
+            GlobalVariableTargetBindingDrafts = result.GlobalVariableTargetBindingDrafts,
+            GlobalVariableDiagnostics = globalVariableDiagnostics,
             ValidationPreview = input.Validation.Data,
             DryRunResult = input.DryRun.Data,
             ReadinessReport = input.PackageReadiness.Data,
@@ -151,6 +161,8 @@ public sealed class BuildResultAssembler
                 workflowDiff = result.BuildResult.WorkflowDiff,
                 applyGate = result.BuildResult.ApplyGate,
                 firstFixRecommendation = firstFix,
+                globalVariableDraftCount = globalVariableDrafts.Count,
+                globalVariableDiagnosticCount = globalVariableDiagnostics.Count,
                 toolEvidenceCount = input.Evidence.Count,
                 metadataOnly = true,
                 redactionPass = true
@@ -240,6 +252,182 @@ public sealed class BuildResultAssembler
         resources.AddRange(VisionAgentBuildSupport.ReadMissingResources(validation.Data));
         resources.AddRange(VisionAgentBuildSupport.ReadMissingResources(packageReadiness.Data));
         return VisionAgentBuildSupport.DeduplicateMissing(resources);
+    }
+
+    private static List<VisionAgentGlobalVariableDraft> BuildGlobalVariableDrafts(BuildResultAssemblyInput input)
+    {
+        var defaults = input.Request.BuildFromPlan?.PlanSnapshot?.RecommendedDefaults ?? [];
+        var prompt = input.LoadPlan.OriginalUserPrompt ?? string.Empty;
+        var acceptance = input.Request.BuildFromPlan?.PlanSnapshot?.AcceptanceCriteria ?? [];
+        var candidates = defaults
+            .Where(LooksLikeGlobalVariableHint)
+            .Select(item => new VisionAgentGlobalVariableDraft
+            {
+                Name = NormalizeVariableName(item.Id),
+                DisplayName = string.IsNullOrWhiteSpace(item.Label) ? item.Id : item.Label,
+                ValueType = InferVariableType(item.Value),
+                InitialValueSummary = SummarizeScalar(item.Value),
+                Source = "plan_recommended_default",
+                Rationale = string.IsNullOrWhiteSpace(item.Impact)
+                    ? "Plan default indicates shared project state."
+                    : item.Impact,
+                ManualWriteAllowed = true,
+                IncludeInResultMetadata = ShouldExposeInResultMetadata(item, prompt, acceptance),
+                RequiresHumanConfirmation = true,
+                MetadataOnly = true
+            })
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+            .ToList();
+
+        if (candidates.Count == 0 && MentionsGlobalVariable(prompt))
+        {
+            candidates.Add(new VisionAgentGlobalVariableDraft
+            {
+                Name = "project.shared_value",
+                DisplayName = "project.shared_value",
+                ValueType = "String",
+                InitialValueSummary = string.Empty,
+                Source = "user_request",
+                Rationale = "User request mentions project/global/shared variables; exact binding still requires engineer confirmation.",
+                RequiresHumanConfirmation = true,
+                MetadataOnly = true
+            });
+        }
+
+        return candidates
+            .GroupBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+    }
+
+    private static List<VisionAgentGlobalVariableTargetBindingDraft> BuildGlobalVariableTargetBindingDrafts(
+        IReadOnlyList<VisionAgentGlobalVariableDraft> drafts,
+        BuildResultAssemblyInput input)
+    {
+        if (drafts.Count == 0)
+        {
+            return [];
+        }
+
+        return input.ParameterMapping.Mappings
+            .Where(mapping => mapping.Pending ||
+                mapping.Source.Contains("plan", StringComparison.OrdinalIgnoreCase) ||
+                mapping.Impact.Contains("shared", StringComparison.OrdinalIgnoreCase))
+            .Take(12)
+            .Select(mapping => new VisionAgentGlobalVariableTargetBindingDraft
+            {
+                VariableName = drafts[0].Name,
+                OperatorHint = string.IsNullOrWhiteSpace(mapping.TempId) ? mapping.OperatorType : mapping.TempId,
+                ParameterHint = mapping.ParameterName,
+                Rationale = "Agent can only suggest this subscription; Studio must bind the exact operator parameter.",
+                RequiresHumanConfirmation = true,
+                MetadataOnly = true
+            })
+            .Where(item => !string.IsNullOrWhiteSpace(item.ParameterHint))
+            .ToList();
+    }
+
+    private static List<VisionAgentGlobalVariableDiagnostic> BuildGlobalVariableDiagnostics(
+        IReadOnlyList<VisionAgentGlobalVariableDraft> drafts,
+        BuildResultAssemblyInput input)
+    {
+        var diagnostics = new List<VisionAgentGlobalVariableDiagnostic>();
+        if (drafts.Count > 0)
+        {
+            diagnostics.Add(new VisionAgentGlobalVariableDiagnostic
+            {
+                Code = "GV_AGENT_DRAFT",
+                Severity = "info",
+                Message = "Global variable drafts are metadata-only suggestions and require manual confirmation before project changes.",
+                VariableName = drafts[0].Name
+            });
+        }
+
+        if (MentionsGlobalVariable(input.LoadPlan.OriginalUserPrompt) && drafts.Count == 0)
+        {
+            diagnostics.Add(new VisionAgentGlobalVariableDiagnostic
+            {
+                Code = "GV_AGENT_NEEDS_REVIEW",
+                Severity = "warning",
+                Message = "Request mentions shared project state, but no specific scalar variable draft could be inferred from the plan."
+            });
+        }
+
+        return diagnostics;
+    }
+
+    private static bool LooksLikeGlobalVariableHint(VisionAgentDefaultAssumption item)
+    {
+        return MentionsGlobalVariable($"{item.Id} {item.Label} {item.Value} {item.Impact}");
+    }
+
+    private static bool MentionsGlobalVariable(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        return text.Contains("global", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("shared", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("variable", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("全局变量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("共享变量", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("项目变量", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeVariableName(string value)
+    {
+        var normalized = new string((value ?? string.Empty)
+            .Trim()
+            .Select(ch => char.IsLetterOrDigit(ch) ? char.ToLowerInvariant(ch) : '.')
+            .ToArray());
+        normalized = string.Join('.', normalized.Split('.', StringSplitOptions.RemoveEmptyEntries));
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        return char.IsLetter(normalized[0]) ? normalized : "project." + normalized;
+    }
+
+    private static string InferVariableType(string value)
+    {
+        if (bool.TryParse(value, out _))
+        {
+            return "Boolean";
+        }
+
+        if (long.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out _))
+        {
+            return "Int64";
+        }
+
+        if (double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+        {
+            return "Double";
+        }
+
+        return "String";
+    }
+
+    private static string SummarizeScalar(string value)
+    {
+        return string.IsNullOrEmpty(value)
+            ? string.Empty
+            : value.Length <= 80 ? value : value[..80] + "...";
+    }
+
+    private static bool ShouldExposeInResultMetadata(
+        VisionAgentDefaultAssumption item,
+        string prompt,
+        IReadOnlyList<string> acceptance)
+    {
+        var text = $"{item.Id} {item.Label} {item.Value} {item.Impact} {prompt} {string.Join(' ', acceptance)}";
+        return text.Contains("result", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("metadata", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("摘要", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("结果", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string FirstFixRecommendation(

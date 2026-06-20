@@ -8,6 +8,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Diagnostics;
 using ClearVision.Product.Infrastructure.Replay;
@@ -41,7 +42,9 @@ public sealed class ContinuousInspectionWorker
         IInspectionEventBus eventBus,
         CancellationToken cancellationToken,
         Func<ContinuousInspectionMode>? resolveCurrentMode = null,
-        IImageCacheRepository? imageCacheRepository = null)
+        IImageCacheRepository? imageCacheRepository = null,
+        IProjectVariableSession? projectVariableSession = null,
+        ProjectVariableBindingIndex? projectVariableBindingIndex = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
         ArgumentNullException.ThrowIfNull(config);
@@ -151,10 +154,20 @@ public sealed class ContinuousInspectionWorker
                                 var scheduled = scheduler.TrySchedule(new ScheduledInferenceItem(
                                     candidate,
                                     item.TrackId,
-                                    (envelope, ct) => flowExecution.ExecuteFlowAsync(
-                                        flow,
-                                        new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope },
-                                        cancellationToken: ct)));
+                                    (envelope, ct) =>
+                                    {
+                                        var inputs = new Dictionary<string, object> { ["ProvidedFrameEnvelope"] = envelope };
+                                        if (projectVariableSession == null || projectVariableBindingIndex == null)
+                                        {
+                                            return flowExecution.ExecuteFlowAsync(flow, inputs, cancellationToken: ct);
+                                        }
+
+                                        var context = new ProjectVariableExecutionContext(
+                                            projectVariableSession,
+                                            projectVariableBindingIndex,
+                                            Guid.NewGuid());
+                                        return flowExecution.ExecuteFlowAsync(flow, inputs, context, cancellationToken: ct);
+                                    }));
                                 if (scheduled)
                                 {
                                     metrics.RecordInferenceScheduled();

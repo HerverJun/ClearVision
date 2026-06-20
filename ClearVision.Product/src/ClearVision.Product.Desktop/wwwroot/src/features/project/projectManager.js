@@ -218,7 +218,8 @@ class ProjectManager {
             // 更新工程基本信息
             await httpClient.put(`/projects/${targetProjectId}`, {
                 name: data.name,
-                description: data.description
+                description: data.description,
+                globalVariables: data.globalVariables || data.GlobalVariables || { schemaVersion: '1.0', variables: [], sourceBindings: [], targetBindings: [] }
             });
 
             // 保存流程
@@ -234,6 +235,9 @@ class ProjectManager {
             this.currentProject.description = data.description ?? this.currentProject.description;
             if (data.flow) {
                 this.currentProject.flow = data.flow;
+            }
+            if (data.globalVariables || data.GlobalVariables) {
+                this.currentProject.globalVariables = data.globalVariables || data.GlobalVariables;
             }
             this.currentProject.modifiedAt = new Date().toISOString();
             this.unsavedChanges = false;
@@ -319,6 +323,40 @@ class ProjectManager {
         this.currentProject.flow = flowData;
         this.unsavedChanges = true;
         this.updateTitle();
+    }
+
+    updateGlobalVariables(globalVariables) {
+        if (!this.currentProject) return;
+
+        this.currentProject.globalVariables = globalVariables || {
+            schemaVersion: '1.0',
+            variables: [],
+            sourceBindings: [],
+            targetBindings: []
+        };
+        this.unsavedChanges = true;
+        this.updateTitle();
+        setCurrentProject(this.currentProject);
+    }
+
+    async saveGlobalVariables(globalVariables = null) {
+        if (!this.currentProject) {
+            throw new Error('没有打开的工程');
+        }
+
+        const schema = globalVariables || this.currentProject.globalVariables || {
+            schemaVersion: '1.0',
+            variables: [],
+            sourceBindings: [],
+            targetBindings: []
+        };
+        const saved = await httpClient.put(`/projects/${this.currentProject.id}/global-variables`, schema);
+        this.currentProject.globalVariables = saved;
+        setCurrentProject(this.currentProject);
+        this.unsavedChanges = false;
+        this.rememberProjectInCaches(this.currentProject);
+        this.updateTitle();
+        return saved;
     }
 
     /**

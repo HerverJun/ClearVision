@@ -10,6 +10,7 @@ using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Desktop.Handlers;
@@ -84,6 +85,11 @@ public static class ApiEndpoints
         public OperatorFlowDto? Flow { get; set; }
 
         public bool RegisterForStationDeployment { get; set; } = true;
+    }
+
+    public sealed class ProjectVariableValueWriteRequest
+    {
+        public object? Value { get; set; }
     }
 
     private static void MapProjectEndpoints(IEndpointRouteBuilder app)
@@ -174,6 +180,96 @@ public static class ApiEndpoints
                 // 日志已由全局异常中间件记录
                 return Results.BadRequest(new { Error = ex.Message });
             }
+        });
+
+        app.MapGet("/api/projects/{id:guid}/global-variables", async (Guid id, ProjectService service) =>
+        {
+            var project = await service.GetByIdAsync(id);
+            return project != null ? Results.Ok(project.GlobalVariables) : Results.NotFound();
+        });
+
+        app.MapPut("/api/projects/{id:guid}/global-variables", async (
+            Guid id,
+            ProjectGlobalVariableSchema schema,
+            ProjectService service,
+            ProjectVariableSessionRegistry sessions) =>
+        {
+            try
+            {
+                var saved = await service.UpdateGlobalVariablesAsync(id, schema);
+                sessions.Replace(id, saved);
+                return Results.Ok(saved);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Error = ex.Message });
+            }
+        });
+
+        app.MapGet("/api/projects/{id:guid}/global-variable-values", async (
+            Guid id,
+            ProjectService service,
+            ProjectVariableSessionRegistry sessions) =>
+        {
+            var project = await service.GetByIdAsync(id);
+            if (project == null)
+            {
+                return Results.NotFound();
+            }
+
+            var session = sessions.GetOrCreate(project);
+            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
+        });
+
+        app.MapPut("/api/projects/{id:guid}/global-variable-values/{variableId:guid}", async (
+            Guid id,
+            Guid variableId,
+            ProjectVariableValueWriteRequest request,
+            ProjectService service,
+            ProjectVariableSessionRegistry sessions) =>
+        {
+            var project = await service.GetByIdAsync(id);
+            if (project == null)
+            {
+                return Results.NotFound();
+            }
+
+            var session = sessions.GetOrCreate(project);
+            if (!session.TryGetDefinition(variableId, out var definition))
+            {
+                return Results.NotFound(new { Error = "Variable not found." });
+            }
+
+            if (!definition.ManualWriteAllowed)
+            {
+                return Results.BadRequest(new { Error = "Manual write is not allowed for this variable." });
+            }
+
+            try
+            {
+                session.SetValue(variableId, request.Value, ProjectVariableUpdatedBy.StudioManual);
+                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { Error = ex.Message });
+            }
+        });
+
+        app.MapPost("/api/projects/{id:guid}/global-variable-values/reset", async (
+            Guid id,
+            ProjectService service,
+            ProjectVariableSessionRegistry sessions) =>
+        {
+            var project = await service.GetByIdAsync(id);
+            if (project == null)
+            {
+                return Results.NotFound();
+            }
+
+            var session = sessions.Replace(id, project.GlobalVariables);
+            session.ResetAll(ProjectVariableUpdatedBy.Reset);
+            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
         });
 
         app.MapPost("/api/projects/{id:guid}/runtime-package/export", async (
@@ -410,6 +506,32 @@ public static class ApiEndpoints
                 return Results.BadRequest(new { Error = ex.Message });
             }
         });
+    }
+
+    private static object ToProjectVariableValueDtos(
+        ProjectGlobalVariableSchema schema,
+        IProjectVariableSession session)
+    {
+        var definitionsById = schema.Variables.ToDictionary(variable => variable.Id);
+        return session.GetSnapshots().Select(snapshot =>
+        {
+            definitionsById.TryGetValue(snapshot.VariableId, out var definition);
+            return new
+            {
+                snapshot.VariableId,
+                Name = definition?.Name ?? string.Empty,
+                DisplayName = definition?.DisplayName ?? definition?.Name ?? string.Empty,
+                ValueType = definition?.ValueType.ToString() ?? string.Empty,
+                Value = ProjectVariableValueConverter.ToObject(snapshot.Value),
+                snapshot.Version,
+                snapshot.UpdatedAtUtc,
+                UpdatedBy = snapshot.UpdatedBy.ToString(),
+                snapshot.RunId,
+                snapshot.OperatorId,
+                ManualWriteAllowed = definition?.ManualWriteAllowed ?? false,
+                IncludeInResultMetadata = definition?.IncludeInResultMetadata ?? false
+            };
+        }).ToList();
     }
 
     private static void MapOperatorEndpoints(IEndpointRouteBuilder app)

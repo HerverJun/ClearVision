@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.ValueObjects;
 
 namespace ClearVision.Product.Core.Services;
@@ -21,6 +22,16 @@ public interface IFlowExecutionService
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>执行结果</returns>
     Task<FlowExecutionResult> ExecuteFlowAsync(OperatorFlow flow, Dictionary<string, object>? inputData = null, bool enableParallel = false, System.Threading.CancellationToken cancellationToken = default);
+
+    Task<FlowExecutionResult> ExecuteFlowAsync(
+        OperatorFlow flow,
+        Dictionary<string, object>? inputData,
+        ProjectVariableExecutionContext projectVariables,
+        bool enableParallel = false,
+        System.Threading.CancellationToken cancellationToken = default)
+    {
+        return ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
+    }
 
     /// <summary>
     /// Executes a flow with an explicit production execution mode.

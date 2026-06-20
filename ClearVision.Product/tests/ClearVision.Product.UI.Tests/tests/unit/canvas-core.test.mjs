@@ -43,6 +43,8 @@ function createMockCanvas() {
         arc() {},
         fill() {},
         stroke() {},
+        fillText() {},
+        measureText(text) { return { width: String(text || '').length * 6 }; },
         save() {},
         restore() {},
         translate() {},
@@ -675,6 +677,35 @@ test('FlowCanvas interactive state changes schedule redraws', async () => {
     fc.destroy();
   } finally {
     rafSpy.restore();
+  }
+});
+
+test('FlowCanvas draws global variable dependency badges from project schema', async () => {
+  const { FlowCanvas } = await import(
+    '../../../../src/ClearVision.Product.Desktop/wwwroot/src/core/canvas/flowCanvas.js'
+  );
+
+  const canvas = createMockCanvas();
+  const labels = [];
+  const ctx = canvas.getContext();
+  ctx.fillText = text => labels.push(String(text));
+  canvas.getContext = () => ctx;
+  global.document = createMockDocument(canvas);
+  global.window = createMockWindow(canvas);
+
+  const fc = new FlowCanvas('canvas');
+  try {
+    fc.setGlobalVariableSchema({
+      sourceBindings: [{ operatorId: 'node-1' }],
+      targetBindings: [{ operatorId: 'node-1' }, { operatorId: 'node-1' }]
+    });
+
+    fc.drawGlobalVariableBadges({ id: 'node-1' }, 0, 0, 140);
+
+    assert.ok(labels.includes('G^1'));
+    assert.ok(labels.includes('Gv2'));
+  } finally {
+    fc.destroy();
   }
 });
 

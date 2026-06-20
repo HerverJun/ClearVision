@@ -12,6 +12,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Exceptions;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Logging;
 
@@ -38,6 +39,7 @@ public class InspectionService : IInspectionService
     private readonly IAnalysisDataBuilder _analysisDataBuilder;
     private readonly IProjectFlowStorage _flowStorage;
     private readonly IInspectionImagePersistenceService? _imagePersistenceService;
+    private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
     private readonly ILogger<InspectionService> _logger;
     private static readonly JsonSerializerOptions FlowJsonOptions = new()
     {
@@ -57,7 +59,8 @@ public class InspectionService : IInspectionService
         IAnalysisDataBuilder analysisDataBuilder,
         IProjectFlowStorage flowStorage,
         ILogger<InspectionService> logger,
-        IInspectionImagePersistenceService? imagePersistenceService = null)
+        IInspectionImagePersistenceService? imagePersistenceService = null,
+        ProjectVariableSessionRegistry? projectVariableSessions = null)
     {
         _resultRepository = resultRepository;
         _projectRepository = projectRepository;
@@ -72,6 +75,7 @@ public class InspectionService : IInspectionService
         _analysisDataBuilder = analysisDataBuilder;
         _flowStorage = flowStorage;
         _imagePersistenceService = imagePersistenceService;
+        _projectVariableSessions = projectVariableSessions;
         _logger = logger;
     }
 
@@ -450,7 +454,10 @@ public class InspectionService : IInspectionService
                 executionInputs["Image"] = imageData;
             }
 
-            var flowResult = await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs);
+            var projectVariables = await CreateProjectVariableContextAsync(projectId, actualFlow);
+            var flowResult = projectVariables == null
+                ? await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs)
+                : await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs, projectVariables);
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;
 
@@ -607,6 +614,28 @@ public class InspectionService : IInspectionService
         }
 
         throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
+    }
+
+    private async Task<ProjectVariableExecutionContext?> CreateProjectVariableContextAsync(Guid projectId, OperatorFlow flow)
+    {
+        if (_projectVariableSessions == null)
+        {
+            return null;
+        }
+
+        var project = await _projectRepository.GetWithFlowAsync(projectId);
+        var schema = project?.GlobalVariables;
+        if (schema == null || (schema.Variables.Count == 0 && schema.SourceBindings.Count == 0 && schema.TargetBindings.Count == 0))
+        {
+            return null;
+        }
+
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(schema, flow);
+        var session = _projectVariableSessions.GetOrCreate(projectId, schema);
+        return new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid());
     }
 
     private async Task<OperatorFlow?> LoadFlowFromStorageAsync(Guid projectId)

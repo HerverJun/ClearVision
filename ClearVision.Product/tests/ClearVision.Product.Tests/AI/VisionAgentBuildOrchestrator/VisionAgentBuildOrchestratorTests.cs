@@ -1460,6 +1460,62 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.WorkflowDiff.DeploymentBlockers.Should().Contain("op_cam.CameraId");
     }
 
+    [Fact(DisplayName = "Build orchestrator should emit global variable drafts as metadata-only suggestions")]
+    public async Task BuildAsync_ShouldEmitGlobalVariableDrafts()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var orchestrator = CreateOrchestrator(sink);
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultOutput"],
+            "use a global variable for shared defect threshold and expose it in result metadata");
+        var plan = baseline with
+        {
+            RecommendedDefaults =
+            [
+                ..baseline.RecommendedDefaults,
+                new VisionAgentDefaultAssumption
+                {
+                    Id = "Shared Defect Threshold",
+                    Label = "Shared defect threshold",
+                    Value = "0.72",
+                    Impact = "Shared project variable used by multiple threshold checks."
+                }
+            ],
+            AcceptanceCriteria =
+            [
+                ..baseline.AcceptanceCriteria,
+                "Expose the confirmed shared threshold in result metadata."
+            ]
+        };
+        plan = plan with
+        {
+            PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
+        };
+
+        var result = await orchestrator.BuildAsync(Request(plan), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.GlobalVariableDrafts.Should().ContainSingle(item =>
+            item.Name == "shared.defect.threshold" &&
+            item.ValueType == "Double" &&
+            item.RequiresHumanConfirmation &&
+            item.MetadataOnly &&
+            item.IncludeInResultMetadata);
+        result.GlobalVariableDiagnostics.Should().Contain(item =>
+            item.Code == "GV_AGENT_DRAFT" &&
+            item.Severity == "info" &&
+            item.MetadataOnly);
+        result.BuildResult!.GlobalVariableDrafts.Should().BeEquivalentTo(result.GlobalVariableDrafts);
+        result.BuildResult.GlobalVariableTargetBindingDrafts.Should().OnlyContain(item =>
+            item.VariableName == "shared.defect.threshold" &&
+            item.RequiresHumanConfirmation &&
+            item.MetadataOnly);
+        sink.Events.Should().Contain(item =>
+            item.EventType == AgentRunEventTypes.ArtifactCreated &&
+            JsonSerializer.Serialize(item.Payload, AgentRunEventJson.Options).Contains("globalVariableDraftCount"));
+    }
+
     [Fact(DisplayName = "Build orchestrator modify intent should preserve existing canvas nodes")]
     public async Task BuildAsync_ShouldPreserveExistingFlowForModifyIntent()
     {
