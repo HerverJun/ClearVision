@@ -22,23 +22,12 @@ public sealed class ProjectVariableSessionRegistry
     public IProjectVariableSession Replace(Guid projectId, ProjectGlobalVariableSchema schema)
     {
         var session = new ProjectVariableSession(schema);
-        if (_sessions.TryRemove(projectId, out var existing))
-        {
-            existing.Dispose();
-        }
-
-        _sessions[projectId] = session;
+        _sessions.AddOrUpdate(projectId, session, (_, _) => session);
         return session;
     }
 
     public bool TryRemove(Guid projectId)
     {
-        if (_sessions.TryRemove(projectId, out var existing))
-        {
-            existing.Dispose();
-            return true;
-        }
-
-        return false;
+        return _sessions.TryRemove(projectId, out _);
     }
 }

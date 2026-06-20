@@ -148,23 +148,21 @@ public class VariableIncrementOperator : OperatorBase
 
         try
         {
-            var currentValue = context.Session.TryGetValue(definition.Id, out var element)
-                ? Convert.ToInt64(ProjectVariableValueConverter.ToObject(element))
-                : 0L;
-            var shouldReset = ShouldReset(currentValue, resetCondition, resetThreshold);
-            var newValue = shouldReset ? resetValue + delta : currentValue + delta;
-            var snapshot = context.Session.SetValue(
+            var increment = context.Session.IncrementAtomic(
                 definition.Id,
-                newValue,
+                delta,
                 ProjectVariableUpdatedBy.VariableIncrement,
                 context.RunId,
-                operatorId);
+                operatorId,
+                resetCondition,
+                resetThreshold,
+                resetValue);
             return BuildSuccess(
                 definition.Name,
-                currentValue,
-                Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)),
+                increment.PreviousValue,
+                increment.NewValue,
                 delta,
-                shouldReset);
+                increment.WasReset);
         }
         catch (Exception ex)
         {

@@ -643,7 +643,18 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         bool enableParallel = false,
         CancellationToken cancellationToken = default)
     {
-        using var scope = _projectVariableContextAccessor.BeginScope(projectVariables);
+        using var previewSession = projectVariables.IsPreview
+            ? projectVariables.Session.CreateSnapshotClone()
+            : null;
+        var effectiveContext = previewSession == null
+            ? projectVariables
+            : new ProjectVariableExecutionContext(
+                previewSession,
+                projectVariables.BindingIndex,
+                projectVariables.RunId,
+                isPreview: true);
+
+        using var scope = _projectVariableContextAccessor.BeginScope(effectiveContext);
         return await ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
     }
 
@@ -889,11 +900,6 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         error = null;
         var context = _projectVariableContextAccessor.Current;
         if (context == null)
-        {
-            return true;
-        }
-
-        if (context.IsPreview)
         {
             return true;
         }

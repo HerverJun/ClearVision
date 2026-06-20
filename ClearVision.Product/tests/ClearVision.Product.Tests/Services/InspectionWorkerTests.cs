@@ -9,6 +9,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Events;
@@ -222,6 +223,91 @@ public class InspectionWorkerTests
 
         (await coordinator.TryStopAsync(projectId, CancellationToken.None)).Should().BeTrue();
         (await worker.WaitForRunExitAsync(projectId, secondSessionId, TimeSpan.FromSeconds(2))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task RunWithScopeAsync_WhenRegistrySessionIsReplaced_CurrentRunKeepsOldSessionAndNextRunGetsNewSession()
+    {
+        var registry = new ProjectVariableSessionRegistry();
+        var sessionId = Guid.NewGuid();
+        var variableId = Guid.NewGuid();
+        var flowStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowFlowToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        ProjectVariableExecutionContext? capturedContext = null;
+
+        var schema = CreateProjectVariableSchema(variableId, 1);
+        var project = new Project("demo");
+        var projectId = project.Id;
+        project.UpdateGlobalVariables(schema);
+
+        var flowExecution = Substitute.For<IFlowExecutionService>();
+        flowExecution.ExecuteFlowAsync(
+                Arg.Any<OperatorFlow>(),
+                Arg.Any<Dictionary<string, object>?>(),
+                Arg.Any<ProjectVariableExecutionContext>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(async callInfo =>
+            {
+                capturedContext = callInfo.ArgAt<ProjectVariableExecutionContext>(2);
+                flowStarted.SetResult();
+                await allowFlowToFinish.Task.WaitAsync(callInfo.ArgAt<CancellationToken>(4));
+                return new FlowExecutionResult
+                {
+                    IsSuccess = true,
+                    ExecutionTimeMs = 1,
+                    OutputData = new Dictionary<string, object> { ["Status"] = "OK" }
+                };
+            });
+
+        var imageAcquisition = Substitute.For<IImageAcquisitionService>();
+        var resultChannelWriter = Substitute.For<IInspectionResultChannelWriter>();
+        resultChannelWriter.WriteAsync(Arg.Any<InspectionResult>(), Arg.Any<CancellationToken>()).Returns(ValueTask.CompletedTask);
+        var resultRepository = Substitute.For<IInspectionResultRepository>();
+        var projectRepository = Substitute.For<IProjectRepository>();
+        projectRepository.GetByIdAsync(projectId).Returns(project);
+        var lifetime = Substitute.For<IHostApplicationLifetime>();
+        lifetime.ApplicationStopping.Returns(CancellationToken.None);
+
+        using var serviceProvider = BuildScopedServices(
+            flowExecution,
+            imageAcquisition,
+            resultChannelWriter,
+            resultRepository,
+            projectRepository,
+            projectVariableSessionRegistry: registry);
+
+        var store = new InMemoryEventStore(NullLogger<InMemoryEventStore>.Instance);
+        var bus = new InMemoryInspectionEventBus(NullLogger<InMemoryInspectionEventBus>.Instance, store);
+        var coordinator = new InspectionRuntimeCoordinator(NullLogger<InspectionRuntimeCoordinator>.Instance);
+        var worker = new InspectionWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            coordinator,
+            bus,
+            NullLogger<InspectionWorker>.Instance,
+            lifetime,
+            new InspectionMetrics(),
+            new AnalysisDataBuilder());
+
+        (await coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None)).Should().Be(StartResult.Success);
+        (await worker.TryStartRunAsync(projectId, sessionId, new OperatorFlow("Test"), null)).Should().BeTrue();
+        await flowStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        capturedContext.Should().NotBeNull();
+        var newSession = registry.Replace(projectId, CreateProjectVariableSchema(variableId, 5));
+
+        capturedContext!.Session.SetValue(variableId, 2L, ProjectVariableUpdatedBy.VariableWrite);
+        capturedContext.Session.TryGetSnapshot(variableId, out var oldSnapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(oldSnapshot.Value).Should().Be(2L);
+
+        registry.GetOrCreate(projectId, CreateProjectVariableSchema(variableId, 5)).Should().BeSameAs(newSession);
+        newSession.TryGetSnapshot(variableId, out var newSnapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(newSnapshot.Value).Should().Be(5L);
+
+        allowFlowToFinish.SetResult();
+        (await coordinator.TryStopAsync(projectId, CancellationToken.None)).Should().BeTrue();
+        (await worker.WaitForRunExitAsync(projectId, sessionId, TimeSpan.FromSeconds(2))).Should().BeTrue();
+        coordinator.GetState(projectId)?.Status.Should().Be(RuntimeStatus.Stopped);
     }
 
     [Fact]
@@ -649,7 +735,8 @@ public class InspectionWorkerTests
         IInspectionResultChannelWriter resultChannelWriter,
         IInspectionResultRepository resultRepository,
         IProjectRepository projectRepository,
-        IConfigurationService? configurationService = null)
+        IConfigurationService? configurationService = null,
+        ProjectVariableSessionRegistry? projectVariableSessionRegistry = null)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -663,7 +750,30 @@ public class InspectionWorkerTests
             services.AddScoped(_ => configurationService);
         }
 
+        if (projectVariableSessionRegistry != null)
+        {
+            services.AddSingleton(projectVariableSessionRegistry);
+        }
+
         return services.BuildServiceProvider();
+    }
+
+    private static ProjectGlobalVariableSchema CreateProjectVariableSchema(Guid variableId, long initialValue)
+    {
+        return new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "counter",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = System.Text.Json.JsonSerializer.SerializeToElement(initialValue),
+                    ManualWriteAllowed = true
+                }
+            ]
+        };
     }
 
     private static bool InvokeIsFrameDrivenExecution(
@@ -715,6 +825,8 @@ public class InspectionWorkerTests
                 null,
                 flowExecution,
                 imageAcquisition,
+                null,
+                null,
                 cancellationToken
         })!;
         return await task;
@@ -753,6 +865,8 @@ public class InspectionWorkerTests
                 imageAcquisition,
                 resultChannelWriter,
                 configurationService,
+                null,
+                null,
                 cancellationToken
             })!;
     }

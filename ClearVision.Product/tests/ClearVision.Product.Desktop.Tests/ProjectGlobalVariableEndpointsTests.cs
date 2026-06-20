@@ -1,0 +1,236 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Reflection;
+using System.Text.Json;
+using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Application.Services;
+using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Core.Services;
+using ClearVision.Product.Desktop.Endpoints;
+using ClearVision.Product.Desktop.Station;
+using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Runtime;
+using FluentAssertions;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
+
+namespace ClearVision.Product.Desktop.Tests;
+
+public sealed class ProjectGlobalVariableEndpointsTests
+{
+    [Fact]
+    public async Task ProjectGlobalVariableEndpoints_ShouldUpdateReadWriteAndResetWhenIdle()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+
+        var updated = CreateSchema(variableId, 5, manualWriteAllowed: true);
+        using var updateResponse = await host.Client.PutAsJsonAsync($"/api/projects/{host.Project.Id}/global-variables", updated);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK, await updateResponse.Content.ReadAsStringAsync());
+
+        using var valuesResponse = await host.Client.GetAsync($"/api/projects/{host.Project.Id}/global-variable-values");
+        valuesResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var values = await valuesResponse.Content.ReadFromJsonAsync<JsonElement>();
+        values.EnumerateArray().Single().GetProperty("value").GetInt64().Should().Be(5L);
+
+        using var writeResponse = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
+            new { value = 8L });
+        writeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetValue(variableId, out var written).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(written).Should().Be(8L);
+
+        using var resetResponse = await host.Client.PostAsync($"/api/projects/{host.Project.Id}/global-variable-values/reset", null);
+        resetResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetValue(variableId, out var reset).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(reset).Should().Be(5L);
+    }
+
+    [Fact]
+    public async Task ProjectGlobalVariableEndpoints_ShouldRejectInvalidSchemaAndKeepOldSession()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            storedFlowJson: JsonSerializer.Serialize(new OperatorFlowDto
+            {
+                Name = "empty",
+                Operators = [],
+                Connections = []
+            }));
+        var oldSession = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
+        oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
+        var invalid = CreateSchema(variableId, 5, manualWriteAllowed: true);
+        invalid.Variables.Add(new ProjectGlobalVariableDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "stats.count",
+            DisplayName = "Duplicate",
+            ValueType = ProjectGlobalVariableValueType.Int64,
+            InitialValue = JsonSerializer.SerializeToElement(6L),
+            ManualWriteAllowed = true
+        });
+
+        using var response = await host.Client.PutAsJsonAsync($"/api/projects/{host.Project.Id}/global-variables", invalid);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).Should().BeSameAs(oldSession);
+        oldSession.TryGetValue(variableId, out var current).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(current).Should().Be(9L);
+    }
+
+    [Fact]
+    public async Task ProjectGlobalVariableEndpoints_ShouldRejectForbiddenWrite()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: false));
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
+            new { value = 8L });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ProjectGlobalVariableEndpoints_ShouldRejectMutationsWhileProjectIsRunning()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            status: RuntimeStatus.Running);
+
+        using var schemaResponse = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variables",
+            CreateSchema(variableId, 5, manualWriteAllowed: true));
+        using var writeResponse = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
+            new { value = 8L });
+        using var resetResponse = await host.Client.PostAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/reset",
+            null);
+
+        schemaResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        writeResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        resetResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetValue(variableId, out var current).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(current).Should().Be(1L);
+    }
+
+    private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, bool manualWriteAllowed)
+    {
+        return new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "stats.count",
+                    DisplayName = "Count",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(initialValue),
+                    ManualWriteAllowed = manualWriteAllowed
+                }
+            ]
+        };
+    }
+
+    private sealed class ProjectGlobalVariableEndpointHost : IAsyncDisposable
+    {
+        private readonly WebApplication _app;
+
+        private ProjectGlobalVariableEndpointHost(WebApplication app, Project project, ProjectVariableSessionRegistry registry)
+        {
+            _app = app;
+            Project = project;
+            Registry = registry;
+            Client = app.GetTestClient();
+        }
+
+        public HttpClient Client { get; }
+
+        public Project Project { get; }
+
+        public ProjectVariableSessionRegistry Registry { get; }
+
+        public static async Task<ProjectGlobalVariableEndpointHost> CreateAsync(
+            ProjectGlobalVariableSchema schema,
+            string? storedFlowJson = null,
+            RuntimeStatus? status = null)
+        {
+            var project = new Project("demo");
+            project.UpdateGlobalVariables(schema);
+            var repository = Substitute.For<IProjectRepository>();
+            repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+            repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+
+            var storage = Substitute.For<IProjectFlowStorage>();
+            storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(storedFlowJson));
+
+            var coordinator = Substitute.For<IInspectionRuntimeCoordinator>();
+            if (status.HasValue)
+            {
+                coordinator.GetState(project.Id).Returns(new RuntimeState
+                {
+                    ProjectId = project.Id,
+                    SessionId = Guid.NewGuid(),
+                    Status = status.Value,
+                    StartedAt = DateTime.UtcNow
+                });
+            }
+
+            var registry = new ProjectVariableSessionRegistry();
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                EnvironmentName = Environments.Development
+            });
+            builder.WebHost.UseTestServer();
+            builder.Services.AddSingleton(repository);
+            builder.Services.AddSingleton(storage);
+            builder.Services.AddSingleton<IOperatorFactory>(new OperatorFactory());
+            builder.Services.AddSingleton(registry);
+            builder.Services.AddSingleton(coordinator);
+            builder.Services.AddSingleton<ILogger<ProjectService>>(NullLogger<ProjectService>.Instance);
+            builder.Services.AddScoped(sp => new RuntimePackageExporter(
+                sp.GetRequiredService<IOperatorFactory>(),
+                NullLogger<RuntimePackageExporter>.Instance));
+            builder.Services.AddSingleton(sp => new StationPackageStore(
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                NullLogger<StationPackageStore>.Instance));
+            builder.Services.AddScoped<ProjectService>();
+            var app = builder.Build();
+            MapProjectEndpoints(app);
+            await app.StartAsync();
+            return new ProjectGlobalVariableEndpointHost(app, project, registry);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            Client.Dispose();
+            await _app.StopAsync();
+            await _app.DisposeAsync();
+        }
+    }
+
+    private static void MapProjectEndpoints(IEndpointRouteBuilder app)
+    {
+        var method = typeof(ApiEndpoints).GetMethod(
+            "MapProjectEndpoints",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        method.Should().NotBeNull();
+        method!.Invoke(null, [app]);
+    }
+}

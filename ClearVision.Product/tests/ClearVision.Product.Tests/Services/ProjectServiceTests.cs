@@ -68,6 +68,32 @@ public class ProjectServiceTests
         Convert.ToInt64(ProjectVariableValueConverter.ToObject(value)).Should().Be(3L);
     }
 
+    [Fact]
+    public async Task UpdateGlobalVariablesAsync_WhenRepositorySaveFails_ShouldKeepExistingSession()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var registry = new ProjectVariableSessionRegistry();
+        var variableId = Guid.NewGuid();
+        var project = new Project("demo");
+        project.UpdateGlobalVariables(CreateSchema(variableId, 1));
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository
+            .When(item => item.UpdateAsync(Arg.Any<Project>()))
+            .Do(_ => throw new InvalidOperationException("save failed"));
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
+        var oldSession = registry.GetOrCreate(project.Id, project.GlobalVariables);
+        oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+
+        var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 5));
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*save failed*");
+        registry.GetOrCreate(project.Id, project.GlobalVariables).Should().BeSameAs(oldSession);
+        oldSession.TryGetValue(variableId, out var value).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(value).Should().Be(9L);
+    }
+
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue)
     {
         return new ProjectGlobalVariableSchema

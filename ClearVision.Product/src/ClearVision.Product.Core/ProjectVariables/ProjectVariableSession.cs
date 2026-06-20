@@ -9,6 +9,8 @@ public interface IProjectVariableSession : IDisposable
 
     IReadOnlyList<ProjectVariableValueSnapshot> GetSnapshots();
 
+    IProjectVariableSession CreateSnapshotClone();
+
     bool TryGetValue(Guid variableId, out JsonElement value);
 
     bool TryGetSnapshot(Guid variableId, out ProjectVariableValueSnapshot snapshot);
@@ -30,6 +32,16 @@ public interface IProjectVariableSession : IDisposable
         ProjectVariableUpdatedBy updatedBy,
         Guid? runId = null,
         Guid? operatorId = null);
+
+    ProjectVariableIncrementResult IncrementAtomic(
+        Guid variableId,
+        long delta,
+        ProjectVariableUpdatedBy updatedBy,
+        Guid? runId = null,
+        Guid? operatorId = null,
+        string resetCondition = "None",
+        long resetThreshold = 0,
+        long resetValue = 0);
 
     ProjectVariableValueSnapshot Reset(Guid variableId, ProjectVariableUpdatedBy updatedBy);
 
@@ -54,6 +66,28 @@ public sealed class ProjectVariableSession : IProjectVariableSession
         ResetAll(ProjectVariableUpdatedBy.Initial);
     }
 
+    private ProjectVariableSession(ProjectGlobalVariableSchema schema, IEnumerable<ProjectVariableValueSnapshot> snapshots)
+    {
+        Schema = schema;
+        _definitionsById = Schema.Variables.ToDictionary(variable => variable.Id);
+        _definitionsByName = Schema.Variables
+            .Where(variable => !string.IsNullOrWhiteSpace(variable.Name))
+            .GroupBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var snapshot in snapshots)
+        {
+            _states[snapshot.VariableId] = new ProjectVariableState(
+                snapshot.VariableId,
+                snapshot.Value.Clone(),
+                snapshot.Version,
+                snapshot.UpdatedAtUtc,
+                snapshot.UpdatedBy,
+                snapshot.RunId,
+                snapshot.OperatorId);
+        }
+    }
+
     public ProjectGlobalVariableSchema Schema { get; }
 
     public IReadOnlyList<ProjectVariableValueSnapshot> GetSnapshots()
@@ -62,6 +96,12 @@ public sealed class ProjectVariableSession : IProjectVariableSession
             .Select(state => state.ToSnapshot())
             .OrderBy(snapshot => _definitionsById.TryGetValue(snapshot.VariableId, out var definition) ? definition.Order : int.MaxValue)
             .ToList();
+    }
+
+    public IProjectVariableSession CreateSnapshotClone()
+    {
+        ThrowIfDisposed();
+        return new ProjectVariableSession(Schema, GetSnapshots());
     }
 
     public bool TryGetValue(Guid variableId, out JsonElement value)
@@ -133,6 +173,19 @@ public sealed class ProjectVariableSession : IProjectVariableSession
         Guid? runId = null,
         Guid? operatorId = null)
     {
+        return IncrementAtomic(variableId, delta, updatedBy, runId, operatorId).Snapshot;
+    }
+
+    public ProjectVariableIncrementResult IncrementAtomic(
+        Guid variableId,
+        long delta,
+        ProjectVariableUpdatedBy updatedBy,
+        Guid? runId = null,
+        Guid? operatorId = null,
+        string resetCondition = "None",
+        long resetThreshold = 0,
+        long resetValue = 0)
+    {
         ThrowIfDisposed();
         if (!_definitionsById.TryGetValue(variableId, out var definition))
         {
@@ -144,11 +197,37 @@ public sealed class ProjectVariableSession : IProjectVariableSession
             throw new InvalidOperationException($"Project global variable '{definition.Name}' is {definition.ValueType}; only Int64 can be incremented.");
         }
 
-        var current = TryGetValue(variableId, out var value)
-            ? ProjectVariableValueConverter.ToObject(value)
-            : 0L;
-        var next = Convert.ToInt64(current) + delta;
-        return SetValue(variableId, next, updatedBy, runId, operatorId);
+        while (true)
+        {
+            if (!_states.TryGetValue(variableId, out var current))
+            {
+                var previous = 0L;
+                var wasReset = ShouldReset(previous, resetCondition, resetThreshold);
+                var next = checked((wasReset ? resetValue : previous) + delta);
+                var converted = JsonSerializer.SerializeToElement(next);
+                ValidateRange(definition, converted);
+                var created = new ProjectVariableState(variableId, converted, 1, DateTimeOffset.UtcNow, updatedBy, runId, operatorId);
+
+                if (_states.TryAdd(variableId, created))
+                {
+                    return new ProjectVariableIncrementResult(created.ToSnapshot(), previous, next, wasReset);
+                }
+
+                continue;
+            }
+
+            var currentValue = Convert.ToInt64(ProjectVariableValueConverter.ToObject(current.Value));
+            var shouldReset = ShouldReset(currentValue, resetCondition, resetThreshold);
+            var nextValue = checked((shouldReset ? resetValue : currentValue) + delta);
+            var nextElement = JsonSerializer.SerializeToElement(nextValue);
+            ValidateRange(definition, nextElement);
+            var updated = current.Next(nextElement, updatedBy, runId, operatorId);
+
+            if (_states.TryUpdate(variableId, updated, current))
+            {
+                return new ProjectVariableIncrementResult(updated.ToSnapshot(), currentValue, nextValue, shouldReset);
+            }
+        }
     }
 
     public ProjectVariableValueSnapshot Reset(Guid variableId, ProjectVariableUpdatedBy updatedBy)
@@ -212,6 +291,17 @@ public sealed class ProjectVariableSession : IProjectVariableSession
         }
     }
 
+    private static bool ShouldReset(long currentValue, string resetCondition, long resetThreshold)
+    {
+        return resetCondition.ToLowerInvariant() switch
+        {
+            "greaterthan" => currentValue > resetThreshold,
+            "lessthan" => currentValue < resetThreshold,
+            "equal" => currentValue == resetThreshold,
+            _ => false
+        };
+    }
+
     private void ThrowIfDisposed()
     {
         if (_disposed)
@@ -248,3 +338,9 @@ public sealed class ProjectVariableSession : IProjectVariableSession
         }
     }
 }
+
+public sealed record ProjectVariableIncrementResult(
+    ProjectVariableValueSnapshot Snapshot,
+    long PreviousValue,
+    long NewValue,
+    bool WasReset);

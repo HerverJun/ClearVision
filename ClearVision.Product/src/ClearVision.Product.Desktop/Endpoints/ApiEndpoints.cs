@@ -192,12 +192,16 @@ public static class ApiEndpoints
             Guid id,
             ProjectGlobalVariableSchema schema,
             ProjectService service,
-            ProjectVariableSessionRegistry sessions) =>
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
+            if (IsProjectRuntimeBusy(id, runtimeCoordinator))
+            {
+                return Results.Conflict(new { Error = "Project is currently running." });
+            }
+
             try
             {
                 var saved = await service.UpdateGlobalVariablesAsync(id, schema);
-                sessions.Replace(id, saved);
                 return Results.Ok(saved);
             }
             catch (Exception ex)
@@ -226,8 +230,14 @@ public static class ApiEndpoints
             Guid variableId,
             ProjectVariableValueWriteRequest request,
             ProjectService service,
-            ProjectVariableSessionRegistry sessions) =>
+            ProjectVariableSessionRegistry sessions,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
+            if (IsProjectRuntimeBusy(id, runtimeCoordinator))
+            {
+                return Results.Conflict(new { Error = "Project is currently running." });
+            }
+
             var project = await service.GetByIdAsync(id);
             if (project == null)
             {
@@ -259,15 +269,21 @@ public static class ApiEndpoints
         app.MapPost("/api/projects/{id:guid}/global-variable-values/reset", async (
             Guid id,
             ProjectService service,
-            ProjectVariableSessionRegistry sessions) =>
+            ProjectVariableSessionRegistry sessions,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
+            if (IsProjectRuntimeBusy(id, runtimeCoordinator))
+            {
+                return Results.Conflict(new { Error = "Project is currently running." });
+            }
+
             var project = await service.GetByIdAsync(id);
             if (project == null)
             {
                 return Results.NotFound();
             }
 
-            var session = sessions.Replace(id, project.GlobalVariables);
+            var session = sessions.GetOrCreate(project);
             session.ResetAll(ProjectVariableUpdatedBy.Reset);
             return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
         });
@@ -532,6 +548,12 @@ public static class ApiEndpoints
                 IncludeInResultMetadata = definition?.IncludeInResultMetadata ?? false
             };
         }).ToList();
+    }
+
+    private static bool IsProjectRuntimeBusy(Guid projectId, IInspectionRuntimeCoordinator runtimeCoordinator)
+    {
+        var state = runtimeCoordinator.GetState(projectId);
+        return state?.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping;
     }
 
     private static void MapOperatorEndpoints(IEndpointRouteBuilder app)

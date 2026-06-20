@@ -347,6 +347,120 @@ public class RuntimeMvpTests
     }
 
     [Fact]
+    public async Task RuntimeHost_LoadPackageAsync_WhenWriterPreparationFails_ShouldRollbackToExistingPackage()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var project = CreateProjectDto("writer-rollback-old");
+            project.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 4L, manualWriteAllowed: true);
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var oldExport = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = Path.Combine(root, "old")
+            });
+            var newExport = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = CreateProjectDto("writer-rollback-new"),
+                TargetRootDirectory = Path.Combine(root, "new")
+            });
+
+            var calls = 0;
+            var preparedResourceDisposed = false;
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                profile =>
+                {
+                    calls++;
+                    if (calls == 2)
+                    {
+                        var dataRoot = Path.Combine(root, "prepared-failure");
+                        Directory.CreateDirectory(dataRoot);
+                        var prepared = new RuntimeResultRecordWriter(dataRoot, profile.ResultRecordQueueCapacity, NullLogger.Instance);
+                        prepared.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                        preparedResourceDisposed = true;
+                        throw new IOException("writer preparation failed");
+                    }
+
+                    var defaultRoot = RuntimePathGuard.GetDefaultStationDataRoot();
+                    Directory.CreateDirectory(defaultRoot);
+                    return ValueTask.FromResult(new RuntimePreparedWriters(
+                        new RuntimeResultRecordWriter(defaultRoot, profile.ResultRecordQueueCapacity, NullLogger.Instance),
+                        new RuntimeImageWriter(defaultRoot, profile, NullLogger.Instance)));
+                });
+
+            await runtimeHost.LoadPackageAsync(oldExport.PackageRootPath);
+            await runtimeHost.SetProjectVariableValueAsync(variableId, 9L);
+
+            var reload = async () => await runtimeHost.LoadPackageAsync(newExport.PackageRootPath);
+
+            await reload.Should().ThrowAsync<IOException>().WithMessage("*writer preparation failed*");
+            preparedResourceDisposed.Should().BeTrue();
+            runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Loaded);
+            runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
+                snapshot.VariableId == variableId &&
+                Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 9L);
+
+            var imagePath = Path.Combine(root, "rollback-input.png");
+            await File.WriteAllBytesAsync(imagePath, new byte[] { 2, 4, 6, 8 });
+            var run = await runtimeHost.RunSingleAsync(imagePath);
+            run.Outcome.Should().Be(RuntimeRunOutcome.Ok);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task RuntimeHost_LoadPackageAsync_WhenReloadSucceeds_ShouldPublishNewSession()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var oldProject = CreateProjectDto("reload-success-old");
+            oldProject.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 4L, manualWriteAllowed: true);
+            var newProject = CreateProjectDto("reload-success-new");
+            newProject.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 6L, manualWriteAllowed: true);
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var oldExport = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = oldProject,
+                TargetRootDirectory = Path.Combine(root, "old")
+            });
+            var newExport = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = newProject,
+                TargetRootDirectory = Path.Combine(root, "new")
+            });
+
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            await runtimeHost.LoadPackageAsync(oldExport.PackageRootPath);
+            await runtimeHost.SetProjectVariableValueAsync(variableId, 9L);
+            await runtimeHost.LoadPackageAsync(newExport.PackageRootPath);
+
+            runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
+                snapshot.VariableId == variableId &&
+                Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 6L);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task RuntimeHost_WhenImageSaveIsEnabledButNoImageExists_ShouldNotPublishSavedImagePath()
     {
         var root = CreateTempDirectory();

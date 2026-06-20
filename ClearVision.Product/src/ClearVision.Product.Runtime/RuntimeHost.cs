@@ -38,6 +38,7 @@ public sealed class RuntimeHost : IAsyncDisposable
     private RuntimeResultRecordWriter? _resultWriter;
     private RuntimeImageWriter? _imageWriter;
     private ProjectVariableSession? _projectVariableSession;
+    private readonly Func<RuntimeProfile, ValueTask<RuntimePreparedWriters>> _writerFactory;
     private int _disposeStarted;
 
     public RuntimeHost(
@@ -45,11 +46,22 @@ public sealed class RuntimeHost : IAsyncDisposable
         RuntimePackageLoader packageLoader,
         RuntimeResultNormalizer resultNormalizer,
         ILogger<RuntimeHost> logger)
+        : this(flowExecutionService, packageLoader, resultNormalizer, logger, null)
+    {
+    }
+
+    internal RuntimeHost(
+        IFlowExecutionService flowExecutionService,
+        RuntimePackageLoader packageLoader,
+        RuntimeResultNormalizer resultNormalizer,
+        ILogger<RuntimeHost> logger,
+        Func<RuntimeProfile, ValueTask<RuntimePreparedWriters>>? writerFactory)
     {
         _flowExecutionService = flowExecutionService;
         _packageLoader = packageLoader;
         _resultNormalizer = resultNormalizer;
         _logger = logger;
+        _writerFactory = writerFactory ?? CreateWritersAsync;
     }
 
     public event Action<RuntimeHostSnapshot>? SnapshotChanged;
@@ -153,32 +165,64 @@ public sealed class RuntimeHost : IAsyncDisposable
     {
         var package = await _packageLoader.LoadAsync(packageRoot, cancellationToken);
         var projectVariableSession = new ProjectVariableSession(package.GlobalVariables);
+        var nextSiteProfile = RuntimeParameterOverrideApplier.CloneProfile(package.DefaultSiteProfile);
+        RuntimePreparedWriters? preparedWriters = null;
+        ProjectVariableSession? oldProjectVariableSession = null;
+        RuntimeResultRecordWriter? oldResultWriter = null;
+        RuntimeImageWriter? oldImageWriter = null;
 
-        await _stateGate.WaitAsync(cancellationToken);
         try
         {
-            EnsureNotRunning();
-            _projectVariableSession?.Dispose();
-            _loadedPackage = package;
-            _projectVariableSession = projectVariableSession;
-            projectVariableSession = null;
-            lock (_profileGate)
-            {
-                _activeSiteProfile = RuntimeParameterOverrideApplier.CloneProfile(package.DefaultSiteProfile);
-            }
+            preparedWriters = await _writerFactory(package.RuntimeProfile);
 
-            ResetSessionCounters();
-            await RecreateWritersAsync(package.RuntimeProfile);
-            _state = RuntimeHostState.Loaded;
+            await _stateGate.WaitAsync(cancellationToken);
+            try
+            {
+                EnsureNotRunning();
+
+                oldProjectVariableSession = _projectVariableSession;
+                oldResultWriter = _resultWriter;
+                oldImageWriter = _imageWriter;
+
+                _loadedPackage = package;
+                _projectVariableSession = projectVariableSession;
+                projectVariableSession = null;
+                _resultWriter = preparedWriters.ResultWriter;
+                _imageWriter = preparedWriters.ImageWriter;
+                preparedWriters = null;
+                lock (_profileGate)
+                {
+                    _activeSiteProfile = nextSiteProfile;
+                }
+
+                ResetSessionCounters();
+                _state = RuntimeHostState.Loaded;
+            }
+            finally
+            {
+                _stateGate.Release();
+            }
         }
         catch
         {
             projectVariableSession?.Dispose();
+            if (preparedWriters != null)
+            {
+                await preparedWriters.DisposeAsync();
+            }
+
             throw;
         }
-        finally
+
+        oldProjectVariableSession?.Dispose();
+        if (oldResultWriter != null)
         {
-            _stateGate.Release();
+            await oldResultWriter.DisposeAsync();
+        }
+
+        if (oldImageWriter != null)
+        {
+            await oldImageWriter.DisposeAsync();
         }
 
         EmitSnapshot();
@@ -751,26 +795,13 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
     }
 
-    private async Task RecreateWritersAsync(RuntimeProfile profile)
+    private ValueTask<RuntimePreparedWriters> CreateWritersAsync(RuntimeProfile profile)
     {
-        var resultWriter = _resultWriter;
-        _resultWriter = null;
-        if (resultWriter != null)
-        {
-            await resultWriter.DisposeAsync();
-        }
-
-        var imageWriter = _imageWriter;
-        _imageWriter = null;
-        if (imageWriter != null)
-        {
-            await imageWriter.DisposeAsync();
-        }
-
         var dataRoot = RuntimePathGuard.GetDefaultStationDataRoot();
         Directory.CreateDirectory(dataRoot);
-        _resultWriter = new RuntimeResultRecordWriter(dataRoot, profile.ResultRecordQueueCapacity, _logger);
-        _imageWriter = new RuntimeImageWriter(dataRoot, profile, _logger);
+        return ValueTask.FromResult(new RuntimePreparedWriters(
+            new RuntimeResultRecordWriter(dataRoot, profile.ResultRecordQueueCapacity, _logger),
+            new RuntimeImageWriter(dataRoot, profile, _logger)));
     }
 
     private static string BuildImageId(string imagePath)
@@ -1173,6 +1204,25 @@ public sealed class RuntimeResultNormalizer
         }
 
         return outputImage as byte[];
+    }
+}
+
+internal sealed class RuntimePreparedWriters : IAsyncDisposable
+{
+    public RuntimePreparedWriters(RuntimeResultRecordWriter resultWriter, RuntimeImageWriter imageWriter)
+    {
+        ResultWriter = resultWriter;
+        ImageWriter = imageWriter;
+    }
+
+    public RuntimeResultRecordWriter ResultWriter { get; }
+
+    public RuntimeImageWriter ImageWriter { get; }
+
+    public async ValueTask DisposeAsync()
+    {
+        await ResultWriter.DisposeAsync();
+        await ImageWriter.DisposeAsync();
     }
 }
 
