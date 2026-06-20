@@ -1,0 +1,339 @@
+.global-variable-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.global-variable-entry-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--text-primary);
+}
+
+.global-variable-entry-summary span,
+.global-variable-entry-hint,
+.gv-muted {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.gv-manager-overlay,
+.gv-choice-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(2, 6, 23, 0.62);
+}
+
+.gv-manager {
+    width: min(1180px, calc(100vw - 48px));
+    height: min(780px, calc(100vh - 48px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-xl);
+}
+
+.gv-manager-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.gv-manager-header h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.gv-manager-header p {
+    margin: 4px 0 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.gv-icon-button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.gv-toolbar {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) 130px 130px auto auto auto;
+    gap: 10px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.gv-warning,
+.gv-error {
+    margin: 12px 20px 0;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.gv-warning {
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--warning-amber);
+}
+
+.gv-error {
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    background: rgba(248, 113, 113, 0.1);
+    color: var(--error-cinnabar);
+}
+
+.gv-manager-body {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    flex: 1;
+}
+
+.gv-variable-list {
+    min-height: 0;
+    overflow: auto;
+    padding: 12px;
+    border-right: 1px solid var(--border-color);
+}
+
+.gv-variable-row {
+    width: 100%;
+    display: grid;
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 10px;
+    text-align: left;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.gv-variable-row.selected {
+    border-color: var(--accent-color);
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.gv-variable-name {
+    font-weight: 600;
+}
+
+.gv-variable-meta,
+.gv-variable-value,
+.gv-variable-source {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.gv-detail {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    padding: 16px;
+}
+
+.gv-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(320px, 1.1fr) minmax(280px, 0.9fr);
+    gap: 14px;
+}
+
+.gv-card {
+    padding: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+}
+
+.gv-editor-card {
+    grid-row: span 3;
+}
+
+.gv-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.gv-section-header h3 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.gv-actions,
+.gv-write-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.gv-form,
+.gv-field {
+    display: grid;
+    gap: 8px;
+}
+
+.gv-form {
+    gap: 12px;
+}
+
+.gv-field span,
+.gv-check-field {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.gv-two-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.gv-field-error {
+    color: var(--error-cinnabar);
+    font-size: 12px;
+}
+
+.gv-binding-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.gv-binding-row:last-child {
+    border-bottom: 0;
+}
+
+.gv-binding-row strong,
+.gv-binding-row span,
+.gv-binding-row em {
+    display: block;
+}
+
+.gv-binding-row em {
+    color: var(--warning-amber);
+    font-size: 12px;
+    font-style: normal;
+}
+
+.gv-binding-row.invalid {
+    border-left: 3px solid var(--warning-amber);
+    padding-left: 10px;
+}
+
+.gv-value-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 0 0 12px;
+}
+
+.gv-value-grid div {
+    min-width: 0;
+}
+
+.gv-value-grid dt {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.gv-value-grid dd {
+    margin: 2px 0 0;
+    overflow-wrap: anywhere;
+}
+
+.gv-empty,
+.gv-loading {
+    padding: 20px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.gv-empty.compact {
+    padding: 8px 0;
+    text-align: left;
+}
+
+.gv-choice {
+    width: min(520px, calc(100vw - 48px));
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    padding: 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.gv-source-dialog {
+    width: min(720px, calc(100vw - 48px));
+}
+
+.gv-source-group {
+    margin: 12px 0;
+}
+
+.gv-source-group h4 {
+    margin: 0 0 8px;
+}
+
+.gv-source-option {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+@media (max-width: 860px) {
+    .gv-manager-overlay {
+        padding: 10px;
+    }
+
+    .gv-manager {
+        width: calc(100vw - 20px);
+        height: calc(100vh - 20px);
+    }
+
+    .gv-toolbar,
+    .gv-manager-body,
+    .gv-detail-grid,
+    .gv-two-columns {
+        grid-template-columns: 1fr;
+    }
+
+    .gv-variable-list {
+        max-height: 220px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+}

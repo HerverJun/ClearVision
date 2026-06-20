@@ -297,6 +297,34 @@ public static class ApiEndpoints
             return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
         });
 
+        app.MapPost("/api/projects/{id:guid}/global-variable-values/{variableId:guid}/reset", async (
+            Guid id,
+            Guid variableId,
+            ProjectService service,
+            ProjectVariableSessionRegistry sessions,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
+        {
+            if (IsProjectRuntimeBusy(id, runtimeCoordinator))
+            {
+                return Results.Conflict(new { Error = "Project is currently running." });
+            }
+
+            var project = await service.GetByIdAsync(id);
+            if (project == null)
+            {
+                return Results.NotFound();
+            }
+
+            var session = sessions.GetOrCreate(project);
+            if (!session.TryGetDefinition(variableId, out _))
+            {
+                return Results.NotFound(new { Error = "Variable not found." });
+            }
+
+            session.Reset(variableId, ProjectVariableUpdatedBy.Reset);
+            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
+        });
+
         app.MapPost("/api/projects/{id:guid}/runtime-package/export", async (
             Guid id,
             ExportRuntimePackageRequest? request,

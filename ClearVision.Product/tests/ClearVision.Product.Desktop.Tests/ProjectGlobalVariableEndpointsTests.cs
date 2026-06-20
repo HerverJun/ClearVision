@@ -51,6 +51,16 @@ public sealed class ProjectGlobalVariableEndpointsTests
         host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetValue(variableId, out var written).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(written).Should().Be(8L);
 
+        using var resetOneResponse = await host.Client.PostAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}/reset",
+            null);
+        resetOneResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetValue(variableId, out var resetOne).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(resetOne).Should().Be(5L);
+
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables)
+            .SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
+
         using var resetResponse = await host.Client.PostAsync($"/api/projects/{host.Project.Id}/global-variable-values/reset", null);
         resetResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetValue(variableId, out var reset).Should().BeTrue();
@@ -121,10 +131,14 @@ public sealed class ProjectGlobalVariableEndpointsTests
         using var resetResponse = await host.Client.PostAsync(
             $"/api/projects/{host.Project.Id}/global-variable-values/reset",
             null);
+        using var resetOneResponse = await host.Client.PostAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}/reset",
+            null);
 
         schemaResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
         writeResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
         resetResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        resetOneResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
         host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetValue(variableId, out var current).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(current).Should().Be(1L);
     }

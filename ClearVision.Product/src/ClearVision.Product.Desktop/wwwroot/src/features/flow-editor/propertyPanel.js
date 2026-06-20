@@ -17,6 +17,7 @@ import {
     getParameterEffectiveState,
     normalizeAcquisitionSourceType
 } from '../../shared/parameterDependencyRules.js';
+import { isVariableCompatibleWithDataType } from '../global-variables/globalVariableStore.js';
 
 function normalizeParameterName(name) {
     return String(name || '').trim().toLowerCase();
@@ -710,6 +711,26 @@ class PropertyPanel {
         `;
     }
 
+    applyGlobalVariableInputState() {
+        const form = document.getElementById('property-form');
+        if (!form) {
+            return;
+        }
+
+        form.querySelectorAll('.gv-binding-select[data-parameter-name]').forEach(select => {
+            const parameterName = select.dataset.parameterName || '';
+            const escapedName = (typeof CSS !== 'undefined' && typeof CSS.escape === 'function')
+                ? CSS.escape(parameterName)
+                : parameterName;
+            const input = form.querySelector(`[name="${escapedName}"]`);
+            if (input) {
+                input.disabled = Boolean(select.value);
+                input.title = select.value ? '由全局变量提供' : '';
+                input.setAttribute?.('aria-disabled', select.value ? 'true' : 'false');
+            }
+        });
+    }
+
     renderGlobalVariableBindingControl(param) {
         const project = projectManager.getCurrentProject?.();
         const schema = this.normalizeGlobalVariableSchema(project?.globalVariables || project?.GlobalVariables);
@@ -840,6 +861,7 @@ class PropertyPanel {
             input.addEventListener('change', () => {
                 if (input.classList.contains('gv-binding-select')) {
                     this.applyGlobalVariableInputState();
+                    this.syncGlobalVariableTargetBindings();
                     return;
                 }
 
@@ -1427,6 +1449,7 @@ class PropertyPanel {
 
         if (changed) {
             projectManager.updateGlobalVariables(schema);
+            serviceRegistry.get('globalVariablePanel')?.setSchemaFromExternal?.(schema);
         }
     }
 
@@ -1445,6 +1468,7 @@ class PropertyPanel {
             if (input) {
                 input.disabled = Boolean(select.value);
                 input.title = select.value ? '由全局变量提供' : '';
+                input.title = select.value ? '由全局变量提供' : '';
             }
         });
     }
@@ -1452,6 +1476,45 @@ class PropertyPanel {
     /**
      * 初始化预览面板
      */
+    renderGlobalVariableBindingControl(param) {
+        const project = projectManager.getCurrentProject?.();
+        const schema = this.normalizeGlobalVariableSchema(project?.globalVariables || project?.GlobalVariables);
+        if (!schema.variables.length || !this.currentOperator?.id || !param?.id) {
+            return '';
+        }
+
+        const binding = schema.targetBindings.find(item =>
+            String(item.operatorId || '').toLowerCase() === String(this.currentOperator.id).toLowerCase() &&
+            String(item.parameterId || '').toLowerCase() === String(param.id).toLowerCase());
+        const compatibleVariables = schema.variables.filter(variable => this.isVariableCompatibleWithParameter(variable, param));
+        const boundVariable = binding
+            ? schema.variables.find(variable => String(variable.id || '').toLowerCase() === String(binding.variableId || '').toLowerCase())
+            : null;
+
+        return `
+            <div class="global-variable-source-control">
+                <label class="form-label compact">参数来源</label>
+                <select class="form-input gv-binding-select" data-parameter-id="${this.escapeAttribute(param.id)}" data-parameter-name="${this.escapeAttribute(param.name)}">
+                    <option value="">固定值</option>
+                    ${compatibleVariables.map(variable => `
+                        <option value="${this.escapeAttribute(variable.id)}" ${binding && String(binding.variableId).toLowerCase() === String(variable.id).toLowerCase() ? 'selected' : ''}>
+                            ${this.escapeHtml(variable.displayName || variable.name)}（${this.escapeHtml(variable.name)}）
+                        </option>
+                    `).join('')}
+                </select>
+                ${binding && !boundVariable ? '<p class="form-description error">已绑定的全局变量不存在，请重新选择。</p>' : ''}
+                ${binding && boundVariable ? '<p class="form-description">已绑定全局变量，固定值控件由全局变量提供。</p>' : ''}
+            </div>
+        `;
+    }
+
+    isVariableCompatibleWithParameter(variable, param) {
+        return isVariableCompatibleWithDataType(
+            variable?.valueType || variable?.ValueType,
+            param?.dataType || param?.DataType || param?.type || param?.Type
+        );
+    }
+
     initPreviewPanel() {
         const container = this.container.querySelector('#operator-preview-container');
         if (!container) {

@@ -580,7 +580,7 @@ public sealed class MainForm : Form
         layout.Controls.Add(CreateSidebarCard("运行包流程", BuildPackageSummaryContent(), Color.SteelBlue), 0, 3);
         layout.Controls.Add(CreateSidebarCard("现场参数", _runtimeParameterPanel, Color.DarkCyan), 0, 4);
 
-        layout.Controls.Add(CreateSidebarCard("Global Variables", BuildProjectVariableMonitor(), Color.MediumPurple), 0, 5);
+        layout.Controls.Add(CreateSidebarCard("全局变量", BuildProjectVariableMonitor(), Color.MediumPurple), 0, 5);
 
         return layout;
     }
@@ -678,11 +678,11 @@ public sealed class MainForm : Form
         _projectVariableView.GridLines = true;
         _projectVariableView.MultiSelect = false;
         _projectVariableView.Columns.Clear();
-        _projectVariableView.Columns.Add("Name", 92);
-        _projectVariableView.Columns.Add("Value", 70);
-        _projectVariableView.Columns.Add("Source", 58);
-        _projectVariableView.Columns.Add("Ver", 42);
-        _projectVariableView.Columns.Add("Updated", 72);
+        _projectVariableView.Columns.Add("名称", 92);
+        _projectVariableView.Columns.Add("当前值", 70);
+        _projectVariableView.Columns.Add("来源", 58);
+        _projectVariableView.Columns.Add("版本", 42);
+        _projectVariableView.Columns.Add("更新", 72);
         _projectVariableView.SelectedIndexChanged += (_, _) => UpdateButtonStates();
         _projectVariableView.DoubleClick += async (_, _) => await EditSelectedProjectVariableAsync();
 
@@ -694,8 +694,8 @@ public sealed class MainForm : Form
             WrapContents = false,
             Margin = new Padding(0, 6, 0, 0)
         };
-        ConfigureButton(_editProjectVariableButton, "Edit", async (_, _) => await EditSelectedProjectVariableAsync());
-        ConfigureButton(_resetProjectVariableButton, "Reset", async (_, _) => await ResetSelectedProjectVariableAsync());
+        ConfigureButton(_editProjectVariableButton, "编辑", async (_, _) => await EditSelectedProjectVariableAsync());
+        ConfigureButton(_resetProjectVariableButton, "重置", async (_, _) => await ResetSelectedProjectVariableAsync());
         buttonPanel.Controls.AddRange([_editProjectVariableButton, _resetProjectVariableButton]);
 
         layout.Controls.Add(_projectVariableView, 0, 0);
@@ -723,7 +723,7 @@ public sealed class MainForm : Form
             var item = new ListViewItem(string.IsNullOrWhiteSpace(definition.DisplayName) ? definition.Name : definition.DisplayName);
             item.Tag = definition.Id;
             item.SubItems.Add(FormatProjectVariableValue(snapshot.Value));
-            item.SubItems.Add(snapshot.UpdatedBy.ToString());
+            item.SubItems.Add(FormatProjectVariableUpdatedBy(snapshot.UpdatedBy));
             item.SubItems.Add(snapshot.Version.ToString(System.Globalization.CultureInfo.InvariantCulture));
             item.SubItems.Add(snapshot.UpdatedAtUtc.ToLocalTime().ToString("HH:mm:ss"));
             _projectVariableView.Items.Add(item);
@@ -733,6 +733,21 @@ public sealed class MainForm : Form
     private static string FormatProjectVariableValue(System.Text.Json.JsonElement value)
     {
         return ProjectVariableValueConverter.ToObject(value)?.ToString() ?? string.Empty;
+    }
+
+    private static string FormatProjectVariableUpdatedBy(ProjectVariableUpdatedBy updatedBy)
+    {
+        return updatedBy switch
+        {
+            ProjectVariableUpdatedBy.Initial => "初始值",
+            ProjectVariableUpdatedBy.StudioManual => "Studio 写入",
+            ProjectVariableUpdatedBy.StationManual => "工站写入",
+            ProjectVariableUpdatedBy.OperatorOutput => "算子输出",
+            ProjectVariableUpdatedBy.VariableWrite => "变量写入",
+            ProjectVariableUpdatedBy.VariableIncrement => "变量递增",
+            ProjectVariableUpdatedBy.Reset => "重置",
+            _ => updatedBy.ToString()
+        };
     }
 
     private bool TryGetSelectedProjectVariable(out ProjectGlobalVariableDefinition definition, out ProjectVariableValueSnapshot snapshot)
@@ -771,7 +786,7 @@ public sealed class MainForm : Form
         }
 
         var currentText = FormatProjectVariableValue(snapshot.Value);
-        var title = $"Edit {definition.Name}";
+        var title = $"编辑 {definition.Name}";
         var entered = PromptForProjectVariableValue(title, definition, currentText);
         if (entered == null)
         {
@@ -780,7 +795,7 @@ public sealed class MainForm : Form
 
         if (!TryParseProjectVariableValue(entered, definition.ValueType, out var typedValue, out var error))
         {
-            MessageBox.Show(this, error, "Invalid value", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show(this, error, "值无效", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -792,7 +807,7 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Edit global variable failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, ex.Message, "编辑全局变量失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -810,8 +825,8 @@ public sealed class MainForm : Form
 
         var result = MessageBox.Show(
             this,
-            $"Reset '{definition.Name}' to its initial value?",
-            "Reset global variable",
+            $"确定将“{definition.Name}”重置为初始值吗？",
+            "重置全局变量",
             MessageBoxButtons.OKCancel,
             MessageBoxIcon.Question);
         if (result != DialogResult.OK)
@@ -827,7 +842,7 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, ex.Message, "Reset global variable failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, ex.Message, "重置全局变量失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
