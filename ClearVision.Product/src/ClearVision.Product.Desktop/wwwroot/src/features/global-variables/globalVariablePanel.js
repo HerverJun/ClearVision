@@ -23,8 +23,13 @@ import {
 } from './globalVariableStore.js';
 
 const LOCKED_RUNTIME_STATES = new Set(['starting', 'running', 'stopping']);
-const TYPE_FILTERS = ['全部类型', ...GLOBAL_VARIABLE_TYPES.map(getTypeLabel)];
-const SOURCE_FILTERS = ['全部来源', '固定初始值', '算子输出'];
+const ALL_TYPES_LABEL = '全部类型';
+const ALL_SOURCES_LABEL = '全部来源';
+const FIXED_SOURCE_LABEL = '固定初始值';
+const OPERATOR_SOURCE_LABEL = '算子输出';
+const TYPE_FILTERS = [ALL_TYPES_LABEL, ...GLOBAL_VARIABLE_TYPES.map(getTypeLabel)];
+const SOURCE_FILTERS = [ALL_SOURCES_LABEL, FIXED_SOURCE_LABEL, OPERATOR_SOURCE_LABEL];
+const RUNTIME_STATE_POLL_INTERVAL_MS = 1500;
 
 export default class GlobalVariablePanel {
     constructor(containerId, options = {}) {
@@ -47,12 +52,16 @@ export default class GlobalVariablePanel {
         this.options = options;
         this.runtimeState = options.getRuntimeState?.() || inspectionController.getState?.() || {};
         this.unsubscribeInspectionState = null;
+        this.runtimeStatePollTimer = null;
+        this.runtimeStateRequestSerial = 0;
         this.subscribeRuntimeState();
     }
 
     async setProject(project) {
         const requestId = ++this.requestSerial;
+        this.stopRuntimeStatePolling({ cancelRequests: true });
         this.project = project || null;
+        this.runtimeState = this.options.getRuntimeState?.() || inspectionController.getState?.() || {};
         this.rebuildBaseline(project?.globalVariables || project?.GlobalVariables);
         this.values = [];
         this.errorMessage = '';
@@ -158,6 +167,7 @@ export default class GlobalVariablePanel {
         }
 
         this.isOpen = false;
+        this.stopRuntimeStatePolling({ cancelRequests: true });
         this.removeDialog();
         this.render();
         return true;
@@ -176,25 +186,10 @@ export default class GlobalVariablePanel {
     renderDialogHtml() {
         const locked = this.isRuntimeLocked();
         const selected = this.getSelectedVariable();
-        const valuesById = new Map(this.values.map(item => [String(item.variableId).toLowerCase(), item]));
-        const filteredVariables = this.getFilteredVariables();
         const runtimeBanner = locked
             ? '<div class="gv-warning" role="status">工程运行中，变量结构和值不可修改；仍可查看与刷新。</div>'
             : '';
-        const listHtml = filteredVariables.length === 0
-            ? '<div class="gv-empty">没有符合条件的变量。</div>'
-            : filteredVariables.map(variable => {
-                const current = valuesById.get(String(variable.id).toLowerCase());
-                const source = this.getSourceBinding(variable.id);
-                return `
-                    <button type="button" class="gv-variable-row ${sameId(variable.id, this.selectedVariableId) ? 'selected' : ''}" data-action="select" data-variable-id="${escapeHtml(variable.id)}">
-                        <span class="gv-variable-name">${escapeHtml(variable.displayName || variable.name)}</span>
-                        <span class="gv-variable-meta">${escapeHtml(variable.name)} · ${escapeHtml(getTypeLabel(variable.valueType))}</span>
-                        <span class="gv-variable-value">${escapeHtml(formatGlobalVariableValue(current?.value ?? variable.initialValue))}</span>
-                        <span class="gv-variable-source">${source ? '算子输出' : '固定初始值'}</span>
-                    </button>
-                `;
-            }).join('');
+        const listHtml = this.renderVariableListHtml();
 
         return `
             <div class="gv-manager" role="dialog" aria-modal="true" aria-labelledby="gv-manager-title" tabindex="-1">
@@ -221,7 +216,7 @@ export default class GlobalVariablePanel {
                 </section>
                 <main class="gv-manager-body">
                     <aside class="gv-variable-list" aria-label="变量列表">
-                        ${this.loading ? '<div class="gv-loading">正在加载变量...</div>' : listHtml}
+                        ${listHtml}
                     </aside>
                     <section class="gv-detail">
                         ${selected || this.draft ? this.renderEditorHtml() : this.renderEmptyDetailHtml()}
@@ -233,13 +228,13 @@ export default class GlobalVariablePanel {
 
     renderVariableListHtml() {
         if (this.loading) {
-            return '<div class="gv-loading">姝ｅ湪鍔犺浇鍙橀噺...</div>';
+            return '<div class="gv-loading">正在加载变量...</div>';
         }
 
         const valuesById = new Map(this.values.map(item => [String(item.variableId).toLowerCase(), item]));
         const filteredVariables = this.getFilteredVariables();
         if (filteredVariables.length === 0) {
-            return '<div class="gv-empty">娌℃湁绗﹀悎鏉′欢鐨勫彉閲忋€?/div>';
+            return '<div class="gv-empty">没有符合条件的变量。</div>';
         }
 
         return filteredVariables.map(variable => {
@@ -248,9 +243,9 @@ export default class GlobalVariablePanel {
             return `
                     <button type="button" class="gv-variable-row ${sameId(variable.id, this.selectedVariableId) ? 'selected' : ''}" data-action="select" data-variable-id="${escapeHtml(variable.id)}">
                         <span class="gv-variable-name">${escapeHtml(variable.displayName || variable.name)}</span>
-                        <span class="gv-variable-meta">${escapeHtml(variable.name)} 路 ${escapeHtml(getTypeLabel(variable.valueType))}</span>
+                        <span class="gv-variable-meta">${escapeHtml(variable.name)} · ${escapeHtml(getTypeLabel(variable.valueType))}</span>
                         <span class="gv-variable-value">${escapeHtml(formatGlobalVariableValue(current?.value ?? variable.initialValue))}</span>
-                    <span class="gv-variable-source">${source ? '\u7b97\u5b50\u8f93\u51fa' : '\u56fa\u5b9a\u521d\u59cb\u503c'}</span>
+                        <span class="gv-variable-source">${source ? OPERATOR_SOURCE_LABEL : FIXED_SOURCE_LABEL}</span>
                     </button>
                 `;
         }).join('');
@@ -310,8 +305,8 @@ export default class GlobalVariablePanel {
                         </label>
                         ${this.renderInitialValueField(draft)}
                         <div class="gv-two-columns">
-                            ${this.renderTextField('minText', '最小值', draft.minText, '可为空', false, draft.valueType !== 'Int64' && draft.valueType !== 'Double')}
-                            ${this.renderTextField('maxText', '最大值', draft.maxText, '可为空', false, draft.valueType !== 'Int64' && draft.valueType !== 'Double')}
+                            ${this.renderTextField('minText', '最小值', draft.minText, '可为空', false, draft.valueType !== 'Int64' && draft.valueType !== 'Double', 'min')}
+                            ${this.renderTextField('maxText', '最大值', draft.maxText, '可为空', false, draft.valueType !== 'Int64' && draft.valueType !== 'Double', 'max')}
                         </div>
                         <div class="gv-two-columns">
                             <label class="gv-check-field"><input type="checkbox" data-field="manualWriteAllowed" ${draft.manualWriteAllowed ? 'checked' : ''} ${locked ? 'disabled' : ''}> 允许人工写入</label>
@@ -348,12 +343,12 @@ export default class GlobalVariablePanel {
         `;
     }
 
-    renderTextField(field, label, value, placeholder, required = false, disabled = false) {
+    renderTextField(field, label, value, placeholder, required = false, disabled = false, errorKey = field) {
         return `
             <label class="gv-field">
                 <span>${escapeHtml(label)}${required ? ' *' : ''}</span>
                 <input class="form-input" data-field="${escapeHtml(field)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder || '')}" ${disabled || this.isRuntimeLocked() ? 'disabled' : ''}>
-                ${this.renderFieldError(field)}
+                ${this.renderFieldError(errorKey)}
             </label>
         `;
     }
@@ -397,6 +392,32 @@ export default class GlobalVariablePanel {
     renderFieldError(field) {
         const message = this.fieldErrors[field];
         return message ? `<span class="gv-field-error">${escapeHtml(message)}</span>` : '';
+    }
+
+    getFieldErrorKey(field) {
+        switch (field) {
+            case 'initialValueText':
+                return 'initialValue';
+            case 'minText':
+                return 'min';
+            case 'maxText':
+                return 'max';
+            default:
+                return field;
+        }
+    }
+
+    clearFieldErrorForInput(field) {
+        const errorKey = this.getFieldErrorKey(field);
+        if (!Object.prototype.hasOwnProperty.call(this.fieldErrors, errorKey)) {
+            return;
+        }
+
+        const nextErrors = { ...this.fieldErrors };
+        delete nextErrors[errorKey];
+        this.fieldErrors = nextErrors;
+        const input = this.dialog?.querySelector?.(`[data-field="${cssEscape(field)}"]`);
+        input?.closest?.('.gv-field')?.querySelector?.('.gv-field-error')?.remove?.();
     }
 
     renderSourceBindingHtml(binding) {
@@ -509,12 +530,12 @@ export default class GlobalVariablePanel {
             return;
         }
         if (target.id === 'gv-type-filter') {
-            this.filters.type = target.value || '全部类型';
+            this.filters.type = target.value || ALL_TYPES_LABEL;
             this.renderVariableList();
             return;
         }
         if (target.id === 'gv-source-filter') {
-            this.filters.source = target.value || '全部来源';
+            this.filters.source = target.value || ALL_SOURCES_LABEL;
             this.renderVariableList();
             return;
         }
@@ -541,7 +562,7 @@ export default class GlobalVariablePanel {
         }
 
         this.updateDirtyState();
-        this.fieldErrors = {};
+        this.clearFieldErrorForInput(field);
         if (shouldRender) {
             this.renderDialog();
         }
@@ -676,6 +697,7 @@ export default class GlobalVariablePanel {
         }
 
         const nextSchema = prepared.schema;
+        this.fieldErrors = {};
 
         return await this.runMutation('save', async () => {
             const projectId = this.project.id;
@@ -918,9 +940,18 @@ export default class GlobalVariablePanel {
             return result;
         } catch (error) {
             if (this.isConflict(error)) {
-                this.errorMessage = '工程正在运行，变量结构和值不可修改。已重新获取当前状态和值。';
-                this.syncRuntimeStateAfterConflict();
-                await this.refreshValues({ requestId: this.requestSerial, render: false }).catch(() => {});
+                this.errorMessage = '工程正在运行，变量结构和值不可修改。正在重新获取当前状态和值。';
+                const [valuesResult, stateResult] = await Promise.allSettled([
+                    this.refreshValues({ requestId: this.requestSerial, render: false }),
+                    this.syncRuntimeStateAfterConflict(projectId)
+                ]);
+                if (projectId === this.project?.id) {
+                    const valuesOk = valuesResult.status === 'fulfilled';
+                    const stateOk = stateResult.status === 'fulfilled' && stateResult.value;
+                    this.errorMessage = valuesOk && stateOk
+                        ? '工程正在运行，变量结构和值不可修改。已重新获取当前状态和值。'
+                        : '工程正在运行，变量结构和值不可修改。当前状态或值刷新失败，请稍后重试。';
+                }
             } else {
                 this.errorMessage = this.toUserMessage(error, '操作失败。');
             }
@@ -1042,14 +1073,14 @@ export default class GlobalVariablePanel {
         return [...this.schema.variables]
             .sort((left, right) => Number(left.order ?? 0) - Number(right.order ?? 0))
             .filter(variable => {
-                if (this.filters.type !== '全部类型' && getTypeLabel(variable.valueType) !== this.filters.type) {
+                if (this.filters.type !== ALL_TYPES_LABEL && getTypeLabel(variable.valueType) !== this.filters.type) {
                     return false;
                 }
                 const hasSource = Boolean(this.getSourceBinding(variable.id));
-                if (this.filters.source === '固定初始值' && hasSource) {
+                if (this.filters.source === FIXED_SOURCE_LABEL && hasSource) {
                     return false;
                 }
-                if (this.filters.source === '算子输出' && !hasSource) {
+                if (this.filters.source === OPERATOR_SOURCE_LABEL && !hasSource) {
                     return false;
                 }
                 if (!search) {
@@ -1143,11 +1174,22 @@ export default class GlobalVariablePanel {
     }
 
     isRuntimeLocked() {
-        const state = this.options.getRuntimeState?.() || this.runtimeState || inspectionController.getState?.() || {};
-        const status = String(state.status || state.Status || '').toLowerCase();
-        return state.isRunning === true ||
-            state.isRealtime === true ||
-            LOCKED_RUNTIME_STATES.has(status);
+        const states = [
+            this.runtimeState,
+            this.options.getRuntimeState?.(),
+            inspectionController.getState?.()
+        ];
+        return states.some(state => {
+            if (!state) {
+                return false;
+            }
+            const status = String(state.status || state.Status || '').toLowerCase();
+            return state.isBusy === true ||
+                state.IsBusy === true ||
+                state.isRunning === true ||
+                state.isRealtime === true ||
+                LOCKED_RUNTIME_STATES.has(status);
+        });
     }
 
     subscribeRuntimeState() {
@@ -1158,6 +1200,7 @@ export default class GlobalVariablePanel {
 
         this.unsubscribeInspectionState = subscribe(state => {
             const wasLocked = this.isRuntimeLocked();
+            this.stopRuntimeStatePolling({ cancelRequests: true });
             this.runtimeState = state || {};
             const isLocked = this.isRuntimeLocked();
             if (wasLocked !== isLocked || this.isOpen) {
@@ -1166,16 +1209,89 @@ export default class GlobalVariablePanel {
         });
     }
 
-    syncRuntimeStateAfterConflict() {
-        const current = inspectionController.getState?.() || this.runtimeState || {};
-        this.runtimeState = {
-            ...current,
-            isRunning: true,
-            status: String(current.status || '').toLowerCase() || 'running'
-        };
+    async syncRuntimeStateAfterConflict(projectId = this.project?.id, { schedulePoll = true } = {}) {
+        if (!projectId) {
+            return null;
+        }
+
+        const requestId = ++this.runtimeStateRequestSerial;
+        const state = await this.fetchRuntimeState(projectId);
+        if (requestId !== this.runtimeStateRequestSerial || projectId !== this.project?.id) {
+            return null;
+        }
+
+        this.applyRuntimeState(state);
+        if (this.isRuntimeStateBusy(state)) {
+            if (schedulePoll) {
+                this.startRuntimeStatePolling(projectId);
+            }
+        } else {
+            this.stopRuntimeStatePolling();
+        }
+        return state;
+    }
+
+    async fetchRuntimeState(projectId) {
+        if (typeof this.options.fetchRuntimeState === 'function') {
+            return this.options.fetchRuntimeState(projectId);
+        }
+        return inspectionController.fetchRuntimeState(projectId);
+    }
+
+    applyRuntimeState(state) {
+        this.runtimeState = state || {};
+        if (this.isOpen) {
+            this.render();
+        } else {
+            this.render();
+        }
+    }
+
+    isRuntimeStateBusy(state) {
+        if (!state) {
+            return false;
+        }
+        const status = String(state.status || state.Status || '').toLowerCase();
+        return state.isBusy === true ||
+            state.IsBusy === true ||
+            state.isRunning === true ||
+            state.isRealtime === true ||
+            LOCKED_RUNTIME_STATES.has(status);
+    }
+
+    startRuntimeStatePolling(projectId = this.project?.id) {
+        if (!projectId || this.runtimeStatePollTimer !== null) {
+            return;
+        }
+
+        this.runtimeStatePollTimer = window.setTimeout(async () => {
+            this.runtimeStatePollTimer = null;
+            if (!this.isOpen || projectId !== this.project?.id) {
+                return;
+            }
+
+            try {
+                await this.syncRuntimeStateAfterConflict(projectId, { schedulePoll: true });
+            } catch {
+                if (this.isOpen && projectId === this.project?.id) {
+                    this.startRuntimeStatePolling(projectId);
+                }
+            }
+        }, RUNTIME_STATE_POLL_INTERVAL_MS);
+    }
+
+    stopRuntimeStatePolling({ cancelRequests = false } = {}) {
+        if (this.runtimeStatePollTimer !== null) {
+            window.clearTimeout(this.runtimeStatePollTimer);
+            this.runtimeStatePollTimer = null;
+        }
+        if (cancelRequests) {
+            this.runtimeStateRequestSerial += 1;
+        }
     }
 
     destroy() {
+        this.stopRuntimeStatePolling({ cancelRequests: true });
         this.unsubscribeInspectionState?.();
         this.unsubscribeInspectionState = null;
         this.removeDialog();
@@ -1379,6 +1495,13 @@ function formatDataType(value) {
 
 function createUuid() {
     return globalThis.crypto?.randomUUID?.() || `gv-binding-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function cssEscape(value) {
+    if (globalThis.CSS?.escape) {
+        return globalThis.CSS.escape(String(value ?? ''));
+    }
+    return String(value ?? '').replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 }
 
 function escapeHtml(value) {

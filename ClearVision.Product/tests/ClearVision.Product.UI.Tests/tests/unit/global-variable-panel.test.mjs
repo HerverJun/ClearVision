@@ -476,6 +476,8 @@ async function startBrowserHarness(initialState = {}) {
     failResetOne: false,
     failResetAll: false,
     conflictSave: false,
+    runtimeStateCalls: 0,
+    runtimeStates: [{ status: 'Idle', isBusy: false }],
     ...initialState
   };
 
@@ -495,6 +497,19 @@ async function startBrowserHarness(initialState = {}) {
 
   const server = http.createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
+    if (/^\/api\/inspection\/realtime\/[^/]+\/state$/.test(url.pathname) && request.method === 'GET') {
+      const index = Math.min(state.runtimeStateCalls, state.runtimeStates.length - 1);
+      state.runtimeStateCalls += 1;
+      return sendJson(response, 200, {
+        projectId: url.pathname.split('/').at(-2),
+        sessionId: 'session-runtime',
+        startedAt: '2026-06-20T00:00:00Z',
+        stoppedAt: state.runtimeStates[index]?.status === 'Stopped' || state.runtimeStates[index]?.status === 'Faulted'
+          ? '2026-06-20T00:00:01Z'
+          : null,
+        ...state.runtimeStates[index]
+      });
+    }
     if (url.pathname.startsWith('/api/projects/')) {
       if (url.pathname.endsWith('/global-variable-values') && request.method === 'GET') {
         return state.failValues ? sendJson(response, 500, { error: 'values failed' }) : sendJson(response, 200, state.values);
@@ -607,6 +622,15 @@ async function getBrowserPanelState(page) {
   }));
 }
 
+async function getFieldErrorText(page, field) {
+  return await page.evaluate(fieldName =>
+    document.querySelector(`[data-field="${fieldName}"]`)
+      ?.closest('.gv-field')
+      ?.querySelector('.gv-field-error')
+      ?.textContent
+      ?.trim() || '', field);
+}
+
 test('browser interaction keeps original draft, schema and selection when new variable is cancelled', async () => {
   const harness = await startBrowserHarness();
   try {
@@ -705,6 +729,54 @@ test('browser interaction deletes the last variable and saves an empty schema', 
   }
 });
 
+test('browser interaction renders search and filters with clean Chinese list markup', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject();
+    await setupGlobalVariablePanel(harness.page, project);
+
+    const root = path.resolve(process.cwd(), '../../..');
+    const panelSource = fs.readFileSync(path.join(root, 'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js'), 'utf8');
+    assert.doesNotMatch(panelSource, /\?\/div>| 路 |姝ｅ湪鍔犺浇|娌℃湁绗﹀悎/);
+    assert.equal((panelSource.match(/filteredVariables\.map\(variable =>/g) || []).length, 1);
+
+    let list = await harness.page.locator('.gv-variable-list').innerHTML();
+    assert.match(list, /judge\.expected_count · 整数/);
+    assert.doesNotMatch(list, /\?\/div>| 路 |姝ｅ湪鍔犺浇|娌℃湁绗﹀悎/);
+    assert.equal(await harness.page.locator('.gv-variable-row').count(), 2);
+
+    await harness.page.fill('#gv-search', 'expected');
+    assert.equal(await harness.page.locator('.gv-variable-row').count(), 1);
+    assert.match(await harness.page.locator('.gv-variable-list').textContent(), /judge\.expected_count · 整数/);
+
+    await harness.page.fill('#gv-search', 'missing');
+    assert.equal(await harness.page.locator('.gv-variable-row').count(), 0);
+    assert.match(await harness.page.locator('.gv-variable-list').textContent(), /没有符合条件的变量。/);
+    list = await harness.page.locator('.gv-variable-list').innerHTML();
+    assert.doesNotMatch(list, /\?\/div>| 路 /);
+
+    await harness.page.fill('#gv-search', '');
+    await harness.page.selectOption('#gv-type-filter', { label: '文本' });
+    assert.equal(await harness.page.locator('.gv-variable-row').count(), 1);
+    assert.match(await harness.page.locator('.gv-variable-list').textContent(), /temp\.value · 文本/);
+
+    await harness.page.selectOption('#gv-type-filter', { label: '全部类型' });
+    await harness.page.selectOption('#gv-source-filter', { label: '算子输出' });
+    assert.equal(await harness.page.locator('.gv-variable-row').count(), 1);
+    assert.match(await harness.page.locator('.gv-variable-list').textContent(), /judge\.expected_count · 整数/);
+
+    await harness.page.selectOption('#gv-source-filter', { label: '固定初始值' });
+    assert.equal(await harness.page.locator('.gv-variable-row').count(), 1);
+    assert.match(await harness.page.locator('.gv-variable-list').textContent(), /temp\.value · 文本/);
+
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.selectedVariableId, 'var-count');
+    assert.equal(state.draft.id, 'var-count');
+  } finally {
+    await harness.close();
+  }
+});
+
 test('browser interaction keeps search focus and toggles runtime readonly state without dropping draft', async () => {
   const harness = await startBrowserHarness();
   try {
@@ -740,9 +812,78 @@ test('browser interaction keeps search focus and toggles runtime readonly state 
   }
 });
 
+test('browser interaction recovers from a 409 using real runtime state polling without dropping draft', async () => {
+  const harness = await startBrowserHarness({
+    conflictSave: true,
+    values: [{ variableId: 'var-count', value: 9, version: 9 }],
+    runtimeStates: [
+      { status: 'Running', isBusy: true },
+      { status: 'Stopped', isBusy: false }
+    ]
+  });
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project);
+
+    await harness.page.fill('input[data-field="displayName"]', 'Conflict Draft');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => document.querySelector('input[data-field="displayName"]')?.disabled === true);
+    await harness.page.waitForFunction(() => document.querySelector('input[data-field="displayName"]')?.disabled === false, { timeout: 5000 });
+
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.draft.displayName, 'Conflict Draft');
+    assert.equal(state.dirty, true);
+    assert.equal(state.values[0].version, 9);
+    assert.equal(state.locked, false);
+    assert.equal(harness.state.runtimeStateCalls, 2);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction cancels runtime state polling on project switch and destroy', async () => {
+  const harness = await startBrowserHarness({
+    conflictSave: true,
+    runtimeStates: [
+      { status: 'Running', isBusy: true },
+      { status: 'Running', isBusy: true },
+      { status: 'Running', isBusy: true }
+    ]
+  });
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project);
+
+    await harness.page.fill('input[data-field="displayName"]', 'Switch Draft');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => window.__panel.runtimeStatePollTimer !== null);
+    assert.equal(harness.state.runtimeStateCalls, 1);
+
+    await harness.page.evaluate(async project => {
+      const nextProject = structuredClone(project);
+      nextProject.id = 'project-next';
+      await window.__panel.setProject(nextProject);
+    }, project);
+    await harness.page.waitForTimeout(1800);
+    assert.equal(harness.state.runtimeStateCalls, 1);
+
+    await harness.page.fill('input[data-field="displayName"]', 'Destroy Draft');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => window.__panel.runtimeStatePollTimer !== null);
+    assert.equal(harness.state.runtimeStateCalls, 2);
+
+    await harness.page.evaluate(() => window.__panel.destroy());
+    await harness.page.waitForTimeout(1800);
+    assert.equal(harness.state.runtimeStateCalls, 2);
+  } finally {
+    await harness.close();
+  }
+});
+
 test('browser interaction refreshes values and locks after a 409 without dropping draft', async () => {
   const harness = await startBrowserHarness({
-    values: [{ variableId: 'var-count', value: 9, version: 9 }]
+    values: [{ variableId: 'var-count', value: 9, version: 9 }],
+    runtimeStates: [{ status: 'Running', isBusy: true }]
   });
   try {
     const project = createInteractiveProject({ single: true });
@@ -758,6 +899,41 @@ test('browser interaction refreshes values and locks after a 409 without droppin
     assert.equal(state.dirty, true);
     assert.equal(state.values[0].version, 9);
     assert.equal(state.locked, true);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction maps Min and Max validation errors to the matching fields', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project);
+
+    await harness.page.fill('input[data-field="minText"]', 'abc');
+    await harness.page.fill('input[data-field="maxText"]', '9007199254740992');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => Boolean(window.__panel.fieldErrors.min && window.__panel.fieldErrors.max));
+
+    assert.match(await getFieldErrorText(harness.page, 'minText'), /请输入整数。/);
+    assert.match(await getFieldErrorText(harness.page, 'maxText'), /超出前端安全整数范围/);
+
+    await harness.page.fill('input[data-field="minText"]', '0');
+    assert.equal(await getFieldErrorText(harness.page, 'minText'), '');
+    assert.match(await getFieldErrorText(harness.page, 'maxText'), /超出前端安全整数范围/);
+
+    await harness.page.fill('input[data-field="maxText"]', '-1');
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => /最大值/.test(window.__panel.fieldErrors.max || ''));
+    assert.match(await getFieldErrorText(harness.page, 'maxText'), /最大值必须大于或等于最小值。/);
+
+    await harness.page.fill('input[data-field="maxText"]', '10');
+    assert.equal(await getFieldErrorText(harness.page, 'maxText'), '');
+    assert.match(await harness.page.evaluate(() => window.__panel.fieldErrors.initialValue || ''), /初始值不能大于最大值。/);
+
+    await harness.page.click('[data-action="save"]');
+    await harness.page.waitForFunction(() => window.__panel.dirty === false);
+    assert.deepEqual(await harness.page.evaluate(() => window.__panel.fieldErrors), {});
   } finally {
     await harness.close();
   }

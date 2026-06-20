@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Services;
@@ -19,6 +20,94 @@ namespace ClearVision.Product.Desktop.Tests;
 
 public class InspectionEventEndpointsTests
 {
+    [Fact]
+    public async Task StateEndpoint_ReturnsIdle_WhenNoSessionExists()
+    {
+        await using var host = await InspectionEventTestHost.CreateAsync();
+        var projectId = Guid.NewGuid();
+
+        using var response = await host.Client.GetAsync($"/api/inspection/realtime/{projectId}/state");
+        var state = await ReadJsonObjectAsync(response);
+
+        response.EnsureSuccessStatusCode();
+        state.GetProperty("projectId").GetGuid().Should().Be(projectId);
+        state.GetProperty("status").GetString().Should().Be("Idle");
+        state.GetProperty("isBusy").GetBoolean().Should().BeFalse();
+        state.GetProperty("sessionId").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Theory]
+    [InlineData(RuntimeStatus.Starting)]
+    [InlineData(RuntimeStatus.Running)]
+    [InlineData(RuntimeStatus.Stopping)]
+    public async Task StateEndpoint_ReturnsBusy_ForActiveRuntimeStates(RuntimeStatus status)
+    {
+        await using var host = await InspectionEventTestHost.CreateAsync();
+        var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        await host.Coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
+        if (status is RuntimeStatus.Running or RuntimeStatus.Stopping)
+        {
+            host.Coordinator.UpdateSessionStatus(projectId, sessionId, status);
+        }
+
+        using var response = await host.Client.GetAsync($"/api/inspection/realtime/{projectId}/state");
+        var state = await ReadJsonObjectAsync(response);
+
+        response.EnsureSuccessStatusCode();
+        state.GetProperty("projectId").GetGuid().Should().Be(projectId);
+        state.GetProperty("status").GetString().Should().Be(status.ToString());
+        state.GetProperty("isBusy").GetBoolean().Should().BeTrue();
+        state.GetProperty("sessionId").GetGuid().Should().Be(sessionId);
+    }
+
+    [Theory]
+    [InlineData(RuntimeStatus.Stopped)]
+    [InlineData(RuntimeStatus.Faulted)]
+    public async Task StateEndpoint_ReturnsNotBusy_ForTerminalRuntimeStates(RuntimeStatus status)
+    {
+        await using var host = await InspectionEventTestHost.CreateAsync();
+        var projectId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+
+        await host.Coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
+        if (status == RuntimeStatus.Stopped)
+        {
+            host.Coordinator.MarkAsStopped(projectId, sessionId);
+        }
+        else
+        {
+            host.Coordinator.MarkAsFaulted(projectId, sessionId, "boom");
+        }
+
+        using var response = await host.Client.GetAsync($"/api/inspection/realtime/{projectId}/state");
+        var state = await ReadJsonObjectAsync(response);
+
+        response.EnsureSuccessStatusCode();
+        state.GetProperty("status").GetString().Should().Be(status.ToString());
+        state.GetProperty("isBusy").GetBoolean().Should().BeFalse();
+        state.GetProperty("sessionId").GetGuid().Should().Be(sessionId);
+    }
+
+    [Fact]
+    public async Task StateEndpoint_ReturnsIdle_ForUnknownProject()
+    {
+        await using var host = await InspectionEventTestHost.CreateAsync();
+        var knownProjectId = Guid.NewGuid();
+        var unknownProjectId = Guid.NewGuid();
+
+        await host.Coordinator.TryStartAsync(knownProjectId, Guid.NewGuid(), CancellationToken.None);
+
+        using var response = await host.Client.GetAsync($"/api/inspection/realtime/{unknownProjectId}/state");
+        var state = await ReadJsonObjectAsync(response);
+
+        response.EnsureSuccessStatusCode();
+        state.GetProperty("projectId").GetGuid().Should().Be(unknownProjectId);
+        state.GetProperty("status").GetString().Should().Be("Idle");
+        state.GetProperty("isBusy").GetBoolean().Should().BeFalse();
+    }
+
     [Fact]
     public async Task EventsEndpoint_StreamsLiveEvents_AsSseFrames()
     {
@@ -168,6 +257,13 @@ public class InspectionEventEndpointsTests
         }
 
         return builder.ToString();
+    }
+
+    private static async Task<JsonElement> ReadJsonObjectAsync(HttpResponseMessage response)
+    {
+        var json = await response.Content.ReadAsStringAsync();
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
     }
 
     private static async Task<string> ReadUntilContainsAllAsync(Stream stream, TimeSpan timeout, params string[] markers)

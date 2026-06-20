@@ -30,6 +30,10 @@ public static class InspectionEventEndpoints
 
     public static IEndpointRouteBuilder MapInspectionEventEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapGet("/api/inspection/realtime/{projectId:guid}/state", (
+            Guid projectId,
+            IInspectionRuntimeCoordinator coordinator) =>
+            Results.Ok(ToRuntimeStateDto(projectId, coordinator.GetState(projectId))));
         app.MapGet("/api/inspection/realtime/{projectId:guid}/events", HandleSseEventsAsync);
         app.MapGet("/api/inspection/realtime/diagnostics", () => Results.Ok(new
         {
@@ -38,6 +42,33 @@ public static class InspectionEventEndpoints
             channelCapacity = ResolveSseChannelCapacity()
         }));
         return app;
+    }
+
+    private static object ToRuntimeStateDto(Guid projectId, RuntimeState? state)
+    {
+        if (state is null)
+        {
+            return new
+            {
+                ProjectId = projectId,
+                Status = "Idle",
+                IsBusy = false,
+                SessionId = (Guid?)null,
+                StartedAt = (DateTime?)null,
+                StoppedAt = (DateTime?)null
+            };
+        }
+
+        var isBusy = state.Status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping;
+        return new
+        {
+            state.ProjectId,
+            Status = state.Status.ToString(),
+            IsBusy = isBusy,
+            SessionId = (Guid?)state.SessionId,
+            state.StartedAt,
+            state.StoppedAt
+        };
     }
 
     private static async Task HandleSseEventsAsync(

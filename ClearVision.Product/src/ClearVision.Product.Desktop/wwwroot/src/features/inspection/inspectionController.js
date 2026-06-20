@@ -40,6 +40,7 @@ const LIGHTWEIGHT_RESULT_OBJECT_FIELD_LIMIT = 48;
 const LIGHTWEIGHT_RESULT_STRING_LIMIT = 512;
 const LIGHTWEIGHT_RESULT_MAX_DEPTH = 3;
 const LIGHTWEIGHT_RESULT_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
+const LOCKED_RUNTIME_STATES_FOR_SNAPSHOT = new Set(['starting', 'running', 'stopping']);
 
 function getInlineResultImageBase64(result) {
     if (!result || typeof result !== 'object') {
@@ -1150,6 +1151,15 @@ class InspectionController {
         return getInspectionState();
     }
 
+    async fetchRuntimeState(projectId = this.projectId) {
+        if (!projectId) {
+            return this.normalizeRuntimeStateSnapshot(null, projectId);
+        }
+
+        const payload = await httpClient.get(`/inspection/realtime/${projectId}/state`);
+        return this.normalizeRuntimeStateSnapshot(payload, projectId);
+    }
+
     subscribeState(callback) {
         return subscribeInspectionState(callback);
     }
@@ -1204,6 +1214,21 @@ class InspectionController {
             default:
                 return normalized;
         }
+    }
+
+    normalizeRuntimeStateSnapshot(payload, projectId = null) {
+        const status = this.normalizeRuntimeState(payload?.status ?? payload?.Status ?? 'Idle');
+        const isBusy = Boolean(payload?.isBusy ?? payload?.IsBusy ?? LOCKED_RUNTIME_STATES_FOR_SNAPSHOT.has(status));
+        return {
+            projectId: payload?.projectId ?? payload?.ProjectId ?? projectId ?? null,
+            status,
+            isBusy,
+            isRunning: isBusy,
+            isRealtime: isBusy,
+            sessionId: payload?.sessionId ?? payload?.SessionId ?? null,
+            startedAt: payload?.startedAt ?? payload?.StartedAt ?? null,
+            stoppedAt: payload?.stoppedAt ?? payload?.StoppedAt ?? null
+        };
     }
 
     normalizeResultPayload(result) {
