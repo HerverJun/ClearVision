@@ -12,6 +12,7 @@ import { buildSseHeaders, parseSseFrame } from './inspectionSseClient.mjs';
 
 // 检测状态
 const [getInspectionState, setInspectionState, subscribeInspectionState] = createSignal({
+    projectId: null,
     isRunning: false,
     isRealtime: false,
     progress: 0,
@@ -41,6 +42,10 @@ const LIGHTWEIGHT_RESULT_STRING_LIMIT = 512;
 const LIGHTWEIGHT_RESULT_MAX_DEPTH = 3;
 const LIGHTWEIGHT_RESULT_IMAGE_KEY_PATTERN = /(image|bitmap|preview|thumbnail|base64|mask)/i;
 const LOCKED_RUNTIME_STATES_FOR_SNAPSHOT = new Set(['starting', 'running', 'stopping']);
+
+function readProjectId(payload, fallback = null) {
+    return payload?.projectId ?? payload?.ProjectId ?? fallback ?? null;
+}
 
 function getInlineResultImageBase64(result) {
     if (!result || typeof result !== 'object') {
@@ -629,11 +634,7 @@ class InspectionController {
         switch (eventName) {
             case 'initialState':
                 debugInspectionLog('[InspectionController] SSE 初始状态:', payload);
-                setInspectionState({
-                    ...getInspectionState(),
-                    isRealtime: payload.status === 'Running' || payload.status === 'Starting',
-                    status: this.normalizeRuntimeState(payload.status)
-                });
+                this.applyRuntimeStateSnapshot(payload);
                 break;
             case 'stateChanged':
                 debugInspectionLog('[InspectionController] SSE 状态变更:', payload);
@@ -679,10 +680,9 @@ class InspectionController {
      * 【架构修复 v2】处理状态变更
      */
     handleStateChanged(data) {
-        setInspectionState({
-            ...getInspectionState(),
-            isRealtime: data.newState === 'Running' || data.newState === 'Starting',
-            status: this.normalizeRuntimeState(data.newState)
+        this.applyRuntimeStateSnapshot({
+            ...data,
+            status: data.status ?? data.Status ?? data.newState ?? data.NewState
         });
 
         if (data.newState === 'Faulted') {
@@ -743,6 +743,7 @@ class InspectionController {
 
         setInspectionState({
             ...getInspectionState(),
+            projectId: this.projectId,
             isRunning: true,
             progress: 0,
             status: 'running'
@@ -860,8 +861,15 @@ class InspectionController {
      * 停止实时检测
      */
     async stopRealtime() {
+        const stoppedProjectId = this.projectId;
         try {
-            await httpClient.post('/inspection/realtime/stop', { projectId: this.projectId });
+            await httpClient.post('/inspection/realtime/stop', { projectId: stoppedProjectId });
+            this.applyRuntimeStateSnapshot({
+                projectId: stoppedProjectId,
+                status: 'Stopped',
+                isBusy: false,
+                stoppedAt: new Date().toISOString()
+            });
             
             if (this.abortController) {
                 this.abortController.abort();
@@ -1007,7 +1015,9 @@ class InspectionController {
 
         setInspectionState({
             ...getInspectionState(),
+            projectId: normalizedResult.projectId ?? this.projectId,
             isRunning: false,
+            isRealtime: false,
             progress: 100,
             status: normalizedResult.status === 'Error' ? 'error' : 'completed'
         });
@@ -1037,6 +1047,7 @@ class InspectionController {
     handleInspectionError(error) {
         setInspectionState({
             ...getInspectionState(),
+            projectId: this.projectId,
             isRunning: false,
             isRealtime: false,
             status: 'error'
@@ -1216,11 +1227,20 @@ class InspectionController {
         }
     }
 
+    applyRuntimeStateSnapshot(payload) {
+        const snapshot = this.normalizeRuntimeStateSnapshot(payload, readProjectId(payload, this.projectId));
+        setInspectionState({
+            ...getInspectionState(),
+            ...snapshot
+        });
+        return snapshot;
+    }
+
     normalizeRuntimeStateSnapshot(payload, projectId = null) {
         const status = this.normalizeRuntimeState(payload?.status ?? payload?.Status ?? 'Idle');
         const isBusy = Boolean(payload?.isBusy ?? payload?.IsBusy ?? LOCKED_RUNTIME_STATES_FOR_SNAPSHOT.has(status));
         return {
-            projectId: payload?.projectId ?? payload?.ProjectId ?? projectId ?? null,
+            projectId: readProjectId(payload, projectId),
             status,
             isBusy,
             isRunning: isBusy,

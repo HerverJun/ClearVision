@@ -5,6 +5,29 @@ import http from 'node:http';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
+const PRODUCTION_CSS_FILES = [
+  'src/shared/styles/variables.css',
+  'src/shared/styles/main.css',
+  'src/shared/styles/ui-components.css',
+  'src/shared/styles/settings.css',
+  'src/shared/styles/property-panel.css',
+  'src/shared/styles/global-variables.css',
+  'src/shared/styles/property-panel-enhancements.css',
+  'src/shared/styles/project-view.css',
+  'src/shared/styles/global-enhancements.css',
+  'src/shared/styles/settings-view-override.css',
+  'src/shared/styles/operator-library.css',
+  'src/features/settings/userManagement.css',
+  'src/shared/styles/ai-panel.css',
+  'src/shared/styles/sprint-c-enhancements.css',
+  'src/shared/styles/analysisCards.css',
+  'src/shared/styles/inspection.css',
+  'src/shared/styles/results.css',
+  'src/shared/styles/stations.css',
+  'src/shared/styles/visual-upgrade.css',
+  'css/planarScaleOffsetCalibWizard.css'
+];
+
 function createElementStub() {
   return {
     innerHTML: '',
@@ -310,7 +333,7 @@ test('running states disable schema and value mutations and 409 refreshes values
   };
 
   const panel = new GlobalVariablePanel('global-variables-root', {
-    getRuntimeState: () => ({ status: 'Running' }),
+    getRuntimeState: () => ({ projectId: project.id, status: 'Running' }),
     showToast() {}
   });
   panel.project = project;
@@ -536,7 +559,24 @@ async function startBrowserHarness(initialState = {}) {
 
     if (url.pathname === '/' || url.pathname === '/harness.html') {
       response.writeHead(200, { 'content-type': 'text/html' });
-      response.end('<!doctype html><meta charset="utf-8"><script>window.__API_BASE_URL__=location.origin+"/api";</script><div id="global-variables-root"></div><div id="property-root"></div>');
+      response.end(`<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>window.__API_BASE_URL__=location.origin+"/api";</script>
+  ${PRODUCTION_CSS_FILES.map(file => `<link rel="stylesheet" href="/${file}">`).join('\n  ')}
+  <style>
+    body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: var(--workspace-bg); }
+    body::before { content: ""; position: fixed; inset: 0; background-image: radial-gradient(circle at 1px 1px, rgba(100,116,139,.28) 1px, transparent 0); background-size: 20px 20px; }
+    #global-variables-root { position: fixed; right: 24px; top: 56px; width: 260px; z-index: 10; }
+  </style>
+</head>
+<body>
+  <div id="global-variables-root"></div>
+  <div id="property-root"></div>
+</body>
+</html>`);
       return;
     }
 
@@ -547,7 +587,10 @@ async function startBrowserHarness(initialState = {}) {
       response.end('not found');
       return;
     }
-    response.writeHead(200, { 'content-type': filePath.endsWith('.js') || filePath.endsWith('.mjs') ? 'text/javascript' : 'text/plain' });
+    const type = filePath.endsWith('.js') || filePath.endsWith('.mjs')
+      ? 'text/javascript'
+      : (filePath.endsWith('.css') ? 'text/css' : 'text/plain');
+    response.writeHead(200, { 'content-type': type });
     fs.createReadStream(filePath).pipe(response);
   });
 
@@ -568,6 +611,12 @@ async function startBrowserHarness(initialState = {}) {
 
 async function setupGlobalVariablePanel(page, project, { choices = [], runtime = false } = {}) {
   await page.evaluate(async ({ project, choices, runtime }) => {
+    window.__panel?.destroy?.();
+    document.querySelectorAll('.gv-manager-overlay, .gv-choice-overlay').forEach(node => node.remove());
+    const host = document.getElementById('global-variables-root');
+    if (host) {
+      host.innerHTML = '';
+    }
     const [panelModule, projectModule, serviceModule] = await Promise.all([
       import('/src/features/global-variables/globalVariablePanel.js'),
       import('/src/features/project/projectManager.js'),
@@ -593,7 +642,7 @@ async function setupGlobalVariablePanel(page, project, { choices = [], runtime =
     if (runtime) {
       options.subscribeRuntimeState = callback => {
         window.__runtimeSubscribers.push(callback);
-        callback({ status: 'idle', isRunning: false, isRealtime: false });
+        callback({ projectId: project.id, status: 'idle', isRunning: false, isRealtime: false });
         return () => {
           window.__runtimeSubscribers = window.__runtimeSubscribers.filter(item => item !== callback);
         };
@@ -631,6 +680,77 @@ async function getFieldErrorText(page, field) {
       ?.trim() || '', field);
 }
 
+function alphaFromCssColor(value) {
+  const match = String(value || '').match(/rgba?\(([^)]+)\)/i);
+  if (!match) {
+    return 1;
+  }
+  const parts = match[1].split(',').map(part => part.trim());
+  return parts.length >= 4 ? Number(parts[3]) : 1;
+}
+
+function overlaps(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+async function getVisualMetrics(page) {
+  return await page.evaluate(() => {
+    const rectOf = selector => {
+      const node = document.querySelector(selector);
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height
+      };
+    };
+    const manager = document.querySelector('.gv-manager');
+    const detail = document.querySelector('.gv-detail');
+    const save = document.querySelector('[data-action="save"]');
+    const newButton = document.querySelector('[data-action="new"]');
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      manager: rectOf('.gv-manager'),
+      header: rectOf('.gv-manager-header'),
+      toolbar: rectOf('.gv-toolbar'),
+      list: rectOf('.gv-variable-list'),
+      detail: rectOf('.gv-detail'),
+      managerBackground: getComputedStyle(manager).backgroundColor,
+      managerClientWidth: manager?.clientWidth ?? 0,
+      managerScrollWidth: manager?.scrollWidth ?? 0,
+      detailClientWidth: detail?.clientWidth ?? 0,
+      detailScrollWidth: detail?.scrollWidth ?? 0,
+      detailClientHeight: detail?.clientHeight ?? 0,
+      detailScrollHeight: detail?.scrollHeight ?? 0,
+      emptyCount: document.querySelectorAll('.gv-empty').length,
+      variableRows: document.querySelectorAll('.gv-variable-row').length,
+      saveButtons: [...document.querySelectorAll('[data-action="save"]')].map(button => ({ disabled: button.disabled })),
+      resetAllDisabled: document.querySelector('[data-action="reset-all"]')?.disabled ?? null,
+      newButton: newButton ? {
+        disabled: newButton.disabled,
+        rect: (() => {
+          const rect = newButton.getBoundingClientRect();
+          return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
+        })()
+      } : null,
+      saveButton: save ? {
+        disabled: save.disabled,
+        rect: (() => {
+          const rect = save.getBoundingClientRect();
+          return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
+        })()
+      } : null
+    };
+  });
+}
+
 test('browser interaction keeps original draft, schema and selection when new variable is cancelled', async () => {
   const harness = await startBrowserHarness();
   try {
@@ -643,6 +763,74 @@ test('browser interaction keeps original draft, schema and selection when new va
     assert.equal(state.draft.displayName, 'Edited Count');
     assert.equal(state.schema.variables.find(item => item.id === 'var-count').displayName, project.globalVariables.variables[0].displayName);
     assert.equal(state.dirty, true);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser visual layout uses production CSS and keeps modal opaque inside viewport', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const project = createInteractiveProject();
+    const viewports = [
+      { width: 1564, height: 314 },
+      { width: 1366, height: 768 },
+      { width: 1024, height: 600 }
+    ];
+    for (const viewport of viewports) {
+      for (const theme of ['light', 'dark']) {
+        await harness.page.setViewportSize(viewport);
+        await setupGlobalVariablePanel(harness.page, project);
+        await harness.page.evaluate(themeName => {
+          document.documentElement.dataset.theme = themeName;
+          document.documentElement.style.colorScheme = themeName;
+        }, theme);
+        const metrics = await getVisualMetrics(harness.page);
+        assert.equal(alphaFromCssColor(metrics.managerBackground), 1);
+        assert.ok(metrics.manager.left >= 0);
+        assert.ok(metrics.manager.top >= 0);
+        assert.ok(metrics.manager.right <= metrics.viewport.width);
+        assert.ok(metrics.manager.bottom <= metrics.viewport.height);
+        assert.equal(overlaps(metrics.header, metrics.toolbar), false);
+        assert.equal(overlaps(metrics.toolbar, metrics.list), false);
+        assert.equal(overlaps(metrics.toolbar, metrics.detail), false);
+        assert.ok(metrics.managerScrollWidth <= metrics.managerClientWidth + 1);
+        assert.ok(metrics.detailScrollWidth <= metrics.detailClientWidth + 1);
+        if (viewport.height === 314) {
+          assert.ok(metrics.detailScrollHeight > metrics.detailClientHeight);
+          assert.ok(metrics.saveButton.rect.top >= 0 && metrics.saveButton.rect.bottom <= metrics.viewport.height);
+        }
+      }
+    }
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser visual layout distinguishes zero variables from search without results', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    await harness.page.setViewportSize({ width: 1564, height: 314 });
+    const emptyProject = createInteractiveProject({ single: true });
+    emptyProject.globalVariables.variables = [];
+    emptyProject.globalVariables.sourceBindings = [];
+    emptyProject.globalVariables.targetBindings = [];
+    await setupGlobalVariablePanel(harness.page, emptyProject);
+    let metrics = await getVisualMetrics(harness.page);
+    assert.equal(metrics.emptyCount, 1);
+    assert.equal(metrics.variableRows, 0);
+    assert.equal(metrics.saveButtons.length, 0);
+    assert.equal(metrics.resetAllDisabled, true);
+    assert.ok(metrics.newButton);
+    assert.equal(metrics.newButton.disabled, false);
+    assert.ok(metrics.newButton.rect.top >= 0 && metrics.newButton.rect.bottom <= metrics.viewport.height);
+
+    await setupGlobalVariablePanel(harness.page, createInteractiveProject());
+    await harness.page.fill('#gv-search', 'no-matching-variable');
+    metrics = await getVisualMetrics(harness.page);
+    assert.equal(metrics.variableRows, 0);
+    assert.equal(metrics.emptyCount, 1);
+    assert.equal(metrics.saveButtons.length, 1);
   } finally {
     await harness.close();
   }
@@ -793,7 +981,7 @@ test('browser interaction keeps search focus and toggles runtime readonly state 
 
     await harness.page.fill('input[data-field="displayName"]', 'Runtime Draft');
     await harness.page.evaluate(() => {
-      window.__runtimeSubscribers.forEach(callback => callback({ status: 'running', isRunning: true, isRealtime: false }));
+      window.__runtimeSubscribers.forEach(callback => callback({ projectId: window.__panel.project.id, status: 'running', isRunning: true, isRealtime: false }));
     });
     await harness.page.waitForFunction(() => document.querySelector('input[data-field="displayName"]')?.disabled === true);
     state = await getBrowserPanelState(harness.page);
@@ -801,7 +989,7 @@ test('browser interaction keeps search focus and toggles runtime readonly state 
     assert.equal(state.locked, true);
 
     await harness.page.evaluate(() => {
-      window.__runtimeSubscribers.forEach(callback => callback({ status: 'idle', isRunning: false, isRealtime: false }));
+      window.__runtimeSubscribers.forEach(callback => callback({ projectId: window.__panel.project.id, status: 'idle', isRunning: false, isRealtime: false }));
     });
     await harness.page.waitForFunction(() => document.querySelector('input[data-field="displayName"]')?.disabled === false);
     state = await getBrowserPanelState(harness.page);
@@ -836,6 +1024,65 @@ test('browser interaction recovers from a 409 using real runtime state polling w
     assert.equal(state.values[0].version, 9);
     assert.equal(state.locked, false);
     assert.equal(harness.state.runtimeStateCalls, 2);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction treats project runtime endpoint as authority over stale local running state', async () => {
+  const harness = await startBrowserHarness({
+    runtimeStates: [
+      { status: 'Stopped', isBusy: false }
+    ]
+  });
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project, { runtime: true });
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({
+        projectId: window.__panel.project.id,
+        status: 'running',
+        isRunning: true,
+        isRealtime: true
+      }));
+    });
+    await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === true);
+    await harness.page.evaluate(async () => {
+      await window.__panel.syncRuntimeStateAfterConflict(window.__panel.project.id, { schedulePoll: true });
+    });
+    await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === false);
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.locked, false);
+    assert.equal(harness.state.runtimeStateCalls, 1);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction ignores running state from previous project after switching to an idle project', async () => {
+  const harness = await startBrowserHarness();
+  try {
+    const projectA = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, projectA, { runtime: true });
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({
+        projectId: window.__panel.project.id,
+        status: 'running',
+        isRunning: true,
+        isRealtime: true
+      }));
+    });
+    await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === true);
+
+    const projectB = createInteractiveProject({ single: true });
+    projectB.id = 'project-b-idle';
+    await harness.page.evaluate(async nextProject => {
+      await window.__panel.setProject(nextProject);
+    }, projectB);
+
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.locked, false);
+    assert.equal(state.projectSchema.variables.length, 1);
   } finally {
     await harness.close();
   }
