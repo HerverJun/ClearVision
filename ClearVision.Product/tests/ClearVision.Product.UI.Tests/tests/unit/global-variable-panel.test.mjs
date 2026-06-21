@@ -523,14 +523,23 @@ async function startBrowserHarness(initialState = {}) {
     if (/^\/api\/inspection\/realtime\/[^/]+\/state$/.test(url.pathname) && request.method === 'GET') {
       const index = Math.min(state.runtimeStateCalls, state.runtimeStates.length - 1);
       state.runtimeStateCalls += 1;
+      const runtimeState = state.runtimeStates[index] || {};
+      if (runtimeState.delayMs) {
+        await new Promise(resolve => setTimeout(resolve, runtimeState.delayMs));
+      }
+      if (runtimeState.fail || runtimeState.errorStatus) {
+        return sendJson(response, runtimeState.errorStatus || 500, {
+          error: runtimeState.errorMessage || 'state failed'
+        });
+      }
       return sendJson(response, 200, {
         projectId: url.pathname.split('/').at(-2),
-        sessionId: 'session-runtime',
+        sessionId: runtimeState.sessionId || 'session-runtime',
         startedAt: '2026-06-20T00:00:00Z',
-        stoppedAt: state.runtimeStates[index]?.status === 'Stopped' || state.runtimeStates[index]?.status === 'Faulted'
+        stoppedAt: runtimeState.status === 'Stopped' || runtimeState.status === 'Faulted'
           ? '2026-06-20T00:00:01Z'
           : null,
-        ...state.runtimeStates[index]
+        ...runtimeState
       });
     }
     if (url.pathname.startsWith('/api/projects/')) {
@@ -609,8 +618,8 @@ async function startBrowserHarness(initialState = {}) {
   };
 }
 
-async function setupGlobalVariablePanel(page, project, { choices = [], runtime = false } = {}) {
-  await page.evaluate(async ({ project, choices, runtime }) => {
+async function setupGlobalVariablePanel(page, project, { choices = [], runtime = false, open = true, waitForRuntimeState = true } = {}) {
+  await page.evaluate(async ({ project, choices, runtime, open }) => {
     window.__panel?.destroy?.();
     document.querySelectorAll('.gv-manager-overlay, .gv-choice-overlay').forEach(node => node.remove());
     const host = document.getElementById('global-variables-root');
@@ -651,8 +660,13 @@ async function setupGlobalVariablePanel(page, project, { choices = [], runtime =
     const panel = new panelModule.default('global-variables-root', options);
     window.__panel = panel;
     await panel.setProject(projectManager.currentProject);
-    panel.openManager();
-  }, { project, choices, runtime });
+    if (open) {
+      panel.openManager();
+    }
+  }, { project, choices, runtime, open });
+  if (open && waitForRuntimeState) {
+    await page.waitForFunction(() => window.__panel?.runtimeStateLoading === false);
+  }
 }
 
 async function getBrowserPanelState(page) {
@@ -1039,8 +1053,9 @@ test('browser interaction recovers from a 409 using real runtime state polling w
     conflictSave: true,
     values: [{ variableId: 'var-count', value: 9, version: 9 }],
     runtimeStates: [
-      { status: 'Running', isBusy: true },
-      { status: 'Stopped', isBusy: false }
+      { sessionId: 'idle-before-conflict', status: 'Idle', isBusy: false },
+      { sessionId: 'conflict-session', status: 'Running', isBusy: true },
+      { sessionId: 'conflict-session', status: 'Stopped', isBusy: false }
     ]
   });
   try {
@@ -1057,21 +1072,22 @@ test('browser interaction recovers from a 409 using real runtime state polling w
     assert.equal(state.dirty, true);
     assert.equal(state.values[0].version, 9);
     assert.equal(state.locked, false);
-    assert.equal(harness.state.runtimeStateCalls, 2);
+    assert.equal(harness.state.runtimeStateCalls, 3);
   } finally {
     await harness.close();
   }
 });
 
-test('browser interaction treats project runtime endpoint as authority over stale local running state', async () => {
+test('browser interaction keeps old session terminal state across close and reopen but accepts a new session', async () => {
   const harness = await startBrowserHarness({
     runtimeStates: [
+      { sessionId: 'old-session', status: 'Stopped', isBusy: false },
       { sessionId: 'old-session', status: 'Stopped', isBusy: false }
     ]
   });
   try {
     const project = createInteractiveProject({ single: true });
-    await setupGlobalVariablePanel(harness.page, project, { runtime: true });
+    await setupGlobalVariablePanel(harness.page, project, { runtime: true, open: false });
     await harness.page.evaluate(() => {
       window.__runtimeSubscribers.forEach(callback => callback({
         projectId: window.__panel.project.id,
@@ -1082,9 +1098,7 @@ test('browser interaction treats project runtime endpoint as authority over stal
       }));
     });
     await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === true);
-    await harness.page.evaluate(async () => {
-      await window.__panel.syncRuntimeStateAfterConflict(window.__panel.project.id, { schedulePoll: true });
-    });
+    await harness.page.click('#gv-open-manager');
     await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === false);
     const state = await getBrowserPanelState(harness.page);
     assert.equal(state.locked, false);
@@ -1100,6 +1114,15 @@ test('browser interaction treats project runtime endpoint as authority over stal
       }));
     });
     assert.equal(await harness.page.evaluate(() => window.__panel.isRuntimeLocked()), false);
+
+    await harness.page.click('[data-action="close"]');
+    await harness.page.waitForFunction(() => !document.querySelector('.gv-manager-overlay'));
+    assert.equal(await harness.page.locator('.global-variable-entry-hint').count(), 0);
+
+    await harness.page.click('#gv-open-manager');
+    await harness.page.waitForFunction(() => window.__panel.runtimeStateLoading === false);
+    assert.equal((await getBrowserPanelState(harness.page)).locked, false);
+    assert.equal(harness.state.runtimeStateCalls, 2);
 
     await harness.page.evaluate(() => {
       window.__runtimeSubscribers.forEach(callback => callback({
@@ -1127,9 +1150,6 @@ test('browser interaction confirms sessionless busy events with the runtime endp
   try {
     const project = createInteractiveProject({ single: true });
     await setupGlobalVariablePanel(harness.page, project, { runtime: true });
-    await harness.page.evaluate(async () => {
-      await window.__panel.syncRuntimeStateAfterConflict(window.__panel.project.id, { schedulePoll: true });
-    });
     await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === false);
 
     await harness.page.evaluate(() => {
@@ -1144,6 +1164,142 @@ test('browser interaction confirms sessionless busy events with the runtime endp
     await harness.page.waitForFunction(() => window.__panel.runtimeState?.sessionId === 'new-session');
     const state = await getBrowserPanelState(harness.page);
     assert.equal(state.locked, true);
+    assert.equal(harness.state.runtimeStateCalls, 2);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction locks on reopen when the endpoint advanced to a new running session while closed', async () => {
+  const harness = await startBrowserHarness({
+    runtimeStates: [
+      { sessionId: 'old-session', status: 'Stopped', isBusy: false },
+      { sessionId: 'new-session', status: 'Running', isBusy: true }
+    ]
+  });
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project, { runtime: true });
+    await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === false);
+
+    await harness.page.click('[data-action="close"]');
+    await harness.page.waitForFunction(() => !document.querySelector('.gv-manager-overlay'));
+    assert.equal(await harness.page.locator('.global-variable-entry-hint').count(), 0);
+
+    await harness.page.click('#gv-open-manager');
+    await harness.page.waitForFunction(() => window.__panel.runtimeState?.sessionId === 'new-session');
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.locked, true);
+    assert.equal(harness.state.runtimeStateCalls, 2);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction ignores a delayed reopen endpoint response after switching projects', async () => {
+  const harness = await startBrowserHarness({
+    runtimeStates: [
+      { sessionId: 'project-a-old', status: 'Stopped', isBusy: false, delayMs: 250 },
+      { sessionId: 'project-b-idle', status: 'Idle', isBusy: false }
+    ]
+  });
+  try {
+    const projectA = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, projectA, { runtime: true, open: false });
+    await harness.page.click('#gv-open-manager');
+    await harness.page.waitForFunction(() => window.__panel.runtimeStateLoading === true);
+
+    const projectB = createInteractiveProject({ single: true });
+    projectB.id = 'project-b-idle';
+    await harness.page.evaluate(async nextProject => {
+      await window.__panel.setProject(nextProject);
+    }, projectB);
+
+    await harness.page.waitForTimeout(400);
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.locked, false);
+    assert.equal(await harness.page.evaluate(() => window.__panel.project.id), 'project-b-idle');
+    assert.equal(await harness.page.evaluate(() => window.__panel.runtimeState?.sessionId || ''), '');
+    assert.equal(harness.state.runtimeStateCalls, 1);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction keeps draft state after runtime endpoint failure and recovers on a later event', async () => {
+  const harness = await startBrowserHarness({
+    runtimeStates: [
+      { status: 'Idle', isBusy: false },
+      { fail: true, errorMessage: 'runtime endpoint failed' },
+      { sessionId: 'recovered-session', status: 'Stopped', isBusy: false }
+    ]
+  });
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project, { runtime: true });
+    await harness.page.fill('input[data-field="displayName"]', 'Failure Draft');
+    const before = await getBrowserPanelState(harness.page);
+
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({
+        projectId: window.__panel.project.id,
+        status: 'running',
+        isRunning: true,
+        isRealtime: true
+      }));
+    });
+    await harness.page.waitForFunction(() => window.__panel.errorMessage.includes('runtime endpoint failed'));
+    let state = await getBrowserPanelState(harness.page);
+    assert.equal(state.draft.displayName, 'Failure Draft');
+    assert.equal(state.dirty, true);
+    assert.deepEqual(state.baselineSchema, before.baselineSchema);
+    assert.equal(state.locked, true);
+
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({
+        projectId: window.__panel.project.id,
+        status: 'running',
+        isRunning: true,
+        isRealtime: true
+      }));
+    });
+    await harness.page.waitForFunction(() => window.__panel.runtimeState?.sessionId === 'recovered-session');
+    state = await getBrowserPanelState(harness.page);
+    assert.equal(state.draft.displayName, 'Failure Draft');
+    assert.equal(state.dirty, true);
+    assert.equal(state.locked, false);
+    assert.equal(harness.state.runtimeStateCalls, 3);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction does not leak runtime polling or subscriptions across close reopen and destroy', async () => {
+  const harness = await startBrowserHarness({
+    runtimeStates: [
+      { sessionId: 'running-session', status: 'Running', isBusy: true },
+      { sessionId: 'running-session', status: 'Running', isBusy: true },
+      { sessionId: 'stopped-session', status: 'Stopped', isBusy: false }
+    ]
+  });
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project, { runtime: true });
+    await harness.page.waitForFunction(() => window.__panel.runtimeStatePollTimer !== null);
+    assert.equal(await harness.page.evaluate(() => window.__runtimeSubscribers.length), 1);
+
+    await harness.page.click('[data-action="close"]');
+    await harness.page.waitForFunction(() => !document.querySelector('.gv-manager-overlay'));
+    assert.equal(await harness.page.evaluate(() => window.__panel.runtimeStatePollTimer), null);
+
+    await harness.page.click('#gv-open-manager');
+    await harness.page.waitForFunction(() => window.__panel.runtimeStateLoading === false);
+    assert.equal(await harness.page.evaluate(() => window.__runtimeSubscribers.length), 1);
+
+    await harness.page.evaluate(() => window.__panel.destroy());
+    await harness.page.waitForTimeout(1800);
+    assert.equal(await harness.page.evaluate(() => window.__runtimeSubscribers.length), 0);
+    assert.equal(await harness.page.evaluate(() => window.__panel.runtimeStatePollTimer), null);
     assert.equal(harness.state.runtimeStateCalls, 2);
   } finally {
     await harness.close();
@@ -1184,9 +1340,10 @@ test('browser interaction cancels runtime state polling on project switch and de
   const harness = await startBrowserHarness({
     conflictSave: true,
     runtimeStates: [
-      { status: 'Running', isBusy: true },
-      { status: 'Running', isBusy: true },
-      { status: 'Running', isBusy: true }
+      { sessionId: 'idle-before-poll', status: 'Idle', isBusy: false },
+      { sessionId: 'switch-running', status: 'Running', isBusy: true },
+      { sessionId: 'destroy-running', status: 'Running', isBusy: true },
+      { sessionId: 'destroy-running', status: 'Running', isBusy: true }
     ]
   });
   try {
@@ -1196,7 +1353,7 @@ test('browser interaction cancels runtime state polling on project switch and de
     await harness.page.fill('input[data-field="displayName"]', 'Switch Draft');
     await harness.page.click('[data-action="save"]');
     await harness.page.waitForFunction(() => window.__panel.runtimeStatePollTimer !== null);
-    assert.equal(harness.state.runtimeStateCalls, 1);
+    assert.equal(harness.state.runtimeStateCalls, 2);
 
     await harness.page.evaluate(async project => {
       const nextProject = structuredClone(project);
@@ -1204,16 +1361,16 @@ test('browser interaction cancels runtime state polling on project switch and de
       await window.__panel.setProject(nextProject);
     }, project);
     await harness.page.waitForTimeout(1800);
-    assert.equal(harness.state.runtimeStateCalls, 1);
+    assert.equal(harness.state.runtimeStateCalls, 2);
 
     await harness.page.fill('input[data-field="displayName"]', 'Destroy Draft');
     await harness.page.click('[data-action="save"]');
     await harness.page.waitForFunction(() => window.__panel.runtimeStatePollTimer !== null);
-    assert.equal(harness.state.runtimeStateCalls, 2);
+    assert.equal(harness.state.runtimeStateCalls, 3);
 
     await harness.page.evaluate(() => window.__panel.destroy());
     await harness.page.waitForTimeout(1800);
-    assert.equal(harness.state.runtimeStateCalls, 2);
+    assert.equal(harness.state.runtimeStateCalls, 3);
   } finally {
     await harness.close();
   }
@@ -1222,7 +1379,10 @@ test('browser interaction cancels runtime state polling on project switch and de
 test('browser interaction refreshes values and locks after a 409 without dropping draft', async () => {
   const harness = await startBrowserHarness({
     values: [{ variableId: 'var-count', value: 9, version: 9 }],
-    runtimeStates: [{ status: 'Running', isBusy: true }]
+    runtimeStates: [
+      { sessionId: 'idle-before-lock', status: 'Idle', isBusy: false },
+      { sessionId: 'lock-session', status: 'Running', isBusy: true }
+    ]
   });
   try {
     const project = createInteractiveProject({ single: true });
@@ -1232,6 +1392,7 @@ test('browser interaction refreshes values and locks after a 409 without droppin
     await harness.page.fill('input[data-field="displayName"]', 'Conflict Draft');
     await harness.page.click('[data-action="save"]');
     await harness.page.waitForFunction(() => window.__panel.values.some(item => item.version === 9));
+    await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === true);
 
     const state = await getBrowserPanelState(harness.page);
     assert.equal(state.draft.displayName, 'Conflict Draft');

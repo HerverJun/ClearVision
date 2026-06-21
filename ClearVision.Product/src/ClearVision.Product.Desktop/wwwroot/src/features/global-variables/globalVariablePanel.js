@@ -53,6 +53,7 @@ export default class GlobalVariablePanel {
         this.runtimeState = options.getRuntimeState?.() || inspectionController.getState?.() || {};
         this.runtimeStateSource = 'local';
         this.endpointTerminalState = null;
+        this.runtimeStateLoading = false;
         this.unsubscribeInspectionState = null;
         this.runtimeStatePollTimer = null;
         this.runtimeStateRequestSerial = 0;
@@ -66,6 +67,7 @@ export default class GlobalVariablePanel {
         this.runtimeState = this.options.getRuntimeState?.() || inspectionController.getState?.() || {};
         this.runtimeStateSource = 'local';
         this.endpointTerminalState = null;
+        this.runtimeStateLoading = false;
         this.rebuildBaseline(project?.globalVariables || project?.GlobalVariables);
         this.values = [];
         this.errorMessage = '';
@@ -148,6 +150,7 @@ export default class GlobalVariablePanel {
         this.draft = this.selectedVariableId ? createVariableDraft(this.getSelectedVariable()) : null;
         this.fieldErrors = {};
         this.render();
+        void this.refreshRuntimeStateOnOpen(this.project.id);
     }
 
     async closeManager() {
@@ -172,7 +175,7 @@ export default class GlobalVariablePanel {
 
         this.isOpen = false;
         this.stopRuntimeStatePolling({ cancelRequests: true });
-        this.endpointTerminalState = null;
+        this.runtimeStateLoading = false;
         this.removeDialog();
         this.render();
         return true;
@@ -1186,6 +1189,10 @@ export default class GlobalVariablePanel {
     }
 
     isRuntimeLocked() {
+        if (this.runtimeStateLoading) {
+            return true;
+        }
+
         const states = [
             this.runtimeState,
             this.options.getRuntimeState?.(),
@@ -1266,7 +1273,7 @@ export default class GlobalVariablePanel {
             if (this.isRelevantRuntimeState(this.runtimeState) &&
                 this.isRuntimeStateBusy(this.runtimeState) &&
                 !this.getRuntimeSessionId(this.runtimeState)) {
-                void this.syncRuntimeStateAfterConflict(this.project?.id, { schedulePoll: true }).catch(() => {});
+                void this.refreshRuntimeStateOnOpen(this.project?.id).catch(() => {});
             }
             if (this.isRelevantRuntimeState(this.runtimeState) && !this.isRuntimeStateBusy(this.runtimeState)) {
                 this.stopRuntimeStatePolling();
@@ -1284,8 +1291,17 @@ export default class GlobalVariablePanel {
         }
 
         const requestId = ++this.runtimeStateRequestSerial;
-        const state = await this.fetchRuntimeState(projectId);
-        if (requestId !== this.runtimeStateRequestSerial || projectId !== this.project?.id) {
+        let state;
+        try {
+            state = await this.fetchRuntimeState(projectId);
+        } catch (error) {
+            if (requestId === this.runtimeStateRequestSerial && sameId(projectId, this.project?.id)) {
+                throw error;
+            }
+            return null;
+        }
+
+        if (requestId !== this.runtimeStateRequestSerial || !sameId(projectId, this.project?.id)) {
             return null;
         }
 
@@ -1298,6 +1314,33 @@ export default class GlobalVariablePanel {
             this.stopRuntimeStatePolling();
         }
         return state;
+    }
+
+    async refreshRuntimeStateOnOpen(projectId = this.project?.id) {
+        if (!projectId) {
+            return null;
+        }
+
+        this.runtimeStateLoading = true;
+        this.errorMessage = '';
+        this.render();
+        try {
+            const state = await this.syncRuntimeStateAfterConflict(projectId, { schedulePoll: true });
+            if (sameId(projectId, this.project?.id)) {
+                this.errorMessage = '';
+            }
+            return state;
+        } catch (error) {
+            if (sameId(projectId, this.project?.id)) {
+                this.errorMessage = this.toUserMessage(error, '运行状态刷新失败，已保留当前草稿；请稍后重试或等待运行状态更新。');
+            }
+            return null;
+        } finally {
+            if (sameId(projectId, this.project?.id)) {
+                this.runtimeStateLoading = false;
+                this.render();
+            }
+        }
     }
 
     async fetchRuntimeState(projectId) {
@@ -1364,6 +1407,7 @@ export default class GlobalVariablePanel {
     destroy() {
         this.stopRuntimeStatePolling({ cancelRequests: true });
         this.endpointTerminalState = null;
+        this.runtimeStateLoading = false;
         this.unsubscribeInspectionState?.();
         this.unsubscribeInspectionState = null;
         this.removeDialog();
