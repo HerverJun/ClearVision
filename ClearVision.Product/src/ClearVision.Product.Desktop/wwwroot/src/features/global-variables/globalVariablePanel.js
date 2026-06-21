@@ -52,6 +52,7 @@ export default class GlobalVariablePanel {
         this.options = options;
         this.runtimeState = options.getRuntimeState?.() || inspectionController.getState?.() || {};
         this.runtimeStateSource = 'local';
+        this.endpointTerminalState = null;
         this.unsubscribeInspectionState = null;
         this.runtimeStatePollTimer = null;
         this.runtimeStateRequestSerial = 0;
@@ -64,6 +65,7 @@ export default class GlobalVariablePanel {
         this.project = project || null;
         this.runtimeState = this.options.getRuntimeState?.() || inspectionController.getState?.() || {};
         this.runtimeStateSource = 'local';
+        this.endpointTerminalState = null;
         this.rebuildBaseline(project?.globalVariables || project?.GlobalVariables);
         this.values = [];
         this.errorMessage = '';
@@ -170,6 +172,7 @@ export default class GlobalVariablePanel {
 
         this.isOpen = false;
         this.stopRuntimeStatePolling({ cancelRequests: true });
+        this.endpointTerminalState = null;
         this.removeDialog();
         this.render();
         return true;
@@ -213,7 +216,7 @@ export default class GlobalVariablePanel {
                     <select class="form-input" id="gv-source-filter" aria-label="来源筛选">
                         ${SOURCE_FILTERS.map(item => `<option value="${escapeHtml(item)}" ${this.filters.source === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}
                     </select>
-                    <button type="button" class="btn btn-primary" data-action="new" ${locked ? 'disabled' : ''} title="新建变量">新建变量</button>
+                    ${schemaIsEmpty ? '' : `<button type="button" class="btn btn-primary" data-action="new" ${locked ? 'disabled' : ''} title="新建变量">新建变量</button>`}
                     <button type="button" class="btn btn-secondary" data-action="refresh" ${this.pendingAction === 'refresh' ? 'disabled' : ''} title="刷新当前值">${this.pendingAction === 'refresh' ? '刷新中...' : '刷新'}</button>
                     <button type="button" class="btn btn-secondary" data-action="reset-all" ${locked || this.schema.variables.length === 0 || this.pendingAction === 'reset-all' ? 'disabled' : ''} title="全部重置">${this.pendingAction === 'reset-all' ? '重置中...' : '全部重置'}</button>
                 </section>
@@ -221,7 +224,7 @@ export default class GlobalVariablePanel {
                     <aside class="gv-variable-list" aria-label="变量列表">
                         ${listHtml}
                     </aside>
-                    <section class="gv-detail">
+                    <section class="gv-detail ${schemaIsEmpty ? 'gv-detail-empty' : ''}">
                         ${selected || this.draft ? this.renderEditorHtml() : this.renderEmptyDetailHtml()}
                     </section>
                 </main>
@@ -269,6 +272,7 @@ export default class GlobalVariablePanel {
             <div class="gv-empty gv-empty-detail">
                 <h3>暂无变量</h3>
                 <p>点击“新建变量”创建第一个全局变量。</p>
+                ${this.isRuntimeLocked() ? '<p class="gv-muted">工程运行中，停止后才能新建变量。</p>' : ''}
                 ${this.dirty ? `
                     <div class="gv-actions">
                         <button type="button" class="btn btn-secondary" data-action="discard">放弃</button>
@@ -1182,18 +1186,15 @@ export default class GlobalVariablePanel {
     }
 
     isRuntimeLocked() {
-        if (this.runtimeStateSource === 'endpoint' &&
-            this.isRelevantRuntimeState(this.runtimeState) &&
-            !this.isRuntimeStateBusy(this.runtimeState)) {
-            return false;
-        }
-
         const states = [
             this.runtimeState,
             this.options.getRuntimeState?.(),
             inspectionController.getState?.()
         ];
-        return states.some(state => this.isRelevantRuntimeState(state) && this.isRuntimeStateBusy(state));
+        return states.some(state =>
+            this.isRelevantRuntimeState(state) &&
+            this.isRuntimeStateBusy(state) &&
+            !this.isStaleBusyRuntimeState(state));
     }
 
     isRelevantRuntimeState(state, projectId = this.project?.id) {
@@ -1201,12 +1202,50 @@ export default class GlobalVariablePanel {
             return false;
         }
 
-        const stateProjectId = state.projectId ?? state.ProjectId ?? null;
+        const stateProjectId = this.getRuntimeProjectId(state);
         if (!stateProjectId) {
             return false;
         }
 
         return sameId(stateProjectId, projectId);
+    }
+
+    getRuntimeProjectId(state) {
+        return state?.projectId ?? state?.ProjectId ?? null;
+    }
+
+    getRuntimeSessionId(state) {
+        const sessionId = state?.sessionId ?? state?.SessionId ?? null;
+        return sessionId == null ? '' : String(sessionId).trim();
+    }
+
+    isStaleBusyRuntimeState(state) {
+        if (!this.endpointTerminalState ||
+            !this.isRelevantRuntimeState(state, this.endpointTerminalState.projectId) ||
+            !this.isRuntimeStateBusy(state)) {
+            return false;
+        }
+
+        const terminalSessionId = this.endpointTerminalState.sessionId;
+        const stateSessionId = this.getRuntimeSessionId(state);
+        return Boolean(terminalSessionId && stateSessionId && terminalSessionId === stateSessionId);
+    }
+
+    updateEndpointTerminalState(state, source) {
+        if (source === 'endpoint' && this.isRelevantRuntimeState(state) && !this.isRuntimeStateBusy(state)) {
+            this.endpointTerminalState = {
+                projectId: this.getRuntimeProjectId(state),
+                sessionId: this.getRuntimeSessionId(state)
+            };
+            return;
+        }
+
+        if (this.isRelevantRuntimeState(state) &&
+            this.isRuntimeStateBusy(state) &&
+            !this.isStaleBusyRuntimeState(state) &&
+            this.getRuntimeSessionId(state)) {
+            this.endpointTerminalState = null;
+        }
     }
 
     subscribeRuntimeState() {
@@ -1217,15 +1256,18 @@ export default class GlobalVariablePanel {
 
         this.unsubscribeInspectionState = subscribe(state => {
             const wasLocked = this.isRuntimeLocked();
-            if (this.runtimeStateSource === 'endpoint' &&
-                this.isRelevantRuntimeState(this.runtimeState) &&
-                !this.isRuntimeStateBusy(this.runtimeState) &&
-                this.isRelevantRuntimeState(state) &&
-                this.isRuntimeStateBusy(state)) {
+            if (this.isStaleBusyRuntimeState(state)) {
                 return;
             }
+
             this.runtimeState = state || {};
             this.runtimeStateSource = 'local';
+            this.updateEndpointTerminalState(this.runtimeState, 'local');
+            if (this.isRelevantRuntimeState(this.runtimeState) &&
+                this.isRuntimeStateBusy(this.runtimeState) &&
+                !this.getRuntimeSessionId(this.runtimeState)) {
+                void this.syncRuntimeStateAfterConflict(this.project?.id, { schedulePoll: true }).catch(() => {});
+            }
             if (this.isRelevantRuntimeState(this.runtimeState) && !this.isRuntimeStateBusy(this.runtimeState)) {
                 this.stopRuntimeStatePolling();
             }
@@ -1268,6 +1310,7 @@ export default class GlobalVariablePanel {
     applyRuntimeState(state, source = 'local') {
         this.runtimeState = state || {};
         this.runtimeStateSource = source;
+        this.updateEndpointTerminalState(this.runtimeState, source);
         if (this.isOpen) {
             this.render();
         } else {
@@ -1320,6 +1363,7 @@ export default class GlobalVariablePanel {
 
     destroy() {
         this.stopRuntimeStatePolling({ cancelRequests: true });
+        this.endpointTerminalState = null;
         this.unsubscribeInspectionState?.();
         this.unsubscribeInspectionState = null;
         this.removeDialog();

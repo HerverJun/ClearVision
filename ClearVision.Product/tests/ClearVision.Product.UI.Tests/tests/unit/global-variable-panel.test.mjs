@@ -730,7 +730,11 @@ async function getVisualMetrics(page) {
       detailClientHeight: detail?.clientHeight ?? 0,
       detailScrollHeight: detail?.scrollHeight ?? 0,
       emptyCount: document.querySelectorAll('.gv-empty').length,
+      newButtonCount: document.querySelectorAll('[data-action="new"]').length,
       variableRows: document.querySelectorAll('.gv-variable-row').length,
+      detailEmpty: document.querySelector('.gv-detail')?.classList.contains('gv-detail-empty') ?? false,
+      lockedReason: document.querySelector('.gv-empty-detail .gv-muted')?.textContent?.trim() || '',
+      emptyCard: rectOf('.gv-empty-detail'),
       saveButtons: [...document.querySelectorAll('[data-action="save"]')].map(button => ({ disabled: button.disabled })),
       resetAllDisabled: document.querySelector('[data-action="reset-all"]')?.disabled ?? null,
       newButton: newButton ? {
@@ -818,18 +822,48 @@ test('browser visual layout distinguishes zero variables from search without res
     await setupGlobalVariablePanel(harness.page, emptyProject);
     let metrics = await getVisualMetrics(harness.page);
     assert.equal(metrics.emptyCount, 1);
+    assert.equal(metrics.newButtonCount, 1);
+    assert.equal(metrics.detailEmpty, true);
     assert.equal(metrics.variableRows, 0);
     assert.equal(metrics.saveButtons.length, 0);
     assert.equal(metrics.resetAllDisabled, true);
     assert.ok(metrics.newButton);
     assert.equal(metrics.newButton.disabled, false);
+    assert.ok(metrics.emptyCard.left >= metrics.detail.left);
+    assert.ok(metrics.emptyCard.right <= metrics.detail.right);
+    assert.ok(metrics.emptyCard.top >= metrics.detail.top);
+    assert.ok(metrics.emptyCard.bottom <= metrics.detail.bottom);
     assert.ok(metrics.newButton.rect.top >= 0 && metrics.newButton.rect.bottom <= metrics.viewport.height);
+
+    await harness.page.click('[data-action="new"]');
+    metrics = await getVisualMetrics(harness.page);
+    assert.equal(metrics.detailEmpty, false);
+    assert.equal(metrics.newButtonCount, 1);
+    assert.equal(metrics.saveButtons.length, 1);
+    assert.equal((await getBrowserPanelState(harness.page)).draft.isNew, true);
+
+    await setupGlobalVariablePanel(harness.page, emptyProject, { runtime: true });
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({
+        projectId: window.__panel.project.id,
+        sessionId: 'empty-running',
+        status: 'running',
+        isRunning: true,
+        isRealtime: true
+      }));
+    });
+    metrics = await getVisualMetrics(harness.page);
+    assert.equal(metrics.newButtonCount, 1);
+    assert.equal(metrics.newButton.disabled, true);
+    assert.match(metrics.lockedReason, /工程运行中/);
 
     await setupGlobalVariablePanel(harness.page, createInteractiveProject());
     await harness.page.fill('#gv-search', 'no-matching-variable');
     metrics = await getVisualMetrics(harness.page);
     assert.equal(metrics.variableRows, 0);
     assert.equal(metrics.emptyCount, 1);
+    assert.equal(metrics.newButtonCount, 1);
+    assert.equal(metrics.detailEmpty, false);
     assert.equal(metrics.saveButtons.length, 1);
   } finally {
     await harness.close();
@@ -981,7 +1015,7 @@ test('browser interaction keeps search focus and toggles runtime readonly state 
 
     await harness.page.fill('input[data-field="displayName"]', 'Runtime Draft');
     await harness.page.evaluate(() => {
-      window.__runtimeSubscribers.forEach(callback => callback({ projectId: window.__panel.project.id, status: 'running', isRunning: true, isRealtime: false }));
+      window.__runtimeSubscribers.forEach(callback => callback({ projectId: window.__panel.project.id, sessionId: 'runtime-draft-session', status: 'running', isRunning: true, isRealtime: false }));
     });
     await harness.page.waitForFunction(() => document.querySelector('input[data-field="displayName"]')?.disabled === true);
     state = await getBrowserPanelState(harness.page);
@@ -1032,7 +1066,7 @@ test('browser interaction recovers from a 409 using real runtime state polling w
 test('browser interaction treats project runtime endpoint as authority over stale local running state', async () => {
   const harness = await startBrowserHarness({
     runtimeStates: [
-      { status: 'Stopped', isBusy: false }
+      { sessionId: 'old-session', status: 'Stopped', isBusy: false }
     ]
   });
   try {
@@ -1041,6 +1075,7 @@ test('browser interaction treats project runtime endpoint as authority over stal
     await harness.page.evaluate(() => {
       window.__runtimeSubscribers.forEach(callback => callback({
         projectId: window.__panel.project.id,
+        sessionId: 'old-session',
         status: 'running',
         isRunning: true,
         isRealtime: true
@@ -1054,6 +1089,62 @@ test('browser interaction treats project runtime endpoint as authority over stal
     const state = await getBrowserPanelState(harness.page);
     assert.equal(state.locked, false);
     assert.equal(harness.state.runtimeStateCalls, 1);
+
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({
+        projectId: window.__panel.project.id,
+        sessionId: 'old-session',
+        status: 'running',
+        isRunning: true,
+        isRealtime: true
+      }));
+    });
+    assert.equal(await harness.page.evaluate(() => window.__panel.isRuntimeLocked()), false);
+
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({
+        projectId: window.__panel.project.id,
+        sessionId: 'new-session',
+        status: 'starting',
+        isRunning: true,
+        isRealtime: true
+      }));
+    });
+    await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === true);
+    assert.equal((await getBrowserPanelState(harness.page)).locked, true);
+  } finally {
+    await harness.close();
+  }
+});
+
+test('browser interaction confirms sessionless busy events with the runtime endpoint', async () => {
+  const harness = await startBrowserHarness({
+    runtimeStates: [
+      { sessionId: 'old-session', status: 'Stopped', isBusy: false },
+      { sessionId: 'new-session', status: 'Running', isBusy: true }
+    ]
+  });
+  try {
+    const project = createInteractiveProject({ single: true });
+    await setupGlobalVariablePanel(harness.page, project, { runtime: true });
+    await harness.page.evaluate(async () => {
+      await window.__panel.syncRuntimeStateAfterConflict(window.__panel.project.id, { schedulePoll: true });
+    });
+    await harness.page.waitForFunction(() => window.__panel.isRuntimeLocked() === false);
+
+    await harness.page.evaluate(() => {
+      window.__runtimeSubscribers.forEach(callback => callback({
+        projectId: window.__panel.project.id,
+        status: 'running',
+        isRunning: true,
+        isRealtime: true
+      }));
+    });
+
+    await harness.page.waitForFunction(() => window.__panel.runtimeState?.sessionId === 'new-session');
+    const state = await getBrowserPanelState(harness.page);
+    assert.equal(state.locked, true);
+    assert.equal(harness.state.runtimeStateCalls, 2);
   } finally {
     await harness.close();
   }
@@ -1067,6 +1158,7 @@ test('browser interaction ignores running state from previous project after swit
     await harness.page.evaluate(() => {
       window.__runtimeSubscribers.forEach(callback => callback({
         projectId: window.__panel.project.id,
+        sessionId: 'project-a-session',
         status: 'running',
         isRunning: true,
         isRealtime: true
