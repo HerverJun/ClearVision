@@ -349,7 +349,6 @@ public sealed class VisionAgentToolLoopBuildTests
             sink);
         return new VisionAgentOrchestrator(
             registry,
-            new FakeGenerationService(),
             sink,
             buildOrchestrator,
             toolLoop: loop,

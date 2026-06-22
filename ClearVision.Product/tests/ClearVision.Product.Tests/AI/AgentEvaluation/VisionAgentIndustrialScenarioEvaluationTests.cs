@@ -225,7 +225,6 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
             sink);
         return new VisionAgentOrchestrator(
             CreateToolRegistry(),
-            new FakeAiFlowGenerationService(),
             sink,
             buildOrchestrator);
     }

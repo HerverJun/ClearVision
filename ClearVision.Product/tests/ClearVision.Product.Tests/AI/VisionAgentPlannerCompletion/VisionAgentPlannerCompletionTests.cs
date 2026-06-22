@@ -18,8 +18,8 @@ namespace ClearVision.Product.Tests.AI.VisionAgentPlannerCompletion;
 
 public sealed class VisionAgentPlannerCompletionTests
 {
-    [Fact(DisplayName = "Default DI registers LLM planner completion but keeps Agent GenerateFlow disabled")]
-    public void DefaultDi_ShouldRegisterLlmCompletionAndKeepAgentDisabled()
+    [Fact(DisplayName = "Default DI registers LLM planner completion and enables Agent GenerateFlow")]
+    public void DefaultDi_ShouldRegisterLlmCompletionAndEnableAgentGenerateFlow()
     {
         var services = new ServiceCollection();
         services.AddAiFlowGeneration(new ConfigurationBuilder().Build());
@@ -27,7 +27,7 @@ public sealed class VisionAgentPlannerCompletionTests
         services.Should().Contain(descriptor =>
             descriptor.ServiceType == typeof(IVisionAgentPlannerCompletionSource) &&
             descriptor.ImplementationType == typeof(LlmVisionAgentPlannerCompletionSource));
-        new AgentGenerateFlowOptions().Enabled.Should().BeFalse();
+        new AgentGenerateFlowOptions().Enabled.Should().BeTrue();
     }
 
     [Fact(DisplayName = "Planner completion source should be controlled by options")]

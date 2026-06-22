@@ -231,6 +231,22 @@ public class AiFlowGenerationResult
 
     public List<object> ToolTrace { get; set; } = new();
 
+    public string PlanId { get; set; } = string.Empty;
+
+    public string PlanHash { get; set; } = string.Empty;
+
+    public string ContractVersion { get; set; } = string.Empty;
+
+    public string AnswerSetFingerprint { get; set; } = string.Empty;
+
+    public string RequestedMode { get; set; } = AiAgentGenerateFlowModes.Scripted;
+
+    public string EffectiveMode { get; set; } = AiAgentGenerateFlowModes.Scripted;
+
+    public bool ToolLoopEntered { get; set; }
+
+    public string FallbackReason { get; set; } = string.Empty;
+
     public VisionAgentBuildResult? BuildResult { get; set; }
 
     public VisionAgentBuildReadinessSnapshot? BuildReadiness { get; set; }

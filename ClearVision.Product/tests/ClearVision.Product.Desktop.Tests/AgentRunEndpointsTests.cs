@@ -481,7 +481,7 @@ public sealed class AgentRunEndpointsTests
         request.ExistingFlowJson.Should().Be("{\"operators\":[]}");
         request.Attachments.Should().BeEmpty();
         request.Mode.Should().Be(GenerateFlowMode.Modify);
-        request.RuntimePreviewConsent.Should().BeFalse();
+        request.RuntimePreviewConsent.Should().BeTrue();
         request.UseVisionAgentGenerateFlow.Should().BeTrue();
         request.TemplateSelection.Should().NotBeNull();
         request.TemplateSelection!.Mode.Should().Be("template_fill");
@@ -711,9 +711,8 @@ public sealed class AgentRunEndpointsTests
 
         var replay = host.StreamService.Replay(runId)!;
         replay.Events.Select(evt => evt.Stage).Should().ContainInOrder([
-            "plan_generation",
-            "assumption_confirmation",
-            "requirement_parsing"
+            "canonical_build_contract",
+            "canonical_build_readiness"
         ]);
         var completed = replay.Events.Single(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
         var completedJson = JsonSerializer.Serialize(completed, AgentRunEventJson.Options);
@@ -1351,12 +1350,15 @@ public sealed class AgentRunEndpointsTests
             {
                 streamService.UtcNowProvider = utcNowProvider;
             }
-            var generation = new FakeAiFlowGenerationService(handler ?? ((_, _) => Task.FromResult(SuccessResult())));
+            var generation = new FakeAiFlowGenerationService(
+                handler ?? ((_, _) => Task.FromResult(SuccessResult())),
+                streamService);
 
             builder.Services.AddSingleton(redactor);
             builder.Services.AddSingleton(store);
             builder.Services.AddSingleton<IAgentRunEventStreamService>(streamService);
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);
+            builder.Services.AddSingleton<IVisionAgentBuildApplicationService>(generation);
             builder.Services.AddSingleton<IVisionAgentToolRegistry, EmptyVisionAgentToolRegistry>();
             builder.Services.AddSingleton<IVisionAgentIntentRouterService>(
                 new FakeVisionAgentIntentRouterService(intentRouterHandler));
@@ -1516,17 +1518,23 @@ public sealed class AgentRunEndpointsTests
         }
     }
 
-    private sealed class FakeAiFlowGenerationService : IAiFlowGenerationService
+    private sealed class FakeAiFlowGenerationService : IAiFlowGenerationService, IVisionAgentBuildApplicationService
     {
         private readonly Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>> _handler;
+        private readonly IAgentRunEventStreamService _streamService;
         private readonly TaskCompletionSource _called = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public FakeAiFlowGenerationService(Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>> handler)
+        public FakeAiFlowGenerationService(
+            Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>> handler,
+            IAgentRunEventStreamService streamService)
         {
             _handler = handler;
+            _streamService = streamService;
         }
 
         public AiFlowGenerationRequest? LastRequest { get; private set; }
+
+        public BuildCommand? LastCommand { get; private set; }
 
         public CancellationToken LastCancellationToken { get; private set; }
 
@@ -1543,9 +1551,114 @@ public sealed class AgentRunEndpointsTests
             return await _handler(request, cancellationToken);
         }
 
+        public async Task<CanonicalBuildOutcome> BuildAsync(
+            BuildCommand command,
+            CancellationToken cancellationToken)
+        {
+            LastCommand = command;
+            LastRequest = command.Request;
+            LastCancellationToken = cancellationToken;
+            _called.TrySetResult();
+            AppendCanonicalStages(command.Request.AgentRunId);
+            var result = await _handler(command.Request, cancellationToken);
+            NormalizeResult(result, command.Request);
+            return new CanonicalBuildOutcome
+            {
+                Result = result,
+                RunId = command.RunId ?? command.Request.AgentRunId ?? string.Empty,
+                RequestId = command.RequestId ?? string.Empty,
+                Transport = command.Transport,
+                CompletionStatus = result.CompletionStatus,
+                FailureType = result.FailureType ?? string.Empty,
+                FailureCode = result.FailureSummary?.Code ?? string.Empty,
+                PlanId = result.PlanId,
+                PlanHash = result.PlanHash,
+                ContractVersion = result.ContractVersion,
+                AnswerSetFingerprint = result.AnswerSetFingerprint,
+                RequestedMode = result.RequestedMode,
+                EffectiveMode = result.EffectiveMode,
+                ToolLoopEntered = result.ToolLoopEntered,
+                FallbackReason = result.FallbackReason,
+                BuildReadiness = result.BuildReadiness,
+                WorkflowDiff = result.BuildResult?.WorkflowDiff,
+                ApplyGate = result.BuildResult?.ApplyGate
+            };
+        }
+
         public async Task WaitForCallAsync()
         {
             await _called.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        private static void NormalizeResult(
+            AiFlowGenerationResult result,
+            AiFlowGenerationRequest request)
+        {
+            var build = request.BuildFromPlan;
+            var planId = result.PlanId;
+            if (string.IsNullOrWhiteSpace(planId))
+            {
+                planId = result.BuildResult?.PlanId ?? build?.PlanId ?? build?.PlanSnapshot?.PlanId ?? string.Empty;
+            }
+
+            var planHash = result.PlanHash;
+            if (string.IsNullOrWhiteSpace(planHash))
+            {
+                planHash = result.BuildResult?.PlanHash ?? build?.PlanHash ?? build?.PlanSnapshot?.PlanHash ?? string.Empty;
+            }
+
+            var contractVersion = string.IsNullOrWhiteSpace(result.ContractVersion)
+                ? build?.PlanSnapshot?.PlanContractVersion ?? VisionAgentPlanContractVersions.V2
+                : result.ContractVersion;
+            var requestedMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode);
+            result.PlanId = planId;
+            result.PlanHash = planHash;
+            result.ContractVersion = contractVersion;
+            result.RequestedMode = requestedMode;
+            result.EffectiveMode = string.IsNullOrWhiteSpace(result.EffectiveMode)
+                ? requestedMode
+                : AiAgentGenerateFlowModes.Normalize(result.EffectiveMode);
+            result.ToolLoopEntered = result.ToolLoopEntered ||
+                                     string.Equals(requestedMode, AiAgentGenerateFlowModes.ToolLoop, StringComparison.OrdinalIgnoreCase);
+
+            result.BuildResult ??= new VisionAgentBuildResult();
+            result.BuildResult = result.BuildResult with
+            {
+                PlanId = planId,
+                PlanHash = planHash,
+                ContractVersion = contractVersion,
+                RequestedMode = requestedMode,
+                EffectiveMode = result.EffectiveMode,
+                ToolLoopEntered = result.ToolLoopEntered,
+                FallbackReason = result.FallbackReason
+            };
+        }
+
+        private void AppendCanonicalStages(string? runId)
+        {
+            if (string.IsNullOrWhiteSpace(runId))
+            {
+                return;
+            }
+
+            _streamService.Append(runId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.StageCompleted,
+                Stage = "canonical_build_contract",
+                Title = "Build contract accepted",
+                Summary = "BuildFromPlan contract was normalized.",
+                Status = AgentRunEventStatuses.Completed,
+                Payload = new { metadataOnly = true }
+            });
+            _streamService.Append(runId, new AgentRunEventDraft
+            {
+                EventType = AgentRunEventTypes.ReadinessChecked,
+                Stage = "canonical_build_readiness",
+                Title = "Build readiness accepted",
+                Summary = "BuildFromPlan readiness was normalized.",
+                Status = AgentRunEventStatuses.Completed,
+                Payload = new { metadataOnly = true }
+            });
         }
     }
 

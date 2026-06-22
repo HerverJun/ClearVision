@@ -425,14 +425,15 @@ public static class AgentRunEndpoints
     {
         using var scope = scopeFactory.CreateScope();
         var streamService = scope.ServiceProvider.GetRequiredService<IAgentRunEventStreamService>();
-        var orchestrator = scope.ServiceProvider.GetRequiredService<IVisionAgentOrchestrator>();
+        var buildApplicationService = scope.ServiceProvider.GetRequiredService<IVisionAgentBuildApplicationService>();
         var cancellationToken = streamService.GetCancellationToken(runId);
 
         try
         {
-            var result = await orchestrator.BuildFromPlanAsync(
-                request.ToGenerationRequest(runId),
+            var outcome = await buildApplicationService.BuildAsync(
+                request.ToBuildCommand(runId),
                 cancellationToken);
+            var result = outcome.Result;
 
             if (cancellationToken.IsCancellationRequested ||
                 string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase))
@@ -467,6 +468,12 @@ public static class AgentRunEndpoints
                         buildReadiness = result.BuildReadiness,
                         planId = ResolveResultPlanId(result, request.BuildFromPlan),
                         planHash = ResolveResultPlanHash(result, request.BuildFromPlan),
+                        contractVersion = result.ContractVersion,
+                        answerSetFingerprint = result.AnswerSetFingerprint,
+                        requestedMode = result.RequestedMode,
+                        effectiveMode = result.EffectiveMode,
+                        toolLoopEntered = result.ToolLoopEntered,
+                        fallbackReason = result.FallbackReason,
                         toolEvidenceTimeline = result.BuildResult?.ToolEvidenceTimeline,
                         workflowDiff = result.BuildResult?.WorkflowDiff,
                         applyGate = result.BuildResult?.ApplyGate,
@@ -504,11 +511,18 @@ public static class AgentRunEndpoints
                 {
                     status = result.CompletionStatus,
                     failureType = result.FailureType,
+                    failureCode = result.FailureSummary?.Code ?? string.Empty,
                     failureSummary = result.FailureSummary,
                     diagnostics = result.LastAttemptDiagnostics,
                     buildReadiness = result.BuildReadiness,
                     planId = ResolveResultPlanId(result, request.BuildFromPlan),
                     planHash = ResolveResultPlanHash(result, request.BuildFromPlan),
+                    contractVersion = result.ContractVersion,
+                    answerSetFingerprint = result.AnswerSetFingerprint,
+                    requestedMode = result.RequestedMode,
+                    effectiveMode = result.EffectiveMode,
+                    toolLoopEntered = result.ToolLoopEntered,
+                    fallbackReason = result.FallbackReason,
                     planSnapshot = request.BuildFromPlan?.PlanSnapshot,
                     buildFromPlan = BuildReplayPayload(request.BuildFromPlan),
                     blockingClarificationFields = result.BlockingClarificationFields,
@@ -541,6 +555,14 @@ public static class AgentRunEndpoints
                     },
                     planId = request.BuildFromPlan?.PlanSnapshot?.PlanId ?? request.BuildFromPlan?.PlanId ?? string.Empty,
                     planHash = request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? request.BuildFromPlan?.PlanHash ?? string.Empty,
+                    contractVersion = request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? string.Empty,
+                    requestedMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+                    effectiveMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+                    toolLoopEntered = string.Equals(
+                        AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+                        AiAgentGenerateFlowModes.ToolLoop,
+                        StringComparison.OrdinalIgnoreCase),
+                    fallbackReason = string.Empty,
                     metadataOnly = true
                 });
         }
@@ -1127,6 +1149,7 @@ public static class AgentRunEndpoints
         VisionAgentBuildFromPlanRequest? buildFromPlan)
     {
         return FirstNonBlank(
+            result.PlanId,
             result.BuildResult?.PlanId,
             buildFromPlan?.PlanSnapshot?.PlanId,
             buildFromPlan?.PlanId);
@@ -1137,6 +1160,7 @@ public static class AgentRunEndpoints
         VisionAgentBuildFromPlanRequest? buildFromPlan)
     {
         return FirstNonBlank(
+            result.PlanHash,
             result.BuildResult?.PlanHash,
             buildFromPlan?.PlanSnapshot?.PlanHash,
             buildFromPlan?.PlanHash);
@@ -1197,6 +1221,7 @@ public sealed record AgentRunCreateRequest
     public string Description { get; init; } = string.Empty;
     public string? AdditionalContext { get; init; }
     public string? SessionId { get; init; }
+    public string? RequestId { get; init; }
     public string? ExistingFlowJson { get; init; }
     public IReadOnlyList<string>? Attachments { get; init; }
     public int? AttachmentCount { get; init; }
@@ -1234,9 +1259,18 @@ public sealed record AgentRunCreateRequest
                 : RequirementMode!,
             UseVisionAgentGenerateFlow = UseVisionAgentGenerateFlow ?? true,
             AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(AgentGenerateFlowMode),
-            RuntimePreviewConsent = false,
+            RuntimePreviewConsent = RuntimePreviewConsent,
             AgentRunId = runId,
             BuildFromPlan = BuildFromPlan
         };
+    }
+
+    public BuildCommand ToBuildCommand(string runId)
+    {
+        return BuildCommand.FromGenerationRequest(
+            ToGenerationRequest(runId),
+            runId,
+            RequestId,
+            BuildCommandTransports.AgentRun);
     }
 }

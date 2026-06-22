@@ -34,40 +34,33 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     };
 
     private readonly IVisionAgentToolRegistry _toolRegistry;
-    private readonly IAiFlowGenerationService _generationService;
     private readonly IVisionAgentPlanPlannerService? _planPlannerService;
     private readonly IVisionAgentSemanticExtractorService? _semanticExtractor;
     private readonly IVisionAgentBuildOrchestrator? _buildOrchestrator;
     private readonly IAgentRunEventSink? _eventSink;
     private readonly VisionAgentLoop? _toolLoop;
     private readonly IVisionAgentLoopCompletionSource? _toolLoopCompletionSource;
-    private readonly AgentGenerateFlowOptions _agentOptions;
     private readonly VisionAgentLoopOptions _loopOptions;
     private readonly AgentRunEventRedactor _redactor;
 
     public VisionAgentOrchestrator(
         IVisionAgentToolRegistry toolRegistry,
-        IAiFlowGenerationService generationService,
         IAgentRunEventSink? eventSink = null,
         IVisionAgentBuildOrchestrator? buildOrchestrator = null,
         IVisionAgentPlanPlannerService? planPlannerService = null,
         IVisionAgentSemanticExtractorService? semanticExtractor = null,
         VisionAgentLoop? toolLoop = null,
         IVisionAgentLoopCompletionSource? toolLoopCompletionSource = null,
-        IOptions<AgentGenerateFlowOptions>? agentOptions = null,
         IOptions<VisionAgentLoopOptions>? loopOptions = null,
         AgentRunEventRedactor? redactor = null)
     {
         _toolRegistry = toolRegistry;
-        _generationService = generationService;
         _planPlannerService = planPlannerService;
         _semanticExtractor = semanticExtractor;
         _buildOrchestrator = buildOrchestrator;
         _eventSink = eventSink;
         _toolLoop = toolLoop;
         _toolLoopCompletionSource = toolLoopCompletionSource;
-        _agentOptions = agentOptions?.Value ?? new AgentGenerateFlowOptions();
-        _agentOptions.Mode = AiAgentGenerateFlowModes.Normalize(_agentOptions.Mode);
         _loopOptions = loopOptions?.Value ?? new VisionAgentLoopOptions();
         _loopOptions.Normalize();
         _redactor = redactor ?? new AgentRunEventRedactor();
@@ -412,7 +405,23 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         }
 
         EmitBuildPreparationEvents(request);
-        return await _generationService.GenerateFlowAsync(request, cancellationToken: cancellationToken);
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+            ErrorMessage = "Vision Agent Build orchestrator is not registered.",
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "vision_agent_build_from_plan",
+                Code = VisionAgentBuildFailureCodes.BuildOrchestratorNotRegistered,
+                Message = "Vision Agent Build orchestrator is not registered.",
+                RepairTarget = "Register the Vision Agent Build orchestrator before starting BuildFromPlan."
+            },
+            InteractionState = AiInteractionStates.Failed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High
+        };
     }
 
     private async Task<AiFlowGenerationResult> BuildFromPlanWithToolLoopAsync(
@@ -500,14 +509,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
     private bool ShouldUseToolLoop(AiFlowGenerationRequest request)
     {
         var requestMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode);
-        if (string.Equals(requestMode, AiAgentGenerateFlowModes.ToolLoop, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return request.UseVisionAgentGenerateFlow &&
-               _agentOptions.Enabled &&
-               string.Equals(_agentOptions.Mode, AiAgentGenerateFlowModes.ToolLoop, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(requestMode, AiAgentGenerateFlowModes.ToolLoop, StringComparison.OrdinalIgnoreCase);
     }
 
     private VisionAgentToolContext BuildToolLoopContext(AiFlowGenerationRequest request)

@@ -5436,6 +5436,10 @@ export const aiPanelAgentWorkspaceMixin = {
             return false;
         }
 
+        if (!this._isAgentRunTerminalPlanCurrent(evt, payload)) {
+            return false;
+        }
+
         const buildResult = this._getPayloadBuildResult(payload);
         const flow = this._getResultFlowForCanvas(payload);
         if (!flow) {
@@ -5470,6 +5474,46 @@ export const aiPanelAgentWorkspaceMixin = {
             assistantTurn: this.activeAssistantTurn
         });
         this._renderBuildWorkspaceFromAgentRun();
+        return true;
+    },
+
+    _isAgentRunTerminalPlanCurrent(evt, payload) {
+        const runId = String(evt?.runId || evt?.RunId || '').trim();
+        if (this.activeAgentRunId && runId && runId !== this.activeAgentRunId) {
+            this.agentRunStaleEventCount = (this.agentRunStaleEventCount || 0) + 1;
+            return false;
+        }
+
+        const plan = this.pendingVisionPlan;
+        if (!plan) return true;
+        const data = this._asObject?.(payload) || {};
+        const buildReplay = this._asObject?.(data.buildFromPlan || data.BuildFromPlan) || {};
+        const incomingPlanId = String(
+            data.planId ||
+            data.PlanId ||
+            buildReplay.planId ||
+            buildReplay.PlanId ||
+            ''
+        ).trim();
+        const currentPlanId = String(plan.planId || plan.id || '').trim();
+        if (!incomingPlanId || !currentPlanId || incomingPlanId !== currentPlanId) {
+            this.agentRunStaleEventCount = (this.agentRunStaleEventCount || 0) + 1;
+            return false;
+        }
+
+        const incomingPlanHash = String(
+            data.planHash ||
+            data.PlanHash ||
+            buildReplay.planHash ||
+            buildReplay.PlanHash ||
+            ''
+        ).trim();
+        const currentPlanHash = String(plan.planHash || '').trim();
+        if (incomingPlanHash && currentPlanHash && incomingPlanHash !== currentPlanHash) {
+            this.agentRunStaleEventCount = (this.agentRunStaleEventCount || 0) + 1;
+            return false;
+        }
+
         return true;
     },
 

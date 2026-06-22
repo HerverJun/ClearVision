@@ -99,30 +99,6 @@ public sealed class VisionAgentBuildOrchestrator : IVisionAgentBuildOrchestrator
                     redactionPass = true
                 });
 
-            var maturityGate = EnforceMaturityGate(request, loadPlan.Payload);
-            if (maturityGate != null)
-            {
-                _eventSink?.StageCompleted(
-                    runId,
-                    "requirement_maturity_gate",
-                    "Build blocked by requirement maturity gate",
-                    maturityGate.RequirementMaturity?.PublicReason ?? "Requirement maturity gate blocked Build.",
-                    new
-                    {
-                        maturity = maturityGate.RequirementMaturity?.Maturity ?? string.Empty,
-                        taskType = maturityGate.RequirementMaturity?.TaskType ?? string.Empty,
-                        canBuild = maturityGate.RequirementMaturity?.CanBuild ?? false,
-                        blockingReasons = maturityGate.DecisionTrace?.BlockingReasons ?? [],
-                        resolvedFields = loadPlan.Payload.ResolvedFields,
-                        remainingFields = loadPlan.Payload.RemainingFields,
-                        answerSetFingerprint = loadPlan.Payload.AnswerSetFingerprint,
-                        requirementMode = loadPlan.Payload.RequirementMode,
-                        metadataOnly = true,
-                        redactionPass = true
-                    });
-                return maturityGate;
-            }
-
             var intent = await _toolRunner.ExecuteEvidenceStepAsync(
                 runId,
                 evidence,

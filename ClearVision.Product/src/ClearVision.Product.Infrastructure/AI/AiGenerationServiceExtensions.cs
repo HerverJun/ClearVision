@@ -3,6 +3,7 @@
 // 提供 AI 相关服务的依赖注入扩展方法
 // 作者：蘅芜君
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,8 +25,12 @@ public static class AiGenerationServiceExtensions
         // 注册 IOptions<AiGenerationOptions>（供 AiConfigStore 初始化时读取 appsettings.json 默认值）
         services.Configure<AiGenerationOptions>(
             configuration.GetSection(AiGenerationOptions.SectionName));
-        services.Configure<AgentGenerateFlowOptions>(
-            configuration.GetSection(AgentGenerateFlowOptions.SectionName));
+        services.AddOptions<AgentGenerateFlowOptions>()
+            .Bind(configuration.GetSection(AgentGenerateFlowOptions.SectionName))
+            .Validate(options =>
+                string.Equals(AiAgentGenerateFlowModes.Normalize(options.Mode), options.Mode, StringComparison.OrdinalIgnoreCase),
+                "AI:VisionAgent:GenerateFlow:Mode must be scripted, planner, or tool_loop.")
+            .ValidateOnStart();
         services.Configure<VisionAgentLoopOptions>(
             configuration.GetSection("AI:VisionAgent:Loop"));
         services.Configure<AgentPlannerCompletionOptions>(
@@ -99,6 +104,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<ApplyGateResolver>();
         services.AddScoped<BuildResultAssembler>();
         services.AddScoped<IVisionAgentBuildOrchestrator, VisionAgentBuildOrchestrator>();
+        services.AddScoped<IVisionAgentBuildApplicationService, VisionAgentBuildApplicationService>();
         services.AddScoped<IVisionAgentStationStatusReader, NoOpVisionAgentStationStatusReader>();
         services.AddScoped<RuntimePreviewArtifactStore>();
         services.AddScoped<RuntimePreviewPilotResourceCatalog>();

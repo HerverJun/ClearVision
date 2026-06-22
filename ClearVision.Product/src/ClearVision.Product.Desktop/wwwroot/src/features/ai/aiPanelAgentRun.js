@@ -451,14 +451,9 @@ export class AgentRunEventTransport {
 export const aiPanelAgentRunMixin = {
     _shouldUseAgentRunEventStream() {
         const hasWindow = typeof window !== 'undefined';
-        const hasWebMessageBridge = hasWindow && (
-            Boolean(window.chrome?.webview?.postMessage)
-            || typeof window.mockWebViewResponse === 'function'
-        );
 
         return Boolean(
             this.useVisionAgentGenerateFlow &&
-            !hasWebMessageBridge &&
             hasWindow &&
             typeof fetch === 'function'
         );
@@ -520,7 +515,7 @@ export const aiPanelAgentRunMixin = {
             attachmentCount: Array.isArray(attachmentPaths) ? attachmentPaths.length : 0,
             ...agentGenerateFlowPayload,
             useVisionAgentGenerateFlow: true,
-            runtimePreviewConsent: false
+            runtimePreviewConsent: agentGenerateFlowPayload?.runtimePreviewConsent === true
         };
     },
 

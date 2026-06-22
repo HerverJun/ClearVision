@@ -5,8 +5,13 @@ public sealed record VisionAgentBuildResult
     public string BuildId { get; init; } = string.Empty;
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
+    public string ContractVersion { get; init; } = string.Empty;
     public string BuildIntent { get; init; } = string.Empty;
     public string AnswerSetFingerprint { get; init; } = string.Empty;
+    public string RequestedMode { get; init; } = AiAgentGenerateFlowModes.Scripted;
+    public string EffectiveMode { get; init; } = AiAgentGenerateFlowModes.Scripted;
+    public bool ToolLoopEntered { get; init; }
+    public string FallbackReason { get; init; } = string.Empty;
     public List<string> ResolvedFields { get; init; } = [];
     public List<string> RemainingFields { get; init; } = [];
     public string SelectionSource { get; init; } = string.Empty;

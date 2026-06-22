@@ -322,8 +322,22 @@ public sealed class VisionAgentPlanAnswerValidator
         {
             if (!questions.TryGetValue(questionId, out var question))
             {
-                invalidQuestionIds.Add(questionId);
-                return false;
+                question = null;
+            }
+
+            if (question == null)
+            {
+                candidates.Add(new CandidateAnswer(
+                    new VisionAgentPlanAnswer
+                    {
+                        QuestionId = questionId,
+                        Field = field,
+                        Value = value,
+                        Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                    },
+                    Priority(VisionAgentPlanAnswerOrigins.ExplicitUserText),
+                    GeneratedRecommended: false));
+                return true;
             }
 
             var questionField = VisionAgentPlanFieldPolicy.ResolveQuestionField(question, blockingReasons);

@@ -66,6 +66,17 @@ public sealed class BuildResultAssembler
         result.DetectedIntent = input.Intent.BuildIntent;
         result.TurnIntent = ToTurnIntent(input.Intent.BuildIntent);
         result.InteractionState = AiInteractionStates.Completed;
+        result.PlanId = input.LoadPlan.PlanId;
+        result.PlanHash = input.LoadPlan.PlanHash;
+        result.ContractVersion = input.Request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? VisionAgentPlanContractVersions.V2;
+        result.AnswerSetFingerprint = input.LoadPlan.AnswerSetFingerprint;
+        result.RequestedMode = AiAgentGenerateFlowModes.Normalize(input.Request.AgentGenerateFlowMode);
+        result.EffectiveMode = result.RequestedMode;
+        result.ToolLoopEntered = string.Equals(
+            result.RequestedMode,
+            AiAgentGenerateFlowModes.ToolLoop,
+            StringComparison.OrdinalIgnoreCase);
+        result.FallbackReason = string.Empty;
         result.ToolTrace.AddRange(input.Evidence.Select(item => (object)item));
         result.StageTimeline.AddRange(input.Evidence.Select(item => new AiGenerationStageDiagnostic
         {
@@ -87,8 +98,16 @@ public sealed class BuildResultAssembler
             BuildId = input.BuildId,
             PlanId = input.LoadPlan.PlanId,
             PlanHash = input.LoadPlan.PlanHash,
+            ContractVersion = input.Request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? VisionAgentPlanContractVersions.V2,
             BuildIntent = input.Intent.BuildIntent,
             AnswerSetFingerprint = input.LoadPlan.AnswerSetFingerprint,
+            RequestedMode = AiAgentGenerateFlowModes.Normalize(input.Request.AgentGenerateFlowMode),
+            EffectiveMode = AiAgentGenerateFlowModes.Normalize(input.Request.AgentGenerateFlowMode),
+            ToolLoopEntered = string.Equals(
+                AiAgentGenerateFlowModes.Normalize(input.Request.AgentGenerateFlowMode),
+                AiAgentGenerateFlowModes.ToolLoop,
+                StringComparison.OrdinalIgnoreCase),
+            FallbackReason = string.Empty,
             ResolvedFields = input.LoadPlan.ResolvedFields.ToList(),
             RemainingFields = input.LoadPlan.RemainingFields.ToList(),
             SelectionSource = input.Selection.SelectionSource,

@@ -1490,6 +1490,9 @@ test('AgentRun event stream is used for Agent GenerateFlow mode with fetch suppo
   global.fetch = async () => ({ ok: true });
 
   assert.equal(panel._shouldUseAgentRunEventStream(), true);
+  window.chrome = { webview: { postMessage: () => {} } };
+  assert.equal(panel._shouldUseAgentRunEventStream(), true);
+  delete window.chrome;
   delete window.EventSource;
   assert.equal(panel._shouldUseAgentRunEventStream(), true);
   panel.useVisionAgentGenerateFlow = false;
@@ -1524,7 +1527,7 @@ test('AgentRun create payload is metadata-only and does not send attachment path
   assert.equal(payload.mode, 'modify');
   assert.equal(payload.useVisionAgentGenerateFlow, true);
   assert.equal(payload.agentGenerateFlowMode, 'planner');
-  assert.equal(payload.runtimePreviewConsent, false);
+  assert.equal(payload.runtimePreviewConsent, true);
   assert.equal(payload.attachmentCount, 1);
   assert.deepEqual(payload.attachments, []);
   assert.equal(payload.existingFlowJson, '{"operators":[]}');

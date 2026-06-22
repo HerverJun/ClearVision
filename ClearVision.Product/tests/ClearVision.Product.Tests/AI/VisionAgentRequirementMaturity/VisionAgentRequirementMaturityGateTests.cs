@@ -704,8 +704,8 @@ public sealed class VisionAgentRequirementMaturityGateTests
         plan.BlockingReasons.Should().Contain("abstract_goal_needs_decomposition");
     }
 
-    [Fact(DisplayName = "BuildFromPlan should bypass old low maturity pre-gate and enter generation")]
-    public async Task BuildFromPlanAsync_ShouldBypassOldLowMaturityPreGateAndEnterGeneration()
+    [Fact(DisplayName = "BuildFromPlan should not fall back to legacy generation when Build execution is unavailable")]
+    public async Task BuildFromPlanAsync_ShouldNotFallbackToLegacyGeneration()
     {
         var generationCalls = 0;
         var generationService = Substitute.For<IAiFlowGenerationService>();
@@ -751,14 +751,14 @@ public sealed class VisionAgentRequirementMaturityGateTests
             },
             CancellationToken.None);
 
-        result.Success.Should().BeTrue();
-        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusCompleted);
-        result.GenerationMode.Should().Be("build_from_plan_entry_reached");
-        generationCalls.Should().Be(1);
+        result.Success.Should().BeFalse();
+        result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
+        result.FailureSummary!.Code.Should().Be(VisionAgentBuildFailureCodes.BuildOrchestratorNotRegistered);
+        generationCalls.Should().Be(0);
     }
 
-    [Fact(DisplayName = "GenerateFlow direct Vision Agent request should hard-block low maturity input")]
-    public async Task GenerateFlowMessageHandler_ShouldBlockLowMaturityDirectRequest()
+    [Fact(DisplayName = "GenerateFlow WebMessage adapter should delegate low maturity input to generation service")]
+    public async Task GenerateFlowMessageHandler_ShouldDelegateLowMaturityDirectRequest()
     {
         var generationCalls = 0;
         var generationService = Substitute.For<IAiFlowGenerationService>();
@@ -784,12 +784,8 @@ public sealed class VisionAgentRequirementMaturityGateTests
 
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
-        root.GetProperty("success").GetBoolean().Should().BeFalse();
-        root.GetProperty("status").GetString().Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
-        root.GetProperty("failureType").GetString().Should().Be(AiFlowGenerationResult.FailureTypeClarificationRequired);
-        root.GetProperty("requirementMaturity").GetProperty("maturity").GetString().Should().Be(AiRequirementMaturity.AbstractGoal);
-        root.GetProperty("decisionTrace").GetProperty("fallbackReason").GetString().Should().Contain("maturity_gate_blocked");
-        generationCalls.Should().Be(0);
+        root.GetProperty("success").GetBoolean().Should().BeTrue();
+        generationCalls.Should().Be(1);
     }
 
     public static IEnumerable<object[]> GoldenCases()
@@ -804,6 +800,7 @@ public sealed class VisionAgentRequirementMaturityGateTests
         IAiFlowGenerationService generationService,
         IVisionAgentSemanticExtractorService? semanticExtractor = null)
     {
+        _ = generationService;
         return new VisionAgentOrchestrator(
             new VisionAgentToolRegistry(
             [
@@ -811,7 +808,6 @@ public sealed class VisionAgentRequirementMaturityGateTests
                 new FlowTemplateMatchTool(),
                 new FlowValidationTool()
             ]),
-            generationService,
             semanticExtractor: semanticExtractor);
     }
 

@@ -777,7 +777,7 @@ test('AI panel keeps explicit new-flow requests from being coerced into modifica
   await expect(page.locator('#ai-agent-runtime')).toContainText('意图 新建流程');
 });
 
-test('AI panel uses WebView2 postMessage contract for generation turns', async ({ page }) => {
+test.skip('AI panel uses WebView2 postMessage contract for generation turns', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
   await installFakeWebView2(page);
   await mockShellApis(page);
@@ -855,4 +855,75 @@ test('AI panel uses WebView2 postMessage contract for generation turns', async (
   await expect(page.locator('#ai-clarification-plan-card')).toContainText('待澄清');
   await expect(page.locator('#ai-clarification-plan-card')).toContainText('1 个阻断问题');
   await expect(page.locator('.ai-assistant-clarification-section').last()).toContainText('请补充检测对象是什么。');
+});
+
+test('AI panel posts Build through AgentRun even when WebView2 is available', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await installFakeWebView2(page);
+  await mockShellApis(page);
+  const agentRunPayloads: any[] = [];
+  await page.route('**/api/ai/agent-runs**', async route => {
+    const request = route.request();
+    if (request.method() === 'POST' && request.url().endsWith('/api/ai/agent-runs')) {
+      agentRunPayloads.push(request.postDataJSON());
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          runId: 'ar_webview_build',
+          brief: 'Build started',
+          events: [
+            {
+              runId: 'ar_webview_build',
+              sequence: 1,
+              eventType: 'run.started',
+              stage: 'run',
+              status: 'running',
+              payload: { metadataOnly: true },
+            },
+          ],
+        }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: [
+        'event: run.completed',
+        'data: {"runId":"ar_webview_build","sequence":2,"eventType":"run.completed","stage":"run","status":"completed","payload":{"status":"completed","flow":{"operators":[]},"buildResult":{"applyGate":{"canvasApplyReady":false,"blocked":true}},"metadataOnly":true}}',
+        '',
+        '',
+      ].join('\n'),
+    });
+  });
+  await bootAuthenticatedApp(page);
+
+  await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
+    (element as HTMLElement).click();
+  });
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && !(window as any).mockWebViewResponse));
+
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel.isVisionAgentDeveloperUiEnabled = true;
+    panel._dispatchGenerateRequest({
+      description: 'webview build request',
+      userMessage: 'webview build request',
+      explicitMode: 'auto',
+      skipPlan: true,
+      skipPlanSource: 'developer_direct_build_debug',
+    });
+  });
+
+  await page.waitForFunction(() => (window as any).aiPanel?.activeAgentRunId === 'ar_webview_build');
+  expect(agentRunPayloads).toHaveLength(1);
+  expect(agentRunPayloads[0].description).toBe('webview build request');
+  expect(agentRunPayloads[0].mode).toBe('auto');
+  expect(agentRunPayloads[0].requirementMode).toBe('strict');
+  expect(agentRunPayloads[0].requestId).toBeTruthy();
+  expect(Object.prototype.hasOwnProperty.call(agentRunPayloads[0], 'sessionId')).toBe(true);
+  const webMessages = await page.evaluate(() => (window as any).__cvWebViewMessages || []);
+  expect(webMessages.some((message: any) => message.messageType === 'GenerateFlow')).toBe(false);
 });

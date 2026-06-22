@@ -5,6 +5,7 @@ using ClearVision.Product.Core.AI.Tools;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
@@ -12,6 +13,7 @@ using ClearVision.Product.Infrastructure.AI.Tools;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace ClearVision.Product.Tests.AI.VisionAgentBuildOrchestratorTests;
 
@@ -118,7 +120,8 @@ public sealed class VisionAgentBuildOrchestratorTests
     [Fact(DisplayName = "BuildFromPlan strict missing image source should block at final evaluator gate")]
     public async Task BuildAsync_StrictMissingImageSource_ShouldBlock()
     {
-        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var sink = new CapturingAgentRunEventSink();
+        var applicationService = CreateBuildApplicationService(sink);
         var baseline = Plan(
             "surface_defect",
             ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
@@ -144,9 +147,12 @@ public sealed class VisionAgentBuildOrchestratorTests
             PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
         };
 
-        var result = await orchestrator.BuildAsync(
-            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Strict),
-            CancellationToken.None);
+        var result = (await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Strict),
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            CancellationToken.None)).Result;
 
         result.Success.Should().BeFalse();
         result.ClarificationRequired.Should().BeTrue();
@@ -384,17 +390,22 @@ public sealed class VisionAgentBuildOrchestratorTests
     [Fact(DisplayName = "BuildFromPlan explicit MES output should block until answered")]
     public async Task BuildAsync_ExplicitMesOutputWithoutAnswer_ShouldBlock()
     {
-        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var sink = new CapturingAgentRunEventSink();
+        var applicationService = CreateBuildApplicationService(sink);
         var plan = ExternalMesOutputPlan();
 
-        var result = await orchestrator.BuildAsync(
-            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Strict),
-            CancellationToken.None);
+        var result = (await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Strict),
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            CancellationToken.None)).Result;
 
         result.Success.Should().BeFalse();
         result.ClarificationRequired.Should().BeTrue();
-        result.RequirementBrief!.BlockingClarificationFields.Should()
-            .Contain(VisionAgentPlanAnswerFields.OutputTarget);
+        result.FailureSummary!.Code.Should().Be(VisionAgentBuildFailureCodes.ReadinessBlocked);
+        result.BuildReadiness!.Blockers.Should()
+            .Contain(blocker => blocker.Field == VisionAgentPlanAnswerFields.OutputTarget);
     }
 
     [Fact(DisplayName = "BuildFromPlan explicit MES output should build after answer")]
@@ -639,7 +650,8 @@ public sealed class VisionAgentBuildOrchestratorTests
     [Fact(DisplayName = "BuildFromPlan draft should block when object and task are both empty")]
     public async Task BuildAsync_DraftWithEmptyObjectAndTask_ShouldBlock()
     {
-        var orchestrator = CreateOrchestrator(new CapturingAgentRunEventSink());
+        var sink = new CapturingAgentRunEventSink();
+        var applicationService = CreateBuildApplicationService(sink);
         var baseline = Plan(
             "surface_defect",
             ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
@@ -674,18 +686,20 @@ public sealed class VisionAgentBuildOrchestratorTests
             PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan)
         };
 
-        var result = await orchestrator.BuildAsync(
-            Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Draft),
-            CancellationToken.None);
+        var result = (await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                Request(plan, acceptedRecommendedDefaults: false, requirementMode: AiRequirementModes.Draft),
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            CancellationToken.None)).Result;
 
         result.Success.Should().BeFalse();
         result.ClarificationRequired.Should().BeTrue();
-        result.RequirementMaturity.Should().NotBeNull();
-        result.RequirementMaturity!.CanPlan.Should().BeFalse();
-        result.DecisionTrace!.BlockingReasons.Should()
-            .Contain(reason => reason.Contains("inspection_object", StringComparison.OrdinalIgnoreCase))
+        result.FailureSummary!.Code.Should().Be(VisionAgentBuildFailureCodes.ReadinessBlocked);
+        result.BuildReadiness!.Blockers.Select(blocker => blocker.Field).Should()
+            .Contain(VisionAgentPlanAnswerFields.InspectionObject)
             .And
-            .Contain(reason => reason.Contains("task_type", StringComparison.OrdinalIgnoreCase));
+            .Contain(VisionAgentPlanAnswerFields.TaskType);
     }
 
     [Fact(DisplayName = "Black-box scenario: metal scratch Build quality")]
@@ -774,7 +788,6 @@ public sealed class VisionAgentBuildOrchestratorTests
             NullLogger<VisionAgentPlanPlannerService>.Instance);
         var planOrchestrator = new VisionAgentOrchestrator(
             CreateToolRegistry(),
-            new FakeAiFlowGenerationService(),
             sink,
             planPlannerService: planner,
             semanticExtractor: new FakeSemanticExtractor(semantic));
@@ -895,25 +908,30 @@ public sealed class VisionAgentBuildOrchestratorTests
     public async Task BuildAsync_InvalidConfirmedAnswer_ShouldBlock()
     {
         var sink = new CapturingAgentRunEventSink();
-        var orchestrator = CreateOrchestrator(sink);
+        var applicationService = CreateBuildApplicationService(sink);
         var plan = PlanWithStrategyConfirmationBlocker();
 
-        var result = await orchestrator.BuildAsync(
-            Request(
-                plan,
-                confirmedAnswers:
-                [
-                    PlanAnswer(
-                        "model_or_rule_strategy",
-                        VisionAgentPlanAnswerFields.AlgorithmStrategy,
-                        "unsupported_strategy")
-                ],
-                acceptedRecommendedDefaults: false),
-            CancellationToken.None);
+        var result = (await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                Request(
+                    plan,
+                    confirmedAnswers:
+                    [
+                        PlanAnswer(
+                            "model_or_rule_strategy",
+                            VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                            "unsupported_strategy")
+                    ],
+                    acceptedRecommendedDefaults: false),
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            CancellationToken.None)).Result;
 
         result.Success.Should().BeFalse();
         result.ClarificationRequired.Should().BeTrue();
-        result.DecisionTrace!.BlockingReasons.Should()
+        result.FailureSummary!.Code.Should().Be(VisionAgentBuildFailureCodes.ReadinessBlocked);
+        result.BuildReadiness!.Blockers.Select(blocker => blocker.Id)
+            .Should()
             .Contain("hard_requirement:invalid_plan_answer_value");
     }
 
@@ -1655,6 +1673,25 @@ public sealed class VisionAgentBuildOrchestratorTests
             sink);
     }
 
+    private static VisionAgentBuildApplicationService CreateBuildApplicationService(
+        CapturingAgentRunEventSink sink,
+        IVisionAgentToolRegistry? registry = null)
+    {
+        return new VisionAgentBuildApplicationService(
+            new BuildExecutionAdapter(CreateOrchestrator(sink, registry)),
+            new VisionAgentPlanAnswerValidator(),
+            new VisionAgentPlanRequirementOverlay(),
+            new ConversationalFlowService(Path.Combine(Path.GetTempPath(), "clearvision-build-app-test-" + Guid.NewGuid().ToString("N"))),
+            NullLogger<VisionAgentBuildApplicationService>.Instance,
+            Options.Create(new AgentGenerateFlowOptions
+            {
+                Enabled = true,
+                Mode = AiAgentGenerateFlowModes.Scripted,
+                FallbackToLegacyOnFailure = false
+            }),
+            sink);
+    }
+
     private static void AssertBuildQuality(
         AiFlowGenerationResult result,
         CapturingAgentRunEventSink sink,
@@ -1885,6 +1922,30 @@ public sealed class VisionAgentBuildOrchestratorTests
             Value = value,
             Origin = origin
         };
+    }
+
+    private sealed class BuildExecutionAdapter : IVisionAgentOrchestrator
+    {
+        private readonly IVisionAgentBuildOrchestrator _buildOrchestrator;
+
+        public BuildExecutionAdapter(IVisionAgentBuildOrchestrator buildOrchestrator)
+        {
+            _buildOrchestrator = buildOrchestrator;
+        }
+
+        public Task<VisionAgentPlanModeResult> CreatePlanAsync(
+            VisionAgentPlanModeRequest request,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<AiFlowGenerationResult> BuildFromPlanAsync(
+            AiFlowGenerationRequest request,
+            CancellationToken cancellationToken)
+        {
+            return _buildOrchestrator.BuildAsync(request, cancellationToken);
+        }
     }
 
     private static VisionAgentPlanModeResult ExternalMesOutputPlan()

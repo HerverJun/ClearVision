@@ -215,7 +215,7 @@ public sealed class VisionAgentGenerateFlowTests
 
         result.Success.Should().BeFalse();
         result.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusClarificationRequired);
-        result.BuildReadiness.Should().BeSameAs(readiness);
+        result.BuildReadiness.Should().BeEquivalentTo(readiness);
         build.CallCount.Should().Be(1);
         agent.CallCount.Should().Be(0);
         extractor.DidNotReceiveWithAnyArgs().Extract(default, default, default);
@@ -245,7 +245,8 @@ public sealed class VisionAgentGenerateFlowTests
         result.FailureSummary.Code.Should().Be("build_from_plan_system_exception");
         result.ErrorMessage.Should().NotContain("boom");
         result.ClarificationRequired.Should().BeFalse();
-        result.BuildReadiness.Should().BeNull();
+        result.BuildReadiness.Should().NotBeNull();
+        result.BuildReadiness!.CanBuild.Should().BeTrue();
         build.CallCount.Should().Be(1);
         agent.CallCount.Should().Be(0);
         extractor.DidNotReceiveWithAnyArgs().Extract(default, default, default);
@@ -303,7 +304,21 @@ public sealed class VisionAgentGenerateFlowTests
             new FlowTemplateMatchTool(),
             new FlowValidationTool()
         ]);
-        var orchestrator = new VisionAgentOrchestrator(registry, generationService, sink);
+        var buildOrchestrator = new FakeBuildOrchestrator(request =>
+        {
+            capturedRequest = request;
+            return Task.FromResult(new AiFlowGenerationResult
+            {
+                Success = true,
+                CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+                Flow = new OperatorFlowDto()
+            });
+        });
+        var orchestrator = new VisionAgentOrchestrator(registry, sink, buildOrchestrator);
+        var applicationService = BuildApplicationServiceFor(
+            orchestrator,
+            new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = false },
+            sink);
 
         var plan = await orchestrator.CreatePlanAsync(
             new VisionAgentPlanModeRequest
@@ -319,80 +334,86 @@ public sealed class VisionAgentGenerateFlowTests
                 }
             },
             CancellationToken.None);
-        var result = await orchestrator.BuildFromPlanAsync(
-            new AiFlowGenerationRequest("metal surface scratch detection", Mode: GenerateFlowMode.New)
+        plan = plan with { PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan) };
+        var request = new AiFlowGenerationRequest("metal surface scratch detection", Mode: GenerateFlowMode.New)
+        {
+            AgentRunId = "ar_test",
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = new VisionAgentBuildFromPlanRequest
             {
-                AgentRunId = "ar_test",
-                UseVisionAgentGenerateFlow = true,
-                BuildFromPlan = new VisionAgentBuildFromPlanRequest
+                PlanId = plan.PlanId,
+                PlanHash = plan.PlanHash,
+                PlanSnapshot = plan,
+                ConfirmedAnswers =
+                [
+                    new VisionAgentPlanAnswer
+                    {
+                        Field = VisionAgentPlanAnswerFields.InspectionObject,
+                        Value = "metal surface",
+                        Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                    },
+                    new VisionAgentPlanAnswer
+                    {
+                        Field = VisionAgentPlanAnswerFields.TaskType,
+                        Value = AiVisionTaskTypes.SurfaceDefect,
+                        Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                    },
+                    new VisionAgentPlanAnswer
+                    {
+                        Field = VisionAgentPlanAnswerFields.ImageSource,
+                        Value = "camera",
+                        Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                    },
+                    new VisionAgentPlanAnswer
+                    {
+                        Field = VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                        Value = "scratch is NG",
+                        Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                    }
+                ],
+                UserSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    PlanId = plan.PlanId,
-                    PlanSnapshot = plan,
-                    UserSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                    {
-                        ["defect_definition"] = "scratch_or_blob"
-                    },
-                    AcceptedDefaults = ["defect_definition"],
-                    CurrentFlowSnapshot = "{\"operators\":[{\"id\":\"camera\"}]}",
-                    AttachmentSummary = new VisionAgentAttachmentSummary
-                    {
-                        Count = 1,
-                        ResourceKinds = ["sample_image_metadata"],
-                        PathsRedacted = true
-                    },
-                    OperatorCatalogVersion = plan.OperatorCatalogVersion,
-                    StationBoundarySummary = plan.StationBoundarySummary,
-                    PlcOutputPolicy = plan.PlcOutputPolicy,
-                    BuildIntent = "new",
-                    OriginalUserPrompt = plan.OriginalUserPrompt,
-                    AcceptedRecommendedDefaults = true
-                }
-            },
-            CancellationToken.None);
+                    ["defect_definition"] = "scratch_or_blob"
+                },
+                AcceptedDefaults = ["defect_definition"],
+                CurrentFlowSnapshot = "{\"operators\":[{\"id\":\"camera\"}]}",
+                AttachmentSummary = new VisionAgentAttachmentSummary
+                {
+                    Count = 1,
+                    ResourceKinds = ["sample_image_metadata"],
+                    PathsRedacted = true
+                },
+                OperatorCatalogVersion = plan.OperatorCatalogVersion,
+                StationBoundarySummary = plan.StationBoundarySummary,
+                PlcOutputPolicy = plan.PlcOutputPolicy,
+                BuildIntent = "new",
+                OriginalUserPrompt = plan.OriginalUserPrompt,
+                AcceptedRecommendedDefaults = true
+            }
+        };
+        var result = (await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                request,
+                request.AgentRunId,
+                transport: BuildCommandTransports.AgentRun,
+                persistResult: false),
+            CancellationToken.None)).Result;
 
-        result.Success.Should().BeTrue();
-        capturedRequest.Should().NotBeNull();
-        capturedRequest!.BuildFromPlan.Should().NotBeNull();
+        result.Success.Should().BeFalse();
+        result.FailureSummary!.Code.Should().Be(VisionAgentBuildFailureCodes.ReadinessBlocked);
+        capturedRequest.Should().BeNull();
         plan.Intent.Should().Be("surface_defect");
         plan.RecommendedRoute.RouteId.Should().Be("surface_defect_detection");
         plan.ClarificationQuestions.Select(question => question.Id)
             .Should()
             .Contain(["q_fallback_image_source", "q_fallback_acceptance_criteria"]);
         plan.ClarificationQuestions.Should().OnlyContain(question => question.Options.Count == 0);
-        sink.Events.Select(evt => evt.Stage).Should().ContainInOrder([
-            "understand_requirement",
-            "understand_requirement",
-            "context_collection",
-            "context_collection",
-            "plan_generation",
-            "assumption_confirmation",
-            "requirement_parsing",
-            "requirement_parsing"
-        ]);
-        sink.Events.Where(evt => evt.Stage is
-                "understand_requirement" or
-                "context_collection" or
-                "plan_generation" or
-                "assumption_confirmation")
-            .Should()
-            .OnlyContain(evt => evt.MetadataOnly);
+        plan.PublicEvents.Select(evt => evt.Stage).Should().Contain(["collecting_context", "rule_fallback_used", "plan_ready"]);
+        plan.PublicEvents.Should().OnlyContain(evt => evt.MetadataOnly);
+        sink.Events.Select(evt => evt.Stage).Should().ContainInOrder(["canonical_build_contract", "canonical_build_readiness"]);
+        sink.Events.Should().OnlyContain(evt => evt.MetadataOnly);
 
-        var planEvent = sink.Events.Single(evt => evt.Stage == "plan_generation");
-        var planPayload = Json(planEvent.Payload);
-        planPayload.GetProperty("planId").GetString().Should().Be(plan.PlanId);
-        planPayload.GetProperty("planSnapshot").GetProperty("RecommendedRoute")
-            .GetProperty("RouteId")
-            .GetString()
-            .Should()
-            .Be("surface_defect_detection");
-        planPayload.GetProperty("userSelections")
-            .GetProperty("defect_definition")
-            .GetString()
-            .Should()
-            .Be("scratch_or_blob");
-        planPayload.GetProperty("acceptedDefaults").EnumerateArray().Should().NotBeEmpty();
-
-        var publicJson = JsonSerializer.Serialize(sink.Events);
+        var publicJson = JsonSerializer.Serialize(new { plan.PublicEvents, sink.Events });
         publicJson.Should().NotContain("systemPrompt");
         publicJson.Should().NotContain("reasoningContent");
         publicJson.Should().NotContain("rawPrompt");
@@ -403,21 +424,20 @@ public sealed class VisionAgentGenerateFlowTests
     public async Task VisionAgentOrchestrator_ShouldPublishPlanHashMismatchDiagnostic()
     {
         var sink = new CapturingAgentRunEventSink();
-        var generationService = Substitute.For<IAiFlowGenerationService>();
-        generationService.GenerateFlowAsync(
-                Arg.Any<AiFlowGenerationRequest>(),
-                Arg.Any<Action<string>?>(),
-                Arg.Any<Action<AiStreamChunk>?>(),
-                Arg.Any<CancellationToken>(),
-                Arg.Any<Action<GenerateFlowAttachmentReport>?>())
-            .Returns(Task.FromResult(new AiFlowGenerationResult
+        var registry = new VisionAgentToolRegistry([new OperatorCatalogTool()]);
+        var orchestrator = new VisionAgentOrchestrator(
+            registry,
+            sink,
+            new FakeBuildOrchestrator(_ => Task.FromResult(new AiFlowGenerationResult
             {
                 Success = true,
                 CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
                 Flow = new OperatorFlowDto()
-            }));
-        var registry = new VisionAgentToolRegistry([new OperatorCatalogTool()]);
-        var orchestrator = new VisionAgentOrchestrator(registry, generationService, sink);
+            })));
+        var applicationService = BuildApplicationServiceFor(
+            orchestrator,
+            new AgentGenerateFlowOptions { Enabled = true, FallbackToLegacyOnFailure = false },
+            sink);
 
         var plan = await orchestrator.CreatePlanAsync(
             new VisionAgentPlanModeRequest
@@ -427,29 +447,34 @@ public sealed class VisionAgentGenerateFlowTests
             },
             CancellationToken.None);
 
-        var result = await orchestrator.BuildFromPlanAsync(
-            new AiFlowGenerationRequest("wire sequence inspection", Mode: GenerateFlowMode.New)
+        var request = new AiFlowGenerationRequest("wire sequence inspection", Mode: GenerateFlowMode.New)
+        {
+            AgentRunId = "ar_hash_mismatch",
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = new VisionAgentBuildFromPlanRequest
             {
-                AgentRunId = "ar_hash_mismatch",
-                UseVisionAgentGenerateFlow = true,
-                BuildFromPlan = new VisionAgentBuildFromPlanRequest
-                {
-                    PlanId = plan.PlanId,
-                    PlanHash = "sha256:mismatched-plan-hash",
-                    PlanSnapshot = plan,
-                    BuildIntent = "new",
-                    OriginalUserPrompt = plan.OriginalUserPrompt,
-                    MetadataOnly = true
-                }
-            },
-            CancellationToken.None);
+                PlanId = plan.PlanId,
+                PlanHash = "sha256:mismatched-plan-hash",
+                PlanSnapshot = plan,
+                BuildIntent = "new",
+                OriginalUserPrompt = plan.OriginalUserPrompt,
+                MetadataOnly = true
+            }
+        };
+        var result = (await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                request,
+                request.AgentRunId,
+                transport: BuildCommandTransports.AgentRun,
+                persistResult: false),
+            CancellationToken.None)).Result;
 
-        result.Success.Should().BeTrue();
-        var diagnostic = sink.Events.Single(evt => evt.Stage == "plan_hash_validation");
-        diagnostic.Status.Should().Be(AgentRunEventStatuses.Completed);
+        result.Success.Should().BeFalse();
+        result.FailureSummary!.Code.Should().Be(VisionAgentBuildFailureCodes.StalePlan);
+        var diagnostic = sink.Events.Single(evt => evt.Stage == "canonical_build_contract");
+        diagnostic.Status.Should().Be(AgentRunEventStatuses.Failed);
         var diagnosticJson = JsonSerializer.Serialize(diagnostic, AgentRunEventJson.Options);
-        diagnosticJson.Should().Contain("plan_hash_mismatch");
-        diagnosticJson.Should().Contain("sha256:mismatched-plan-hash");
+        diagnosticJson.Should().Contain(VisionAgentBuildFailureCodes.StalePlan);
         diagnosticJson.Should().NotContain("SECRET_RAW_PROMPT");
         diagnosticJson.Should().NotContain("systemPrompt");
         diagnosticJson.Should().NotContain("rawPrompt");
@@ -679,10 +704,10 @@ public sealed class VisionAgentGenerateFlowTests
         frontendGuardSource.Should().NotContain("replay_flow_with_frame");
     }
 
-    [Fact(DisplayName = "Controlled agent should not be enabled by default in options")]
-    public void AgentGenerateFlowOptions_ShouldDefaultDisabled()
+    [Fact(DisplayName = "Controlled agent should be enabled by default in options")]
+    public void AgentGenerateFlowOptions_ShouldDefaultEnabled()
     {
-        new AgentGenerateFlowOptions().Enabled.Should().BeFalse();
+        new AgentGenerateFlowOptions().Enabled.Should().BeTrue();
     }
 
     private static AiFlowGenerationRequest AgentRequest(string description, string? existingFlowJson = null)
@@ -811,7 +836,40 @@ public sealed class VisionAgentGenerateFlowTests
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>(),
             Options.Create(agentOptions),
             agentGenerateFlowService,
-            serviceProvider);
+            BuildApplicationServiceFor(serviceProvider, agentOptions));
+    }
+
+    private static IVisionAgentBuildApplicationService? BuildApplicationServiceFor(
+        IServiceProvider? serviceProvider,
+        AgentGenerateFlowOptions options)
+    {
+        if (serviceProvider?.GetService(typeof(IVisionAgentBuildOrchestrator)) is not IVisionAgentBuildOrchestrator build)
+        {
+            return null;
+        }
+
+        return new VisionAgentBuildApplicationService(
+            new BuildOrchestratorExecution(build),
+            new VisionAgentPlanAnswerValidator(),
+            new VisionAgentPlanRequirementOverlay(),
+            new ConversationalFlowService(Path.Combine(Path.GetTempPath(), "clearvision-test-build-app-" + Guid.NewGuid().ToString("N"))),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService>>(),
+            Options.Create(options));
+    }
+
+    private static IVisionAgentBuildApplicationService BuildApplicationServiceFor(
+        IVisionAgentOrchestrator execution,
+        AgentGenerateFlowOptions options,
+        IAgentRunEventSink? eventSink = null)
+    {
+        return new VisionAgentBuildApplicationService(
+            execution,
+            new VisionAgentPlanAnswerValidator(),
+            new VisionAgentPlanRequirementOverlay(),
+            new ConversationalFlowService(Path.Combine(Path.GetTempPath(), "clearvision-test-build-app-" + Guid.NewGuid().ToString("N"))),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService>>(),
+            Options.Create(options),
+            eventSink);
     }
 
     private static VisionAgentBuildFromPlanRequest BuildableLesionBuildFromPlanRequest()
@@ -984,14 +1042,12 @@ public sealed class VisionAgentGenerateFlowTests
 
     private static VisionAgentBuildFromPlanRequest BuildFromPlanRequest()
     {
-        return new VisionAgentBuildFromPlanRequest
+        var request = new VisionAgentBuildFromPlanRequest
         {
             PlanId = "plan-build-from-plan",
-            PlanHash = "sha256:test",
             PlanSnapshot = new VisionAgentPlanModeResult
             {
                 PlanId = "plan-build-from-plan",
-                PlanHash = "sha256:test",
                 PlanContractVersion = VisionAgentPlanContractVersions.V2,
                 OriginalUserPrompt = "detect circular hole offset",
                 Goal = "detect circular hole offset",
@@ -1020,13 +1076,37 @@ public sealed class VisionAgentGenerateFlowTests
             [
                 new VisionAgentPlanAnswer
                 {
+                    Field = VisionAgentPlanAnswerFields.InspectionObject,
+                    Value = "circular hole",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.TaskType,
+                    Value = AiVisionTaskTypes.GeometryMeasurement,
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
                     Field = "image_source",
                     Value = "camera",
                     QuestionId = "image_source",
                     Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
+                },
+                new VisionAgentPlanAnswer
+                {
+                    Field = VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                    Value = "center offset within tolerance",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserText
                 }
             ],
             MetadataOnly = true
+        };
+        var hash = VisionAgentOrchestrator.ComputePlanHash(request.PlanSnapshot);
+        return request with
+        {
+            PlanHash = hash,
+            PlanSnapshot = request.PlanSnapshot! with { PlanHash = hash }
         };
     }
 
@@ -1165,6 +1245,30 @@ public sealed class VisionAgentGenerateFlowTests
         {
             CallCount++;
             return _handler(request);
+        }
+    }
+
+    private sealed class BuildOrchestratorExecution : IVisionAgentOrchestrator
+    {
+        private readonly IVisionAgentBuildOrchestrator _buildOrchestrator;
+
+        public BuildOrchestratorExecution(IVisionAgentBuildOrchestrator buildOrchestrator)
+        {
+            _buildOrchestrator = buildOrchestrator;
+        }
+
+        public Task<VisionAgentPlanModeResult> CreatePlanAsync(
+            VisionAgentPlanModeRequest request,
+            CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<AiFlowGenerationResult> BuildFromPlanAsync(
+            AiFlowGenerationRequest request,
+            CancellationToken cancellationToken)
+        {
+            return _buildOrchestrator.BuildAsync(request, cancellationToken);
         }
     }
 
