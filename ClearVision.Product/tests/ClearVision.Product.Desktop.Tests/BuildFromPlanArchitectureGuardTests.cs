@@ -1,4 +1,5 @@
 using FluentAssertions;
+using System.Runtime.CompilerServices;
 
 namespace ClearVision.Product.Desktop.Tests;
 
@@ -23,6 +24,48 @@ public sealed class BuildFromPlanArchitectureGuardTests
             text.Should().NotContain("VisionAgentBuildOrchestrator", relativePath);
             text.Should().NotContain("AgentGenerateFlowOptions", relativePath);
         }
+    }
+
+    [Fact]
+    public void AgentRunEndpoint_ShouldDelegateBuildTerminalLifecycleToRunService()
+    {
+        var text = File.ReadAllText(Path.Combine(
+            Root,
+            "ClearVision.Product/src/ClearVision.Product.Desktop/Endpoints/AgentRunEndpoints.cs"));
+        var start = text.IndexOf("private static async Task RunGenerateFlowAsync", StringComparison.Ordinal);
+        var end = text.IndexOf("private static object BuildCreatePayload", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThanOrEqualTo(0);
+        end.Should().BeGreaterThan(start);
+        var methodBody = text[start..end];
+
+        methodBody.Should().Contain("IVisionAgentBuildRunService");
+        methodBody.Should().NotContain("IVisionAgentBuildApplicationService");
+        methodBody.Should().NotContain("IVisionAgentBuildTerminalProjector");
+        methodBody.Should().NotContain("streamService.Complete");
+        methodBody.Should().NotContain("streamService.Fail");
+        methodBody.Should().NotContain("streamService.Cancel");
+        text.Should().NotContain("ProjectBuildTerminal");
+        text.Should().NotContain("BuildReplayPayload");
+        text.Should().NotContain("ResolveResultPlanId");
+    }
+
+    [Fact]
+    public void WebMessageBuildFromPlanAdapter_ShouldCreateAgentRunBeforeBuild()
+    {
+        var text = File.ReadAllText(Path.Combine(
+            Root,
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/GenerateFlowMessageHandler.cs"));
+        var start = text.IndexOf("private async Task<AiFlowGenerationResult> RunBuildFromPlanViaAgentRunAsync", StringComparison.Ordinal);
+        var end = text.IndexOf("private static AiFlowGenerationResult BuildAgentRunAdapterMissingResult", start, StringComparison.Ordinal);
+        start.Should().BeGreaterThanOrEqualTo(0);
+        end.Should().BeGreaterThan(start);
+        var methodBody = text[start..end];
+
+        methodBody.Should().Contain("_agentRunStreamService.CreateRun");
+        methodBody.Should().Contain("_buildRunService.RunAsync");
+        methodBody.Should().Contain("BuildCommandTransports.WebMessage");
+        methodBody.Should().NotContain("_generationService.GenerateFlowAsync");
+        methodBody.Should().NotContain("IVisionAgentBuildApplicationService");
     }
 
     [Fact]
@@ -71,17 +114,30 @@ public sealed class BuildFromPlanArchitectureGuardTests
         }
     }
 
-    private static string FindRepositoryRoot()
+    private static string FindRepositoryRoot([CallerFilePath] string sourceFile = "")
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null)
+        foreach (var startPath in new[]
+                 {
+                     Path.GetDirectoryName(sourceFile),
+                     Directory.GetCurrentDirectory(),
+                     AppContext.BaseDirectory
+                 })
         {
-            if (File.Exists(Path.Combine(directory.FullName, "ClearVision.Product", "ClearVision.Product.sln")))
+            if (string.IsNullOrWhiteSpace(startPath))
             {
-                return directory.FullName;
+                continue;
             }
 
-            directory = directory.Parent;
+            var directory = new DirectoryInfo(startPath);
+            while (directory != null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "ClearVision.Product", "ClearVision.Product.sln")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
         }
 
         throw new InvalidOperationException("Unable to locate repository root.");

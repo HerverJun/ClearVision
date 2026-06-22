@@ -5,6 +5,7 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using FluentAssertions;
 using NSubstitute;
 
@@ -675,26 +676,19 @@ public class GenerateFlowMessageHandlerTests
     {
         var generationService = Substitute.For<IAiFlowGenerationService>();
         var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
-        var handler = new GenerateFlowMessageHandler(generationService, logger);
-        AiFlowGenerationRequest? capturedRequest = null;
-
-        generationService.GenerateFlowAsync(
-                Arg.Any<AiFlowGenerationRequest>(),
-                Arg.Any<Action<string>>(),
-                Arg.Any<Action<ClearVision.Product.Contracts.Messages.AiStreamChunk>>(),
-                Arg.Any<CancellationToken>(),
-                Arg.Any<Action<ClearVision.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
-            .Returns(callInfo =>
-            {
-                capturedRequest = callInfo.ArgAt<AiFlowGenerationRequest>(0);
-                return Task.FromResult(new AiFlowGenerationResult
+        var buildRunService = new CapturingBuildRunService(command => new AiFlowGenerationResult
                 {
                     Success = true,
                     CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
                     GenerationMode = "build_from_plan_entry_reached",
-                    Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() }
+                    Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() },
+                    PlanId = command.Request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
+                    PlanHash = command.Request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty
                 });
-            });
+        var streamService = new AgentRunEventStreamService();
+        var handler = new GenerateFlowMessageHandler(generationService, logger, buildRunService, streamService);
+        var messages = new List<(string Type, string Payload)>();
+        string? createdRunId = null;
 
         var plan = LegacyBlockedBuildFromPlanSnapshot();
         var resultJson = await handler.HandleAsync(
@@ -711,7 +705,9 @@ public class GenerateFlowMessageHandlerTests
                 MetadataOnly = true
             },
             useVisionAgentGenerateFlow: true,
-            agentGenerateFlowMode: AiAgentGenerateFlowModes.Scripted);
+            agentGenerateFlowMode: AiAgentGenerateFlowModes.Scripted,
+            onMessage: (type, payload) => messages.Add((type, payload)),
+            onAgentRunCreated: runId => createdRunId = runId);
 
         using var doc = JsonDocument.Parse(resultJson);
         doc.RootElement.GetProperty("success").GetBoolean().Should().BeTrue();
@@ -719,11 +715,17 @@ public class GenerateFlowMessageHandlerTests
         doc.RootElement.GetProperty("generationMode").GetString().Should().Be("build_from_plan_entry_reached");
         doc.RootElement.GetProperty("planId").GetString().Should().Be(plan.PlanId);
         doc.RootElement.GetProperty("planHash").GetString().Should().Be(plan.PlanHash);
-        capturedRequest.Should().NotBeNull();
-        capturedRequest!.BuildFromPlan.Should().NotBeNull();
-        capturedRequest.BuildFromPlan!.PlanSnapshot!.CanBuild.Should().BeFalse();
-        capturedRequest.BuildFromPlan.ConfirmedAnswers.Should().HaveCount(4);
-        await generationService.Received(1).GenerateFlowAsync(
+        createdRunId.Should().StartWith("ar_");
+        messages.Should().Contain(message => message.Type == "GenerateFlowAgentRunCreated");
+        buildRunService.LastCommand.Should().NotBeNull();
+        buildRunService.LastCommand!.Transport.Should().Be(BuildCommandTransports.WebMessage);
+        buildRunService.LastCommand.RunId.Should().Be(createdRunId);
+        buildRunService.LastCommand.PersistResult.Should().BeFalse();
+        buildRunService.LastCommand.Request.AgentRunId.Should().Be(createdRunId);
+        buildRunService.LastCommand.Request.BuildFromPlan.Should().NotBeNull();
+        buildRunService.LastCommand.Request.BuildFromPlan!.PlanSnapshot!.CanBuild.Should().BeFalse();
+        buildRunService.LastCommand.Request.BuildFromPlan.ConfirmedAnswers.Should().HaveCount(4);
+        await generationService.DidNotReceive().GenerateFlowAsync(
             Arg.Any<AiFlowGenerationRequest>(),
             Arg.Any<Action<string>>(),
             Arg.Any<Action<ClearVision.Product.Contracts.Messages.AiStreamChunk>>(),
@@ -736,7 +738,6 @@ public class GenerateFlowMessageHandlerTests
     {
         var generationService = Substitute.For<IAiFlowGenerationService>();
         var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
-        var handler = new GenerateFlowMessageHandler(generationService, logger);
         var readiness = new VisionAgentBuildReadinessSnapshot
         {
             CanBuild = false,
@@ -756,14 +757,7 @@ public class GenerateFlowMessageHandlerTests
             PrimaryMessage = "Need canonical fields before Build.",
             ContractVersion = VisionAgentPlanContractVersions.V2
         };
-
-        generationService.GenerateFlowAsync(
-                Arg.Any<AiFlowGenerationRequest>(),
-                Arg.Any<Action<string>>(),
-                Arg.Any<Action<ClearVision.Product.Contracts.Messages.AiStreamChunk>>(),
-                Arg.Any<CancellationToken>(),
-                Arg.Any<Action<ClearVision.Product.Contracts.Messages.GenerateFlowAttachmentReport>>())
-            .Returns(Task.FromResult(new AiFlowGenerationResult
+        var buildRunService = new CapturingBuildRunService(command => new AiFlowGenerationResult
             {
                 Success = false,
                 CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
@@ -777,8 +771,13 @@ public class GenerateFlowMessageHandlerTests
                     CanBuild = false,
                     MissingFields = ["image_source", "acceptance_criteria"],
                     PublicReason = "Need canonical fields before Build."
-                }
-            }));
+                },
+                PlanId = command.Request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
+                PlanHash = command.Request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty
+            });
+        var streamService = new AgentRunEventStreamService();
+        var handler = new GenerateFlowMessageHandler(generationService, logger, buildRunService, streamService);
+        string? createdRunId = null;
 
         var plan = LegacyBlockedBuildFromPlanSnapshot();
         var resultJson = await handler.HandleAsync(
@@ -794,7 +793,8 @@ public class GenerateFlowMessageHandlerTests
                 OriginalUserPrompt = "start build from confirmed plan",
                 MetadataOnly = true
             },
-            useVisionAgentGenerateFlow: false);
+            useVisionAgentGenerateFlow: false,
+            onAgentRunCreated: runId => createdRunId = runId);
 
         using var doc = JsonDocument.Parse(resultJson);
         var root = doc.RootElement;
@@ -808,6 +808,60 @@ public class GenerateFlowMessageHandlerTests
             .Select(item => item.GetString()).Should().Equal("image_source", "acceptance_criteria");
         root.GetProperty("blockingClarificationFields").EnumerateArray()
             .Select(item => item.GetString()).Should().Equal("image_source", "acceptance_criteria");
+        createdRunId.Should().StartWith("ar_");
+        buildRunService.LastCommand.Should().NotBeNull();
+        buildRunService.LastCommand!.Transport.Should().Be(BuildCommandTransports.WebMessage);
+        buildRunService.LastCommand.Request.AgentRunId.Should().Be(createdRunId);
+        await generationService.DidNotReceive().GenerateFlowAsync(
+            Arg.Any<AiFlowGenerationRequest>(),
+            Arg.Any<Action<string>>(),
+            Arg.Any<Action<ClearVision.Product.Contracts.Messages.AiStreamChunk>>(),
+            Arg.Any<CancellationToken>(),
+            Arg.Any<Action<ClearVision.Product.Contracts.Messages.GenerateFlowAttachmentReport>>());
+    }
+
+    private sealed class CapturingBuildRunService : IVisionAgentBuildRunService
+    {
+        private readonly Func<BuildCommand, AiFlowGenerationResult> _resultFactory;
+
+        public CapturingBuildRunService(Func<BuildCommand, AiFlowGenerationResult> resultFactory)
+        {
+            _resultFactory = resultFactory;
+        }
+
+        public BuildCommand? LastCommand { get; private set; }
+
+        public Task<VisionAgentBuildRunResult> RunAsync(
+            BuildCommand command,
+            CancellationToken cancellationToken = default)
+        {
+            LastCommand = command;
+            var result = _resultFactory(command);
+            var outcome = new CanonicalBuildOutcome
+            {
+                Result = result,
+                RunId = command.RunId ?? command.Request.AgentRunId ?? string.Empty,
+                RequestId = command.RequestId ?? string.Empty,
+                Transport = command.Transport,
+                CompletionStatus = result.CompletionStatus,
+                FailureType = result.FailureType ?? string.Empty,
+                FailureCode = result.FailureSummary?.Code ?? string.Empty,
+                PlanId = result.PlanId,
+                PlanHash = result.PlanHash,
+                ContractVersion = result.ContractVersion,
+                AnswerSetFingerprint = result.AnswerSetFingerprint,
+                RequestedMode = result.RequestedMode,
+                EffectiveMode = result.EffectiveMode,
+                ToolLoopEntered = result.ToolLoopEntered,
+                FallbackReason = result.FallbackReason,
+                BuildReadiness = result.BuildReadiness,
+                WorkflowDiff = result.BuildResult?.WorkflowDiff,
+                ApplyGate = result.BuildResult?.ApplyGate,
+                Persisted = true
+            };
+
+            return Task.FromResult(new VisionAgentBuildRunResult(outcome, null));
+        }
     }
 
     private static VisionAgentPlanModeResult LegacyBlockedBuildFromPlanSnapshot()

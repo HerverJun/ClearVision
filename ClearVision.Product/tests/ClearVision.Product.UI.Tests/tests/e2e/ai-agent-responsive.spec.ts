@@ -58,6 +58,45 @@ async function installFakeWebView2(page: Page): Promise<void> {
   });
 }
 
+async function mockAgentRunBuild(page: Page, runId: string, payloads: any[]): Promise<void> {
+  await page.route('**/api/ai/agent-runs**', async route => {
+    const request = route.request();
+    if (request.method() === 'POST' && request.url().endsWith('/api/ai/agent-runs')) {
+      payloads.push(request.postDataJSON());
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          runId,
+          brief: 'Build started',
+          events: [
+            {
+              runId,
+              sequence: 1,
+              eventType: 'run.started',
+              stage: 'run',
+              status: 'running',
+              payload: { metadataOnly: true },
+            },
+          ],
+        }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: [
+        'event: run.completed',
+        `data: {"runId":"${runId}","sequence":2,"eventType":"run.completed","stage":"run","status":"completed","payload":{"status":"completed","flow":{"operators":[]},"buildResult":{"applyGate":{"canvasApplyReady":false,"blocked":true}},"metadataOnly":true}}`,
+        '',
+        '',
+      ].join('\n'),
+    });
+  });
+}
+
 test('AI agent clarification layout stays usable on narrow viewports', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockShellApis(page);
@@ -659,6 +698,8 @@ test('AI panel sends current flow context for modification turns', async ({ page
   await page.setViewportSize({ width: 1280, height: 820 });
   await installFakeWebView2(page);
   await mockShellApis(page);
+  const agentRunPayloads: any[] = [];
+  await mockAgentRunBuild(page, 'ar_webview_modify', agentRunPayloads);
   await bootAuthenticatedApp(page);
 
   await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
@@ -706,19 +747,17 @@ test('AI panel sends current flow context for modification turns', async ({ page
     });
   });
 
-  await page.waitForFunction(() =>
-    ((window as any).__cvWebViewMessages || []).some((message: any) => message.messageType === 'GenerateFlow'));
-
-  const sent = await page.evaluate(() => {
-    const messages = (window as any).__cvWebViewMessages || [];
-    return messages.find((message: any) => message.messageType === 'GenerateFlow');
-  });
-
-  expect(sent.payload.mode).toBe('modify');
-  expect(sent.payload.description).toBe('把算子名称改成中文，其他参数和连线保持不变');
-  expect(sent.payload.existingFlowJson).toBeTruthy();
-  expect(sent.payload.existingFlowJson.operators).toHaveLength(2);
-  expect(sent.payload.existingFlowJson.connections).toHaveLength(1);
+  await page.waitForFunction(() => (window as any).aiPanel?.activeAgentRunId === 'ar_webview_modify');
+  expect(agentRunPayloads).toHaveLength(1);
+  expect(agentRunPayloads[0].mode).toBe('modify');
+  expect(agentRunPayloads[0].existingFlowJson).toBeTruthy();
+  const existingFlowSnapshot = typeof agentRunPayloads[0].existingFlowJson === 'string'
+    ? JSON.parse(agentRunPayloads[0].existingFlowJson)
+    : agentRunPayloads[0].existingFlowJson;
+  expect(existingFlowSnapshot.operators).toHaveLength(2);
+  expect(existingFlowSnapshot.connections).toHaveLength(1);
+  const webMessages = await page.evaluate(() => (window as any).__cvWebViewMessages || []);
+  expect(webMessages.some((message: any) => message.messageType === 'GenerateFlow')).toBe(false);
   await expect(page.locator('#ai-agent-runtime')).toContainText('微调中');
   await expect(page.locator('#ai-agent-runtime')).toContainText('意图 增量微调');
 });
@@ -727,6 +766,8 @@ test('AI panel keeps explicit new-flow requests from being coerced into modifica
   await page.setViewportSize({ width: 1280, height: 820 });
   await installFakeWebView2(page);
   await mockShellApis(page);
+  const agentRunPayloads: any[] = [];
+  await mockAgentRunBuild(page, 'ar_webview_new', agentRunPayloads);
   await bootAuthenticatedApp(page);
 
   await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
@@ -762,17 +803,12 @@ test('AI panel keeps explicit new-flow requests from being coerced into modifica
     });
   });
 
-  await page.waitForFunction(() =>
-    ((window as any).__cvWebViewMessages || []).some((message: any) => message.messageType === 'GenerateFlow'));
-
-  const sent = await page.evaluate(() => {
-    const messages = (window as any).__cvWebViewMessages || [];
-    return messages.find((message: any) => message.messageType === 'GenerateFlow');
-  });
-
-  expect(sent.payload.mode).toBe('new');
-  expect(sent.payload.description).toBe('新增一个缺陷检测流程');
-  expect(sent.payload.existingFlowJson).toBeNull();
+  await page.waitForFunction(() => (window as any).aiPanel?.activeAgentRunId === 'ar_webview_new');
+  expect(agentRunPayloads).toHaveLength(1);
+  expect(agentRunPayloads[0].mode).toBe('new');
+  expect(agentRunPayloads[0].existingFlowJson).toBeNull();
+  const webMessages = await page.evaluate(() => (window as any).__cvWebViewMessages || []);
+  expect(webMessages.some((message: any) => message.messageType === 'GenerateFlow')).toBe(false);
   await expect(page.locator('#ai-agent-runtime')).toContainText('生成中');
   await expect(page.locator('#ai-agent-runtime')).toContainText('意图 新建流程');
 });

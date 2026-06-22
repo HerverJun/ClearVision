@@ -1415,6 +1415,7 @@ public sealed class AgentRunEndpointsTests
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);
             builder.Services.AddSingleton<IVisionAgentBuildApplicationService>(generation);
             builder.Services.AddSingleton<IVisionAgentBuildTerminalProjector, VisionAgentBuildTerminalProjector>();
+            builder.Services.AddScoped<IVisionAgentBuildRunService, VisionAgentBuildRunService>();
             builder.Services.AddSingleton<IVisionAgentToolRegistry, EmptyVisionAgentToolRegistry>();
             builder.Services.AddSingleton<IVisionAgentIntentRouterService>(
                 new FakeVisionAgentIntentRouterService(intentRouterHandler));

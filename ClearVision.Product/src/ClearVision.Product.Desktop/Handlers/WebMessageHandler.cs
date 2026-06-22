@@ -20,6 +20,7 @@ using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Extensions;
 using ClearVision.Product.Desktop.Inspection;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -393,7 +394,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
 
             using var scope = _scopeFactory.CreateScope();
             var handler = scope.ServiceProvider.GetRequiredService<ClearVision.Product.Infrastructure.AI.GenerateFlowMessageHandler>();
-            activeRequest = RegisterGenerateFlowRequest(requestId, sessionId);
+            var registeredRequest = RegisterGenerateFlowRequest(requestId, sessionId);
+            activeRequest = registeredRequest;
 
             // 在后台线程执行 AI 生成，避免 WebView2/UI 线程被流式解析和回调压满。
             var resultJson = await Task.Run(() => handler.HandleAsync(
@@ -417,7 +419,11 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                     var progressJson = $"{{\"messageType\":{JsonSerializer.Serialize(type)},\"payload\":{payload}}}";
                     PostWebMessageJson(progressJson);
                 },
-                cancellationToken: activeRequest.CancellationTokenSource.Token));
+                cancellationToken: registeredRequest.CancellationTokenSource.Token,
+                onAgentRunCreated: runId =>
+                {
+                    registeredRequest.AgentRunId = runId;
+                }));
 
             // 发回前端（原始 JSON）
             PostWebMessageJson(resultJson);
@@ -681,6 +687,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 activeRequest.CancellationTokenSource.Cancel();
             }
 
+            CancelAgentRunForGenerateFlow(activeRequest);
+
             _logger.LogInformation(
                 "已取消 AI 生成请求。RequestId={RequestId}, SessionId={SessionId}",
                 activeRequest.RequestId,
@@ -714,6 +722,29 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 RequestId = null,
                 ErrorMessage = ex.Message
             }, _jsonOptions));
+        }
+    }
+
+    private void CancelAgentRunForGenerateFlow(ActiveGenerateFlowRequest activeRequest)
+    {
+        if (string.IsNullOrWhiteSpace(activeRequest.AgentRunId))
+        {
+            return;
+        }
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var streamService = scope.ServiceProvider.GetService<IAgentRunEventStreamService>();
+            streamService?.Cancel(activeRequest.AgentRunId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to cancel AgentRun for GenerateFlow WebMessage request. RunId={RunId}, RequestId={RequestId}",
+                activeRequest.AgentRunId,
+                activeRequest.RequestId);
         }
     }
 
@@ -1073,6 +1104,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
                 {
                     activeRequest.CancellationTokenSource.Cancel();
                 }
+
+                CancelAgentRunForGenerateFlow(activeRequest);
             }
             catch (Exception ex)
             {
@@ -1159,6 +1192,8 @@ public class WebMessageHandler : IWebMessageClient, IDisposable
         public string RequestId { get; }
 
         public string? SessionId { get; }
+
+        public string? AgentRunId { get; set; }
 
         public CancellationTokenSource CancellationTokenSource { get; }
 

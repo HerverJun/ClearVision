@@ -5,6 +5,7 @@ using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.AI;
@@ -16,6 +17,8 @@ public class GenerateFlowMessageHandler
 {
     private readonly IAiFlowGenerationService _generationService;
     private readonly Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler> _logger;
+    private readonly IVisionAgentBuildRunService? _buildRunService;
+    private readonly IAgentRunEventStreamService? _agentRunStreamService;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -25,10 +28,14 @@ public class GenerateFlowMessageHandler
 
     public GenerateFlowMessageHandler(
         IAiFlowGenerationService generationService,
-        Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler> logger)
+        Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler> logger,
+        IVisionAgentBuildRunService? buildRunService = null,
+        IAgentRunEventStreamService? agentRunStreamService = null)
     {
         _generationService = generationService;
         _logger = logger;
+        _buildRunService = buildRunService;
+        _agentRunStreamService = agentRunStreamService;
     }
 
     public async Task<string> HandleAsync(
@@ -47,7 +54,8 @@ public class GenerateFlowMessageHandler
         string? agentGenerateFlowMode = null,
         bool runtimePreviewConsent = false,
         Action<string, string>? onMessage = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<string>? onAgentRunCreated = null)
     {
         _logger.LogInformation("Received AI generate-flow request. Description={Description}", description);
 
@@ -62,43 +70,52 @@ public class GenerateFlowMessageHandler
                     requestId
                 }, _jsonOptions));
 
-            var result = await _generationService.GenerateFlowAsync(
-                new AiFlowGenerationRequest(
-                    Description: description,
-                    AdditionalContext: hint,
-                    SessionId: sessionId,
-                    ExistingFlowJson: existingFlowJson,
-                    Attachments: attachments,
-                    Mode: mode,
-                    DebugPrompt: debugPrompt,
-                    TemplateSelection: templateSelection)
-                {
-                    RequirementMode = requirementMode ?? AiRequirementModes.Strict,
-                    UseVisionAgentGenerateFlow = useVisionAgentGenerateFlow,
-                    AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(agentGenerateFlowMode),
-                    RuntimePreviewConsent = runtimePreviewConsent,
-                    BuildFromPlan = buildFromPlan
-                },
-                progressMsg => onMessage?.Invoke(
-                    "GenerateFlowProgress",
-                    JsonSerializer.Serialize(new
-                    {
-                        message = progressMsg,
-                        phase = InferProgressPhase(progressMsg),
-                        requestId
-                    }, _jsonOptions)),
-                chunk => onMessage?.Invoke(
-                    "GenerateFlowStreamChunk",
-                    JsonSerializer.Serialize(new GenerateFlowStreamChunk
-                    {
-                        ChunkType = chunk.ChunkType,
-                        Content = chunk.Content,
-                        RequestId = requestId
-                    }, _jsonOptions)),
-                cancellationToken,
-                attachmentReport => onMessage?.Invoke(
-                    "GenerateFlowAttachmentReport",
-                    JsonSerializer.Serialize(attachmentReport with { RequestId = requestId }, _jsonOptions)));
+            var generationRequest = new AiFlowGenerationRequest(
+                Description: description,
+                AdditionalContext: hint,
+                SessionId: sessionId,
+                ExistingFlowJson: existingFlowJson,
+                Attachments: attachments,
+                Mode: mode,
+                DebugPrompt: debugPrompt,
+                TemplateSelection: templateSelection)
+            {
+                RequirementMode = requirementMode ?? AiRequirementModes.Strict,
+                UseVisionAgentGenerateFlow = useVisionAgentGenerateFlow,
+                AgentGenerateFlowMode = AiAgentGenerateFlowModes.Normalize(agentGenerateFlowMode),
+                RuntimePreviewConsent = runtimePreviewConsent,
+                BuildFromPlan = buildFromPlan
+            };
+
+            var result = buildFromPlan != null
+                ? await RunBuildFromPlanViaAgentRunAsync(
+                    generationRequest,
+                    requestId,
+                    onMessage,
+                    onAgentRunCreated,
+                    cancellationToken)
+                : await _generationService.GenerateFlowAsync(
+                    generationRequest,
+                    progressMsg => onMessage?.Invoke(
+                        "GenerateFlowProgress",
+                        JsonSerializer.Serialize(new
+                        {
+                            message = progressMsg,
+                            phase = InferProgressPhase(progressMsg),
+                            requestId
+                        }, _jsonOptions)),
+                    chunk => onMessage?.Invoke(
+                        "GenerateFlowStreamChunk",
+                        JsonSerializer.Serialize(new GenerateFlowStreamChunk
+                        {
+                            ChunkType = chunk.ChunkType,
+                            Content = chunk.Content,
+                            RequestId = requestId
+                        }, _jsonOptions)),
+                    cancellationToken,
+                    attachmentReport => onMessage?.Invoke(
+                        "GenerateFlowAttachmentReport",
+                        JsonSerializer.Serialize(attachmentReport with { RequestId = requestId }, _jsonOptions)));
 
             var response = new GenerateFlowResponse
             {
@@ -210,6 +227,80 @@ public class GenerateFlowMessageHandler
         }
     }
 
+    private async Task<AiFlowGenerationResult> RunBuildFromPlanViaAgentRunAsync(
+        AiFlowGenerationRequest request,
+        string? requestId,
+        Action<string, string>? onMessage,
+        Action<string>? onAgentRunCreated,
+        CancellationToken cancellationToken)
+    {
+        if (_buildRunService == null || _agentRunStreamService == null)
+        {
+            return BuildAgentRunAdapterMissingResult(request);
+        }
+
+        var createResult = _agentRunStreamService.CreateRun(request.Description, new
+        {
+            mode = request.Mode.ToWireValue(),
+            useVisionAgentGenerateFlow = true,
+            agentGenerateFlowMode = request.AgentGenerateFlowMode,
+            requestId,
+            planId = request.BuildFromPlan?.PlanId ?? string.Empty,
+            planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
+            hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,
+            metadataOnly = true
+        });
+
+        onAgentRunCreated?.Invoke(createResult.RunId);
+        onMessage?.Invoke(
+            "GenerateFlowAgentRunCreated",
+            JsonSerializer.Serialize(new
+            {
+                runId = createResult.RunId,
+                requestId,
+                events = createResult.Events,
+                metadataOnly = true
+            }, _jsonOptions));
+
+        var runRequest = request with { AgentRunId = createResult.RunId };
+        var command = BuildCommand.FromGenerationRequest(
+            runRequest,
+            createResult.RunId,
+            requestId,
+            BuildCommandTransports.WebMessage,
+            persistResult: false);
+        var result = await _buildRunService.RunAsync(command, cancellationToken);
+        return result.Outcome.Result;
+    }
+
+    private static AiFlowGenerationResult BuildAgentRunAdapterMissingResult(AiFlowGenerationRequest request)
+    {
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+            ErrorMessage = "BuildFromPlan AgentRun adapter is not available.",
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "vision_agent_build_from_plan",
+                Code = VisionAgentBuildFailureCodes.SystemException,
+                Message = "BuildFromPlan AgentRun adapter is not available.",
+                RepairTarget = "Register IVisionAgentBuildRunService and IAgentRunEventStreamService before accepting BuildFromPlan requests."
+            },
+            PlanId = request.BuildFromPlan?.PlanSnapshot?.PlanId ?? request.BuildFromPlan?.PlanId ?? string.Empty,
+            PlanHash = request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? request.BuildFromPlan?.PlanHash ?? string.Empty,
+            ContractVersion = request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? string.Empty,
+            RequestedMode = request.AgentGenerateFlowMode,
+            EffectiveMode = request.AgentGenerateFlowMode,
+            ToolLoopEntered = false,
+            FallbackReason = string.Empty,
+            InteractionState = AiInteractionStates.Failed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High
+        };
+    }
+
     private static string SerializeResponse(GenerateFlowResponse response, string? failureType)
     {
         return JsonSerializer.Serialize(new
@@ -296,6 +387,7 @@ public class GenerateFlowMessageHandler
         VisionAgentBuildFromPlanRequest? buildFromPlan)
     {
         return FirstNonBlank(
+            result.PlanId,
             result.BuildResult?.PlanId,
             buildFromPlan?.PlanSnapshot?.PlanId,
             buildFromPlan?.PlanId);
@@ -306,6 +398,7 @@ public class GenerateFlowMessageHandler
         VisionAgentBuildFromPlanRequest? buildFromPlan)
     {
         return FirstNonBlank(
+            result.PlanHash,
             result.BuildResult?.PlanHash,
             buildFromPlan?.PlanSnapshot?.PlanHash,
             buildFromPlan?.PlanHash);
