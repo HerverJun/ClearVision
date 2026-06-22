@@ -426,28 +426,37 @@ public static class AgentRunEndpoints
         using var scope = scopeFactory.CreateScope();
         var streamService = scope.ServiceProvider.GetRequiredService<IAgentRunEventStreamService>();
         var buildApplicationService = scope.ServiceProvider.GetRequiredService<IVisionAgentBuildApplicationService>();
+        var terminalProjector = scope.ServiceProvider.GetRequiredService<IVisionAgentBuildTerminalProjector>();
         var cancellationToken = streamService.GetCancellationToken(runId);
+        var generationRequest = request.ToGenerationRequest(runId);
+        var buildCommand = BuildCommand.FromGenerationRequest(
+            generationRequest,
+            runId,
+            request.RequestId,
+            BuildCommandTransports.AgentRun,
+            persistResult: false);
 
         try
         {
             var outcome = await buildApplicationService.BuildAsync(
-                request.ToBuildCommand(runId),
+                buildCommand,
                 cancellationToken);
             var result = outcome.Result;
 
             if (cancellationToken.IsCancellationRequested ||
                 string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase))
             {
-                streamService.Cancel(runId);
+                var terminal = streamService.Cancel(runId);
+                ProjectBuildTerminal(terminalProjector, runId, generationRequest, result, terminal);
                 return;
             }
 
             if (result.Success)
             {
-                streamService.Complete(runId, "视觉智能体已完成仅元数据流程草稿构建。", new
+                var terminal = streamService.Complete(runId, "视觉智能体已完成仅元数据流程草稿构建。", new
                     {
                         status = result.CompletionStatus,
-                        sessionId = result.SessionId,
+                        sessionId = FirstNonBlank(result.SessionId, generationRequest.SessionId),
                         generationMode = result.GenerationMode,
                         templateLockLevel = result.TemplateLockLevel,
                         recommendedTemplate = result.RecommendedTemplate,
@@ -499,10 +508,11 @@ public static class AgentRunEndpoints
                         reportId = $"agent-report-{runId}",
                         metadataOnly = true
                     });
+                ProjectBuildTerminal(terminalProjector, runId, generationRequest, result, terminal);
                 return;
             }
 
-            streamService.Fail(
+            var failedTerminal = streamService.Fail(
                 runId,
                 result.ErrorMessage ?? result.FailureSummary?.Message ?? "视觉智能体运行失败。",
                 result.FailureSummary?.RepairTarget ??
@@ -531,15 +541,22 @@ public static class AgentRunEndpoints
                     decisionTrace = result.DecisionTrace,
                     metadataOnly = true
                 });
+            ProjectBuildTerminal(terminalProjector, runId, generationRequest, result, failedTerminal);
         }
         catch (OperationCanceledException)
         {
-            streamService.Cancel(runId);
+            var terminal = streamService.Cancel(runId);
+            ProjectBuildTerminal(
+                terminalProjector,
+                runId,
+                generationRequest,
+                BuildCancelledProjectionResult(generationRequest, terminal),
+                terminal);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "AgentRun GenerateFlow background task failed. RunId={RunId}", runId);
-            streamService.Fail(
+            var terminal = streamService.Fail(
                 runId,
                 "视觉智能体在完成前失败。",
                 "请重试本轮请求；如果后台任务持续失败，再检查后端日志。",
@@ -565,7 +582,86 @@ public static class AgentRunEndpoints
                     fallbackReason = string.Empty,
                     metadataOnly = true
                 });
+            ProjectBuildTerminal(
+                terminalProjector,
+                runId,
+                generationRequest,
+                BuildSystemErrorProjectionResult(generationRequest, terminal),
+                terminal);
         }
+    }
+
+    private static void ProjectBuildTerminal(
+        IVisionAgentBuildTerminalProjector terminalProjector,
+        string runId,
+        AiFlowGenerationRequest request,
+        AiFlowGenerationResult result,
+        AgentRunEvent? terminal)
+    {
+        if (terminal == null)
+        {
+            return;
+        }
+
+        terminalProjector.Project(new VisionAgentBuildTerminalProjection(
+            runId,
+            BuildCommandTransports.AgentRun,
+            request,
+            result,
+            terminal));
+    }
+
+    private static AiFlowGenerationResult BuildCancelledProjectionResult(
+        AiFlowGenerationRequest request,
+        AgentRunEvent? terminal)
+    {
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusCancelled,
+            FailureType = AiFlowGenerationResult.FailureTypeUserCancelled,
+            ErrorMessage = terminal?.Summary ?? "Vision Agent BuildFromPlan was cancelled.",
+            PlanId = request.BuildFromPlan?.PlanSnapshot?.PlanId ?? request.BuildFromPlan?.PlanId ?? string.Empty,
+            PlanHash = request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? request.BuildFromPlan?.PlanHash ?? string.Empty,
+            ContractVersion = request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? string.Empty,
+            RequestedMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+            EffectiveMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+            ToolLoopEntered = false,
+            FallbackReason = string.Empty,
+            InteractionState = AiInteractionStates.Idle,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High
+        };
+    }
+
+    private static AiFlowGenerationResult BuildSystemErrorProjectionResult(
+        AiFlowGenerationRequest request,
+        AgentRunEvent? terminal)
+    {
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+            ErrorMessage = terminal?.Summary ?? "Vision Agent BuildFromPlan failed before completion.",
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "vision_agent_build_from_plan",
+                Code = VisionAgentBuildFailureCodes.SystemException,
+                Message = "Vision Agent BuildFromPlan failed before completion.",
+                RepairTarget = "Review backend logs and retry after fixing the BuildFromPlan failure."
+            },
+            PlanId = request.BuildFromPlan?.PlanSnapshot?.PlanId ?? request.BuildFromPlan?.PlanId ?? string.Empty,
+            PlanHash = request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? request.BuildFromPlan?.PlanHash ?? string.Empty,
+            ContractVersion = request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? string.Empty,
+            RequestedMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+            EffectiveMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+            ToolLoopEntered = false,
+            FallbackReason = string.Empty,
+            InteractionState = AiInteractionStates.Failed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High
+        };
     }
 
     private static object BuildCreatePayload(AgentRunCreateRequest request)
@@ -1265,12 +1361,13 @@ public sealed record AgentRunCreateRequest
         };
     }
 
-    public BuildCommand ToBuildCommand(string runId)
+    public BuildCommand ToBuildCommand(string runId, bool persistResult = false)
     {
         return BuildCommand.FromGenerationRequest(
             ToGenerationRequest(runId),
             runId,
             RequestId,
-            BuildCommandTransports.AgentRun);
+            BuildCommandTransports.AgentRun,
+            persistResult);
     }
 }

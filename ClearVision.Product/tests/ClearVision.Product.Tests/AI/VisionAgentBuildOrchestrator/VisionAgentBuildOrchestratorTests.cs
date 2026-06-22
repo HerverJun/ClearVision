@@ -860,19 +860,24 @@ public sealed class VisionAgentBuildOrchestratorTests
     public async Task BuildAsync_StrategyConfirmationMissing_ShouldBlockDespiteDefaultValue()
     {
         var sink = new CapturingAgentRunEventSink();
-        var orchestrator = CreateOrchestrator(sink);
+        var applicationService = CreateBuildApplicationService(sink);
         var plan = PlanWithStrategyConfirmationBlocker();
 
-        var result = await orchestrator.BuildAsync(
-            Request(
-                plan,
-                userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-                acceptedRecommendedDefaults: false),
-            CancellationToken.None);
+        var result = (await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                Request(
+                    plan,
+                    userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                    acceptedRecommendedDefaults: false),
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
+            CancellationToken.None)).Result;
 
         result.Success.Should().BeFalse();
         result.ClarificationRequired.Should().BeTrue();
-        result.DecisionTrace!.BlockingReasons.Should()
+        result.FailureSummary!.Code.Should().Be(VisionAgentBuildFailureCodes.ReadinessBlocked);
+        result.BuildReadiness!.Blockers.Select(blocker => blocker.Id)
+            .Should()
             .Contain("strategy_confirmation:model_or_rule_strategy_missing");
     }
 

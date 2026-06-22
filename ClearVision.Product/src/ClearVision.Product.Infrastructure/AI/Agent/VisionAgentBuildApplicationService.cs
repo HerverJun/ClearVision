@@ -180,7 +180,12 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         AiFlowGenerationRequest request,
         AiFlowGenerationResult result)
     {
-        var persisted = command.PersistResult && TryProjectTerminal(command, request, result);
+        var persistInApplicationService = command.PersistResult &&
+                                          !string.Equals(
+                                              command.Transport,
+                                              BuildCommandTransports.AgentRun,
+                                              StringComparison.OrdinalIgnoreCase);
+        var persisted = persistInApplicationService && TryProjectTerminal(command, request, result);
         return new CanonicalBuildOutcome
         {
             Result = result,
@@ -395,7 +400,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             AnswerSetFingerprint = answerSetFingerprint,
             RequestedMode = requestedMode,
             EffectiveMode = effectiveMode,
-            ToolLoopEntered = string.Equals(requestedMode, AiAgentGenerateFlowModes.ToolLoop, StringComparison.OrdinalIgnoreCase),
+            ToolLoopEntered = false,
             FallbackReason = string.Empty,
             RemainingFields = buildReadiness?.RemainingFields.ToList() ?? [],
             ResolvedFields = buildReadiness?.ResolvedFields.ToList() ?? [],

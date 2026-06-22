@@ -44,6 +44,33 @@ public sealed class BuildFromPlanArchitectureGuardTests
         adapterBody.Should().NotContain("GetService<");
     }
 
+    [Fact]
+    public void BuildExecutionLayer_ShouldNotContainLegacyReadinessGate()
+    {
+        var guardedFiles = new[]
+        {
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent/VisionAgentOrchestrator.cs",
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent/VisionAgentBuildOrchestrator.cs"
+        };
+        var forbiddenMarkers = new[]
+        {
+            "EnforceBuildMaturityGate",
+            "EnforceMaturityGate",
+            "BuildMaturityGateFailure",
+            "BuildMaturityBlockedResult",
+            "maturity_gate_blocked"
+        };
+
+        foreach (var relativePath in guardedFiles)
+        {
+            var text = File.ReadAllText(Path.Combine(Root, relativePath));
+            foreach (var marker in forbiddenMarkers)
+            {
+                text.Should().NotContain(marker, relativePath);
+            }
+        }
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

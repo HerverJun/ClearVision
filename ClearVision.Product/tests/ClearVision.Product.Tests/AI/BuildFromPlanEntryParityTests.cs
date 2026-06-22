@@ -130,7 +130,28 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     }
 
     [Fact]
-    public async Task SameRunTerminalProjection_ShouldPersistSessionOnce()
+    public async Task ToolLoopPreExecutionFailure_ShouldNotReportToolLoopEntered()
+    {
+        var request = BuildRequest(
+            BuildPlan(),
+            build => build with { PlanHash = "sha256:stale" }) with
+        {
+            AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
+        };
+
+        var outcome = await CreateService().BuildAsync(
+            BuildCommand.FromGenerationRequest(request, "run-tool-loop-stale", persistResult: false),
+            CancellationToken.None);
+
+        outcome.FailureCode.Should().Be(VisionAgentBuildFailureCodes.StalePlan);
+        outcome.RequestedMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
+        outcome.EffectiveMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
+        outcome.ToolLoopEntered.Should().BeFalse();
+        outcome.Result.BuildResult!.ToolLoopEntered.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SameWebMessageTerminalProjection_ShouldPersistSessionOnce()
     {
         var conversation = new ConversationalFlowService(_tempRoot);
         var service = CreateService(conversation: conversation);
@@ -139,7 +160,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             request,
             "run-idempotent",
             "req-idempotent",
-            BuildCommandTransports.AgentRun);
+            BuildCommandTransports.WebMessage);
 
         var first = await service.BuildAsync(command, CancellationToken.None);
         var second = await service.BuildAsync(command, CancellationToken.None);
@@ -147,6 +168,25 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         first.Persisted.Should().BeTrue();
         second.Persisted.Should().BeFalse();
         conversation.GetSession("session-idempotent")!.History.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task AgentRunTransport_ShouldDeferSessionProjectionToTerminalProjector()
+    {
+        var conversation = new ConversationalFlowService(_tempRoot);
+        var service = CreateService(conversation: conversation);
+        var request = BuildRequest(BuildPlan()) with { SessionId = "session-agent-run-deferred" };
+
+        var outcome = await service.BuildAsync(
+            BuildCommand.FromGenerationRequest(
+                request,
+                "run-agent-deferred",
+                "req-agent-deferred",
+                BuildCommandTransports.AgentRun),
+            CancellationToken.None);
+
+        outcome.Persisted.Should().BeFalse();
+        conversation.GetSession("session-agent-run-deferred").Should().BeNull();
     }
 
     public void Dispose()

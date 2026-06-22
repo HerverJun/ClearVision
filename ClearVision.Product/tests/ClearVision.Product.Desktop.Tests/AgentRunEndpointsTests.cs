@@ -11,6 +11,7 @@ using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Desktop.Endpoints;
 using ClearVision.Product.Desktop.Middleware;
+using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.Tools;
@@ -62,6 +63,50 @@ public sealed class AgentRunEndpointsTests
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact(DisplayName = "AgentRun terminal projector persists session once from terminal event")]
+    public async Task GenerateFlowTerminal_ShouldProjectSessionOnceFromTerminalEvent()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var sessionId = "session-terminal-projector";
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new
+        {
+            description = "Detect scratches on a metal part",
+            sessionId,
+            mode = "new",
+            useVisionAgentGenerateFlow = true
+        });
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = document.RootElement.GetProperty("runId").GetString()!;
+
+        await host.Generation.WaitForCallAsync();
+        await host.WaitForTerminalAsync(runId);
+
+        host.Generation.LastCommand!.PersistResult.Should().BeFalse();
+        var replay = host.StreamService.Replay(runId)!;
+        var terminal = replay.Events.Last(evt =>
+            evt.EventType is AgentRunEventTypes.RunCompleted or
+                AgentRunEventTypes.RunFailed or
+                AgentRunEventTypes.RunCancelled);
+        var session = host.ConversationService.GetSession(sessionId)!;
+        session.History.Should().HaveCount(1);
+        session.History[0].Payload!.Progress.Should()
+            .Contain(BuildCommandTransports.AgentRun)
+            .And.Contain($"agent_run:{runId}")
+            .And.Contain($"terminal:{terminal.Sequence}");
+
+        var duplicate = host.TerminalProjector.Project(new VisionAgentBuildTerminalProjection(
+            runId,
+            BuildCommandTransports.AgentRun,
+            host.Generation.LastRequest!,
+            AgentRunEndpointTestHost.SuccessResult(),
+            terminal));
+
+        duplicate.Should().BeFalse();
+        host.ConversationService.GetSession(sessionId)!.History.Should().HaveCount(1);
     }
 
     [Fact(DisplayName = "POST Agent plan returns backend structured scenario-specific PlanModeResult")]
@@ -1313,12 +1358,16 @@ public sealed class AgentRunEndpointsTests
             WebApplication app,
             string directory,
             FakeAiFlowGenerationService generation,
-            IAgentRunEventStreamService streamService)
+            IAgentRunEventStreamService streamService,
+            IConversationalFlowService conversationService,
+            IVisionAgentBuildTerminalProjector terminalProjector)
         {
             _app = app;
             _directory = directory;
             Generation = generation;
             StreamService = streamService;
+            ConversationService = conversationService;
+            TerminalProjector = terminalProjector;
             Client = app.GetTestClient();
         }
 
@@ -1327,6 +1376,10 @@ public sealed class AgentRunEndpointsTests
         public FakeAiFlowGenerationService Generation { get; }
 
         public IAgentRunEventStreamService StreamService { get; }
+
+        public IConversationalFlowService ConversationService { get; }
+
+        public IVisionAgentBuildTerminalProjector TerminalProjector { get; }
 
         public static async Task<AgentRunEndpointTestHost> CreateAsync(
             Func<AiFlowGenerationRequest, CancellationToken, Task<AiFlowGenerationResult>>? handler = null,
@@ -1346,6 +1399,7 @@ public sealed class AgentRunEndpointsTests
             var redactor = new AgentRunEventRedactor();
             var store = new AgentRunEventStore(directory, redactor);
             var streamService = new AgentRunEventStreamService(store, redactor);
+            var conversationService = new ConversationalFlowService(Path.Combine(directory, "sessions"));
             if (utcNowProvider != null)
             {
                 streamService.UtcNowProvider = utcNowProvider;
@@ -1356,9 +1410,11 @@ public sealed class AgentRunEndpointsTests
 
             builder.Services.AddSingleton(redactor);
             builder.Services.AddSingleton(store);
+            builder.Services.AddSingleton<IConversationalFlowService>(conversationService);
             builder.Services.AddSingleton<IAgentRunEventStreamService>(streamService);
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);
             builder.Services.AddSingleton<IVisionAgentBuildApplicationService>(generation);
+            builder.Services.AddSingleton<IVisionAgentBuildTerminalProjector, VisionAgentBuildTerminalProjector>();
             builder.Services.AddSingleton<IVisionAgentToolRegistry, EmptyVisionAgentToolRegistry>();
             builder.Services.AddSingleton<IVisionAgentIntentRouterService>(
                 new FakeVisionAgentIntentRouterService(intentRouterHandler));
@@ -1380,8 +1436,15 @@ public sealed class AgentRunEndpointsTests
             }
             app.MapAgentRunEndpoints();
             await app.StartAsync();
+            var terminalProjector = app.Services.GetRequiredService<IVisionAgentBuildTerminalProjector>();
 
-            return new AgentRunEndpointTestHost(app, directory, generation, streamService);
+            return new AgentRunEndpointTestHost(
+                app,
+                directory,
+                generation,
+                streamService,
+                conversationService,
+                terminalProjector);
         }
 
         public static AiFlowGenerationResult SuccessResult()
