@@ -753,6 +753,10 @@ public sealed class AgentRunEndpointsTests
         request.TemplateSelection.Should().NotBeNull();
         request.TemplateSelection!.TemplateId.Should().Be("tmpl-scratch");
         request.Attachments.Should().BeEmpty();
+        host.Generation.LastCommand.Should().NotBeNull();
+        host.Generation.LastCommand!.Transport.Should().Be(BuildCommandTransports.AgentRun);
+        host.Generation.LastCommand.RunId.Should().Be(runId);
+        host.Generation.LastCommand.PersistResult.Should().BeFalse();
 
         var replay = host.StreamService.Replay(runId)!;
         replay.Events.Select(evt => evt.Stage).Should().ContainInOrder([
@@ -760,6 +764,26 @@ public sealed class AgentRunEndpointsTests
             "canonical_build_readiness"
         ]);
         var completed = replay.Events.Single(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+        var session = host.ConversationService.GetSession("session-plan-build")!;
+        session.History.Should().HaveCount(1);
+        session.History[0].Payload!.Progress.Should()
+            .Contain(BuildCommandTransports.AgentRun)
+            .And.Contain($"agent_run:{runId}")
+            .And.Contain($"terminal:{completed.Sequence}");
+        host.TerminalProjector.Project(new VisionAgentBuildTerminalProjection(
+            runId,
+            BuildCommandTransports.AgentRun,
+            request,
+            AgentRunEndpointTestHost.SuccessResult(),
+            completed)).Should().BeFalse();
+        session.History.Should().HaveCount(1);
+        using var replayResponse = await host.Client.GetAsync($"/api/ai/agent-runs/{runId}");
+        replayResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var replayDoc = JsonDocument.Parse(await replayResponse.Content.ReadAsStringAsync());
+        replayDoc.RootElement.GetProperty("events").EnumerateArray()
+            .Select(evt => evt.GetProperty("eventType").GetString())
+            .Should()
+            .Contain(AgentRunEventTypes.RunCompleted);
         var completedJson = JsonSerializer.Serialize(completed, AgentRunEventJson.Options);
         completedJson.Should().Contain("\"buildFromPlan\"");
         completedJson.Should().Contain("\"planId\":\"plan_scratch_1\"");
@@ -1410,6 +1434,7 @@ public sealed class AgentRunEndpointsTests
 
             builder.Services.AddSingleton(redactor);
             builder.Services.AddSingleton(store);
+            builder.Services.AddSingleton<IVisionAgentBuildProjectionJournal, VisionAgentBuildProjectionJournal>();
             builder.Services.AddSingleton<IConversationalFlowService>(conversationService);
             builder.Services.AddSingleton<IAgentRunEventStreamService>(streamService);
             builder.Services.AddSingleton<IAiFlowGenerationService>(generation);

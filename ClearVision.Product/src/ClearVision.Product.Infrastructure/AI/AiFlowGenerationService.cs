@@ -14,6 +14,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.AI.DryRun;
 using ClearVision.Product.Infrastructure.AI.Runtime;
 using Microsoft.Extensions.Hosting;
@@ -44,7 +45,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     private readonly Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> _logger;
     private readonly AgentGenerateFlowOptions _agentGenerateFlowOptions;
     private readonly IVisionAgentGenerateFlowService? _agentGenerateFlowService;
-    private readonly IVisionAgentBuildApplicationService? _buildApplicationService;
+    private readonly IVisionAgentBuildRunService? _buildRunService;
+    private readonly IAgentRunEventStreamService? _agentRunStreamService;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -74,7 +76,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService> logger,
         IOptions<AgentGenerateFlowOptions>? agentGenerateFlowOptions = null,
         IVisionAgentGenerateFlowService? agentGenerateFlowService = null,
-        IVisionAgentBuildApplicationService? buildApplicationService = null)
+        IVisionAgentBuildRunService? buildRunService = null,
+        IAgentRunEventStreamService? agentRunStreamService = null)
     {
         _aiOrchestrator = aiOrchestrator;
         _promptBuilder = promptBuilder;
@@ -94,7 +97,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         _logger = logger;
         _agentGenerateFlowOptions = agentGenerateFlowOptions?.Value ?? new AgentGenerateFlowOptions();
         _agentGenerateFlowService = agentGenerateFlowService;
-        _buildApplicationService = buildApplicationService;
+        _buildRunService = buildRunService;
+        _agentRunStreamService = agentRunStreamService;
     }
 
     public async Task<AiFlowGenerationResult> GenerateFlowAsync(
@@ -933,20 +937,20 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         Action<string> reportProgress,
         CancellationToken cancellationToken)
     {
-        if (_buildApplicationService == null)
+        if (_buildRunService == null || _agentRunStreamService == null)
         {
             return new AiFlowGenerationResult
             {
                 Success = false,
                 CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
                 FailureType = AiFlowGenerationResult.FailureTypeSystemError,
-                ErrorMessage = "Vision Agent Build application service is not registered.",
+                ErrorMessage = "Vision Agent Build run service is not registered.",
                 FailureSummary = new AiFailureSummary
                 {
                     Category = "vision_agent_build_from_plan",
                     Code = VisionAgentBuildFailureCodes.BuildOrchestratorNotRegistered,
-                    Message = "Vision Agent Build application service is not registered.",
-                    RepairTarget = "Register IVisionAgentBuildApplicationService before starting BuildFromPlan."
+                    Message = "Vision Agent Build run service is not registered.",
+                    RepairTarget = "Register IVisionAgentBuildRunService and IAgentRunEventStreamService before starting BuildFromPlan."
                 },
                 InteractionState = AiInteractionStates.Failed,
                 TurnIntent = AiTurnIntents.NewFlow,
@@ -954,15 +958,39 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             };
         }
 
-        reportProgress("Vision Agent BuildFromPlan request is using the canonical Build application service.");
-        var outcome = await _buildApplicationService.BuildAsync(
+        reportProgress("Vision Agent BuildFromPlan request is using the canonical AgentRun run service.");
+        var runId = request.AgentRunId?.Trim();
+        if (string.IsNullOrWhiteSpace(runId) || _agentRunStreamService.Replay(runId) == null)
+        {
+            var createResult = _agentRunStreamService.CreateRun(
+                request.Description,
+                new
+                {
+                    mode = request.Mode.ToWireValue(),
+                    useVisionAgentGenerateFlow = true,
+                    agentGenerateFlowMode = request.AgentGenerateFlowMode,
+                    transport = BuildCommandTransports.Internal,
+                    sessionId = request.SessionId,
+                    planId = request.BuildFromPlan?.PlanId ?? string.Empty,
+                    planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
+                    hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,
+                    metadataOnly = true
+                });
+            runId = createResult.RunId;
+        }
+
+        var runRequest = string.Equals(request.AgentRunId, runId, StringComparison.OrdinalIgnoreCase)
+            ? request
+            : request with { AgentRunId = runId };
+        var runResult = await _buildRunService.RunAsync(
             BuildCommand.FromGenerationRequest(
-                request,
-                request.AgentRunId,
-                transport: BuildCommandTransports.WebMessage),
+                runRequest,
+                runId,
+                transport: BuildCommandTransports.Internal,
+                persistResult: false),
             cancellationToken);
 
-        return outcome.Result;
+        return runResult.Outcome.Result;
     }
     private void PersistAgentGenerateFlowResult(
         AiFlowGenerationRequest request,
@@ -4034,4 +4062,3 @@ public class AiFlowGenerationService : IAiFlowGenerationService
         return (int)(cjkCount * 1.5 + nonCjkCount * 0.25);
     }
 }
-

@@ -1,9 +1,17 @@
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
+using ClearVision.Product.Infrastructure.AI.Connectors;
+using ClearVision.Product.Infrastructure.AI.DryRun;
+using ClearVision.Product.Infrastructure.AI.Runtime;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -16,177 +24,333 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         "clearvision-build-entry-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task AgentRunAndWebMessage_ShouldReturnEquivalentBusinessOutcome()
+    public async Task AgentRunWebMessageAndInternalEntries_ShouldProduceEquivalentTerminalProjection()
     {
+        using var harness = CreateHarness();
         var plan = BuildPlan();
-        var request = BuildRequest(plan);
-        var agentRun = await CreateService().BuildAsync(
-            BuildCommand.FromGenerationRequest(
-                request,
-                "run-agent",
-                "req-agent",
-                BuildCommandTransports.AgentRun,
-                persistResult: false),
-            CancellationToken.None);
-        var webMessage = await CreateService().BuildAsync(
-            BuildCommand.FromGenerationRequest(
-                request,
-                "run-web",
-                "req-web",
-                BuildCommandTransports.WebMessage,
-                persistResult: false),
-            CancellationToken.None);
 
-        BusinessProjection(agentRun).Should().BeEquivalentTo(BusinessProjection(webMessage));
+        var agentRun = await RunAgentRunEntryAsync(harness, BuildRequest(plan) with { SessionId = "session-agent" });
+        var webMessage = await RunWebMessageEntryAsync(harness, BuildRequest(plan) with { SessionId = "session-web" });
+        var internalEntry = await RunInternalEntryAsync(harness, BuildRequest(plan) with { SessionId = "session-internal" });
+
+        agentRun.RunId.Should().StartWith("ar_");
+        webMessage.RunId.Should().StartWith("ar_");
+        internalEntry.RunId.Should().StartWith("ar_");
+        agentRun.Terminal.Should().NotBeNull();
+        webMessage.Terminal.Should().NotBeNull();
+        internalEntry.Terminal.Should().NotBeNull();
+        agentRun.Replay.Events.Should().NotBeEmpty();
+        webMessage.Replay.Events.Should().NotBeEmpty();
+        internalEntry.Replay.Events.Should().NotBeEmpty();
+
+        TerminalBusinessProjection(webMessage.Replay).Should().BeEquivalentTo(TerminalBusinessProjection(agentRun.Replay));
+        TerminalBusinessProjection(internalEntry.Replay).Should().BeEquivalentTo(TerminalBusinessProjection(agentRun.Replay));
+
+        harness.Conversation.GetSession("session-agent")!.History.Should().HaveCount(1);
+        harness.Conversation.GetSession("session-web")!.History.Should().HaveCount(1);
+        harness.Conversation.GetSession("session-internal")!.History.Should().HaveCount(1);
+        harness.Projector.ProjectRecovered(agentRun.Replay).Should().BeFalse();
+        harness.Projector.ProjectRecovered(webMessage.Replay).Should().BeFalse();
+        harness.Projector.ProjectRecovered(internalEntry.Replay).Should().BeFalse();
     }
 
     [Fact]
-    public async Task DisabledBuild_ShouldFailWithCanonicalCode()
+    public async Task DisabledBuild_ShouldFailWithCanonicalCodeThroughRunService()
     {
-        var outcome = await CreateService(enabled: false).BuildAsync(
-            BuildCommand.FromGenerationRequest(BuildRequest(BuildPlan()), "run-disabled", persistResult: false),
-            CancellationToken.None);
+        using var harness = CreateHarness(enabled: false);
+        var entry = await RunAgentRunEntryAsync(harness, BuildRequest(BuildPlan()) with { SessionId = "session-disabled" });
 
-        outcome.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
-        outcome.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeSystemError);
-        outcome.FailureCode.Should().Be(VisionAgentBuildFailureCodes.Disabled);
+        var projection = TerminalBusinessProjection(entry.Replay);
+        projection.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
+        projection.FailureType.Should().Be(AiFlowGenerationResult.FailureTypeSystemError);
+        projection.FailureCode.Should().Be(VisionAgentBuildFailureCodes.Disabled);
+        harness.Conversation.GetSession("session-disabled")!.History.Should().HaveCount(1);
     }
 
-    [Fact]
-    public async Task MissingContract_ShouldFailClosed()
+    [Theory]
+    [InlineData("missing_contract", VisionAgentBuildFailureCodes.ContractInvalid)]
+    [InlineData("plan_id_mismatch", VisionAgentBuildFailureCodes.PlanIdMismatch)]
+    [InlineData("plan_hash_stale", VisionAgentBuildFailureCodes.StalePlan)]
+    public async Task ContractFailures_ShouldFailClosedThroughRunService(string scenario, string expectedCode)
     {
-        var request = new AiFlowGenerationRequest("detect scratches")
+        using var harness = CreateHarness();
+        var plan = BuildPlan();
+        var request = scenario switch
         {
-            UseVisionAgentGenerateFlow = true
+            "missing_contract" => new AiFlowGenerationRequest("detect scratches")
+            {
+                SessionId = $"session-{scenario}",
+                UseVisionAgentGenerateFlow = true,
+                AgentGenerateFlowMode = AiAgentGenerateFlowModes.Scripted
+            },
+            "plan_id_mismatch" => BuildRequest(plan, build => build with { PlanId = "different-plan" }) with
+            {
+                SessionId = $"session-{scenario}"
+            },
+            _ => BuildRequest(plan, build => build with { PlanHash = "sha256:stale" }) with
+            {
+                SessionId = $"session-{scenario}"
+            }
         };
 
-        var outcome = await CreateService().BuildAsync(
-            BuildCommand.FromGenerationRequest(request, "run-missing", persistResult: false),
-            CancellationToken.None);
+        var entry = await RunAgentRunEntryAsync(harness, request);
 
-        outcome.FailureCode.Should().Be(VisionAgentBuildFailureCodes.ContractInvalid);
-        outcome.Result.BuildResult!.ApplyGate.Blocked.Should().BeTrue();
+        var projection = TerminalBusinessProjection(entry.Replay);
+        projection.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
+        projection.FailureCode.Should().Be(expectedCode);
+        harness.Conversation.GetSession($"session-{scenario}")!.History.Should().HaveCount(1);
     }
 
     [Fact]
-    public async Task PlanIdMismatch_ShouldFailClosedWithFixedCode()
+    public async Task LegacyContractWithoutHash_ShouldSucceedWithExplicitWarningThroughRunService()
     {
-        var plan = BuildPlan();
-        var request = BuildRequest(plan, build => build with { PlanId = "different-plan" });
-
-        var outcome = await CreateService().BuildAsync(
-            BuildCommand.FromGenerationRequest(request, "run-plan-mismatch", persistResult: false),
-            CancellationToken.None);
-
-        outcome.FailureCode.Should().Be(VisionAgentBuildFailureCodes.PlanIdMismatch);
-        outcome.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
-    }
-
-    [Fact]
-    public async Task PlanHashMismatch_ShouldRejectAsStalePlan()
-    {
-        var plan = BuildPlan();
-        var request = BuildRequest(plan, build => build with { PlanHash = "sha256:stale" });
-
-        var outcome = await CreateService().BuildAsync(
-            BuildCommand.FromGenerationRequest(request, "run-stale", persistResult: false),
-            CancellationToken.None);
-
-        outcome.FailureCode.Should().Be(VisionAgentBuildFailureCodes.StalePlan);
-        outcome.Result.BuildResult!.ApplyGate.ApplyBlockers.Should().Contain(VisionAgentBuildFailureCodes.StalePlan);
-    }
-
-    [Fact]
-    public async Task LegacyContractWithoutHash_ShouldSucceedWithExplicitWarning()
-    {
+        using var harness = CreateHarness();
         var legacy = BuildPlan(VisionAgentPlanContractVersions.V1, includeHash: false);
-        var request = BuildRequest(legacy, build => build with { PlanHash = string.Empty });
+        var request = BuildRequest(legacy, build => build with { PlanHash = string.Empty }) with
+        {
+            SessionId = "session-legacy"
+        };
 
-        var outcome = await CreateService().BuildAsync(
-            BuildCommand.FromGenerationRequest(request, "run-legacy", persistResult: false),
-            CancellationToken.None);
+        var entry = await RunAgentRunEntryAsync(harness, request);
 
-        outcome.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusCompleted);
-        outcome.Result.BuildResult!.PublicWarnings.Should().Contain("legacy_plan_hash_missing");
-        outcome.PlanHash.Should().StartWith("sha256:");
+        var projection = TerminalBusinessProjection(entry.Replay);
+        projection.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusCompleted);
+        projection.PlanHash.Should().StartWith("sha256:");
+        projection.BuildResultJson.Should().Contain("legacy_plan_hash_missing");
     }
 
     [Fact]
-    public async Task ToolLoopMode_ShouldNormalizeRequestedAndEffectiveMode()
+    public async Task ToolLoopMode_ShouldMatchAcrossAgentRunWebMessageAndInternalEntries()
     {
+        using var harness = CreateHarness();
+        var plan = BuildPlan();
+
+        var agentRun = await RunAgentRunEntryAsync(harness, BuildRequest(plan) with
+        {
+            SessionId = "session-tool-agent",
+            AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
+        });
+        var webMessage = await RunWebMessageEntryAsync(harness, BuildRequest(plan) with
+        {
+            SessionId = "session-tool-web",
+            AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
+        });
+        var internalEntry = await RunInternalEntryAsync(harness, BuildRequest(plan) with
+        {
+            SessionId = "session-tool-internal",
+            AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
+        });
+
+        var expected = TerminalBusinessProjection(agentRun.Replay);
+        expected.RequestedMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
+        expected.EffectiveMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
+        expected.ToolLoopEntered.Should().BeTrue();
+        TerminalBusinessProjection(webMessage.Replay).Should().BeEquivalentTo(expected);
+        TerminalBusinessProjection(internalEntry.Replay).Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
+    public async Task ProjectedTerminal_ShouldNotDuplicateAfterJournalReloadAndReplay()
+    {
+        using var harness = CreateHarness();
+        var entry = await RunAgentRunEntryAsync(harness, BuildRequest(BuildPlan()) with { SessionId = "session-restart" });
+        harness.Conversation.GetSession("session-restart")!.History.Should().HaveCount(1);
+
+        var reloadedJournal = new VisionAgentBuildProjectionJournal(harness.Store, harness.Redactor);
+        var reloadedProjector = new VisionAgentBuildTerminalProjector(
+            harness.Conversation,
+            reloadedJournal,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>());
+
+        reloadedProjector.ProjectRecovered(entry.Replay).Should().BeFalse();
+        harness.Conversation.GetSession("session-restart")!.History.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task StartupReconciliation_ShouldProjectUnfinishedTerminalOnce()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("startup recovery", new { sessionId = "session-startup", metadataOnly = true });
         var request = BuildRequest(BuildPlan()) with
         {
-            AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
+            AgentRunId = run.RunId,
+            SessionId = "session-startup"
         };
-
-        var outcome = await CreateService().BuildAsync(
-            BuildCommand.FromGenerationRequest(request, "run-tool-loop", persistResult: false),
-            CancellationToken.None);
-
-        outcome.RequestedMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
-        outcome.EffectiveMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
-        outcome.ToolLoopEntered.Should().BeTrue();
-        outcome.Result.BuildResult!.RequestedMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
-    }
-
-    [Fact]
-    public async Task ToolLoopPreExecutionFailure_ShouldNotReportToolLoopEntered()
-    {
-        var request = BuildRequest(
-            BuildPlan(),
-            build => build with { PlanHash = "sha256:stale" }) with
+        var result = SuccessResult(request);
+        harness.Stream.Complete(run.RunId, "done", new
         {
-            AgentGenerateFlowMode = AiAgentGenerateFlowModes.ToolLoop
+            status = result.CompletionStatus,
+            sessionId = request.SessionId,
+            flow = result.Flow,
+            buildResult = result.BuildResult,
+            buildReadiness = result.BuildReadiness,
+            metadataOnly = true
+        }).Should().NotBeNull();
+        harness.Conversation.GetSession("session-startup").Should().BeNull();
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IVisionAgentBuildTerminalProjector>(
+            new VisionAgentBuildTerminalProjector(
+                harness.Conversation,
+                harness.Journal,
+                Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>()));
+        await using var provider = services.BuildServiceProvider();
+        var reconciler = new VisionAgentBuildProjectionReconciliationService(
+            harness.Store,
+            new AgentRunEventStreamService(harness.Store, harness.Redactor),
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildProjectionReconciliationService>>());
+
+        await reconciler.ReconcileAsync(CancellationToken.None);
+        harness.Conversation.GetSession("session-startup")!.History.Should().HaveCount(1);
+        harness.Journal.LoadCheckpoints()
+            .Single(item => item.RunId == run.RunId)
+            .Status.Should()
+            .Be(VisionAgentBuildProjectionStatuses.Projected);
+        await reconciler.ReconcileAsync(CancellationToken.None);
+
+        harness.Conversation.GetSession("session-startup")!.History.Should().HaveCount(1);
+        harness.Journal.LoadCheckpoints()
+            .Single(item => item.RunId == run.RunId)
+            .Status.Should()
+            .Be(VisionAgentBuildProjectionStatuses.Projected);
+    }
+
+    [Fact]
+    public void ProjectorRetry_ShouldRepairPendingJournalWithoutDuplicatingExistingSessionTurn()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("partial projection", new { sessionId = "session-partial", metadataOnly = true });
+        var request = BuildRequest(BuildPlan()) with
+        {
+            AgentRunId = run.RunId,
+            SessionId = "session-partial"
+        };
+        var result = SuccessResult(request);
+        var terminal = harness.Stream.Complete(run.RunId, "done", new
+        {
+            status = result.CompletionStatus,
+            sessionId = request.SessionId,
+            flow = result.Flow,
+            buildResult = result.BuildResult,
+            buildReadiness = result.BuildReadiness,
+            metadataOnly = true
+        })!;
+        harness.Journal.Begin(run.RunId, request.SessionId, terminal.Sequence, terminal.EventType);
+        harness.Conversation.GetOrCreateSession(request.SessionId);
+        harness.Conversation.RecordAssistantResponse(
+            request.SessionId,
+            "already written",
+            null,
+            null,
+            new ConversationTurnPayload
+            {
+                Progress =
+                [
+                    BuildCommandTransports.AgentRun,
+                    $"agent_run:{run.RunId}",
+                    $"terminal:{terminal.Sequence}"
+                ]
+            });
+
+        var reloadedJournal = new VisionAgentBuildProjectionJournal(harness.Store, harness.Redactor);
+        var projector = new VisionAgentBuildTerminalProjector(
+            harness.Conversation,
+            reloadedJournal,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>());
+
+        projector.Project(new VisionAgentBuildTerminalProjection(
+            run.RunId,
+            BuildCommandTransports.AgentRun,
+            request,
+            result,
+            terminal)).Should().BeFalse();
+
+        harness.Conversation.GetSession("session-partial")!.History.Should().HaveCount(1);
+        reloadedJournal.LoadCheckpoints()
+            .Single(item => item.RunId == run.RunId)
+            .Status.Should()
+            .Be(VisionAgentBuildProjectionStatuses.Projected);
+    }
+
+    [Fact]
+    public void ProjectorFailure_ShouldRemainRetryableAndThenProjectOnce()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("projection retry", new { sessionId = "session-retry", metadataOnly = true });
+        var request = BuildRequest(BuildPlan()) with
+        {
+            SessionId = "session-retry",
+            AgentRunId = run.RunId
+        };
+        var result = SuccessResult(request);
+        var terminal = harness.Stream.Complete(run.RunId, "done", new { status = result.CompletionStatus, sessionId = request.SessionId, flow = result.Flow, buildResult = result.BuildResult, metadataOnly = true })!;
+        var throwingConversation = new ThrowOnceConversationService(harness.Conversation);
+        var projector = new VisionAgentBuildTerminalProjector(
+            throwingConversation,
+            harness.Journal,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>());
+
+        projector.Project(new VisionAgentBuildTerminalProjection(run.RunId, BuildCommandTransports.AgentRun, request, result, terminal))
+            .Should()
+            .BeFalse();
+        projector.Project(new VisionAgentBuildTerminalProjection(run.RunId, BuildCommandTransports.AgentRun, request, result, terminal))
+            .Should()
+            .BeTrue();
+
+        harness.Conversation.GetSession("session-retry")!.History.Should().HaveCount(1);
+        var checkpoint = harness.Journal.LoadCheckpoints().Single(item => item.RunId == run.RunId);
+        checkpoint.Status.Should().Be(VisionAgentBuildProjectionStatuses.Projected);
+        checkpoint.Attempts.Should().Be(2);
+    }
+
+    [Fact]
+    public void SessionIdPolicy_ShouldUseDeterministicRunSessionAndIgnoreDrift()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("session policy", new { metadataOnly = true });
+        var terminal = harness.Stream.Cancel(run.RunId)!;
+        var request = BuildRequest(BuildPlan()) with
+        {
+            SessionId = "bad/path",
+            AgentRunId = run.RunId
+        };
+        var result = new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusCancelled,
+            FailureType = AiFlowGenerationResult.FailureTypeUserCancelled
         };
 
-        var outcome = await CreateService().BuildAsync(
-            BuildCommand.FromGenerationRequest(request, "run-tool-loop-stale", persistResult: false),
-            CancellationToken.None);
+        harness.Projector.Project(new VisionAgentBuildTerminalProjection(run.RunId, BuildCommandTransports.AgentRun, request, result, terminal))
+            .Should()
+            .BeTrue();
+        harness.Projector.Project(new VisionAgentBuildTerminalProjection(
+                run.RunId,
+                BuildCommandTransports.AgentRun,
+                request with { SessionId = "session-drift" },
+                result,
+                terminal))
+            .Should()
+            .BeFalse();
 
-        outcome.FailureCode.Should().Be(VisionAgentBuildFailureCodes.StalePlan);
-        outcome.RequestedMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
-        outcome.EffectiveMode.Should().Be(AiAgentGenerateFlowModes.ToolLoop);
-        outcome.ToolLoopEntered.Should().BeFalse();
-        outcome.Result.BuildResult!.ToolLoopEntered.Should().BeFalse();
+        harness.Conversation.GetSession($"agent-run-{run.RunId}")!.History.Should().HaveCount(1);
+        harness.Conversation.GetSession("session-drift").Should().BeNull();
     }
 
     [Fact]
-    public async Task SameWebMessageTerminalProjection_ShouldPersistSessionOnce()
+    public void Cleanup_ShouldNotDeletePendingOrFailedProjectionCheckpoints()
     {
-        var conversation = new ConversationalFlowService(_tempRoot);
-        var service = CreateService(conversation: conversation);
-        var request = BuildRequest(BuildPlan()) with { SessionId = "session-idempotent" };
-        var command = BuildCommand.FromGenerationRequest(
-            request,
-            "run-idempotent",
-            "req-idempotent",
-            BuildCommandTransports.WebMessage);
+        using var harness = CreateHarness();
+        var begin = harness.Journal.Begin("ar_cleanup", "session-cleanup", 3, AgentRunEventTypes.RunCompleted);
+        begin.Status.Should().Be(VisionAgentBuildProjectionBeginStatus.Started);
+        harness.Journal.MarkFailed("ar_cleanup", "session-cleanup", 3, AgentRunEventTypes.RunCompleted, new InvalidOperationException("public failure"));
 
-        var first = await service.BuildAsync(command, CancellationToken.None);
-        var second = await service.BuildAsync(command, CancellationToken.None);
+        harness.Journal.Cleanup(DateTimeOffset.UtcNow.AddDays(60), TimeSpan.FromDays(1));
 
-        first.Persisted.Should().BeTrue();
-        second.Persisted.Should().BeFalse();
-        conversation.GetSession("session-idempotent")!.History.Should().HaveCount(1);
-    }
-
-    [Fact]
-    public async Task AgentRunTransport_ShouldDeferSessionProjectionToTerminalProjector()
-    {
-        var conversation = new ConversationalFlowService(_tempRoot);
-        var service = CreateService(conversation: conversation);
-        var request = BuildRequest(BuildPlan()) with { SessionId = "session-agent-run-deferred" };
-
-        var outcome = await service.BuildAsync(
-            BuildCommand.FromGenerationRequest(
-                request,
-                "run-agent-deferred",
-                "req-agent-deferred",
-                BuildCommandTransports.AgentRun),
-            CancellationToken.None);
-
-        outcome.Persisted.Should().BeFalse();
-        conversation.GetSession("session-agent-run-deferred").Should().BeNull();
+        var checkpoint = harness.Journal.LoadCheckpoints().Single(item => item.RunId == "ar_cleanup");
+        checkpoint.Status.Should().Be(VisionAgentBuildProjectionStatuses.Failed);
+        checkpoint.PublicErrorMessage.Should().Be("public failure");
     }
 
     public void Dispose()
@@ -197,44 +361,274 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         }
     }
 
-    private VisionAgentBuildApplicationService CreateService(
-        bool enabled = true,
-        string mode = AiAgentGenerateFlowModes.Scripted,
-        IConversationalFlowService? conversation = null)
+    private BuildHarness CreateHarness(bool enabled = true)
     {
-        return new VisionAgentBuildApplicationService(
-            new FakeBuildExecution(),
+        var directory = Path.Combine(_tempRoot, Guid.NewGuid().ToString("N"));
+        var redactor = new AgentRunEventRedactor();
+        var store = new AgentRunEventStore(Path.Combine(directory, "events"), redactor);
+        var stream = new AgentRunEventStreamService(store, redactor);
+        var journal = new VisionAgentBuildProjectionJournal(store, redactor);
+        var conversation = new ConversationalFlowService(Path.Combine(directory, "sessions"));
+        var execution = new FakeBuildExecution();
+        var application = new VisionAgentBuildApplicationService(
+            execution,
             new VisionAgentPlanAnswerValidator(),
             new VisionAgentPlanRequirementOverlay(),
-            conversation ?? new ConversationalFlowService(_tempRoot),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService>>(),
             Options.Create(new AgentGenerateFlowOptions
             {
                 Enabled = enabled,
-                Mode = mode
+                Mode = AiAgentGenerateFlowModes.Scripted
             }));
+        var projector = new VisionAgentBuildTerminalProjector(
+            conversation,
+            journal,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>());
+        var runService = new VisionAgentBuildRunService(
+            application,
+            stream,
+            projector,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildRunService>>());
+
+        return new BuildHarness(directory, redactor, store, stream, journal, conversation, projector, runService);
     }
 
-    private static object BusinessProjection(CanonicalBuildOutcome outcome)
+    private static async Task<EntryResult> RunAgentRunEntryAsync(
+        BuildHarness harness,
+        AiFlowGenerationRequest request)
     {
-        return new
+        var create = harness.Stream.CreateRun(request.Description, new
         {
-            outcome.CompletionStatus,
-            outcome.FailureType,
-            outcome.FailureCode,
-            outcome.PlanId,
-            outcome.PlanHash,
-            outcome.ContractVersion,
-            outcome.AnswerSetFingerprint,
-            outcome.RequestedMode,
-            outcome.EffectiveMode,
-            outcome.ToolLoopEntered,
-            outcome.FallbackReason,
-            Readiness = JsonSerializer.Serialize(outcome.BuildReadiness),
-            Flow = JsonSerializer.Serialize(outcome.Result.Flow),
-            WorkflowDiff = JsonSerializer.Serialize(outcome.WorkflowDiff),
-            ApplyGate = JsonSerializer.Serialize(outcome.ApplyGate)
+            sessionId = request.SessionId,
+            planId = request.BuildFromPlan?.PlanId ?? string.Empty,
+            planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
+            metadataOnly = true
+        });
+        var runRequest = request with { AgentRunId = create.RunId };
+        var result = await harness.RunService.RunAsync(
+            BuildCommand.FromGenerationRequest(
+                runRequest,
+                create.RunId,
+                $"req-{create.RunId}",
+                BuildCommandTransports.AgentRun,
+                persistResult: false),
+            CancellationToken.None);
+        var replay = harness.Stream.Replay(create.RunId)!;
+        return new EntryResult(create.RunId, result.TerminalEvent, replay);
+    }
+
+    private static async Task<EntryResult> RunWebMessageEntryAsync(
+        BuildHarness harness,
+        AiFlowGenerationRequest request)
+    {
+        var handler = new GenerateFlowMessageHandler(
+            Substitute.For<IAiFlowGenerationService>(),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>(),
+            harness.RunService,
+            harness.Stream);
+        string? runId = null;
+        var json = await handler.HandleAsync(
+            request.Description,
+            request.SessionId,
+            request.ExistingFlowJson,
+            request.AdditionalContext,
+            request.Mode,
+            request.DebugPrompt,
+            $"req-web-{Guid.NewGuid():N}",
+            request.Attachments,
+            request.RequirementMode,
+            request.TemplateSelection,
+            request.BuildFromPlan,
+            request.UseVisionAgentGenerateFlow,
+            request.AgentGenerateFlowMode,
+            request.RuntimePreviewConsent,
+            onAgentRunCreated: id => runId = id);
+
+        using var document = JsonDocument.Parse(json);
+        document.RootElement.GetProperty("completionStatus").GetString()
+            .Should()
+            .NotBeNullOrWhiteSpace();
+        runId.Should().NotBeNullOrWhiteSpace();
+        var replay = harness.Stream.Replay(runId!)!;
+        return new EntryResult(runId!, Terminal(replay), replay);
+    }
+
+    private static async Task<EntryResult> RunInternalEntryAsync(
+        BuildHarness harness,
+        AiFlowGenerationRequest request)
+    {
+        var service = CreateInternalGenerationService(harness);
+        var result = await service.GenerateFlowAsync(request, cancellationToken: CancellationToken.None);
+        result.SessionId.Should().Be(request.SessionId);
+        result.CompletionStatus.Should().NotBeNullOrWhiteSpace();
+        result.PlanId.Should().NotBeNullOrWhiteSpace();
+
+        var runId = harness.Stream.ReplayLatest()?.Summary.RunId;
+        runId.Should().NotBeNullOrWhiteSpace();
+        var replay = harness.Stream.Replay(runId!)!;
+        return new EntryResult(runId!, Terminal(replay), replay);
+    }
+
+    private static AiFlowGenerationService CreateInternalGenerationService(BuildHarness harness)
+    {
+        var operatorFactory = Substitute.For<IOperatorFactory>();
+        var flowExecutionService = Substitute.For<IFlowExecutionService>();
+        var promptVersionManager = Substitute.For<IPromptVersionManager>();
+        promptVersionManager.GetActiveVersionAsync().Returns(Task.FromResult(new PromptVersion
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Prompt",
+            Content = "test"
+        }));
+
+        return new AiFlowGenerationService(
+            new AiGenerationOrchestrator(
+                Substitute.For<IAiModelSelector>(),
+                Substitute.For<IAiConnectorFactory>()),
+            new PromptBuilder(operatorFactory),
+            harness.Conversation,
+            Substitute.For<IAiFlowValidator>(),
+            new AutoLayoutService(),
+            operatorFactory,
+            Substitute.For<IFlowTemplateService>(),
+            Substitute.For<IScenarioMatcher>(),
+            Substitute.For<IRequirementBriefExtractor>(),
+            Substitute.For<IAiTurnRouter>(),
+            Substitute.For<ITemplateConstraintValidator>(),
+            new AiFlowResponseParser(),
+            new DryRunService(flowExecutionService),
+            Substitute.For<IHostEnvironment>(),
+            promptVersionManager,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>(),
+            Options.Create(new AgentGenerateFlowOptions
+            {
+                Enabled = true,
+                Mode = AiAgentGenerateFlowModes.Scripted,
+                FallbackToLegacyOnFailure = false
+            }),
+            Substitute.For<IVisionAgentGenerateFlowService>(),
+            harness.RunService,
+            harness.Stream);
+    }
+
+    private static TerminalBusinessProjectionSnapshot TerminalBusinessProjection(AgentRunReplayResult replay)
+    {
+        var terminal = Terminal(replay);
+        var source = TerminalSource(terminal);
+        return new TerminalBusinessProjectionSnapshot(
+            ReadString(source, "status"),
+            ReadString(source, "failureType"),
+            ReadString(source, "failureCode"),
+            ReadString(source, "planId"),
+            ReadString(source, "planHash"),
+            ReadString(source, "contractVersion"),
+            ReadString(source, "answerSetFingerprint"),
+            ReadString(source, "requestedMode"),
+            ReadString(source, "effectiveMode"),
+            ReadBool(source, "toolLoopEntered"),
+            ReadString(source, "fallbackReason"),
+            ReadRawJson(source, "buildReadiness"),
+            ReadRawJson(source, "flow"),
+            ReadRawJson(source, "buildResult"),
+            ReadRawJson(source, "workflowDiff"),
+            ReadRawJson(source, "applyGate"),
+            ReadRawJson(source, "pendingParameters"),
+            ReadRawJson(source, "missingResources"),
+            ReadString(source, "firstFixRecommendation"));
+    }
+
+    private static AgentRunEvent Terminal(AgentRunReplayResult replay)
+    {
+        return replay.Events.Last(evt =>
+            evt.EventType is AgentRunEventTypes.RunCompleted or
+                AgentRunEventTypes.RunFailed or
+                AgentRunEventTypes.RunCancelled);
+    }
+
+    private static JsonElement TerminalSource(AgentRunEvent terminal)
+    {
+        var payload = JsonSerializer.SerializeToElement(terminal.Payload, AgentRunEventJson.Options);
+        if (terminal.EventType == AgentRunEventTypes.RunFailed &&
+            TryGetProperty(payload, "diagnostic", out var diagnostic))
+        {
+            return diagnostic;
+        }
+
+        return payload;
+    }
+
+    private sealed record TerminalBusinessProjectionSnapshot(
+        string? CompletionStatus,
+        string? FailureType,
+        string? FailureCode,
+        string? PlanId,
+        string? PlanHash,
+        string? ContractVersion,
+        string? AnswerFingerprint,
+        string? RequestedMode,
+        string? EffectiveMode,
+        bool ToolLoopEntered,
+        string? FallbackReason,
+        string BuildReadinessJson,
+        string FlowJson,
+        string BuildResultJson,
+        string WorkflowDiffJson,
+        string ApplyGateJson,
+        string PendingParametersJson,
+        string MissingResourcesJson,
+        string? FirstFix);
+
+    private static string ReadRawJson(JsonElement source, string name)
+    {
+        return TryGetProperty(source, name, out var property)
+            ? property.GetRawText()
+            : string.Empty;
+    }
+
+    private static string ReadString(JsonElement source, string name)
+    {
+        if (!TryGetProperty(source, name, out var property))
+        {
+            return string.Empty;
+        }
+
+        return property.ValueKind == JsonValueKind.String
+            ? property.GetString() ?? string.Empty
+            : property.ToString();
+    }
+
+    private static bool ReadBool(JsonElement source, string name)
+    {
+        if (!TryGetProperty(source, name, out var property))
+        {
+            return false;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String => bool.TryParse(property.GetString(), out var parsed) && parsed,
+            _ => false
         };
+    }
+
+    private static bool TryGetProperty(JsonElement source, string name, out JsonElement property)
+    {
+        if (source.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var item in source.EnumerateObject())
+            {
+                if (string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    property = item.Value;
+                    return true;
+                }
+            }
+        }
+
+        property = default;
+        return false;
     }
 
     private static AiFlowGenerationRequest BuildRequest(
@@ -335,6 +729,135 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         };
     }
 
+    private static AiFlowGenerationResult SuccessResult(AiFlowGenerationRequest request)
+    {
+        var build = request.BuildFromPlan!;
+        var plan = build.PlanSnapshot!;
+        var buildResult = new VisionAgentBuildResult
+        {
+            BuildId = "build-fake",
+            PlanId = build.PlanId,
+            PlanHash = build.PlanHash,
+            ContractVersion = plan.PlanContractVersion,
+            AnswerSetFingerprint = "manual",
+            ApplyGate = new VisionAgentApplyGate
+            {
+                CanvasApplyReady = true,
+                RuntimeDraftReady = true,
+                DeploymentReady = false,
+                Status = "ready",
+                MetadataOnly = true
+            },
+            WorkflowDiff = new VisionAgentWorkflowDiff
+            {
+                AddedNodes = ["op_camera"],
+                MetadataOnly = true
+            },
+            ToolEvidenceTimeline =
+            [
+                new VisionAgentToolEvidence
+                {
+                    Stage = "fake_build",
+                    ToolName = "fake_build",
+                    Source = string.Equals(
+                        request.AgentGenerateFlowMode,
+                        AiAgentGenerateFlowModes.ToolLoop,
+                        StringComparison.OrdinalIgnoreCase)
+                        ? "tool_loop"
+                        : "fixed_build_orchestrator",
+                    Status = "completed"
+                }
+            ],
+            MetadataOnly = true
+        };
+
+        return new AiFlowGenerationResult
+        {
+            Success = true,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+            Flow = new OperatorFlowDto(),
+            AiExplanation = "fake build completed",
+            BuildResult = buildResult,
+            BuildReadiness = new VisionAgentBuildReadinessSnapshot
+            {
+                CanBuild = true,
+                ContractVersion = plan.PlanContractVersion,
+                ResolvedFields = plan.ResolvedPlanFields
+            },
+            InteractionState = AiInteractionStates.Completed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High
+        };
+    }
+
+    private sealed record EntryResult(
+        string RunId,
+        AgentRunEvent? Terminal,
+        AgentRunReplayResult Replay);
+
+    private sealed record BuildHarness(
+        string Directory,
+        AgentRunEventRedactor Redactor,
+        AgentRunEventStore Store,
+        AgentRunEventStreamService Stream,
+        VisionAgentBuildProjectionJournal Journal,
+        ConversationalFlowService Conversation,
+        VisionAgentBuildTerminalProjector Projector,
+        VisionAgentBuildRunService RunService) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (System.IO.Directory.Exists(Directory))
+            {
+                System.IO.Directory.Delete(Directory, recursive: true);
+            }
+        }
+    }
+
+    private sealed class ThrowOnceConversationService : IConversationalFlowService
+    {
+        private readonly IConversationalFlowService _inner;
+        private bool _throw = true;
+
+        public ThrowOnceConversationService(IConversationalFlowService inner)
+        {
+            _inner = inner;
+        }
+
+        public ConversationSession GetOrCreateSession(string? sessionId) => _inner.GetOrCreateSession(sessionId);
+
+        public ConversationIntent DetectIntent(string userDescription, bool hasExistingFlow) =>
+            _inner.DetectIntent(userDescription, hasExistingFlow);
+
+        public ConversationContext PrepareContext(AiFlowGenerationRequest request) =>
+            _inner.PrepareContext(request);
+
+        public void RecordAssistantResponse(
+            string sessionId,
+            string assistantMessage,
+            string? latestFlowJson,
+            string? latestCanvasFlowJson = null,
+            ConversationTurnPayload? payload = null)
+        {
+            if (_throw)
+            {
+                _throw = false;
+                throw new InvalidOperationException("public failure");
+            }
+
+            _inner.RecordAssistantResponse(sessionId, assistantMessage, latestFlowJson, latestCanvasFlowJson, payload);
+        }
+
+        public IReadOnlyList<ConversationSessionSummary> ListSessions() => _inner.ListSessions();
+
+        public ConversationSession? GetSession(string sessionId) => _inner.GetSession(sessionId);
+
+        public bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson) =>
+            _inner.TryBackfillCanvasFlowJson(sessionId, canvasFlowJson);
+
+        public bool DeleteSession(string sessionId) => _inner.DeleteSession(sessionId);
+    }
+
     private sealed class FakeBuildExecution : IVisionAgentOrchestrator
     {
         public Task<VisionAgentPlanModeResult> CreatePlanAsync(
@@ -348,62 +871,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             AiFlowGenerationRequest request,
             CancellationToken cancellationToken)
         {
-            var build = request.BuildFromPlan!;
-            var plan = build.PlanSnapshot!;
-            var gate = new VisionAgentApplyGate
-            {
-                CanvasApplyReady = true,
-                RuntimeDraftReady = true,
-                DeploymentReady = false,
-                Status = "ready",
-                MetadataOnly = true
-            };
-            var diff = new VisionAgentWorkflowDiff
-            {
-                AddedNodes = ["op_camera", "op_defect", "op_output"],
-                MetadataOnly = true
-            };
-            var buildResult = new VisionAgentBuildResult
-            {
-                BuildId = "build-fake",
-                PlanId = build.PlanId,
-                PlanHash = build.PlanHash,
-                ContractVersion = plan.PlanContractVersion,
-                ApplyGate = gate,
-                WorkflowDiff = diff,
-                ToolEvidenceTimeline =
-                [
-                    new VisionAgentToolEvidence
-                    {
-                        Stage = "fake_build",
-                        ToolName = "fake_build",
-                        Source = string.Equals(
-                            request.AgentGenerateFlowMode,
-                            AiAgentGenerateFlowModes.ToolLoop,
-                            StringComparison.OrdinalIgnoreCase)
-                            ? "tool_loop"
-                            : "fixed_build_orchestrator",
-                        Status = "completed"
-                    }
-                ]
-            };
-            return Task.FromResult(new AiFlowGenerationResult
-            {
-                Success = true,
-                CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
-                Flow = new OperatorFlowDto(),
-                AiExplanation = "fake build completed",
-                BuildResult = buildResult,
-                BuildReadiness = new VisionAgentBuildReadinessSnapshot
-                {
-                    CanBuild = true,
-                    ContractVersion = plan.PlanContractVersion,
-                    ResolvedFields = plan.ResolvedPlanFields
-                },
-                InteractionState = AiInteractionStates.Completed,
-                TurnIntent = AiTurnIntents.NewFlow,
-                RouterConfidence = AiRouterConfidence.High
-            });
+            return Task.FromResult(SuccessResult(request));
         }
     }
 }

@@ -81,10 +81,59 @@ public sealed class BuildFromPlanArchitectureGuardTests
         var adapterBody = text[start..end];
 
         adapterBody.Should().Contain("BuildCommand.FromGenerationRequest");
-        adapterBody.Should().Contain("IVisionAgentBuildApplicationService");
+        adapterBody.Should().Contain("_agentRunStreamService.CreateRun");
+        adapterBody.Should().Contain("_buildRunService.RunAsync");
+        adapterBody.Should().Contain("BuildCommandTransports.Internal");
+        adapterBody.Should().NotContain("IVisionAgentBuildApplicationService");
         adapterBody.Should().NotContain("IVisionAgentBuildOrchestrator");
         adapterBody.Should().NotContain("_requirementBriefExtractor");
+        adapterBody.Should().NotContain("TryPersistAgentGenerateFlowResult");
         adapterBody.Should().NotContain("GetService<");
+    }
+
+    [Fact]
+    public void OnlyRunService_ShouldCallBuildApplicationService()
+    {
+        var sourceFiles = Directory.EnumerateFiles(
+                Path.Combine(Root, "ClearVision.Product/src"),
+                "*.cs",
+                SearchOption.AllDirectories)
+            .Where(path => !path.EndsWith("IVisionAgentBuildApplicationService.cs", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        foreach (var file in sourceFiles)
+        {
+            var text = File.ReadAllText(file);
+            if (!text.Contains(".BuildAsync(", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var relativePath = Path.GetRelativePath(Root, file).Replace('\\', '/');
+            if (relativePath.EndsWith("VisionAgentBuildRunService.cs", StringComparison.OrdinalIgnoreCase))
+            {
+                text.Should().Contain("_applicationService.BuildAsync");
+                continue;
+            }
+
+            text.Should().NotContain("IVisionAgentBuildApplicationService", relativePath);
+            text.Should().NotContain("_applicationService.BuildAsync", relativePath);
+            text.Should().NotContain("buildApplicationService.BuildAsync", relativePath);
+        }
+    }
+
+    [Fact]
+    public void ApplicationService_ShouldNotPersistSessionProjection()
+    {
+        var text = File.ReadAllText(Path.Combine(
+            Root,
+            "ClearVision.Product/src/ClearVision.Product.Infrastructure/AI/Agent/VisionAgentBuildApplicationService.cs"));
+
+        text.Should().NotContain("IConversationalFlowService");
+        text.Should().NotContain("RecordAssistantResponse");
+        text.Should().NotContain("ProjectedTerminals");
+        text.Should().NotContain("TryProjectTerminal");
+        text.Should().NotContain("Transport != AgentRun");
     }
 
     [Fact]

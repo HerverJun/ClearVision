@@ -1686,7 +1686,6 @@ public sealed class VisionAgentBuildOrchestratorTests
             new BuildExecutionAdapter(CreateOrchestrator(sink, registry)),
             new VisionAgentPlanAnswerValidator(),
             new VisionAgentPlanRequirementOverlay(),
-            new ConversationalFlowService(Path.Combine(Path.GetTempPath(), "clearvision-build-app-test-" + Guid.NewGuid().ToString("N"))),
             NullLogger<VisionAgentBuildApplicationService>.Instance,
             Options.Create(new AgentGenerateFlowOptions
             {

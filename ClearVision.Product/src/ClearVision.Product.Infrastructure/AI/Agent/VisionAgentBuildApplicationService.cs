@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-using System.Text.Json;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI;
@@ -11,18 +9,9 @@ namespace ClearVision.Product.Infrastructure.AI.Agent;
 
 public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplicationService
 {
-    private static readonly ConcurrentDictionary<string, byte> ProjectedTerminals =
-        new(StringComparer.OrdinalIgnoreCase);
-
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
     private readonly IVisionAgentOrchestrator _execution;
     private readonly VisionAgentPlanAnswerValidator _answerValidator;
     private readonly VisionAgentPlanRequirementOverlay _requirementOverlay;
-    private readonly IConversationalFlowService _conversationalFlowService;
     private readonly IAgentRunEventSink? _eventSink;
     private readonly Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService> _logger;
     private readonly AgentGenerateFlowOptions _options;
@@ -31,7 +20,6 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         IVisionAgentOrchestrator execution,
         VisionAgentPlanAnswerValidator answerValidator,
         VisionAgentPlanRequirementOverlay requirementOverlay,
-        IConversationalFlowService conversationalFlowService,
         Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService> logger,
         IOptions<AgentGenerateFlowOptions>? options = null,
         IAgentRunEventSink? eventSink = null)
@@ -39,7 +27,6 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         _execution = execution;
         _answerValidator = answerValidator;
         _requirementOverlay = requirementOverlay;
-        _conversationalFlowService = conversationalFlowService;
         _logger = logger;
         _options = options?.Value ?? new AgentGenerateFlowOptions();
         _options.Mode = AiAgentGenerateFlowModes.Normalize(_options.Mode);
@@ -180,12 +167,6 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         AiFlowGenerationRequest request,
         AiFlowGenerationResult result)
     {
-        var persistInApplicationService = command.PersistResult &&
-                                          !string.Equals(
-                                              command.Transport,
-                                              BuildCommandTransports.AgentRun,
-                                              StringComparison.OrdinalIgnoreCase);
-        var persisted = persistInApplicationService && TryProjectTerminal(command, request, result);
         return new CanonicalBuildOutcome
         {
             Result = result,
@@ -206,7 +187,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             BuildReadiness = result.BuildReadiness,
             WorkflowDiff = result.BuildResult?.WorkflowDiff,
             ApplyGate = result.BuildResult?.ApplyGate,
-            Persisted = persisted
+            Persisted = false
         };
     }
 
@@ -510,73 +491,6 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             FallbackReason = fallbackReason,
             PublicWarnings = publicWarnings.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
         };
-    }
-
-    private bool TryProjectTerminal(
-        BuildCommand command,
-        AiFlowGenerationRequest request,
-        AiFlowGenerationResult result)
-    {
-        var session = _conversationalFlowService.GetOrCreateSession(request.SessionId);
-        result.SessionId = session.SessionId;
-        var runKey = FirstNonBlank(command.RunId, request.AgentRunId, command.RequestId, $"session:{session.SessionId}");
-        var projectionKey = $"{runKey}:{session.SessionId}:terminal";
-        if (!ProjectedTerminals.TryAdd(projectionKey, 0))
-        {
-            return false;
-        }
-
-        try
-        {
-            var assistantMessage = result.Success
-                ? result.AiExplanation ?? "Vision Agent BuildFromPlan completed."
-                : result.ErrorMessage ?? result.FailureSummary?.Message ?? "Vision Agent BuildFromPlan failed.";
-            var flowJson = result.Flow == null ? null : JsonSerializer.Serialize(result.Flow, JsonOptions);
-            var payload = new ConversationTurnPayload
-            {
-                Kind = result.Success ? "assistant_agent_result" : "assistant_agent_failure",
-                Status = result.CompletionStatus,
-                InteractionState = result.InteractionState,
-                TurnIntent = result.TurnIntent,
-                RouterConfidence = result.RouterConfidence,
-                Reply = result.Success ? assistantMessage : null,
-                Progress = [command.Transport],
-                ClarificationRequired = result.ClarificationRequired,
-                RequirementBrief = result.RequirementBrief,
-                BuildResult = result.BuildResult,
-                WorkflowDiff = result.BuildResult?.WorkflowDiff,
-                ApplyGate = result.BuildResult?.ApplyGate,
-                ToolEvidenceTimeline = result.BuildResult?.ToolEvidenceTimeline,
-                FirstFixRecommendation = result.BuildResult?.FirstFixRecommendation,
-                BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
-                NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
-                Failure = result.Success || result.FailureSummary == null
-                    ? null
-                    : new ConversationTurnFailurePayload
-                    {
-                        Summary = assistantMessage,
-                        FailureSummary = result.FailureSummary,
-                        Diagnostics = result.LastAttemptDiagnostics.ToList()
-                    }
-            };
-            _conversationalFlowService.RecordAssistantResponse(
-                session.SessionId,
-                assistantMessage,
-                flowJson,
-                flowJson,
-                payload);
-            return true;
-        }
-        catch (Exception ex)
-        {
-            ProjectedTerminals.TryRemove(projectionKey, out _);
-            Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
-                _logger,
-                ex,
-                "Failed to project AgentRun terminal outcome. RunKey={RunKey}",
-                runKey);
-            return false;
-        }
     }
 
     private void EmitContractAccepted(string? runId, BuildContractValidation contract)

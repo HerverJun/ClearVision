@@ -54,6 +54,14 @@ public sealed class AgentRunEventStore
             .ToList();
     }
 
+    public IReadOnlyList<AgentRunEvent> LoadEvents()
+    {
+        return ReadJsonLines<AgentRunEvent>(EventPath)
+            .OrderBy(evt => evt.RunId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(evt => evt.Sequence)
+            .ToList();
+    }
+
     public AgentRunSummary? LoadSummary(string runId)
     {
         return ReadJsonLines<AgentRunSummary>(SummaryPath)

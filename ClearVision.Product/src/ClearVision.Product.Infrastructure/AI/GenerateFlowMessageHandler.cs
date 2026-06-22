@@ -245,6 +245,7 @@ public class GenerateFlowMessageHandler
             useVisionAgentGenerateFlow = true,
             agentGenerateFlowMode = request.AgentGenerateFlowMode,
             requestId,
+            sessionId = request.SessionId,
             planId = request.BuildFromPlan?.PlanId ?? string.Empty,
             planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
             hasPlanSnapshot = request.BuildFromPlan?.PlanSnapshot != null,

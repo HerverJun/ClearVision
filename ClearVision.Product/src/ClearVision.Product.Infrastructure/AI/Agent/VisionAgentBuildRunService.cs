@@ -269,6 +269,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         return new
         {
             status = result.CompletionStatus,
+            sessionId = FirstNonBlank(result.SessionId, request.SessionId),
             failureType = result.FailureType,
             failureCode = result.FailureSummary?.Code ?? string.Empty,
             failureSummary = result.FailureSummary,

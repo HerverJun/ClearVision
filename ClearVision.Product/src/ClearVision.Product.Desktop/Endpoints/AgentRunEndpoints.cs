@@ -442,6 +442,7 @@ public static class AgentRunEndpoints
             mode = request.Mode ?? request.BuildFromPlan?.BuildIntent ?? "auto",
             useVisionAgentGenerateFlow = request.UseVisionAgentGenerateFlow ?? true,
             agentGenerateFlowMode = request.AgentGenerateFlowMode ?? AiAgentGenerateFlowModes.Scripted,
+            sessionId = request.SessionId,
             attachmentCount = request.BuildFromPlan?.AttachmentSummary.Count ?? request.AttachmentCount ?? request.Attachments?.Count ?? 0,
             planId = request.BuildFromPlan?.PlanId ?? string.Empty,
             planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,

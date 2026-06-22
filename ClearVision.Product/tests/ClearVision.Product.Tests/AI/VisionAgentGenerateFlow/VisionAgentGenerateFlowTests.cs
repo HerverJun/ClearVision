@@ -797,6 +797,13 @@ public sealed class VisionAgentGenerateFlowTests
                 Mode = GenerateFlowMode.Auto
             });
         conversationService.GetSession("session").Returns(new ConversationSession { SessionId = "session" });
+        conversationService.GetOrCreateSession(Arg.Any<string?>())
+            .Returns(call => new ConversationSession
+            {
+                SessionId = string.IsNullOrWhiteSpace(call.Arg<string?>())
+                    ? "session"
+                    : call.Arg<string?>()!.Trim()
+            });
         var turnRouter = Substitute.For<IAiTurnRouter>();
         turnRouter.Route(Arg.Any<AiTurnRouteRequest>())
             .Returns(new AiTurnRoute(
@@ -815,6 +822,7 @@ public sealed class VisionAgentGenerateFlowTests
         var operatorFactory = Substitute.For<IOperatorFactory>();
         var flowExecutionService = Substitute.For<IFlowExecutionService>();
 
+        var buildRunHarness = BuildRunServiceFor(serviceProvider, agentOptions, conversationService);
         return new AiFlowGenerationService(
             new AiGenerationOrchestrator(
                 Substitute.For<IAiModelSelector>(),
@@ -836,26 +844,46 @@ public sealed class VisionAgentGenerateFlowTests
             Substitute.For<Microsoft.Extensions.Logging.ILogger<AiFlowGenerationService>>(),
             Options.Create(agentOptions),
             agentGenerateFlowService,
-            BuildApplicationServiceFor(serviceProvider, agentOptions));
+            buildRunHarness?.RunService,
+            buildRunHarness?.StreamService);
     }
 
-    private static IVisionAgentBuildApplicationService? BuildApplicationServiceFor(
+    private static BuildRunHarness? BuildRunServiceFor(
         IServiceProvider? serviceProvider,
-        AgentGenerateFlowOptions options)
+        AgentGenerateFlowOptions options,
+        IConversationalFlowService conversationService)
     {
         if (serviceProvider?.GetService(typeof(IVisionAgentBuildOrchestrator)) is not IVisionAgentBuildOrchestrator build)
         {
             return null;
         }
 
-        return new VisionAgentBuildApplicationService(
+        var directory = Path.Combine(Path.GetTempPath(), "clearvision-test-build-run-" + Guid.NewGuid().ToString("N"));
+        var redactor = new AgentRunEventRedactor();
+        var store = new AgentRunEventStore(directory, redactor);
+        var streamService = new AgentRunEventStreamService(store, redactor);
+        var journal = new VisionAgentBuildProjectionJournal(store, redactor);
+        var projector = new VisionAgentBuildTerminalProjector(
+            conversationService,
+            journal,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>());
+        var applicationService = new VisionAgentBuildApplicationService(
             new BuildOrchestratorExecution(build),
             new VisionAgentPlanAnswerValidator(),
             new VisionAgentPlanRequirementOverlay(),
-            new ConversationalFlowService(Path.Combine(Path.GetTempPath(), "clearvision-test-build-app-" + Guid.NewGuid().ToString("N"))),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService>>(),
             Options.Create(options));
+        var runService = new VisionAgentBuildRunService(
+            applicationService,
+            streamService,
+            projector,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildRunService>>());
+        return new BuildRunHarness(runService, streamService);
     }
+
+    private sealed record BuildRunHarness(
+        IVisionAgentBuildRunService RunService,
+        IAgentRunEventStreamService StreamService);
 
     private static IVisionAgentBuildApplicationService BuildApplicationServiceFor(
         IVisionAgentOrchestrator execution,
@@ -866,7 +894,6 @@ public sealed class VisionAgentGenerateFlowTests
             execution,
             new VisionAgentPlanAnswerValidator(),
             new VisionAgentPlanRequirementOverlay(),
-            new ConversationalFlowService(Path.Combine(Path.GetTempPath(), "clearvision-test-build-app-" + Guid.NewGuid().ToString("N"))),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildApplicationService>>(),
             Options.Create(options),
             eventSink);
