@@ -13,9 +13,11 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.Core;
+using ClearVision.Product.Tests.Runtime;
 
 namespace ClearVision.Product.Tests.Services;
 
+[Collection(RuntimeConcurrencyCollection.Name)]
 public class InspectionServiceRealtimeTests
 {
     [Fact]

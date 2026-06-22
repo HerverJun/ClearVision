@@ -137,7 +137,9 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
             buildIntent: "modify",
             currentFlowSnapshot: JsonSerializer.Serialize(existingFlow));
 
-        AssertPlanQuality(plan);
+        AssertPlanQuality(plan, expectClarificationQuestions: false);
+        plan.RemainingPlanFields.Should().BeEmpty();
+        plan.ClarificationQuestions.Should().BeEmpty();
         AssertBuildRequestPreservesPlanContext(request, expectCurrentFlow: true);
         AssertCommonBuildQuality(result, sink);
         result.BuildResult!.WorkflowDiff.PreservedNodes.Should().HaveCountGreaterThanOrEqualTo(existingFlow.Operators.Count);
@@ -244,10 +246,16 @@ public sealed class VisionAgentIndustrialScenarioEvaluationTests
         ]);
     }
 
-    private static void AssertPlanQuality(VisionAgentPlanModeResult plan)
+    private static void AssertPlanQuality(
+        VisionAgentPlanModeResult plan,
+        bool expectClarificationQuestions = true)
     {
         plan.PlanHash.Should().NotBeNullOrWhiteSpace();
-        plan.ClarificationQuestions.Should().NotBeEmpty();
+        if (expectClarificationQuestions)
+        {
+            plan.ClarificationQuestions.Should().NotBeEmpty();
+        }
+
         plan.RecommendedDefaults.Should().NotBeEmpty();
         plan.RecommendedRoute.Operators.Should().NotBeEmpty();
         plan.NextAction.Should().Contain("构建");

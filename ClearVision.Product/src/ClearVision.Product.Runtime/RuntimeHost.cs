@@ -1510,7 +1510,7 @@ internal sealed class RuntimeResultRecordWriter : IRuntimeResultRecordWriter
         }
         finally
         {
-            await _disposeCts.CancelAsync();
+            _disposeCts.Cancel();
             _disposeCts.Dispose();
         }
     }
@@ -1706,7 +1706,7 @@ internal sealed class RuntimeImageWriter : IRuntimeImageWriter
         }
         finally
         {
-            await _disposeCts.CancelAsync();
+            _disposeCts.Cancel();
             _disposeCts.Dispose();
         }
     }

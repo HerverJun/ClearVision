@@ -10,9 +10,11 @@ using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using ClearVision.Product.Tests.Runtime;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[Collection(RuntimeConcurrencyCollection.Name)]
 public class PlcCommunicationOperatorBaseConcurrencyTests
 {
     [Fact]

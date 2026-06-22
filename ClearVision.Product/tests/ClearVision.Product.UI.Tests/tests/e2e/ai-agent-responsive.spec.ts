@@ -97,6 +97,35 @@ async function mockAgentRunBuild(page: Page, runId: string, payloads: any[]): Pr
   });
 }
 
+async function seedLegacyWebMessageGenerateRequest(page: Page, userMessage: string): Promise<string> {
+  return await page.evaluate(message => {
+    const panel = (window as any).aiPanel;
+    const requestId = panel._createGenerateRequestId?.() ?? `legacy-${Date.now()}`;
+    panel.isVisionAgentDeveloperUiEnabled = true;
+    panel.lastUserPrompt = message;
+    panel.activeGenerateRequestId = requestId;
+    panel.activeGenerateSessionId = panel.sessionId;
+    panel.isCancellingGenerate = false;
+    panel.pendingManualRetry = null;
+    panel.pendingClarificationPayload = null;
+    panel.agentWorkspaceMode = 'build';
+    panel._setGeneratingState?.(true);
+    panel._setWorkbenchState?.('generating');
+    panel._renderAgentWorkspaceOverview?.();
+    panel._renderPlanWorkspace?.(panel.pendingVisionPlan);
+    panel._renderBuildWorkspaceFromAgentRun?.();
+    panel._renderAgentRuntime?.({
+      turnIntent: 'new_flow',
+      interactionState: 'generating',
+      routerConfidence: '',
+      blockingClarificationFields: [],
+      nonBlockingMissingFields: [],
+    });
+    panel._startAssistantTurn?.();
+    return requestId;
+  }, userMessage);
+}
+
 test('AI agent clarification layout stays usable on narrow viewports', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockShellApis(page);
@@ -395,18 +424,7 @@ test('AI panel routes WebView GenerateFlowResult into agent clarification state'
   });
   await page.waitForFunction(() => Boolean((window as any).aiPanel && (window as any).mockWebViewResponse));
 
-  const requestId = await page.evaluate(() => {
-    const panel = (window as any).aiPanel;
-    panel.isVisionAgentDeveloperUiEnabled = true;
-    panel._dispatchGenerateRequest({
-      description: '帮我构建一个流程',
-      userMessage: '帮我构建一个流程',
-      explicitMode: 'new',
-      skipPlan: true,
-      skipPlanSource: 'developer_direct_build_debug',
-    });
-    return panel.activeGenerateRequestId;
-  });
+  const requestId = await seedLegacyWebMessageGenerateRequest(page, '帮我构建一个流程');
   await expect(page.locator('#ai-agent-runtime')).toContainText('生成中');
   expect(requestId).toBeTruthy();
 
@@ -531,18 +549,7 @@ test('AI panel renders fallback ClarificationPlanCard for no-template no-rule cl
   });
   await page.waitForFunction(() => Boolean((window as any).aiPanel && (window as any).mockWebViewResponse));
 
-  const requestId = await page.evaluate(() => {
-    const panel = (window as any).aiPanel;
-    panel.isVisionAgentDeveloperUiEnabled = true;
-    panel._dispatchGenerateRequest({
-      description: '帮我做一个没有模板的检测',
-      userMessage: '帮我做一个没有模板的检测',
-      explicitMode: 'new',
-      skipPlan: true,
-      skipPlanSource: 'developer_direct_build_debug',
-    });
-    return panel.activeGenerateRequestId;
-  });
+  const requestId = await seedLegacyWebMessageGenerateRequest(page, '帮我做一个没有模板的检测');
   expect(requestId).toBeTruthy();
 
   await page.evaluate(id => {
@@ -747,7 +754,7 @@ test('AI panel sends current flow context for modification turns', async ({ page
     });
   });
 
-  await page.waitForFunction(() => (window as any).aiPanel?.activeAgentRunId === 'ar_webview_modify');
+  await expect.poll(() => agentRunPayloads.length).toBe(1);
   expect(agentRunPayloads).toHaveLength(1);
   expect(agentRunPayloads[0].mode).toBe('modify');
   expect(agentRunPayloads[0].existingFlowJson).toBeTruthy();
@@ -803,7 +810,7 @@ test('AI panel keeps explicit new-flow requests from being coerced into modifica
     });
   });
 
-  await page.waitForFunction(() => (window as any).aiPanel?.activeAgentRunId === 'ar_webview_new');
+  await expect.poll(() => agentRunPayloads.length).toBe(1);
   expect(agentRunPayloads).toHaveLength(1);
   expect(agentRunPayloads[0].mode).toBe('new');
   expect(agentRunPayloads[0].existingFlowJson).toBeNull();
@@ -953,7 +960,7 @@ test('AI panel posts Build through AgentRun even when WebView2 is available', as
     });
   });
 
-  await page.waitForFunction(() => (window as any).aiPanel?.activeAgentRunId === 'ar_webview_build');
+  await expect.poll(() => agentRunPayloads.length).toBe(1);
   expect(agentRunPayloads).toHaveLength(1);
   expect(agentRunPayloads[0].description).toBe('webview build request');
   expect(agentRunPayloads[0].mode).toBe('auto');

@@ -19,6 +19,7 @@ using OpenCvSharp;
 
 namespace ClearVision.Product.Tests.Runtime;
 
+[Collection(RuntimeConcurrencyCollection.Name)]
 public class ContinuousRuntimeTests
 {
     [Fact]

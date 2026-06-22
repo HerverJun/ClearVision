@@ -2946,7 +2946,7 @@
         "Name": "ClipLimit",
         "DisplayName": "\u88C1\u526A\u9650\u5236",
         "DataType": "double",
-        "Description": "Limits local contrast amplification to avoid excessive noise boosting.",
+        "Description": "\u9650\u5236\u5C40\u90E8\u5BF9\u6BD4\u5EA6\u653E\u5927\u5E45\u5EA6\uFF0C\u907F\u514D\u566A\u58F0\u88AB\u8FC7\u5EA6\u589E\u5F3A\u3002",
         "DefaultValue": "2",
         "MinValue": "0",
         "MaxValue": "40",
@@ -2995,7 +2995,7 @@
         "Name": "Channel",
         "DisplayName": "\u76EE\u6807\u901A\u9053",
         "DataType": "enum",
-        "Description": "Auto follows ColorSpace. L/V/Y/All explicitly choose the processing branch.",
+        "Description": "Auto \u6839\u636E\u8272\u5F69\u7A7A\u95F4\u81EA\u52A8\u9009\u62E9\u5904\u7406\u901A\u9053\uFF1BL/V/Y/All \u7528\u4E8E\u660E\u786E\u6307\u5B9A\u5904\u7406\u5206\u652F\u3002",
         "DefaultValue": "Auto",
         "MinValue": null,
         "MaxValue": null,
@@ -5599,7 +5599,7 @@
     "Inputs": [
       {
         "Name": "Detections",
-        "DisplayName": "Detections",
+        "DisplayName": "\u68C0\u6D4B\u7ED3\u679C",
         "DataType": "DetectionList",
         "IsRequired": true,
         "Description": ""
@@ -5629,49 +5629,49 @@
     "Outputs": [
       {
         "Name": "IsMatch",
-        "DisplayName": "Is Match",
+        "DisplayName": "\u662F\u5426\u5339\u914D",
         "DataType": "Boolean",
         "IsRequired": false,
         "Description": ""
       },
       {
         "Name": "ActualOrder",
-        "DisplayName": "Actual Order",
+        "DisplayName": "\u5B9E\u9645\u987A\u5E8F",
         "DataType": "Any",
         "IsRequired": false,
         "Description": ""
       },
       {
         "Name": "Count",
-        "DisplayName": "Count",
+        "DisplayName": "\u6570\u91CF",
         "DataType": "Integer",
         "IsRequired": false,
         "Description": ""
       },
       {
         "Name": "MissingLabels",
-        "DisplayName": "Missing Labels",
+        "DisplayName": "\u7F3A\u5931\u6807\u7B7E",
         "DataType": "Any",
         "IsRequired": false,
         "Description": ""
       },
       {
         "Name": "DuplicateLabels",
-        "DisplayName": "Duplicate Labels",
+        "DisplayName": "\u91CD\u590D\u6807\u7B7E",
         "DataType": "Any",
         "IsRequired": false,
         "Description": ""
       },
       {
         "Name": "SortedDetections",
-        "DisplayName": "Sorted Detections",
+        "DisplayName": "\u6392\u5E8F\u540E\u68C0\u6D4B",
         "DataType": "DetectionList",
         "IsRequired": false,
         "Description": ""
       },
       {
         "Name": "Assignment",
-        "DisplayName": "\u69FD\u4F4D\u5206\u914D\u7ED3\u679C",
+        "DisplayName": "\u5206\u914D\u7ED3\u679C",
         "DataType": "Any",
         "IsRequired": false,
         "Description": ""
@@ -5699,7 +5699,7 @@
       },
       {
         "Name": "PerspectiveApplied",
-        "DisplayName": "\u5DF2\u5E94\u7528\u900F\u89C6\u6821\u6B63",
+        "DisplayName": "\u5DF2\u5E94\u7528\u900F\u89C6",
         "DataType": "Boolean",
         "IsRequired": false,
         "Description": ""
@@ -5713,7 +5713,7 @@
       },
       {
         "Name": "Message",
-        "DisplayName": "Message",
+        "DisplayName": "\u6D88\u606F",
         "DataType": "String",
         "IsRequired": false,
         "Description": ""
@@ -5722,9 +5722,9 @@
     "Parameters": [
       {
         "Name": "ExpectedLabels",
-        "DisplayName": "\u671F\u671B\u6807\u7B7E",
+        "DisplayName": "\u671F\u671B\u6807\u7B7E\u5E8F\u5217",
         "DataType": "string",
-        "Description": "\u6309\u987A\u5E8F\u586B\u5199\u671F\u671B\u6807\u7B7E\uFF0C\u4F7F\u7528\u9017\u53F7\u5206\u9694\u3002",
+        "Description": "\u6309\u987A\u5E8F\u586B\u5199\u7684\u671F\u671B\u6807\u7B7E\uFF0C\u4F7F\u7528\u9017\u53F7\u5206\u9694\u3002",
         "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
@@ -5733,26 +5733,26 @@
       },
       {
         "Name": "SortBy",
-        "DisplayName": "\u6392\u5E8F\u4F9D\u636E",
+        "DisplayName": "\u6392\u5E8F\u5B57\u6BB5",
         "DataType": "enum",
-        "Description": "\u5728\u8FDB\u884C\u987A\u5E8F\u5224\u5B9A\u524D\u7528\u4E8E\u6392\u5E8F\u68C0\u6D4B\u7ED3\u679C\u7684\u5B57\u6BB5\u3002",
+        "Description": "\u5224\u5B9A\u524D\u7528\u4E8E\u6392\u5E8F\u68C0\u6D4B\u7ED3\u679C\u7684\u5B57\u6BB5\u3002",
         "DefaultValue": "CenterX",
         "MinValue": null,
         "MaxValue": null,
         "IsRequired": true,
         "AllowedValues": [
-          "\u4E2D\u5FC3X",
-          "\u4E2D\u5FC3Y",
-          "Top Y",
+          "\u4E2D\u5FC3 X",
+          "\u4E2D\u5FC3 Y",
+          "\u9876\u90E8 Y",
           "\u7F6E\u4FE1\u5EA6",
           "\u9762\u79EF"
         ]
       },
       {
         "Name": "Direction",
-        "DisplayName": "\u65B9\u5411",
+        "DisplayName": "\u6392\u5E8F\u65B9\u5411",
         "DataType": "enum",
-        "Description": "\u6392\u5E8F\u540E\u7684\u6392\u5217\u65B9\u5411\u3002",
+        "Description": "\u6392\u5E8F\u540E\u7684\u65B9\u5411\u3002",
         "DefaultValue": "Ascending",
         "MinValue": null,
         "MaxValue": null,
@@ -5770,7 +5770,7 @@
         "Name": "ExpectedCount",
         "DisplayName": "\u671F\u671B\u6570\u91CF",
         "DataType": "int",
-        "Description": "\u671F\u671B\u68C0\u6D4B\u6570\u91CF\uFF1B\u586B 0 \u65F6\u5C06\u6839\u636E ExpectedLabels \u81EA\u52A8\u63A8\u5BFC\u3002",
+        "Description": "\u671F\u671B\u68C0\u6D4B\u6570\u91CF\uFF1B\u4E3A 0 \u65F6\u4ECE\u671F\u671B\u6807\u7B7E\u5E8F\u5217\u63A8\u5BFC\u3002",
         "DefaultValue": "0",
         "MinValue": "0",
         "MaxValue": "256",
@@ -5779,9 +5779,9 @@
       },
       {
         "Name": "MinConfidence",
-        "DisplayName": "\u6700\u5C0F\u7F6E\u4FE1\u5EA6",
+        "DisplayName": "\u6700\u4F4E\u7F6E\u4FE1\u5EA6",
         "DataType": "double",
-        "Description": "\u5728\u987A\u5E8F\u5224\u5B9A\u524D\u5FFD\u7565\u4F4E\u4E8E\u8BE5\u7F6E\u4FE1\u5EA6\u7684\u68C0\u6D4B\u7ED3\u679C\u3002",
+        "Description": "\u987A\u5E8F\u5224\u5B9A\u524D\u5FFD\u7565\u4F4E\u4E8E\u8BE5\u7F6E\u4FE1\u5EA6\u7684\u68C0\u6D4B\u7ED3\u679C\u3002",
         "DefaultValue": "0",
         "MinValue": "0",
         "MaxValue": "1",
@@ -5792,7 +5792,7 @@
         "Name": "AllowMissing",
         "DisplayName": "\u5141\u8BB8\u7F3A\u5931",
         "DataType": "bool",
-        "Description": "\u7F3A\u5C11\u671F\u671B\u6807\u7B7E\u65F6\u662F\u5426\u4ECD\u89C6\u4E3A\u5339\u914D\u3002",
+        "Description": "\u671F\u671B\u6807\u7B7E\u7F3A\u5931\u65F6\u662F\u5426\u4ECD\u5224\u4E3A\u5339\u914D\u3002",
         "DefaultValue": "False",
         "MinValue": null,
         "MaxValue": null,
@@ -5803,7 +5803,7 @@
         "Name": "AllowDuplicate",
         "DisplayName": "\u5141\u8BB8\u91CD\u590D",
         "DataType": "bool",
-        "Description": "\u51FA\u73B0\u91CD\u590D\u6807\u7B7E\u65F6\u662F\u5426\u4ECD\u89C6\u4E3A\u5339\u914D\u3002",
+        "Description": "\u6807\u7B7E\u91CD\u590D\u65F6\u662F\u5426\u4ECD\u5224\u4E3A\u5339\u914D\u3002",
         "DefaultValue": "False",
         "MinValue": null,
         "MaxValue": null,
@@ -5814,7 +5814,7 @@
         "Name": "GroupingMode",
         "DisplayName": "\u5206\u7EC4\u6A21\u5F0F",
         "DataType": "enum",
-        "Description": "SingleRow \u4FDD\u6301\u65E7\u6392\u5E8F\u65B9\u5F0F\uFF0CRowCluster \u6309\u884C\u805A\u7C7B\uFF0CSlotAssignment \u6309\u671F\u671B\u69FD\u4F4D\u5206\u914D\u68C0\u6D4B\u7ED3\u679C\uFF0CAuto \u5728\u63D0\u4F9B\u69FD\u4F4D\u65F6\u4F18\u5148\u4F7F\u7528\u69FD\u4F4D\u5206\u914D\u3002",
+        "Description": "SingleRow \u4F7F\u7528\u5355\u884C\u6392\u5E8F\uFF0CRowCluster \u6309\u884C\u5206\u7EC4\uFF0CSlotAssignment \u6309\u69FD\u4F4D\u5206\u914D\uFF0CAuto \u4F18\u5148\u4F7F\u7528\u69FD\u4F4D\u3002",
         "DefaultValue": "SingleRow",
         "MinValue": null,
         "MaxValue": null,
@@ -5830,7 +5830,7 @@
         "Name": "ExpectedSlots",
         "DisplayName": "\u671F\u671B\u69FD\u4F4D",
         "DataType": "string",
-        "Description": "JSON \u6570\u7EC4\u6216 x:y;x:y \u5F62\u5F0F\u7684\u69FD\u4F4D\u4E2D\u5FC3\u5217\u8868\u3002",
+        "Description": "\u671F\u671B\u69FD\u4F4D\u4E2D\u5FC3\u70B9\uFF0C\u652F\u6301 JSON \u6570\u7EC4\u6216 x:y;x:y \u7B80\u5199\u3002",
         "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
@@ -5841,7 +5841,7 @@
         "Name": "RowTolerance",
         "DisplayName": "\u884C\u5BB9\u5DEE",
         "DataType": "double",
-        "Description": "\u884C\u805A\u7C7B\u65F6\u5141\u8BB8\u7684\u6700\u5927 Y \u504F\u5DEE\uFF0C0 \u8868\u793A\u81EA\u52A8\u3002",
+        "Description": "\u884C\u805A\u7C7B\u5141\u8BB8\u7684\u6700\u5927 Y \u504F\u5DEE\uFF1B0 \u8868\u793A\u81EA\u52A8\u3002",
         "DefaultValue": "0",
         "MinValue": "0",
         "MaxValue": "5000",
@@ -5852,7 +5852,7 @@
         "Name": "SlotTolerance",
         "DisplayName": "\u69FD\u4F4D\u5BB9\u5DEE",
         "DataType": "double",
-        "Description": "\u68C0\u6D4B\u7ED3\u679C\u5206\u914D\u5230\u671F\u671B\u69FD\u4F4D\u7684\u6700\u5927\u8DDD\u79BB\uFF0C0 \u8868\u793A\u81EA\u52A8\u3002",
+        "Description": "\u5206\u914D\u5230\u671F\u671B\u69FD\u4F4D\u7684\u6700\u5927\u8DDD\u79BB\uFF1B0 \u8868\u793A\u81EA\u52A8\u3002",
         "DefaultValue": "0",
         "MinValue": "0",
         "MaxValue": "5000",
@@ -13008,7 +13008,7 @@
         "Name": "PollingMode",
         "DisplayName": "Polling Mode",
         "DataType": "enum",
-        "Description": "Whether to poll while reading.",
+        "Description": "\u8BFB\u53D6\u65F6\u662F\u5426\u542F\u7528\u8F6E\u8BE2\u7B49\u5F85\u3002",
         "DefaultValue": "None",
         "MinValue": null,
         "MaxValue": null,
@@ -13022,7 +13022,7 @@
         "Name": "PollingCondition",
         "DisplayName": "Polling Condition",
         "DataType": "enum",
-        "Description": "Condition for polling.",
+        "Description": "\u8F6E\u8BE2\u7B49\u5F85\u65F6\u7528\u4E8E\u5224\u65AD\u76EE\u6807\u503C\u662F\u5426\u6EE1\u8DB3\u7684\u6761\u4EF6\u3002",
         "DefaultValue": "Equal",
         "MinValue": null,
         "MaxValue": null,
@@ -13040,7 +13040,7 @@
         "Name": "PollingValue",
         "DisplayName": "Polling Value",
         "DataType": "string",
-        "Description": "Target value for polling.",
+        "Description": "\u8F6E\u8BE2\u7B49\u5F85\u65F6\u8981\u5339\u914D\u7684\u76EE\u6807\u503C\u3002",
         "DefaultValue": "1",
         "MinValue": null,
         "MaxValue": null,
@@ -13051,7 +13051,7 @@
         "Name": "PollingTimeout",
         "DisplayName": "Polling Timeout (ms)",
         "DataType": "int",
-        "Description": "Maximum wait duration in milliseconds.",
+        "Description": "\u8F6E\u8BE2\u7B49\u5F85\u7684\u6700\u5927\u6301\u7EED\u65F6\u95F4\uFF08\u6BEB\u79D2\uFF09\u3002",
         "DefaultValue": "30000",
         "MinValue": "100",
         "MaxValue": "300000",
@@ -13062,7 +13062,7 @@
         "Name": "PollingInterval",
         "DisplayName": "Polling Interval (ms)",
         "DataType": "int",
-        "Description": "Interval between polling reads in milliseconds.",
+        "Description": "\u8F6E\u8BE2\u8BFB\u53D6\u4E4B\u95F4\u7684\u65F6\u95F4\u95F4\u9694\uFF08\u6BEB\u79D2\uFF09\u3002",
         "DefaultValue": "50",
         "MinValue": "10",
         "MaxValue": "5000",
@@ -19007,6 +19007,17 @@
         "MaxValue": null,
         "IsRequired": true,
         "AllowedValues": []
+      },
+      {
+        "Name": "MaxFormattedCollectionItems",
+        "DisplayName": "Max formatted collection items",
+        "DataType": "int",
+        "Description": "",
+        "DefaultValue": "256",
+        "MinValue": "1",
+        "MaxValue": "10000",
+        "IsRequired": true,
+        "AllowedValues": []
       }
     ],
     "RequiredResources": [],
@@ -19489,6 +19500,20 @@
         "Description": ""
       },
       {
+        "Name": "ClassMaskCount",
+        "DisplayName": "Class Mask Count",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
+        "Name": "OmittedClassMaskCount",
+        "DisplayName": "Omitted Class Mask Count",
+        "DataType": "Integer",
+        "IsRequired": false,
+        "Description": ""
+      },
+      {
         "Name": "PresentClasses",
         "DisplayName": "Present Classes",
         "DataType": "Any",
@@ -19595,6 +19620,17 @@
         "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "MaxClassMasks",
+        "DisplayName": "Max Class Masks",
+        "DataType": "int",
+        "Description": "Limits generated per-class mask images; 0 disables per-class masks.",
+        "DefaultValue": "32",
+        "MinValue": "0",
+        "MaxValue": "4096",
         "IsRequired": true,
         "AllowedValues": []
       },
@@ -23285,6 +23321,31 @@
     ],
     "Parameters": [
       {
+        "Name": "Scope",
+        "DisplayName": "\u4F5C\u7528\u57DF",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Run",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u5355\u6B21\u8FD0\u884C",
+          "\u9879\u76EE\u5168\u5C40"
+        ]
+      },
+      {
+        "Name": "VariableId",
+        "DisplayName": "\u53D8\u91CFID",
+        "DataType": "string",
+        "Description": "Project \u4F5C\u7528\u57DF\u53D8\u91CF\u7684\u7A33\u5B9A ID",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
         "Name": "VariableName",
         "DisplayName": "\u53D8\u91CF\u540D",
         "DataType": "string",
@@ -23299,7 +23360,7 @@
         "Name": "Delta",
         "DisplayName": "\u589E\u91CF",
         "DataType": "int",
-        "Description": "\u6BCF\u6B21\u9012\u589E\u7684\u503C\uFF08\u53EF\u4E3A\u8D1F\u6570\u5B9E\u73B0\u9012\u51CF\uFF09",
+        "Description": "\u6BCF\u6B21\u9012\u589E\u7684\u503C\uFF0C\u53EF\u4E3A\u8D1F\u6570",
         "DefaultValue": "1",
         "MinValue": null,
         "MaxValue": null,
@@ -23403,6 +23464,31 @@
       }
     ],
     "Parameters": [
+      {
+        "Name": "Scope",
+        "DisplayName": "\u4F5C\u7528\u57DF",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Run",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u5355\u6B21\u8FD0\u884C",
+          "\u9879\u76EE\u5168\u5C40"
+        ]
+      },
+      {
+        "Name": "VariableId",
+        "DisplayName": "\u53D8\u91CFID",
+        "DataType": "string",
+        "Description": "Project \u4F5C\u7528\u57DF\u53D8\u91CF\u7684\u7A33\u5B9A ID",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
       {
         "Name": "VariableName",
         "DisplayName": "\u53D8\u91CF\u540D",
@@ -23509,6 +23595,31 @@
     ],
     "Parameters": [
       {
+        "Name": "Scope",
+        "DisplayName": "\u4F5C\u7528\u57DF",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Run",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "\u5355\u6B21\u8FD0\u884C",
+          "\u9879\u76EE\u5168\u5C40"
+        ]
+      },
+      {
+        "Name": "VariableId",
+        "DisplayName": "\u53D8\u91CFID",
+        "DataType": "string",
+        "Description": "Project \u4F5C\u7528\u57DF\u53D8\u91CF\u7684\u7A33\u5B9A ID",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
         "Name": "VariableName",
         "DisplayName": "\u53D8\u91CF\u540D",
         "DataType": "string",
@@ -23539,7 +23650,7 @@
         "Name": "UseInputValue",
         "DisplayName": "\u4F7F\u7528\u8F93\u5165\u503C",
         "DataType": "bool",
-        "Description": "\u4F18\u5148\u4F7F\u7528\u4E0A\u6E38\u8F93\u5165\u7684\u503C\uFF0C\u5426\u5219\u4F7F\u7528\u4E0B\u65B9\u9759\u6001\u503C",
+        "Description": "\u4F18\u5148\u4F7F\u7528\u4E0A\u6E38\u8F93\u5165\u503C\uFF0C\u5426\u5219\u4F7F\u7528\u9759\u6001\u503C",
         "DefaultValue": "True",
         "MinValue": null,
         "MaxValue": null,
@@ -23550,7 +23661,7 @@
         "Name": "StaticValue",
         "DisplayName": "\u9759\u6001\u503C",
         "DataType": "string",
-        "Description": "\u5F53\u6CA1\u6709\u4E0A\u6E38\u8F93\u5165\u65F6\u4F7F\u7528\u7684\u503C",
+        "Description": "\u6CA1\u6709\u4E0A\u6E38\u8F93\u5165\u65F6\u4F7F\u7528\u7684\u503C",
         "DefaultValue": "0",
         "MinValue": null,
         "MaxValue": null,
