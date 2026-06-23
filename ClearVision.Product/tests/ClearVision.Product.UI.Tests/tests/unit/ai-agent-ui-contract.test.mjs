@@ -4071,6 +4071,261 @@ test('pending recommended Plan option stays visible and cannot unblock Build', a
   assert.equal(panel._getPlanBuildActionState(plan).canStart, true);
 });
 
+function pendingFieldPlan(panel, {
+  questionId,
+  field,
+  pendingValue,
+  concreteValue,
+  blockerCategory = 'hard_requirement',
+  blockingReason = `${field}_missing`
+}) {
+  const labels = {
+    image_source: 'Image source',
+    acceptance_criteria: 'Acceptance criteria',
+    algorithm_strategy: 'Algorithm strategy'
+  };
+  const resolved = ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria']
+    .filter(item => item !== field);
+  return panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [
+      {
+        id: questionId,
+        field,
+        title: `${labels[field] || field} confirmation`,
+        why: `${labels[field] || field} must be confirmed before Build.`,
+        defaultValue: pendingValue,
+        defaultAssumption: 'Keep this field pending until the user confirms it.',
+        impact: 'Pending selections do not unblock Build.',
+        options: [
+          {
+            value: pendingValue,
+            label: `Keep ${field} pending`,
+            recommended: true,
+            description: 'Do not guess this requirement.',
+            impact: 'This selection keeps Build blocked.'
+          },
+          {
+            value: concreteValue,
+            label: `Confirm ${field}`,
+            recommended: false,
+            description: 'Use this confirmed answer.',
+            impact: 'This can resolve the field.'
+          }
+        ]
+      }
+    ],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        {
+          id: `${blockerCategory}:${blockingReason}`,
+          category: blockerCategory,
+          field,
+          questionId,
+          blocksBuild: true,
+          resolutionMode: 'answer_question',
+          publicLabel: `${labels[field] || field} pending`
+        }
+      ],
+      resolvedFields: resolved,
+      remainingFields: [field],
+      primaryMessage: `${labels[field] || field} pending`,
+      contractVersion: 'v2'
+    },
+    blockingReasons: [`${blockerCategory}:${blockingReason}`],
+    semanticExtraction: {
+      isVisionRequest: true,
+      source: 'rule_fallback',
+      taskType: 'surface_defect',
+      confidence: 0.8,
+      taskTypeConfidence: 0.8,
+      inspectionObject: 'logo area',
+      defectType: 'appearance defect',
+      imageSource: field === 'image_source' ? '' : 'camera',
+      okCondition: field === 'acceptance_criteria' ? '' : 'no visible defect',
+      ngCondition: '',
+      outputTarget: 'OK/NG result',
+      missingFields: [field]
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      objectSignals: ['logo area'],
+      taskSignals: ['appearance defect'],
+      missingFields: [field],
+      blockingReasons: [blockingReason],
+      publicReason: `${labels[field] || field} pending`
+    }
+  }));
+}
+
+function optionMarkup(html, value) {
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = String(html || '').match(new RegExp(`<button(?:(?!</button>)[\\s\\S])*?data-plan-question-option="${escaped}"(?:(?!</button>)[\\s\\S])*?</button>`));
+  assert.ok(match, `missing option ${value}`);
+  return match[0];
+}
+
+test('pending recommended Plan option is a UI selection without becoming an effective answer', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  const planActionButton = createFakeButton();
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': createFakeElement(),
+      '#ai-plan-workspace': planWorkspace,
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': inlineBuildButton,
+      '#ai-plan-build-status': createFakeElement()
+    },
+    { '.ai-plan-action': [planActionButton] }
+  );
+  const plan = pendingFieldPlan(panel, {
+    questionId: 'image_source',
+    field: 'image_source',
+    pendingValue: 'camera_pending',
+    concreteValue: 'file_sample'
+  });
+  panel.pendingVisionPlan = plan;
+  panel._renderPlanWorkspace(plan);
+
+  panel._selectPlanQuestionOption('image_source', 'camera_pending');
+
+  assert.equal(panel.planQuestionSelections.image_source, 'camera_pending');
+  assert.equal(Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'), false);
+  assert.equal(plan.buildReadiness.canBuild, false);
+  assert.equal(plan.executable, false);
+  assert.equal(plan.buildReadiness.resolvedFields.includes('image_source'), false);
+  assert.equal(panel._getPlanBuildActionState(plan).canStart, false);
+  assert.equal(inlineBuildButton.disabled, true);
+  let pending = optionMarkup(planWorkspace.innerHTML, 'camera_pending');
+  let concrete = optionMarkup(planWorkspace.innerHTML, 'file_sample');
+  assert.match(pending, /is-selected/);
+  assert.match(pending, /is-recommended/);
+  assert.match(pending, /aria-pressed="true"/);
+  assert.doesNotMatch(concrete, /is-selected/);
+  assert.match(planWorkspace.innerHTML, /已选择，仍保持待确认。该选择不会解除构建阻断。/);
+
+  panel._selectPlanQuestionOption('image_source', 'file_sample');
+
+  assert.equal(panel.planQuestionSelections.image_source, 'file_sample');
+  assert.equal(panel.planQuestionAnswers.image_source.field, 'image_source');
+  assert.equal(panel.planQuestionAnswers.image_source.value, 'file_sample');
+  assert.equal(panel.planQuestionAnswers.image_source.origin, 'explicit_user_selection');
+  assert.equal(plan.buildReadiness.canBuild, true);
+  pending = optionMarkup(planWorkspace.innerHTML, 'camera_pending');
+  concrete = optionMarkup(planWorkspace.innerHTML, 'file_sample');
+  assert.doesNotMatch(pending, /is-selected/);
+  assert.match(pending, /aria-pressed="false"/);
+  assert.match(concrete, /is-selected/);
+  assert.match(concrete, /aria-pressed="true"/);
+
+  panel._selectPlanQuestionOption('image_source', 'camera_pending');
+
+  assert.equal(panel.planQuestionSelections.image_source, 'camera_pending');
+  assert.equal(Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'), false);
+  assert.equal(plan.buildReadiness.canBuild, false);
+  assert.equal(plan.executable, false);
+  pending = optionMarkup(planWorkspace.innerHTML, 'camera_pending');
+  assert.match(pending, /is-selected/);
+  assert.match(pending, /aria-pressed="true"/);
+  panel._renderPlanWorkspace(plan);
+  pending = optionMarkup(planWorkspace.innerHTML, 'camera_pending');
+  assert.match(pending, /is-selected/);
+  assert.match(pending, /aria-pressed="true"/);
+  panel._customInputPlanQuestion('image_source', 'pending');
+  assert.equal(panel.planQuestionSelections.image_source, 'camera_pending');
+  assert.equal(Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'), false);
+
+  panel._customInputPlanQuestion('image_source', 'line camera 1');
+  assert.equal(panel.planQuestionSelections.image_source, 'line camera 1');
+  assert.equal(panel.planQuestionAnswers.image_source.value, 'line camera 1');
+  panel._selectPlanQuestionOption('image_source', 'camera_pending');
+  assert.equal(panel.planQuestionSelections.image_source, 'camera_pending');
+  assert.equal(Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'), false);
+});
+
+test('fallback pending recommendations stay UI-only for all canonical pending question types', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const cases = [
+    {
+      questionId: 'image_source',
+      field: 'image_source',
+      pendingValue: 'camera_pending',
+      concreteValue: 'file_sample',
+      blockerCategory: 'hard_requirement',
+      blockingReason: 'image_source_missing'
+    },
+    {
+      questionId: 'acceptance_criteria',
+      field: 'acceptance_criteria',
+      pendingValue: 'ok_ng_pending',
+      concreteValue: 'defect_is_ng',
+      blockerCategory: 'hard_requirement',
+      blockingReason: 'acceptance_criteria_missing'
+    },
+    {
+      questionId: 'model_or_rule_strategy',
+      field: 'algorithm_strategy',
+      pendingValue: 'strategy_pending',
+      concreteValue: 'traditional_rule',
+      blockerCategory: 'strategy_confirmation',
+      blockingReason: 'model_or_rule_strategy_missing'
+    }
+  ];
+
+  for (const item of cases) {
+    const panel = createPanel(AiPanel, { developer: false, enabled: true });
+    const planWorkspace = createFakeElement();
+    panel.container = createContainer(
+      {
+        '#ai-agent-workspace-overview': createFakeElement(),
+        '#ai-plan-workspace': planWorkspace,
+        '#ai-build-workspace': createFakeElement(),
+        '#ai-result-status-note': createFakeElement(),
+        '#ai-btn-start-build-inline': createFakeButton(),
+        '#ai-plan-build-status': createFakeElement()
+      },
+      { '.ai-plan-action': [createFakeButton()] }
+    );
+    const plan = pendingFieldPlan(panel, item);
+    panel.pendingVisionPlan = plan;
+    panel._renderPlanWorkspace(plan);
+
+    assert.equal(panel._acceptRecommendedPlanAnswers(plan), false);
+    assert.deepEqual(panel.planQuestionSelections, {});
+    assert.deepEqual(panel.planQuestionAnswers, {});
+    assert.equal(panel._refreshPlanEffectiveBuildReadiness(plan, { acceptedRecommended: true }), false);
+    assert.equal(plan.buildReadiness.resolvedFields.includes(item.field), false);
+
+    panel._selectPlanQuestionOption(item.questionId, item.pendingValue);
+    assert.equal(panel.planQuestionSelections[item.questionId], item.pendingValue);
+    assert.equal(Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, item.field), false);
+    assert.equal(plan.buildReadiness.canBuild, false);
+    assert.equal(plan.buildReadiness.resolvedFields.includes(item.field), false);
+    assert.match(optionMarkup(planWorkspace.innerHTML, item.pendingValue), /is-selected/);
+    assert.match(optionMarkup(planWorkspace.innerHTML, item.pendingValue), /is-recommended/);
+    assert.match(optionMarkup(planWorkspace.innerHTML, item.pendingValue), /aria-pressed="true"/);
+
+    panel._selectPlanQuestionOption(item.questionId, item.concreteValue);
+    assert.equal(panel.planQuestionSelections[item.questionId], item.concreteValue);
+    assert.equal(panel.planQuestionAnswers[item.field].value, item.concreteValue);
+    assert.equal(panel.planQuestionAnswers[item.field].origin, 'explicit_user_selection');
+    assert.match(optionMarkup(planWorkspace.innerHTML, item.concreteValue), /is-selected/);
+
+    panel._selectPlanQuestionOption(item.questionId, item.pendingValue);
+    assert.equal(panel.planQuestionSelections[item.questionId], item.pendingValue);
+    assert.equal(Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, item.field), false);
+    assert.equal(plan.buildReadiness.canBuild, false);
+  }
+});
+
 test('Plan with pending image source and acquisition route can start editable draft', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });

@@ -2849,8 +2849,22 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _getPlanQuestionSelectedValue(question) {
+        const id = String(question?.id || '').trim();
+        const selected = id ? String((this.planQuestionSelections || {})[id] || '').trim() : '';
+        if (this._isPlanQuestionSelectionAllowed(question, selected)) {
+            return selected;
+        }
         const answer = this._getPlanAnswerForQuestion(question);
         return answer?.value || '';
+    },
+
+    _isPlanQuestionSelectionAllowed(question, value) {
+        const selected = String(value || '').trim();
+        if (!selected) return false;
+        if (this._toArray(question?.options).some(option => String(option?.value || '').trim() === selected)) {
+            return true;
+        }
+        return !this._isPlanPlaceholderValue(selected);
     },
 
     _buildConfirmedPlanAnswers(plan, { acceptedRecommended = false } = {}) {
@@ -4255,6 +4269,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _renderPlanQuestion(question, selectedValue) {
         const isCustomValue = selectedValue && !question.options.some(opt => opt.value === selectedValue);
+        const selectedPending = this._isPlanPlaceholderValue(selectedValue);
         return `
             <article class="ai-plan-question">
                 <div class="ai-plan-question-head">
@@ -4296,6 +4311,7 @@ export const aiPanelAgentWorkspaceMixin = {
                         确定
                     </button>
                 </div>
+                ${selectedPending ? '<div class="ai-plan-question-selection-feedback">已选择，仍保持待确认。该选择不会解除构建阻断。</div>' : ''}
                 <div class="ai-plan-question-impact">${this._escapeHtml(question.impact)}</div>
             </article>
         `;
@@ -4305,6 +4321,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!questionId || !this.pendingVisionPlan) return;
         const cleanedValue = String(value || '').trim();
         if (!cleanedValue) return;
+        if (this._isPlanPlaceholderValue(cleanedValue)) return;
 
         const question = this._toArray(this.pendingVisionPlan.questions)
             .find(item => String(item?.id || '').trim() === String(questionId || '').trim());
@@ -4335,30 +4352,54 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _selectPlanQuestionOption(questionId, value) {
         if (!questionId || !value || !this.pendingVisionPlan) return;
+        const selectedValue = String(value || '').trim();
         const question = this._toArray(this.pendingVisionPlan.questions)
             .find(item => String(item?.id || '').trim() === String(questionId || '').trim());
+        if (!this._toArray(question?.options).some(option => String(option?.value || '').trim() === selectedValue)) {
+            return;
+        }
         const field = this._inferPlanQuestionFieldForQuestion(question || { id: questionId }, this.pendingVisionPlan) ||
             this._fallbackPlanQuestionField(question || { id: questionId }, questionId);
         if (!field) return;
-        const answer = {
-            questionId,
-            field,
-            value,
-            origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION
-        };
         const cleanedSelections = this._clearPlanQuestionSelectionsForField(field, questionId);
+        const nextAnswers = this._clearPlanQuestionAnswersForField(field, questionId);
         this.planQuestionSelections = {
             ...cleanedSelections,
-            [questionId]: value
+            [questionId]: selectedValue
         };
-        this.planQuestionAnswers = {
-            ...(this.planQuestionAnswers || {}),
-            [field]: answer
-        };
+        if (!this._isPlanPlaceholderValue(selectedValue)) {
+            nextAnswers[field] = {
+                questionId,
+                field,
+                value: selectedValue,
+                origin: PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION
+            };
+        }
+        this.planQuestionAnswers = nextAnswers;
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
         this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderAgentWorkspaceOverview();
+    },
+
+    _clearPlanQuestionAnswersForField(field, keepQuestionId = '') {
+        const answers = { ...(this.planQuestionAnswers || {}) };
+        const normalizedField = String(field || '').trim();
+        const keepId = String(keepQuestionId || '').trim();
+        if (!normalizedField) return answers;
+        for (const key of Object.keys(answers)) {
+            const answer = this._normalizePlanAnswer(answers[key]) || this._asObject?.(answers[key]) || answers[key] || {};
+            const answerField = this._inferPlanQuestionField(answer.field || answer.Field || key) ||
+                String(answer.field || answer.Field || key || '').trim().toLowerCase();
+            const answerQuestionId = String(answer.questionId || answer.QuestionId || '').trim();
+            if (key === normalizedField ||
+                key === keepId ||
+                answerField === normalizedField ||
+                (answerQuestionId && answerQuestionId === keepId)) {
+                delete answers[key];
+            }
+        }
+        return answers;
     },
 
     _clearPlanQuestionSelectionsForField(field, keepQuestionId = '') {

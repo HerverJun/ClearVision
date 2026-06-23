@@ -809,6 +809,191 @@ test.skip('AI panel uses WebView2 postMessage contract for generation turns', as
   expect(await page.evaluate(() => (window as any).aiPanel.pendingClarificationPayload)).toBeNull();
 });
 
+test('Plan pending recommendation click keeps DOM selection separate from effective answers', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await installFakeWebView2(page);
+  await mockShellApis(page);
+  await bootAuthenticatedApp(page);
+
+  await page.locator('.nav-btn[data-view="ai"]').evaluate(element => {
+    (element as HTMLElement).click();
+  });
+  await page.waitForFunction(() => Boolean((window as any).aiPanel && document.querySelector('#ai-plan-workspace')));
+
+  await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    const plan = panel._normalizeBackendPlanResult({
+      planId: 'plan_playwright_pending',
+      planHash: 'sha256:playwright-pending',
+      originalUserPrompt: 'detect logo scratches',
+      goal: 'detect logo scratches',
+      intent: 'surface_defect',
+      confidence: 'high',
+      requirementMode: 'strict',
+      planSource: 'rule_fallback',
+      fallbackReason: 'planner_failed',
+      requirementUnderstanding: ['Inspection intent: surface defect inspection.'],
+      recommendedRoute: {
+        routeId: 'surface_defect_detection',
+        title: 'Surface defect route',
+        summary: 'Detect visible defects.',
+        operators: ['ImageAcquisition', 'SurfaceDefectDetection', 'ResultOutput'],
+      },
+      clarificationQuestions: [
+        {
+          id: 'image_source',
+          field: 'image_source',
+          title: 'Image source',
+          why: 'Build needs a confirmed input source.',
+          defaultValue: 'camera_pending',
+          defaultAssumption: 'Keep image source pending until the user confirms it.',
+          impact: 'Pending selections do not unblock Build.',
+          options: [
+            {
+              value: 'camera_pending',
+              label: 'Keep image source pending',
+              recommended: true,
+              description: 'Do not guess a camera or file path.',
+              impact: 'This keeps Build blocked.',
+            },
+            {
+              value: 'file_sample',
+              label: 'Offline sample',
+              recommended: false,
+              description: 'Use an offline image sample.',
+              impact: 'This resolves the image source.',
+            },
+          ],
+        },
+      ],
+      recommendedDefaults: [],
+      risks: ['Representative images are still needed.'],
+      acceptanceCriteria: ['Workflow contains acquisition, detection, and output.'],
+      executablePlan: ['Map parameters and run readiness checks.'],
+      canPlan: true,
+      canBuild: false,
+      buildReadiness: {
+        canBuild: false,
+        blockers: [
+          {
+            id: 'hard_requirement:image_source',
+            category: 'hard_requirement',
+            field: 'image_source',
+            questionId: 'image_source',
+            blocksBuild: true,
+            resolutionMode: 'answer_question',
+            publicLabel: 'Image source pending',
+          },
+        ],
+        resolvedFields: ['inspection_object', 'task_type', 'acceptance_criteria'],
+        remainingFields: ['image_source'],
+        primaryMessage: 'Image source pending',
+        contractVersion: 'v2',
+      },
+      blockingReasons: ['hard_requirement:image_source_missing'],
+      requirementMaturity: {
+        maturity: 'ambiguous',
+        taskType: 'surface_defect',
+        canPlan: true,
+        canBuild: false,
+        objectSignals: ['logo area'],
+        taskSignals: ['scratch'],
+        missingFields: ['image_source'],
+        blockingReasons: ['image_source_missing'],
+        publicReason: 'Image source pending',
+      },
+      semanticExtraction: {
+        isVisionRequest: true,
+        source: 'rule_fallback',
+        taskType: 'surface_defect',
+        confidence: 0.8,
+        taskTypeConfidence: 0.8,
+        inspectionObject: 'logo area',
+        defectType: 'scratch',
+        imageSource: '',
+        okCondition: 'no visible scratch',
+        ngCondition: '',
+        outputTarget: 'OK/NG result',
+        missingFields: ['image_source'],
+      },
+    });
+    panel.pendingVisionPlan = plan;
+    panel.planQuestionSelections = {};
+    panel.planQuestionAnswers = {};
+    panel.agentWorkspaceMode = 'plan';
+    panel._renderAgentWorkspaceOverview();
+    panel._renderPlanWorkspace(plan);
+  });
+
+  const pending = page.locator('[data-plan-question-option="camera_pending"]');
+  const concrete = page.locator('[data-plan-question-option="file_sample"]');
+
+  await pending.click();
+  await expect(pending).toHaveClass(/is-selected/);
+  await expect(pending).toHaveClass(/is-recommended/);
+  await expect(pending).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.ai-plan-question-selection-feedback')).toContainText('已选择，仍保持待确认');
+  await expect(page.locator('.ai-plan-question-selection-feedback')).toContainText('该选择不会解除构建阻断');
+  expect(await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    return {
+      selected: panel.planQuestionSelections.image_source,
+      hasAnswer: Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'),
+      canBuild: panel.pendingVisionPlan.buildReadiness.canBuild,
+      resolved: [...panel.pendingVisionPlan.buildReadiness.resolvedFields].sort(),
+    };
+  })).toEqual({
+    selected: 'camera_pending',
+    hasAnswer: false,
+    canBuild: false,
+    resolved: ['acceptance_criteria', 'inspection_object', 'task_type'],
+  });
+
+  await concrete.click();
+  await expect(concrete).toHaveClass(/is-selected/);
+  await expect(concrete).toHaveAttribute('aria-pressed', 'true');
+  await expect(pending).not.toHaveClass(/is-selected/);
+  await expect(pending).toHaveAttribute('aria-pressed', 'false');
+  expect(await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    return {
+      selected: panel.planQuestionSelections.image_source,
+      answer: panel.planQuestionAnswers.image_source,
+      canBuild: panel.pendingVisionPlan.buildReadiness.canBuild,
+    };
+  })).toMatchObject({
+    selected: 'file_sample',
+    answer: {
+      field: 'image_source',
+      value: 'file_sample',
+      origin: 'explicit_user_selection',
+    },
+    canBuild: true,
+  });
+
+  await pending.click();
+  await expect(pending).toHaveClass(/is-selected/);
+  await expect(pending).toHaveClass(/is-recommended/);
+  await expect(pending).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => {
+    const panel = (window as any).aiPanel;
+    panel._renderPlanWorkspace(panel.pendingVisionPlan);
+    return {
+      selected: panel.planQuestionSelections.image_source,
+      hasAnswer: Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'),
+      canBuild: panel.pendingVisionPlan.buildReadiness.canBuild,
+      pendingClass: document.querySelector('[data-plan-question-option="camera_pending"]')?.className,
+      pendingPressed: document.querySelector('[data-plan-question-option="camera_pending"]')?.getAttribute('aria-pressed'),
+    };
+  })).toMatchObject({
+    selected: 'camera_pending',
+    hasAnswer: false,
+    canBuild: false,
+    pendingPressed: 'true',
+  });
+  await expect(pending).toHaveClass(/is-selected/);
+});
+
 test('AI panel posts Build through AgentRun even when WebView2 is available', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
   await installFakeWebView2(page);
