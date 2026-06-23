@@ -52,8 +52,10 @@ public sealed class VisionAgentConsolidationTests
         questions.Should().NotBeEmpty();
         foreach (var q in questions)
         {
-            q.Options.Should().BeEmpty();
-            q.DefaultValue.Should().BeEmpty();
+            q.Options.Should().NotBeEmpty();
+            q.Options.Should().Contain(option => option.Recommended && option.Value.EndsWith("_pending"));
+            q.DefaultValue.Should().EndWith("_pending");
+            q.DefaultAssumption.Should().Contain("\u6682\u65e0\u5b89\u5168\u9ed8\u8ba4");
             q.Options.Any(opt => opt.Label.Contains("病灶") || opt.Label.Contains("包装箱") || opt.Label.Contains("零件")).Should().BeFalse();
         }
     }
@@ -158,8 +160,10 @@ public sealed class VisionAgentConsolidationTests
         // fallback 只提供自由输入，不包含推荐占位选项。
         foreach (var q in questions)
         {
-            q.Options.Should().BeEmpty();
-            q.DefaultValue.Should().BeEmpty();
+            q.Options.Should().NotBeEmpty();
+            q.Options.Should().Contain(option => option.Recommended && option.Value.EndsWith("_pending"));
+            q.DefaultValue.Should().EndWith("_pending");
+            q.DefaultAssumption.Should().Contain("\u6682\u65e0\u5b89\u5168\u9ed8\u8ba4");
         }
     }
 
@@ -216,6 +220,84 @@ public sealed class VisionAgentConsolidationTests
     }
 
     // 6. Planner 越权过滤
+    [Fact]
+    public void FallbackPendingRecommendedOptions_ShouldStayVisibleButNotUnblockBuild()
+    {
+        var questions = VisionAgentPlanFieldPolicy.BuildFallbackQuestionsForRemaining(
+            [
+                VisionAgentPlanAnswerFields.ImageSource,
+                VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                VisionAgentPlanAnswerFields.AlgorithmStrategy
+            ]);
+
+        questions.Select(question => question.Field).Should().BeEquivalentTo(
+            [
+                VisionAgentPlanAnswerFields.ImageSource,
+                VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                VisionAgentPlanAnswerFields.AlgorithmStrategy
+            ]);
+        questions.Should().AllSatisfy(question =>
+        {
+            var recommended = question.Options.Single(option => option.Recommended);
+            recommended.Value.Should().EndWith("_pending");
+            recommended.Label.Should().MatchRegex("[^\\u0000-\\u007F]");
+            recommended.Description.Should().MatchRegex("[^\\u0000-\\u007F]");
+            recommended.Impact.Should().MatchRegex("[^\\u0000-\\u007F]");
+            question.DefaultValue.Should().Be(recommended.Value);
+            question.DefaultAssumption.Should().Contain("\u6682\u65e0\u5b89\u5168\u9ed8\u8ba4");
+        });
+        questions.Single(question => question.Field == VisionAgentPlanAnswerFields.ImageSource)
+            .Options.Single(option => option.Recommended).Value.Should().Be("camera_pending");
+        questions.Single(question => question.Field == VisionAgentPlanAnswerFields.AcceptanceCriteria)
+            .Options.Single(option => option.Recommended).Value.Should().Be("ok_ng_pending");
+        questions.Single(question => question.Field == VisionAgentPlanAnswerFields.AlgorithmStrategy)
+            .Options.Single(option => option.Recommended).Value.Should().Be("strategy_pending");
+
+        var plan = new VisionAgentPlanModeResult
+        {
+            PlanContractVersion = "v2",
+            PlanId = "fallback_pending_plan",
+            ClarificationQuestions = questions,
+            RemainingPlanFields =
+            [
+                VisionAgentPlanAnswerFields.ImageSource,
+                VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                VisionAgentPlanAnswerFields.AlgorithmStrategy
+            ],
+            BlockingReasons =
+            [
+                "hard_requirement:image_source_missing",
+                "hard_requirement:acceptance_criteria_missing",
+                "strategy_confirmation:algorithm_strategy_missing"
+            ]
+        };
+
+        var validation = new VisionAgentPlanAnswerValidator().Validate(
+            plan,
+            questions.Select(question => new VisionAgentPlanAnswer
+            {
+                QuestionId = question.Id,
+                Field = question.Field,
+                Value = question.DefaultValue,
+                Origin = VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault
+            }).ToList(),
+            new Dictionary<string, string>(),
+            acceptedRecommendedDefaults: true);
+
+        validation.AcceptedAnswers.Should().BeEmpty();
+        validation.ResolvedFields.Should().BeEmpty();
+        validation.InvalidValues.Should().Contain(value => value.Contains("placeholder_value"));
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            acceptedRecommendedDefaults: true,
+            validatedAnswers: validation);
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.ResolvedFields.Should().BeEmpty();
+        readiness.Blockers.Should().Contain(blocker => blocker.BlocksBuild);
+    }
+
     [Fact]
     public void NormalizeQuestions_ShouldFilterInvalidQuestions()
     {

@@ -256,7 +256,6 @@ public sealed record VisionAgentIntentRouterResult
     public bool NeedsClarification { get; init; } = true;
     public string PublicReason { get; init; } = string.Empty;
     public string AssistantReply { get; init; } = string.Empty;
-    public List<string> ClarificationQuestions { get; init; } = [];
     public bool FallbackAllowed { get; init; } = true;
     public string RouterSource { get; init; } = string.Empty;
     public string FallbackReason { get; init; } = string.Empty;

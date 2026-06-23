@@ -292,7 +292,6 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
                 ? DefaultReason(intent)
                 : candidate.PublicReason),
             AssistantReply = ResolveAssistantReply(candidate.AssistantReply, candidate.PublicReason, intent, request),
-            ClarificationQuestions = [],
             FallbackAllowed = candidate.FallbackAllowed,
             RouterSource = source,
             FallbackReason = SafeToken(fallbackReason),
@@ -382,7 +381,6 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
                 ? UnauthorizedReason(intent)
                 : RuleFallbackReason(reason, maturity, intent),
             AssistantReply = DefaultReply(intent, request),
-            ClarificationQuestions = [],
             FallbackAllowed = true,
             RouterSource = "rule_fallback",
             FallbackReason = SafeToken(fallbackReason),
@@ -743,7 +741,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             shouldOpenPlan = false;
             shouldBuildDirectly = false;
             needsClarification = true;
-            questions = questions.Count == 0 ? MaturityClarificationQuestions(maturity) : questions;
+            questions = [];
             fallbackReason = AppendFallbackReason(fallbackReason, "pending_plan_answers_required");
             return;
         }
@@ -799,7 +797,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             shouldOpenPlan = false;
             shouldBuildDirectly = false;
             needsClarification = true;
-            questions = questions.Count == 0 ? MaturityClarificationQuestions(maturity) : questions;
+            questions = [];
             fallbackReason = AppendFallbackReason(fallbackReason, "maturity_gate_blocked");
             return;
         }
@@ -1019,13 +1017,13 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             "You are ClearVision Intent Router for an industrial vision assistant.",
             "Return exactly one JSON object. No prose, markdown, comments, raw prompt, system prompt, reasoning, or chain-of-thought.",
             "Classify the user's latest input into exactly one intent: casual_chat, help, ambiguous_vision_requirement, actionable_vision_plan, modify_existing_flow, build_from_confirmed_plan, direct_build_debug.",
-            "Rules: casual/help must not open Plan or Build. ambiguous_vision_requirement must ask concise public clarification questions and canBuild=false. actionable_vision_plan opens Plan only. modify_existing_flow may build directly only when current flow metadata exists. build_from_confirmed_plan may build directly only when a pending confirmed plan exists. direct_build_debug is only valid when developerDirectBuildDebug=true.",
+            "Rules: casual/help must not open Plan or Build. ambiguous_vision_requirement must stay outside Plan and return a natural assistantReply only; missing fields stay in maturity diagnostics, not user-visible router questions. actionable_vision_plan opens Plan only. modify_existing_flow may build directly only when current flow metadata exists. build_from_confirmed_plan may build directly only when a pending confirmed plan exists. direct_build_debug is only valid when developerDirectBuildDebug=true.",
             "Use the model for semantic judgment. Do not rely on keyword matching. Do not include chain-of-thought; publicReason must be short and safe.",
             "assistantReply must be the natural user-facing assistant message only. Do not put classification labels, intent names, canBuild, shouldOpenPlan, or phrases like 'ordinary greeting', 'no planning needed', or 'recognized as' in assistantReply.",
             "publicReason is an internal public diagnostic for debug/trace only and must not be written as the main assistant reply.",
             "Examples: for hi, assistantReply='在的。你可以直接描述检测目标、缺陷类型、测量项或流程修改需求，我会先帮你规划方案。'; for help, assistantReply='我可以帮你规划视觉检测流程、选择算子链、整理待确认资源，并在人工确认后生成可应用到画布的草稿。'; for ambiguous packaging box input, assistantReply='你想检测包装箱的哪一类问题？比如胶带贴歪、条码不可读、Logo 缺失、箱角破损，或外观污渍。'",
             "Safety boundary: never request or expose camera paths, PLC addresses, Station IPs, external URLs, API keys, headers, tokens, baseUrl, rawPrompt, systemPrompt, image bytes/base64, model/template/image/PLC filesystem paths, or deployment/config writes.",
-            "Required JSON fields: intent, confidence, shouldOpenPlan, shouldBuildDirectly, canBuild, needsClarification, publicReason, assistantReply, clarificationQuestions, fallbackAllowed."
+            "Required JSON fields: intent, confidence, shouldOpenPlan, shouldBuildDirectly, canBuild, needsClarification, publicReason, assistantReply, fallbackAllowed."
         ]);
         return new VisionAgentIntentRouterPrompt(systemPrompt, [new ChatMessage("user", BuildContext(request, options.MaxContextChars))]);
     }
@@ -1038,7 +1036,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         var systemPrompt = string.Join(Environment.NewLine,
         [
             "Repair the Intent Router output. Return exactly one valid JSON object and no other text.",
-            "The object must use only public fields: intent, confidence, shouldOpenPlan, shouldBuildDirectly, canBuild, needsClarification, publicReason, assistantReply, clarificationQuestions, fallbackAllowed.",
+            "The object must use only public fields: intent, confidence, shouldOpenPlan, shouldBuildDirectly, canBuild, needsClarification, publicReason, assistantReply, fallbackAllowed.",
             "assistantReply must be a natural user-facing reply, not a diagnostic explanation. Keep publicReason only as debug/trace diagnostics.",
             "Do not include rawPrompt, systemPrompt, reasoning, chain-of-thought, keys, tokens, baseUrl, paths, IPs, PLC addresses, or base64."
         ]);
@@ -1158,48 +1156,6 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             "low" => "low",
             _ => "low"
         };
-    }
-
-    private static List<string> SanitizeQuestions(IEnumerable<string>? questions)
-    {
-        return (questions ?? [])
-            .Select(SafeText)
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(5)
-            .ToList();
-    }
-
-    private static List<string> DefaultClarificationQuestions()
-    {
-        return
-        [
-            "请补充检测目标或产品对象。",
-            "请说明要判断的缺陷、测量项或识别内容。",
-            "请说明输入来源是相机、文件还是仅先做元数据草稿。",
-            "请说明 OK/NG 判定规则。"
-        ];
-    }
-
-    private static List<string> MaturityClarificationQuestions(AiRequirementMaturityResult maturity)
-    {
-        var fields = maturity.MissingFields.Count > 0
-            ? maturity.MissingFields
-            : ["inspection_object", "task_type", "image_source", "acceptance_criteria"];
-        return fields
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(field => field switch
-            {
-                "inspection_object" => "请补充检测目标或产品对象。",
-                "task_type" => "请说明要判断的缺陷、测量项或识别内容。",
-                "image_source" => "请说明输入来源是相机、文件还是仅先做元数据草稿。",
-                "acceptance_criteria" => "请说明 OK/NG 判定规则。",
-                "model_or_rule_strategy" => "请说明倾向使用规则、传统算法、模板还是模型策略。",
-                "output_target" => "请说明输出目标或验收结果字段。",
-                _ => $"请补充 {field}。"
-            })
-            .Take(5)
-            .ToList();
     }
 
     private static string DefaultReason(string intent)

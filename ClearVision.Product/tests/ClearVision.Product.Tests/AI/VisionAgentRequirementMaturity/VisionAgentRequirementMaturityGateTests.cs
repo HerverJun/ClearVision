@@ -679,8 +679,8 @@ public sealed class VisionAgentRequirementMaturityGateTests
         plan.RequirementMaturity!.CanBuild.Should().Be(routerResult.RequirementMaturity!.CanBuild);
     }
 
-    [Fact(DisplayName = "Intent Router should downgrade over-confident abstract build intents")]
-    public async Task RouteAsync_ShouldDowngradeOverconfidentAbstractIntent()
+    [Fact(DisplayName = "Intent Router should open Plan but block Build for over-confident abstract intents")]
+    public async Task RouteAsync_ShouldOpenPlanButBlockBuildForOverconfidentAbstractIntent()
     {
         var service = new VisionAgentIntentRouterService(
             new DelegateIntentCompletionSource((_, _) => Task.FromResult(JsonSerializer.Serialize(new
@@ -706,15 +706,16 @@ public sealed class VisionAgentRequirementMaturityGateTests
             },
             CancellationToken.None);
 
-        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentAmbiguousVisionRequirement);
-        result.ShouldOpenPlan.Should().BeFalse();
+        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentActionableVisionPlan);
+        result.ShouldOpenPlan.Should().BeTrue();
         result.CanBuild.Should().BeFalse();
-        result.NeedsClarification.Should().BeTrue();
+        result.NeedsClarification.Should().BeFalse();
         result.RequirementMaturity.Should().NotBeNull();
         result.RequirementMaturity!.Maturity.Should().Be(AiRequirementMaturity.AbstractGoal);
+        result.RequirementMaturity.CanPlan.Should().BeFalse();
         result.DecisionTrace.Should().NotBeNull();
         result.DecisionTrace!.MaturityLevel.Should().Be(AiRequirementMaturity.AbstractGoal);
-        result.DecisionTrace.FallbackReason.Should().Contain("maturity_gate_blocked");
+        result.DecisionTrace.FallbackReason.Should().Contain("planning_allowed_maturity_needs_plan");
     }
 
     [Fact(DisplayName = "Plan should not choose operator route for abstract goals")]

@@ -407,7 +407,13 @@ public sealed class VisionAgentGenerateFlowTests
         plan.ClarificationQuestions.Select(question => question.Id)
             .Should()
             .Contain(["q_fallback_image_source", "q_fallback_acceptance_criteria"]);
-        plan.ClarificationQuestions.Should().OnlyContain(question => question.Options.Count == 0);
+        plan.ClarificationQuestions.Should().OnlyContain(question =>
+            question.Options.Count > 0 &&
+            question.Options.Any(option => option.Recommended && option.Value.EndsWith("_pending", StringComparison.OrdinalIgnoreCase)));
+        plan.ClarificationQuestions.Select(question => question.DefaultValue)
+            .Should()
+            .OnlyContain(value => value.EndsWith("_pending", StringComparison.OrdinalIgnoreCase));
+        plan.CanBuild.Should().BeFalse();
         plan.PublicEvents.Select(evt => evt.Stage).Should().Contain(["collecting_context", "rule_fallback_used", "plan_ready"]);
         plan.PublicEvents.Should().OnlyContain(evt => evt.MetadataOnly);
         sink.Events.Select(evt => evt.Stage).Should().ContainInOrder(["canonical_build_contract", "canonical_build_readiness"]);

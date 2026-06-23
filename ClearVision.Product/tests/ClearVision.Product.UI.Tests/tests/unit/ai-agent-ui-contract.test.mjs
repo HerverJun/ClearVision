@@ -1821,7 +1821,7 @@ test('help Intent Router result replies without opening Plan', async () => {
   assert.doesNotMatch(collectProcessText(turn), /规划中/);
 });
 
-test('ambiguous Intent Router result enters Plan instead of legacy clarification card', async () => {
+test('ambiguous Intent Router result obeys canonical shouldOpenPlan=false without legacy clarification card', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const plan = createFakeElement();
@@ -1841,72 +1841,107 @@ test('ambiguous Intent Router result enters Plan instead of legacy clarification
     shouldBuildDirectly: false,
     canBuild: false,
     needsClarification: true,
-    publicReason: '需求信息不足，暂不可构建。',
-    assistantReply: '你想检测包装箱的哪一类问题？比如胶带贴歪、条码不可读、Logo 缺失、箱角破损，或外观污渍。',
-    clarificationQuestions: ['检测目标是什么？', '需要判断哪些缺陷？', '输入来源和 OK/NG 规则是什么？'],
+    publicReason: 'Need more details before planning.',
+    assistantReply: '请补充检测目标、输入来源和判定标准。',
+    clarificationQuestions: ['legacy question must be ignored'],
     fallbackAllowed: true,
     routerSource: 'model_router',
     metadataOnly: true
   });
-  panel._requestBackendVisionPlan = async request => {
-    assert.equal(request.description, '包装箱');
-    return backendPlanResult({
-      planId: 'plan_router_ambiguous',
-      goal: 'router ambiguous plan',
+  panel._requestBackendVisionPlan = async () => {
+    throw new Error('canonical shouldOpenPlan=false must not request Plan');
+  };
+
+  panel._dispatchGenerateRequest({ description: '包装盒', userMessage: '包装盒' });
+  const turn = panel.activeAssistantTurn;
+  await flushAsync();
+
+  assert.equal(panel.pendingVisionPlan, null);
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.equal(panel.lastWorkbenchState, 'idle');
+  assert.equal(panel.pendingClarificationPayload, null);
+  assert.doesNotMatch(plan.innerHTML, /ai-clarification-plan-card|ClarificationPlanCard|clarification_1/);
+  assert.match(plan.innerHTML, /ai-plan-empty/);
+  assert.equal(build.hidden, true);
+  assert.equal(panel.isGenerating, false);
+  assert.equal(panel.lastResultStatusNote.text, '');
+  assert.match(turn.replyBody.textContent, /请补充检测目标/);
+  assert.doesNotMatch(turn.replyBody.textContent, /ClarificationPlanCard|clarification_1/);
+
+});
+
+test('abstract visual goal with canonical shouldOpenPlan enters requirement decomposition Plan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const plan = createFakeElement();
+  const build = createFakeElement();
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': plan,
+    '#ai-build-workspace': build,
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._requestBackendIntentRouterRun = async () => ({
+    intent: 'actionable_vision_plan',
+    confidence: 'low',
+    shouldOpenPlan: true,
+    shouldBuildDirectly: false,
+    canBuild: false,
+    needsClarification: false,
+    publicReason: 'Abstract visual goal needs requirement decomposition.',
+    assistantReply: '我先整理视觉工程规划。',
+    fallbackAllowed: true,
+    routerSource: 'model_router',
+    requirementMaturity: {
+      maturity: 'abstract_goal',
+      taskType: 'abstract_goal',
+      canPlan: false,
       canBuild: false,
-      canPlan: true,
-      clarificationQuestions: [
-        {
-          id: 'inspection_object',
-          field: 'inspection_object',
-          title: 'What object should be inspected?',
-          why: 'The object drives the route.',
-          defaultValue: 'object_pending',
-          defaultAssumption: 'Keep the object pending.',
-          impact: 'Build stays blocked until confirmed.',
-          options: [
-            {
-              value: 'object_pending',
-              label: 'Keep pending',
-              recommended: true,
-              description: 'Use Plan clarification.',
-              impact: 'No Router clarification card.'
-            }
-          ]
-        }
-      ],
+      missingFields: ['inspection_object', 'task_type'],
+      blockingReasons: ['abstract_goal_needs_decomposition']
+    },
+    metadataOnly: true
+  });
+  let planRequest = null;
+  panel._requestBackendVisionPlan = async request => {
+    planRequest = request;
+    return backendPlanResult({
+      planId: 'plan_abstract',
+      goal: '完整视觉检测方案',
+      canBuild: false,
+      canPlan: false,
+      recommendedRoute: {
+        routeId: 'requirement_decomposition',
+        title: '需求分解',
+        summary: '先澄清视觉目标，不预选算子链。',
+        operators: [],
+        templateDecision: 'requirement_decomposition'
+      },
       requirementMaturity: {
-        maturity: 'ambiguous',
-        taskType: 'unknown',
-        canPlan: true,
+        maturity: 'abstract_goal',
+        taskType: 'abstract_goal',
+        canPlan: false,
         canBuild: false,
-        missingFields: ['inspection_object'],
-        blockingReasons: ['inspection_object_missing']
+        missingFields: ['inspection_object', 'task_type'],
+        blockingReasons: ['abstract_goal_needs_decomposition']
       }
     });
   };
 
-  panel._dispatchGenerateRequest({ description: '包装箱', userMessage: '包装箱' });
-  const turn = panel.activeAssistantTurn;
+  panel._dispatchGenerateRequest({ description: '做一个完整视觉检测方案', userMessage: '做一个完整视觉检测方案' });
   await flushAsync();
 
-  assert.equal(panel.pendingVisionPlan?.planId, 'plan_router_ambiguous');
-  assert.equal(panel.pendingVisionPlan?.goal, 'router ambiguous plan');
+  assert.equal(planRequest.description, '做一个完整视觉检测方案');
+  assert.equal(panel.pendingVisionPlan?.planId, 'plan_abstract');
+  assert.equal(panel.pendingVisionPlan?.route?.routeId, 'requirement_decomposition');
+  assert.deepEqual(panel.pendingVisionPlan?.route?.operators, []);
+  assert.equal(panel.pendingVisionPlan?.executable, false);
   assert.equal(panel.agentWorkspaceMode, 'plan');
-  assert.equal(panel.lastWorkbenchState, 'clarifying');
   assert.equal(panel.pendingClarificationPayload, null);
-  assert.doesNotMatch(plan.innerHTML, /ai-clarification-plan-card/);
-  assert.doesNotMatch(plan.innerHTML, /clarification_1/);
-  assert.doesNotMatch(plan.innerHTML, /ai-plan-empty/);
+  assert.doesNotMatch(plan.innerHTML, /ai-clarification-plan-card|ClarificationPlanCard|clarification_1/);
   assert.equal(build.hidden, true);
-  assert.equal(panel.isGenerating, false);
-  assert.notEqual(panel.lastResultStatusNote.tone, 'warning');
-  assert.doesNotMatch(panel.lastResultStatusNote.text, /需求不足/);
-  assert.match(turn.replyBody.textContent, /规划已完成|Plan/u);
-  assert.doesNotMatch(turn.replyBody.textContent, /需求信息不足/);
-  assert.doesNotMatch(turn.replyBody.textContent, /暂不可构建/);
-  assert.doesNotMatch(collectProcessText(turn), /需求信息不足/);
-  assert.doesNotMatch(collectProcessText(turn), /已识别为/);
 });
 
 test('local Intent Router fallback opens Plan for explicit unknown slots and reports degraded routing', async () => {
@@ -2976,7 +3011,7 @@ test('Fallback questions with empty options stay free-text and clean stale selec
 
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
   assert.match(planWorkspace.innerHTML, /ai-plan-custom-input-field/);
-  assert.doesNotMatch(planWorkspace.innerHTML, /data-plan-question-option="custom_input"/);
+  assert.match(planWorkspace.innerHTML, /data-plan-question-option="custom_input"/);
 
   const acceptedAnswers = panel._buildConfirmedPlanAnswers(panel.pendingVisionPlan, { acceptedRecommended: true });
   assert.deepEqual(acceptedAnswers, []);
@@ -3942,6 +3977,100 @@ test('Backend Plan can be plannable while Build remains disabled', async () => {
   assert.equal(inlineBuildButton.disabled, true);
 });
 
+test('pending recommended Plan option stays visible and cannot unblock Build', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const inlineBuildButton = createFakeButton();
+  const planActionButton = createFakeButton();
+  const buildStatus = createFakeElement();
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': createFakeElement(),
+      '#ai-plan-workspace': planWorkspace,
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': inlineBuildButton,
+      '#ai-plan-build-status': buildStatus
+    },
+    { '.ai-plan-action': [planActionButton] }
+  );
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [
+      {
+        id: 'image_source',
+        field: 'image_source',
+        title: '图像来源如何确认？',
+        defaultValue: 'camera_pending',
+        defaultAssumption: '暂无安全默认值，需确认；推荐保持待确认。',
+        options: [
+          {
+            value: 'camera_pending',
+            label: '保持图像来源待确认',
+            recommended: true,
+            description: '不猜测相机或文件路径。',
+            impact: '不会解除构建阻断。'
+          },
+          {
+            value: 'file_sample',
+            label: '本地图像样本',
+            recommended: false,
+            description: '使用文件样本继续。',
+            impact: '确认后可解除该字段阻断。'
+          }
+        ]
+      }
+    ],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [
+        {
+          id: 'hard_requirement:image_source',
+          category: 'hard_requirement',
+          field: 'image_source',
+          questionId: 'image_source',
+          blocksBuild: true,
+          resolutionMode: 'answer_question',
+          publicLabel: '图像来源待确认'
+        }
+      ],
+      resolvedFields: ['inspection_object', 'task_type', 'acceptance_criteria'],
+      remainingFields: ['image_source'],
+      primaryMessage: '图像来源待确认',
+      contractVersion: 'v2'
+    },
+    requirementMaturity: {
+      maturity: 'ambiguous',
+      taskType: 'surface_defect',
+      canPlan: true,
+      canBuild: false,
+      missingFields: ['image_source'],
+      blockingReasons: ['image_source_missing']
+    }
+  }));
+
+  panel.pendingVisionPlan = plan;
+  panel._renderPlanWorkspace(plan);
+
+  const question = plan.questions[0];
+  assert.equal(question.options[0].value, 'camera_pending');
+  assert.equal(question.options[0].recommended, true);
+  assert.equal(question.options[1].value, 'file_sample');
+  assert.equal(question.options[1].recommended, false);
+  assert.equal(question.defaultValue, 'camera_pending');
+  assert.match(planWorkspace.innerHTML, /保持图像来源待确认/);
+  assert.match(planWorkspace.innerHTML, /本地图像样本/);
+  assert.equal(panel._acceptRecommendedPlanAnswers(plan), false);
+  assert.equal(panel._refreshPlanEffectiveBuildReadiness(plan, { acceptedRecommended: true }), false);
+  assert.equal(panel._getPlanBuildActionState(plan).canStart, false);
+  assert.equal(inlineBuildButton.disabled, true);
+
+  panel._selectPlanQuestionOption('image_source', 'file_sample');
+  assert.equal(panel._refreshPlanEffectiveBuildReadiness(plan), true);
+  assert.equal(panel._getPlanBuildActionState(plan).canStart, true);
+});
+
 test('Plan with pending image source and acquisition route can start editable draft', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -4068,7 +4197,7 @@ test('Build clarification preserves pending Plan and confirmed answers', async (
   assert.equal(panel.pendingVisionPlan.planId, 'plan_keep');
   assert.equal(panel.pendingVisionPlan.planHash, 'sha256:keep-plan');
   assert.deepEqual(panel.planQuestionAnswers.model_or_rule_strategy, answerBefore);
-  assert.equal(panel.pendingClarificationPayload?.status, 'clarification_required');
+  assert.equal(panel.pendingClarificationPayload, null);
 });
 
 test('Router local HTTP fallback preserves Pending Plan by default', async () => {
@@ -6043,6 +6172,22 @@ test('AgentRun source guard registers frontend stream transports and cancel endp
   assert.match(agentRunSource, /\/ai\/agent-runs\/\$\{encodeURIComponent\(this\.runId\)\}\/events/);
   assert.match(agentRunSource, /\/ai\/agent-runs\/\$\{encodeURIComponent\(runId\)\}\/cancel/);
   assert.doesNotMatch(agentRunSource, /chain.?of.?thought|reasoning_content|\bsystemPrompt\b|\buserPrompt\b|powershell|cmd\.exe|child_process|process\./i);
+});
+
+test('Vision Agent source guard has no legacy ClarificationPlanCard production path', () => {
+  const currentFile = fileURLToPath(import.meta.url);
+  const testProjectRoot = path.resolve(path.dirname(currentFile), '..', '..');
+  const productRoot = path.resolve(testProjectRoot, '..', '..');
+  const workspaceSource = fs.readFileSync(
+    path.resolve(productRoot, 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai', 'aiPanelAgentWorkspace.js'),
+    'utf8'
+  );
+
+  assert.doesNotMatch(workspaceSource, /_buildIntentRouterClarificationPayload/);
+  assert.doesNotMatch(workspaceSource, /_normalizeClarificationPlanBrief/);
+  assert.doesNotMatch(workspaceSource, /_renderClarificationPlanWorkspace/);
+  assert.doesNotMatch(workspaceSource, /ClarificationPlanCard/);
+  assert.doesNotMatch(workspaceSource, /clarification_\$\{index \+ 1\}|clarification_1/);
 });
 
 test('response mapping displays missingResources', async () => {

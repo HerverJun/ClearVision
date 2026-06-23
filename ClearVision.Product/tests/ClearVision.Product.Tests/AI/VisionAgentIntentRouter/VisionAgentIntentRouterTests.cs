@@ -97,7 +97,6 @@ public sealed class VisionAgentIntentRouterTests
         result.ShouldBuildDirectly.Should().BeFalse();
         result.CanBuild.Should().BeFalse();
         result.NeedsClarification.Should().BeFalse();
-        result.ClarificationQuestions.Should().BeEmpty();
         result.RequirementMaturity.Should().NotBeNull();
         result.RequirementMaturity!.CanPlan.Should().BeTrue();
     }
@@ -141,9 +140,43 @@ public sealed class VisionAgentIntentRouterTests
         result.ShouldBuildDirectly.Should().BeFalse();
         result.CanBuild.Should().BeFalse();
         result.NeedsClarification.Should().BeFalse();
-        result.ClarificationQuestions.Should().BeEmpty();
         result.RequirementMaturity.Should().NotBeNull();
         result.RequirementMaturity!.CanPlan.Should().BeTrue();
+        result.RequirementMaturity.CanBuild.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "Intent Router should open Plan for abstract visual engineering goals")]
+    public async Task RouteAsync_AbstractVisualGoal_ShouldOpenPlanWithoutRouterClarification()
+    {
+        var service = CreateService(_ => Json(new
+        {
+            intent = "ambiguous_vision_requirement",
+            confidence = "medium",
+            shouldOpenPlan = false,
+            shouldBuildDirectly = false,
+            canBuild = false,
+            needsClarification = true,
+            publicReason = "Need requirement decomposition.",
+            assistantReply = "I will organize the vision plan first.",
+            fallbackAllowed = true
+        }));
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "\u505a\u4e00\u4e2a\u5b8c\u6574\u89c6\u89c9\u68c0\u6d4b\u65b9\u6848"
+            },
+            CancellationToken.None);
+
+        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentActionableVisionPlan);
+        result.ShouldOpenPlan.Should().BeTrue();
+        result.ShouldBuildDirectly.Should().BeFalse();
+        result.CanBuild.Should().BeFalse();
+        result.NeedsClarification.Should().BeFalse();
+        result.RequirementMaturity.Should().NotBeNull();
+        result.RequirementMaturity!.Maturity.Should().Be(AiRequirementMaturity.AbstractGoal);
+        result.RequirementMaturity.TaskType.Should().Be(AiVisionTaskTypes.AbstractGoal);
+        result.RequirementMaturity.CanPlan.Should().BeFalse();
         result.RequirementMaturity.CanBuild.Should().BeFalse();
     }
 
