@@ -244,7 +244,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         var shouldOpenPlan = intent == IntentActionableVisionPlan;
         var shouldBuildDirectly = intent is IntentModifyExistingFlow or IntentBuildFromConfirmedPlan or IntentDirectBuildDebug;
         var needsClarification = intent == IntentAmbiguousVisionRequirement;
-        var questions = SanitizeQuestions(candidate.ClarificationQuestions);
+        var questions = new List<string>();
 
         if (intent == IntentBuildFromConfirmedPlan && !request.HasPendingPlan)
         {
@@ -253,7 +253,6 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             canBuild = false;
             shouldBuildDirectly = false;
             needsClarification = true;
-            questions = DefaultClarificationQuestions();
             fallbackReason = "confirmed_plan_missing";
         }
 
@@ -265,11 +264,6 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
             shouldBuildDirectly = false;
             needsClarification = false;
             fallbackReason = "direct_build_debug_not_enabled";
-        }
-
-        if (intent == IntentAmbiguousVisionRequirement && questions.Count == 0)
-        {
-            questions = DefaultClarificationQuestions();
         }
 
         ApplyMaturityGate(
@@ -298,7 +292,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
                 ? DefaultReason(intent)
                 : candidate.PublicReason),
             AssistantReply = ResolveAssistantReply(candidate.AssistantReply, candidate.PublicReason, intent, request),
-            ClarificationQuestions = questions,
+            ClarificationQuestions = [],
             FallbackAllowed = candidate.FallbackAllowed,
             RouterSource = source,
             FallbackReason = SafeToken(fallbackReason),
@@ -356,7 +350,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         var isConfirmed = intent == IntentBuildFromConfirmedPlan;
         var isDirectDebug = intent == IntentDirectBuildDebug;
         var isAmbiguous = intent == IntentAmbiguousVisionRequirement;
-        var questions = isAmbiguous ? MaturityClarificationQuestions(maturity) : [];
+        var questions = new List<string>();
         var canBuild = isActionable || isModify || isConfirmed || isDirectDebug;
         var shouldOpenPlan = isActionable;
         var shouldBuildDirectly = isModify || isConfirmed || isDirectDebug;
@@ -388,7 +382,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
                 ? UnauthorizedReason(intent)
                 : RuleFallbackReason(reason, maturity, intent),
             AssistantReply = DefaultReply(intent, request),
-            ClarificationQuestions = questions,
+            ClarificationQuestions = [],
             FallbackAllowed = true,
             RouterSource = "rule_fallback",
             FallbackReason = SafeToken(fallbackReason),
@@ -843,7 +837,7 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         if (maturity.Maturity == AiRequirementMaturity.AbstractGoal ||
             string.Equals(maturity.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
         {
-            return false;
+            return LooksLikeVisionPlanningNeed(Clean(request.Description), request, maturity);
         }
 
         if (request.TemplateSelection != null)
@@ -863,6 +857,33 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         }
 
         return LooksLikeActionableVisionNeed(Clean(request.Description));
+    }
+
+    private static bool LooksLikeVisionPlanningNeed(
+        string text,
+        VisionAgentIntentRouterRequest request,
+        AiRequirementMaturityResult maturity)
+    {
+        if (request.TemplateSelection != null)
+        {
+            return true;
+        }
+
+        if (request.SemanticExtraction is { IsVisionRequest: true })
+        {
+            return true;
+        }
+
+        if (maturity.ObjectSignals.Count > 0 || maturity.TaskSignals.Count > 0)
+        {
+            return true;
+        }
+
+        return ContainsAny(text,
+        [
+            "视觉", "检测", "检验", "测量", "识别", "相机", "图像", "外观", "缺陷", "流程", "工程",
+            "vision", "inspection", "detect", "measurement", "camera", "image"
+        ]);
     }
 
     private static string AppendFallbackReason(string existing, string reason)

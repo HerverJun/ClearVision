@@ -777,7 +777,8 @@ export const aiPanelChatMixin = {
         const manualRetry = payload?.manualRetry ?? payload?.ManualRetry ?? payload?.manual_retry ?? null;
         const clarificationRequired = Boolean(payload?.clarificationRequired ?? payload?.ClarificationRequired);
 
-        if (clarificationRequired || status === 'clarification_required') {
+        if ((clarificationRequired || status === 'clarification_required') &&
+            this.useVisionAgentGenerateFlow !== true) {
             return { text: '待澄清', tone: 'warning' };
         }
         if (manualRetry?.required || status === 'manual_retry_required') {
@@ -825,7 +826,7 @@ export const aiPanelChatMixin = {
         this._setAssistantSectionText(turn, 'reply', reply);
         this._renderPublicDiagnosticsSection(turn, payload);
 
-        if (this._isClarificationResult(payload)) {
+        if (this._isClarificationResult(payload) && this.useVisionAgentGenerateFlow !== true) {
             this._renderAssistantClarification(turn, payload);
         }
 

@@ -861,7 +861,7 @@ export const aiPanelAgentWorkspaceMixin = {
             return true;
         }
 
-        if (route.shouldOpenPlan || route.intent === 'actionable_vision_plan') {
+        if (route.shouldOpenPlan === true) {
             return this._enterPlanModeFromPrompt({
                 description: context.description,
                 hint: context.hint,
@@ -928,20 +928,10 @@ export const aiPanelAgentWorkspaceMixin = {
                 return true;
             }
 
-            return this._enterPlanModeFromPrompt({
-                description: context.description,
-                hint: context.hint,
-                userMessage: context.userMessage,
-                attachmentPaths: context.attachmentPaths,
-                templateSelection: context.templateSelection,
-                semanticExtraction: route.semanticExtraction,
-                clearInput: false,
-                input: null,
-                turn: context.turn,
-                addUserMessage: false,
-                clearPendingPlan: route.shouldResetPendingPlan !== false
-            });
-
+            this.pendingClarificationPayload = null;
+            this._setWorkbenchState(AiWorkbenchStates.IDLE);
+            this._setResultStatusNote('', '');
+            this._setAssistantTurnStatus(context.turn, '宸插洖澶?, 'success');
         } else {
             this.pendingClarificationPayload = null;
             this._setWorkbenchState(AiWorkbenchStates.IDLE);
@@ -965,19 +955,7 @@ export const aiPanelAgentWorkspaceMixin = {
             const localized = this._localizeDisplayText(String(value || '').trim());
             return this._redactPublicDiagnosticText?.(localized) || localized;
         };
-        const questions = (this._normalizeClarificationQuestionList?.(item.clarificationQuestions || item.ClarificationQuestions) || [])
-            .map((question, index) => ({
-                field: String(question.field || `clarification_${index + 1}`).trim() || `clarification_${index + 1}`,
-                question: normalizeDisplayText(question.question || ''),
-                required: question.required !== false,
-                reason: normalizeDisplayText(question.reason || ''),
-                priority: String(question.priority || 'high').trim() || 'high',
-                options: this._toArray(question.options)
-                    .map(option => normalizeDisplayText(option))
-                    .filter(Boolean)
-            }))
-            .filter(question => question.question || question.options.length > 0)
-            .slice(0, 5);
+        const questions = [];
         const requirementMaturity = this._normalizeRequirementMaturity(item.requirementMaturity || item.RequirementMaturity);
         const semanticExtraction = this._normalizeSemanticExtraction(item.semanticExtraction || item.SemanticExtraction);
         const rawShouldResetPendingPlan = item.shouldResetPendingPlan ?? item.ShouldResetPendingPlan;
@@ -3622,9 +3600,9 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!question) return null;
         const options = this._toArray(question.options || question.Options)
             .map(option => this._normalizePlanOption(option))
-            .filter(option => option && !this._isPlanPlaceholderValue(option.value));
+            .filter(Boolean);
         const rawDefault = String(question.defaultValue || question.DefaultValue || '').trim();
-        const defaultValue = this._isPlanPlaceholderValue(rawDefault) ? '' : rawDefault;
+        const defaultValue = rawDefault;
         return {
             id: question.id || question.Id || '',
             field: this._inferPlanQuestionField(question.field || question.Field || question.id || question.Id),
@@ -4503,13 +4481,6 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!el) return;
 
         el.hidden = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD;
-        const clarificationPayload = !plan && this.agentWorkspaceMode !== AgentWorkspaceModes.BUILD
-            ? this._resolveActiveClarificationPayload()
-            : null;
-        if (clarificationPayload && this._renderClarificationPlanWorkspace(el, clarificationPayload)) {
-            return;
-        }
-
         if (!plan) {
             const progress = this._getPlanRunProgressState?.();
             const liveStatus = progress?.eventCount > 0

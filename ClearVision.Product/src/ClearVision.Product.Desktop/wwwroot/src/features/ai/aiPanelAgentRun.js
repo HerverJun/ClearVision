@@ -986,7 +986,7 @@ export const aiPanelAgentRunMixin = {
             const isClarificationTerminal = appliedCanonical &&
                 (this._isClarificationResult?.(payload) === true || failureType === 'clarification_required');
             if (isClarificationTerminal) {
-                this.pendingClarificationPayload = evt.payload;
+                this.pendingClarificationPayload = null;
                 this.agentWorkspaceMode = 'plan';
                 this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
                 this._renderAgentWorkspaceOverview?.();

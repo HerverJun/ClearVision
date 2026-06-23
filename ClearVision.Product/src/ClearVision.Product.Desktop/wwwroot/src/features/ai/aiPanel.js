@@ -838,14 +838,17 @@ export class AiPanel {
         }
 
         if (isClarification) {
-            this.pendingClarificationPayload = payload;
+            const isVisionAgentMode = this.useVisionAgentGenerateFlow === true;
+            this.pendingClarificationPayload = isVisionAgentMode ? null : payload;
             const shouldResetPendingPlan = (payload.shouldResetPendingPlan ?? payload.ShouldResetPendingPlan) === true ||
                 (payload.resetPendingPlan ?? payload.ResetPendingPlan) === true;
-            if (shouldResetPendingPlan) {
+            if (!isVisionAgentMode && shouldResetPendingPlan) {
                 this.pendingVisionPlan = null;
                 this._clearPlanQuestionAnswers?.();
             }
-            this._resetClarificationSelectionDraft();
+            if (!isVisionAgentMode) {
+                this._resetClarificationSelectionDraft();
+            }
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
         } else {
@@ -862,15 +865,20 @@ export class AiPanel {
         if (!payload.success) {
             this._clearActiveRequestState();
             if (isClarification) {
+                const isVisionAgentMode = this.useVisionAgentGenerateFlow === true;
                 this.pendingManualRetry = null;
                 this._renderManualRetryBanner();
-                this._setAssistantTurnStatus(activeTurn, '待澄清', 'warning');
+                this._setAssistantTurnStatus(activeTurn, isVisionAgentMode ? '已回复' : '待澄清', isVisionAgentMode ? 'success' : 'warning');
                 this._setAssistantSectionText(
                     activeTurn,
                     'reply',
                     payload.aiExplanation || payload.AiExplanation || payload.errorMessage || payload.message || '当前需求需要先澄清。'
                 );
-                this._renderAssistantClarification(activeTurn, payload);
+                if (!isVisionAgentMode) {
+                    this._renderAssistantClarification(activeTurn, payload);
+                } else if (activeTurn.clarificationSection) {
+                    activeTurn.clarificationSection.hidden = true;
+                }
                 if (!this.currentResult?.flow) {
                     const summary = this.container.querySelector('#ai-result-summary');
                     if (summary) {
@@ -879,8 +887,10 @@ export class AiPanel {
                 }
                 if (this.currentResult?.flow) {
                     this._setResultStatusNote('本轮生成前需要先补充需求，右侧仍保留上一版可应用方案。', 'warning');
-                } else {
+                } else if (!isVisionAgentMode) {
                     this._setResultStatusNote('当前需求还需要澄清，右侧已整理问题清单。', 'info');
+                } else {
+                    this._setResultStatusNote('', '');
                 }
 
                 if (this.sessionId) {

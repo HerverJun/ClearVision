@@ -428,8 +428,7 @@ public static class VisionAgentPlanFieldPolicy
                 {
                     var options = (q.Options ?? [])
                         .Where(option => !string.IsNullOrWhiteSpace(option.Value) &&
-                                         !string.IsNullOrWhiteSpace(option.Label) &&
-                                         !IsPlaceholderValue(option.Value))
+                                         !string.IsNullOrWhiteSpace(option.Label))
                         .Take(5)
                         .ToList();
                     if (options.Count > 0 && options.All(option => !option.Recommended))
@@ -482,13 +481,13 @@ public static class VisionAgentPlanFieldPolicy
             };
 
             var why = $"流程规划需要明确 {title}。";
-            var defaultAssumption = "暂无默认假设，请手动输入以补齐槽位。";
             var impact = "缺少此字段将阻碍流程的自动构建。";
 
             var options = BuildFallbackOptions(field);
             var recommended = options.FirstOrDefault(option => option.Recommended)?.Value ??
                               options.FirstOrDefault()?.Value ??
                               string.Empty;
+            var defaultAssumption = BuildFallbackDefaultAssumption(field, recommended);
 
             list.Add(new VisionAgentClarificationQuestion
             {
@@ -511,47 +510,66 @@ public static class VisionAgentPlanFieldPolicy
         {
             VisionAgentPlanAnswerFields.InspectionObject =>
             [
-                Option("object_pending", "Keep object pending", true, "Keep the inspection object as a metadata question.", "The draft can be planned, but build readiness remains blocked."),
-                Option("use_prompt_object", "Use prompt object", false, "Use the object inferred from the user prompt.", "Review before building if the prompt is broad."),
-                Option("operator_input", "Ask operator", false, "Require an operator-provided object value.", "Adds a manual confirmation step.")
+                Option("object_pending", "保持检测对象待确认", true, "规划阶段不猜测检测对象，先把对象作为待确认元数据保留。", "可以继续形成规划，但不会解除构建阻断。"),
+                Option("use_prompt_object", "使用用户描述中的对象", false, "当提示词已明确对象时使用该对象。", "对象描述过宽时仍需要复核。"),
+                Option("operator_input", "由操作员补充对象", false, "要求操作员明确输入检测对象。", "增加人工确认步骤。")
             ],
             VisionAgentPlanAnswerFields.TaskType =>
             [
-                Option("general_inspection", "General inspection", true, "Start from a general inspection route.", "Keeps planning available when the exact task type is not whitelisted."),
-                Option("presence_absence", "Presence check", false, "Treat the task as presence or missing-part inspection.", "May need adjustment for measurement or guidance tasks."),
-                Option("custom_task", "Custom task", false, "Keep the task type as a custom metadata value.", "Build readiness stays blocked until confirmed.")
+                Option("task_type_pending", "保持任务类型待确认", true, "任务类型不在安全白名单或语义不够明确时，先保留为待确认。", "可以进入规划，但不会解除构建阻断。"),
+                Option("general_inspection", "通用视觉检查", false, "仅在用户确认这是通用检查时使用。", "可能不适合测量、引导或定位任务。"),
+                Option("custom_task", "自定义视觉任务", false, "保留为用户确认后的自定义任务。", "构建前仍需要确认算子策略。")
             ],
             VisionAgentPlanAnswerFields.ImageSource =>
             [
-                Option("camera_pending", "Camera pending", true, "Reserve the image source as a pending camera input.", "Avoids guessing local camera or file resources."),
-                Option("file_sample", "Sample file", false, "Use an offline sample image source.", "Useful for early validation only."),
-                Option("station_camera", "Station camera", false, "Use station camera metadata when available.", "Requires station resource confirmation.")
+                Option("camera_pending", "保持图像来源待确认", true, "不猜测相机、文件路径或采集资源，先保留为待确认输入。", "可以规划采集环节，但不会解除构建阻断。"),
+                Option("file_sample", "离线样张", false, "使用用户确认的离线样张作为输入。", "只适合早期验证，不代表产线采集。"),
+                Option("station_camera", "工站相机", false, "使用已绑定的工站相机元数据。", "需要确认相机资源和采集配置。")
             ],
             VisionAgentPlanAnswerFields.AcceptanceCriteria =>
             [
-                Option("ok_ng_pending", "OK/NG pending", true, "Keep acceptance criteria pending.", "The plan stays editable while build readiness is blocked."),
-                Option("defect_is_ng", "Defect is NG", false, "Use visible defect or mismatch as NG.", "Only safe for common inspection tasks."),
-                Option("measure_tolerance_pending", "Tolerance pending", false, "Keep measurement tolerance pending.", "Best for geometry and positioning tasks.")
+                Option("ok_ng_pending", "保持判定标准待确认", true, "不伪造 OK/NG、阈值或公差，先保留为待确认标准。", "规划可继续，但构建前必须确认。"),
+                Option("defect_is_ng", "缺陷即 NG", false, "用户确认可见缺陷或不匹配即判 NG 时使用。", "只适合常见外观或有无检测。"),
+                Option("measure_tolerance_pending", "公差待确认", false, "测量、公差或轨迹偏差标准暂不确定时使用。", "构建前仍需补充具体数值或规则。")
             ],
             VisionAgentPlanAnswerFields.OutputTarget =>
             [
-                Option("local_result", "Local result", true, "Output a local structured result first.", "Avoids unsafe PLC or network assumptions."),
-                Option("plc_pending", "PLC pending", false, "Reserve PLC output metadata.", "Requires address and handshake confirmation."),
-                Option("report_only", "Report only", false, "Keep output as report metadata.", "Useful for early validation.")
+                Option("output_pending", "保持输出目标待确认", true, "不猜测 PLC、网络或文件输出，先保留为待确认输出。", "不会解除构建或部署前的输出阻断。"),
+                Option("local_result", "本地结构化结果", false, "仅输出本地结果字段。", "适合早期验证，避免不安全外部写入。"),
+                Option("plc_pending", "PLC 输出待确认", false, "保留 PLC 地址、握手和失效保护为待确认元数据。", "需要工程师确认后才能部署。")
             ],
             VisionAgentPlanAnswerFields.AlgorithmStrategy =>
             [
-                Option("strategy_pending", "Strategy pending", true, "Keep algorithm choice pending.", "Build readiness remains blocked until strategy is confirmed."),
-                Option("rule_first", "Rule first", false, "Start with rule or geometry operators.", "Best when features are stable and measurable."),
-                Option("model_pending", "Model pending", false, "Reserve a model-based operator.", "Requires model metadata before build.")
+                Option("strategy_pending", "保持算法策略待确认", true, "不默认选择规则、模板或模型，先保留策略确认。", "不会解除构建阻断。"),
+                Option("rule_first", "优先规则/几何算法", false, "目标特征稳定、可测量且用户确认时使用。", "不适合外观变化大或需模型识别的任务。"),
+                Option("model_pending", "模型资源待确认", false, "规划模型算子，但模型资源仍待绑定。", "构建或部署前需要模型元数据。")
             ],
             _ =>
             [
-                Option("metadata_pending", "Keep pending", true, "Keep this field as pending metadata.", "The plan can continue while build readiness remains gated."),
-                Option("use_prompt_value", "Use prompt value", false, "Use the value inferred from the prompt.", "Review before building."),
-                Option("operator_input", "Ask operator", false, "Require explicit operator input.", "Adds a manual confirmation step.")
+                Option("metadata_pending", "保持待确认", true, "该字段暂无安全默认值，需用户或工程师确认。", "可以继续规划，但不会解除构建阻断。"),
+                Option("use_prompt_value", "使用提示词中的值", false, "仅在提示词已明确该值时使用。", "构建前仍建议复核。"),
+                Option("operator_input", "由操作员补充", false, "要求操作员明确输入该字段。", "增加人工确认步骤。")
             ]
         };
+    }
+
+    private static string BuildFallbackDefaultAssumption(string field, string recommended)
+    {
+        if (IsPlaceholderValue(recommended))
+        {
+            return field switch
+            {
+                VisionAgentPlanAnswerFields.InspectionObject => "暂无安全默认检测对象，推荐保持待确认；该选择不视为已解决字段。",
+                VisionAgentPlanAnswerFields.TaskType => "暂无安全默认任务类型，推荐保持待确认；该选择不视为已解决字段。",
+                VisionAgentPlanAnswerFields.ImageSource => "暂无安全默认图像来源，推荐保持待确认；该选择不视为已解决字段。",
+                VisionAgentPlanAnswerFields.AcceptanceCriteria => "暂无安全默认判定标准，推荐保持待确认；该选择不视为已解决字段。",
+                VisionAgentPlanAnswerFields.OutputTarget => "暂无安全默认输出目标，推荐保持待确认；该选择不视为已解决字段。",
+                VisionAgentPlanAnswerFields.AlgorithmStrategy => "暂无安全默认算法策略，推荐保持待确认；该选择不视为已解决字段。",
+                _ => "暂无安全默认值，推荐保持待确认；该选择不视为已解决字段。"
+            };
+        }
+
+        return "推荐项可作为规划阶段默认值；构建前仍会按字段完整性和资源就绪状态复核。";
     }
 
     private static VisionAgentClarificationOption Option(
