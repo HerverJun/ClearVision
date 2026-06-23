@@ -1821,7 +1821,7 @@ test('help Intent Router result replies without opening Plan', async () => {
   assert.doesNotMatch(collectProcessText(turn), /规划中/);
 });
 
-test('ambiguous Intent Router result asks clarification and cannot Build', async () => {
+test('ambiguous Intent Router result enters Plan instead of legacy clarification card', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const plan = createFakeElement();
@@ -1848,38 +1848,61 @@ test('ambiguous Intent Router result asks clarification and cannot Build', async
     routerSource: 'model_router',
     metadataOnly: true
   });
-  panel._requestBackendVisionPlan = async () => {
-    throw new Error('ambiguous input should not request Plan');
+  panel._requestBackendVisionPlan = async request => {
+    assert.equal(request.description, '包装箱');
+    return backendPlanResult({
+      planId: 'plan_router_ambiguous',
+      goal: 'router ambiguous plan',
+      canBuild: false,
+      canPlan: true,
+      clarificationQuestions: [
+        {
+          id: 'inspection_object',
+          field: 'inspection_object',
+          title: 'What object should be inspected?',
+          why: 'The object drives the route.',
+          defaultValue: 'object_pending',
+          defaultAssumption: 'Keep the object pending.',
+          impact: 'Build stays blocked until confirmed.',
+          options: [
+            {
+              value: 'object_pending',
+              label: 'Keep pending',
+              recommended: true,
+              description: 'Use Plan clarification.',
+              impact: 'No Router clarification card.'
+            }
+          ]
+        }
+      ],
+      requirementMaturity: {
+        maturity: 'ambiguous',
+        taskType: 'unknown',
+        canPlan: true,
+        canBuild: false,
+        missingFields: ['inspection_object'],
+        blockingReasons: ['inspection_object_missing']
+      }
+    });
   };
 
   panel._dispatchGenerateRequest({ description: '包装箱', userMessage: '包装箱' });
   const turn = panel.activeAssistantTurn;
   await flushAsync();
 
-  assert.equal(panel.pendingVisionPlan, null);
+  assert.equal(panel.pendingVisionPlan?.planId, 'plan_router_ambiguous');
+  assert.equal(panel.pendingVisionPlan?.goal, 'router ambiguous plan');
   assert.equal(panel.agentWorkspaceMode, 'plan');
   assert.equal(panel.lastWorkbenchState, 'clarifying');
-  assert.equal(panel.pendingClarificationPayload?.status, 'clarification_required');
-  assert.equal(panel.pendingClarificationPayload?.failureType, 'clarification_required');
-  assert.equal(panel.pendingClarificationPayload?.clarificationRequired, true);
-  assert.equal(panel.pendingClarificationPayload?.turnIntent, 'new_flow');
-  assert.equal(panel.pendingClarificationPayload?.interactionState, 'clarifying');
-  assert.equal(panel.pendingClarificationPayload?.routerConfidence, 'medium');
-  assert.equal(
-    panel.pendingClarificationPayload?.requirementBrief?.clarificationQuestions?.[0]?.question,
-    '检测目标是什么？'
-  );
-  assert.deepEqual(
-    panel.pendingClarificationPayload?.requirementBrief?.blockingClarificationFields,
-    ['clarification_1', 'clarification_2', 'clarification_3']
-  );
-  assert.match(plan.innerHTML, /ai-clarification-plan-card/);
+  assert.equal(panel.pendingClarificationPayload, null);
+  assert.doesNotMatch(plan.innerHTML, /ai-clarification-plan-card/);
+  assert.doesNotMatch(plan.innerHTML, /clarification_1/);
   assert.doesNotMatch(plan.innerHTML, /ai-plan-empty/);
   assert.equal(build.hidden, true);
   assert.equal(panel.isGenerating, false);
-  assert.equal(panel.lastResultStatusNote.tone, 'warning');
-  assert.match(panel.lastResultStatusNote.text, /需求不足/);
-  assert.match(turn.replyBody.textContent, /你想检测包装箱的哪一类问题/);
+  assert.notEqual(panel.lastResultStatusNote.tone, 'warning');
+  assert.doesNotMatch(panel.lastResultStatusNote.text, /需求不足/);
+  assert.match(turn.replyBody.textContent, /规划已完成|Plan/u);
   assert.doesNotMatch(turn.replyBody.textContent, /需求信息不足/);
   assert.doesNotMatch(turn.replyBody.textContent, /暂不可构建/);
   assert.doesNotMatch(collectProcessText(turn), /需求信息不足/);

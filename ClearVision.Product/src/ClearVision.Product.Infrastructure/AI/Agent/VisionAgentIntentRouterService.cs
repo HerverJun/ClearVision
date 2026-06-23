@@ -786,6 +786,19 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
 
         if (!maturity.CanPlan)
         {
+            if (ShouldOpenPlanDespiteMaturityBlock(request, maturity))
+            {
+                intent = IntentActionableVisionPlan;
+                confidence = "low";
+                canBuild = false;
+                shouldOpenPlan = true;
+                shouldBuildDirectly = false;
+                needsClarification = false;
+                questions = [];
+                fallbackReason = AppendFallbackReason(fallbackReason, "planning_allowed_maturity_needs_plan");
+                return;
+            }
+
             intent = IntentAmbiguousVisionRequirement;
             confidence = "medium";
             canBuild = false;
@@ -816,6 +829,40 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
                 fallbackReason = AppendFallbackReason(fallbackReason, "planning_allowed_build_blocked");
             }
         }
+    }
+
+    private static bool ShouldOpenPlanDespiteMaturityBlock(
+        VisionAgentIntentRouterRequest request,
+        AiRequirementMaturityResult maturity)
+    {
+        if (string.IsNullOrWhiteSpace(request.Description))
+        {
+            return false;
+        }
+
+        if (maturity.Maturity == AiRequirementMaturity.AbstractGoal ||
+            string.Equals(maturity.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (request.TemplateSelection != null)
+        {
+            return true;
+        }
+
+        if (request.SemanticExtraction is { IsVisionRequest: true } semantic &&
+            !string.Equals(semantic.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (maturity.ObjectSignals.Count > 0 || maturity.TaskSignals.Count > 0)
+        {
+            return true;
+        }
+
+        return LooksLikeActionableVisionNeed(Clean(request.Description));
     }
 
     private static string AppendFallbackReason(string existing, string reason)
@@ -1303,14 +1350,15 @@ public sealed class VisionAgentIntentRouterService : IVisionAgentIntentRouterSer
         }
 
         if (ContainsAny(text, ["构建", "生成", "创建", "新建", "搭建", "设计", "做一个"]) &&
-            ContainsAny(text, ["检测", "测量", "识别", "流程", "视觉", "外观", "缺陷", "条码", "二维码", "OCR", "尺寸"]))
+            ContainsAny(text, ["检测", "测量", "识别", "流程", "视觉", "外观", "缺陷", "条码", "二维码", "OCR", "尺寸", "引导", "定位", "机械臂", "机器人"]))
         {
             return true;
         }
 
         var detailSignals = new[]
         {
-            "贴歪", "条码", "可读", "Logo", "缺失", "箱角", "破损", "划痕", "裂纹", "孔距", "线序", "缺陷", "OK", "NG", "检测", "测量", "识别"
+            "贴歪", "条码", "可读", "Logo", "缺失", "箱角", "破损", "划痕", "裂纹", "孔距", "线序", "缺陷", "OK", "NG", "检测", "测量", "识别",
+            "视觉引导", "机械臂", "机器人", "打螺钉", "拧螺丝", "锁螺丝", "焊缝", "涂胶", "胶路", "轨迹定位", "螺钉", "螺丝"
         };
         return detailSignals.Count(signal => text.Contains(signal, StringComparison.OrdinalIgnoreCase)) >= 2;
     }

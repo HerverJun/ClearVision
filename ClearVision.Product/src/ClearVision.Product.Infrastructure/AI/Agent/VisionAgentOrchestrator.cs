@@ -909,7 +909,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
                 ? VisionAgentPlanFieldPolicy.IsDraftBlocking(field, maturity.TaskType, maturity)
                 : VisionAgentPlanFieldPolicy.IsStrictBlocking(field, maturity.TaskType, maturity));
 
-        var canBuild = !hasBlockingMissing && (maturity.CanPlan || maturity.CanBuild);
+        var canBuild = !hasBlockingMissing && maturity.CanBuild;
 
         var updatedMaturity = maturity with
         {

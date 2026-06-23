@@ -485,19 +485,90 @@ public static class VisionAgentPlanFieldPolicy
             var defaultAssumption = "暂无默认假设，请手动输入以补齐槽位。";
             var impact = "缺少此字段将阻碍流程的自动构建。";
 
+            var options = BuildFallbackOptions(field);
+            var recommended = options.FirstOrDefault(option => option.Recommended)?.Value ??
+                              options.FirstOrDefault()?.Value ??
+                              string.Empty;
+
             list.Add(new VisionAgentClarificationQuestion
             {
                 Id = $"q_fallback_{field}",
                 Field = field,
                 Title = title,
                 Why = why,
-                DefaultValue = string.Empty,
+                DefaultValue = recommended,
                 DefaultAssumption = defaultAssumption,
                 Impact = impact,
-                Options = []
+                Options = options
             });
         }
         return list;
+    }
+
+    private static List<VisionAgentClarificationOption> BuildFallbackOptions(string field)
+    {
+        return field switch
+        {
+            VisionAgentPlanAnswerFields.InspectionObject =>
+            [
+                Option("object_pending", "Keep object pending", true, "Keep the inspection object as a metadata question.", "The draft can be planned, but build readiness remains blocked."),
+                Option("use_prompt_object", "Use prompt object", false, "Use the object inferred from the user prompt.", "Review before building if the prompt is broad."),
+                Option("operator_input", "Ask operator", false, "Require an operator-provided object value.", "Adds a manual confirmation step.")
+            ],
+            VisionAgentPlanAnswerFields.TaskType =>
+            [
+                Option("general_inspection", "General inspection", true, "Start from a general inspection route.", "Keeps planning available when the exact task type is not whitelisted."),
+                Option("presence_absence", "Presence check", false, "Treat the task as presence or missing-part inspection.", "May need adjustment for measurement or guidance tasks."),
+                Option("custom_task", "Custom task", false, "Keep the task type as a custom metadata value.", "Build readiness stays blocked until confirmed.")
+            ],
+            VisionAgentPlanAnswerFields.ImageSource =>
+            [
+                Option("camera_pending", "Camera pending", true, "Reserve the image source as a pending camera input.", "Avoids guessing local camera or file resources."),
+                Option("file_sample", "Sample file", false, "Use an offline sample image source.", "Useful for early validation only."),
+                Option("station_camera", "Station camera", false, "Use station camera metadata when available.", "Requires station resource confirmation.")
+            ],
+            VisionAgentPlanAnswerFields.AcceptanceCriteria =>
+            [
+                Option("ok_ng_pending", "OK/NG pending", true, "Keep acceptance criteria pending.", "The plan stays editable while build readiness is blocked."),
+                Option("defect_is_ng", "Defect is NG", false, "Use visible defect or mismatch as NG.", "Only safe for common inspection tasks."),
+                Option("measure_tolerance_pending", "Tolerance pending", false, "Keep measurement tolerance pending.", "Best for geometry and positioning tasks.")
+            ],
+            VisionAgentPlanAnswerFields.OutputTarget =>
+            [
+                Option("local_result", "Local result", true, "Output a local structured result first.", "Avoids unsafe PLC or network assumptions."),
+                Option("plc_pending", "PLC pending", false, "Reserve PLC output metadata.", "Requires address and handshake confirmation."),
+                Option("report_only", "Report only", false, "Keep output as report metadata.", "Useful for early validation.")
+            ],
+            VisionAgentPlanAnswerFields.AlgorithmStrategy =>
+            [
+                Option("strategy_pending", "Strategy pending", true, "Keep algorithm choice pending.", "Build readiness remains blocked until strategy is confirmed."),
+                Option("rule_first", "Rule first", false, "Start with rule or geometry operators.", "Best when features are stable and measurable."),
+                Option("model_pending", "Model pending", false, "Reserve a model-based operator.", "Requires model metadata before build.")
+            ],
+            _ =>
+            [
+                Option("metadata_pending", "Keep pending", true, "Keep this field as pending metadata.", "The plan can continue while build readiness remains gated."),
+                Option("use_prompt_value", "Use prompt value", false, "Use the value inferred from the prompt.", "Review before building."),
+                Option("operator_input", "Ask operator", false, "Require explicit operator input.", "Adds a manual confirmation step.")
+            ]
+        };
+    }
+
+    private static VisionAgentClarificationOption Option(
+        string value,
+        string label,
+        bool recommended,
+        string description,
+        string impact)
+    {
+        return new VisionAgentClarificationOption
+        {
+            Value = value,
+            Label = label,
+            Recommended = recommended,
+            Description = description,
+            Impact = impact
+        };
     }
 
     public static bool IsPlaceholderValue(string? value)

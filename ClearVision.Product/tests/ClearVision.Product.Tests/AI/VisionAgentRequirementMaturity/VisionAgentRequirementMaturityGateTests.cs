@@ -76,7 +76,9 @@ public sealed class VisionAgentRequirementMaturityGateTests
         plan.ClarificationQuestions.Select(question => question.Id)
             .Should()
             .Contain(["q_fallback_image_source", "q_fallback_acceptance_criteria", "q_fallback_algorithm_strategy"]);
-        plan.ClarificationQuestions.Should().OnlyContain(question => question.Options.Count == 0);
+        plan.ClarificationQuestions.Should().OnlyContain(question =>
+            question.Options.Count > 0 &&
+            question.Options.Count(option => option.Recommended) == 1);
         plan.ClarificationQuestions.Select(question => question.Id)
             .Should()
             .NotContain(["inspection_object", "task_type"]);
@@ -119,7 +121,9 @@ public sealed class VisionAgentRequirementMaturityGateTests
             VisionAgentPlanAnswerFields.AcceptanceCriteria
         ]);
         plan.CanBuild.Should().BeFalse();
-        plan.ClarificationQuestions.Should().OnlyContain(question => question.Options.Count == 0);
+        plan.ClarificationQuestions.Should().OnlyContain(question =>
+            question.Options.Count > 0 &&
+            question.Options.Count(option => option.Recommended) == 1);
     }
 
     [Fact(DisplayName = "Create Plan rule fallback should keep lesion detection task type remaining")]
@@ -360,7 +364,8 @@ public sealed class VisionAgentRequirementMaturityGateTests
             new VisionAgentRequirementMaturityRequest { Description = "use camera input" },
             semantic);
 
-        result.CanPlan.Should().BeFalse();
+        result.CanPlan.Should().BeTrue();
+        result.CanBuild.Should().BeFalse();
         result.MissingFields.Should().Contain(["inspection_object", "task_type", "acceptance_criteria"]);
         result.MissingFields.Should().NotContain("image_source");
     }
@@ -548,6 +553,37 @@ public sealed class VisionAgentRequirementMaturityGateTests
 
         result.CanPlan.Should().BeTrue();
         result.TaskType.Should().Be(expectedTaskType);
+    }
+
+    [Fact(DisplayName = "Semantic unknown vision task should still be plannable but not buildable")]
+    public void SemanticUnknownVisionTask_ShouldPlanButBlockBuild()
+    {
+        var result = VisionAgentRequirementMaturityGate.Evaluate(
+            new VisionAgentRequirementMaturityRequest
+            {
+                Description = "为我构建一个视觉引导机械臂打螺钉的视觉项目。"
+            },
+            new VisionAgentSemanticExtractionResult
+            {
+                IsVisionRequest = true,
+                Intent = "new_flow",
+                TaskType = "robot_guidance",
+                TaskTypeConfidence = 0.72,
+                CanPlanCandidate = true,
+                CanBuildCandidate = false,
+                Source = VisionAgentSemanticSources.Model,
+                MetadataOnly = true
+            });
+
+        result.CanPlan.Should().BeTrue();
+        result.CanBuild.Should().BeFalse();
+        result.TaskType.Should().Be(AiVisionTaskTypes.Unknown);
+        result.MissingFields.Should().Contain([
+            VisionAgentPlanAnswerFields.InspectionObject,
+            VisionAgentPlanAnswerFields.TaskType,
+            VisionAgentPlanAnswerFields.ImageSource,
+            VisionAgentPlanAnswerFields.AcceptanceCriteria
+        ]);
     }
 
     [Theory(DisplayName = "Explicit object target sentence patterns should create known slots")]

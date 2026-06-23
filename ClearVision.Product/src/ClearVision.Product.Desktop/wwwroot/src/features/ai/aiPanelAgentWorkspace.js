@@ -913,19 +913,35 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         if (route.needsClarification || route.intent === 'ambiguous_vision_requirement') {
-            const clarificationPayload = this._buildIntentRouterClarificationPayload(route, context);
-            const shouldClearPendingPlan = route.shouldResetPendingPlan === true || !this.pendingVisionPlan;
-            if (shouldClearPendingPlan) {
-                this.pendingVisionPlan = null;
-                this._clearPlanQuestionAnswers();
+            if (this.pendingVisionPlan && route.shouldResetPendingPlan !== true) {
+                this.pendingClarificationPayload = null;
+                this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
+                this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+                this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
+                this._setResultStatusNote(route.publicReason || 'Plan answers are still required before build.', 'warning');
+                this._setGeneratingState?.(false);
+                this._renderAgentWorkspaceOverview();
+                this._renderPlanWorkspace(this.pendingVisionPlan);
+                this._renderBuildWorkspaceFromAgentRun();
+                this._updatePlanBuildActionState();
+                this.activeAssistantTurn = null;
+                return true;
             }
-            this.pendingClarificationPayload = clarificationPayload;
-            this._resetClarificationSelectionDraft?.();
-            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
-            this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
-            this._renderAgentRuntime?.(clarificationPayload);
-            this._setResultStatusNote('需求不足，暂不可构建。', 'warning');
-            this._setAssistantTurnStatus(context.turn, '需求不足', 'warning');
+
+            return this._enterPlanModeFromPrompt({
+                description: context.description,
+                hint: context.hint,
+                userMessage: context.userMessage,
+                attachmentPaths: context.attachmentPaths,
+                templateSelection: context.templateSelection,
+                semanticExtraction: route.semanticExtraction,
+                clearInput: false,
+                input: null,
+                turn: context.turn,
+                addUserMessage: false,
+                clearPendingPlan: route.shouldResetPendingPlan !== false
+            });
+
         } else {
             this.pendingClarificationPayload = null;
             this._setWorkbenchState(AiWorkbenchStates.IDLE);
@@ -1205,6 +1221,10 @@ export const aiPanelAgentWorkspaceMixin = {
             ['surface_or_pose_defect', ['缺陷', '外观', '划痕', '刮伤', '裂纹', '破损', '凹坑', '压痕', '脏污', '污渍', '贴正', '贴歪', '贴附', '胶带', '偏斜', 'surface', 'defect', 'scratch', 'crack', 'damage', 'dent', 'stain', 'tape']]
         ];
         const strategyTerms = ['规则', '模型', '深度学习', '传统算法', '模板', '阈值', 'AI', 'rule', 'model', 'deep learning', 'template', 'threshold'];
+        objectTerms.push('机械臂', '机器人', '螺钉', '螺丝', '焊缝', '涂胶', '胶路', '工件');
+        taskGroups.push(
+            ['robot_guidance', ['视觉引导', '机械臂引导', '机器人引导', '打螺钉', '拧螺丝', '锁螺丝', '焊缝引导', '焊缝跟踪', '涂胶轨迹', '轨迹定位', 'robot guidance', 'screw driving', 'weld seam', 'glue path']]
+        );
         const knownObjectSignals = collect(objectTerms).slice(0, 12);
         const objectSignals = [...new Set([...knownObjectSignals, ...explicitObject.filter(Boolean)])].slice(0, 12);
         const matchedTask = taskGroups

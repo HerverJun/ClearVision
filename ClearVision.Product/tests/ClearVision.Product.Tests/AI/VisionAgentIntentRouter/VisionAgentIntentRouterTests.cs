@@ -102,6 +102,51 @@ public sealed class VisionAgentIntentRouterTests
         result.RequirementMaturity!.CanPlan.Should().BeTrue();
     }
 
+    [Fact(DisplayName = "Intent Router should not expose clarification questions for unknown semantic vision tasks")]
+    public async Task RouteAsync_UnknownSemanticVisionTask_ShouldOpenPlanWithoutRouterClarification()
+    {
+        var service = CreateService(_ => Json(new
+        {
+            intent = "ambiguous_vision_requirement",
+            confidence = "medium",
+            shouldOpenPlan = false,
+            shouldBuildDirectly = false,
+            canBuild = false,
+            needsClarification = true,
+            publicReason = "Need more details.",
+            assistantReply = "Which robot guidance task?",
+            clarificationQuestions = new[] { "What should the robot do?" },
+            fallbackAllowed = true
+        }));
+
+        var result = await service.RouteAsync(
+            new VisionAgentIntentRouterRequest
+            {
+                Description = "为我构建一个视觉引导机械臂打螺钉的视觉项目。",
+                SemanticExtraction = new VisionAgentSemanticExtractionResult
+                {
+                    IsVisionRequest = true,
+                    Intent = "new_flow",
+                    TaskType = "robot_guidance",
+                    CanPlanCandidate = true,
+                    CanBuildCandidate = false,
+                    Source = VisionAgentSemanticSources.Model,
+                    MetadataOnly = true
+                }
+            },
+            CancellationToken.None);
+
+        result.Intent.Should().Be(VisionAgentIntentRouterService.IntentActionableVisionPlan);
+        result.ShouldOpenPlan.Should().BeTrue();
+        result.ShouldBuildDirectly.Should().BeFalse();
+        result.CanBuild.Should().BeFalse();
+        result.NeedsClarification.Should().BeFalse();
+        result.ClarificationQuestions.Should().BeEmpty();
+        result.RequirementMaturity.Should().NotBeNull();
+        result.RequirementMaturity!.CanPlan.Should().BeTrue();
+        result.RequirementMaturity.CanBuild.Should().BeFalse();
+    }
+
     [Fact(DisplayName = "Intent Router should polish slot-known ambiguous diagnostic reply into Plan reply")]
     public async Task RouteAsync_ShouldPolishDiagnosticAssistantReplyForAmbiguousVision()
     {

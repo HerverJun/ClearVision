@@ -24,7 +24,7 @@ public static class VisionAgentRequirementMaturityGate
 {
     private static readonly string[] BusinessSignals =
     [
-        "视觉", "检测", "检验", "测量", "识别", "流程", "工程", "方案", "算法", "模型", "相机", "图像",
+        "视觉", "检测", "检验", "测量", "识别", "流程", "工程", "方案", "算法", "模型", "相机", "图像", "引导", "定位",
         "缺陷", "外观", "线序", "端子", "OCR", "二维码", "条码", "DataMatrix", "PLC", "ROI",
         "inspection", "inspect", "detect", "detection", "measure", "measurement", "vision", "workflow", "flow",
         "defect", "ocr", "barcode", "qr", "datamatrix", "plc"
@@ -79,7 +79,9 @@ public static class VisionAgentRequirementMaturityGate
         ],
         [AiVisionTaskTypes.TemplateLocation] =
         [
-            "定位", "对位", "找正", "模板", "匹配", "位姿", "locate", "position", "align", "template", "matching", "pose"
+            "定位", "对位", "找正", "模板", "匹配", "位姿", "视觉引导", "机械臂引导", "机器人引导", "打螺钉", "拧螺丝",
+            "锁螺丝", "焊缝引导", "焊缝跟踪", "涂胶轨迹", "胶路", "轨迹定位", "locate", "position", "align", "template",
+            "matching", "pose", "robot guidance", "screw driving", "weld seam", "glue path"
         ],
         [AiVisionTaskTypes.PlcOutput] =
         [
@@ -95,7 +97,8 @@ public static class VisionAgentRequirementMaturityGate
     private static readonly string[] ObjectSignals =
     [
         "包装箱", "纸箱", "箱体", "胶带", "金属件", "金属表面", "端子", "线束", "连接器", "标签", "二维码", "条码",
-        "圆孔", "圆形孔位", "孔位", "铜孔", "产品", "零件", "遥控器", "按键", "面板", "瓶盖", "螺丝", "pin", "hole",
+        "圆孔", "圆形孔位", "孔位", "铜孔", "产品", "零件", "遥控器", "按键", "面板", "瓶盖", "螺丝", "螺钉",
+        "机械臂", "机器人", "焊缝", "涂胶", "胶路", "工件", "pin", "hole",
         "terminal", "connector", "label", "package", "carton", "part", "product", "button", "wire", "harness", "metal", "surface"
     ];
 
@@ -361,7 +364,9 @@ public static class VisionAgentRequirementMaturityGate
                                   !string.Equals(semantic.TaskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
                                   !string.Equals(semantic.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase);
 
-        var isReliable = IsReliablePlannable(request, semantic, hasObject, hasTaskType);
+        var isReliable = IsReliablePlannable(request, semantic, hasObject, hasTaskType) ||
+                         semantic.CanPlanCandidate ||
+                         isVisionRequest;
         var canPlan = isReliable;
         if (!canPlan)
         {
