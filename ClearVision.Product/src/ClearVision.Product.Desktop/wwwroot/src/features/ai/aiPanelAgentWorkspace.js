@@ -78,6 +78,8 @@ const PLAN_PHASES = [
 ];
 
 const PLAN_PENDING_STATUS = 'waiting';
+const LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE = 'legacy_build_artifact_missing_canonical_flow';
+const LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE = '该历史构建结果不包含可验证的画布流程产物，无法直接应用。\n请基于原计划重新构建。';
 
 const PLAN_ANSWER_FIELDS = Object.freeze({
     INSPECTION_OBJECT: 'inspection_object',
@@ -5432,10 +5434,21 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _renderBuildChecks(events) {
+        const resultPayload = this._getAgentRunResultPayload(events);
+        const compatibilityState = this._getBuildArtifactFlowCompatibilityState(resultPayload, events);
+        if (compatibilityState.status === LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE) {
+            return `
+                <div class="ai-build-check is-blocked">
+                    <strong>应用门禁：已阻断</strong>
+                    <span>${this._escapeHtml(compatibilityState.publicMessage)}</span>
+                </div>
+            `;
+        }
+
         const buildResult = this._getBuildResult(events);
-        const applyGate = buildResult?.applyGate || buildResult?.ApplyGate || this._getAgentRunResultPayload(events)?.applyGate;
+        const applyGate = buildResult?.applyGate || buildResult?.ApplyGate || resultPayload?.applyGate;
         const readiness = buildResult?.readinessReport || buildResult?.ReadinessReport || null;
-        const firstFix = buildResult?.firstFixRecommendation || buildResult?.FirstFixRecommendation || this._getAgentRunResultPayload(events)?.firstFixRecommendation || '';
+        const firstFix = buildResult?.firstFixRecommendation || buildResult?.FirstFixRecommendation || resultPayload?.firstFixRecommendation || '';
         if (applyGate) {
             const gate = this._asObject?.(applyGate) || {};
             const canvasReady = this._readBooleanField(gate, 'canvasApplyReady', 'CanvasApplyReady');
@@ -5489,8 +5502,22 @@ export const aiPanelAgentWorkspaceMixin = {
         const connections = flow ? this._extractConnections(flow) : [];
         const terminal = events.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
         const diff = buildResult?.workflowDiff || buildResult?.WorkflowDiff || resultPayload?.workflowDiff || null;
+        const compatibilityState = this._getBuildArtifactFlowCompatibilityState(resultPayload, events);
         if (!terminal) {
             return '<div class="ai-followup-empty">构建完成后会显示最终可编辑流程草稿。</div>';
+        }
+
+        if (compatibilityState.status === LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE) {
+            return `
+                <div class="ai-build-check is-blocked">
+                    <strong>无法应用历史构建结果</strong>
+                    <span>${this._escapeHtml(compatibilityState.publicMessage)}</span>
+                </div>
+                <details class="ai-plan-diagnostics">
+                    <summary>兼容诊断</summary>
+                    <div>${this._escapeHtml(compatibilityState.code)}</div>
+                </details>
+            `;
         }
 
         if (!flow) {
@@ -5561,6 +5588,117 @@ export const aiPanelAgentWorkspaceMixin = {
             : this._getPayloadBuildResult(this.currentResult);
     },
 
+    _hasBuildArtifactValue(source, names) {
+        if (!source || typeof source !== 'object') return false;
+
+        for (const name of names) {
+            if (!Object.prototype.hasOwnProperty.call(source, name)) continue;
+            const value = source[name];
+            if (value === null || value === undefined) continue;
+            if (Array.isArray(value)) return value.length > 0;
+            if (typeof value === 'object') return Object.keys(value).length > 0;
+            if (String(value).trim()) return true;
+        }
+
+        return false;
+    },
+
+    _getBuildArtifactFlowCompatibilityState(payload = this.currentResult, events = this.activeAgentRunEvents) {
+        const obj = this._asObject?.(payload) || {};
+        const eventList = Array.isArray(events) ? events : [];
+        const buildResult = this._getPayloadBuildResult(obj);
+        const flow = this._getResultFlowForCanvas(obj);
+        if (flow && this._extractOperators(flow).length > 0) {
+            return {
+                status: 'canonical_flow_available',
+                flow,
+                buildResult
+            };
+        }
+
+        const hasTopLevelWorkflowDraft = this._hasBuildArtifactValue(obj, ['workflowDraft', 'WorkflowDraft']);
+        const hasBuildWorkflowDraft = this._hasBuildArtifactValue(buildResult, ['workflowDraft', 'WorkflowDraft']);
+        const hasTopLevelOperatorPipeline = this._hasBuildArtifactValue(obj, ['operatorPipeline', 'OperatorPipeline']);
+        const hasBuildOperatorPipeline = this._hasBuildArtifactValue(buildResult, ['operatorPipeline', 'OperatorPipeline']);
+        const hasRunCompletedTerminal = eventList.some(evt => String(evt?.eventType || '') === 'run.completed');
+        const hasBuildArtifact = Boolean(
+            buildResult ||
+            hasTopLevelWorkflowDraft ||
+            hasBuildWorkflowDraft ||
+            hasTopLevelOperatorPipeline ||
+            hasBuildOperatorPipeline ||
+            hasRunCompletedTerminal
+        );
+
+        if (!hasBuildArtifact) {
+            return {
+                status: 'no_build_artifact',
+                flow: null,
+                buildResult
+            };
+        }
+
+        return {
+            status: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
+            code: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
+            publicMessage: LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE,
+            flow: null,
+            buildResult,
+            hasRunCompletedTerminal,
+            hasWorkflowDraft: hasTopLevelWorkflowDraft || hasBuildWorkflowDraft,
+            hasOperatorPipeline: hasTopLevelOperatorPipeline || hasBuildOperatorPipeline
+        };
+    },
+
+    _buildLegacyMissingCanonicalFlowResult(payload, compatibilityState) {
+        const obj = this._asObject?.(payload) || {};
+        const buildResult = compatibilityState?.buildResult || this._getPayloadBuildResult(obj) || null;
+        const applyGate = {
+            canvasApplyReady: false,
+            runtimeDraftReady: false,
+            deploymentReady: false,
+            blocked: true,
+            status: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
+            firstFixRecommendation: '请基于原计划重新构建。',
+            metadataOnly: true
+        };
+        const resultBuildResult = buildResult
+            ? {
+                ...buildResult,
+                applyGate,
+                ApplyGate: applyGate,
+                compatibilityDiagnosticCode: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE
+            }
+            : null;
+
+        return {
+            ...obj,
+            success: false,
+            Success: false,
+            completionStatus: 'failed',
+            CompletionStatus: 'failed',
+            failureType: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
+            FailureType: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
+            interactionState: 'failed',
+            aiExplanation: LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE,
+            AiExplanation: LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE,
+            buildCompatibilityStatus: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
+            compatibilityDiagnosticCode: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
+            buildResult: resultBuildResult || buildResult,
+            BuildResult: resultBuildResult || buildResult,
+            applyGate,
+            ApplyGate: applyGate,
+            pendingParameters: this._toArray(obj.pendingParameters || obj.PendingParameters).length
+                ? this._toArray(obj.pendingParameters || obj.PendingParameters)
+                : this._toArray(buildResult?.pendingParameters || buildResult?.PendingParameters),
+            missingResources: this._toArray(obj.missingResources || obj.MissingResources).length
+                ? this._toArray(obj.missingResources || obj.MissingResources)
+                : this._toArray(buildResult?.missingResources || buildResult?.MissingResources),
+            flow: null,
+            Flow: null
+        };
+    },
+
     _applyAgentRunResultPayload(evt) {
         const payload = this._asObject?.(evt?.payload) || {};
         if (evt.eventType !== 'run.completed') {
@@ -5574,6 +5712,20 @@ export const aiPanelAgentWorkspaceMixin = {
         const buildResult = this._getPayloadBuildResult(payload);
         const flow = this._getResultFlowForCanvas(payload);
         if (!flow) {
+            const compatibilityState = this._getBuildArtifactFlowCompatibilityState(payload, [evt, ...(this.activeAgentRunEvents || [])]);
+            if (compatibilityState.status === LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE) {
+                const result = this._buildLegacyMissingCanonicalFlowResult(payload, compatibilityState);
+                this._setCurrentResult(result);
+                this._workbenchStageTimeline = result.stageTimeline || result.StageTimeline || this._workbenchStageTimeline || [];
+                if (this.container) {
+                    this._displayResult(result, {
+                        appendChatMessage: false,
+                        assistantTurn: this.activeAssistantTurn
+                    });
+                    this._renderBuildWorkspaceFromAgentRun();
+                }
+                this._setResultStatusNote?.(compatibilityState.publicMessage, 'warning');
+            }
             return false;
         }
 
@@ -5686,6 +5838,11 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _isCanvasApplyReadyForResult(result = this.currentResult) {
+        const compatibilityState = this._getBuildArtifactFlowCompatibilityState(result);
+        if (compatibilityState.status === LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE) {
+            return false;
+        }
+
         const gate = this._getPayloadApplyGate(result);
         if (!gate) return true;
         const canvasReady = this._readBooleanField(gate, 'canvasApplyReady', 'CanvasApplyReady');

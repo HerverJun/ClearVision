@@ -976,8 +976,14 @@ export const aiPanelAgentRunMixin = {
                 );
             } else {
                 this._setWorkbenchState(AiWorkbenchStates.FAILED);
-                this._setAssistantTurnStatus(this.activeAssistantTurn, '构建完成但草稿缺失', 'warning');
-                this._setResultStatusNote('构建已结束，但没有收到可回放流程草稿；请重新构建或查看事件回放。', 'warning');
+                const compatibilityState = this._getBuildArtifactFlowCompatibilityState?.(this.currentResult, this.activeAgentRunEvents);
+                if (compatibilityState?.status === 'legacy_build_artifact_missing_canonical_flow') {
+                    this._setAssistantTurnStatus(this.activeAssistantTurn, '需要重新构建', 'warning');
+                    this._setResultStatusNote(compatibilityState.publicMessage, 'warning');
+                } else {
+                    this._setAssistantTurnStatus(this.activeAssistantTurn, '构建完成但草稿缺失', 'warning');
+                    this._setResultStatusNote('构建已结束，但没有收到可回放流程草稿；请重新构建或查看事件回放。', 'warning');
+                }
             }
         } else if (evt.eventType === 'run.cancelled') {
             this._setWorkbenchState(AiWorkbenchStates.CANCELLED);

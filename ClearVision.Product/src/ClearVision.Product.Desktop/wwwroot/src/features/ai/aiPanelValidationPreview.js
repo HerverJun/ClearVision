@@ -82,6 +82,36 @@ export const aiPanelValidationPreviewMixin = {
         return names.some(name => this._getObjectValue(source, [name]) !== undefined);
     },
 
+    _getStructureDryRunState(dryRun) {
+        const succeeded = this._getBooleanValue(dryRun, ['dryRunSucceeded', 'DryRunSucceeded']);
+        if (succeeded === true) {
+            return {
+                status: 'passed',
+                label: '结构预演：通过',
+                summaryLabel: '通过',
+                cls: 'is-ok',
+                icon: '&#10003;'
+            };
+        }
+        if (succeeded === false) {
+            return {
+                status: 'failed',
+                label: '结构预演：未通过',
+                summaryLabel: '未通过',
+                cls: 'is-failed',
+                icon: '&#10007;'
+            };
+        }
+
+        return {
+            status: 'unavailable',
+            label: '结构预演：状态不可用',
+            summaryLabel: '状态不可用',
+            cls: 'is-unavailable',
+            icon: '&#9432;'
+        };
+    },
+
     _normalizeAgentValidationPreview(data) {
         const preview = data?.validationPreview ?? data?.ValidationPreview ?? null;
         if (!preview || typeof preview !== 'object') {
@@ -193,6 +223,9 @@ export const aiPanelValidationPreviewMixin = {
         const stationTouched = this._getBooleanValue(section, ['stationTouched', 'StationTouched']);
         const adapterName = String(this._getObjectValue(section, ['adapterName', 'AdapterName']) ?? '').trim();
         const previewMode = String(this._getObjectValue(section, ['previewMode', 'PreviewMode']) ?? '').trim();
+        const structureDryRunState = sectionKey === 'dryRun'
+            ? this._getStructureDryRunState(section)
+            : null;
         const countLabel = formatCountLabel({
             blocking: blocking.length,
             warnings: warnings.length,
@@ -210,8 +243,9 @@ export const aiPanelValidationPreviewMixin = {
                 </summary>
                 <div class="ai-agent-preview-body">
                 ${summary ? `<div class="ai-agent-preview-summary">${this._escapeHtml(summary)}</div>` : ''}
-                ${(readyForDeployment !== null || workflowDraftAllowed !== null || previewReady !== null || adapterName || previewMode) ? `
+                ${(structureDryRunState || readyForDeployment !== null || workflowDraftAllowed !== null || previewReady !== null || adapterName || previewMode) ? `
                     <div class="ai-agent-preview-state-row">
+                        ${structureDryRunState ? `<span class="${this._escapeHtml(structureDryRunState.cls)}" data-structure-dryrun-status="${this._escapeHtml(structureDryRunState.status)}" title="dryRunSucceeded=${structureDryRunState.status === 'unavailable' ? 'unavailable' : structureDryRunState.status === 'passed' ? 'true' : 'false'}">${this._escapeHtml(structureDryRunState.label)}</span>` : ''}
                         ${readyForDeployment !== null ? `<span title="readyForDeployment=${readyForDeployment ? 'true' : 'false'}">部署就绪：${formatBoolean(readyForDeployment)}</span>` : ''}
                         ${workflowDraftAllowed !== null ? `<span title="workflowDraftAllowed=${workflowDraftAllowed ? 'true' : 'false'}">草稿可编辑：${formatBoolean(workflowDraftAllowed)}</span>` : ''}
                         ${previewReady !== null ? `<span title="previewReady=${previewReady ? 'true' : 'false'}">预演就绪：${formatBoolean(previewReady)}</span>` : ''}
@@ -289,20 +323,13 @@ export const aiPanelValidationPreviewMixin = {
     },
 
     _renderStructureSimulationDryRun(dryRun) {
-        const succeeded = this._getBooleanValue(dryRun, ['dryRunSucceeded', 'DryRunSucceeded']);
+        const state = this._getStructureDryRunState(dryRun);
         const blocking = this._getArrayValue(dryRun, ['blockingIssues', 'BlockingIssues']);
         const warnings = this._getArrayValue(dryRun, ['warnings', 'Warnings']);
         const missing = this._getArrayValue(dryRun, ['missingResources', 'MissingResources']);
         const executed = this._getArrayValue(dryRun, ['executedOperators', 'ExecutedOperators']);
         const skipped = this._getArrayValue(dryRun, ['skippedOperators', 'SkippedOperators']);
         const summary = String(this._getObjectValue(dryRun, ['dryRunSummary', 'DryRunSummary', 'summary', 'Summary']) ?? '').trim();
-        const cls = succeeded === true ? 'is-ok' : succeeded === false ? 'is-failed' : 'is-unavailable';
-        const icon = succeeded === true ? '&#10003;' : succeeded === false ? '&#10007;' : '&#9432;';
-        const title = succeeded === true
-            ? '结构预演通过'
-            : succeeded === false
-                ? '结构预演未通过'
-                : '元数据预演状态不可用';
         const countLabel = formatCountLabel({
             blocking: blocking.length,
             warnings: warnings.length,
@@ -313,10 +340,10 @@ export const aiPanelValidationPreviewMixin = {
         });
 
         return `
-            <div class="ai-validation-dryrun ${cls}" data-dryrun-contract="structure-simulation">
+            <div class="ai-validation-dryrun ${state.cls}" data-dryrun-contract="structure-simulation">
                 <div class="ai-validation-dryrun-header">
-                    <span class="ai-validation-issue-icon">${icon}</span>
-                    <span>${this._escapeHtml(title)}</span>
+                    <span class="ai-validation-issue-icon">${state.icon}</span>
+                    <span>${this._escapeHtml(state.label)}</span>
                 </div>
                 <div class="ai-agent-preview-body">
                     <div class="ai-agent-preview-summary">${this._escapeHtml(summary || countLabel)}</div>
@@ -337,9 +364,10 @@ export const aiPanelValidationPreviewMixin = {
         const coverageValue = this._getNumberValue(dryRun, ['coveragePercentage', 'CoveragePercentage']);
         const coveredValue = this._getNumberValue(dryRun, ['coveredBranches', 'CoveredBranches']);
         const totalValue = this._getNumberValue(dryRun, ['totalBranches', 'TotalBranches']);
-        const coverage = coverageValue ?? 0;
-        const covered = coveredValue ?? 0;
-        const total = totalValue ?? 0;
+        const hasCoverage = coverageValue !== null && coveredValue !== null && totalValue !== null;
+        const coverage = hasCoverage ? coverageValue : null;
+        const covered = hasCoverage ? coveredValue : null;
+        const total = hasCoverage ? totalValue : null;
         const duration = this._getNumberValue(dryRun, ['durationMs', 'DurationMs']);
         const icon = isSuccess ? '&#10003;' : '&#10007;';
         const cls = isSuccess ? 'is-ok' : 'is-failed';
@@ -350,12 +378,12 @@ export const aiPanelValidationPreviewMixin = {
                     <span>DryRun ${isSuccess ? '通过' : '失败'}</span>
                     ${duration != null ? `<span class="ai-validation-dryrun-duration">${Math.round(duration)}ms</span>` : ''}
                 </div>
-                <div class="ai-validation-dryrun-coverage">
+                ${hasCoverage ? `<div class="ai-validation-dryrun-coverage">
                     <div class="ai-coverage-bar">
                         <div class="ai-coverage-bar-fill" style="width:${Math.min(100, Math.max(0, coverage))}%"></div>
                     </div>
                     <div class="ai-coverage-text">分支覆盖 ${covered}/${total} (${coverage.toFixed(1)}%)</div>
-                </div>
+                </div>` : '<div class="ai-validation-dryrun-coverage is-unavailable">覆盖率数据未提供</div>'}
             </div>
         `;
     },

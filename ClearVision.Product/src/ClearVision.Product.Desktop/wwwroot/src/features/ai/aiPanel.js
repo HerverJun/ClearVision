@@ -1069,20 +1069,26 @@ export class AiPanel {
         const flow = data?.flow || data?.Flow || null;
         const ops = this._extractOperators(flow);
         const connections = this._extractConnections(flow);
+        const buildFlowCompatibility = this._getBuildArtifactFlowCompatibilityState?.(data);
+        const legacyMissingCanonicalFlow = buildFlowCompatibility?.status === 'legacy_build_artifact_missing_canonical_flow';
         this._syncPendingParameterDrafts(data, flow);
         this._renderAgentRuntime(data);
         this._renderRequirementBrief(data);
 
         const clarificationRequired = this._isClarificationResult(data);
         const requirementBrief = this._normalizeRequirementBrief(data?.requirementBrief ?? data?.RequirementBrief ?? null);
-        const summaryLines = clarificationRequired && !flow
+        const summaryLines = legacyMissingCanonicalFlow
+            ? [
+                this._escapeHtml(buildFlowCompatibility.publicMessage).replace(/\n/g, '<br/>')
+            ]
+            : clarificationRequired && !flow
             ? [
                 `当前需求还需要澄清，已整理 <span class="result-count">${(requirementBrief?.clarificationQuestions?.length || requirementBrief?.missingFacts?.length || 0)}</span> 个问题。`
             ]
             : [
                 `该方案包含 <span class="result-count">${ops.length}</span> 个算子和 <span class="result-count">${connections.length}</span> 条连线。`
             ];
-        const templateSummary = this._buildTemplateFirstSummary(data);
+        const templateSummary = legacyMissingCanonicalFlow ? '' : this._buildTemplateFirstSummary(data);
         if (templateSummary) {
             summaryLines.push(templateSummary);
         }
@@ -1105,6 +1111,8 @@ export class AiPanel {
         );
         if (clarificationRequired && !flow) {
             opsContainer.innerHTML = '<div class="ai-followup-empty">构建尚未开始。请先确认计划或开始构建，生成算子链后会显示在这里。</div>';
+        } else if (legacyMissingCanonicalFlow) {
+            opsContainer.innerHTML = `<div class="ai-followup-empty">${this._escapeHtml(buildFlowCompatibility.publicMessage).replace(/\n/g, '<br/>')}</div>`;
         } else {
             ops.forEach((op, i) => {
                 const opName = op?.displayName || op?.DisplayName || op?.name || op?.Name || '未命名算子';

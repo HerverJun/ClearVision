@@ -5863,9 +5863,15 @@ test('AgentRun completed payload without canonical flow fails closed despite Wor
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   const { elements, container } = createBuildWorkspaceContainer();
   panel.container = container;
-  panel.flowCanvas = createFakeFlowCanvas();
+  panel.flowCanvas = createFakeFlowCanvas({
+    operators: [{ id: 'existing_canvas', type: 'ImageAcquisition', name: 'Existing canvas', parameters: [] }],
+    connections: []
+  });
+  const initialCanvasRevision = panel.flowCanvas.getFlowRevision();
   panel.activeAgentRunId = 'ar_missing_canonical_flow';
   panel.agentWorkspaceMode = 'build';
+  panel._setCurrentResult(buildResultContractPayload());
+  assert.equal(elements['#ai-btn-apply'].disabled, false);
   const payload = buildResultContractPayload();
   delete payload.flow;
   delete payload.buildResult.flow;
@@ -5889,10 +5895,63 @@ test('AgentRun completed payload without canonical flow fails closed despite Wor
   assert.equal(panel._getResultFlowForCanvas(payload), null);
   assert.equal(panel._applyAgentRunResultPayload(completedEvent), false);
 
-  panel._renderBuildWorkspaceFromAgentRun();
-
+  assert.equal(panel.currentResult?.compatibilityDiagnosticCode, 'legacy_build_artifact_missing_canonical_flow');
+  assert.equal(panel.currentResult?.flow, null);
+  assert.equal(panel.currentResult?.applyGate?.canvasApplyReady, false);
+  assert.equal(panel._isCanvasApplyReadyForResult(panel.currentResult), false);
+  assert.equal(panel.flowCanvas.getFlowRevision(), initialCanvasRevision);
+  assert.equal(elements['#ai-btn-apply'].disabled, true);
+  assert.equal(elements['#ai-btn-apply'].getAttribute('aria-disabled'), 'true');
+  assert.match(panel.lastResultStatusNote?.text || '', /该历史构建结果不包含可验证的画布流程产物/);
+  assert.match(elements['#ai-result-summary'].innerHTML, /该历史构建结果不包含可验证的画布流程产物/);
+  assert.doesNotMatch(elements['#ai-result-summary'].innerHTML, /该方案包含 <span class="result-count">0<\/span> 个算子/);
+  assert.match(elements['#ai-build-event-timeline'].innerHTML, /Build 工具证据/);
+  assert.match(elements['#ai-build-parameters'].innerHTML, /模型资源/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /应用门禁：已阻断/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /请基于原计划重新构建/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /无法应用历史构建结果/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /legacy_build_artifact_missing_canonical_flow/);
   assert.doesNotMatch(elements['#ai-build-final-draft'].innerHTML, /可编辑草稿已就绪/);
   assert.doesNotMatch(elements['#ai-btn-apply'].innerHTML, /应用到画布/);
+});
+
+test('AgentRun completed payload with BuildResult.Flow remains apply-ready', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.activeAgentRunId = 'ar_build_result_flow';
+  panel.agentWorkspaceMode = 'build';
+  panel._displayResult = result => {
+    panel.displayedResult = result;
+  };
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  assert.ok(payload.buildResult.flow);
+  const completedEvent = {
+    runId: 'ar_build_result_flow',
+    sequence: 32,
+    eventType: 'run.completed',
+    stage: 'run',
+    title: 'Run completed',
+    summary: 'Build completed.',
+    status: 'completed',
+    payload,
+    metadataOnly: true,
+    redactionPass: true
+  };
+  panel.activeAgentRunEvents = [completedEvent];
+
+  assert.equal(panel._getBuildArtifactFlowCompatibilityState(payload).status, 'canonical_flow_available');
+  assert.equal(panel._applyAgentRunResultPayload(completedEvent), true);
+
+  assert.equal(panel._extractOperators(panel.currentResult.flow).length, 4);
+  assert.equal(panel._isCanvasApplyReadyForResult(panel.currentResult), true);
+  assert.equal(elements['#ai-btn-apply'].disabled, false);
+  assert.match(elements['#ai-btn-apply'].innerHTML, /应用到画布/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /可编辑草稿已就绪/);
+  assert.doesNotMatch(elements['#ai-build-final-draft'].innerHTML, /legacy_build_artifact_missing_canonical_flow/);
 });
 
 test('Legacy WebMessage fallback does not overwrite AgentRun completed BuildResult draft', async () => {
@@ -6864,9 +6923,10 @@ test('AgentRun completed without replayable draft does not mark workbench apply-
 
   assert.equal(closed, true);
   assert.equal(panel.isGenerating, false);
-  assert.equal(turn.statusEl.textContent, '构建完成但草稿缺失');
+  assert.equal(turn.statusEl.textContent, '需要重新构建');
   assert.equal(panel.lastWorkbenchState, 'failed');
-  assert.match(panel.lastResultStatusNote.text, /没有收到可回放流程草稿/);
+  assert.match(panel.lastResultStatusNote.text, /该历史构建结果不包含可验证的画布流程产物/);
+  assert.equal(panel.currentResult?.compatibilityDiagnosticCode, 'legacy_build_artifact_missing_canonical_flow');
 });
 
 test('AgentRun cancelled event sets cancelled UI state', async () => {
@@ -7038,7 +7098,7 @@ test('DryRun structure simulation uses dryRunSucceeded contract without legacy c
   });
 
   assert.match(validation.innerHTML, /data-dryrun-contract="structure-simulation"/);
-  assert.match(validation.innerHTML, /结构预演通过/);
+  assert.match(validation.innerHTML, /结构预演：通过/);
   assert.match(validation.innerHTML, /Structure simulation completed/);
   assert.doesNotMatch(validation.innerHTML, /DryRun 失败/);
   assert.doesNotMatch(validation.innerHTML, /分支覆盖 0\/0/);
@@ -7075,7 +7135,47 @@ test('unknown DryRun contract displays unavailable instead of default failure', 
   assert.doesNotMatch(validation.innerHTML, /分支覆盖 0\/0/);
 });
 
-test('legacy execution DryRun still renders explicit coverage contract', async () => {
+test('legacy execution DryRun with complete coverage renders branch statistics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+
+  panel._renderValidationConsole({
+    dryRunResult: {
+      IsSuccess: true,
+      CoveredBranches: 3,
+      TotalBranches: 4,
+      CoveragePercentage: 75,
+      DurationMs: 4
+    }
+  });
+
+  assert.match(validation.innerHTML, /data-dryrun-contract="execution-stub"/);
+  assert.match(validation.innerHTML, /DryRun 通过/);
+  assert.match(validation.innerHTML, /分支覆盖 3\/4 \(75\.0%\)/);
+  assert.doesNotMatch(validation.innerHTML, /覆盖率数据未提供/);
+});
+
+test('legacy execution DryRun without coverage does not invent zero statistics', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+
+  panel._renderValidationConsole({
+    dryRunResult: {
+      IsSuccess: true,
+      DurationMs: 5
+    }
+  });
+
+  assert.match(validation.innerHTML, /data-dryrun-contract="execution-stub"/);
+  assert.match(validation.innerHTML, /DryRun 通过/);
+  assert.match(validation.innerHTML, /覆盖率数据未提供/);
+  assert.doesNotMatch(validation.innerHTML, /分支覆盖 0\/0/);
+  assert.doesNotMatch(validation.innerHTML, /ai-coverage-bar-fill/);
+});
+
+test('legacy execution DryRun preserves valid zero branch totals when coverage is explicit', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel);
   const { validation } = attachValidationPanel(panel);
@@ -7085,14 +7185,77 @@ test('legacy execution DryRun still renders explicit coverage contract', async (
       IsSuccess: true,
       CoveredBranches: 0,
       TotalBranches: 0,
-      CoveragePercentage: 0,
+      CoveragePercentage: 100,
       DurationMs: 4
     }
   });
 
   assert.match(validation.innerHTML, /data-dryrun-contract="execution-stub"/);
-  assert.match(validation.innerHTML, /DryRun 通过/);
-  assert.match(validation.innerHTML, /分支覆盖 0\/0 \(0\.0%\)/);
+  assert.match(validation.innerHTML, /分支覆盖 0\/0 \(100\.0%\)/);
+  assert.doesNotMatch(validation.innerHTML, /覆盖率数据未提供/);
+});
+
+test('legacy execution DryRun without isSuccess remains unavailable', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+
+  panel._renderValidationConsole({
+    dryRunResult: {
+      CoveredBranches: 3,
+      TotalBranches: 4,
+      CoveragePercentage: 75,
+      DurationMs: 4
+    }
+  });
+
+  assert.match(validation.innerHTML, /data-dryrun-contract="unknown"/);
+  assert.match(validation.innerHTML, /DryRun 状态不可用/);
+  assert.doesNotMatch(validation.innerHTML, /分支覆盖 3\/4/);
+});
+
+test('validationPreview structure dryRun renders explicit passed failed and unavailable states', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+  const response = agentResponse();
+
+  response.validationPreview.dryRun = {
+    dryRunSucceeded: true,
+    blockingIssues: [],
+    warnings: [],
+    executedOperators: ['op_detect'],
+    skippedOperators: [],
+    dryRunSummary: 'Metadata structure simulation passed.'
+  };
+  panel._renderValidationConsole(response);
+  assert.match(validation.innerHTML, /data-structure-dryrun-status="passed"/);
+  assert.match(validation.innerHTML, /结构预演：通过/);
+
+  response.validationPreview.dryRun = {
+    dryRunSucceeded: false,
+    blockingIssues: [],
+    warnings: [],
+    executedOperators: ['op_detect'],
+    skippedOperators: [],
+    dryRunSummary: 'Backend marked structure simulation failed.'
+  };
+  panel._renderValidationConsole(response);
+  assert.match(validation.innerHTML, /data-structure-dryrun-status="failed"/);
+  assert.match(validation.innerHTML, /结构预演：未通过/);
+  assert.match(validation.innerHTML, /Backend marked structure simulation failed/);
+
+  response.validationPreview.dryRun = {
+    blockingIssues: [],
+    warnings: [],
+    executedOperators: ['op_detect'],
+    skippedOperators: [],
+    dryRunSummary: 'Missing status field.'
+  };
+  panel._renderValidationConsole(response);
+  assert.match(validation.innerHTML, /data-structure-dryrun-status="unavailable"/);
+  assert.match(validation.innerHTML, /结构预演：状态不可用/);
+  assert.doesNotMatch(validation.innerHTML, /data-dryrun-contract=/);
 });
 
 test('response mapping displays RuntimePreview adapter summary', async () => {
@@ -9709,11 +9872,15 @@ test('Vision Agent build canvas source guard only applies canonical Flow artifac
   const getFlowStart = source.indexOf('\n    _getResultFlowForCanvas');
   const getFlowEnd = source.indexOf('\n    _normalizeWorkflowDraftForCanvas', getFlowStart);
   const getFlowSource = source.slice(getFlowStart, getFlowEnd);
+  const compatibilityStart = source.indexOf('\n    _getBuildArtifactFlowCompatibilityState');
+  const compatibilityEnd = source.indexOf('\n    _buildLegacyMissingCanonicalFlowResult', compatibilityStart);
+  const compatibilitySource = source.slice(compatibilityStart, compatibilityEnd);
   assert.doesNotMatch(source, /_buildCanvasFlowFromOperatorPipeline/);
   assert.doesNotMatch(source, /_buildLinearCanvasConnections/);
   assert.doesNotMatch(source, /_mergeBuildFallbackWithCurrentCanvas/);
   assert.doesNotMatch(getFlowSource, /operatorPipeline|OperatorPipeline/);
   assert.doesNotMatch(getFlowSource, /buildResult\.(workflowDraft|WorkflowDraft)|obj\.(workflowDraft|WorkflowDraft)/);
+  assert.doesNotMatch(compatibilitySource, /_normalizeWorkflowDraftForCanvas/);
   assert.doesNotMatch(source, /connections:\s*connections\.length\s*\?\s*connections\s*:/);
 });
 
