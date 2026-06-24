@@ -162,7 +162,9 @@ public class InspectionService : IInspectionService
 
     public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, byte[] imageData, OperatorFlow? flow)
     {
-        return await ExecuteSingleCoreAsync(projectId, imageData, flow);
+        return await ExecuteSingleWithCoordinatorAsync(
+            projectId,
+            () => ExecuteSingleCoreAsync(projectId, imageData, flow));
 #if false
         var actualFlow = await ResolveExecutionFlowAsync(projectId, flow);
         if (flow != null)
@@ -276,7 +278,9 @@ public class InspectionService : IInspectionService
 
     public async Task<InspectionResult> ExecuteSingleAsync(Guid projectId, string cameraId, OperatorFlow? flow)
     {
-        return await ExecuteSingleFromCameraCoreAsync(projectId, cameraId, flow);
+        return await ExecuteSingleWithCoordinatorAsync(
+            projectId,
+            () => ExecuteSingleFromCameraCoreAsync(projectId, cameraId, flow));
     }
 
     #endregion
@@ -440,6 +444,35 @@ public class InspectionService : IInspectionService
     #endregion
 
     #region 辅助方法
+
+    private async Task<InspectionResult> ExecuteSingleWithCoordinatorAsync(
+        Guid projectId,
+        Func<Task<InspectionResult>> executeAsync)
+    {
+        var sessionId = Guid.NewGuid();
+        var startResult = await _coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
+        if (startResult != StartResult.Success)
+        {
+            throw new InvalidOperationException(startResult == StartResult.AlreadyRunning
+                ? "Project is currently running."
+                : "Runtime coordinator is shutting down.");
+        }
+
+        try
+        {
+            _coordinator.UpdateSessionStatus(projectId, sessionId, RuntimeStatus.Running);
+            return await executeAsync();
+        }
+        catch (Exception ex)
+        {
+            _coordinator.MarkAsFaulted(projectId, sessionId, ex.Message);
+            throw;
+        }
+        finally
+        {
+            _coordinator.MarkAsStopped(projectId, sessionId);
+        }
+    }
 
     private async Task<InspectionResult> ExecuteSingleCoreAsync(Guid projectId, byte[]? imageData, OperatorFlow? flow)
     {

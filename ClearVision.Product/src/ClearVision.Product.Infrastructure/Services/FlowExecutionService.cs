@@ -643,19 +643,28 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         bool enableParallel = false,
         CancellationToken cancellationToken = default)
     {
-        using var previewSession = projectVariables.IsPreview
-            ? projectVariables.Session.CreateSnapshotClone()
-            : null;
-        var effectiveContext = previewSession == null
-            ? projectVariables
-            : new ProjectVariableExecutionContext(
-                previewSession,
-                projectVariables.BindingIndex,
-                projectVariables.RunId,
-                isPreview: true);
+        var authoritativeSession = projectVariables.Session;
+        var expectedVersions = authoritativeSession.GetSnapshots()
+            .ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        using var workingSession = authoritativeSession.CreateSnapshotClone();
+        var effectiveContext = new ProjectVariableExecutionContext(
+            workingSession,
+            projectVariables.BindingIndex,
+            projectVariables.RunId,
+            projectVariables.IsPreview);
 
         using var scope = _projectVariableContextAccessor.BeginScope(effectiveContext);
-        return await ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
+        var result = await ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
+        if (!projectVariables.IsPreview && result.IsSuccess && !result.WasShortCircuited)
+        {
+            if (!authoritativeSession.TryCommitFrom(workingSession, expectedVersions, out var commitError))
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = commitError;
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -775,73 +784,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
 
         var schema = projectVariables.Session.Schema;
-        var orderByOperatorId = baseOrder
-            .Select((op, index) => (op.Id, Index: index))
-            .ToDictionary(item => item.Id, item => item.Index);
-        var operatorsById = baseOrder.ToDictionary(op => op.Id);
-        var outgoing = baseOrder.ToDictionary(op => op.Id, _ => new HashSet<Guid>());
-        var indegree = baseOrder.ToDictionary(op => op.Id, _ => 0);
-
-        foreach (var op in baseOrder)
+        if (!ProjectGlobalVariableFlowValidator.TryBuildExecutionOrder(
+            plan.Flow,
+            schema,
+            baseOrder,
+            out var ordered,
+            out var diagnosticChain))
         {
-            foreach (var connection in plan.Topology.GetOutgoingConnections(op.Id))
-            {
-                if (operatorsById.ContainsKey(connection.TargetOperatorId) &&
-                    outgoing[op.Id].Add(connection.TargetOperatorId))
-                {
-                    indegree[connection.TargetOperatorId]++;
-                }
-            }
-        }
-
-        foreach (var edge in projectVariables.BindingIndex.GetImplicitEdges(schema))
-        {
-            if (!operatorsById.ContainsKey(edge.SourceOperatorId) ||
-                !operatorsById.ContainsKey(edge.TargetOperatorId))
-            {
-                continue;
-            }
-
-            if (outgoing[edge.SourceOperatorId].Add(edge.TargetOperatorId))
-            {
-                indegree[edge.TargetOperatorId]++;
-            }
-        }
-
-        var ready = new SortedSet<Guid>(Comparer<Guid>.Create((left, right) =>
-        {
-            var byIndex = orderByOperatorId[left].CompareTo(orderByOperatorId[right]);
-            return byIndex != 0 ? byIndex : left.CompareTo(right);
-        }));
-
-        foreach (var (operatorId, count) in indegree)
-        {
-            if (count == 0)
-            {
-                ready.Add(operatorId);
-            }
-        }
-
-        var ordered = new List<Operator>(baseOrder.Count);
-        while (ready.Count > 0)
-        {
-            var operatorId = ready.Min;
-            ready.Remove(operatorId);
-            ordered.Add(operatorsById[operatorId]);
-
-            foreach (var next in outgoing[operatorId])
-            {
-                indegree[next]--;
-                if (indegree[next] == 0)
-                {
-                    ready.Add(next);
-                }
-            }
-        }
-
-        if (ordered.Count != baseOrder.Count)
-        {
-            throw new InvalidOperationException("Project global variable bindings create an implicit execution cycle.");
+            throw new InvalidOperationException($"GV024: {diagnosticChain}");
         }
 
         return ordered;
@@ -942,7 +892,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
             catch (Exception ex)
             {
-                error = $"GV024: source output '{port.Name}' cannot update project global variable '{definition.Name}': {ex.Message}";
+                error = $"GV029: source output '{port.Name}' cannot update project global variable '{definition.Name}': {ex.Message}";
                 return false;
             }
         }
@@ -1977,19 +1927,32 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         ProjectVariableExecutionContext projectVariables,
         CancellationToken cancellationToken = default)
     {
-        using var previewSession = projectVariables.IsPreview
-            ? projectVariables.Session.CreateSnapshotClone()
-            : null;
-        var effectiveContext = previewSession == null
-            ? projectVariables
-            : new ProjectVariableExecutionContext(
-                previewSession,
-                projectVariables.BindingIndex,
-                projectVariables.RunId,
-                isPreview: true);
+        var authoritativeSession = projectVariables.Session;
+        var expectedVersions = authoritativeSession.GetSnapshots()
+            .ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        using var workingSession = authoritativeSession.CreateSnapshotClone();
+        var effectiveContext = new ProjectVariableExecutionContext(
+            workingSession,
+            projectVariables.BindingIndex,
+            projectVariables.RunId,
+            projectVariables.IsPreview);
 
         using var scope = _projectVariableContextAccessor.BeginScope(effectiveContext);
-        return await ExecuteFlowDebugAsync(flow, options, inputData, cancellationToken);
+        var result = await ExecuteFlowDebugAsync(flow, options, inputData, cancellationToken);
+        if (!projectVariables.IsPreview &&
+            result.IsSuccess &&
+            !result.WasShortCircuited &&
+            !result.BreakpointHit &&
+            !result.PausedOperatorId.HasValue)
+        {
+            if (!authoritativeSession.TryCommitFrom(workingSession, expectedVersions, out var commitError))
+            {
+                result.IsSuccess = false;
+                result.ErrorMessage = commitError;
+            }
+        }
+
+        return result;
     }
 
     public async Task<FlowDebugExecutionResult> ExecuteFlowDebugAsync(

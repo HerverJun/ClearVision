@@ -1,10 +1,12 @@
-import httpClient from '../../core/messaging/httpClient.js';
+﻿import httpClient from '../../core/messaging/httpClient.js';
 
 export const GLOBAL_VARIABLE_TYPES = Object.freeze(['String', 'Int64', 'Double', 'Boolean']);
-const MAX_SAFE_INT64_TEXT = String(Number.MAX_SAFE_INTEGER);
-const SAFE_INTEGER_RANGE_ERROR = '超出前端安全整数范围';
+const MIN_INT64 = -9223372036854775808n;
+const MAX_INT64 = 9223372036854775807n;
+const INT64_RANGE_ERROR = '超出 Int64 范围。';
 const INTEGER_ERROR = '\u8bf7\u8f93\u5165\u6574\u6570\u3002';
 const NUMBER_ERROR = '\u8bf7\u8f93\u5165\u6570\u5b57\u3002';
+const REQUIRED_NUMBER_ERROR = '请输入初始值。';
 
 export function createEmptyGlobalVariableSchema() {
     return {
@@ -175,8 +177,8 @@ export function validateVariableDraft(draft, schema, originalVariable = null) {
 
     if (!name) {
         errors.name = '名称不能为空。';
-    } else if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name)) {
-        errors.name = '名称只能包含字母、数字、下划线、点和短横线，且必须以字母或下划线开头。';
+    } else if (!/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/.test(name)) {
+        errors.name = '名称只能使用字母、数字、下划线和点分段，且每段必须以字母开头。';
     } else {
         const duplicate = normalizedSchema.variables.find(item =>
             sameId(item.id, originalVariable?.id) === false &&
@@ -200,7 +202,7 @@ export function validateVariableDraft(draft, schema, originalVariable = null) {
     if (!maxResult.ok) {
         errors.max = maxResult.error;
     }
-    if (min != null && max != null && min > max) {
+    if (min != null && max != null && compareRangeValues(valueType, min, max) > 0) {
         errors.max = '最大值必须大于或等于最小值。';
     }
     if ((min != null || max != null) && valueType !== 'Int64' && valueType !== 'Double') {
@@ -211,10 +213,10 @@ export function validateVariableDraft(draft, schema, originalVariable = null) {
     if (!coerced.ok) {
         errors.initialValue = coerced.error;
     } else if ((valueType === 'Int64' || valueType === 'Double') && coerced.value != null) {
-        if (min != null && coerced.value < min) {
+        if (min != null && compareRangeValues(valueType, coerced.value, min) < 0) {
             errors.initialValue = '初始值不能小于最小值。';
         }
-        if (max != null && coerced.value > max) {
+        if (max != null && compareRangeValues(valueType, coerced.value, max) > 0) {
             errors.initialValue = '初始值不能大于最大值。';
         }
     }
@@ -225,23 +227,26 @@ export function validateVariableDraft(draft, schema, originalVariable = null) {
 export function coerceGlobalVariableValue(valueType, rawValue) {
     const type = normalizeValueType(valueType);
     if (rawValue === null || rawValue === undefined) {
+        if (type === 'Int64' || type === 'Double') {
+            return { ok: false, value: null, error: REQUIRED_NUMBER_ERROR };
+        }
         return { ok: true, value: null, error: '' };
     }
 
     switch (type) {
         case 'Int64': {
             if (rawValue === '') {
-                return { ok: true, value: null, error: '' };
+                return { ok: false, value: null, error: REQUIRED_NUMBER_ERROR };
             }
-            return coerceSafeInteger(rawValue);
+            return coerceInt64Text(rawValue);
         }
         case 'Double': {
             if (rawValue === '') {
-                return { ok: true, value: null, error: '' };
+                return { ok: false, value: null, error: REQUIRED_NUMBER_ERROR };
             }
             const value = Number(String(rawValue).trim());
             if (!Number.isFinite(value)) {
-                return { ok: false, value: null, error: '请输入数字。' };
+                return { ok: false, value: null, error: NUMBER_ERROR };
             }
             return { ok: true, value, error: '' };
         }
@@ -250,10 +255,10 @@ export function coerceGlobalVariableValue(valueType, rawValue) {
                 return { ok: true, value: rawValue, error: '' };
             }
             const text = String(rawValue).trim().toLowerCase();
-            if (text === '' || text === 'false' || text === '0' || text === '否') {
+            if (text === '' || text === 'false' || text === '0' || text === '否' || text === 'no') {
                 return { ok: true, value: false, error: '' };
             }
-            if (text === 'true' || text === '1' || text === '是') {
+            if (text === 'true' || text === '1' || text === '是' || text === 'yes') {
                 return { ok: true, value: true, error: '' };
             }
             return { ok: false, value: null, error: '请选择布尔值。' };
@@ -277,7 +282,7 @@ export function isVariableCompatibleWithDataType(valueType, dataType) {
         return ['int', 'integer', 'long', 'int64', 'double', 'float', 'number', 'decimal'].includes(normalizedDataType);
     }
     if (variableType === 'double') {
-        return ['int', 'integer', 'long', 'int64', 'double', 'float', 'number', 'decimal'].includes(normalizedDataType);
+        return ['double', 'float', 'number', 'decimal'].includes(normalizedDataType);
     }
     if (variableType === 'boolean') {
         return ['bool', 'boolean'].includes(normalizedDataType);
@@ -361,7 +366,7 @@ function coerceNullableNumber(valueType, value) {
         return { ok: true, value: null, error: '' };
     }
     if (normalizeValueType(valueType) === 'Int64') {
-        return coerceSafeInteger(value);
+        return coerceInt64Text(value);
     }
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) {
@@ -370,45 +375,34 @@ function coerceNullableNumber(valueType, value) {
     return { ok: true, value: parsed, error: '' };
 }
 
-function coerceSafeInteger(rawValue) {
+function coerceInt64Text(rawValue) {
+    if (typeof rawValue === 'bigint') {
+        return rawValue >= MIN_INT64 && rawValue <= MAX_INT64
+            ? { ok: true, value: rawValue.toString(), error: '' }
+            : { ok: false, value: null, error: INT64_RANGE_ERROR };
+    }
+
     if (typeof rawValue === 'number') {
-        if (!Number.isFinite(rawValue) || !Number.isInteger(rawValue)) {
+        if (!Number.isFinite(rawValue) || !Number.isInteger(rawValue) || !Number.isSafeInteger(rawValue)) {
             return { ok: false, value: null, error: INTEGER_ERROR };
         }
-        if (!Number.isSafeInteger(rawValue)) {
-            return { ok: false, value: null, error: SAFE_INTEGER_RANGE_ERROR };
-        }
-        return { ok: true, value: rawValue, error: '' };
     }
 
     const text = String(rawValue).trim();
     if (text === '') {
-        return { ok: true, value: null, error: '' };
+        return { ok: false, value: null, error: REQUIRED_NUMBER_ERROR };
     }
     if (!/^[+-]?\d+$/.test(text)) {
-        const numeric = Number(text);
-        if (Number.isFinite(numeric) && Number.isInteger(numeric) && (/e/i.test(text) || !Number.isSafeInteger(numeric))) {
-            return { ok: false, value: null, error: SAFE_INTEGER_RANGE_ERROR };
-        }
         return { ok: false, value: null, error: INTEGER_ERROR };
     }
 
-    const sign = text.startsWith('-') ? -1 : 1;
-    const digits = text.replace(/^[+-]/, '').replace(/^0+(?=\d)/, '');
-    if (compareIntegerText(digits, MAX_SAFE_INT64_TEXT) > 0) {
-        return { ok: false, value: null, error: SAFE_INTEGER_RANGE_ERROR };
+    const normalized = text.replace(/^\+/, '').replace(/^(-?)0+(?=\d)/, '$1');
+    const parsed = BigInt(normalized);
+    if (parsed < MIN_INT64 || parsed > MAX_INT64) {
+        return { ok: false, value: null, error: INT64_RANGE_ERROR };
     }
-    return { ok: true, value: sign * Number(digits || '0'), error: '' };
-}
 
-function compareIntegerText(left, right) {
-    if (left.length !== right.length) {
-        return left.length > right.length ? 1 : -1;
-    }
-    if (left === right) {
-        return 0;
-    }
-    return left > right ? 1 : -1;
+    return { ok: true, value: parsed.toString(), error: '' };
 }
 
 function normalizeNullableNumber(value, valueType = 'Double') {
@@ -416,11 +410,23 @@ function normalizeNullableNumber(value, valueType = 'Double') {
         return null;
     }
     if (normalizeValueType(valueType) === 'Int64') {
-        const coerced = coerceSafeInteger(value);
+        const coerced = coerceInt64Text(value);
         return coerced.ok ? coerced.value : null;
     }
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+}
+
+function compareRangeValues(valueType, left, right) {
+    if (normalizeValueType(valueType) === 'Int64') {
+        const leftValue = BigInt(String(left));
+        const rightValue = BigInt(String(right));
+        return leftValue === rightValue ? 0 : (leftValue > rightValue ? 1 : -1);
+    }
+
+    const leftValue = Number(left);
+    const rightValue = Number(right);
+    return leftValue === rightValue ? 0 : (leftValue > rightValue ? 1 : -1);
 }
 
 function createUuid() {

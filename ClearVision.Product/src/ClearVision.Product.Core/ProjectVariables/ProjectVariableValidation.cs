@@ -58,12 +58,16 @@ public static partial class ProjectGlobalVariableSchemaValidator
             ValidateTargetBinding(binding, variablesById, operatorsById, diagnostics);
         }
 
+        diagnostics.AddRange(ProjectGlobalVariableFlowValidator.Validate(schema, flow));
+
         return diagnostics;
     }
 
     public static void ThrowIfInvalid(ProjectGlobalVariableSchema? schema, OperatorFlow? flow = null)
     {
-        var diagnostics = Validate(schema, flow).Where(d => d.Code is not "GV012").ToList();
+        var diagnostics = Validate(schema, flow)
+            .Where(d => d.Severity == ProjectGlobalVariableDiagnosticSeverity.Error)
+            .ToList();
         if (diagnostics.Count > 0)
         {
             throw new InvalidOperationException(string.Join(Environment.NewLine, diagnostics.Select(d => $"{d.Code}: {d.Message}")));
@@ -110,12 +114,27 @@ public static partial class ProjectGlobalVariableSchemaValidator
 
         if (variable.ValueType is ProjectGlobalVariableValueType.Int64 or ProjectGlobalVariableValueType.Double)
         {
+            if (variable.Min.HasValue && !double.IsFinite(variable.Min.Value))
+            {
+                diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV018", "Numeric minimum must be finite.", variable.Id));
+            }
+
+            if (variable.Max.HasValue && !double.IsFinite(variable.Max.Value))
+            {
+                diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV019", "Numeric maximum must be finite.", variable.Id));
+            }
+
+            if (variable.Min.HasValue && variable.Max.HasValue && variable.Min.Value > variable.Max.Value)
+            {
+                diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV021", "Numeric minimum cannot be greater than maximum.", variable.Id));
+            }
+
             var numeric = variable.ValueType == ProjectGlobalVariableValueType.Int64
                 ? converted.GetInt64()
                 : converted.GetDouble();
 
-            if (variable.Min.HasValue && numeric < variable.Min.Value ||
-                variable.Max.HasValue && numeric > variable.Max.Value)
+            if ((variable.Min.HasValue && double.IsFinite(variable.Min.Value) && numeric < variable.Min.Value) ||
+                (variable.Max.HasValue && double.IsFinite(variable.Max.Value) && numeric > variable.Max.Value))
             {
                 diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV014", "Initial value is outside the configured numeric range.", variable.Id));
             }
@@ -153,7 +172,13 @@ public static partial class ProjectGlobalVariableSchemaValidator
 
         if (!op.IsEnabled)
         {
-            diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV020", "Source binding references a disabled operator.", binding.VariableId, binding.OperatorId, binding.OutputPortId));
+            diagnostics.Add(new ProjectGlobalVariableDiagnostic(
+                "GV020",
+                "Source binding references a disabled operator.",
+                binding.VariableId,
+                binding.OperatorId,
+                binding.OutputPortId,
+                Severity: ProjectGlobalVariableDiagnosticSeverity.Warning));
         }
 
         var outputPort = op.OutputPorts.FirstOrDefault(port => port.Id == binding.OutputPortId);
@@ -199,7 +224,13 @@ public static partial class ProjectGlobalVariableSchemaValidator
 
         if (!op.IsEnabled)
         {
-            diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV020", "Target binding references a disabled operator.", binding.VariableId, binding.OperatorId, ParameterId: binding.ParameterId));
+            diagnostics.Add(new ProjectGlobalVariableDiagnostic(
+                "GV020",
+                "Target binding references a disabled operator.",
+                binding.VariableId,
+                binding.OperatorId,
+                ParameterId: binding.ParameterId,
+                Severity: ProjectGlobalVariableDiagnosticSeverity.Warning));
         }
 
         var parameter = op.Parameters.FirstOrDefault(parameter => parameter.Id == binding.ParameterId);

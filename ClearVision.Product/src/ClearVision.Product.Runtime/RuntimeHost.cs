@@ -159,6 +159,11 @@ public sealed class RuntimeHost : IAsyncDisposable
                 throw new RuntimePackageException($"Project global variable '{variableId}' does not exist.");
             }
 
+            if (!definition.ManualWriteAllowed)
+            {
+                throw new RuntimePackageException($"Project global variable '{definition.Name}' does not allow manual Station resets.");
+            }
+
             var snapshot = session.Reset(variableId, ProjectVariableUpdatedBy.Reset);
             EmitLog($"Station reset project global variable '{definition.Name}' to its initial value.");
             return snapshot;

@@ -77,7 +77,12 @@ public class FlowLinter
         return new LintIssue
         {
             Code = diagnostic.Code,
-            Severity = diagnostic.Code is "GV012" or "GV020" ? LintSeverity.Warning : LintSeverity.Error,
+            Severity = diagnostic.Severity switch
+            {
+                ProjectGlobalVariableDiagnosticSeverity.Information => LintSeverity.Information,
+                ProjectGlobalVariableDiagnosticSeverity.Warning => LintSeverity.Warning,
+                _ => LintSeverity.Error
+            },
             OperatorId = diagnostic.OperatorId ?? Guid.Empty,
             Message = diagnostic.Message,
             Suggestion = diagnostic.Code switch
@@ -85,6 +90,7 @@ public class FlowLinter
                 "GV016" => "Remove either the SiteProfile exposure or the global-variable target binding for this parameter.",
                 "GV017" => "Bind only scalar output ports to project global variables.",
                 "GV020" => "Enable the referenced operator or remove the global-variable binding.",
+                "GV024" => "Break the global-variable feedback path before saving or exporting the flow.",
                 _ => "Check the project global variable definition and binding references."
             }
         };

@@ -159,7 +159,7 @@ public static class ProjectVariableValueConverter
     {
         return value switch
         {
-            null => 0L,
+            null => throw new InvalidCastException("Int64 value is required."),
             long longValue => longValue,
             int intValue => intValue,
             short shortValue => shortValue,
@@ -175,13 +175,13 @@ public static class ProjectVariableValueConverter
     {
         return value switch
         {
-            null => 0d,
-            double doubleValue => doubleValue,
-            float floatValue => floatValue,
-            decimal decimalValue => Convert.ToDouble(decimalValue),
+            null => throw new InvalidCastException("Double value is required."),
+            double doubleValue when double.IsFinite(doubleValue) => doubleValue,
+            float floatValue when float.IsFinite(floatValue) => floatValue,
+            decimal decimalValue => EnsureFiniteDouble(Convert.ToDouble(decimalValue)),
             long longValue => longValue,
             int intValue => intValue,
-            string stringValue when double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
+            string stringValue when double.TryParse(stringValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) && double.IsFinite(parsed) => parsed,
             _ => throw new InvalidCastException($"Value type '{value.GetType().Name}' is not compatible with Double.")
         };
     }
@@ -231,8 +231,8 @@ public static class ProjectVariableValueConverter
     {
         return value.ValueKind switch
         {
-            JsonValueKind.Number => value.GetDouble(),
-            JsonValueKind.String when double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
+            JsonValueKind.Number => EnsureFiniteDouble(value.GetDouble()),
+            JsonValueKind.String when double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) && double.IsFinite(parsed) => parsed,
             _ => throw new InvalidCastException($"JSON {value.ValueKind} is not compatible with Double.")
         };
     }
@@ -262,7 +262,17 @@ public static class ProjectVariableValueConverter
         };
     }
 
-    private static bool IsWhole(double value) => Math.Abs(value % 1) < double.Epsilon;
+    private static double EnsureFiniteDouble(double value)
+    {
+        if (!double.IsFinite(value))
+        {
+            throw new InvalidCastException("Double value must be finite.");
+        }
+
+        return value;
+    }
+
+    private static bool IsWhole(double value) => double.IsFinite(value) && Math.Abs(value % 1) < double.Epsilon;
 
     private static bool IsComplexObject(object value)
     {
@@ -334,7 +344,25 @@ public static class ProjectGlobalVariableTypeCompatibility
         {
             ProjectGlobalVariableValueType.String => StringParameterTypes.Contains(normalized),
             ProjectGlobalVariableValueType.Int64 => IntegerParameterTypes.Contains(normalized) || NumberParameterTypes.Contains(normalized),
-            ProjectGlobalVariableValueType.Double => NumberParameterTypes.Contains(normalized),
+            ProjectGlobalVariableValueType.Double => NumberParameterTypes.Contains(normalized) && !IntegerParameterTypes.Contains(normalized),
+            ProjectGlobalVariableValueType.Boolean => BooleanParameterTypes.Contains(normalized),
+            _ => false
+        };
+    }
+
+    public static bool IsCompatibleWithVariableOperatorDataType(ProjectGlobalVariableValueType variableType, string? dataType)
+    {
+        var normalized = string.IsNullOrWhiteSpace(dataType) ? string.Empty : dataType.Trim();
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return true;
+        }
+
+        return variableType switch
+        {
+            ProjectGlobalVariableValueType.String => StringParameterTypes.Contains(normalized),
+            ProjectGlobalVariableValueType.Int64 => IntegerParameterTypes.Contains(normalized),
+            ProjectGlobalVariableValueType.Double => NumberParameterTypes.Contains(normalized) && !IntegerParameterTypes.Contains(normalized),
             ProjectGlobalVariableValueType.Boolean => BooleanParameterTypes.Contains(normalized),
             _ => false
         };

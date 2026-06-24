@@ -16,7 +16,6 @@ import {
     resetGlobalVariableValue,
     resetGlobalVariableValues,
     sameId,
-    saveGlobalVariableSchema,
     serializeVariableDraft,
     loadGlobalVariableValues,
     writeGlobalVariableValue
@@ -716,7 +715,7 @@ export default class GlobalVariablePanel {
 
         return await this.runMutation('save', async () => {
             const projectId = this.project.id;
-            const saved = await saveGlobalVariableSchema(projectId, nextSchema);
+            const saved = await projectManager.saveGlobalVariables(nextSchema);
             if (this.project?.id !== projectId) {
                 return false;
             }

@@ -92,6 +92,21 @@ public sealed class JsonFileProjectFlowStorage : IProjectFlowStorage
         }
     }
 
+    public async Task DeleteFlowJsonAsync(Guid projectId)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            File.Delete(GetFilePath(projectId));
+            File.Delete(GetLastGoodPath(projectId));
+            File.Delete(GetMetadataPath(projectId));
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     private async Task WriteMetadataAsync(Guid projectId, string flowJson)
     {
         var metadata = new

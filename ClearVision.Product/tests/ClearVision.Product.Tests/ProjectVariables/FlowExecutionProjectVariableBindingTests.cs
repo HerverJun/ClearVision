@@ -268,6 +268,96 @@ public sealed class FlowExecutionProjectVariableBindingTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_WhenVariableIncrementSucceedsButLaterOperatorFails_ShouldDiscardWorkingCopy()
+    {
+        var variableId = Guid.NewGuid();
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        var increment = CreateProjectVariableIncrementOperator(variableId, 5);
+        var failing = new Operator(Guid.NewGuid(), "FailingPlc", OperatorType.ResultJudgment, 10, 0);
+        var flow = new OperatorFlow("increment-rollback");
+        flow.AddOperator(increment);
+        flow.AddOperator(failing);
+        var schema = CreateSingleInt64Schema(variableId, 1L);
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid());
+        var failingExecutor = Substitute.For<IOperatorExecutor>();
+        failingExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
+        failingExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        failingExecutor.ExecuteAsync(failing, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Failure("PLC write failed")));
+        using var service = new FlowExecutionService(
+            [
+                new VariableIncrementOperator(
+                    NullLogger<VariableIncrementOperator>.Instance,
+                    new VariableContext(),
+                    accessor),
+                failingExecutor
+            ],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            accessor);
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("PLC write failed");
+        session.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(4L);
+        formal.Version.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_WhenAuthorityChangesBeforeCommit_ShouldRejectStaleTransaction()
+    {
+        var variableId = Guid.NewGuid();
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        var write = CreateProjectVariableWriteOperator(variableId, 12);
+        var concurrent = new Operator(Guid.NewGuid(), "ConcurrentManualWrite", OperatorType.ResultJudgment, 10, 0);
+        var flow = new OperatorFlow("write-conflict");
+        flow.AddOperator(write);
+        flow.AddOperator(concurrent);
+        var schema = CreateSingleInt64Schema(variableId, 1L);
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid());
+        var concurrentExecutor = Substitute.For<IOperatorExecutor>();
+        concurrentExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
+        concurrentExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        concurrentExecutor.ExecuteAsync(concurrent, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                session.SetValue(variableId, 20L, ProjectVariableUpdatedBy.StudioManual);
+                return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>()));
+            });
+        using var service = new FlowExecutionService(
+            [
+                new VariableWriteOperator(
+                    NullLogger<VariableWriteOperator>.Instance,
+                    new VariableContext(),
+                    accessor),
+                concurrentExecutor
+            ],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            accessor);
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("GV025");
+        session.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(20L);
+        formal.Version.Should().Be(2);
+    }
+
+    [Fact]
     public async Task ExecuteFlowDebugAsync_WhenProjectVariableReadUsesSameDebugSession_ShouldReadFreshFormalSnapshot()
     {
         var variableId = Guid.NewGuid();

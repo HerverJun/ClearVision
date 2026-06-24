@@ -11,6 +11,11 @@ public interface IProjectVariableSession : IDisposable
 
     IProjectVariableSession CreateSnapshotClone();
 
+    bool TryCommitFrom(
+        IProjectVariableSession source,
+        IReadOnlyDictionary<Guid, long> expectedVersions,
+        out string? error);
+
     bool TryGetValue(Guid variableId, out JsonElement value);
 
     bool TryGetSnapshot(Guid variableId, out ProjectVariableValueSnapshot snapshot);
@@ -53,6 +58,7 @@ public sealed class ProjectVariableSession : IProjectVariableSession
     private readonly ConcurrentDictionary<Guid, ProjectVariableState> _states = new();
     private readonly Dictionary<Guid, ProjectGlobalVariableDefinition> _definitionsById;
     private readonly Dictionary<string, ProjectGlobalVariableDefinition> _definitionsByName;
+    private readonly object _stateGate = new();
     private bool _disposed;
 
     public ProjectVariableSession(ProjectGlobalVariableSchema? schema)
@@ -92,10 +98,13 @@ public sealed class ProjectVariableSession : IProjectVariableSession
 
     public IReadOnlyList<ProjectVariableValueSnapshot> GetSnapshots()
     {
-        return _states.Values
-            .Select(state => state.ToSnapshot())
-            .OrderBy(snapshot => _definitionsById.TryGetValue(snapshot.VariableId, out var definition) ? definition.Order : int.MaxValue)
-            .ToList();
+        lock (_stateGate)
+        {
+            return _states.Values
+                .Select(state => state.ToSnapshot())
+                .OrderBy(snapshot => _definitionsById.TryGetValue(snapshot.VariableId, out var definition) ? definition.Order : int.MaxValue)
+                .ToList();
+        }
     }
 
     public IProjectVariableSession CreateSnapshotClone()
@@ -106,10 +115,13 @@ public sealed class ProjectVariableSession : IProjectVariableSession
 
     public bool TryGetValue(Guid variableId, out JsonElement value)
     {
-        if (_states.TryGetValue(variableId, out var state))
+        lock (_stateGate)
         {
-            value = state.Value;
-            return true;
+            if (_states.TryGetValue(variableId, out var state))
+            {
+                value = state.Value;
+                return true;
+            }
         }
 
         value = default;
@@ -118,14 +130,61 @@ public sealed class ProjectVariableSession : IProjectVariableSession
 
     public bool TryGetSnapshot(Guid variableId, out ProjectVariableValueSnapshot snapshot)
     {
-        if (_states.TryGetValue(variableId, out var state))
+        lock (_stateGate)
         {
-            snapshot = state.ToSnapshot();
-            return true;
+            if (_states.TryGetValue(variableId, out var state))
+            {
+                snapshot = state.ToSnapshot();
+                return true;
+            }
         }
 
         snapshot = default!;
         return false;
+    }
+
+    public bool TryCommitFrom(
+        IProjectVariableSession source,
+        IReadOnlyDictionary<Guid, long> expectedVersions,
+        out string? error)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(expectedVersions);
+
+        var sourceSnapshots = source.GetSnapshots();
+        lock (_stateGate)
+        {
+            foreach (var (variableId, expectedVersion) in expectedVersions)
+            {
+                if (!_states.TryGetValue(variableId, out var current))
+                {
+                    error = $"GV025: project global variable '{variableId}' no longer exists in the authoritative session.";
+                    return false;
+                }
+
+                if (current.Version != expectedVersion)
+                {
+                    error = $"GV025: project global variable '{variableId}' changed from version {expectedVersion} to {current.Version} before this run could commit.";
+                    return false;
+                }
+            }
+
+            foreach (var snapshot in sourceSnapshots)
+            {
+                _states[snapshot.VariableId] = new ProjectVariableState(
+                    snapshot.VariableId,
+                    snapshot.Value.Clone(),
+                    snapshot.Version,
+                    snapshot.UpdatedAtUtc,
+                    snapshot.UpdatedBy,
+                    snapshot.RunId,
+                    snapshot.OperatorId);
+            }
+        }
+
+        error = null;
+        return true;
     }
 
     public bool TryGetDefinition(Guid variableId, out ProjectGlobalVariableDefinition definition)
@@ -158,10 +217,14 @@ public sealed class ProjectVariableSession : IProjectVariableSession
 
         ValidateRange(definition, converted);
 
-        var state = _states.AddOrUpdate(
-            variableId,
-            _ => new ProjectVariableState(variableId, converted, 1, DateTimeOffset.UtcNow, updatedBy, runId, operatorId),
-            (_, current) => current.Next(converted, updatedBy, runId, operatorId));
+        ProjectVariableState state;
+        lock (_stateGate)
+        {
+            state = _states.TryGetValue(variableId, out var current)
+                ? current.Next(converted, updatedBy, runId, operatorId)
+                : new ProjectVariableState(variableId, converted, 1, DateTimeOffset.UtcNow, updatedBy, runId, operatorId);
+            _states[variableId] = state;
+        }
 
         return state.ToSnapshot();
     }
@@ -197,7 +260,7 @@ public sealed class ProjectVariableSession : IProjectVariableSession
             throw new InvalidOperationException($"Project global variable '{definition.Name}' is {definition.ValueType}; only Int64 can be incremented.");
         }
 
-        while (true)
+        lock (_stateGate)
         {
             if (!_states.TryGetValue(variableId, out var current))
             {
@@ -208,12 +271,8 @@ public sealed class ProjectVariableSession : IProjectVariableSession
                 ValidateRange(definition, converted);
                 var created = new ProjectVariableState(variableId, converted, 1, DateTimeOffset.UtcNow, updatedBy, runId, operatorId);
 
-                if (_states.TryAdd(variableId, created))
-                {
-                    return new ProjectVariableIncrementResult(created.ToSnapshot(), previous, next, wasReset);
-                }
-
-                continue;
+                _states[variableId] = created;
+                return new ProjectVariableIncrementResult(created.ToSnapshot(), previous, next, wasReset);
             }
 
             var currentValue = Convert.ToInt64(ProjectVariableValueConverter.ToObject(current.Value));
@@ -223,10 +282,8 @@ public sealed class ProjectVariableSession : IProjectVariableSession
             ValidateRange(definition, nextElement);
             var updated = current.Next(nextElement, updatedBy, runId, operatorId);
 
-            if (_states.TryUpdate(variableId, updated, current))
-            {
-                return new ProjectVariableIncrementResult(updated.ToSnapshot(), currentValue, nextValue, shouldReset);
-            }
+            _states[variableId] = updated;
+            return new ProjectVariableIncrementResult(updated.ToSnapshot(), currentValue, nextValue, shouldReset);
         }
     }
 
@@ -244,29 +301,35 @@ public sealed class ProjectVariableSession : IProjectVariableSession
     public void ResetAll(ProjectVariableUpdatedBy updatedBy)
     {
         ThrowIfDisposed();
-        foreach (var definition in Schema.Variables)
+        lock (_stateGate)
         {
-            if (!ProjectVariableValueConverter.TryConvertToVariableValue(definition.InitialValue, definition.ValueType, out var converted, out var error))
+            foreach (var definition in Schema.Variables)
             {
-                throw new InvalidOperationException($"Project global variable '{definition.Name}' has invalid initial value: {error}");
-            }
+                if (!ProjectVariableValueConverter.TryConvertToVariableValue(definition.InitialValue, definition.ValueType, out var converted, out var error))
+                {
+                    throw new InvalidOperationException($"Project global variable '{definition.Name}' has invalid initial value: {error}");
+                }
 
-            ValidateRange(definition, converted);
-            _states[definition.Id] = new ProjectVariableState(
-                definition.Id,
-                converted,
-                0,
-                DateTimeOffset.UtcNow,
-                updatedBy,
-                null,
-                null);
+                ValidateRange(definition, converted);
+                _states[definition.Id] = new ProjectVariableState(
+                    definition.Id,
+                    converted,
+                    0,
+                    DateTimeOffset.UtcNow,
+                    updatedBy,
+                    null,
+                    null);
+            }
         }
     }
 
     public void Dispose()
     {
         _disposed = true;
-        _states.Clear();
+        lock (_stateGate)
+        {
+            _states.Clear();
+        }
     }
 
     private static void ValidateRange(ProjectGlobalVariableDefinition definition, JsonElement value)

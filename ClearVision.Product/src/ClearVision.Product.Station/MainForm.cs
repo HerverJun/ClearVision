@@ -818,7 +818,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        if (!CanResetProjectVariables())
+        if (!CanResetProjectVariables() || !definition.ManualWriteAllowed)
         {
             return;
         }
@@ -1446,7 +1446,7 @@ public sealed class MainForm : Form
         _hardwareSettingsButton.Enabled = !running;
         _runtimeParameterPanel.SetEditingEnabled(hasPackage && !running);
         var hasSelectedVariable = TryGetSelectedProjectVariable(out var selectedVariable, out _);
-        _resetProjectVariableButton.Enabled = hasSelectedVariable && hasPackage && !running;
+        _resetProjectVariableButton.Enabled = hasSelectedVariable && hasPackage && !running && selectedVariable.ManualWriteAllowed;
         _editProjectVariableButton.Enabled = hasSelectedVariable && hasPackage && !running && selectedVariable.ManualWriteAllowed;
     }
 

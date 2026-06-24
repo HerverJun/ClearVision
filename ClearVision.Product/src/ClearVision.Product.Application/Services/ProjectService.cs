@@ -1,6 +1,6 @@
-// ProjectService.cs
-// 将 OperatorConnection 值对象映射为 DTO
-// 作者：蘅芜君
+﻿// ProjectService.cs
+// 灏?OperatorConnection 鍊煎璞℃槧灏勪负 DTO
+// 浣滆€咃細铇呰姕鍚?
 
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging;
 namespace ClearVision.Product.Application.Services;
 
 /// <summary>
-/// 工程应用服务
+/// 宸ョ▼搴旂敤鏈嶅姟
 /// </summary>
 public class ProjectService
 {
@@ -63,7 +63,7 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 创建工程
+    /// 鍒涘缓宸ョ▼
     /// </summary>
     public async Task<ProjectDto> CreateAsync(CreateProjectRequest request)
     {
@@ -73,7 +73,7 @@ public class ProjectService
         project.UpdateGlobalVariables(globalVariables);
         await _projectRepository.AddAsync(project);
 
-        // 如果创建时带有流程（通常是空的，但为了完整性）
+        // 濡傛灉鍒涘缓鏃跺甫鏈夋祦绋嬶紙閫氬父鏄┖鐨勶紝浣嗕负浜嗗畬鏁存€э級
         if (request.Flow != null)
         {
             var json = JsonSerializer.Serialize(request.Flow);
@@ -84,7 +84,7 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 获取工程
+    /// 鑾峰彇宸ョ▼
     /// </summary>
     public async Task<ProjectDto?> GetByIdAsync(Guid id)
     {
@@ -94,7 +94,7 @@ public class ProjectService
 
         var dto = MapToDto(project);
 
-        // 从文件加载流程数据覆盖 DB 数据 (如果有)
+        // 浠庢枃浠跺姞杞芥祦绋嬫暟鎹鐩?DB 鏁版嵁 (濡傛灉鏈?
         var flowJson = await _flowStorage.LoadFlowJsonAsync(id);
         if (!string.IsNullOrEmpty(flowJson))
         {
@@ -109,11 +109,11 @@ public class ProjectService
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Failed to deserialize flow JSON for project {ProjectId}; falling back to database flow.", id);
-                // 忽略反序列化错误，回退到 DB 数据
+                // 蹇界暐鍙嶅簭鍒楀寲閿欒锛屽洖閫€鍒?DB 鏁版嵁
             }
         }
 
-        // 【统一修复】无论数据来自 DB 还是 JSON，都尝试回填缺失的 Options
+        // 銆愮粺涓€淇銆戞棤璁烘暟鎹潵鑷?DB 杩樻槸 JSON锛岄兘灏濊瘯鍥炲～缂哄け鐨?Options
         if (dto.Flow != null)
         {
             var migrated = MigrateFlowDto(dto.Flow);
@@ -139,7 +139,7 @@ public class ProjectService
 
             foreach (var paramDto in opDto.Parameters)
             {
-                // 如果 Options 为空且 DataType 是 enum，尝试从元数据恢复
+                // 濡傛灉 Options 涓虹┖涓?DataType 鏄?enum锛屽皾璇曚粠鍏冩暟鎹仮澶?
                 if ((paramDto.Options == null || paramDto.Options.Count == 0) &&
                     (paramDto.DataType.Equals("enum", StringComparison.OrdinalIgnoreCase) ||
                      paramDto.DataType.Equals("select", StringComparison.OrdinalIgnoreCase)))
@@ -155,18 +155,18 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 获取所有工程
+    /// 鑾峰彇鎵€鏈夊伐绋?
     /// </summary>
     public async Task<IEnumerable<ProjectDto>> GetAllAsync()
     {
         var projects = await _projectRepository.GetAllAsync();
-        // GetAll 通常不返回详细的 Flow 内容以优化性能，或者我们可以选择加载
-        // 这里暂时保持原样，仅返回轻量级列表
+        // GetAll 閫氬父涓嶈繑鍥炶缁嗙殑 Flow 鍐呭浠ヤ紭鍖栨€ц兘锛屾垨鑰呮垜浠彲浠ラ€夋嫨鍔犺浇
+        // 杩欓噷鏆傛椂淇濇寔鍘熸牱锛屼粎杩斿洖杞婚噺绾у垪琛?
         return projects.Select(MapToDto);
     }
 
     /// <summary>
-    /// 更新工程
+    /// 鏇存柊宸ョ▼
     /// </summary>
     public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectRequest request)
     {
@@ -174,84 +174,111 @@ public class ProjectService
         if (project == null)
             throw new ProjectNotFoundException(id);
 
-        project.UpdateInfo(request.Name, request.Description);
-        var requestFlow = request.Flow?.ToEntity();
-        if (request.GlobalVariables != null)
+        var previousName = project.Name;
+        var previousDescription = project.Description;
+        var previousGlobalVariables = CloneSchema(project.GlobalVariables);
+        var previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
+        var nextFlow = request.Flow ?? await LoadStoredFlowDtoAsync(id);
+        var nextSchema = request.GlobalVariables ?? project.GlobalVariables;
+        if (nextFlow != null)
         {
-            var validationFlow = requestFlow ?? await LoadStoredFlowEntityAsync(id);
-            ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(request.GlobalVariables, validationFlow);
-            project.UpdateGlobalVariables(request.GlobalVariables);
+            MigrateFlowDto(nextFlow);
+            EnrichFlowDtoWithMetadata(nextFlow);
         }
 
-        // 如果有流程数据，更新到文件
-        if (request.Flow != null)
+        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(nextSchema, nextFlow?.ToEntity());
+        var nextFlowJson = request.Flow == null ? null : JsonSerializer.Serialize(nextFlow, _jsonOptions);
+
+        // 濡傛灉鏈夋祦绋嬫暟鎹紝鏇存柊鍒版枃浠?
+        try
         {
-            MigrateFlowDto(request.Flow);
-            EnrichFlowDtoWithMetadata(request.Flow);
-            requestFlow = request.Flow.ToEntity();
-            ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(project.GlobalVariables, requestFlow);
-            var json = JsonSerializer.Serialize(request.Flow, _jsonOptions);
-            await _flowStorage.SaveFlowJsonAsync(id, json);
+            if (nextFlowJson != null)
+            {
+                await _flowStorage.SaveFlowJsonAsync(id, nextFlowJson);
+            }
+
+            project.UpdateInfo(request.Name, request.Description);
+            if (request.GlobalVariables != null)
+            {
+                project.UpdateGlobalVariables(nextSchema);
+            }
+
+            await _projectRepository.UpdateAsync(project);
+        }
+        catch
+        {
+            project.UpdateInfo(previousName, previousDescription);
+            project.UpdateGlobalVariables(previousGlobalVariables);
+            if (nextFlowJson != null && previousFlowJson != null)
+            {
+                await _flowStorage.SaveFlowJsonAsync(id, previousFlowJson);
+            }
+            else if (nextFlowJson != null)
+            {
+                await _flowStorage.DeleteFlowJsonAsync(id);
+            }
+
+            throw;
         }
 
-        await _projectRepository.UpdateAsync(project);
         if (request.GlobalVariables != null)
         {
             _projectVariableSessions?.Replace(id, project.GlobalVariables);
         }
 
-        return MapToDto(project);
+        var dto = MapToDto(project);
+        dto.Flow = nextFlow;
+        return dto;
     }
 
     /// <summary>
-    /// 更新工程流程
+    /// 鏇存柊宸ョ▼娴佺▼
     /// </summary>
     public async Task UpdateFlowAsync(Guid id, UpdateFlowRequest request)
     {
-        // 1. 验证工程存在
+        // 1. 楠岃瘉宸ョ▼瀛樺湪
         var project = await _projectRepository.GetByIdAsync(id);
         if (project == null)
             throw new ProjectNotFoundException(id);
 
-        // 2. 构造流程DTO
+        // 2. 鏋勯€犳祦绋婦TO
         var flowDto = new OperatorFlowDto
         {
-            Name = "MainFlow", // 保持默认名称或从某处获取
+            Name = "MainFlow", // 淇濇寔榛樿鍚嶇О鎴栦粠鏌愬鑾峰彇
             Operators = request.Operators,
             Connections = request.Connections
         };
+        await UpdateAsync(id, new UpdateProjectRequest
+        {
+            Name = project.Name,
+            Description = project.Description,
+            Flow = flowDto,
+            GlobalVariables = project.GlobalVariables
+        });
 
-        MigrateFlowDto(flowDto);
-        EnrichFlowDtoWithMetadata(flowDto);
-        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(project.GlobalVariables, flowDto.ToEntity());
-
-        // 3. 序列化并保存到文件
-        var json = JsonSerializer.Serialize(flowDto, _jsonOptions);
-        await _flowStorage.SaveFlowJsonAsync(id, json);
-
-        // 4. 更新工程修改时间 (可选，但推荐)
-        // project.LastModified = DateTime.UtcNow; // 如果 Project 有这个字段
+        // 4. 鏇存柊宸ョ▼淇敼鏃堕棿 (鍙€夛紝浣嗘帹鑽?
+        // project.LastModified = DateTime.UtcNow; // 濡傛灉 Project 鏈夎繖涓瓧娈?
         // await _projectRepository.UpdateAsync(project);
     }
 
     /// <summary>
-    /// 将OperatorFlowDto转换为Core实体
+    /// 灏哋peratorFlowDto杞崲涓篊ore瀹炰綋
     /// </summary>
     private OperatorFlow MapDtoToFlow(OperatorFlowDto dto, Guid? flowId = null)
     {
         var flow = new OperatorFlow(dto.Name);
 
-        // 【关键修复】如果指定了 flowId (通常是 Project.Id)，强制设置它
-        // EF Core Table Splitting 要求 Project.Id == Flow.Id
+        // 銆愬叧閿慨澶嶃€戝鏋滄寚瀹氫簡 flowId (閫氬父鏄?Project.Id)锛屽己鍒惰缃畠
+        // EF Core Table Splitting 瑕佹眰 Project.Id == Flow.Id
         if (flowId.HasValue)
         {
-            // Flow继承自Entity，Id定义在Entity中
+            // Flow缁ф壙鑷狤ntity锛孖d瀹氫箟鍦‥ntity涓?
             typeof(ClearVision.Product.Core.Entities.Base.Entity)
                 .GetProperty("Id")?
                 .SetValue(flow, flowId.Value);
         }
 
-        // 添加算子
+        // 娣诲姞绠楀瓙
         foreach (var opDto in dto.Operators)
         {
             var canonicalType = OperatorTypeAliasResolver.Resolve(opDto.Type);
@@ -262,26 +289,26 @@ public class ProjectService
                 opDto.Y
             );
 
-            // 设置ID（如果提供了）
+            // 璁剧疆ID锛堝鏋滄彁渚涗簡锛?
             if (opDto.Id != Guid.Empty)
             {
-                // 使用反射设置ID，因为构造函数会生成新的ID
+                // 浣跨敤鍙嶅皠璁剧疆ID锛屽洜涓烘瀯閫犲嚱鏁颁細鐢熸垚鏂扮殑ID
                 typeof(Operator).GetProperty("Id")?.SetValue(op, opDto.Id);
             }
 
-            // 恢复输入端口（保留ID以维持连线）
+            // 鎭㈠杈撳叆绔彛锛堜繚鐣橧D浠ョ淮鎸佽繛绾匡級
             foreach (var portDto in opDto.InputPorts)
             {
                 op.LoadInputPort(portDto.Id, portDto.Name, portDto.DataType, portDto.IsRequired);
             }
 
-            // 恢复输出端口（保留ID以维持连线）
+            // 鎭㈠杈撳嚭绔彛锛堜繚鐣橧D浠ョ淮鎸佽繛绾匡級
             foreach (var portDto in opDto.OutputPorts)
             {
                 op.LoadOutputPort(portDto.Id, portDto.Name, portDto.DataType);
             }
 
-            // 添加参数
+            // 娣诲姞鍙傛暟
             foreach (var paramDto in opDto.Parameters)
             {
                 var param = new Parameter(
@@ -308,18 +335,18 @@ public class ProjectService
             flow.AddOperator(op);
         }
 
-        // 添加连接
+        // 娣诲姞杩炴帴
         foreach (var connDto in dto.Connections)
         {
-            // 【修复】修正参数顺序：sourceOperatorId, sourcePortId, targetOperatorId, targetPortId
+            // 銆愪慨澶嶃€戜慨姝ｅ弬鏁伴『搴忥細sourceOperatorId, sourcePortId, targetOperatorId, targetPortId
             var connection = new OperatorConnection(
                 connDto.SourceOperatorId,
-                connDto.SourcePortId,        // ✅ 修正：第2个参数应该是 SourcePortId
-                connDto.TargetOperatorId,    // ✅ 修正：第3个参数应该是 TargetOperatorId
+                connDto.SourcePortId,        // 鉁?淇锛氱2涓弬鏁板簲璇ユ槸 SourcePortId
+                connDto.TargetOperatorId,    // 鉁?淇锛氱3涓弬鏁板簲璇ユ槸 TargetOperatorId
                 connDto.TargetPortId
             );
 
-            // 设置连接ID
+            // 璁剧疆杩炴帴ID
             if (connDto.Id != Guid.Empty)
             {
                 typeof(OperatorConnection).GetProperty("Id")?.SetValue(connection, connDto.Id);
@@ -332,7 +359,7 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 删除工程
+    /// 鍒犻櫎宸ョ▼
     /// </summary>
     public async Task DeleteAsync(Guid id)
     {
@@ -345,7 +372,7 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 搜索工程
+    /// 鎼滅储宸ョ▼
     /// </summary>
     public async Task<IEnumerable<ProjectDto>> SearchAsync(string keyword)
     {
@@ -354,7 +381,7 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 获取最近打开的工程
+    /// 鑾峰彇鏈€杩戞墦寮€鐨勫伐绋?
     /// </summary>
     public async Task<IEnumerable<ProjectDto>> GetRecentlyOpenedAsync(int count = 10)
     {
@@ -368,19 +395,31 @@ public class ProjectService
         if (project == null)
             throw new ProjectNotFoundException(id);
 
-        OperatorFlow? flow = null;
-        var flowJson = await _flowStorage.LoadFlowJsonAsync(id);
-        if (!string.IsNullOrWhiteSpace(flowJson))
+        await UpdateAsync(id, new UpdateProjectRequest
         {
-            var flowDto = JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, _jsonOptions);
-            flow = flowDto?.ToEntity();
+            Name = project.Name,
+            Description = project.Description,
+            Flow = await LoadStoredFlowDtoAsync(id),
+            GlobalVariables = schema
+        });
+        return project.GlobalVariables;
+    }
+
+    private static ProjectGlobalVariableSchema CloneSchema(ProjectGlobalVariableSchema schema)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(schema, _jsonOptions);
+        return JsonSerializer.Deserialize<ProjectGlobalVariableSchema>(bytes, _jsonOptions) ?? new ProjectGlobalVariableSchema();
+    }
+
+    private async Task<OperatorFlowDto?> LoadStoredFlowDtoAsync(Guid projectId)
+    {
+        var flowJson = await _flowStorage.LoadFlowJsonAsync(projectId);
+        if (string.IsNullOrWhiteSpace(flowJson))
+        {
+            return null;
         }
 
-        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(schema, flow);
-        project.UpdateGlobalVariables(schema);
-        await _projectRepository.UpdateAsync(project);
-        _projectVariableSessions?.Replace(id, project.GlobalVariables);
-        return project.GlobalVariables;
+        return JsonSerializer.Deserialize<OperatorFlowDto>(flowJson, _jsonOptions);
     }
 
     private async Task<OperatorFlow?> LoadStoredFlowEntityAsync(Guid projectId)
@@ -408,13 +447,13 @@ public class ProjectService
             LastOpenedAt = project.LastOpenedAt,
             GlobalSettings = project.GlobalSettings,
             GlobalVariables = project.GlobalVariables,
-            // 修复：添加 Flow 字段映射
+            // 淇锛氭坊鍔?Flow 瀛楁鏄犲皠
             Flow = project.Flow != null ? MapFlowToDto(project.Flow) : null
         };
     }
 
     /// <summary>
-    /// 将 OperatorFlow 实体映射为 DTO
+    /// 灏?OperatorFlow 瀹炰綋鏄犲皠涓?DTO
     /// </summary>
     private OperatorFlowDto MapFlowToDto(OperatorFlow flow)
     {
@@ -428,7 +467,7 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 将 Operator 实体映射为 DTO
+    /// 灏?Operator 瀹炰綋鏄犲皠涓?DTO
     /// </summary>
     private OperatorDto MapOperatorToDto(Operator op)
     {
@@ -450,7 +489,7 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 将 Port 值对象映射为 DTO
+    /// 灏?Port 鍊煎璞℃槧灏勪负 DTO
     /// </summary>
     private PortDto MapPortToDto(Port port)
     {
@@ -465,7 +504,7 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 将 Parameter 值对象映射为 DTO
+    /// 灏?Parameter 鍊煎璞℃槧灏勪负 DTO
     /// </summary>
     private ParameterDto MapParameterToDto(Parameter param)
     {
@@ -486,7 +525,7 @@ public class ProjectService
     }
 
     /// <summary>
-    /// 将 OperatorConnection 值对象映射为 DTO
+    /// 灏?OperatorConnection 鍊煎璞℃槧灏勪负 DTO
     /// </summary>
     private OperatorConnectionDto MapConnectionToDto(OperatorConnection conn)
     {

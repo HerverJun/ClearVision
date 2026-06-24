@@ -18,4 +18,9 @@ public interface IProjectFlowStorage
     /// 加载流程 JSON 字符串
     /// </summary>
     Task<string?> LoadFlowJsonAsync(Guid projectId);
+
+    Task DeleteFlowJsonAsync(Guid projectId)
+    {
+        return Task.CompletedTask;
+    }
 }

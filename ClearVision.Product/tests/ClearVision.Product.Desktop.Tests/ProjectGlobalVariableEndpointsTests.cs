@@ -42,7 +42,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
         using var valuesResponse = await host.Client.GetAsync($"/api/projects/{host.Project.Id}/global-variable-values");
         valuesResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var values = await valuesResponse.Content.ReadFromJsonAsync<JsonElement>();
-        values.EnumerateArray().Single().GetProperty("value").GetInt64().Should().Be(5L);
+        values.EnumerateArray().Single().GetProperty("value").GetString().Should().Be("5");
 
         using var writeResponse = await host.Client.PutAsJsonAsync(
             $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
@@ -112,6 +112,28 @@ public sealed class ProjectGlobalVariableEndpointsTests
             new { value = 8L });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ProjectGlobalVariableEndpoints_ShouldRejectForbiddenReset()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: false));
+
+        using var resetOne = await host.Client.PostAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}/reset",
+            null);
+        using var resetAll = await host.Client.PostAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/reset",
+            null);
+
+        resetOne.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        resetAll.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var resetOneBody = await resetOne.Content.ReadFromJsonAsync<JsonElement>();
+        var resetAllBody = await resetAll.Content.ReadFromJsonAsync<JsonElement>();
+        resetOneBody.GetProperty("code").GetString().Should().Be("GV030");
+        resetAllBody.GetProperty("code").GetString().Should().Be("GV030");
     }
 
     [Fact]

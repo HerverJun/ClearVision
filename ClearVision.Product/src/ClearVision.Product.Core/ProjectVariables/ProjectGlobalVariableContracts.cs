@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ClearVision.Product.Core.ProjectVariables;
 
@@ -35,8 +36,10 @@ public sealed class ProjectGlobalVariableDefinition
 
     public JsonElement InitialValue { get; set; } = JsonSerializer.SerializeToElement("");
 
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString)]
     public double? Min { get; set; }
 
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString | JsonNumberHandling.WriteAsString)]
     public double? Max { get; set; }
 
     public bool ManualWriteAllowed { get; set; } = true;
@@ -98,10 +101,18 @@ public sealed record ProjectVariableValueSnapshot(
     Guid? RunId,
     Guid? OperatorId);
 
+public enum ProjectGlobalVariableDiagnosticSeverity
+{
+    Information = 0,
+    Warning = 1,
+    Error = 2
+}
+
 public sealed record ProjectGlobalVariableDiagnostic(
     string Code,
     string Message,
     Guid? VariableId = null,
     Guid? OperatorId = null,
     Guid? PortId = null,
-    Guid? ParameterId = null);
+    Guid? ParameterId = null,
+    ProjectGlobalVariableDiagnosticSeverity Severity = ProjectGlobalVariableDiagnosticSeverity.Error);

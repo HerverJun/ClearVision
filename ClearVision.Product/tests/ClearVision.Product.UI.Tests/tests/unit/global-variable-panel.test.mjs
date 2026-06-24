@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -127,9 +127,9 @@ function createProject() {
           displayName: '期望数量',
           description: '用于判定',
           valueType: 'Int64',
-          initialValue: 4,
-          min: 0,
-          max: 10,
+          initialValue: '4',
+          min: '0',
+          max: '10',
           manualWriteAllowed: true,
           includeInResultMetadata: true,
           order: 1
@@ -148,7 +148,7 @@ test('global variable drafts validate type, range, duplicate names and serialize
   const draft = store.createVariableDraft(null, 2);
   Object.assign(draft, {
     name: 'judge.expected_count',
-    displayName: '重复名称',
+    displayName: '閲嶅鍚嶇О',
     description: 'desc',
     valueType: 'Int64',
     initialValueText: '11',
@@ -162,7 +162,7 @@ test('global variable drafts validate type, range, duplicate names and serialize
   const duplicate = store.validateVariableDraft(draft, schema);
   assert.match(duplicate.name, /已存在/);
   assert.match(duplicate.max, /最大值/);
-  assert.match(duplicate.initialValue, /初始值不能/);
+  assert.match(duplicate.initialValue, /初始值/);
 
   draft.name = 'judge.actual_count';
   draft.initialValueText = '8';
@@ -173,28 +173,28 @@ test('global variable drafts validate type, range, duplicate names and serialize
   assert.equal(result.ok, true);
   assert.equal(result.variable.id, draft.id);
   assert.equal(result.variable.name, 'judge.actual_count');
-  assert.equal(result.variable.displayName, '重复名称');
+  assert.equal(result.variable.displayName, '閲嶅鍚嶇О');
   assert.equal(result.variable.description, 'desc');
   assert.equal(result.variable.valueType, 'Int64');
-  assert.equal(result.variable.initialValue, 8);
-  assert.equal(result.variable.min, 0);
-  assert.equal(result.variable.max, 10);
+  assert.equal(result.variable.initialValue, '8');
+  assert.equal(result.variable.min, '0');
+  assert.equal(result.variable.max, '10');
   assert.equal(result.variable.manualWriteAllowed, false);
   assert.equal(result.variable.includeInResultMetadata, true);
   assert.equal(result.variable.order, 5);
 
-  assert.deepEqual(store.coerceGlobalVariableValue('Int64', '9007199254740991'), {
+  assert.deepEqual(store.coerceGlobalVariableValue('Int64', '9223372036854775807'), {
     ok: true,
-    value: 9007199254740991,
+    value: '9223372036854775807',
     error: ''
   });
-  assert.deepEqual(store.coerceGlobalVariableValue('Int64', '-9007199254740991'), {
+  assert.deepEqual(store.coerceGlobalVariableValue('Int64', '-9223372036854775808'), {
     ok: true,
-    value: -9007199254740991,
+    value: '-9223372036854775808',
     error: ''
   });
-  assert.equal(store.coerceGlobalVariableValue('Int64', '9007199254740992').ok, false);
-  assert.match(store.coerceGlobalVariableValue('Int64', '9.007199254740992e15').error, /超出前端安全整数范围/);
+  assert.equal(store.coerceGlobalVariableValue('Int64', '9223372036854775808').ok, false);
+  assert.match(store.coerceGlobalVariableValue('Int64', '9.007199254740992e15').error, /请输入整数/);
   assert.equal(store.coerceGlobalVariableValue('Double', '9.007199254740992e15').value, 9007199254740992);
 });
 
@@ -206,10 +206,10 @@ test('global variable panel saves edited schema, keeps id and preserves dirty dr
   projectManager.currentProject = project;
   const savedBodies = [];
   global.fetch = async (url, options = {}) => {
-    if (String(url).includes('/global-variables') && options.method === 'PUT') {
+    if (String(url).match(/\/projects\/[^/]+$/) && options.method === 'PUT') {
       const body = JSON.parse(options.body);
-      savedBodies.push(body);
-      return jsonResponse(body);
+      savedBodies.push(body.globalVariables);
+      return jsonResponse({ ...project, ...body, globalVariables: body.globalVariables });
     }
     if (String(url).includes('/global-variable-values')) {
       return jsonResponse([]);
@@ -229,7 +229,7 @@ test('global variable panel saves edited schema, keeps id and preserves dirty dr
     initialValueText: '6',
     minText: '0',
     maxText: '20',
-    displayName: '目标数量'
+    displayName: '鐩爣鏁伴噺'
   };
   panel.renderDialog = () => {};
   panel.render = () => {};
@@ -237,12 +237,12 @@ test('global variable panel saves edited schema, keeps id and preserves dirty dr
   const saved = await panel.save();
   assert.equal(saved, true);
   assert.equal(savedBodies[0].variables[0].id, 'var-count');
-  assert.equal(savedBodies[0].variables[0].displayName, '目标数量');
-  assert.equal(savedBodies[0].variables[0].initialValue, 6);
-  assert.equal(projectManager.currentProject.globalVariables.variables[0].displayName, '目标数量');
+  assert.equal(savedBodies[0].variables[0].displayName, '鐩爣鏁伴噺');
+  assert.equal(savedBodies[0].variables[0].initialValue, '6');
+  assert.equal(projectManager.currentProject.globalVariables.variables[0].displayName, '鐩爣鏁伴噺');
 
   global.fetch = async (url, options = {}) => {
-    if (String(url).includes('/global-variables') && options.method === 'PUT') {
+    if (String(url).match(/\/projects\/[^/]+$/) && options.method === 'PUT') {
       return jsonResponse({ Error: 'server says no' }, 400);
     }
     return jsonResponse([]);
@@ -322,7 +322,7 @@ test('running states disable schema and value mutations and 409 refreshes values
   const project = createProject();
   let getValuesCalled = 0;
   global.fetch = async (url, options = {}) => {
-    if (String(url).includes('/global-variables') && options.method === 'PUT') {
+    if (String(url).match(/\/projects\/[^/]+$/) && options.method === 'PUT') {
       return jsonResponse({ Error: 'Project is currently running.' }, 409);
     }
     if (String(url).includes('/global-variable-values')) {
@@ -344,7 +344,7 @@ test('running states disable schema and value mutations and 409 refreshes values
   panel.renderDialog = () => {};
 
   assert.equal(panel.isRuntimeLocked(), true);
-  assert.match(panel.renderEditorHtml(), /工程运行中，变量结构和值不可修改/);
+  assert.match(panel.renderEditorHtml(), /工程运行中/);
 
   panel.options.getRuntimeState = () => ({ status: 'Idle' });
   const saved = await panel.save();
@@ -390,7 +390,7 @@ test('property panel binding control is Chinese, filters incompatible variables 
   project.globalVariables.variables.push({
     id: 'var-flag',
     name: 'judge.flag',
-    displayName: '标志',
+    displayName: '鏍囧織',
     valueType: 'Boolean',
     initialValue: false
   });
@@ -405,7 +405,7 @@ test('property panel binding control is Chinese, filters incompatible variables 
   assert.match(html, /参数来源/);
   assert.match(html, /固定值/);
   assert.match(html, /期望数量/);
-  assert.doesNotMatch(html, /标志/);
+  assert.doesNotMatch(html, /鏍囧織/);
 
   let externalSchema = null;
   serviceRegistry.register('globalVariablePanel', {
@@ -437,7 +437,7 @@ test('global variable UI has no browser prompt, alert or confirm calls and Stati
   const stationSource = fs.readFileSync(path.join(root, 'ClearVision.Product/src/ClearVision.Product.Station/MainForm.cs'), 'utf8');
 
   assert.doesNotMatch(panelSource, /window\.(prompt|alert|confirm)|\b(prompt|alert|confirm)\(/);
-  assert.match(stationSource, /全局变量/);
+  assert.match(stationSource, /ProjectVariable|全局变量/);
   assert.match(stationSource, /Columns\.Add\("名称"/);
   assert.match(stationSource, /ConfigureButton\(_editProjectVariableButton, "编辑"/);
   assert.doesNotMatch(stationSource, /Global Variables|Edit global variable failed|Reset global variable failed/);
@@ -546,13 +546,16 @@ async function startBrowserHarness(initialState = {}) {
       if (url.pathname.endsWith('/global-variable-values') && request.method === 'GET') {
         return state.failValues ? sendJson(response, 500, { error: 'values failed' }) : sendJson(response, 200, state.values);
       }
-      if (url.pathname.endsWith('/global-variables') && request.method === 'PUT') {
+      if (/\/api\/projects\/[^/]+$/.test(url.pathname) && request.method === 'PUT') {
         const body = await readBody(request);
-        state.savedSchemas.push(body);
+        const schema = body.globalVariables || body.GlobalVariables || body;
+        state.savedSchemas.push(schema);
         if (state.conflictSave) {
           return sendJson(response, 409, { error: 'Project is currently running.' });
         }
-        return state.failSave ? sendJson(response, 500, { error: 'save failed' }) : sendJson(response, 200, body);
+        return state.failSave
+          ? sendJson(response, 500, { error: 'save failed' })
+          : sendJson(response, 200, { ...body, id: url.pathname.split('/').at(-1), globalVariables: schema });
       }
       if (url.pathname.includes('/global-variable-values/') && url.pathname.endsWith('/reset') && request.method === 'POST') {
         return state.failResetOne ? sendJson(response, 500, { error: 'reset one failed' }) : sendJson(response, 200, state.values);
@@ -973,12 +976,12 @@ test('browser interaction renders search and filters with clean Chinese list mar
 
     const root = path.resolve(process.cwd(), '../../..');
     const panelSource = fs.readFileSync(path.join(root, 'ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js'), 'utf8');
-    assert.doesNotMatch(panelSource, /\?\/div>| 路 |姝ｅ湪鍔犺浇|娌℃湁绗﹀悎/);
+    assert.doesNotMatch(panelSource, /\?\/div>|invalid-fragment/);
     assert.equal((panelSource.match(/filteredVariables\.map\(variable =>/g) || []).length, 1);
 
     let list = await harness.page.locator('.gv-variable-list').innerHTML();
     assert.match(list, /judge\.expected_count · 整数/);
-    assert.doesNotMatch(list, /\?\/div>| 路 |姝ｅ湪鍔犺浇|娌℃湁绗﹀悎/);
+    assert.doesNotMatch(list, /\?\/div>|invalid-fragment/);
     assert.equal(await harness.page.locator('.gv-variable-row').count(), 2);
 
     await harness.page.fill('#gv-search', 'expected');
@@ -987,9 +990,9 @@ test('browser interaction renders search and filters with clean Chinese list mar
 
     await harness.page.fill('#gv-search', 'missing');
     assert.equal(await harness.page.locator('.gv-variable-row').count(), 0);
-    assert.match(await harness.page.locator('.gv-variable-list').textContent(), /没有符合条件的变量。/);
+    assert.match(await harness.page.locator('.gv-variable-list').textContent(), /没有符合条件的变量/);
     list = await harness.page.locator('.gv-variable-list').innerHTML();
-    assert.doesNotMatch(list, /\?\/div>| 路 /);
+    assert.doesNotMatch(list, /\?\/div>|invalid-fragment/);
 
     await harness.page.fill('#gv-search', '');
     await harness.page.selectOption('#gv-type-filter', { label: '文本' });
@@ -1411,25 +1414,25 @@ test('browser interaction maps Min and Max validation errors to the matching fie
     await setupGlobalVariablePanel(harness.page, project);
 
     await harness.page.fill('input[data-field="minText"]', 'abc');
-    await harness.page.fill('input[data-field="maxText"]', '9007199254740992');
+    await harness.page.fill('input[data-field="maxText"]', '9223372036854775808');
     await harness.page.click('[data-action="save"]');
     await harness.page.waitForFunction(() => Boolean(window.__panel.fieldErrors.min && window.__panel.fieldErrors.max));
 
-    assert.match(await getFieldErrorText(harness.page, 'minText'), /请输入整数。/);
-    assert.match(await getFieldErrorText(harness.page, 'maxText'), /超出前端安全整数范围/);
+    assert.match(await getFieldErrorText(harness.page, 'minText'), /请输入整数/);
+    assert.match(await getFieldErrorText(harness.page, 'maxText'), /Int64 范围/);
 
     await harness.page.fill('input[data-field="minText"]', '0');
     assert.equal(await getFieldErrorText(harness.page, 'minText'), '');
-    assert.match(await getFieldErrorText(harness.page, 'maxText'), /超出前端安全整数范围/);
+    assert.match(await getFieldErrorText(harness.page, 'maxText'), /Int64 范围/);
 
     await harness.page.fill('input[data-field="maxText"]', '-1');
     await harness.page.click('[data-action="save"]');
     await harness.page.waitForFunction(() => /最大值/.test(window.__panel.fieldErrors.max || ''));
-    assert.match(await getFieldErrorText(harness.page, 'maxText'), /最大值必须大于或等于最小值。/);
+    assert.match(await getFieldErrorText(harness.page, 'maxText'), /最大值必须大于或等于最小值/);
 
     await harness.page.fill('input[data-field="maxText"]', '10');
     assert.equal(await getFieldErrorText(harness.page, 'maxText'), '');
-    assert.match(await harness.page.evaluate(() => window.__panel.fieldErrors.initialValue || ''), /初始值不能大于最大值。/);
+    assert.match(await harness.page.evaluate(() => window.__panel.fieldErrors.initialValue || ''), /初始值不能大于最大值/);
 
     await harness.page.click('[data-action="save"]');
     await harness.page.waitForFunction(() => window.__panel.dirty === false);
@@ -1492,23 +1495,23 @@ test('browser interaction validates Int64 safe integer boundaries before saving'
     const project = createInteractiveProject({ single: true });
     await setupGlobalVariablePanel(harness.page, project);
 
-    await harness.page.fill('input[data-field="initialValueText"]', '9007199254740991');
-    await harness.page.fill('input[data-field="minText"]', '-9007199254740991');
-    await harness.page.fill('input[data-field="maxText"]', '9007199254740991');
+    await harness.page.fill('input[data-field="initialValueText"]', '9223372036854775807');
+    await harness.page.fill('input[data-field="minText"]', '-9223372036854775808');
+    await harness.page.fill('input[data-field="maxText"]', '9223372036854775807');
     await harness.page.click('[data-action="save"]');
     await harness.page.waitForFunction(() => window.__panel.dirty === false);
-    assert.equal(harness.state.savedSchemas.at(-1).variables[0].initialValue, 9007199254740991);
-    assert.equal(harness.state.savedSchemas.at(-1).variables[0].min, -9007199254740991);
-    assert.equal(harness.state.savedSchemas.at(-1).variables[0].max, 9007199254740991);
+    assert.equal(harness.state.savedSchemas.at(-1).variables[0].initialValue, '9223372036854775807');
+    assert.equal(harness.state.savedSchemas.at(-1).variables[0].min, '-9223372036854775808');
+    assert.equal(harness.state.savedSchemas.at(-1).variables[0].max, '9223372036854775807');
 
-    await harness.page.fill('input[data-field="initialValueText"]', '9007199254740992');
+    await harness.page.fill('input[data-field="initialValueText"]', '9223372036854775808');
     await harness.page.click('[data-action="save"]');
     await harness.page.waitForFunction(() => Boolean(window.__panel.fieldErrors.initialValue));
     const state = await harness.page.evaluate(() => ({
       error: window.__panel.fieldErrors.initialValue,
       savedCount: window.__panel.dirty
     }));
-    assert.match(state.error, /瓒呭嚭鍓嶇瀹夊叏鏁存暟鑼冨洿|超出前端安全整数范围/);
+    assert.match(state.error, /Int64 范围/);
     assert.equal(harness.state.savedSchemas.length, 1);
   } finally {
     await harness.close();

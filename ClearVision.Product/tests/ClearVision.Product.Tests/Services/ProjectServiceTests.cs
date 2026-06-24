@@ -94,6 +94,70 @@ public class ProjectServiceTests
         ProjectVariableValueConverter.ToObject(value).Should().Be(9L);
     }
 
+    [Fact]
+    public async Task UpdateAsync_WhenNewFlowReferencesNewSchemaVariable_ShouldSaveTogether()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var factory = new OperatorFactory();
+        var registry = new ProjectVariableSessionRegistry();
+        var variableId = Guid.NewGuid();
+        var project = new Project("demo");
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
+        var sut = new ProjectService(repository, storage, factory, null, registry);
+        var schema = CreateSchema(variableId, 3);
+        var flow = CreateVariableReadFlow(variableId, "stats.count");
+
+        var saved = await sut.UpdateAsync(project.Id, new UpdateProjectRequest
+        {
+            Name = "demo",
+            Description = "updated",
+            Flow = flow,
+            GlobalVariables = schema
+        });
+
+        saved.Flow.Should().NotBeNull();
+        project.Description.Should().Be("updated");
+        project.GlobalVariables.Variables.Single().Id.Should().Be(variableId);
+        await storage.Received(1).SaveFlowJsonAsync(project.Id, Arg.Is<string>(json => json.Contains("VariableRead")));
+        await repository.Received(1).UpdateAsync(project);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WhenRepositoryFailsAfterFlowSave_ShouldRestoreFlowSchemaAndSession()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var registry = new ProjectVariableSessionRegistry();
+        var variableId = Guid.NewGuid();
+        var project = new Project("demo");
+        project.UpdateGlobalVariables(CreateSchema(variableId, 1));
+        const string oldFlowJson = "{\"name\":\"old\",\"operators\":[],\"connections\":[]}";
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository
+            .When(item => item.UpdateAsync(Arg.Any<Project>()))
+            .Do(_ => throw new InvalidOperationException("db failed"));
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(oldFlowJson));
+        var oldSession = registry.GetOrCreate(project.Id, project.GlobalVariables);
+        oldSession.SetValue(variableId, 8L, ProjectVariableUpdatedBy.StudioManual);
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+
+        var act = async () => await sut.UpdateAsync(project.Id, new UpdateProjectRequest
+        {
+            Name = "renamed",
+            Flow = CreateVariableReadFlow(variableId, "stats.count"),
+            GlobalVariables = CreateSchema(variableId, 5)
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*db failed*");
+        project.Name.Should().Be("demo");
+        project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
+        await storage.Received().SaveFlowJsonAsync(project.Id, oldFlowJson);
+        registry.GetOrCreate(project.Id, project.GlobalVariables).Should().BeSameAs(oldSession);
+    }
+
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue)
     {
         return new ProjectGlobalVariableSchema
@@ -110,6 +174,31 @@ public class ProjectServiceTests
                     ManualWriteAllowed = true
                 }
             ]
+        };
+    }
+
+    private static OperatorFlowDto CreateVariableReadFlow(Guid variableId, string variableName)
+    {
+        return new OperatorFlowDto
+        {
+            Name = "MainFlow",
+            Operators =
+            [
+                new OperatorDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "ReadCount",
+                    Type = ClearVision.Product.Core.Enums.OperatorType.VariableRead,
+                    Parameters =
+                    [
+                        new ParameterDto { Id = Guid.NewGuid(), Name = "Scope", DisplayName = "Scope", DataType = "enum", Value = "Project" },
+                        new ParameterDto { Id = Guid.NewGuid(), Name = "VariableId", DisplayName = "VariableId", DataType = "string", Value = variableId.ToString() },
+                        new ParameterDto { Id = Guid.NewGuid(), Name = "VariableName", DisplayName = "VariableName", DataType = "string", Value = variableName },
+                        new ParameterDto { Id = Guid.NewGuid(), Name = "DataType", DisplayName = "DataType", DataType = "enum", Value = "Int" }
+                    ]
+                }
+            ],
+            Connections = []
         };
     }
 }
