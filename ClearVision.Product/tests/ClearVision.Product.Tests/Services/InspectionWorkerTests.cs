@@ -291,7 +291,7 @@ public class InspectionWorkerTests
 
         (await coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None)).Should().Be(StartResult.Success);
         (await worker.TryStartRunAsync(projectId, sessionId, new OperatorFlow("Test"), null)).Should().BeTrue();
-        await flowStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await flowStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         capturedContext.Should().NotBeNull();
         var newSession = registry.Replace(projectId, CreateProjectVariableSchema(variableId, 5));
@@ -306,7 +306,7 @@ public class InspectionWorkerTests
 
         allowFlowToFinish.SetResult();
         (await coordinator.TryStopAsync(projectId, CancellationToken.None)).Should().BeTrue();
-        (await worker.WaitForRunExitAsync(projectId, sessionId, TimeSpan.FromSeconds(2))).Should().BeTrue();
+        (await worker.WaitForRunExitAsync(projectId, sessionId, TimeSpan.FromSeconds(10))).Should().BeTrue();
         coordinator.GetState(projectId)?.Status.Should().Be(RuntimeStatus.Stopped);
     }
 

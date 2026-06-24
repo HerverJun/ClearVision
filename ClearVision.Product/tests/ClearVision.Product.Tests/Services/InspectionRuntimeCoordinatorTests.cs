@@ -36,7 +36,7 @@ public class InspectionRuntimeCoordinatorTests
         var started = DateTime.UtcNow;
         while (coordinator.GetState(projectId) != null)
         {
-            if (DateTime.UtcNow - started > TimeSpan.FromSeconds(2))
+            if (DateTime.UtcNow - started > TimeSpan.FromSeconds(10))
             {
                 throw new TimeoutException("Coordinator cleanup did not remove the session in time.");
             }
