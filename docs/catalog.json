@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-13T18:02:14.6855594+08:00",
+  "generatedAt": "2026-06-25T01:40:02.5832618+08:00",
   "totalCount": 118,
   "categories": {
     "AI检测": {
@@ -3549,7 +3549,19 @@
           "isRequired": null
         }
       ],
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "CalibrationFile",
+          "displayName": "Calibration File",
+          "dataType": "file",
+          "description": null,
+          "defaultValue": "",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        }
+      ],
       "quality": {
         "totalScore": 33,
         "level": "D",
@@ -3632,6 +3644,28 @@
           "dataType": "double",
           "description": null,
           "defaultValue": "0",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "PixelSize",
+          "displayName": "像素尺寸(mm/px)",
+          "dataType": "double",
+          "description": null,
+          "defaultValue": "0.01",
+          "min": "0.0001",
+          "max": "100",
+          "isRequired": true,
+          "options": null
+        },
+        {
+          "name": "CalibrationFile",
+          "displayName": "标定文件路径",
+          "dataType": "file",
+          "description": null,
+          "defaultValue": "",
           "min": null,
           "max": null,
           "isRequired": true,
@@ -11180,6 +11214,30 @@
           "max": null,
           "isRequired": true,
           "options": null
+        },
+        {
+          "name": "FileFormat",
+          "displayName": "File Format",
+          "dataType": "enum",
+          "description": null,
+          "defaultValue": "JSON",
+          "min": null,
+          "max": null,
+          "isRequired": true,
+          "options": [
+            {
+              "value": "JSON",
+              "label": "JSON"
+            },
+            {
+              "value": "XML",
+              "label": "XML"
+            },
+            {
+              "value": "YAML",
+              "label": "YAML"
+            }
+          ]
         }
       ],
       "quality": {
