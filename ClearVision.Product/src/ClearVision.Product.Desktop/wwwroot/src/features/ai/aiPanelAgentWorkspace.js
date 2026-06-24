@@ -79,7 +79,7 @@ const PLAN_PHASES = [
 
 const PLAN_PENDING_STATUS = 'waiting';
 const LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE = 'legacy_build_artifact_missing_canonical_flow';
-const LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE = '该历史构建结果不包含可验证的画布流程产物，无法直接应用。\n请基于原计划重新构建。';
+const LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE = '该构建结果不包含可验证的画布流程产物，无法直接应用。\n请基于原计划重新构建。';
 
 const PLAN_ANSWER_FIELDS = Object.freeze({
     INSPECTION_OBJECT: 'inspection_object',
@@ -5510,7 +5510,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (compatibilityState.status === LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE) {
             return `
                 <div class="ai-build-check is-blocked">
-                    <strong>无法应用历史构建结果</strong>
+                    <strong>无法应用构建结果</strong>
                     <span>${this._escapeHtml(compatibilityState.publicMessage)}</span>
                 </div>
                 <details class="ai-plan-diagnostics">
@@ -5603,6 +5603,108 @@ export const aiPanelAgentWorkspaceMixin = {
         return false;
     },
 
+    _getBuildArtifactTextValue(source, names) {
+        if (!source || typeof source !== 'object') return '';
+
+        for (const name of names) {
+            if (!Object.prototype.hasOwnProperty.call(source, name)) continue;
+            const value = source[name];
+            if (value === null || value === undefined) continue;
+            const text = String(value).trim();
+            if (text) return text;
+        }
+
+        return '';
+    },
+
+    _getBuildArtifactBooleanValue(source, names) {
+        if (!source || typeof source !== 'object') return null;
+
+        for (const name of names) {
+            if (!Object.prototype.hasOwnProperty.call(source, name)) continue;
+            const value = source[name];
+            if (typeof value === 'boolean') return value;
+            if (typeof value === 'string') {
+                const normalized = value.trim().toLowerCase();
+                if (normalized === 'true') return true;
+                if (normalized === 'false') return false;
+            }
+        }
+
+        return null;
+    },
+
+    _getBuildArtifactTerminalContext(payload = this.currentResult, events = this.activeAgentRunEvents) {
+        const obj = this._asObject?.(payload) || {};
+        const eventList = Array.isArray(events) ? events : [];
+        const eventTypes = new Set(eventList.map(evt => String(evt?.eventType || '').trim().toLowerCase()).filter(Boolean));
+        const success = this._getBuildArtifactBooleanValue(obj, ['success', 'Success']);
+        const completionStatus = this._getBuildArtifactTextValue(obj, ['completionStatus', 'CompletionStatus']).toLowerCase();
+        const status = this._getBuildArtifactTextValue(obj, ['status', 'Status']).toLowerCase();
+        const interactionState = this._getBuildArtifactTextValue(obj, ['interactionState', 'InteractionState']).toLowerCase();
+        const failureType = this._getBuildArtifactTextValue(obj, ['failureType', 'FailureType']);
+        const normalizedFailureType = failureType.toLowerCase();
+        const kind = this._getBuildArtifactTextValue(obj, ['kind', 'Kind', 'projectionKind', 'ProjectionKind']).toLowerCase();
+        const compatibilityMarker = [
+            this._getBuildArtifactTextValue(obj, ['buildCompatibilityStatus', 'BuildCompatibilityStatus']),
+            this._getBuildArtifactTextValue(obj, ['compatibilityDiagnosticCode', 'CompatibilityDiagnosticCode'])
+        ].some(value => value === LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE);
+
+        return {
+            eventTypes,
+            success,
+            completionStatus,
+            status,
+            interactionState,
+            failureType,
+            normalizedFailureType,
+            kind,
+            compatibilityMarker
+        };
+    },
+
+    _getNonCompletedBuildTerminalStatus(context) {
+        if (!context) return '';
+
+        if (
+            context.eventTypes.has('run.cancelled') ||
+            context.completionStatus === 'cancelled' ||
+            context.completionStatus === 'canceled' ||
+            context.interactionState === 'cancelled'
+        ) {
+            return 'terminal_cancelled_without_flow';
+        }
+
+        if (
+            context.completionStatus === 'clarification_required' ||
+            context.interactionState === 'clarifying'
+        ) {
+            return 'terminal_clarification_without_flow';
+        }
+
+        if (
+            context.eventTypes.has('run.failed') ||
+            context.success === false ||
+            context.completionStatus === 'failed' ||
+            context.interactionState === 'failed' ||
+            (context.failureType && context.normalizedFailureType !== LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE) ||
+            context.kind === 'assistant_agent_failure'
+        ) {
+            return 'terminal_failed_without_flow';
+        }
+
+        return '';
+    },
+
+    _hasCompletedBuildTerminalEvidence(context) {
+        if (!context) return false;
+
+        return context.eventTypes.has('run.completed') ||
+            context.success === true ||
+            context.completionStatus === 'completed' ||
+            (context.kind === 'assistant_agent_result' && context.status === 'completed');
+    },
+
     _getBuildArtifactFlowCompatibilityState(payload = this.currentResult, events = this.activeAgentRunEvents) {
         const obj = this._asObject?.(payload) || {};
         const eventList = Array.isArray(events) ? events : [];
@@ -5616,25 +5718,54 @@ export const aiPanelAgentWorkspaceMixin = {
             };
         }
 
+        const terminalContext = this._getBuildArtifactTerminalContext(obj, eventList);
+        if (terminalContext.compatibilityMarker) {
+            return {
+                status: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
+                code: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
+                publicMessage: LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE,
+                flow: null,
+                buildResult,
+                terminal: terminalContext
+            };
+        }
+
+        const nonCompletedTerminalStatus = this._getNonCompletedBuildTerminalStatus(terminalContext);
+        if (nonCompletedTerminalStatus) {
+            return {
+                status: nonCompletedTerminalStatus,
+                flow: null,
+                buildResult,
+                terminal: terminalContext
+            };
+        }
+
         const hasTopLevelWorkflowDraft = this._hasBuildArtifactValue(obj, ['workflowDraft', 'WorkflowDraft']);
         const hasBuildWorkflowDraft = this._hasBuildArtifactValue(buildResult, ['workflowDraft', 'WorkflowDraft']);
         const hasTopLevelOperatorPipeline = this._hasBuildArtifactValue(obj, ['operatorPipeline', 'OperatorPipeline']);
         const hasBuildOperatorPipeline = this._hasBuildArtifactValue(buildResult, ['operatorPipeline', 'OperatorPipeline']);
-        const hasRunCompletedTerminal = eventList.some(evt => String(evt?.eventType || '') === 'run.completed');
+        const hasTopLevelParameterMapping = this._hasBuildArtifactValue(obj, ['parameterMapping', 'ParameterMapping']);
+        const hasBuildParameterMapping = this._hasBuildArtifactValue(buildResult, ['parameterMapping', 'ParameterMapping']);
+        const hasTopLevelWorkflowDiff = this._hasBuildArtifactValue(obj, ['workflowDiff', 'WorkflowDiff']);
+        const hasBuildWorkflowDiff = this._hasBuildArtifactValue(buildResult, ['workflowDiff', 'WorkflowDiff']);
         const hasBuildArtifact = Boolean(
             buildResult ||
             hasTopLevelWorkflowDraft ||
             hasBuildWorkflowDraft ||
             hasTopLevelOperatorPipeline ||
             hasBuildOperatorPipeline ||
-            hasRunCompletedTerminal
+            hasTopLevelParameterMapping ||
+            hasBuildParameterMapping ||
+            hasTopLevelWorkflowDiff ||
+            hasBuildWorkflowDiff
         );
 
-        if (!hasBuildArtifact) {
+        if (!this._hasCompletedBuildTerminalEvidence(terminalContext) || !hasBuildArtifact) {
             return {
                 status: 'no_build_artifact',
                 flow: null,
-                buildResult
+                buildResult,
+                terminal: terminalContext
             };
         }
 
@@ -5644,7 +5775,7 @@ export const aiPanelAgentWorkspaceMixin = {
             publicMessage: LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE,
             flow: null,
             buildResult,
-            hasRunCompletedTerminal,
+            hasRunCompletedTerminal: terminalContext.eventTypes.has('run.completed'),
             hasWorkflowDraft: hasTopLevelWorkflowDraft || hasBuildWorkflowDraft,
             hasOperatorPipeline: hasTopLevelOperatorPipeline || hasBuildOperatorPipeline
         };
@@ -5662,17 +5793,11 @@ export const aiPanelAgentWorkspaceMixin = {
             firstFixRecommendation: '请基于原计划重新构建。',
             metadataOnly: true
         };
-        const resultBuildResult = buildResult
-            ? {
-                ...buildResult,
-                applyGate,
-                ApplyGate: applyGate,
-                compatibilityDiagnosticCode: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE
-            }
-            : null;
 
         return {
             ...obj,
+            status: 'failed',
+            Status: 'failed',
             success: false,
             Success: false,
             completionStatus: 'failed',
@@ -5680,12 +5805,13 @@ export const aiPanelAgentWorkspaceMixin = {
             failureType: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
             FailureType: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
             interactionState: 'failed',
+            InteractionState: 'failed',
             aiExplanation: LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE,
             AiExplanation: LEGACY_BUILD_MISSING_CANONICAL_FLOW_MESSAGE,
             buildCompatibilityStatus: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
             compatibilityDiagnosticCode: LEGACY_BUILD_MISSING_CANONICAL_FLOW_CODE,
-            buildResult: resultBuildResult || buildResult,
-            BuildResult: resultBuildResult || buildResult,
+            buildResult,
+            BuildResult: buildResult,
             applyGate,
             ApplyGate: applyGate,
             pendingParameters: this._toArray(obj.pendingParameters || obj.PendingParameters).length

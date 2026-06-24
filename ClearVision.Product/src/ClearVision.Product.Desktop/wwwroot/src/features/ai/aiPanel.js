@@ -1071,15 +1071,36 @@ export class AiPanel {
         const connections = this._extractConnections(flow);
         const buildFlowCompatibility = this._getBuildArtifactFlowCompatibilityState?.(data);
         const legacyMissingCanonicalFlow = buildFlowCompatibility?.status === 'legacy_build_artifact_missing_canonical_flow';
+        const nonCompletedBuildTerminalWithoutFlow = !flow && [
+            'terminal_failed_without_flow',
+            'terminal_cancelled_without_flow',
+            'terminal_clarification_without_flow'
+        ].includes(buildFlowCompatibility?.status);
         this._syncPendingParameterDrafts(data, flow);
         this._renderAgentRuntime(data);
         this._renderRequirementBrief(data);
 
         const clarificationRequired = this._isClarificationResult(data);
         const requirementBrief = this._normalizeRequirementBrief(data?.requirementBrief ?? data?.RequirementBrief ?? null);
+        const failureSummary = data?.failureSummary || data?.FailureSummary || null;
+        const terminalSummary = String(
+            failureSummary?.message ||
+            failureSummary?.Message ||
+            data?.errorMessage ||
+            data?.ErrorMessage ||
+            data?.aiExplanation ||
+            data?.AiExplanation ||
+            data?.message ||
+            data?.Message ||
+            '构建未返回可应用画布流程，已保留原始终态。'
+        ).trim();
         const summaryLines = legacyMissingCanonicalFlow
             ? [
                 this._escapeHtml(buildFlowCompatibility.publicMessage).replace(/\n/g, '<br/>')
+            ]
+            : nonCompletedBuildTerminalWithoutFlow
+            ? [
+                this._escapeHtml(terminalSummary)
             ]
             : clarificationRequired && !flow
             ? [
@@ -1113,6 +1134,8 @@ export class AiPanel {
             opsContainer.innerHTML = '<div class="ai-followup-empty">构建尚未开始。请先确认计划或开始构建，生成算子链后会显示在这里。</div>';
         } else if (legacyMissingCanonicalFlow) {
             opsContainer.innerHTML = `<div class="ai-followup-empty">${this._escapeHtml(buildFlowCompatibility.publicMessage).replace(/\n/g, '<br/>')}</div>`;
+        } else if (nonCompletedBuildTerminalWithoutFlow) {
+            opsContainer.innerHTML = `<div class="ai-followup-empty">${this._escapeHtml(terminalSummary)}</div>`;
         } else {
             ops.forEach((op, i) => {
                 const opName = op?.displayName || op?.DisplayName || op?.name || op?.Name || '未命名算子';

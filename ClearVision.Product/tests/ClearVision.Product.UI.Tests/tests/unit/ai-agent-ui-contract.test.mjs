@@ -5896,23 +5896,152 @@ test('AgentRun completed payload without canonical flow fails closed despite Wor
   assert.equal(panel._applyAgentRunResultPayload(completedEvent), false);
 
   assert.equal(panel.currentResult?.compatibilityDiagnosticCode, 'legacy_build_artifact_missing_canonical_flow');
+  assert.equal(panel.currentResult?.status, 'failed');
+  assert.equal(panel.currentResult?.Status, 'failed');
+  assert.equal(panel.currentResult?.completionStatus, 'failed');
+  assert.equal(panel.currentResult?.CompletionStatus, 'failed');
+  assert.equal(panel.currentResult?.interactionState, 'failed');
+  assert.equal(panel.currentResult?.InteractionState, 'failed');
+  assert.equal(panel.currentResult?.success, false);
+  assert.equal(panel.currentResult?.Success, false);
+  assert.equal(panel.currentResult?.failureType, 'legacy_build_artifact_missing_canonical_flow');
+  assert.equal(panel.currentResult?.FailureType, 'legacy_build_artifact_missing_canonical_flow');
+  assert.notEqual(panel.currentResult?.status, 'completed');
   assert.equal(panel.currentResult?.flow, null);
   assert.equal(panel.currentResult?.applyGate?.canvasApplyReady, false);
   assert.equal(panel._isCanvasApplyReadyForResult(panel.currentResult), false);
   assert.equal(panel.flowCanvas.getFlowRevision(), initialCanvasRevision);
   assert.equal(elements['#ai-btn-apply'].disabled, true);
   assert.equal(elements['#ai-btn-apply'].getAttribute('aria-disabled'), 'true');
-  assert.match(panel.lastResultStatusNote?.text || '', /该历史构建结果不包含可验证的画布流程产物/);
-  assert.match(elements['#ai-result-summary'].innerHTML, /该历史构建结果不包含可验证的画布流程产物/);
+  assert.match(panel.lastResultStatusNote?.text || '', /该构建结果不包含可验证的画布流程产物/);
+  assert.match(elements['#ai-result-summary'].innerHTML, /该构建结果不包含可验证的画布流程产物/);
   assert.doesNotMatch(elements['#ai-result-summary'].innerHTML, /该方案包含 <span class="result-count">0<\/span> 个算子/);
   assert.match(elements['#ai-build-event-timeline'].innerHTML, /Build 工具证据/);
   assert.match(elements['#ai-build-parameters'].innerHTML, /模型资源/);
   assert.match(elements['#ai-build-checks'].innerHTML, /应用门禁：已阻断/);
   assert.match(elements['#ai-build-checks'].innerHTML, /请基于原计划重新构建/);
-  assert.match(elements['#ai-build-final-draft'].innerHTML, /无法应用历史构建结果/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /无法应用构建结果/);
   assert.match(elements['#ai-build-final-draft'].innerHTML, /legacy_build_artifact_missing_canonical_flow/);
   assert.doesNotMatch(elements['#ai-build-final-draft'].innerHTML, /可编辑草稿已就绪/);
   assert.doesNotMatch(elements['#ai-btn-apply'].innerHTML, /应用到画布/);
+});
+
+test('AgentRun failed payload with BuildResult and no Flow preserves original failure terminal', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.agentWorkspaceMode = 'build';
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  delete payload.buildResult.flow;
+  delete payload.buildResult.applyGate;
+  payload.success = false;
+  payload.status = 'failed';
+  payload.completionStatus = 'failed';
+  payload.failureType = 'system_error';
+  payload.aiExplanation = 'Model provider returned a system error.';
+  payload.failureSummary = { message: 'Model provider returned a system error.', repairTarget: 'Retry after checking model service.' };
+  const failedEvent = {
+    runId: 'ar_failed_no_flow',
+    sequence: 31,
+    eventType: 'run.failed',
+    stage: 'run',
+    title: 'Run failed',
+    summary: 'Model provider returned a system error.',
+    status: 'failed',
+    payload,
+    metadataOnly: true,
+    redactionPass: true
+  };
+  panel.activeAgentRunEvents = [failedEvent];
+
+  const state = panel._getBuildArtifactFlowCompatibilityState(payload, [failedEvent]);
+  assert.equal(state.status, 'terminal_failed_without_flow');
+  assert.equal(state.terminal.failureType, 'system_error');
+
+  panel._renderBuildWorkspaceFromAgentRun();
+  panel._displayResult(payload, { appendChatMessage: false });
+
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /Model provider returned a system error/);
+  assert.match(elements['#ai-result-summary'].innerHTML, /Model provider returned a system error/);
+  assert.doesNotMatch(elements['#ai-build-final-draft'].innerHTML, /legacy_build_artifact_missing_canonical_flow/);
+  assert.doesNotMatch(elements['#ai-build-final-draft'].innerHTML, /该构建结果不包含可验证的画布流程产物/);
+});
+
+test('AgentRun failed readiness blocker with BuildResult keeps real blocker and first fix', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.agentWorkspaceMode = 'build';
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  delete payload.buildResult.flow;
+  payload.success = false;
+  payload.status = 'failed';
+  payload.completionStatus = 'failed';
+  payload.failureType = 'readiness_blocked';
+  payload.buildResult.applyGate = {
+    canvasApplyReady: false,
+    runtimeDraftReady: false,
+    deploymentReady: false,
+    blocked: true,
+    status: 'readiness_blocked',
+    firstFixRecommendation: 'Bind model_resource metadata before applying.',
+    metadataOnly: true
+  };
+  payload.buildResult.firstFixRecommendation = 'Bind model_resource metadata before applying.';
+  const failedEvent = {
+    runId: 'ar_readiness_blocked',
+    sequence: 31,
+    eventType: 'run.failed',
+    stage: 'run',
+    title: 'Run failed',
+    summary: 'Readiness blocked by missing model resource.',
+    status: 'failed',
+    payload,
+    metadataOnly: true,
+    redactionPass: true
+  };
+  panel.activeAgentRunEvents = [failedEvent];
+
+  assert.equal(panel._getBuildArtifactFlowCompatibilityState(payload, [failedEvent]).status, 'terminal_failed_without_flow');
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  assert.match(elements['#ai-build-checks'].innerHTML, /应用门禁/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /画布可应用：否/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /First Fix/);
+  assert.match(elements['#ai-build-checks'].innerHTML, /模型资源/);
+  assert.match(elements['#ai-build-final-draft'].innerHTML, /Readiness blocked by missing model resource/);
+  assert.doesNotMatch(elements['#ai-build-checks'].innerHTML, /该构建结果不包含可验证的画布流程产物/);
+});
+
+test('AgentRun cancelled payload with BuildResult and no Flow stays cancelled', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  delete payload.buildResult.flow;
+  payload.status = 'cancelled';
+  payload.completionStatus = 'cancelled';
+
+  const cancelledEvent = {
+    runId: 'ar_cancelled_no_flow',
+    sequence: 31,
+    eventType: 'run.cancelled',
+    stage: 'run',
+    title: 'Run cancelled',
+    summary: 'User cancelled build.',
+    status: 'cancelled',
+    payload,
+    metadataOnly: true,
+    redactionPass: true
+  };
+
+  const state = panel._getBuildArtifactFlowCompatibilityState(payload, [cancelledEvent]);
+  assert.equal(state.status, 'terminal_cancelled_without_flow');
+  assert.doesNotMatch(JSON.stringify(state), /legacy_build_artifact_missing_canonical_flow/);
 });
 
 test('AgentRun completed payload with BuildResult.Flow remains apply-ready', async () => {
@@ -5952,6 +6081,74 @@ test('AgentRun completed payload with BuildResult.Flow remains apply-ready', asy
   assert.match(elements['#ai-btn-apply'].innerHTML, /应用到画布/);
   assert.match(elements['#ai-build-final-draft'].innerHTML, /可编辑草稿已就绪/);
   assert.doesNotMatch(elements['#ai-build-final-draft'].innerHTML, /legacy_build_artifact_missing_canonical_flow/);
+});
+
+test('Session failure projection with BuildResult and no Flow keeps original failure without active events', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  delete payload.buildResult.flow;
+  payload.kind = 'assistant_agent_failure';
+  payload.status = 'failed';
+  payload.success = false;
+  payload.completionStatus = 'failed';
+  payload.failureType = 'system_error';
+  payload.failureSummary = { message: 'Historical session system error.', repairTarget: 'Retry the build.' };
+  payload.aiExplanation = 'Historical session system error.';
+
+  assert.equal(panel._getBuildArtifactFlowCompatibilityState(payload, []).status, 'terminal_failed_without_flow');
+
+  panel._displayResult(payload, { appendChatMessage: false });
+
+  assert.match(elements['#ai-result-summary'].innerHTML, /Historical session system error/);
+  assert.match(elements['#ai-result-ops'].innerHTML, /Historical session system error/);
+  assert.doesNotMatch(elements['#ai-result-summary'].innerHTML, /该构建结果不包含可验证的画布流程产物/);
+  assert.doesNotMatch(elements['#ai-result-summary'].innerHTML, /legacy_build_artifact_missing_canonical_flow/);
+});
+
+test('Session completed projection without Flow restores compatibility without active events', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  delete payload.buildResult.flow;
+  payload.kind = 'assistant_agent_result';
+  payload.status = 'completed';
+  payload.success = true;
+  payload.completionStatus = 'completed';
+
+  const state = panel._getBuildArtifactFlowCompatibilityState(payload, []);
+  assert.equal(state.status, 'legacy_build_artifact_missing_canonical_flow');
+
+  panel._displayResult(payload, { appendChatMessage: false });
+
+  assert.equal(panel._isCanvasApplyReadyForResult(payload), false);
+  assert.match(elements['#ai-result-summary'].innerHTML, /该构建结果不包含可验证的画布流程产物/);
+  assert.doesNotMatch(elements['#ai-result-summary'].innerHTML, /该方案包含 <span class="result-count">0<\/span> 个算子/);
+});
+
+test('Existing compatibility marker restores legacy missing Flow status without active events', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  delete payload.buildResult.flow;
+  payload.status = 'failed';
+  payload.completionStatus = 'failed';
+  payload.success = false;
+  payload.failureType = 'legacy_build_artifact_missing_canonical_flow';
+  payload.buildCompatibilityStatus = 'legacy_build_artifact_missing_canonical_flow';
+  payload.compatibilityDiagnosticCode = 'legacy_build_artifact_missing_canonical_flow';
+
+  const state = panel._getBuildArtifactFlowCompatibilityState(payload, []);
+
+  assert.equal(state.status, 'legacy_build_artifact_missing_canonical_flow');
+  assert.equal(state.code, 'legacy_build_artifact_missing_canonical_flow');
 });
 
 test('Legacy WebMessage fallback does not overwrite AgentRun completed BuildResult draft', async () => {
@@ -6923,10 +7120,10 @@ test('AgentRun completed without replayable draft does not mark workbench apply-
 
   assert.equal(closed, true);
   assert.equal(panel.isGenerating, false);
-  assert.equal(turn.statusEl.textContent, '需要重新构建');
+  assert.equal(turn.statusEl.textContent, '构建完成但草稿缺失');
   assert.equal(panel.lastWorkbenchState, 'failed');
-  assert.match(panel.lastResultStatusNote.text, /该历史构建结果不包含可验证的画布流程产物/);
-  assert.equal(panel.currentResult?.compatibilityDiagnosticCode, 'legacy_build_artifact_missing_canonical_flow');
+  assert.match(panel.lastResultStatusNote.text, /没有收到可回放流程草稿/);
+  assert.notEqual(panel.currentResult?.compatibilityDiagnosticCode, 'legacy_build_artifact_missing_canonical_flow');
 });
 
 test('AgentRun cancelled event sets cancelled UI state', async () => {

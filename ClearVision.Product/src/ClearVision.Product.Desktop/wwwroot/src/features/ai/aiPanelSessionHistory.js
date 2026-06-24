@@ -258,6 +258,16 @@ export const aiPanelSessionHistoryMixin = {
             applyGate: restoredApplyGate,
             toolEvidenceTimeline: restoredToolEvidence,
             firstFixRecommendation: restoredFirstFix,
+            kind: latestAssistantPayload?.kind ?? latestAssistantPayload?.Kind ?? '',
+            status: latestAssistantPayload?.status ?? latestAssistantPayload?.Status ?? '',
+            success: latestAssistantPayload?.success ?? latestAssistantPayload?.Success,
+            completionStatus: latestAssistantPayload?.completionStatus ?? latestAssistantPayload?.CompletionStatus ?? '',
+            interactionState: latestAssistantPayload?.interactionState ?? latestAssistantPayload?.InteractionState ?? '',
+            failureType: latestAssistantPayload?.failureType ?? latestAssistantPayload?.FailureType ?? '',
+            failureSummary: latestAssistantPayload?.failureSummary ?? latestAssistantPayload?.FailureSummary ?? null,
+            errorMessage: latestAssistantPayload?.errorMessage ?? latestAssistantPayload?.ErrorMessage ?? '',
+            buildCompatibilityStatus: latestAssistantPayload?.buildCompatibilityStatus ?? latestAssistantPayload?.BuildCompatibilityStatus ?? '',
+            compatibilityDiagnosticCode: latestAssistantPayload?.compatibilityDiagnosticCode ?? latestAssistantPayload?.CompatibilityDiagnosticCode ?? '',
             clarificationRequired: Boolean(
                 followupSource?.clarificationRequired ??
                 followupSource?.ClarificationRequired ??
