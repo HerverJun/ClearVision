@@ -968,7 +968,7 @@ test('Plan pending recommendation click keeps DOM selection separate from effect
       value: 'file_sample',
       origin: 'explicit_user_selection',
     },
-    canBuild: true,
+    canBuild: false,
   });
 
   await pending.click();

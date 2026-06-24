@@ -160,6 +160,229 @@ public sealed class VisionAgentBuildOrchestratorTests
             .Contain(VisionAgentPlanAnswerFields.ImageSource);
     }
 
+    [Fact(DisplayName = "BuildReadiness preview should share strict/draft defer semantics with BuildFromPlan")]
+    public async Task PreviewBuildReadiness_StrictAndDraftDefer_ShouldUseCanonicalEvaluator()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var applicationService = CreateBuildApplicationService(sink);
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "logo appearance defect workflow");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["hard_requirement:image_source_missing"],
+            ClarificationQuestions =
+            [
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "image_source",
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Title = "Image source",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "camera_pending",
+                            Label = "Keep pending",
+                            Recommended = true,
+                            AnswerEffect = VisionAgentClarificationAnswerEffects.Defer
+                        }
+                    ]
+                }
+            ],
+            SemanticExtraction = baseline.SemanticExtraction! with
+            {
+                ImageSource = string.Empty
+            },
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+        plan = plan with { PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan) };
+        var selections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["image_source"] = "camera_pending"
+        };
+
+        var strict = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(plan, selections, requirementMode: AiRequirementModes.Strict, answerRevision: 7),
+            CancellationToken.None);
+        var draft = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(plan, selections, requirementMode: AiRequirementModes.Draft, answerRevision: 8),
+            CancellationToken.None);
+
+        strict.BuildReadiness.CanBuild.Should().BeFalse();
+        strict.DeferredQuestionIds.Should().ContainSingle("image_source");
+        strict.AcceptedAnswers.Should().BeEmpty();
+        draft.BuildReadiness.CanBuild.Should().BeTrue();
+        draft.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Id == "resource_pending:image_source_missing" &&
+            blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
+            blocker.BlocksBuild == false);
+        draft.AnswerRevision.Should().Be(8);
+        sink.Events.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "BuildReadiness preview should keep station camera resource pending in strict and draft")]
+    public async Task PreviewBuildReadiness_StationCamera_ShouldKeepCameraBindingResourcePending()
+    {
+        var applicationService = CreateBuildApplicationService(new CapturingAgentRunEventSink());
+        var baseline = Plan(
+            "surface_defect",
+            ["ImageAcquisition", "SurfaceDefectDetection", "ResultJudgment", "ResultOutput"],
+            "station camera scratch inspection workflow");
+        var plan = baseline with
+        {
+            CanBuild = false,
+            BlockingReasons = ["hard_requirement:image_source_missing"],
+            ClarificationQuestions =
+            [
+                new VisionAgentClarificationQuestion
+                {
+                    Id = "image_source",
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Title = "Image source",
+                    Options =
+                    [
+                        new VisionAgentClarificationOption
+                        {
+                            Value = "station_camera",
+                            Label = "Station camera",
+                            Recommended = true,
+                            AnswerEffect = VisionAgentClarificationAnswerEffects.ResolveField
+                        }
+                    ]
+                }
+            ],
+            SemanticExtraction = baseline.SemanticExtraction! with
+            {
+                ImageSource = string.Empty
+            },
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+        plan = plan with { PlanHash = VisionAgentOrchestrator.ComputePlanHash(plan) };
+        var answer = PlanAnswer("image_source", VisionAgentPlanAnswerFields.ImageSource, "station_camera");
+
+        var strict = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(plan, confirmedAnswers: [answer], requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+        var draft = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(plan, confirmedAnswers: [answer], requirementMode: AiRequirementModes.Draft),
+            CancellationToken.None);
+
+        strict.BuildReadiness.CanBuild.Should().BeFalse();
+        strict.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.BlocksBuild);
+        draft.BuildReadiness.CanBuild.Should().BeTrue();
+        draft.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.BlocksBuild == false);
+        draft.AcceptedAnswers.Should().ContainSingle(accepted =>
+            accepted.Field == VisionAgentPlanAnswerFields.ImageSource &&
+            accepted.Value == "station_camera");
+    }
+
+    [Fact(DisplayName = "BuildReadiness preview should block external output in strict and draft")]
+    public async Task PreviewBuildReadiness_ExternalOutput_ShouldBlockBothModes()
+    {
+        var applicationService = CreateBuildApplicationService(new CapturingAgentRunEventSink());
+        var plan = ExternalMesOutputPlan();
+
+        var strict = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(plan, requirementMode: AiRequirementModes.Strict),
+            CancellationToken.None);
+        var draft = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(plan, requirementMode: AiRequirementModes.Draft),
+            CancellationToken.None);
+
+        strict.BuildReadiness.CanBuild.Should().BeFalse();
+        draft.BuildReadiness.CanBuild.Should().BeFalse();
+        strict.BuildReadiness.Blockers.Should().Contain(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild);
+        draft.BuildReadiness.Blockers.Should().Contain(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.OutputTarget &&
+            blocker.BlocksBuild);
+    }
+
+    [Fact(DisplayName = "BuildReadiness preview should match BuildFromPlan readiness and fingerprint")]
+    public async Task PreviewBuildReadiness_ShouldMatchBuildFromPlanFinalGate()
+    {
+        var sink = new CapturingAgentRunEventSink();
+        var applicationService = CreateBuildApplicationService(sink);
+        var plan = PlanWithStrategyConfirmationBlocker();
+        var request = Request(
+            plan,
+            userSelections: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            acceptedRecommendedDefaults: false);
+
+        var preview = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(
+                plan,
+                userSelections: request.BuildFromPlan!.UserSelections,
+                confirmedAnswers: request.BuildFromPlan.ConfirmedAnswers,
+                acceptedRecommendedDefaults: request.BuildFromPlan.AcceptedRecommendedDefaults,
+                requirementMode: request.RequirementMode,
+                answerRevision: 42),
+            CancellationToken.None);
+        var build = await applicationService.BuildAsync(
+            BuildCommand.FromGenerationRequest(request, transport: BuildCommandTransports.Internal, persistResult: false),
+            CancellationToken.None);
+
+        preview.BuildReadiness.Should().BeEquivalentTo(build.Result.BuildReadiness);
+        preview.AnswerSetFingerprint.Should().Be(build.Result.AnswerSetFingerprint);
+        preview.AcceptedAnswers.Should().BeEquivalentTo(
+            new VisionAgentPlanAnswerValidator().Validate(
+                plan,
+                request.BuildFromPlan.ConfirmedAnswers,
+                request.BuildFromPlan.UserSelections,
+                request.BuildFromPlan.AcceptedRecommendedDefaults).AcceptedAnswers);
+    }
+
+    [Fact(DisplayName = "BuildReadiness preview should fail closed on stale plan hash without changing answer revision")]
+    public async Task PreviewBuildReadiness_StalePlanHash_ShouldReturnControlledFailure()
+    {
+        var applicationService = CreateBuildApplicationService(new CapturingAgentRunEventSink());
+        var plan = PlanWithStrategyConfirmationBlocker();
+
+        var preview = await applicationService.PreviewBuildReadinessAsync(
+            PreviewRequest(plan, planHashOverride: "sha256:stale", answerRevision: 99),
+            CancellationToken.None);
+
+        preview.ContractValid.Should().BeFalse();
+        preview.FailureCode.Should().Be(VisionAgentBuildFailureCodes.StalePlan);
+        preview.AnswerRevision.Should().Be(99);
+        preview.BuildReadiness.CanBuild.Should().BeFalse();
+        preview.BuildReadiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Id == VisionAgentBuildFailureCodes.StalePlan &&
+            blocker.BlocksBuild);
+    }
+
+    [Fact(DisplayName = "Requirement mode and answer revision should not participate in PlanHash")]
+    public void PreviewInputs_ShouldNotParticipateInPlanHash()
+    {
+        var plan = PlanWithStrategyConfirmationBlocker();
+
+        var strict = PreviewRequest(plan, requirementMode: AiRequirementModes.Strict, answerRevision: 1);
+        var draft = PreviewRequest(plan, requirementMode: AiRequirementModes.Draft, answerRevision: 2);
+
+        VisionAgentOrchestrator.ComputePlanHash(strict.PlanSnapshot).Should().Be(plan.PlanHash);
+        VisionAgentOrchestrator.ComputePlanHash(draft.PlanSnapshot).Should().Be(plan.PlanHash);
+    }
+
     [Fact(DisplayName = "BuildFromPlan strict answered image source should build")]
     public async Task BuildAsync_StrictImageSourceAnswered_ShouldBuild()
     {
@@ -1910,6 +2133,49 @@ public sealed class VisionAgentBuildOrchestratorTests
                 AcceptedRecommendedDefaults = acceptedRecommendedDefaults,
                 MetadataOnly = true
             }
+        };
+    }
+
+    private static VisionAgentBuildReadinessPreviewRequest PreviewRequest(
+        VisionAgentPlanModeResult plan,
+        Dictionary<string, string>? userSelections = null,
+        List<VisionAgentPlanAnswer>? confirmedAnswers = null,
+        bool acceptedRecommendedDefaults = false,
+        string requirementMode = AiRequirementModes.Strict,
+        int answerRevision = 1,
+        string? planHashOverride = null)
+    {
+        var request = Request(
+            plan,
+            planHashOverride: planHashOverride,
+            userSelections: userSelections ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            confirmedAnswers: confirmedAnswers ?? [],
+            acceptedRecommendedDefaults: acceptedRecommendedDefaults,
+            requirementMode: requirementMode);
+        var build = request.BuildFromPlan!;
+        return new VisionAgentBuildReadinessPreviewRequest
+        {
+            PlanId = build.PlanId,
+            PlanHash = build.PlanHash,
+            PlanSnapshot = build.PlanSnapshot,
+            RequirementMode = request.RequirementMode,
+            ConfirmedAnswers = build.ConfirmedAnswers,
+            UserSelections = build.UserSelections,
+            AcceptedDefaults = build.AcceptedDefaults,
+            AcceptedRecommendedDefaults = build.AcceptedRecommendedDefaults,
+            AnswerRevision = answerRevision,
+            AdditionalContext = request.AdditionalContext,
+            CurrentFlowSnapshot = build.CurrentFlowSnapshot,
+            TemplateSelection = build.TemplateSelection,
+            AttachmentSummary = build.AttachmentSummary,
+            OperatorCatalogVersion = build.OperatorCatalogVersion,
+            StationBoundarySummary = build.StationBoundarySummary,
+            PlcOutputPolicy = build.PlcOutputPolicy,
+            BuildIntent = build.BuildIntent,
+            OriginalUserPrompt = build.OriginalUserPrompt,
+            RequirementMaturity = build.RequirementMaturity,
+            DecisionTrace = build.DecisionTrace,
+            MetadataOnly = true
         };
     }
 

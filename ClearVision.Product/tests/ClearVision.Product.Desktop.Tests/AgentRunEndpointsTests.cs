@@ -186,6 +186,42 @@ public sealed class AgentRunEndpointsTests
                     !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));
     }
 
+    [Fact(DisplayName = "POST Agent plan readiness preview returns canonical readiness without creating AgentRun")]
+    public async Task PreviewPlanReadiness_ShouldNotCreateRunOrProjectSession()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var plan = LegacyBlockedAgentRunBuildFromPlanSnapshot();
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan/readiness-preview", new
+        {
+            planId = plan.PlanId,
+            planHash = plan.PlanHash,
+            planSnapshot = plan,
+            requirementMode = AiRequirementModes.Strict,
+            confirmedAnswers = ConfirmedAgentRunBuildFromPlanAnswers(),
+            userSelections = new Dictionary<string, string>
+            {
+                ["defect_definition"] = "scratch_or_blob"
+            },
+            acceptedDefaults = new[] { "resource_policy" },
+            acceptedRecommendedDefaults = false,
+            answerRevision = 12,
+            metadataOnly = true
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("planId").GetString().Should().Be(plan.PlanId);
+        root.GetProperty("planHash").GetString().Should().Be(plan.PlanHash);
+        root.GetProperty("answerRevision").GetInt32().Should().Be(12);
+        root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        root.TryGetProperty("runId", out _).Should().BeFalse();
+        host.StreamService.ReplayLatest(string.Empty).Should().BeNull();
+        host.Generation.LastCommand.Should().BeNull();
+        host.ConversationService.GetSession("agent-ui-contract").Should().BeNull();
+    }
+
     [Fact(DisplayName = "POST Agent intent router returns public route decision")]
     public async Task CreateIntentRouter_ShouldReturnPublicRouteDecision()
     {
@@ -1683,6 +1719,35 @@ public sealed class AgentRunEndpointsTests
                 WorkflowDiff = result.BuildResult?.WorkflowDiff,
                 ApplyGate = result.BuildResult?.ApplyGate
             };
+        }
+
+        public Task<VisionAgentBuildReadinessPreviewResult> PreviewBuildReadinessAsync(
+            VisionAgentBuildReadinessPreviewRequest request,
+            CancellationToken cancellationToken)
+        {
+            LastCancellationToken = cancellationToken;
+            var readiness = request.PlanSnapshot?.BuildReadiness ?? new VisionAgentBuildReadinessSnapshot
+            {
+                CanBuild = true,
+                ContractVersion = request.PlanSnapshot?.PlanContractVersion ?? VisionAgentPlanContractVersions.V2
+            };
+            return Task.FromResult(new VisionAgentBuildReadinessPreviewResult
+            {
+                PlanId = request.PlanId,
+                PlanHash = request.PlanHash,
+                RequirementMode = request.RequirementMode,
+                AnswerRevision = request.AnswerRevision,
+                AcceptedAnswers = request.ConfirmedAnswers,
+                AnswerSetFingerprint = "sha256:test-preview",
+                BuildReadiness = readiness,
+                PendingConfirmationCount = readiness.RemainingFields.Count,
+                ResourcePendingCount = readiness.Blockers.Count(blocker =>
+                    blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending),
+                HardBlockerCount = readiness.Blockers.Count(blocker =>
+                    blocker.BlocksBuild &&
+                    blocker.Category != VisionAgentBuildBlockerCategories.ResourcePending),
+                MetadataOnly = true
+            });
         }
 
         public async Task WaitForCallAsync()

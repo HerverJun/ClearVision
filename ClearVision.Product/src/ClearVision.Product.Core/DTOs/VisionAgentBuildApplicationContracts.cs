@@ -56,6 +56,51 @@ public sealed record CanonicalBuildOutcome
     public bool Persisted { get; init; }
 }
 
+public sealed record VisionAgentBuildReadinessPreviewRequest
+{
+    public string PlanId { get; init; } = string.Empty;
+    public string PlanHash { get; init; } = string.Empty;
+    public VisionAgentPlanModeResult? PlanSnapshot { get; init; }
+    public string RequirementMode { get; init; } = AiRequirementModes.Strict;
+    public List<VisionAgentPlanAnswer> ConfirmedAnswers { get; init; } = [];
+    public Dictionary<string, string> UserSelections { get; init; } =
+        new(StringComparer.OrdinalIgnoreCase);
+    public List<string> AcceptedDefaults { get; init; } = [];
+    public bool AcceptedRecommendedDefaults { get; init; }
+    public int AnswerRevision { get; init; }
+    public string? AdditionalContext { get; init; }
+    public string? CurrentFlowSnapshot { get; init; }
+    public AiTemplateSelectionInfo? TemplateSelection { get; init; }
+    public VisionAgentAttachmentSummary AttachmentSummary { get; init; } = new();
+    public string OperatorCatalogVersion { get; init; } = string.Empty;
+    public string StationBoundarySummary { get; init; } = string.Empty;
+    public string PlcOutputPolicy { get; init; } = string.Empty;
+    public string BuildIntent { get; init; } = "new";
+    public string OriginalUserPrompt { get; init; } = string.Empty;
+    public AiRequirementMaturityResult? RequirementMaturity { get; init; }
+    public AiDecisionTrace? DecisionTrace { get; init; }
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record VisionAgentBuildReadinessPreviewResult
+{
+    public string PlanId { get; init; } = string.Empty;
+    public string PlanHash { get; init; } = string.Empty;
+    public string RequirementMode { get; init; } = AiRequirementModes.Strict;
+    public int AnswerRevision { get; init; }
+    public List<VisionAgentPlanAnswer> AcceptedAnswers { get; init; } = [];
+    public string AnswerSetFingerprint { get; init; } = string.Empty;
+    public VisionAgentBuildReadinessSnapshot BuildReadiness { get; init; } = new();
+    public List<string> DeferredQuestionIds { get; init; } = [];
+    public int PendingConfirmationCount { get; init; }
+    public int ResourcePendingCount { get; init; }
+    public int HardBlockerCount { get; init; }
+    public bool ContractValid { get; init; } = true;
+    public string FailureCode { get; init; } = string.Empty;
+    public string FailureMessage { get; init; } = string.Empty;
+    public bool MetadataOnly { get; init; } = true;
+}
+
 public static class VisionAgentBuildFailureCodes
 {
     public const string Disabled = "build_from_plan_disabled";

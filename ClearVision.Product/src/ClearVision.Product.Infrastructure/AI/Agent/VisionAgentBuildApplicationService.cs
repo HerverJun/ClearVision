@@ -33,6 +33,41 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         _eventSink = eventSink;
     }
 
+    public Task<VisionAgentBuildReadinessPreviewResult> PreviewBuildReadinessAsync(
+        VisionAgentBuildReadinessPreviewRequest previewRequest,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(previewRequest);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var request = BuildPreviewGenerationRequest(previewRequest);
+        var requestedMode = ResolveRequestedMode(request);
+        var effectiveMode = requestedMode;
+
+        if (!_options.Enabled)
+        {
+            return Task.FromResult(InvalidPreviewResult(
+                previewRequest,
+                VisionAgentBuildFailureCodes.Disabled,
+                "Vision Agent BuildFromPlan is disabled by configuration."));
+        }
+
+        var contract = ValidateContract(request, requestedMode, effectiveMode);
+        if (!contract.Valid)
+        {
+            return Task.FromResult(InvalidPreviewResult(
+                previewRequest,
+                contract.FailureCode,
+                contract.FailureMessage,
+                contract.PlanId,
+                contract.PlanHash,
+                contract.ContractVersion));
+        }
+
+        var readinessContext = BuildReadinessContext(request, contract);
+        return Task.FromResult(BuildPreviewResult(previewRequest, contract, readinessContext));
+    }
+
     public async Task<CanonicalBuildOutcome> BuildAsync(
         BuildCommand command,
         CancellationToken cancellationToken)
@@ -337,7 +372,193 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
         };
         return new CanonicalReadinessContext(
             readiness,
+            validatedAnswers,
             validatedAnswers.AnswerSetFingerprint);
+    }
+
+    private static AiFlowGenerationRequest BuildPreviewGenerationRequest(
+        VisionAgentBuildReadinessPreviewRequest request)
+    {
+        var build = new VisionAgentBuildFromPlanRequest
+        {
+            PlanId = request.PlanId,
+            PlanHash = request.PlanHash,
+            PlanSnapshot = request.PlanSnapshot,
+            ConfirmedAnswers = request.ConfirmedAnswers,
+            UserSelections = request.UserSelections,
+            AcceptedDefaults = request.AcceptedDefaults,
+            CurrentFlowSnapshot = request.CurrentFlowSnapshot,
+            TemplateSelection = request.TemplateSelection ?? request.PlanSnapshot?.TemplateSelection,
+            AttachmentSummary = request.AttachmentSummary,
+            OperatorCatalogVersion = request.OperatorCatalogVersion,
+            StationBoundarySummary = request.StationBoundarySummary,
+            PlcOutputPolicy = request.PlcOutputPolicy,
+            BuildIntent = request.BuildIntent,
+            OriginalUserPrompt = request.OriginalUserPrompt,
+            AcceptedRecommendedDefaults = request.AcceptedRecommendedDefaults,
+            RequirementMaturity = request.RequirementMaturity,
+            DecisionTrace = request.DecisionTrace,
+            MetadataOnly = true
+        };
+
+        return new AiFlowGenerationRequest(
+            FirstNonBlank(request.OriginalUserPrompt, request.PlanSnapshot?.OriginalUserPrompt, request.PlanSnapshot?.Goal),
+            request.AdditionalContext,
+            null,
+            request.CurrentFlowSnapshot,
+            Array.Empty<string>(),
+            GenerateFlowModeExtensions.ParseOrAuto(request.BuildIntent),
+            false,
+            build.TemplateSelection)
+        {
+            RequirementMode = NormalizeRequirementMode(request.RequirementMode),
+            UseVisionAgentGenerateFlow = true,
+            AgentGenerateFlowMode = AiAgentGenerateFlowModes.Scripted,
+            RuntimePreviewConsent = false,
+            BuildFromPlan = build
+        };
+    }
+
+    private VisionAgentBuildReadinessPreviewResult BuildPreviewResult(
+        VisionAgentBuildReadinessPreviewRequest request,
+        BuildContractValidation contract,
+        CanonicalReadinessContext readinessContext)
+    {
+        var readiness = readinessContext.Readiness;
+        var deferredQuestionIds = FindDeferredQuestionIds(contract.Plan!, contract.Build!.UserSelections);
+        var pendingConfirmationCount = CountPendingConfirmations(readiness);
+        var resourcePendingCount = readiness.Blockers
+            .Where(blocker => blocker.Category.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase))
+            .Select(blocker => FirstNonBlank(blocker.QuestionId, blocker.Field, blocker.Id))
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        var hardBlockerCount = readiness.Blockers.Count(blocker =>
+            blocker.BlocksBuild &&
+            !blocker.Category.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase));
+
+        return new VisionAgentBuildReadinessPreviewResult
+        {
+            PlanId = contract.PlanId,
+            PlanHash = contract.PlanHash,
+            RequirementMode = NormalizeRequirementMode(request.RequirementMode),
+            AnswerRevision = request.AnswerRevision,
+            AcceptedAnswers = readinessContext.Validation.AcceptedAnswers,
+            AnswerSetFingerprint = readinessContext.AnswerSetFingerprint,
+            BuildReadiness = readiness,
+            DeferredQuestionIds = deferredQuestionIds,
+            PendingConfirmationCount = pendingConfirmationCount,
+            ResourcePendingCount = resourcePendingCount,
+            HardBlockerCount = hardBlockerCount,
+            ContractValid = true,
+            MetadataOnly = true
+        };
+    }
+
+    private static VisionAgentBuildReadinessPreviewResult InvalidPreviewResult(
+        VisionAgentBuildReadinessPreviewRequest request,
+        string failureCode,
+        string failureMessage,
+        string planId = "",
+        string planHash = "",
+        string contractVersion = "")
+    {
+        var blocker = new VisionAgentBuildBlocker
+        {
+            Id = failureCode,
+            Category = VisionAgentBuildBlockerCategories.HardRequirement,
+            BlocksBuild = true,
+            ResolutionMode = VisionAgentBuildBlockerResolutionModes.AnswerQuestion,
+            PublicLabel = failureMessage
+        };
+        return new VisionAgentBuildReadinessPreviewResult
+        {
+            PlanId = FirstNonBlank(planId, request.PlanId, request.PlanSnapshot?.PlanId),
+            PlanHash = FirstNonBlank(planHash, request.PlanHash, request.PlanSnapshot?.PlanHash),
+            RequirementMode = NormalizeRequirementMode(request.RequirementMode),
+            AnswerRevision = request.AnswerRevision,
+            BuildReadiness = new VisionAgentBuildReadinessSnapshot
+            {
+                CanBuild = false,
+                Blockers = [blocker],
+                PrimaryMessage = failureMessage,
+                ContractVersion = FirstNonBlank(contractVersion, request.PlanSnapshot?.PlanContractVersion, VisionAgentPlanContractVersions.V2)
+            },
+            HardBlockerCount = 1,
+            ContractValid = false,
+            FailureCode = failureCode,
+            FailureMessage = failureMessage,
+            MetadataOnly = true
+        };
+    }
+
+    private static List<string> FindDeferredQuestionIds(
+        VisionAgentPlanModeResult plan,
+        IReadOnlyDictionary<string, string>? userSelections)
+    {
+        if (userSelections == null || userSelections.Count == 0)
+        {
+            return [];
+        }
+
+        var questions = plan.ClarificationQuestions ?? [];
+        var deferred = new List<string>();
+        foreach (var question in questions)
+        {
+            var questionId = Clean(question.Id);
+            if (string.IsNullOrWhiteSpace(questionId))
+            {
+                continue;
+            }
+
+            var field = VisionAgentPlanFieldPolicy.ResolveQuestionField(question, plan.BlockingReasons);
+            if (!userSelections.TryGetValue(questionId, out var selected) &&
+                (string.IsNullOrWhiteSpace(field) || !userSelections.TryGetValue(field, out selected)))
+            {
+                continue;
+            }
+
+            var selectedValue = Clean(selected);
+            var option = question.Options.FirstOrDefault(item =>
+                Clean(item.Value).Equals(selectedValue, StringComparison.OrdinalIgnoreCase));
+            if (option != null &&
+                string.Equals(option.AnswerEffect, VisionAgentClarificationAnswerEffects.Defer, StringComparison.OrdinalIgnoreCase))
+            {
+                deferred.Add(questionId);
+            }
+        }
+
+        return deferred.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static int CountPendingConfirmations(VisionAgentBuildReadinessSnapshot readiness)
+    {
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var blocker in readiness.Blockers)
+        {
+            if (blocker.Category.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase) ||
+                blocker.Category.Equals(VisionAgentBuildBlockerCategories.ContractWarning, StringComparison.OrdinalIgnoreCase) ||
+                blocker.Category.Equals(VisionAgentBuildBlockerCategories.SafetyBlocker, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var key = FirstNonBlank(blocker.QuestionId, blocker.Field, blocker.Id);
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                keys.Add(key);
+            }
+        }
+
+        foreach (var field in readiness.RemainingFields)
+        {
+            if (!string.IsNullOrWhiteSpace(field))
+            {
+                keys.Add(field);
+            }
+        }
+
+        return keys.Count;
     }
 
     private AiFlowGenerationResult Failure(
@@ -653,6 +874,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
 
     private sealed record CanonicalReadinessContext(
         VisionAgentBuildReadinessSnapshot Readiness,
+        VisionAgentPlanAnswerValidationResult Validation,
         string AnswerSetFingerprint);
 
     private sealed record BuildContractValidation(

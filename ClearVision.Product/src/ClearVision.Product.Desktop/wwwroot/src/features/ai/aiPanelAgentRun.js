@@ -970,6 +970,10 @@ export const aiPanelAgentRunMixin = {
                 if (evt.summary) {
                     this._setResultStatusNote(this._localizeDisplayText?.(evt.summary) || evt.summary, 'info');
                 }
+                this._showDraftBuildCompletionNotice?.(
+                    this.currentResult,
+                    this._asObject?.(evt.payload) || evt.payload || {}
+                );
             } else {
                 this._setWorkbenchState(AiWorkbenchStates.FAILED);
                 this._setAssistantTurnStatus(this.activeAssistantTurn, '构建完成但草稿缺失', 'warning');

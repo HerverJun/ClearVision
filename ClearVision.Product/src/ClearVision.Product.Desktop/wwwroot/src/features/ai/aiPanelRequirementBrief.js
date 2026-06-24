@@ -4,19 +4,11 @@ export const aiPanelRequirementBriefMixin = {
     },
 
     _loadRequirementMode() {
-        try {
-            return this._normalizeRequirementMode(localStorage.getItem('cv_ai_requirement_mode'));
-        } catch {
-            return 'strict';
-        }
+        return 'strict';
     },
 
     _saveRequirementMode(mode) {
-        try {
-            localStorage.setItem('cv_ai_requirement_mode', this._normalizeRequirementMode(mode));
-        } catch {
-            // ignore localStorage failures
-        }
+        return this._normalizeRequirementMode(mode);
     },
 
     _setRequirementMode(mode, { silent = false } = {}) {
@@ -27,12 +19,19 @@ export const aiPanelRequirementBriefMixin = {
         }
 
         this.requirementMode = normalized;
-        this._saveRequirementMode(normalized);
+        if (this.pendingVisionPlan) {
+            this.pendingVisionPlan.requirementMode = normalized;
+            this._rememberRequirementModeForPlan?.(this.pendingVisionPlan, normalized);
+        }
+        this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+        this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'requirement_mode' });
         this._updateRequirementModeUI();
+        this._renderPlanWorkspace?.(this.pendingVisionPlan);
+        this._renderAgentWorkspaceOverview?.();
 
         if (!silent) {
-            const label = normalized === 'draft' ? '可直接构建草稿' : '先确认计划';
-            this._addMessage('system', `规划状态已切换为：${label}。`);
+            const label = normalized === 'draft' ? '先生成可编辑草稿' : '严格确认后构建';
+            this._addMessage?.('system', `规划模式已切换为：${label}。`);
         }
     },
 
@@ -49,8 +48,8 @@ export const aiPanelRequirementBriefMixin = {
 
         if (tip) {
             tip.textContent = normalized === 'draft'
-                ? '可按当前假设继续构建，未解决项会作为风险持续显示。'
-                : '规划模式会先确认阻断性工程字段，再进入构建。';
+                ? 'Draft：允许后端判定为可后补的决策或资源暂缓，先生成可编辑草稿，不代表可部署。'
+                : 'Strict：关键决策及当前模式要求的资源确认后才可构建。';
         }
     }
 };

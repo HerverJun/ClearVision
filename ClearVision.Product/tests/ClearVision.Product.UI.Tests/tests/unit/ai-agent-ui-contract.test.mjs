@@ -315,6 +315,14 @@ function createPanel(AiPanel, overrides = {}) {
   panel.planQuestionSelections = {};
   panel.planQuestionAnswers = {};
   panel.planAnswerRevision = 0;
+  panel.planAcceptedRecommendedDefaults = false;
+  panel.planRequirementModes = new Map();
+  panel.currentPlanIdentity = '';
+  panel.effectiveReadiness = null;
+  panel.previewState = 'idle';
+  panel.activePlanReadinessPreviewController = null;
+  panel.activePlanReadinessPreviewRequest = null;
+  panel.lastPlanReadinessPreviewError = '';
   panel.activeGenerateRequestId = null;
   panel.activeIntentRouterRequestId = null;
   panel.activePlanRequestId = null;
@@ -382,6 +390,132 @@ function createPanel(AiPanel, overrides = {}) {
     routerSource: 'test_router',
     metadataOnly: true
   }));
+  panel._buildTestPlanReadinessPreview = request => {
+    const plan = panel.pendingVisionPlan;
+    const acceptedRecommended = request.acceptedRecommendedDefaults === true;
+    let readiness = overrides.previewReadiness || null;
+    if (!readiness && plan && panel._isUsableAuthoritativeReadiness(plan.authoritativeBuildReadiness)) {
+      readiness = panel._applyAnswersToAuthoritativeReadiness(
+        plan.authoritativeBuildReadiness,
+        plan.questions,
+        panel.planQuestionAnswers || {},
+        { acceptedRecommended }
+      );
+    }
+    if (!readiness && plan) {
+      readiness = panel._buildLegacyPlanReadinessSnapshot({
+        plan,
+        rawCanBuild: plan.rawPlanSnapshot?.canBuild ?? plan.rawPlanSnapshot?.CanBuild ?? plan.executable,
+        requirementMaturity: plan.requirementMaturity,
+        semanticExtraction: plan.semanticExtraction,
+        route: plan.route || plan.recommendedRoute || plan.RecommendedRoute,
+        blockingReasons: plan.blockingReasons,
+        questions: plan.questions,
+        acceptedRecommended,
+        requirementMode: request.requirementMode || panel.requirementMode || 'strict'
+      });
+    }
+    readiness = readiness ||
+      request.planSnapshot?.buildReadiness ||
+      request.planSnapshot?.BuildReadiness ||
+      {
+        canBuild: false,
+        blockers: [],
+        resolvedFields: [],
+        remainingFields: ['inspection_object'],
+        primaryMessage: '仍需确认基础需求。',
+        contractVersion: 'v2'
+      };
+    const acceptedAnswers = request.confirmedAnswers || [];
+    const acceptedKeys = new Set(acceptedAnswers.flatMap(answer => [
+      String(answer.questionId || answer.QuestionId || '').trim(),
+      String(answer.field || answer.Field || '').trim()
+    ]).filter(Boolean));
+    if (acceptedKeys.size > 0) {
+      const nextBlockers = (readiness.blockers || readiness.Blockers || []).filter(blocker => {
+        if (String(blocker.category || blocker.Category || '').toLowerCase() === 'safety_blocker') {
+          return true;
+        }
+        const keys = [
+          blocker.questionId || blocker.QuestionId || '',
+          blocker.field || blocker.Field || ''
+        ].map(value => String(value || '').trim()).filter(Boolean);
+        return !keys.some(key => acceptedKeys.has(key));
+      });
+      const nextRemaining = (readiness.remainingFields || readiness.RemainingFields || [])
+        .filter(field => !acceptedKeys.has(String(field || '').trim()));
+      const blockingLeft = nextBlockers.some(blocker => (blocker.blocksBuild ?? blocker.BlocksBuild) === true);
+      readiness = {
+        ...readiness,
+        canBuild: !blockingLeft && nextRemaining.length === 0,
+        blockers: nextBlockers,
+        remainingFields: nextRemaining,
+        resolvedFields: [
+          ...(readiness.resolvedFields || readiness.ResolvedFields || []),
+          ...acceptedAnswers.map(answer => answer.field || answer.Field).filter(Boolean)
+        ],
+        primaryMessage: !blockingLeft && nextRemaining.length === 0
+          ? '规划已完成，可以开始构建。'
+          : (readiness.primaryMessage || readiness.PrimaryMessage || '')
+      };
+    }
+    const blockers = readiness.blockers || readiness.Blockers || [];
+    const resourcePendingCount = blockers.filter(blocker =>
+      String(blocker.category || blocker.Category || '').toLowerCase() === 'resource_pending').length;
+    const hardBlockerCount = blockers.filter(blocker =>
+      (blocker.blocksBuild ?? blocker.BlocksBuild) === true &&
+      String(blocker.category || blocker.Category || '').toLowerCase() !== 'resource_pending').length;
+    const remainingFields = readiness.remainingFields || readiness.RemainingFields || [];
+    const deferredQuestionIds = panel._toArray(plan?.questions)
+      .filter(question => {
+        const selected = String((request.userSelections || {})[question.id] || '').trim();
+        const option = panel._toArray(question.options)
+          .find(item => String(item.value || '').trim() === selected);
+        return option && panel._isDeferOption(option);
+      })
+      .map(question => question.id);
+    return {
+      planId: request.planId,
+      planHash: request.planHash,
+      requirementMode: request.requirementMode || 'strict',
+      answerRevision: request.answerRevision || 0,
+      acceptedAnswers: request.confirmedAnswers || [],
+      answerSetFingerprint: `test:${request.answerRevision || 0}:${request.requirementMode || 'strict'}`,
+      buildReadiness: readiness,
+      deferredQuestionIds,
+      pendingConfirmationCount: remainingFields.length,
+      resourcePendingCount,
+      hardBlockerCount,
+      metadataOnly: true
+    };
+  };
+  panel._requestBackendPlanReadinessPreview = overrides.planReadinessPreview || (request =>
+    panel._buildTestPlanReadinessPreview(request));
+  if (!overrides.useProductionPreview) {
+    panel._requestPlanReadinessPreview = (plan = panel.pendingVisionPlan, options = {}) => {
+      if (!plan) return false;
+      panel._activatePlanIdentity?.(plan);
+      const request = panel._buildPlanReadinessPreviewRequest(plan, options);
+      panel.previewState = 'validating';
+      plan.previewState = 'validating';
+      plan.executable = false;
+      const result = panel._requestBackendPlanReadinessPreview(request);
+      if (result && typeof result.then === 'function') {
+        return AiPanel.prototype._requestPlanReadinessPreview.call(panel, plan, options);
+      }
+      panel._applyPlanReadinessPreviewResult(plan, result);
+      return true;
+    };
+    const realNormalizeBackendPlanResult = AiPanel.prototype._normalizeBackendPlanResult;
+    panel._normalizeBackendPlanResult = (...args) => {
+      const previousPlan = panel.pendingVisionPlan;
+      const plan = realNormalizeBackendPlanResult.apply(panel, args);
+      panel.pendingVisionPlan = plan;
+      panel._requestPlanReadinessPreview(plan, { reason: 'test_normalize' });
+      panel.pendingVisionPlan = previousPlan;
+      return plan;
+    };
+  }
   return panel;
 }
 
@@ -2025,7 +2159,6 @@ test('Plan Mode captures vague inspection request without starting Build', async
   assert.match(plan.innerHTML, /通用表面缺陷候选区域/);
   assert.match(plan.innerHTML, /裂纹/);
   assert.match(plan.innerHTML, /凹痕\/污渍/);
-  assert.match(plan.innerHTML, /阈值需要结合样品确认/);
   assert.match(plan.innerHTML, /开始构建/);
   assert.doesNotMatch(plan.innerHTML, /按推荐方案开始构建/);
   assert.match(plan.innerHTML, /资源补齐会在开始构建后出现/);
@@ -2905,7 +3038,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
   assert.equal(captured.buildFromPlan.planSnapshot.planHash, 'sha256:plan-build-1');
   assert.equal(captured.buildFromPlan.planSnapshot.canBuild, true);
-  assert.equal(captured.buildFromPlan.planSnapshot.buildReadiness.canBuild, true);
+  assert.equal(captured.buildFromPlan.planSnapshot.buildReadiness, undefined);
   assert.equal(captured.buildFromPlan.requirementMaturity.canBuild, true);
   assert.deepEqual(captured.buildFromPlan.templateSelection, {
     mode: 'template_adapt',
@@ -2948,7 +3081,12 @@ test('Recommended strategy is not selected until accepted for Build', async () =
   assert.equal(captured, null);
 
   const acceptedStarted = panel._startBuildFromCurrentPlan({ acceptedRecommended: true });
-  assert.equal(acceptedStarted, true);
+  assert.equal(acceptedStarted, false);
+  assert.equal(captured, null);
+  assert.equal(panel.planAcceptedRecommendedDefaults, true);
+
+  const startedAfterPreview = panel._startBuildFromCurrentPlan();
+  assert.equal(startedAfterPreview, true);
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, true);
   assert.equal(captured.buildFromPlan.userSelections.model_or_rule_strategy, 'deep_learning');
@@ -3033,7 +3171,6 @@ test('Fallback questions with empty options stay free-text and clean stale selec
 test('Draft Plan can start Build with legal Planner route without accepting strategy', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
-  panel.requirementMode = 'draft';
   const planWorkspace = createFakeElement();
   panel.container = createContainer({
     '#ai-agent-workspace-overview': createFakeElement(),
@@ -3047,6 +3184,21 @@ test('Draft Plan can start Build with legal Planner route without accepting stra
   }));
   panel.planQuestionSelections = {};
   panel.planQuestionAnswers = {};
+  panel._requestBackendPlanReadinessPreview = request => ({
+    ...panel._buildTestPlanReadinessPreview(request),
+    buildReadiness: {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: ['inspection_object', 'task_type'],
+      remainingFields: [],
+      primaryMessage: '可生成可编辑草稿。',
+      contractVersion: 'v2'
+    },
+    pendingConfirmationCount: 0,
+    resourcePendingCount: 0,
+    hardBlockerCount: 0
+  });
+  panel._setRequirementMode('draft', { silent: true });
   let captured = null;
   panel._dispatchGenerateRequest = args => {
     captured = args;
@@ -3228,7 +3380,7 @@ test('Aliased medical requirement answers unblock Plan Build button', async () =
 
   panel._updatePlanBuildActionState();
   assert.equal(plan.executable, false);
-  assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, true);
+  assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, false);
 
   panel._selectPlanQuestionOption('medical_modality_and_lesion_type', 'ct_lung_nodule_detection');
   assert.equal(panel.planQuestionAnswers.medical_modality_and_lesion_type.field, 'task_type');
@@ -3336,7 +3488,7 @@ test('Unknown strategy confirmation question id is resolved from matching blocke
   };
 
   panel._updatePlanBuildActionState();
-  assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, true);
+  assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, false);
 
   panel._selectPlanQuestionOption('line_guidance_profile', 'profile_a');
   assert.equal(panel.planQuestionAnswers.line_guidance_profile.field, 'line_guidance_profile');
@@ -3855,11 +4007,14 @@ test('External output target blocker shows concrete label and recommended output
   panel._updatePlanBuildActionState();
   assert.equal(plan.executable, false);
   assert.match(panel._getPlanBuildBlockedReason(plan), /请选择输出目标/);
-  assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, true);
+  assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, false);
 
-  assert.equal(panel._startBuildFromCurrentPlan({ acceptedRecommended: true }), true);
+  assert.equal(panel._startBuildFromCurrentPlan({ acceptedRecommended: true }), false);
+  assert.equal(captured, null);
+  panel._selectPlanQuestionOption('output_target', 'local_result_payload');
+  assert.equal(panel._startBuildFromCurrentPlan(), true);
   assert.equal(captured.buildFromPlan.confirmedAnswers[0].field, 'output_target');
-  assert.equal(captured.buildFromPlan.confirmedAnswers[0].value, 'business_system_output');
+  assert.equal(captured.buildFromPlan.confirmedAnswers[0].value, 'local_result_payload');
 });
 
 test('Backend Plan without explicit canBuild is not executable by default', async () => {
@@ -4324,7 +4479,6 @@ test('Plan option AnswerEffect controls labels feedback and informational no-op'
 test('Plan resource pending drives strict and draft CTA without deployment-ready copy', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
-  panel.requirementMode = 'draft';
   const inlineBuildButton = createFakeButton();
   const mainButton = createFakeButton();
   const buildStatus = createFakeElement();
@@ -4364,6 +4518,7 @@ test('Plan resource pending drives strict and draft CTA without deployment-ready
     }
   }));
   panel.pendingVisionPlan = draftPlan;
+  panel._setRequirementMode('draft', { silent: true });
   panel._renderPlanWorkspace(draftPlan);
 
   const action = panel._getPlanBuildActionState(draftPlan);
@@ -4387,6 +4542,7 @@ test('Plan resource pending drives strict and draft CTA without deployment-ready
     }
   }));
   panel.pendingVisionPlan = strictPlan;
+  panel._setRequirementMode('strict', { silent: true });
   panel._renderPlanWorkspace(strictPlan);
 
   const blocked = panel._getPlanBuildActionState(strictPlan);
@@ -4394,6 +4550,114 @@ test('Plan resource pending drives strict and draft CTA without deployment-ready
   assert.equal(blocked.label, '仍需补齐资源 1 项');
   assert.match(planWorkspace.innerHTML, /严格确认模式/);
   assert.match(buildStatus.textContent, /资源仍待绑定/);
+});
+
+test('Plan requirement mode is scoped to plan identity and never restored from localStorage', async () => {
+  const { AiPanel } = await loadAiPanel();
+  localStorage.setItem('cv_ai_requirement_mode', 'draft');
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+
+  assert.equal(panel._loadRequirementMode(), 'strict');
+  const planA = panel._normalizeBackendPlanResult(backendPlanResult({
+    planId: 'plan_mode_a',
+    planHash: 'sha256:mode-a',
+    canBuild: true
+  }));
+  panel.pendingVisionPlan = planA;
+  panel._setRequirementMode('draft', { silent: true });
+  assert.equal(panel.requirementMode, 'draft');
+  assert.equal(planA.planId, 'plan_mode_a');
+
+  const planB = panel._normalizeBackendPlanResult(backendPlanResult({
+    planId: 'plan_mode_b',
+    planHash: 'sha256:mode-b',
+    canBuild: true
+  }));
+  panel.pendingVisionPlan = planB;
+  panel._activatePlanIdentity(planB);
+
+  assert.equal(panel.requirementMode, 'strict');
+  assert.equal(planB.requirementMode, 'strict');
+  assert.equal(planA.planHash, 'sha256:mode-a');
+  assert.equal(planB.planHash, 'sha256:mode-b');
+});
+
+test('Plan readiness preview accepts only latest revision and fails closed on preview error', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const first = deferred();
+  const second = deferred();
+  const calls = [];
+  const panel = createPanel(AiPanel, {
+    developer: false,
+    enabled: true,
+    useProductionPreview: true,
+    planReadinessPreview: request => {
+      calls.push(request);
+      return calls.length === 1 ? first.promise : second.promise;
+    }
+  });
+  const inlineBuildButton = createFakeButton();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': createFakeElement(),
+      '#ai-plan-workspace': createFakeElement(),
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': inlineBuildButton,
+      '#ai-plan-build-status': createFakeElement()
+    },
+    { '.ai-plan-action': [createFakeButton()] }
+  );
+  const plan = pendingFieldPlan(panel, {
+    questionId: 'image_source',
+    field: 'image_source',
+    pendingValue: 'camera_pending',
+    concreteValue: 'file_sample'
+  });
+  panel.pendingVisionPlan = plan;
+
+  panel._selectPlanQuestionOption('image_source', 'camera_pending');
+  assert.equal(panel.previewState, 'validating');
+  assert.equal(panel._getPlanBuildActionState(plan).canStart, false);
+  assert.equal(inlineBuildButton.disabled, true);
+  panel._selectPlanQuestionOption('image_source', 'file_sample');
+  assert.equal(calls.length, 2);
+
+  first.resolve({
+    planId: plan.planId,
+    planHash: plan.planHash,
+    requirementMode: 'strict',
+    answerRevision: calls[0].answerRevision,
+    acceptedAnswers: [],
+    answerSetFingerprint: 'stale',
+    buildReadiness: {
+      canBuild: false,
+      blockers: [{ id: 'hard_requirement:image_source_missing', category: 'hard_requirement', field: 'image_source', questionId: 'image_source', blocksBuild: true, resolutionMode: 'answer_question' }],
+      resolvedFields: [],
+      remainingFields: ['image_source'],
+      primaryMessage: 'stale',
+      contractVersion: 'v2'
+    },
+    pendingConfirmationCount: 1,
+    resourcePendingCount: 0,
+    hardBlockerCount: 1,
+    metadataOnly: true
+  });
+  await flushAsync();
+  assert.equal(panel.previewState, 'validating');
+  assert.equal(panel.planQuestionSelections.image_source, 'file_sample');
+
+  second.reject(new Error('network down'));
+  await flushAsync();
+  assert.equal(panel.previewState, 'failed');
+  assert.equal(panel._getPlanBuildActionState(plan).canStart, false);
+  assert.equal(panel.planQuestionAnswers.image_source.value, 'file_sample');
 });
 
 test('Plan main CTA ignores model NextAction and uses canonical readiness', async () => {
@@ -4507,7 +4771,6 @@ test('fallback pending recommendations stay UI-only for all canonical pending qu
 test('Plan with pending image source and acquisition route can start editable draft', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
-  panel.requirementMode = 'draft';
   const inlineBuildButton = createFakeButton();
   const planActionButton = createFakeButton();
   const buildStatus = createFakeElement();
@@ -4562,6 +4825,7 @@ test('Plan with pending image source and acquisition route can start editable dr
   }));
 
   panel.pendingVisionPlan = plan;
+  panel._setRequirementMode('draft', { silent: true });
   let captured = null;
   panel._dispatchGenerateRequest = args => {
     captured = args;
@@ -4576,8 +4840,8 @@ test('Plan with pending image source and acquisition route can start editable dr
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.buildFromPlan.planId, plan.planId);
   assert.equal(captured.buildFromPlan.planHash, plan.planHash);
-  assert.equal(buildStatus.textContent, '当前显式选择已满足构建条件');
-  assert.match(planWorkspace.innerHTML, /开始构建/);
+  assert.equal(buildStatus.textContent, '可编辑草稿可先生成；当前不代表可部署。');
+  assert.match(planWorkspace.innerHTML, /按当前方案生成可编辑草稿|可编辑草稿模式/);
   assert.doesNotMatch(planWorkspace.innerHTML, /按推荐方案开始构建/);
 });
 
@@ -4676,7 +4940,6 @@ test('Router local HTTP fallback preserves Pending Plan by default', async () =>
 test('Draft chat start build can enter Build with legal pending fields', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
-  panel.requirementMode = 'draft';
   panel.container = createContainer({
     '#ai-agent-workspace-overview': createFakeElement(),
     '#ai-plan-workspace': createFakeElement(),
@@ -4730,6 +4993,7 @@ test('Draft chat start build can enter Build with legal pending fields', async (
       publicReason: 'Image source and acceptance criteria can remain pending in draft.'
     }
   }));
+  panel._setRequirementMode('draft', { silent: true });
 
   panel._handleIntentRouterResult({
     intent: 'build_from_confirmed_plan',

@@ -98,7 +98,7 @@ export class AiPanel {
         this.publicLiveStatusTimer = null;
         this.publicLiveWorkbenchSequence = 0;
         this.pendingManualRetry = null;
-        this.requirementMode = this._loadRequirementMode();
+        this.requirementMode = 'strict';
 
         // 工作台状态机
         this.workbenchState = AiWorkbenchStates.IDLE;
@@ -118,6 +118,14 @@ export class AiPanel {
         this.planQuestionSelections = {};
         this.planQuestionAnswers = {};
         this.planAnswerRevision = 0;
+        this.planAcceptedRecommendedDefaults = false;
+        this.planRequirementModes = new Map();
+        this.currentPlanIdentity = '';
+        this.effectiveReadiness = null;
+        this.previewState = 'idle';
+        this.activePlanReadinessPreviewController = null;
+        this.activePlanReadinessPreviewRequest = null;
+        this.lastPlanReadinessPreviewError = '';
 
         // 应用预览与撤销
         this._preApplySnapshot = null;

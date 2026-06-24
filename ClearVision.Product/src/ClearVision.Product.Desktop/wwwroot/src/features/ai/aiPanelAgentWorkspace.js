@@ -453,6 +453,12 @@ export const aiPanelAgentWorkspaceMixin = {
             this.pendingVisionPlan = null;
             this.pendingClarificationPayload = null;
             this._clearPlanQuestionAnswers();
+            this.requirementMode = 'strict';
+            this.planRequirementModes = new Map();
+            this.currentPlanIdentity = '';
+            this._resetPlanReadinessPreviewState?.({ abort: true });
+        } else {
+            this._activatePlanIdentity?.(this.pendingVisionPlan);
         }
 
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
@@ -465,7 +471,272 @@ export const aiPanelAgentWorkspaceMixin = {
     _clearPlanQuestionAnswers() {
         this.planQuestionSelections = {};
         this.planQuestionAnswers = {};
+        this.planAcceptedRecommendedDefaults = false;
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+    },
+
+    _getPlanIdentity(plan) {
+        const planId = String(plan?.planId || plan?.id || '').trim();
+        const planHash = String(
+            plan?.planHash ||
+            plan?.rawPlanSnapshot?.planHash ||
+            plan?.rawPlanSnapshot?.PlanHash ||
+            ''
+        ).trim();
+        return planId && planHash ? `${planId}::${planHash}` : '';
+    },
+
+    _activatePlanIdentity(plan) {
+        const identity = this._getPlanIdentity(plan);
+        if (!identity) {
+            this.requirementMode = 'strict';
+            this.currentPlanIdentity = '';
+            return;
+        }
+
+        const identityChanged = this.currentPlanIdentity !== identity;
+        if (identityChanged) {
+            this.activePlanReadinessPreviewController?.abort?.();
+            this.activePlanReadinessPreviewController = null;
+            this.activePlanReadinessPreviewRequest = null;
+            this.currentPlanIdentity = identity;
+            this.effectiveReadiness = null;
+            this.previewState = 'idle';
+            this.lastPlanReadinessPreviewError = '';
+        }
+
+        if (!this.planRequirementModes) {
+            this.planRequirementModes = new Map();
+        }
+        if (!this.planRequirementModes.has(identity)) {
+            this.planRequirementModes.set(identity, 'strict');
+        }
+
+        this.requirementMode = this._normalizeRequirementMode?.(this.planRequirementModes.get(identity)) || 'strict';
+        if (plan) {
+            plan.requirementMode = this.requirementMode;
+        }
+    },
+
+    _rememberRequirementModeForPlan(plan, mode) {
+        const identity = this._getPlanIdentity(plan);
+        if (!identity) return;
+        if (!this.planRequirementModes) {
+            this.planRequirementModes = new Map();
+        }
+        this.planRequirementModes.set(identity, this._normalizeRequirementMode?.(mode) || 'strict');
+    },
+
+    _resetPlanReadinessPreviewState({ abort = true } = {}) {
+        if (abort) {
+            this.activePlanReadinessPreviewController?.abort?.();
+        }
+        this.activePlanReadinessPreviewController = null;
+        this.activePlanReadinessPreviewRequest = null;
+        this.effectiveReadiness = null;
+        this.previewState = 'idle';
+        this.lastPlanReadinessPreviewError = '';
+        if (this.pendingVisionPlan) {
+            this.pendingVisionPlan.effectiveReadiness = null;
+            this.pendingVisionPlan.previewState = 'idle';
+            this.pendingVisionPlan.previewError = '';
+        }
+    },
+
+    _isCurrentPlanReadinessPreviewRequest(request) {
+        if (!request || !this.pendingVisionPlan) return false;
+        const plan = this.pendingVisionPlan;
+        return String(request.planId || '') === String(plan.planId || plan.id || '') &&
+            String(request.planHash || '') === String(plan.planHash || '') &&
+            Number(request.answerRevision) === (Number(this.planAnswerRevision) || 0) &&
+            this._normalizeRequirementMode?.(request.requirementMode) ===
+                (this._normalizeRequirementMode?.(this.requirementMode) || 'strict');
+    },
+
+    _normalizePlanReadinessPreviewResult(result) {
+        const data = this._asObject?.(result) || result || {};
+        const readiness = this._normalizePlanBuildReadiness(data.buildReadiness || data.BuildReadiness);
+        return {
+            planId: String(data.planId || data.PlanId || '').trim(),
+            planHash: String(data.planHash || data.PlanHash || '').trim(),
+            requirementMode: this._normalizeRequirementMode?.(data.requirementMode || data.RequirementMode) || 'strict',
+            answerRevision: Number(data.answerRevision ?? data.AnswerRevision ?? 0) || 0,
+            acceptedAnswers: this._toArray(data.acceptedAnswers || data.AcceptedAnswers)
+                .map(answer => this._normalizePlanAnswer(answer))
+                .filter(Boolean),
+            answerSetFingerprint: String(data.answerSetFingerprint || data.AnswerSetFingerprint || '').trim(),
+            buildReadiness: readiness,
+            deferredQuestionIds: this._toArray(data.deferredQuestionIds || data.DeferredQuestionIds)
+                .map(item => String(item || '').trim())
+                .filter(Boolean),
+            pendingConfirmationCount: Number(data.pendingConfirmationCount ?? data.PendingConfirmationCount ?? 0) || 0,
+            resourcePendingCount: Number(data.resourcePendingCount ?? data.ResourcePendingCount ?? 0) || 0,
+            hardBlockerCount: Number(data.hardBlockerCount ?? data.HardBlockerCount ?? 0) || 0,
+            metadataOnly: (data.metadataOnly ?? data.MetadataOnly) === true,
+            contractValid: (data.contractValid ?? data.ContractValid) !== false,
+            failureCode: String(data.failureCode || data.FailureCode || '').trim(),
+            failureMessage: this._localizeDisplayText(data.failureMessage || data.FailureMessage || '')
+        };
+    },
+
+    _makeInitialPlanReadinessPreview(plan, readiness) {
+        const normalizedReadiness = this._normalizePlanBuildReadiness(readiness) || readiness || null;
+        if (!this._isUsableAuthoritativeReadiness(normalizedReadiness)) return null;
+        const stats = this._getPlanReadinessStats({ ...plan, buildReadiness: normalizedReadiness });
+        return {
+            planId: String(plan?.planId || plan?.id || '').trim(),
+            planHash: String(plan?.planHash || '').trim(),
+            requirementMode: this._normalizeRequirementMode?.(plan?.requirementMode || this.requirementMode || 'strict') || 'strict',
+            answerRevision: Number(this.planAnswerRevision) || 0,
+            acceptedAnswers: this._toArray(plan?.rawPlanSnapshot?.confirmedPlanAnswers || plan?.rawPlanSnapshot?.ConfirmedPlanAnswers)
+                .map(answer => this._normalizePlanAnswer(answer))
+                .filter(Boolean),
+            answerSetFingerprint: '',
+            buildReadiness: normalizedReadiness,
+            deferredQuestionIds: [],
+            pendingConfirmationCount: stats.pendingConfirmationCount,
+            resourcePendingCount: stats.resourcePendingCount,
+            hardBlockerCount: this._toArray(normalizedReadiness.blockers).filter(blocker => blocker?.blocksBuild === true &&
+                blocker?.category !== PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING).length,
+            metadataOnly: true,
+            contractValid: true,
+            failureCode: '',
+            failureMessage: ''
+        };
+    },
+
+    _getCurrentCanonicalPreview(plan) {
+        const preview = plan?.effectiveReadiness || this.effectiveReadiness || null;
+        if (!preview || !preview.buildReadiness) return null;
+        if ((plan?.previewState || this.previewState) !== 'ready') return null;
+        const planId = String(plan?.planId || plan?.id || '').trim();
+        const planHash = String(plan?.planHash || '').trim();
+        if (String(preview.planId || '') !== planId || String(preview.planHash || '') !== planHash) return null;
+        if (Number(preview.answerRevision) !== (Number(this.planAnswerRevision) || 0)) return null;
+        const mode = this._normalizeRequirementMode?.(this.requirementMode) || 'strict';
+        if ((this._normalizeRequirementMode?.(preview.requirementMode) || 'strict') !== mode) return null;
+        return preview;
+    },
+
+    _applyPlanReadinessPreviewResult(plan, result) {
+        const preview = this._normalizePlanReadinessPreviewResult(result);
+        if (!preview.buildReadiness || !this._isUsableAuthoritativeReadiness(preview.buildReadiness)) {
+            return false;
+        }
+        if (preview.contractValid === false) {
+            const message = preview.failureMessage || '构建条件校验失败，请重试';
+            this.lastPlanReadinessPreviewError = message;
+            plan.previewError = message;
+            plan.executable = false;
+            return false;
+        }
+        const request = {
+            planId: preview.planId,
+            planHash: preview.planHash,
+            answerRevision: preview.answerRevision,
+            requirementMode: preview.requirementMode
+        };
+        if (!this._isCurrentPlanReadinessPreviewRequest(request)) {
+            return false;
+        }
+
+        plan.requirementMode = preview.requirementMode;
+        plan.effectiveReadiness = preview;
+        plan.previewState = 'ready';
+        plan.previewError = '';
+        plan.buildReadiness = preview.buildReadiness;
+        plan.executable = preview.buildReadiness.canBuild === true;
+        plan.resolvedPlanFields = this._toArray(preview.buildReadiness.resolvedFields);
+        plan.remainingPlanFields = this._toArray(preview.buildReadiness.remainingFields);
+        plan.blockingReasons = this._toArray(preview.buildReadiness.blockers)
+            .filter(blocker => blocker?.blocksBuild === true)
+            .map(blocker => blocker.publicLabel || blocker.field || blocker.questionId || blocker.id)
+            .filter(Boolean);
+        this.effectiveReadiness = preview;
+        this.previewState = 'ready';
+        this.lastPlanReadinessPreviewError = '';
+        return true;
+    },
+
+    _buildPlanReadinessPreviewRequest(plan, { acceptedRecommended = false } = {}) {
+        const request = this._buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended });
+        return {
+            ...request,
+            requirementMode: this._normalizeRequirementMode?.(this.requirementMode) || 'strict',
+            answerRevision: Number(this.planAnswerRevision) || 0
+        };
+    },
+
+    async _requestBackendPlanReadinessPreview(request, options = {}) {
+        return await httpClient.post('/ai/agent-plan/readiness-preview', request, options);
+    },
+
+    _requestPlanReadinessPreview(plan = this.pendingVisionPlan, { acceptedRecommended = false, reason = '' } = {}) {
+        if (!plan) return false;
+        this._activatePlanIdentity?.(plan);
+        const request = this._buildPlanReadinessPreviewRequest(plan, { acceptedRecommended });
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        this.activePlanReadinessPreviewController?.abort?.();
+        this.activePlanReadinessPreviewController = controller;
+        const previewRequest = {
+            planId: String(request.planId || '').trim(),
+            planHash: String(request.planHash || '').trim(),
+            answerRevision: Number(request.answerRevision) || 0,
+            requirementMode: this._normalizeRequirementMode?.(request.requirementMode) || 'strict',
+            reason
+        };
+        this.activePlanReadinessPreviewRequest = previewRequest;
+        this.previewState = 'validating';
+        this.lastPlanReadinessPreviewError = '';
+        plan.previewState = 'validating';
+        plan.previewError = '';
+        plan.executable = false;
+        this._updatePlanBuildActionState?.();
+
+        this._requestBackendPlanReadinessPreview(request, controller?.signal ? { signal: controller.signal } : {})
+            .then(result => {
+                if (this.activePlanReadinessPreviewRequest !== previewRequest ||
+                    !this._isCurrentPlanReadinessPreviewRequest(previewRequest)) {
+                    return;
+                }
+                if (!this._applyPlanReadinessPreviewResult(plan, result)) {
+                    const message = this.lastPlanReadinessPreviewError || '构建条件校验失败，请重试';
+                    this.previewState = 'failed';
+                    this.lastPlanReadinessPreviewError = message;
+                    plan.previewState = 'failed';
+                    plan.previewError = message;
+                    plan.executable = false;
+                    this.activePlanReadinessPreviewController = null;
+                    this.activePlanReadinessPreviewRequest = null;
+                    this._renderPlanWorkspace?.(plan);
+                    this._renderAgentWorkspaceOverview?.();
+                    this._updatePlanBuildActionState?.();
+                    return;
+                }
+                this.activePlanReadinessPreviewController = null;
+                this.activePlanReadinessPreviewRequest = null;
+                this._renderPlanWorkspace?.(plan);
+                this._renderAgentWorkspaceOverview?.();
+                this._updatePlanBuildActionState?.();
+            })
+            .catch(error => {
+                if (error?.name === 'AbortError') return;
+                if (this.activePlanReadinessPreviewRequest !== previewRequest ||
+                    !this._isCurrentPlanReadinessPreviewRequest(previewRequest)) {
+                    return;
+                }
+                const message = error?.message || '构建条件校验失败，请重试';
+                this.previewState = 'failed';
+                this.lastPlanReadinessPreviewError = message;
+                plan.previewState = 'failed';
+                plan.previewError = message;
+                this.activePlanReadinessPreviewController = null;
+                this.activePlanReadinessPreviewRequest = null;
+                this._renderPlanWorkspace?.(plan);
+                this._renderAgentWorkspaceOverview?.();
+                this._updatePlanBuildActionState?.();
+            });
+        return true;
     },
 
     _mergeBackendPlanAnswers(plan) {
@@ -511,6 +782,7 @@ export const aiPanelAgentWorkspaceMixin = {
             this.planQuestionAnswers = nextAnswers;
             this.planQuestionSelections = nextSelections;
             this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+            this._requestPlanReadinessPreview?.(plan, { acceptedRecommended: true, reason: 'accepted_recommended' });
         }
     },
 
@@ -1389,6 +1661,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 if (!this._isActivePlanRequest(planRequestId)) return;
                 this.pendingVisionPlan = this._normalizeBackendPlanResult(result, normalizedDescription);
                 this._mergeBackendPlanAnswers(this.pendingVisionPlan);
+                this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'plan_received' });
                 this._clearActivePlanRequest(planRequestId);
                 this._setGeneratingState?.(false);
                 const timeoutFallback = this._isPlannerTimeoutFallback(this.pendingVisionPlan);
@@ -1969,7 +2242,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const rawCanBuild = plan.canBuild ?? plan.CanBuild;
         const rawCanPlan = plan.canPlan ?? plan.CanPlan;
         const maturityCanPlan = requirementMaturity?.canPlan === true;
-        const requirementMode = this._normalizeRequirementMode?.(plan.requirementMode ?? plan.RequirementMode ?? this.requirementMode ?? 'strict') || 'strict';
+        const requirementMode = 'strict';
         const blockingReasons = this._toArray(plan.blockingReasons || plan.BlockingReasons)
             .map(item => this._localizeDisplayText(item))
             .filter(reason => !this._isDraftableImageSourceBlockingReason(reason, route, requirementMode));
@@ -1993,7 +2266,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 requirementMode
             });
 
-        return {
+        const normalized = {
             id: plan.planId || plan.PlanId || `plan-${Date.now()}`,
             planId: plan.planId || plan.PlanId || '',
             planHash: String(plan.planHash || plan.PlanHash || '').trim(),
@@ -2059,8 +2332,29 @@ export const aiPanelAgentWorkspaceMixin = {
             decisionTrace,
             stationBoundarySummary: plan.stationBoundarySummary || plan.StationBoundarySummary || '',
             plcOutputPolicy: plan.plcOutputPolicy || plan.PlcOutputPolicy || '',
-            rawPlanSnapshot: plan
+            rawPlanSnapshot: plan,
+            effectiveReadiness: null,
+            previewState: 'idle',
+            previewError: ''
         };
+        this._activatePlanIdentity?.(normalized);
+        const initialPreview = this._makeInitialPlanReadinessPreview(normalized, authoritativeBuildReadiness);
+        if (initialPreview) {
+            normalized.effectiveReadiness = initialPreview;
+            normalized.previewState = 'ready';
+            normalized.previewError = '';
+            normalized.buildReadiness = initialPreview.buildReadiness;
+            normalized.executable = initialPreview.buildReadiness.canBuild === true;
+            this.effectiveReadiness = initialPreview;
+            this.previewState = 'ready';
+            this.lastPlanReadinessPreviewError = '';
+        } else {
+            normalized.executable = false;
+            normalized.previewState = 'idle';
+            this.effectiveReadiness = null;
+            this.previewState = 'idle';
+        }
+        return normalized;
     },
 
     _normalizePlanBuildReadiness(value) {
@@ -2128,6 +2422,30 @@ export const aiPanelAgentWorkspaceMixin = {
         plan.authoritativeBuildReadiness = readiness;
         plan.buildReadiness = readiness;
         plan.executable = readiness.canBuild === true;
+        const canonicalState = {
+            planId: currentPlanId,
+            planHash: currentPlanHash,
+            requirementMode: this._normalizeRequirementMode?.(this.requirementMode || plan.requirementMode || 'strict') || 'strict',
+            answerRevision: Number(this.planAnswerRevision) || 0,
+            acceptedAnswers: this._toArray(data.acceptedAnswers || data.AcceptedAnswers),
+            answerSetFingerprint: String(data.answerSetFingerprint || data.AnswerSetFingerprint || ''),
+            buildReadiness: readiness,
+            deferredQuestionIds: [],
+            pendingConfirmationCount: this._toArray(readiness.remainingFields).length,
+            resourcePendingCount: this._toArray(readiness.blockers)
+                .filter(blocker => blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING).length,
+            hardBlockerCount: this._toArray(readiness.blockers)
+                .filter(blocker => blocker?.blocksBuild === true &&
+                    blocker?.category !== PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING).length,
+            metadataOnly: (data.metadataOnly ?? data.MetadataOnly) === true,
+            contractValid: true,
+            failureCode: '',
+            failureMessage: ''
+        };
+        plan.effectiveReadiness = canonicalState;
+        plan.previewState = 'ready';
+        this.effectiveReadiness = canonicalState;
+        this.previewState = 'ready';
         plan.resolvedPlanFields = this._toArray(readiness.resolvedFields);
         plan.remainingPlanFields = this._toArray(readiness.remainingFields);
         const blockingFields = this._toArray(data.blockingClarificationFields || data.BlockingClarificationFields);
@@ -2667,47 +2985,86 @@ export const aiPanelAgentWorkspaceMixin = {
             };
         }
 
-        const canBuild = this._refreshPlanEffectiveBuildReadiness?.(plan, { acceptedRecommended: false }) === true;
-        const stats = this._getPlanReadinessStats(plan);
-        const draftResourceOnly = canBuild && this._hasOnlyDraftableResourceBlockers(plan);
-        const canAcceptRecommended = !canBuild && this._canBuildPlanWithRecommendedAnswers(plan);
+        const mode = this._normalizeRequirementMode?.(this.requirementMode || plan.requirementMode || 'strict') || 'strict';
+        const previewState = plan.previewState || this.previewState || 'idle';
+        if (previewState === 'validating') {
+            return {
+                canBuild: false,
+                canAcceptRecommended: false,
+                canStart: false,
+                acceptedRecommended: false,
+                label: '正在校验构建条件…',
+                statusText: '正在校验构建条件…',
+                stats: this._getPlanReadinessStats(plan)
+            };
+        }
+        if (previewState === 'failed') {
+            return {
+                canBuild: false,
+                canAcceptRecommended: false,
+                canStart: false,
+                acceptedRecommended: false,
+                label: '构建条件校验失败，请重试',
+                statusText: '构建条件校验失败，请重试',
+                stats: this._getPlanReadinessStats(plan)
+            };
+        }
+
+        const preview = this._getCurrentCanonicalPreview?.(plan);
+        if (!preview?.buildReadiness) {
+            return {
+                canBuild: false,
+                canAcceptRecommended: false,
+                canStart: false,
+                acceptedRecommended: false,
+                label: '正在校验构建条件…',
+                statusText: '正在校验构建条件…',
+                stats: this._getPlanReadinessStats(plan)
+            };
+        }
+
+        const readiness = preview.buildReadiness;
+        const stats = {
+            ...this._getPlanReadinessStats({ ...plan, buildReadiness: readiness }),
+            pendingConfirmationCount: Number(preview.pendingConfirmationCount) || 0,
+            resourcePendingCount: Number(preview.resourcePendingCount) || 0,
+            hardBlockerCount: Number(preview.hardBlockerCount) || 0
+        };
+        const canBuild = readiness.canBuild === true;
         if (canBuild) {
             return {
                 canBuild: true,
                 canAcceptRecommended: false,
                 canStart: true,
                 acceptedRecommended: false,
-                label: draftResourceOnly ? '按当前方案生成可编辑草稿' : '开始构建',
-                statusText: draftResourceOnly
-                    ? '可以生成可编辑草稿，部署前仍需绑定资源。'
-                    : '当前显式选择已满足构建条件',
+                label: mode === 'draft' ? '按当前方案生成可编辑草稿' : '开始构建',
+                statusText: mode === 'draft'
+                    ? '可编辑草稿可先生成；当前不代表可部署。'
+                    : '当前确认项已满足构建条件。',
                 stats
             };
         }
 
-        if (canAcceptRecommended) {
-            return {
-                canBuild: false,
-                canAcceptRecommended: true,
-                canStart: true,
-                acceptedRecommended: true,
-                label: '接受推荐方案并构建',
-                statusText: '当前阻断项存在可解决字段的推荐方案，可批量确认后构建',
-                stats
-            };
-        }
+        const deferredCount = this._toArray(preview.deferredQuestionIds).length;
+        const resourceOnly = stats.resourcePendingCount > 0 &&
+            stats.pendingConfirmationCount === 0 &&
+            stats.hardBlockerCount === 0;
+        const hardCount = stats.hardBlockerCount || stats.pendingConfirmationCount || stats.blockingCount || 1;
+        const blockedReason = this._getPlanBuildBlockedReason(plan);
 
         return {
             canBuild: false,
             canAcceptRecommended: false,
             canStart: false,
             acceptedRecommended: false,
-            label: stats.pendingConfirmationCount > 0
-                ? `仍需人工确认 ${stats.pendingConfirmationCount} 项`
-                : stats.resourcePendingCount > 0
+            label: mode === 'draft'
+                ? `仍需确认基础需求 ${hardCount} 项`
+                : resourceOnly
                     ? `仍需补齐资源 ${stats.resourcePendingCount} 项`
-                    : '开始构建',
-            statusText: this._getPlanBuildBlockedReason(plan),
+                    : `仍需人工确认 ${Math.max(stats.pendingConfirmationCount, hardCount)} 项`,
+            statusText: mode === 'strict' && deferredCount > 0
+                ? '已暂缓确认。严格模式下仍会阻断构建。'
+                : blockedReason,
             stats
         };
     },
@@ -2977,7 +3334,9 @@ export const aiPanelAgentWorkspaceMixin = {
         if (changed) {
             this.planQuestionAnswers = nextAnswers;
             this.planQuestionSelections = nextSelections;
+            this.planAcceptedRecommendedDefaults = true;
             this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+            this._requestPlanReadinessPreview?.(plan, { acceptedRecommended: true, reason: 'accepted_recommended' });
         }
 
         return changed;
@@ -3340,6 +3699,17 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _refreshPlanEffectiveBuildReadiness(plan, { acceptedRecommended = false } = {}) {
         if (!plan) return false;
+        const canonicalPreview = this._getCurrentCanonicalPreview?.(plan);
+        if (canonicalPreview?.buildReadiness) {
+            plan.buildReadiness = canonicalPreview.buildReadiness;
+            plan.executable = canonicalPreview.buildReadiness.canBuild === true;
+            return plan.executable === true;
+        }
+        if (this.previewState === 'validating' || plan.previewState === 'validating' ||
+            this.previewState === 'failed' || plan.previewState === 'failed') {
+            plan.executable = false;
+            return false;
+        }
         if (this._isUsableAuthoritativeReadiness(plan.authoritativeBuildReadiness)) {
             const preview = this._applyAnswersToAuthoritativeReadiness(
                 plan.authoritativeBuildReadiness,
@@ -4166,6 +4536,26 @@ export const aiPanelAgentWorkspaceMixin = {
             ? '可编辑草稿模式'
             : '严格确认模式';
         const readinessStats = this._getPlanReadinessStats(plan);
+        const actionState = this._getPlanBuildActionState(plan);
+        const currentPreview = this._getCurrentCanonicalPreview?.(plan);
+        const hasDeferredStrictBlock = (this._normalizeRequirementMode?.(this.requirementMode) || 'strict') === 'strict' &&
+            this._toArray(currentPreview?.deferredQuestionIds).length > 0 &&
+            actionState.canStart !== true;
+        const previewFailed = (plan.previewState || this.previewState) === 'failed';
+        const modeToggle = `
+            <div class="ai-plan-mode-toggle" role="group" aria-label="构建确认模式">
+                <button type="button" data-requirement-mode="strict" class="${this.requirementMode === 'strict' ? 'is-active' : ''}" aria-pressed="${this.requirementMode === 'strict' ? 'true' : 'false'}">严格确认后构建</button>
+                <button type="button" data-requirement-mode="draft" class="${this.requirementMode === 'draft' ? 'is-active' : ''}" aria-pressed="${this.requirementMode === 'draft' ? 'true' : 'false'}">先生成可编辑草稿</button>
+            </div>
+            <div class="ai-plan-mode-help" id="ai-requirement-mode-tip">${this.requirementMode === 'draft'
+                ? 'Draft：允许后端判定为可后补的决策或资源暂缓，先生成可编辑草稿，不代表可部署。'
+                : 'Strict：关键决策及当前模式要求的资源确认后才可构建。'}</div>
+        `;
+        const ctaAssist = hasDeferredStrictBlock
+            ? `<div class="ai-plan-cta-assist">已暂缓确认。严格模式下仍会阻断构建。<button type="button" id="ai-btn-switch-draft-from-defer">切换为可编辑草稿模式</button></div>`
+            : previewFailed
+                ? `<div class="ai-plan-cta-assist">构建条件校验失败，请重试<button type="button" id="ai-btn-retry-readiness-preview">重试校验</button></div>`
+                : '';
         el.innerHTML = `
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">需求理解</div>
@@ -4178,6 +4568,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <div class="ai-build-compact-row"><b>待确认</b><span>${this._escapeHtml(String(readinessStats.pendingConfirmationCount))}</span></div>
                     <div class="ai-build-compact-row"><b>后补资源</b><span>${this._escapeHtml(String(readinessStats.resourcePendingCount))}</span></div>
                 </div>
+                ${modeToggle}
                 ${plan.buildReadiness?.primaryMessage ? `<div class="ai-build-note">${this._escapeHtml(plan.buildReadiness.primaryMessage)}</div>` : ''}
             </section>
             ${semanticPanel}
@@ -4214,10 +4605,6 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-workspace-section-title">关键问题</div>
                 <div class="ai-plan-question-list">
                     ${plan.questions
-                        .filter(question => {
-                            const field = this._inferPlanQuestionFieldForQuestion(question, plan) || '';
-                            return !field || !(plan.resolvedPlanFields || []).includes(field);
-                        })
                         .map(question => this._renderPlanQuestion(question, this._getPlanQuestionSelectedValue(question))).join('')}
                 </div>
                 <div class="ai-build-note">资源补齐会在开始构建后出现。此阶段不会提前显示完整资源补齐卡。</div>
@@ -4243,6 +4630,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 </div>
             </section>
             <div class="ai-plan-actions">
+                ${ctaAssist}
                 <span class="ai-plan-action-status" id="ai-plan-build-status"></span>
                 <button class="ai-plan-action is-primary" type="button" id="ai-btn-start-build">开始构建</button>
             </div>
@@ -4254,6 +4642,11 @@ export const aiPanelAgentWorkspaceMixin = {
                     button.getAttribute('data-plan-question') || '',
                     button.getAttribute('data-plan-question-option') || ''
                 );
+            });
+        });
+        el.querySelectorAll('[data-requirement-mode]').forEach(button => {
+            button.addEventListener('click', () => {
+                this._setRequirementMode?.(button.dataset.requirementMode || 'strict');
             });
         });
         el.querySelectorAll('.ai-plan-custom-input-btn').forEach(button => {
@@ -4278,6 +4671,11 @@ export const aiPanelAgentWorkspaceMixin = {
         el.querySelector('#ai-btn-start-build')?.addEventListener('click', event => this._startBuildFromCurrentPlan({
             acceptedRecommended: event.currentTarget?.dataset?.acceptRecommended === 'true'
         }));
+        el.querySelector('#ai-btn-switch-draft-from-defer')?.addEventListener('click', () => this._setRequirementMode?.('draft'));
+        el.querySelector('#ai-btn-retry-readiness-preview')?.addEventListener('click', () => {
+            this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'retry' });
+            this._renderPlanWorkspace(this.pendingVisionPlan);
+        });
         this._updatePlanBuildActionState();
     },
 
@@ -4427,8 +4825,6 @@ export const aiPanelAgentWorkspaceMixin = {
                                 <strong class="ai-plan-option-tag">${this._escapeHtml(tag)}</strong>
                                 ${resourceBlocker && this._isResolveFieldOption(option) ? '<strong class="ai-plan-option-tag">资源待后补</strong>' : ''}
                                 <small>${this._escapeHtml(option.description)}</small>
-                                ${option.recommendationReason ? `<small>${this._escapeHtml(option.recommendationReason)}</small>` : ''}
-                                <em>${this._escapeHtml(option.impact)}</em>
                             </button>
                         `;
                     }).join('')}
@@ -4448,7 +4844,6 @@ export const aiPanelAgentWorkspaceMixin = {
                     </button>
                 </div>
                 ${selectionFeedback ? `<div class="ai-plan-question-selection-feedback">${this._escapeHtml(selectionFeedback)}</div>` : ''}
-                <div class="ai-plan-question-impact">${this._escapeHtml(question.impact)}</div>
             </article>
         `;
     },
@@ -4480,8 +4875,9 @@ export const aiPanelAgentWorkspaceMixin = {
             ...(this.planQuestionAnswers || {}),
             [field]: answer
         };
+        this.planAcceptedRecommendedDefaults = false;
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
-        this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
+        this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'custom_answer' });
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderAgentWorkspaceOverview();
     },
@@ -4517,8 +4913,9 @@ export const aiPanelAgentWorkspaceMixin = {
             };
         }
         this.planQuestionAnswers = nextAnswers;
+        this.planAcceptedRecommendedDefaults = false;
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
-        this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
+        this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'question_option' });
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderAgentWorkspaceOverview();
     },
@@ -4575,20 +4972,30 @@ export const aiPanelAgentWorkspaceMixin = {
 
         const plan = this.pendingVisionPlan;
         if (acceptedRecommended) {
-            this._acceptRecommendedPlanAnswers(plan);
-        }
-        this._refreshPlanEffectiveBuildReadiness?.(plan, { acceptedRecommended });
-        if (plan.executable !== true) {
+            const changed = this._acceptRecommendedPlanAnswers(plan);
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
-            const readinessReason = this._getPlanBuildBlockedReason(plan);
-            const strategyBlockers = this._getUnresolvedStrategyBlockers({
-                blockingReasons: plan.blockingReasons,
-                questions: plan.questions,
-                acceptedRecommended
-            });
-            const reason = strategyBlockers.length
-                ? '需确认策略后才能开始构建。'
-                : plan.requirementMaturity?.publicReason || '当前计划仍需澄清，暂不可构建。';
+            this._setResultStatusNote?.(
+                changed ? '已接受推荐方案，正在校验构建条件…' : '正在校验构建条件…',
+                'info'
+            );
+            if (!changed) {
+                this._requestPlanReadinessPreview?.(plan, { acceptedRecommended: true, reason: 'accepted_recommended' });
+            }
+            this._renderAgentWorkspaceOverview();
+            this._renderPlanWorkspace(plan);
+            this._renderBuildWorkspaceFromAgentRun();
+            this._updatePlanBuildActionState();
+            return false;
+        }
+        const actionState = this._getPlanBuildActionState(plan);
+        if (actionState.canStart !== true) {
+            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            const readinessReason = actionState.statusText || this._getPlanBuildBlockedReason(plan);
+            if (!this._getCurrentCanonicalPreview?.(plan) &&
+                plan.previewState !== 'validating' &&
+                plan.previewState !== 'failed') {
+                this._requestPlanReadinessPreview?.(plan, { reason: 'build_click' });
+            }
             this._addMessage?.('system', readinessReason);
             this._setResultStatusNote?.(readinessReason, 'warning');
             this._renderAgentWorkspaceOverview();
@@ -4599,7 +5006,7 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         this.activePlanRequestId = null;
-        const buildFromPlan = this._buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended });
+        const buildFromPlan = this._buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended: false });
         this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(plan);
@@ -4622,6 +5029,7 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     _buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended = false } = {}) {
+        const acceptedRecommendedDefaults = Boolean(acceptedRecommended || this.planAcceptedRecommendedDefaults);
         const currentFlowSnapshot = this._hasCurrentFlowContext?.()
             ? this._stringifyPlanSnapshot(this._getCurrentFlowJson?.())
             : null;
@@ -4638,9 +5046,9 @@ export const aiPanelAgentWorkspaceMixin = {
             planId: plan.planId || plan.id || '',
             planHash,
             planSnapshot: this._buildPlanSnapshotForBuild(plan),
-            confirmedAnswers: this._buildConfirmedPlanAnswers(plan, { acceptedRecommended }),
-            userSelections: this._buildPlanSelectionMap(plan, { acceptedRecommended }),
-            acceptedDefaults: this._collectAcceptedDefaultIds(plan, acceptedRecommended),
+            confirmedAnswers: this._buildConfirmedPlanAnswers(plan, { acceptedRecommended: acceptedRecommendedDefaults }),
+            userSelections: this._buildPlanSelectionMap(plan, { acceptedRecommended: acceptedRecommendedDefaults }),
+            acceptedDefaults: this._collectAcceptedDefaultIds(plan, acceptedRecommendedDefaults),
             currentFlowSnapshot,
             templateSelection,
             attachmentSummary: this._buildPlanAttachmentSummary([]),
@@ -4649,7 +5057,7 @@ export const aiPanelAgentWorkspaceMixin = {
             plcOutputPolicy: plan.plcOutputPolicy || '',
             buildIntent,
             originalUserPrompt: plan.originalDescription || plan.buildPrompt || '',
-            acceptedRecommendedDefaults: Boolean(acceptedRecommended),
+            acceptedRecommendedDefaults,
             requirementMaturity: plan.requirementMaturity || plan.rawPlanSnapshot?.requirementMaturity || plan.rawPlanSnapshot?.RequirementMaturity || null,
             decisionTrace: plan.decisionTrace || plan.rawPlanSnapshot?.decisionTrace || plan.rawPlanSnapshot?.DecisionTrace || null,
             metadataOnly: true
@@ -4696,10 +5104,6 @@ export const aiPanelAgentWorkspaceMixin = {
             if (!snapshot.decisionTrace && !snapshot.DecisionTrace && plan?.decisionTrace) {
                 snapshot.decisionTrace = plan.decisionTrace;
             }
-            if (snapshot.canBuild === undefined && snapshot.CanBuild === undefined) {
-                snapshot.canBuild = plan?.executable === true;
-            }
-            snapshot.buildReadiness = plan?.buildReadiness || snapshot.buildReadiness || snapshot.BuildReadiness || null;
             return snapshot;
         }
         return {
@@ -5200,8 +5604,27 @@ export const aiPanelAgentWorkspaceMixin = {
             appendChatMessage: false,
             assistantTurn: this.activeAssistantTurn
         });
+        this._showDraftBuildCompletionNotice(result, payload);
         this._renderBuildWorkspaceFromAgentRun();
         return true;
+    },
+
+    _showDraftBuildCompletionNotice(result, payload = {}) {
+        const mode = this._normalizeRequirementMode?.(
+            payload.requirementMode ||
+            payload.RequirementMode ||
+            this.requirementMode
+        ) || 'strict';
+        if (mode !== 'draft') return;
+
+        const preview = this._getCurrentCanonicalPreview?.(this.pendingVisionPlan);
+        const pendingCount = Number(preview?.pendingConfirmationCount) || 0;
+        const resourceCount = Number(preview?.resourcePendingCount) ||
+            this._toArray(result?.missingResources || result?.MissingResources).length;
+        this._setResultStatusNote?.(
+            `可编辑草稿已生成。仍有 ${pendingCount} 项待确认、${resourceCount} 项资源待补。当前不具备部署条件。`,
+            'warning'
+        );
     },
 
     _isAgentRunTerminalPlanCurrent(evt, payload) {
