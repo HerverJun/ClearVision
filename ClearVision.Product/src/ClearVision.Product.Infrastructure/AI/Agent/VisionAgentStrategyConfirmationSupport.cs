@@ -184,13 +184,10 @@ internal static class VisionAgentStrategyConfirmationSupport
                 continue;
             }
 
-            var recommended = question.Options.FirstOrDefault(option => option.Recommended)?.Value;
+            var recommended = question.Options.FirstOrDefault(option =>
+                option.Recommended &&
+                VisionAgentPlanFieldPolicy.IsResolveFieldOption(option))?.Value;
             var normalized = NormalizeChoice(recommended);
-            if (string.IsNullOrWhiteSpace(normalized))
-            {
-                normalized = NormalizeChoice(question.DefaultValue);
-            }
-
             if (!string.IsNullOrWhiteSpace(normalized))
             {
                 strategy = normalized;

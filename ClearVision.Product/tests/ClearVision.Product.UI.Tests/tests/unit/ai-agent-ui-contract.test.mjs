@@ -4076,6 +4076,8 @@ function pendingFieldPlan(panel, {
   field,
   pendingValue,
   concreteValue,
+  pendingAnswerEffect,
+  concreteAnswerEffect,
   blockerCategory = 'hard_requirement',
   blockingReason = `${field}_missing`
 }) {
@@ -4102,6 +4104,7 @@ function pendingFieldPlan(panel, {
             value: pendingValue,
             label: `Keep ${field} pending`,
             recommended: true,
+            answerEffect: pendingAnswerEffect,
             description: 'Do not guess this requirement.',
             impact: 'This selection keeps Build blocked.'
           },
@@ -4109,6 +4112,7 @@ function pendingFieldPlan(panel, {
             value: concreteValue,
             label: `Confirm ${field}`,
             recommended: false,
+            answerEffect: concreteAnswerEffect,
             description: 'Use this confirmed answer.',
             impact: 'This can resolve the field.'
           }
@@ -4209,8 +4213,10 @@ test('pending recommended Plan option is a UI selection without becoming an effe
   assert.match(pending, /is-selected/);
   assert.match(pending, /is-recommended/);
   assert.match(pending, /aria-pressed="true"/);
+  assert.match(pending, /建议暂缓/);
   assert.doesNotMatch(concrete, /is-selected/);
-  assert.match(planWorkspace.innerHTML, /已选择，仍保持待确认。该选择不会解除构建阻断。/);
+  assert.match(concrete, /可选方案/);
+  assert.match(planWorkspace.innerHTML, /已选择暂缓确认，该字段仍会阻断构建。/);
 
   panel._selectPlanQuestionOption('image_source', 'file_sample');
 
@@ -4225,6 +4231,7 @@ test('pending recommended Plan option is a UI selection without becoming an effe
   assert.match(pending, /aria-pressed="false"/);
   assert.match(concrete, /is-selected/);
   assert.match(concrete, /aria-pressed="true"/);
+  assert.match(planWorkspace.innerHTML, /已确认，该选择可用于构建判断。/);
 
   panel._selectPlanQuestionOption('image_source', 'camera_pending');
 
@@ -4249,6 +4256,177 @@ test('pending recommended Plan option is a UI selection without becoming an effe
   panel._selectPlanQuestionOption('image_source', 'camera_pending');
   assert.equal(panel.planQuestionSelections.image_source, 'camera_pending');
   assert.equal(Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'), false);
+});
+
+test('Plan option AnswerEffect controls labels feedback and informational no-op', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': createFakeElement(),
+      '#ai-plan-workspace': planWorkspace,
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': createFakeButton(),
+      '#ai-plan-build-status': createFakeElement()
+    },
+    { '.ai-plan-action': [createFakeButton()] }
+  );
+  const plan = panel._normalizeBackendPlanResult(backendPlanResult({
+    canBuild: false,
+    clarificationQuestions: [
+      {
+        id: 'image_source',
+        field: 'image_source',
+        title: 'Image source',
+        why: 'Confirm image source.',
+        defaultValue: 'camera_pending',
+        defaultAssumption: 'Keep pending until confirmed.',
+        impact: 'Controls Build readiness.',
+        options: [
+          { value: 'file_sample', label: 'File sample', recommended: true, answerEffect: 'resolve_field', recommendationReason: 'Safe public sample route.', description: 'Use sample.', impact: 'Resolves input.' },
+          { value: 'camera_pending', label: 'Keep pending', recommended: true, answerEffect: 'defer', description: 'Do not decide yet.', impact: 'Still blocks Build.' },
+          { value: 'camera_note', label: 'Camera note', recommended: false, answerEffect: 'informational', description: 'Read-only detail.', impact: 'No answer.' }
+        ]
+      }
+    ],
+    buildReadiness: {
+      canBuild: false,
+      blockers: [{ id: 'hard_requirement:image_source_missing', category: 'hard_requirement', field: 'image_source', questionId: 'image_source', blocksBuild: true, resolutionMode: 'answer_question', publicLabel: 'Image source pending' }],
+      resolvedFields: ['inspection_object', 'task_type', 'acceptance_criteria'],
+      remainingFields: ['image_source'],
+      primaryMessage: 'Image source pending',
+      contractVersion: 'v2'
+    }
+  }));
+  panel.pendingVisionPlan = plan;
+  panel._renderPlanWorkspace(plan);
+
+  assert.match(optionMarkup(planWorkspace.innerHTML, 'file_sample'), /推荐方案/);
+  assert.match(optionMarkup(planWorkspace.innerHTML, 'camera_pending'), /建议暂缓/);
+  assert.match(optionMarkup(planWorkspace.innerHTML, 'camera_note'), /仅供阅读/);
+
+  panel._selectPlanQuestionOption('image_source', 'file_sample');
+  assert.equal(panel.planQuestionAnswers.image_source.value, 'file_sample');
+  assert.match(planWorkspace.innerHTML, /已确认，该选择可用于构建判断。/);
+
+  panel._selectPlanQuestionOption('image_source', 'camera_pending');
+  assert.equal(panel.planQuestionSelections.image_source, 'camera_pending');
+  assert.equal(Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'), false);
+  assert.match(planWorkspace.innerHTML, /已选择暂缓确认，该字段仍会阻断构建。/);
+
+  panel._selectPlanQuestionOption('image_source', 'camera_note');
+  assert.equal(panel.planQuestionSelections.image_source, 'camera_pending');
+  assert.equal(Object.prototype.hasOwnProperty.call(panel.planQuestionAnswers, 'image_source'), false);
+});
+
+test('Plan resource pending drives strict and draft CTA without deployment-ready copy', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.requirementMode = 'draft';
+  const inlineBuildButton = createFakeButton();
+  const mainButton = createFakeButton();
+  const buildStatus = createFakeElement();
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': createFakeElement(),
+      '#ai-plan-workspace': planWorkspace,
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': inlineBuildButton,
+      '#ai-plan-build-status': buildStatus,
+      '#ai-btn-start-build': mainButton
+    },
+    { '.ai-plan-action': [mainButton] }
+  );
+  const draftPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    requirementMode: 'draft',
+    canBuild: true,
+    clarificationQuestions: [
+      {
+        id: 'image_source',
+        field: 'image_source',
+        title: 'Image source',
+        why: 'Confirm input route.',
+        defaultValue: 'station_camera',
+        options: [{ value: 'station_camera', label: 'Station camera', recommended: true, answerEffect: 'resolve_field' }]
+      }
+    ],
+    buildReadiness: {
+      canBuild: true,
+      blockers: [{ id: 'resource_pending:camera_binding', category: 'resource_pending', field: 'image_source', questionId: 'image_source', blocksBuild: false, resolutionMode: 'provide_resource', publicLabel: '可以生成可编辑草稿，部署前仍需绑定资源。' }],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: [],
+      primaryMessage: '可以生成可编辑草稿，部署前仍需绑定资源。',
+      contractVersion: 'v2'
+    }
+  }));
+  panel.pendingVisionPlan = draftPlan;
+  panel._renderPlanWorkspace(draftPlan);
+
+  const action = panel._getPlanBuildActionState(draftPlan);
+  assert.equal(action.canStart, true);
+  assert.equal(action.label, '按当前方案生成可编辑草稿');
+  assert.match(planWorkspace.innerHTML, /可编辑草稿模式/);
+  assert.match(planWorkspace.innerHTML, /后补资源/);
+  assert.match(optionMarkup(planWorkspace.innerHTML, 'station_camera'), /资源待后补/);
+  assert.doesNotMatch(planWorkspace.innerHTML, /部署就绪/);
+
+  const strictPlan = panel._normalizeBackendPlanResult(backendPlanResult({
+    requirementMode: 'strict',
+    canBuild: false,
+    buildReadiness: {
+      canBuild: false,
+      blockers: [{ id: 'resource_pending:camera_binding', category: 'resource_pending', field: 'image_source', questionId: 'image_source', blocksBuild: true, resolutionMode: 'provide_resource', publicLabel: '资源仍待绑定，当前模式下不能开始构建。' }],
+      resolvedFields: ['inspection_object', 'task_type', 'image_source', 'acceptance_criteria'],
+      remainingFields: [],
+      primaryMessage: '资源仍待绑定，当前模式下不能开始构建。',
+      contractVersion: 'v2'
+    }
+  }));
+  panel.pendingVisionPlan = strictPlan;
+  panel._renderPlanWorkspace(strictPlan);
+
+  const blocked = panel._getPlanBuildActionState(strictPlan);
+  assert.equal(blocked.canStart, false);
+  assert.equal(blocked.label, '仍需补齐资源 1 项');
+  assert.match(planWorkspace.innerHTML, /严格确认模式/);
+  assert.match(buildStatus.textContent, /资源仍待绑定/);
+});
+
+test('Plan main CTA ignores model NextAction and uses canonical readiness', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const mainButton = createFakeButton();
+  const planWorkspace = createFakeElement();
+  panel.container = createContainer(
+    {
+      '#ai-agent-workspace-overview': createFakeElement(),
+      '#ai-plan-workspace': planWorkspace,
+      '#ai-build-workspace': createFakeElement(),
+      '#ai-result-status-note': createFakeElement(),
+      '#ai-btn-start-build-inline': createFakeButton(),
+      '#ai-plan-build-status': createFakeElement(),
+      '#ai-btn-start-build': mainButton
+    },
+    { '.ai-plan-action': [mainButton] }
+  );
+  const plan = pendingFieldPlan(panel, {
+    questionId: 'image_source',
+    field: 'image_source',
+    pendingValue: 'camera_pending',
+    concreteValue: 'file_sample'
+  });
+  plan.nextAction = 'Deploy now from model advice';
+  panel.pendingVisionPlan = plan;
+  panel._renderPlanWorkspace(plan);
+
+  assert.match(planWorkspace.innerHTML, /模型 NextAction/);
+  assert.match(planWorkspace.innerHTML, /Deploy now from model advice/);
+  assert.equal(panel._getPlanBuildActionState(plan).label, '仍需人工确认 1 项');
+  assert.notEqual(mainButton.textContent, 'Deploy now from model advice');
 });
 
 test('fallback pending recommendations stay UI-only for all canonical pending question types', async () => {
@@ -4398,7 +4576,7 @@ test('Plan with pending image source and acquisition route can start editable dr
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.buildFromPlan.planId, plan.planId);
   assert.equal(captured.buildFromPlan.planHash, plan.planHash);
-  assert.equal(buildStatus.textContent, '当前选择已满足构建条件');
+  assert.equal(buildStatus.textContent, '当前显式选择已满足构建条件');
   assert.match(planWorkspace.innerHTML, /开始构建/);
   assert.doesNotMatch(planWorkspace.innerHTML, /按推荐方案开始构建/);
 });

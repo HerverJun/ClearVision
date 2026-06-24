@@ -16,6 +16,8 @@ public static class VisionAgentPlanFieldCategories
 
 public static class VisionAgentPlanFieldPolicy
 {
+    private const int MaxPublicReasonChars = 160;
+
     private static readonly Dictionary<string, VisionAgentPlanFieldRule> Rules = new(StringComparer.OrdinalIgnoreCase)
     {
         [VisionAgentPlanAnswerFields.InspectionObject] = Requirement(VisionAgentPlanAnswerFields.InspectionObject, allowFreeText: true),
@@ -429,12 +431,9 @@ public static class VisionAgentPlanFieldPolicy
                     var options = (q.Options ?? [])
                         .Where(option => !string.IsNullOrWhiteSpace(option.Value) &&
                                          !string.IsNullOrWhiteSpace(option.Label))
+                        .Select(NormalizeOptionContract)
                         .Take(5)
                         .ToList();
-                    if (options.Count > 0 && options.All(option => !option.Recommended))
-                    {
-                        options[0] = options[0] with { Recommended = true };
-                    }
                     var rawDefault = IsPlaceholderValue(q.DefaultValue) ? string.Empty : q.DefaultValue;
                     var recommended = options.FirstOrDefault(option => option.Recommended)?.Value ??
                                       options.FirstOrDefault()?.Value ??
@@ -541,7 +540,7 @@ public static class VisionAgentPlanFieldPolicy
             VisionAgentPlanAnswerFields.AlgorithmStrategy =>
             [
                 Option("strategy_pending", "保持算法策略待确认", true, "不默认选择规则、模板或模型，先保留策略确认。", "不会解除构建阻断。"),
-                Option("rule_first", "优先规则/几何算法", false, "目标特征稳定、可测量且用户确认时使用。", "不适合外观变化大或需模型识别的任务。"),
+                Option("traditional_rule", "优先规则/几何算法", false, "目标特征稳定、可测量且用户确认时使用。", "不适合外观变化大或需模型识别的任务。"),
                 Option("model_pending", "模型资源待确认", false, "规划模型算子，但模型资源仍待绑定。", "构建或部署前需要模型元数据。")
             ],
             _ =>
@@ -579,14 +578,68 @@ public static class VisionAgentPlanFieldPolicy
         string description,
         string impact)
     {
+        var effect = InferLegacyAnswerEffect(value);
         return new VisionAgentClarificationOption
         {
             Value = value,
             Label = label,
             Recommended = recommended,
+            AnswerEffect = effect,
+            RecommendationReason = recommended
+                ? effect == VisionAgentClarificationAnswerEffects.ResolveField
+                    ? "This option can resolve the canonical field; resource readiness is evaluated separately."
+                    : "This option keeps the field pending until a user or engineer confirms it."
+                : string.Empty,
             Description = description,
             Impact = impact
         };
+    }
+
+    public static VisionAgentClarificationOption NormalizeOptionContract(VisionAgentClarificationOption option)
+    {
+        return option with
+        {
+            AnswerEffect = NormalizeAnswerEffect(option),
+            RecommendationReason = NormalizeRecommendationReason(option.RecommendationReason)
+        };
+    }
+
+    public static string NormalizeAnswerEffect(VisionAgentClarificationOption? option)
+    {
+        var raw = Clean(option?.AnswerEffect).ToLowerInvariant();
+        return raw switch
+        {
+            VisionAgentClarificationAnswerEffects.ResolveField => VisionAgentClarificationAnswerEffects.ResolveField,
+            VisionAgentClarificationAnswerEffects.Defer => VisionAgentClarificationAnswerEffects.Defer,
+            VisionAgentClarificationAnswerEffects.Informational => VisionAgentClarificationAnswerEffects.Informational,
+            _ => InferLegacyAnswerEffect(option?.Value)
+        };
+    }
+
+    public static string NormalizeRecommendationReason(string? value)
+    {
+        var text = Clean(value);
+        if (text.Length > MaxPublicReasonChars)
+        {
+            text = text[..MaxPublicReasonChars];
+        }
+
+        return text
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Trim();
+    }
+
+    public static bool IsResolveFieldOption(VisionAgentClarificationOption? option)
+    {
+        return NormalizeAnswerEffect(option) == VisionAgentClarificationAnswerEffects.ResolveField;
+    }
+
+    private static string InferLegacyAnswerEffect(string? value)
+    {
+        return IsPlaceholderValue(value)
+            ? VisionAgentClarificationAnswerEffects.Defer
+            : VisionAgentClarificationAnswerEffects.ResolveField;
     }
 
     public static bool IsPlaceholderValue(string? value)

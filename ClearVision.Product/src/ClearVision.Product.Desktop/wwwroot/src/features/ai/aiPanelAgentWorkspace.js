@@ -114,6 +114,12 @@ const PLAN_BUILD_RESOLUTION_MODES = Object.freeze({
     NON_BLOCKING: 'non_blocking'
 });
 
+const PLAN_ANSWER_EFFECTS = Object.freeze({
+    RESOLVE_FIELD: 'resolve_field',
+    DEFER: 'defer',
+    INFORMATIONAL: 'informational'
+});
+
 const PLAN_QUESTION_FIELD_BY_ID = Object.freeze({
     object_type: PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
     product_type: PLAN_ANSWER_FIELDS.INSPECTION_OBJECT,
@@ -597,6 +603,7 @@ export const aiPanelAgentWorkspaceMixin = {
             inlineBuildBtn.dataset.acceptRecommended = actionState.acceptedRecommended ? 'true' : 'false';
             if (actionState.label) {
                 inlineBuildBtn.setAttribute?.('aria-label', actionState.label);
+                inlineBuildBtn.textContent = actionState.label;
             }
             inlineBuildBtn.title = !hasPlan
                 ? '请先完成规划'
@@ -613,9 +620,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (buildStatus) {
             buildStatus.textContent = !hasPlan
                 ? ''
-                : canBuild
-                    ? '当前选择已满足构建条件'
-                    : blockedTitle;
+                : actionState.statusText || blockedTitle;
         }
 
         const mainBuildBtn = this.container?.querySelector('#ai-btn-start-build');
@@ -2408,6 +2413,7 @@ export const aiPanelAgentWorkspaceMixin = {
     _doesAnswerResolveAuthoritativeBlocker(blocker, answer, questions = []) {
         if (!blocker || !answer) return false;
         if (blocker.category === PLAN_BUILD_BLOCKER_CATEGORIES.SAFETY_BLOCKER) return false;
+        if (blocker.category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING) return false;
         const question = this._toArray(questions)
             .find(item => String(item?.id || item?.Id || '').trim() === String(answer.questionId || '').trim()) || null;
         if (!this._isAuthoritativeReadinessAnswerAllowed(answer, question)) return false;
@@ -2618,6 +2624,37 @@ export const aiPanelAgentWorkspaceMixin = {
         return false;
     },
 
+    _getPlanReadinessStats(plan) {
+        const readiness = plan?.buildReadiness || {};
+        const blockers = this._toArray(readiness.blockers);
+        const blockingIds = new Set(blockers
+            .filter(blocker => blocker?.blocksBuild === true)
+            .map(blocker => String(blocker?.id || '').trim())
+            .filter(Boolean));
+        const resourceIds = new Set(blockers
+            .filter(blocker => blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING)
+            .map(blocker => String(blocker?.id || '').trim())
+            .filter(Boolean));
+        const pendingFields = new Set(this._toArray(readiness.remainingFields)
+            .map(field => this._inferPlanQuestionField(field) || String(field || '').trim().toLowerCase())
+            .filter(Boolean));
+        return {
+            blockingCount: blockingIds.size,
+            pendingConfirmationCount: pendingFields.size,
+            resourcePendingCount: resourceIds.size
+        };
+    },
+
+    _hasOnlyDraftableResourceBlockers(plan) {
+        const mode = this._normalizeRequirementMode?.(plan?.requirementMode || this.requirementMode || 'strict') || 'strict';
+        if (mode !== 'draft') return false;
+        const blockers = this._toArray(plan?.buildReadiness?.blockers);
+        if (!blockers.length) return false;
+        return blockers.some(blocker => blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING) &&
+            blockers.every(blocker => blocker?.blocksBuild !== true ||
+                blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING);
+    },
+
     _getPlanBuildActionState(plan) {
         if (!plan) {
             return {
@@ -2631,6 +2668,8 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const canBuild = this._refreshPlanEffectiveBuildReadiness?.(plan, { acceptedRecommended: false }) === true;
+        const stats = this._getPlanReadinessStats(plan);
+        const draftResourceOnly = canBuild && this._hasOnlyDraftableResourceBlockers(plan);
         const canAcceptRecommended = !canBuild && this._canBuildPlanWithRecommendedAnswers(plan);
         if (canBuild) {
             return {
@@ -2638,8 +2677,11 @@ export const aiPanelAgentWorkspaceMixin = {
                 canAcceptRecommended: false,
                 canStart: true,
                 acceptedRecommended: false,
-                label: '开始构建',
-                statusText: '当前显式选择已满足构建条件'
+                label: draftResourceOnly ? '按当前方案生成可编辑草稿' : '开始构建',
+                statusText: draftResourceOnly
+                    ? '可以生成可编辑草稿，部署前仍需绑定资源。'
+                    : '当前显式选择已满足构建条件',
+                stats
             };
         }
 
@@ -2649,8 +2691,9 @@ export const aiPanelAgentWorkspaceMixin = {
                 canAcceptRecommended: true,
                 canStart: true,
                 acceptedRecommended: true,
-                label: '按推荐项确认并构建',
-                statusText: '当前阻断问题均有推荐项，可批量确认后构建'
+                label: '接受推荐方案并构建',
+                statusText: '当前阻断项存在可解决字段的推荐方案，可批量确认后构建',
+                stats
             };
         }
 
@@ -2659,8 +2702,13 @@ export const aiPanelAgentWorkspaceMixin = {
             canAcceptRecommended: false,
             canStart: false,
             acceptedRecommended: false,
-            label: '开始构建',
-            statusText: this._getPlanBuildBlockedReason(plan)
+            label: stats.pendingConfirmationCount > 0
+                ? `仍需人工确认 ${stats.pendingConfirmationCount} 项`
+                : stats.resourcePendingCount > 0
+                    ? `仍需补齐资源 ${stats.resourcePendingCount} 项`
+                    : '开始构建',
+            statusText: this._getPlanBuildBlockedReason(plan),
+            stats
         };
     },
 
@@ -2806,6 +2854,9 @@ export const aiPanelAgentWorkspaceMixin = {
         const value = String(item.value || item.Value || '').trim();
         const origin = String(item.origin || item.Origin || PLAN_ANSWER_ORIGINS.EXPLICIT_USER_SELECTION).trim().toLowerCase();
         if (!field || !value || this._isPlanPlaceholderValue(value)) return null;
+        const option = this._toArray(fallbackQuestion?.options || fallbackQuestion?.Options)
+            .find(candidate => String(candidate?.value || candidate?.Value || '').trim() === value);
+        if (option && !this._isResolveFieldOption(option)) return null;
         return {
             questionId,
             field,
@@ -3171,8 +3222,10 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _getQuestionRecommendedValue(question) {
         const recommendedOption = this._toArray(question?.options)
-            .find(option => option?.recommended === true && !this._isPlanPlaceholderValue(option?.value));
-        const value = recommendedOption?.value || question?.defaultValue || '';
+            .find(option => option?.recommended === true &&
+                this._isResolveFieldOption(option) &&
+                !this._isPlanPlaceholderValue(option?.value));
+        const value = recommendedOption?.value || '';
         return this._isPlanPlaceholderValue(value) ? '' : value;
     },
 
@@ -3565,13 +3618,37 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _normalizePlanOption(option) {
         if (!option) return null;
+        const value = option.value || option.Value || '';
+        const answerEffect = this._normalizePlanAnswerEffect(option.answerEffect || option.AnswerEffect, value);
         return {
-            value: option.value || option.Value || '',
-            label: this._localizeDisplayText(option.label || option.Label || option.value || option.Value || ''),
+            value,
+            label: this._localizeDisplayText(option.label || option.Label || value || ''),
             recommended: Boolean(option.recommended ?? option.Recommended),
+            answerEffect,
+            recommendationReason: this._sanitizePlanDiagnosticText(option.recommendationReason || option.RecommendationReason || '', 160),
             description: this._localizeDisplayText(option.description || option.Description || ''),
             impact: this._localizeDisplayText(option.impact || option.Impact || '')
         };
+    },
+
+    _normalizePlanAnswerEffect(effect, value = '') {
+        const normalized = String(effect || '').trim().toLowerCase();
+        if (Object.values(PLAN_ANSWER_EFFECTS).includes(normalized)) return normalized;
+        return this._isPlanPlaceholderValue(value)
+            ? PLAN_ANSWER_EFFECTS.DEFER
+            : PLAN_ANSWER_EFFECTS.RESOLVE_FIELD;
+    },
+
+    _isResolveFieldOption(option) {
+        return this._normalizePlanAnswerEffect(option?.answerEffect || option?.AnswerEffect, option?.value || option?.Value) === PLAN_ANSWER_EFFECTS.RESOLVE_FIELD;
+    },
+
+    _isDeferOption(option) {
+        return this._normalizePlanAnswerEffect(option?.answerEffect || option?.AnswerEffect, option?.value || option?.Value) === PLAN_ANSWER_EFFECTS.DEFER;
+    },
+
+    _isInformationalOption(option) {
+        return this._normalizePlanAnswerEffect(option?.answerEffect || option?.AnswerEffect, option?.value || option?.Value) === PLAN_ANSWER_EFFECTS.INFORMATIONAL;
     },
 
     _normalizePlanDefault(item) {
@@ -4085,10 +4162,23 @@ export const aiPanelAgentWorkspaceMixin = {
             ? `<div class="ai-plan-chain">${routeOperators.map(op => `<span title="${this._escapeHtml(op)}">${this._escapeHtml(this._formatOperatorType(op))}</span>`).join('')}</div>`
             : '<div class="ai-plan-maturity-empty">需求成熟度不足时不会提前选择算子链。</div>';
         const plannerFailureDiagnostics = this._renderPlannerFailureDiagnostics(plan);
+        const modeLabel = (this._normalizeRequirementMode?.(plan.requirementMode || this.requirementMode || 'strict') || 'strict') === 'draft'
+            ? '可编辑草稿模式'
+            : '严格确认模式';
+        const readinessStats = this._getPlanReadinessStats(plan);
         el.innerHTML = `
             <section class="ai-workspace-section">
                 <div class="ai-workspace-section-title">需求理解</div>
                 <div class="ai-workspace-list">${plan.understanding.map(item => `<div>${this._escapeHtml(item)}</div>`).join('')}</div>
+            </section>
+            <section class="ai-workspace-section ai-requirement-maturity ${plan.executable ? 'is-ready' : 'is-blocked'}">
+                <div class="ai-workspace-section-title">${this._escapeHtml(modeLabel)}</div>
+                <div class="ai-requirement-maturity-grid">
+                    <div class="ai-build-compact-row"><b>阻断项</b><span>${this._escapeHtml(String(readinessStats.blockingCount))}</span></div>
+                    <div class="ai-build-compact-row"><b>待确认</b><span>${this._escapeHtml(String(readinessStats.pendingConfirmationCount))}</span></div>
+                    <div class="ai-build-compact-row"><b>后补资源</b><span>${this._escapeHtml(String(readinessStats.resourcePendingCount))}</span></div>
+                </div>
+                ${plan.buildReadiness?.primaryMessage ? `<div class="ai-build-note">${this._escapeHtml(plan.buildReadiness.primaryMessage)}</div>` : ''}
             </section>
             ${semanticPanel}
             ${maturityPanel}
@@ -4109,6 +4199,7 @@ export const aiPanelAgentWorkspaceMixin = {
                         <span class="ai-plan-tech-code">${this._escapeHtml(plan.planHash || '计划哈希待生成')}</span>
                     </div>
                     ${plannerFailureDiagnostics}
+                    ${plan.nextAction ? `<div class="ai-build-note"><strong>模型 NextAction</strong>${this._escapeHtml(plan.nextAction)}</div>` : ''}
                     ${plan.fallbackReason ? `<div class="ai-build-note"><strong>兜底原因</strong>${this._escapeHtml(plan.fallbackReason)}</div>` : ''}
                     ${plan.planWarnings.length ? `<ul>${plan.planWarnings.map(item => `<li>${this._escapeHtml(item)}</li>`).join('')}</ul>` : ''}
                     ${plan.contractRepairNotes.length ? `<div class="ai-plan-chain">${plan.contractRepairNotes.map(item => `<span>${this._escapeHtml(item)}</span>`).join('')}</div>` : ''}
@@ -4267,9 +4358,48 @@ export const aiPanelAgentWorkspaceMixin = {
         `;
     },
 
+    _getPlanQuestionResourceBlocker(question, plan = this.pendingVisionPlan) {
+        const id = String(question?.id || question?.Id || '').trim();
+        const field = this._inferPlanQuestionFieldForQuestion(question, plan) ||
+            this._fallbackPlanQuestionField(question, id);
+        return this._toArray(plan?.buildReadiness?.blockers)
+            .find(blocker => blocker?.category === PLAN_BUILD_BLOCKER_CATEGORIES.RESOURCE_PENDING &&
+                ((id && blocker.questionId === id) || (field && blocker.field === field))) || null;
+    },
+
+    _formatPlanOptionTag(option) {
+        if (this._isInformationalOption(option)) return '仅供阅读';
+        if (option?.recommended === true && this._isResolveFieldOption(option)) return '推荐方案';
+        if (option?.recommended === true && this._isDeferOption(option)) return '建议暂缓';
+        if (this._isDeferOption(option)) return '保持待确认';
+        return '可选方案';
+    },
+
+    _formatPlanSelectionFeedback(question, selectedValue, plan = this.pendingVisionPlan) {
+        const selected = String(selectedValue || '').trim();
+        if (!selected) return '';
+        const option = this._toArray(question?.options)
+            .find(item => String(item?.value || '').trim() === selected);
+        if (!option || this._isInformationalOption(option)) return '';
+        if (this._isDeferOption(option)) {
+            return '已选择暂缓确认，该字段仍会阻断构建。';
+        }
+
+        const resourceBlocker = this._getPlanQuestionResourceBlocker(question, plan);
+        if (resourceBlocker?.blocksBuild === true) {
+            return '资源仍待绑定，当前模式下不能开始构建。';
+        }
+        if (resourceBlocker) {
+            return '可以生成可编辑草稿，部署前仍需绑定资源。';
+        }
+
+        return '已确认，该选择可用于构建判断。';
+    },
+
     _renderPlanQuestion(question, selectedValue) {
         const isCustomValue = selectedValue && !question.options.some(opt => opt.value === selectedValue);
-        const selectedPending = this._isPlanPlaceholderValue(selectedValue);
+        const selectionFeedback = this._formatPlanSelectionFeedback(question, selectedValue);
+        const resourceBlocker = this._getPlanQuestionResourceBlocker(question);
         return `
             <article class="ai-plan-question">
                 <div class="ai-plan-question-head">
@@ -4283,15 +4413,21 @@ export const aiPanelAgentWorkspaceMixin = {
                 <div class="ai-plan-question-options">
                     ${question.options.map(option => {
                         const selected = String(selectedValue || '') === option.value;
+                        const tag = this._formatPlanOptionTag(option);
+                        const disabled = this._isInformationalOption(option);
                         return `
                             <button
-                                class="ai-plan-option ${selected ? 'is-selected' : ''} ${option.recommended ? 'is-recommended' : ''}"
+                                class="ai-plan-option ${selected ? 'is-selected' : ''} ${option.recommended ? 'is-recommended' : ''} ${disabled ? 'is-informational' : ''}"
                                 type="button"
                                 data-plan-question="${this._escapeHtml(question.id)}"
                                 data-plan-question-option="${this._escapeHtml(option.value)}"
+                                ${disabled ? 'disabled' : ''}
                                 aria-pressed="${selected ? 'true' : 'false'}">
-                                <span>${this._escapeHtml(option.label)}${option.recommended ? '（推荐）' : ''}</span>
+                                <span>${this._escapeHtml(option.label)}</span>
+                                <strong class="ai-plan-option-tag">${this._escapeHtml(tag)}</strong>
+                                ${resourceBlocker && this._isResolveFieldOption(option) ? '<strong class="ai-plan-option-tag">资源待后补</strong>' : ''}
                                 <small>${this._escapeHtml(option.description)}</small>
+                                ${option.recommendationReason ? `<small>${this._escapeHtml(option.recommendationReason)}</small>` : ''}
                                 <em>${this._escapeHtml(option.impact)}</em>
                             </button>
                         `;
@@ -4311,7 +4447,7 @@ export const aiPanelAgentWorkspaceMixin = {
                         确定
                     </button>
                 </div>
-                ${selectedPending ? '<div class="ai-plan-question-selection-feedback">已选择，仍保持待确认。该选择不会解除构建阻断。</div>' : ''}
+                ${selectionFeedback ? `<div class="ai-plan-question-selection-feedback">${this._escapeHtml(selectionFeedback)}</div>` : ''}
                 <div class="ai-plan-question-impact">${this._escapeHtml(question.impact)}</div>
             </article>
         `;
@@ -4355,7 +4491,12 @@ export const aiPanelAgentWorkspaceMixin = {
         const selectedValue = String(value || '').trim();
         const question = this._toArray(this.pendingVisionPlan.questions)
             .find(item => String(item?.id || '').trim() === String(questionId || '').trim());
-        if (!this._toArray(question?.options).some(option => String(option?.value || '').trim() === selectedValue)) {
+        const selectedOption = this._toArray(question?.options)
+            .find(option => String(option?.value || '').trim() === selectedValue);
+        if (!selectedOption) {
+            return;
+        }
+        if (this._isInformationalOption(selectedOption)) {
             return;
         }
         const field = this._inferPlanQuestionFieldForQuestion(question || { id: questionId }, this.pendingVisionPlan) ||
@@ -4367,7 +4508,7 @@ export const aiPanelAgentWorkspaceMixin = {
             ...cleanedSelections,
             [questionId]: selectedValue
         };
-        if (!this._isPlanPlaceholderValue(selectedValue)) {
+        if (this._isResolveFieldOption(selectedOption) && !this._isPlanPlaceholderValue(selectedValue)) {
             nextAnswers[field] = {
                 questionId,
                 field,

@@ -932,8 +932,8 @@ test('Plan pending recommendation click keeps DOM selection separate from effect
   await expect(pending).toHaveClass(/is-selected/);
   await expect(pending).toHaveClass(/is-recommended/);
   await expect(pending).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.ai-plan-question-selection-feedback')).toContainText('已选择，仍保持待确认');
-  await expect(page.locator('.ai-plan-question-selection-feedback')).toContainText('该选择不会解除构建阻断');
+  await expect(page.locator('.ai-plan-question-selection-feedback')).toContainText('已选择暂缓确认');
+  await expect(page.locator('.ai-plan-question-selection-feedback')).toContainText('该字段仍会阻断构建');
   expect(await page.evaluate(() => {
     const panel = (window as any).aiPanel;
     return {

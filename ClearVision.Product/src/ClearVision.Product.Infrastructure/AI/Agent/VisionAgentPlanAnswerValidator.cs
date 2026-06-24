@@ -270,6 +270,14 @@ public sealed class VisionAgentPlanAnswerValidator
             return false;
         }
 
+        var selectedOption = question.Options.FirstOrDefault(option =>
+            Clean(option.Value).Equals(value, StringComparison.OrdinalIgnoreCase));
+        if (!VisionAgentPlanFieldPolicy.IsResolveFieldOption(selectedOption))
+        {
+            invalidValues.Add($"{questionId}:answer_effect_not_resolve_field");
+            return false;
+        }
+
         if (origin == VisionAgentPlanAnswerOrigins.AcceptedRecommendedDefault)
         {
             if (VisionAgentPlanFieldPolicy.TryGet(field, out var rule) &&
@@ -417,9 +425,9 @@ public sealed class VisionAgentPlanAnswerValidator
 
     private static string RecommendedValue(VisionAgentClarificationQuestion question)
     {
-        var value = Clean(question.Options.FirstOrDefault(option => option.Recommended)?.Value) is { Length: > 0 } recommended
-            ? recommended
-            : Clean(question.DefaultValue);
+        var value = Clean(question.Options.FirstOrDefault(option =>
+                option.Recommended &&
+                VisionAgentPlanFieldPolicy.IsResolveFieldOption(option))?.Value);
         return VisionAgentPlanFieldPolicy.IsPlaceholderValue(value) ? string.Empty : value;
     }
 

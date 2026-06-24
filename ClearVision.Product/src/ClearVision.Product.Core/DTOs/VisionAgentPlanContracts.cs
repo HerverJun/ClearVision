@@ -75,6 +75,13 @@ public static class VisionAgentPlanAnswerOrigins
     public const string DefaultAssumption = "default_assumption";
 }
 
+public static class VisionAgentClarificationAnswerEffects
+{
+    public const string ResolveField = "resolve_field";
+    public const string Defer = "defer";
+    public const string Informational = "informational";
+}
+
 public static class VisionAgentBuildBlockerCategories
 {
     public const string HardRequirement = "hard_requirement";
@@ -369,6 +376,8 @@ public sealed record VisionAgentClarificationOption
     public string Value { get; init; } = string.Empty;
     public string Label { get; init; } = string.Empty;
     public bool Recommended { get; init; }
+    public string AnswerEffect { get; init; } = string.Empty;
+    public string RecommendationReason { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public string Impact { get; init; } = string.Empty;
 }

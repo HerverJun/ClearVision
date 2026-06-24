@@ -216,6 +216,241 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
     }
 
     [Fact]
+    public void Evaluate_RecommendedResolveField_ShouldResolveBlocker()
+    {
+        var baseline = Plan([]);
+        var plan = baseline with
+        {
+            SemanticExtraction = baseline.SemanticExtraction! with { ImageSource = string.Empty },
+            ClarificationQuestions =
+            [
+                Question(
+                    "image_source",
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    "file_sample",
+                    "File sample",
+                    VisionAgentClarificationAnswerEffects.ResolveField)
+            ],
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+
+        var validation = new VisionAgentPlanAnswerValidator().Validate(plan, [], null, true);
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            acceptedRecommendedDefaults: true,
+            validatedAnswers: validation,
+            requirementMode: AiRequirementModes.Strict);
+
+        validation.AcceptedAnswers.Should().ContainSingle(answer =>
+            answer.Field == VisionAgentPlanAnswerFields.ImageSource &&
+            answer.Value == "file_sample");
+        readiness.CanBuild.Should().BeTrue();
+        readiness.Blockers.Should().NotContain(blocker => blocker.BlocksBuild);
+    }
+
+    [Fact]
+    public void Evaluate_RecommendedDefer_ShouldNotResolveBlockerOrEnterConfirmedAnswers()
+    {
+        var baseline = Plan([]);
+        var plan = baseline with
+        {
+            SemanticExtraction = baseline.SemanticExtraction! with { ImageSource = string.Empty },
+            ClarificationQuestions =
+            [
+                Question(
+                    "image_source",
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    "camera_pending",
+                    "Keep pending",
+                    VisionAgentClarificationAnswerEffects.Defer)
+            ],
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+
+        var validation = new VisionAgentPlanAnswerValidator().Validate(plan, [], null, true);
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            acceptedRecommendedDefaults: true,
+            validatedAnswers: validation,
+            requirementMode: AiRequirementModes.Strict);
+
+        validation.AcceptedAnswers.Should().BeEmpty();
+        readiness.CanBuild.Should().BeFalse();
+        readiness.Blockers.Should().Contain(blocker =>
+            blocker.Field == VisionAgentPlanAnswerFields.ImageSource &&
+            blocker.BlocksBuild);
+    }
+
+    [Fact]
+    public void Validate_AcceptedRecommendedDefaults_ShouldSkipDeferAndInformational()
+    {
+        var plan = Plan([]) with
+        {
+            ClarificationQuestions =
+            [
+                Question(
+                    "image_source",
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    "camera_pending",
+                    "Keep pending",
+                    VisionAgentClarificationAnswerEffects.Defer),
+                Question(
+                    "algorithm_strategy",
+                    VisionAgentPlanAnswerFields.AlgorithmStrategy,
+                    "strategy_note",
+                    "Read note",
+                    VisionAgentClarificationAnswerEffects.Informational),
+                Question(
+                    "acceptance_criteria",
+                    VisionAgentPlanAnswerFields.AcceptanceCriteria,
+                    "defect_is_ng",
+                    "Defect is NG",
+                    VisionAgentClarificationAnswerEffects.ResolveField)
+            ]
+        };
+
+        var validation = new VisionAgentPlanAnswerValidator().Validate(plan, [], null, true);
+
+        validation.AcceptedAnswers.Should().ContainSingle(answer =>
+            answer.Field == VisionAgentPlanAnswerFields.AcceptanceCriteria &&
+            answer.Value == "defect_is_ng");
+        validation.AcceptedAnswers.Should().NotContain(answer =>
+            answer.Value == "camera_pending" ||
+            answer.Value == "strategy_note");
+    }
+
+    [Fact]
+    public void Validate_LegacyOptionWithoutAnswerEffect_ShouldInferPendingAsDeferAndConcreteAsResolve()
+    {
+        var plan = Plan([]) with
+        {
+            ClarificationQuestions =
+            [
+                Question("image_source", VisionAgentPlanAnswerFields.ImageSource, "camera_pending", "Pending"),
+                Question("acceptance_criteria", VisionAgentPlanAnswerFields.AcceptanceCriteria, "defect_is_ng", "Defect is NG")
+            ]
+        };
+
+        var validation = new VisionAgentPlanAnswerValidator().Validate(plan, [], null, true);
+
+        validation.AcceptedAnswers.Should().ContainSingle(answer =>
+            answer.Field == VisionAgentPlanAnswerFields.AcceptanceCriteria &&
+            answer.Value == "defect_is_ng");
+        validation.AcceptedAnswers.Should().NotContain(answer => answer.Value == "camera_pending");
+    }
+
+    [Fact]
+    public void Evaluate_StationCamera_ShouldResolveImageSourceAndKeepCameraBindingResourceBlocker()
+    {
+        var baseline = Plan([]);
+        var plan = baseline with
+        {
+            SemanticExtraction = baseline.SemanticExtraction! with { ImageSource = string.Empty },
+            ClarificationQuestions =
+            [
+                Question(
+                    "image_source",
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    "station_camera",
+                    "Station camera",
+                    VisionAgentClarificationAnswerEffects.ResolveField)
+            ],
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+        var validation = new VisionAgentPlanAnswerValidator().Validate(
+            plan,
+            [
+                new VisionAgentPlanAnswer
+                {
+                    QuestionId = "image_source",
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Value = "station_camera",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                }
+            ],
+            null,
+            false);
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            validatedAnswers: validation,
+            requirementMode: AiRequirementModes.Strict);
+
+        readiness.ResolvedFields.Should().Contain(VisionAgentPlanAnswerFields.ImageSource);
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
+            blocker.ResolutionMode == VisionAgentBuildBlockerResolutionModes.ProvideResource &&
+            blocker.BlocksBuild);
+        readiness.CanBuild.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Evaluate_StationCameraDraft_ShouldAllowEditableDraftButKeepResourcePending()
+    {
+        var baseline = Plan([]);
+        var plan = baseline with
+        {
+            SemanticExtraction = baseline.SemanticExtraction! with { ImageSource = string.Empty },
+            ClarificationQuestions =
+            [
+                Question(
+                    "image_source",
+                    VisionAgentPlanAnswerFields.ImageSource,
+                    "station_camera",
+                    "Station camera",
+                    VisionAgentClarificationAnswerEffects.ResolveField)
+            ],
+            RequirementMaturity = baseline.RequirementMaturity! with
+            {
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = [VisionAgentPlanAnswerFields.ImageSource],
+                BlockingReasons = ["image_source_missing"]
+            }
+        };
+        var validation = new VisionAgentPlanAnswerValidator().Validate(
+            plan,
+            [
+                new VisionAgentPlanAnswer
+                {
+                    QuestionId = "image_source",
+                    Field = VisionAgentPlanAnswerFields.ImageSource,
+                    Value = "station_camera",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                }
+            ],
+            null,
+            false);
+
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            plan,
+            validatedAnswers: validation,
+            requirementMode: AiRequirementModes.Draft);
+
+        readiness.CanBuild.Should().BeTrue();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Id == "resource_pending:camera_binding" &&
+            blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
+            blocker.BlocksBuild == false);
+    }
+
+    [Fact]
     public void Evaluate_DraftMissingImageSourceWithAcquisitionRoute_ShouldRemainResourcePending()
     {
         var baseline = Plan(["hard_requirement:image_source_missing"]);
@@ -581,15 +816,31 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
     }
 
     [Fact]
-    public void Evaluate_ResourcePending_ShouldRemainNonBlocking()
+    public void Evaluate_ResourcePending_ShouldBlockInStrictMode()
     {
         var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(Plan(["resource_pending:model_resource_missing"]));
+
+        readiness.CanBuild.Should().BeFalse();
+        readiness.Blockers.Should().ContainSingle(blocker =>
+            blocker.Id == "resource_pending:model_resource" &&
+            blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
+            blocker.BlocksBuild);
+        AssertCanBuildInvariant(readiness);
+    }
+
+    [Fact]
+    public void Evaluate_ResourcePending_ShouldRemainNonBlockingInDraftWhenRouteCanGenerate()
+    {
+        var readiness = VisionAgentPlanReadinessEvaluator.Evaluate(
+            Plan(["resource_pending:model_resource_missing"]),
+            requirementMode: AiRequirementModes.Draft);
 
         readiness.CanBuild.Should().BeTrue();
         readiness.Blockers.Should().ContainSingle(blocker =>
             blocker.Id == "resource_pending:model_resource" &&
             blocker.Category == VisionAgentBuildBlockerCategories.ResourcePending &&
-            blocker.BlocksBuild == false);
+            blocker.BlocksBuild == false &&
+            blocker.ResolutionMode == VisionAgentBuildBlockerResolutionModes.ProvideResource);
         AssertCanBuildInvariant(readiness);
     }
 
@@ -706,7 +957,8 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
         string id,
         string field,
         string recommendedValue,
-        string label)
+        string label,
+        string answerEffect = "")
     {
         return new VisionAgentClarificationQuestion
         {
@@ -721,6 +973,7 @@ public sealed class VisionAgentPlanReadinessEvaluatorTests
                     Value = recommendedValue,
                     Label = label,
                     Recommended = true,
+                    AnswerEffect = answerEffect,
                     Description = label,
                     Impact = "Editable draft can continue."
                 }

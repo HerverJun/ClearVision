@@ -892,14 +892,14 @@ PlannerCandidateParsed:
         var options = (question.Options ?? [])
             .Where(option => !string.IsNullOrWhiteSpace(option.Value) &&
                              !string.IsNullOrWhiteSpace(option.Label))
+            .Select(VisionAgentPlanFieldPolicy.NormalizeOptionContract)
             .Take(5)
             .ToList();
-        if (options.Count > 0 && options.All(option => !option.Recommended))
-        {
-            options[0] = options[0] with { Recommended = true };
-        }
-
-        var recommended = options.FirstOrDefault(option => option.Recommended)?.Value ??
+        var recommended = options.FirstOrDefault(option =>
+                              option.Recommended &&
+                              VisionAgentPlanFieldPolicy.IsResolveFieldOption(option))?.Value ??
+                          options.FirstOrDefault(option =>
+                              VisionAgentPlanFieldPolicy.IsResolveFieldOption(option))?.Value ??
                           options.FirstOrDefault()?.Value ??
                           question.DefaultValue;
         return question with
@@ -1338,8 +1338,9 @@ public sealed class VisionAgentPlanPromptComposer
             "You are ClearVision Plan Mode, an industrial vision engineering planner.",
             "Return exactly one JSON object that matches PlannerCandidate. No prose, markdown, comments, raw prompt, system prompt, reasoning, or chain-of-thought.",
             "You must plan from public metadata only. Do not include local paths, image bytes/base64, tokens, secrets, PLC addresses, Station IPs, camera resource paths, or hidden reasoning.",
-            "Generate 0 to 5 high-value clarification questions targeting ONLY fields listed in [remaining_fields] and NEVER fields in [resolved_fields] or [confirmed_plan_answers]. Each question needs id, field, title, why, defaultValue, defaultAssumption, impact, and 2 to 5 options. The field must be one of inspection_object, task_type, image_source, acceptance_criteria, output_target, target_attribute, defect_type, measurement_target, algorithm_strategy, roi_strategy, template_strategy. Exactly one or more options must have recommended=true.",
-            "Use only operator types from the provided operator catalog. Missing camera/model/template/calibration/PLC resources must stay pending metadata.",
+            "Generate 0 to 5 high-value clarification questions targeting ONLY fields listed in [remaining_fields] and NEVER fields in [resolved_fields] or [confirmed_plan_answers]. Each question needs id, field, title, why, defaultValue, defaultAssumption, impact, and 2 to 5 options. The field must be one of inspection_object, task_type, image_source, acceptance_criteria, output_target, target_attribute, defect_type, measurement_target, algorithm_strategy, roi_strategy, template_strategy. Options must include answerEffect: resolve_field, defer, or informational. recommended is orthogonal to answerEffect.",
+            "Use answerEffect=resolve_field only for concrete choices such as file_sample, station_camera, traditional_rule, or a confirmed output target. Use answerEffect=defer for camera_pending, ok_ng_pending, strategy_pending, placeholder, pending, or *_pending. Use answerEffect=informational only for read-only explanatory items. Do not mark informational as a recommended answer.",
+            "Use only operator types from the provided operator catalog. Missing camera/model/template/calibration/PLC resources must be expressed as resource_pending blockers; do not degrade concrete choices into invalid answers.",
             "If a templateSelection is provided, respect it and do not replace it.",
             "Required top-level fields: goal, intent, confidence, requirementUnderstanding, recommendedRoute, clarificationQuestions, recommendedDefaults, risks, acceptanceCriteria, executablePlan, canBuildCandidate, blockingReasons, nextAction.",
             "Do not output planId, planHash, semanticExtraction, requirementMaturity, decisionTrace, contextSummary, catalog versions, stationBoundarySummary, plcOutputPolicy, publicEvents, or metadataOnly. The backend fills those fields."
@@ -1619,8 +1620,8 @@ public sealed class VisionAgentPlanPromptComposer
       "defaultAssumption": "assumption",
       "impact": "build impact",
       "options": [
-        { "value": "recommended", "label": "Recommended", "recommended": true, "description": "option", "impact": "impact" },
-        { "value": "pending", "label": "Keep pending", "recommended": false, "description": "option", "impact": "impact" }
+        { "value": "recommended", "label": "Recommended", "recommended": true, "answerEffect": "resolve_field", "recommendationReason": "public sanitized reason", "description": "option", "impact": "impact" },
+        { "value": "pending", "label": "Keep pending", "recommended": false, "answerEffect": "defer", "recommendationReason": "", "description": "option", "impact": "impact" }
       ]
     }
   ],

@@ -42,26 +42,28 @@ public static class VisionAgentPlanReadinessEvaluator
                 "缺少规划快照，无法开始构建。");
         }
 
-        if (effectiveRequirement == null && plan != null)
+        var planSnapshot = plan;
+
+        if (effectiveRequirement == null)
         {
-            var initialAnswers = validatedAnswers?.AcceptedAnswers ?? plan.ConfirmedPlanAnswers ?? [];
-            var validated = validatedAnswers ?? new VisionAgentPlanAnswerValidator().Validate(plan, initialAnswers, null, false);
+            var initialAnswers = validatedAnswers?.AcceptedAnswers ?? planSnapshot.ConfirmedPlanAnswers ?? [];
+            var validated = validatedAnswers ?? new VisionAgentPlanAnswerValidator().Validate(planSnapshot, initialAnswers, null, false);
             var maturityRequest = new VisionAgentRequirementMaturityRequest
             {
-                Description = plan.OriginalUserPrompt ?? plan.Goal ?? string.Empty,
+                Description = planSnapshot.OriginalUserPrompt ?? planSnapshot.Goal ?? string.Empty,
                 RequirementMode = requirementMode,
                 HasCurrentFlow = false,
-                TemplateSelection = plan.TemplateSelection
+                TemplateSelection = planSnapshot.TemplateSelection
             };
             var overlay = new VisionAgentPlanRequirementOverlay();
-            effectiveRequirement = overlay.Build(plan, validated, maturityRequest);
+            effectiveRequirement = overlay.Build(planSnapshot, validated, maturityRequest);
         }
 
         var effectiveForReadiness = effectiveRequirement;
-        var maturity = effectiveForReadiness?.Maturity ?? plan.RequirementMaturity;
-        var resolvedFields = BuildResolvedFields(plan, validatedAnswers, effectiveForReadiness);
+        var maturity = effectiveForReadiness?.Maturity ?? planSnapshot.RequirementMaturity;
+        var resolvedFields = BuildResolvedFields(planSnapshot, validatedAnswers, effectiveForReadiness);
         if (requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase) &&
-            !PlanHasObjectOrTaskFact(plan))
+            !PlanHasObjectOrTaskFact(planSnapshot))
         {
             resolvedFields.RemoveAll(field => field.Equals(VisionAgentPlanAnswerFields.TaskType, StringComparison.OrdinalIgnoreCase));
         }
@@ -69,8 +71,8 @@ public static class VisionAgentPlanReadinessEvaluator
         var remainingFields = BuildRemainingFields(maturity, resolvedFields, effectiveForReadiness);
         var answers = validatedAnswers?.AcceptedAnswers ?? [];
         var blockers = new List<VisionAgentBuildBlocker>();
-        var questionIndex = BuildQuestionIndex(plan);
-        var hasSupportedRoute = HasSupportedRouteOrTemplate(plan, out var invalidOperators);
+        var questionIndex = BuildQuestionIndex(planSnapshot);
+        var hasSupportedRoute = HasSupportedRouteOrTemplate(planSnapshot, out var invalidOperators);
         var strictMode = !string.Equals(requirementMode, AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase);
 
         AddValidationBlockers(validatedAnswers, blockers);
@@ -120,6 +122,8 @@ public static class VisionAgentPlanReadinessEvaluator
                     buildDecisions);
             }
         }
+
+        AddResourceBlockersForAcceptedAnswers(planSnapshot, blockers, answers, requirementMode, maturity, hasSupportedRoute);
 
         if (!hasSupportedRoute)
         {
@@ -409,12 +413,13 @@ public static class VisionAgentPlanReadinessEvaluator
 
         if (parsed.Kind.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase))
         {
+            var blocksResource = ShouldBlockResourcePending(plan, field, requirementMode, maturity, hasSupportedRoute);
             return Blocker(
                 $"resource_pending:{idKey}",
                 VisionAgentBuildBlockerCategories.ResourcePending,
                 field,
                 questionId,
-                false,
+                blocksResource,
                 VisionAgentBuildBlockerResolutionModes.ProvideResource,
                 "资源可在开始构建后补齐。");
         }
@@ -602,6 +607,11 @@ public static class VisionAgentPlanReadinessEvaluator
             return false;
         }
 
+        if (blocker.Category.Equals(VisionAgentBuildBlockerCategories.ResourcePending, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         if (!string.IsNullOrWhiteSpace(blocker.Field) &&
             resolvedFields.Contains(blocker.Field, StringComparer.OrdinalIgnoreCase))
         {
@@ -682,6 +692,66 @@ public static class VisionAgentPlanReadinessEvaluator
         }
 
         return VisionAgentPlanFieldPolicy.IsStrictBlocking(normalized, maturity?.TaskType, maturity);
+    }
+
+    private static void AddResourceBlockersForAcceptedAnswers(
+        VisionAgentPlanModeResult plan,
+        List<VisionAgentBuildBlocker> blockers,
+        IReadOnlyList<VisionAgentPlanAnswer> answers,
+        string requirementMode,
+        AiRequirementMaturityResult? maturity,
+        bool hasSupportedRoute)
+    {
+        foreach (var answer in answers)
+        {
+            var field = VisionAgentPlanFieldPolicy.NormalizeField(answer.Field);
+            var value = Clean(answer.Value).ToLowerInvariant();
+            if (!field.Equals(VisionAgentPlanAnswerFields.ImageSource, StringComparison.OrdinalIgnoreCase) ||
+                value is not ("station_camera" or "line_camera") ||
+                answer.Origin.Equals(VisionAgentPlanAnswerOrigins.ResourceBound, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var blocksResource = ShouldBlockResourcePending(
+                plan,
+                VisionAgentPlanAnswerFields.ImageSource,
+                requirementMode,
+                maturity,
+                hasSupportedRoute);
+            AddOrReplace(blockers, Blocker(
+                "resource_pending:camera_binding",
+                VisionAgentBuildBlockerCategories.ResourcePending,
+                VisionAgentPlanAnswerFields.ImageSource,
+                Clean(answer.QuestionId),
+                blocksResource,
+                VisionAgentBuildBlockerResolutionModes.ProvideResource,
+                blocksResource
+                    ? "资源仍待绑定，当前模式下不能开始构建。"
+                    : "可以生成可编辑草稿，部署前仍需绑定资源。"));
+        }
+    }
+
+    private static bool ShouldBlockResourcePending(
+        VisionAgentPlanModeResult plan,
+        string field,
+        string requirementMode,
+        AiRequirementMaturityResult? maturity,
+        bool hasSupportedRoute)
+    {
+        if (!requirementMode.Equals(AiRequirementModes.Draft, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var normalized = VisionAgentPlanFieldPolicy.NormalizeField(field);
+        if (normalized.Equals(VisionAgentPlanAnswerFields.OutputTarget, StringComparison.OrdinalIgnoreCase) &&
+            RequestsExternalOutput(plan, string.Empty))
+        {
+            return true;
+        }
+
+        return !hasSupportedRoute || maturity?.CanPlan != true;
     }
 
     private static bool RequiresStrategyConfirmation(
@@ -1047,9 +1117,9 @@ public static class VisionAgentPlanReadinessEvaluator
 
     private static string RecommendedValue(VisionAgentClarificationQuestion question)
     {
-        var value = Clean(question.Options.FirstOrDefault(option => option.Recommended)?.Value) is { Length: > 0 } recommended
-            ? recommended
-            : Clean(question.DefaultValue);
+        var value = Clean(question.Options.FirstOrDefault(option =>
+            option.Recommended &&
+            VisionAgentPlanFieldPolicy.IsResolveFieldOption(option))?.Value);
         return VisionAgentPlanFieldPolicy.IsPlaceholderValue(value) ? string.Empty : value;
     }
 

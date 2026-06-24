@@ -1886,7 +1886,7 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
             DefaultValue = defaultValue,
             DefaultAssumption = defaultAssumption,
             Impact = impact,
-            Options = options
+            Options = options.Select(VisionAgentPlanFieldPolicy.NormalizeOptionContract).ToList()
         };
     }
 
@@ -1897,14 +1897,14 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         string description,
         string impact)
     {
-        return new VisionAgentClarificationOption
+        return VisionAgentPlanFieldPolicy.NormalizeOptionContract(new VisionAgentClarificationOption
         {
             Value = value,
             Label = label,
             Recommended = recommended,
             Description = description,
             Impact = impact
-        };
+        });
     }
 
     private static bool ContainsAny(string text, params string[] values)
