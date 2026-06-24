@@ -339,18 +339,31 @@ public sealed class ProjectVariableSession : IProjectVariableSession
             return;
         }
 
-        var numeric = definition.ValueType == ProjectGlobalVariableValueType.Int64
-            ? value.GetInt64()
-            : value.GetDouble();
-
-        if (definition.Min.HasValue && numeric < definition.Min.Value)
+        if (definition.ValueType == ProjectGlobalVariableValueType.Int64)
         {
-            throw new InvalidOperationException($"Project global variable '{definition.Name}' value is below Min={definition.Min.Value}.");
+            var numeric = value.GetInt64();
+            if (definition.MinBound.HasValue && definition.MinBound.Value.TryGetInt64(out var min) && numeric < min)
+            {
+                throw new InvalidOperationException($"Project global variable '{definition.Name}' value is below Min={definition.MinBound.Value.Text}.");
+            }
+
+            if (definition.MaxBound.HasValue && definition.MaxBound.Value.TryGetInt64(out var max) && numeric > max)
+            {
+                throw new InvalidOperationException($"Project global variable '{definition.Name}' value is above Max={definition.MaxBound.Value.Text}.");
+            }
+
+            return;
         }
 
-        if (definition.Max.HasValue && numeric > definition.Max.Value)
+        var doubleValue = value.GetDouble();
+        if (definition.MinBound.HasValue && definition.MinBound.Value.TryGetDouble(out var doubleMin) && doubleValue < doubleMin)
         {
-            throw new InvalidOperationException($"Project global variable '{definition.Name}' value is above Max={definition.Max.Value}.");
+            throw new InvalidOperationException($"Project global variable '{definition.Name}' value is below Min={definition.MinBound.Value.Text}.");
+        }
+
+        if (definition.MaxBound.HasValue && definition.MaxBound.Value.TryGetDouble(out var doubleMax) && doubleValue > doubleMax)
+        {
+            throw new InvalidOperationException($"Project global variable '{definition.Name}' value is above Max={definition.MaxBound.Value.Text}.");
         }
     }
 

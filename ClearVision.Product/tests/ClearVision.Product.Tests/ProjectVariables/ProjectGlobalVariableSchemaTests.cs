@@ -223,6 +223,69 @@ public sealed class ProjectGlobalVariableSchemaTests
         diagnostics.Should().Contain(item => item.Code == "GV026");
     }
 
+    [Fact]
+    public void JsonRoundTrip_WhenInt64UsesFullRangeBounds_ShouldPreserveDecimalStrings()
+    {
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "stats.total",
+                    DisplayName = "stats.total",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(long.MaxValue),
+                    MinBound = ProjectVariableNumericBound.FromInt64(long.MinValue),
+                    MaxBound = ProjectVariableNumericBound.FromInt64(long.MaxValue)
+                }
+            ]
+        };
+
+        var json = JsonSerializer.Serialize(schema, ProjectVariableJson.Options);
+        using var document = JsonDocument.Parse(json);
+        var variableJson = document.RootElement.GetProperty("variables").EnumerateArray().Single();
+        variableJson.GetProperty("initialValue").GetString().Should().Be(long.MaxValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        variableJson.GetProperty("min").GetString().Should().Be(long.MinValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        variableJson.GetProperty("max").GetString().Should().Be(long.MaxValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        var roundTripped = JsonSerializer.Deserialize<ProjectGlobalVariableSchema>(json, ProjectVariableJson.Options)!;
+        var variable = roundTripped.Variables.Single();
+        variable.InitialValue.GetInt64().Should().Be(long.MaxValue);
+        variable.MinBound.Should().NotBeNull();
+        variable.MaxBound.Should().NotBeNull();
+        variable.MinBound!.Value.TryGetInt64(out var min).Should().BeTrue();
+        variable.MaxBound!.Value.TryGetInt64(out var max).Should().BeTrue();
+        min.Should().Be(long.MinValue);
+        max.Should().Be(long.MaxValue);
+        ProjectGlobalVariableSchemaValidator.Validate(roundTripped).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Validate_WhenInt64BoundIsFractional_ReturnsDiagnostic()
+    {
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "stats.total",
+                    DisplayName = "stats.total",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(5L),
+                    MinBound = "1.5"
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema);
+
+        diagnostics.Should().Contain(item => item.Code == "GV018");
+    }
+
     private static ProjectGlobalVariableDefinition Variable(
         string name,
         ProjectGlobalVariableValueType type,

@@ -482,9 +482,9 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/catalog", async (
-            IConfigurationService configService,
-            AiConfigStore aiConfigStore,
-            RuntimePreviewPilotResourceCatalog catalogBuilder) =>
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPilotResourceCatalog catalogBuilder) =>
         {
             var config = await configService.LoadAsync();
             var pilot = config.Runtime.RuntimePreviewPilot.CloneNormalized();
@@ -494,11 +494,11 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/settings/runtime-preview-pilot/readiness", async (
             RuntimePreviewPilotReadinessEndpointRequest request,
-            IConfigurationService configService,
-            AiConfigStore aiConfigStore,
-            RuntimePreviewPilotResourceCatalog catalogBuilder,
-            RuntimePreviewPilotReadinessGate readinessGate,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPilotResourceCatalog catalogBuilder,
+            [FromServices] RuntimePreviewPilotReadinessGate readinessGate,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -557,8 +557,8 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/sessions", (
-            RuntimePreviewSessionStore sessionStore,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewSessionStore sessionStore,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -587,10 +587,10 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/settings/runtime-preview-pilot/sessions", async (
             RuntimePreviewSessionCreateRequest request,
-            IConfigurationService configService,
-            AiConfigStore aiConfigStore,
-            RuntimePreviewSimulatedExecutionHarness harness,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewSimulatedExecutionHarness harness,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -621,10 +621,10 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/settings/runtime-preview-pilot/sessions/simulate", async (
             RuntimePreviewSessionCreateRequest request,
-            IConfigurationService configService,
-            AiConfigStore aiConfigStore,
-            RuntimePreviewSimulatedExecutionHarness harness,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewSimulatedExecutionHarness harness,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -662,8 +662,8 @@ public static class SettingsEndpoints
 
         app.MapGet("/api/settings/runtime-preview-pilot/sessions/{sessionId}/report", (
             string sessionId,
-            RuntimePreviewReportArchive reportArchive,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -695,8 +695,8 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/settings/runtime-preview-pilot/sessions/{sessionId}/cancel", (
             string sessionId,
-            RuntimePreviewSimulatedExecutionHarness harness,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewSimulatedExecutionHarness harness,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -728,8 +728,8 @@ public static class SettingsEndpoints
 
         app.MapGet("/api/settings/runtime-preview-pilot/sessions/{sessionId}/replay", (
             string sessionId,
-            RuntimePreviewSimulatedExecutionHarness harness,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewSimulatedExecutionHarness harness,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -761,8 +761,8 @@ public static class SettingsEndpoints
 
         app.MapGet("/api/settings/runtime-preview-pilot/sessions/{sessionId}/report/export", (
             string sessionId,
-            RuntimePreviewReportArchive reportArchive,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -801,10 +801,10 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/settings/runtime-preview-pilot/sessions/deploy-readiness", async (
             RuntimePreviewDeployReadinessRequest request,
-            IConfigurationService configService,
-            AiConfigStore aiConfigStore,
-            RuntimePreviewDeployReadinessService deployReadinessService,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewDeployReadinessService deployReadinessService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
         {
@@ -843,11 +843,11 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/settings/runtime-preview-pilot/sessions/package-readiness", async (
             RuntimePreviewPackageReadinessRequest request,
-            IConfigurationService configService,
-            AiConfigStore aiConfigStore,
-            RuntimePreviewPackageReadinessBridge packageReadinessBridge,
-            RuntimePreviewReportArchive reportArchive,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPackageReadinessBridge packageReadinessBridge,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
         {
@@ -888,11 +888,11 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/settings/runtime-preview-pilot/sessions/manifest-dry-run", async (
             RuntimePackageManifestDryRunRequest request,
-            IConfigurationService configService,
-            AiConfigStore aiConfigStore,
-            RuntimePreviewPackageReadinessBridge packageReadinessBridge,
-            RuntimePreviewReportArchive reportArchive,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPackageReadinessBridge packageReadinessBridge,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
         {
@@ -945,11 +945,11 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/settings/runtime-preview-pilot/sessions/pre-release-review", async (
             RuntimePreviewPreReleaseReviewRequest request,
-            IConfigurationService configService,
-            AiConfigStore aiConfigStore,
-            RuntimePreviewPreReleaseReviewService preReleaseReviewService,
-            RuntimePreviewReportArchive reportArchive,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewPreReleaseReviewService preReleaseReviewService,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
         {
@@ -1001,8 +1001,8 @@ public static class SettingsEndpoints
 
         app.MapPost("/api/settings/runtime-preview-pilot/retention/cleanup", (
             RuntimePreviewRetentionCleanupEndpointRequest request,
-            RuntimePreviewGovernanceMaintenanceService maintenanceService,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewGovernanceMaintenanceService maintenanceService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -1031,8 +1031,8 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/station-profiles", (
-            RuntimePreviewStationProfileCatalog stationProfileCatalog,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewStationProfileCatalog stationProfileCatalog,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -1060,8 +1060,8 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/operator-contract-registry", (
-            RuntimePreviewOperatorContractRegistry operatorContractRegistry,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewOperatorContractRegistry operatorContractRegistry,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -1090,10 +1090,10 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/scenario-evidence", async (
-            IConfigurationService configService,
-            AiConfigStore aiConfigStore,
-            RuntimePreviewScenarioEvidenceService scenarioEvidenceService,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] IConfigurationService configService,
+            [FromServices] AiConfigStore aiConfigStore,
+            [FromServices] RuntimePreviewScenarioEvidenceService scenarioEvidenceService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext,
             CancellationToken cancellationToken) =>
         {
@@ -1124,8 +1124,8 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/scenario-corpus", (
-            RuntimePreviewScenarioCorpusService scenarioCorpusService,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewScenarioCorpusService scenarioCorpusService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -1154,8 +1154,8 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/redacted-flow-corpus", (
-            RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -1184,8 +1184,8 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/agent-explanation-benchmark", (
-            RuntimePreviewAgentExplanationService explanationService,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewAgentExplanationService explanationService,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -1214,8 +1214,8 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/governance/index", (
-            RuntimePreviewGovernanceStore governanceStore,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewGovernanceStore governanceStore,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -1243,8 +1243,8 @@ public static class SettingsEndpoints
         });
 
         app.MapGet("/api/settings/runtime-preview-pilot/governance/export", (
-            RuntimePreviewGovernanceStore governanceStore,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewGovernanceStore governanceStore,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(
@@ -1279,13 +1279,13 @@ public static class SettingsEndpoints
             string? reviewId,
             string? stationProfileId,
             string? operatorType,
-            RuntimePreviewSessionStore sessionStore,
-            RuntimePreviewReportArchive reportArchive,
-            RuntimePreviewScenarioCorpusService scenarioCorpusService,
-            RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
-            RuntimePreviewStationProfileCatalog stationProfileCatalog,
-            RuntimePreviewOperatorContractRegistry operatorContractRegistry,
-            RuntimePreviewPermissionBroker permissionBroker,
+            [FromServices] RuntimePreviewSessionStore sessionStore,
+            [FromServices] RuntimePreviewReportArchive reportArchive,
+            [FromServices] RuntimePreviewScenarioCorpusService scenarioCorpusService,
+            [FromServices] RuntimePreviewRedactedFlowCorpusService redactedFlowCorpusService,
+            [FromServices] RuntimePreviewStationProfileCatalog stationProfileCatalog,
+            [FromServices] RuntimePreviewOperatorContractRegistry operatorContractRegistry,
+            [FromServices] RuntimePreviewPermissionBroker permissionBroker,
             HttpContext httpContext) =>
         {
             var endpointDecision = permissionBroker.EvaluateEndpointAccess(

@@ -112,29 +112,84 @@ public static partial class ProjectGlobalVariableSchemaValidator
             return;
         }
 
-        if (variable.ValueType is ProjectGlobalVariableValueType.Int64 or ProjectGlobalVariableValueType.Double)
+        if (variable.ValueType == ProjectGlobalVariableValueType.Int64)
         {
-            if (variable.Min.HasValue && !double.IsFinite(variable.Min.Value))
+            long? min = null;
+            long? max = null;
+            if (variable.MinBound.HasValue)
             {
-                diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV018", "Numeric minimum must be finite.", variable.Id));
+                if (variable.MinBound.Value.TryGetInt64(out var parsed))
+                {
+                    min = parsed;
+                }
+                else
+                {
+                    diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV018", "Numeric minimum must be a valid Int64.", variable.Id));
+                }
             }
 
-            if (variable.Max.HasValue && !double.IsFinite(variable.Max.Value))
+            if (variable.MaxBound.HasValue)
             {
-                diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV019", "Numeric maximum must be finite.", variable.Id));
+                if (variable.MaxBound.Value.TryGetInt64(out var parsed))
+                {
+                    max = parsed;
+                }
+                else
+                {
+                    diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV019", "Numeric maximum must be a valid Int64.", variable.Id));
+                }
             }
 
-            if (variable.Min.HasValue && variable.Max.HasValue && variable.Min.Value > variable.Max.Value)
+            if (min.HasValue && max.HasValue && min.Value > max.Value)
             {
                 diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV021", "Numeric minimum cannot be greater than maximum.", variable.Id));
             }
 
-            var numeric = variable.ValueType == ProjectGlobalVariableValueType.Int64
-                ? converted.GetInt64()
-                : converted.GetDouble();
+            var numeric = converted.GetInt64();
 
-            if ((variable.Min.HasValue && double.IsFinite(variable.Min.Value) && numeric < variable.Min.Value) ||
-                (variable.Max.HasValue && double.IsFinite(variable.Max.Value) && numeric > variable.Max.Value))
+            if ((min.HasValue && numeric < min.Value) ||
+                (max.HasValue && numeric > max.Value))
+            {
+                diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV014", "Initial value is outside the configured numeric range.", variable.Id));
+            }
+        }
+        else if (variable.ValueType == ProjectGlobalVariableValueType.Double)
+        {
+            double? min = null;
+            double? max = null;
+            if (variable.MinBound.HasValue)
+            {
+                if (variable.MinBound.Value.TryGetDouble(out var parsed))
+                {
+                    min = parsed;
+                }
+                else
+                {
+                    diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV018", "Numeric minimum must be finite.", variable.Id));
+                }
+            }
+
+            if (variable.MaxBound.HasValue)
+            {
+                if (variable.MaxBound.Value.TryGetDouble(out var parsed))
+                {
+                    max = parsed;
+                }
+                else
+                {
+                    diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV019", "Numeric maximum must be finite.", variable.Id));
+                }
+            }
+
+            if (min.HasValue && max.HasValue && min.Value > max.Value)
+            {
+                diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV021", "Numeric minimum cannot be greater than maximum.", variable.Id));
+            }
+
+            var numeric = converted.GetDouble();
+
+            if ((min.HasValue && numeric < min.Value) ||
+                (max.HasValue && numeric > max.Value))
             {
                 diagnostics.Add(new ProjectGlobalVariableDiagnostic("GV014", "Initial value is outside the configured numeric range.", variable.Id));
             }
