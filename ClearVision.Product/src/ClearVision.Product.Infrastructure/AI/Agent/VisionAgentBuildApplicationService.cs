@@ -710,6 +710,7 @@ public sealed class VisionAgentBuildApplicationService : IVisionAgentBuildApplic
             EffectiveMode = actualEffectiveMode,
             ToolLoopEntered = toolLoopEntered,
             FallbackReason = fallbackReason,
+            Flow = buildResult.Flow ?? result.Flow,
             PublicWarnings = publicWarnings.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
         };
     }

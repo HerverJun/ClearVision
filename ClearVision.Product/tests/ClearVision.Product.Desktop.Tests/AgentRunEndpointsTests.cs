@@ -1795,7 +1795,8 @@ public sealed class AgentRunEndpointsTests
                 RequestedMode = requestedMode,
                 EffectiveMode = result.EffectiveMode,
                 ToolLoopEntered = result.ToolLoopEntered,
-                FallbackReason = result.FallbackReason
+                FallbackReason = result.FallbackReason,
+                Flow = result.BuildResult.Flow ?? result.Flow
             };
         }
 

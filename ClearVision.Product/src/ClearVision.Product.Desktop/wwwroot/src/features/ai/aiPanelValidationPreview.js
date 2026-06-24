@@ -64,6 +64,24 @@ export const aiPanelValidationPreviewMixin = {
         return null;
     },
 
+    _getNumberValue(source, names) {
+        const value = this._getObjectValue(source, names);
+        if (value === undefined || value === null || value === '') {
+            return null;
+        }
+
+        const number = Number(value);
+        return Number.isFinite(number) ? number : null;
+    },
+
+    _hasObjectValue(source, names) {
+        if (!source || typeof source !== 'object') {
+            return false;
+        }
+
+        return names.some(name => this._getObjectValue(source, [name]) !== undefined);
+    },
+
     _normalizeAgentValidationPreview(data) {
         const preview = data?.validationPreview ?? data?.ValidationPreview ?? null;
         if (!preview || typeof preview !== 'object') {
@@ -230,6 +248,143 @@ export const aiPanelValidationPreviewMixin = {
         `;
     },
 
+    _classifyDryRunResult(dryRun) {
+        if (!dryRun || typeof dryRun !== 'object') {
+            return 'none';
+        }
+
+        if (this._hasObjectValue(dryRun, [
+            'dryRunSucceeded',
+            'DryRunSucceeded',
+            'executedOperators',
+            'ExecutedOperators',
+            'skippedOperators',
+            'SkippedOperators',
+            'blockingIssues',
+            'BlockingIssues',
+            'missingResources',
+            'MissingResources',
+            'dryRunSummary',
+            'DryRunSummary'
+        ])) {
+            return 'structureSimulation';
+        }
+
+        if (this._hasObjectValue(dryRun, [
+            'isSuccess',
+            'IsSuccess',
+            'coveredBranches',
+            'CoveredBranches',
+            'totalBranches',
+            'TotalBranches',
+            'coveragePercentage',
+            'CoveragePercentage',
+            'durationMs',
+            'DurationMs'
+        ])) {
+            return 'executionStub';
+        }
+
+        return 'unknown';
+    },
+
+    _renderStructureSimulationDryRun(dryRun) {
+        const succeeded = this._getBooleanValue(dryRun, ['dryRunSucceeded', 'DryRunSucceeded']);
+        const blocking = this._getArrayValue(dryRun, ['blockingIssues', 'BlockingIssues']);
+        const warnings = this._getArrayValue(dryRun, ['warnings', 'Warnings']);
+        const missing = this._getArrayValue(dryRun, ['missingResources', 'MissingResources']);
+        const executed = this._getArrayValue(dryRun, ['executedOperators', 'ExecutedOperators']);
+        const skipped = this._getArrayValue(dryRun, ['skippedOperators', 'SkippedOperators']);
+        const summary = String(this._getObjectValue(dryRun, ['dryRunSummary', 'DryRunSummary', 'summary', 'Summary']) ?? '').trim();
+        const cls = succeeded === true ? 'is-ok' : succeeded === false ? 'is-failed' : 'is-unavailable';
+        const icon = succeeded === true ? '&#10003;' : succeeded === false ? '&#10007;' : '&#9432;';
+        const title = succeeded === true
+            ? '结构预演通过'
+            : succeeded === false
+                ? '结构预演未通过'
+                : '元数据预演状态不可用';
+        const countLabel = formatCountLabel({
+            blocking: blocking.length,
+            warnings: warnings.length,
+            missing: missing.length,
+            executed: executed.length,
+            skipped: skipped.length,
+            artifacts: 0
+        });
+
+        return `
+            <div class="ai-validation-dryrun ${cls}" data-dryrun-contract="structure-simulation">
+                <div class="ai-validation-dryrun-header">
+                    <span class="ai-validation-issue-icon">${icon}</span>
+                    <span>${this._escapeHtml(title)}</span>
+                </div>
+                <div class="ai-agent-preview-body">
+                    <div class="ai-agent-preview-summary">${this._escapeHtml(summary || countLabel)}</div>
+                    ${this._renderAgentPreviewIssueList(blocking, 'blocking')}
+                    ${this._renderAgentPreviewIssueList(warnings, 'warning')}
+                    ${this._renderAgentPreviewIssueList(missing, 'warning')}
+                </div>
+            </div>
+        `;
+    },
+
+    _renderExecutionStubDryRun(dryRun) {
+        const isSuccess = this._getBooleanValue(dryRun, ['isSuccess', 'IsSuccess']);
+        if (isSuccess === null) {
+            return this._renderUnknownDryRunResult();
+        }
+
+        const coverageValue = this._getNumberValue(dryRun, ['coveragePercentage', 'CoveragePercentage']);
+        const coveredValue = this._getNumberValue(dryRun, ['coveredBranches', 'CoveredBranches']);
+        const totalValue = this._getNumberValue(dryRun, ['totalBranches', 'TotalBranches']);
+        const coverage = coverageValue ?? 0;
+        const covered = coveredValue ?? 0;
+        const total = totalValue ?? 0;
+        const duration = this._getNumberValue(dryRun, ['durationMs', 'DurationMs']);
+        const icon = isSuccess ? '&#10003;' : '&#10007;';
+        const cls = isSuccess ? 'is-ok' : 'is-failed';
+        return `
+            <div class="ai-validation-dryrun ${cls}" data-dryrun-contract="execution-stub">
+                <div class="ai-validation-dryrun-header">
+                    <span class="ai-validation-issue-icon">${icon}</span>
+                    <span>DryRun ${isSuccess ? '通过' : '失败'}</span>
+                    ${duration != null ? `<span class="ai-validation-dryrun-duration">${Math.round(duration)}ms</span>` : ''}
+                </div>
+                <div class="ai-validation-dryrun-coverage">
+                    <div class="ai-coverage-bar">
+                        <div class="ai-coverage-bar-fill" style="width:${Math.min(100, Math.max(0, coverage))}%"></div>
+                    </div>
+                    <div class="ai-coverage-text">分支覆盖 ${covered}/${total} (${coverage.toFixed(1)}%)</div>
+                </div>
+            </div>
+        `;
+    },
+
+    _renderUnknownDryRunResult() {
+        return `
+            <div class="ai-validation-dryrun is-unavailable" data-dryrun-contract="unknown">
+                <div class="ai-validation-dryrun-header">
+                    <span class="ai-validation-issue-icon">&#9432;</span>
+                    <span>DryRun 状态不可用</span>
+                </div>
+                <div class="ai-agent-preview-summary">当前结果缺少可判别 DryRun 合同字段。</div>
+            </div>
+        `;
+    },
+
+    _renderDryRunResult(dryRun) {
+        switch (this._classifyDryRunResult(dryRun)) {
+            case 'structureSimulation':
+                return this._renderStructureSimulationDryRun(dryRun);
+            case 'executionStub':
+                return this._renderExecutionStubDryRun(dryRun);
+            case 'unknown':
+                return this._renderUnknownDryRunResult();
+            default:
+                return '';
+        }
+    },
+
     _renderAgentValidationArtifacts(data) {
         const preview = this._normalizeAgentValidationPreview(data);
         const pendingActions = this._normalizeAgentPendingActions(data?.pendingActions ?? data?.PendingActions);
@@ -292,9 +447,11 @@ export const aiPanelValidationPreviewMixin = {
         const diagnostics = data?.lastAttemptDiagnostics || data?.LastAttemptDiagnostics || [];
         const manualRetry = data?.manualRetry || data?.ManualRetry || null;
         const dryRun = data?.dryRunResult || data?.DryRunResult || null;
+        const hasStructuredPreviewDryRun = Boolean(this._normalizeAgentValidationPreview(data)?.dryRun);
         const knowledgeDiags = data?.knowledgeDiagnostics || data?.KnowledgeDiagnostics || [];
         const agentArtifactsHtml = this._renderAgentValidationArtifacts(data);
-        const hasContent = diagnostics.length > 0 || manualRetry?.required || dryRun || knowledgeDiags.length > 0 || agentArtifactsHtml;
+        const hasDryRunCard = Boolean(dryRun) && !hasStructuredPreviewDryRun;
+        const hasContent = diagnostics.length > 0 || manualRetry?.required || hasDryRunCard || knowledgeDiags.length > 0 || agentArtifactsHtml;
 
         if (!hasContent) {
             card.hidden = true;
@@ -357,30 +514,8 @@ export const aiPanelValidationPreviewMixin = {
             }
         }
 
-        // DryRun result
-        if (dryRun) {
-            const isSuccess = dryRun.isSuccess ?? dryRun.IsSuccess ?? false;
-            const coverage = dryRun.coveragePercentage ?? dryRun.CoveragePercentage ?? 0;
-            const covered = dryRun.coveredBranches ?? dryRun.CoveredBranches ?? 0;
-            const total = dryRun.totalBranches ?? dryRun.TotalBranches ?? 0;
-            const duration = dryRun.durationMs ?? dryRun.DurationMs ?? null;
-            const icon = isSuccess ? '&#10003;' : '&#10007;';
-            const cls = isSuccess ? 'is-ok' : 'is-failed';
-            sections.push(`
-                <div class="ai-validation-dryrun ${cls}">
-                    <div class="ai-validation-dryrun-header">
-                        <span class="ai-validation-issue-icon">${icon}</span>
-                        <span>DryRun ${isSuccess ? '通过' : '失败'}</span>
-                        ${duration != null ? `<span class="ai-validation-dryrun-duration">${Math.round(duration)}ms</span>` : ''}
-                    </div>
-                    <div class="ai-validation-dryrun-coverage">
-                        <div class="ai-coverage-bar">
-                            <div class="ai-coverage-bar-fill" style="width:${Math.min(100, coverage)}%"></div>
-                        </div>
-                        <div class="ai-coverage-text">分支覆盖 ${covered}/${total} (${coverage.toFixed(1)}%)</div>
-                    </div>
-                </div>
-            `);
+        if (hasDryRunCard) {
+            sections.push(this._renderDryRunResult(dryRun));
         }
 
         // Knowledge graph diagnostics

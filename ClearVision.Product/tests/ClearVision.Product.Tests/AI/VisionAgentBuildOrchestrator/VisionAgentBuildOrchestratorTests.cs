@@ -1551,6 +1551,7 @@ public sealed class VisionAgentBuildOrchestratorTests
         result.BuildResult.ApplyGate.Blocked.Should().BeFalse();
         result.BuildResult.ApplyGate.DeploymentBlockers.Should().NotBeEmpty();
         result.BuildResult.FirstFixRecommendation.Should().NotBeNullOrWhiteSpace();
+        result.BuildResult.Flow.Should().NotBeNull();
         Flow(result).Operators.Should().NotBeEmpty();
         sink.Events.Should().Contain(evt => evt.EventType == AgentRunEventTypes.WorkflowDraftUpdated);
         sink.Events.Should().Contain(evt => evt.EventType == AgentRunEventTypes.PackageReadinessChecked);

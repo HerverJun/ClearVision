@@ -5482,8 +5482,8 @@ export const aiPanelAgentWorkspaceMixin = {
     _renderBuildFinalDraft(events) {
         const resultPayload = this._getAgentRunResultPayload(events);
         const buildResult = this._getBuildResult(events);
-        const flow = this._getResultFlowForCanvas(resultPayload, { allowMergeFallback: false }) ||
-            this._getResultFlowForCanvas(this.currentResult, { allowMergeFallback: false }) ||
+        const flow = this._getResultFlowForCanvas(resultPayload) ||
+            this._getResultFlowForCanvas(this.currentResult) ||
             null;
         const ops = flow ? this._extractOperators(flow) : [];
         const connections = flow ? this._extractConnections(flow) : [];
@@ -5699,8 +5699,7 @@ export const aiPanelAgentWorkspaceMixin = {
         return value === true || String(value).toLowerCase() === 'true';
     },
 
-    _getResultFlowForCanvas(result = this.currentResult, options = {}) {
-        const allowMergeFallback = options.allowMergeFallback !== false;
+    _getResultFlowForCanvas(result = this.currentResult) {
         const obj = this._asObject?.(result) || {};
         const directFlow = this._normalizeWorkflowDraftForCanvas(obj.flow || obj.Flow);
         if (directFlow && this._extractOperators(directFlow).length > 0) {
@@ -5709,20 +5708,13 @@ export const aiPanelAgentWorkspaceMixin = {
 
         const buildResult = this._getPayloadBuildResult(obj);
         if (!buildResult) return null;
-
-        const workflowDraft = buildResult.workflowDraft || buildResult.WorkflowDraft || null;
-        let fallback = this._normalizeWorkflowDraftForCanvas(workflowDraft, buildResult);
-        if (!fallback || this._extractOperators(fallback).length === 0) {
-            fallback = this._buildCanvasFlowFromOperatorPipeline(buildResult);
-        }
+        const fallback = this._normalizeWorkflowDraftForCanvas(buildResult.flow || buildResult.Flow, buildResult);
 
         if (!fallback || this._extractOperators(fallback).length === 0) {
             return null;
         }
 
-        return allowMergeFallback
-            ? this._mergeBuildFallbackWithCurrentCanvas(fallback, buildResult)
-            : fallback;
+        return fallback;
     },
 
     _normalizeWorkflowDraftForCanvas(flow, buildResult = null) {
@@ -5739,7 +5731,7 @@ export const aiPanelAgentWorkspaceMixin = {
         return {
             ...flowData,
             operators,
-            connections: connections.length ? connections : this._buildLinearCanvasConnections(operators),
+            connections,
             metadataOnly: Boolean(flowData.metadataOnly ?? flowData.MetadataOnly ?? buildResult?.metadataOnly ?? buildResult?.MetadataOnly ?? true)
         };
     },
@@ -5870,91 +5862,6 @@ export const aiPanelAgentWorkspaceMixin = {
             [port.id, port.Id, port.name, port.Name]
                 .map(value => String(value || '').trim().toLowerCase())
                 .includes(key)) || items[0] || null;
-    },
-
-    _buildLinearCanvasConnections(operators) {
-        const connections = [];
-        for (let index = 0; index < operators.length - 1; index += 1) {
-            const source = operators[index];
-            const target = operators[index + 1];
-            const sourcePort = this._toArray(source.outputPorts || source.OutputPorts)[0];
-            const targetPort = this._toArray(target.inputPorts || target.InputPorts)[0];
-            if (!sourcePort || !targetPort) continue;
-            connections.push({
-                id: `conn_${index + 1}`,
-                sourceOperatorId: source.id,
-                sourcePortId: sourcePort.id || sourcePort.Id || '',
-                targetOperatorId: target.id,
-                targetPortId: targetPort.id || targetPort.Id || ''
-            });
-        }
-        return connections;
-    },
-
-    _buildCanvasFlowFromOperatorPipeline(buildResult) {
-        const pipeline = this._toArray(buildResult?.operatorPipeline || buildResult?.OperatorPipeline);
-        if (!pipeline.length) return null;
-        const mappings = this._toArray(buildResult?.parameterMapping || buildResult?.ParameterMapping);
-        const operators = pipeline.map(step => {
-            const tempId = step.tempId || step.TempId || step.operatorType || step.OperatorType || '';
-            const operatorType = step.operatorType || step.OperatorType || 'DeepLearning';
-            const parameters = Object.fromEntries(mappings
-                .filter(item => String(item.tempId || item.TempId || '').toLowerCase() === String(tempId).toLowerCase())
-                .map(item => [item.parameterName || item.ParameterName || '', item.valueSummary || item.ValueSummary || ''])
-                .filter(([name]) => name));
-            return {
-                tempId,
-                operatorType,
-                displayName: this._formatOperatorType(operatorType) || operatorType,
-                parameters
-            };
-        });
-        return this._normalizeWorkflowDraftForCanvas({
-            operators,
-            connections: [],
-            metadataOnly: true
-        }, buildResult);
-    },
-
-    _mergeBuildFallbackWithCurrentCanvas(fallbackFlow, buildResult = null) {
-        const intent = String(buildResult?.buildIntent || buildResult?.BuildIntent || '').toLowerCase();
-        const diff = this._asObject?.(buildResult?.workflowDiff || buildResult?.WorkflowDiff) || {};
-        const preserved = this._toArray(diff.preservedNodes || diff.PreservedNodes);
-        if (!['modify', 'refactor', 'review_pending_parameters'].includes(intent) && preserved.length === 0) {
-            return fallbackFlow;
-        }
-
-        let current = null;
-        try {
-            current = this.flowCanvas?.serialize?.() || null;
-        } catch {
-            current = null;
-        }
-
-        const currentFlow = this._normalizeWorkflowDraftForCanvas(current);
-        if (!currentFlow || this._extractOperators(currentFlow).length === 0) {
-            return fallbackFlow;
-        }
-
-        const currentOps = this._extractOperators(currentFlow);
-        const fallbackOps = this._extractOperators(fallbackFlow);
-        const seen = new Set(currentOps.map(op => String(op.id || op.Id || op.name || op.Name || '').toLowerCase()).filter(Boolean));
-        const addedOps = fallbackOps.filter(op => {
-            const key = String(op.id || op.Id || op.name || op.Name || '').toLowerCase();
-            if (!key || seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        });
-        return {
-            ...currentFlow,
-            operators: [...currentOps, ...addedOps],
-            connections: [
-                ...this._extractConnections(currentFlow),
-                ...this._extractConnections(fallbackFlow).filter(conn =>
-                    addedOps.some(op => op.id === conn.sourceOperatorId || op.id === conn.targetOperatorId))
-            ],
-            metadataOnly: true
-        };
     },
 
     _cloneJsonSafe(value) {

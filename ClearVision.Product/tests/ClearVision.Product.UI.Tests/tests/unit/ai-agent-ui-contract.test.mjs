@@ -1052,6 +1052,8 @@ function cloneJson(value) {
 
 function buildResultContractPayload(overrides = {}) {
   const pascal = overrides.pascal === true;
+  const sourceType = overrides.sourceType || 'File';
+  const preserveExistingNode = Array.isArray(overrides.preservedNodes) && overrides.preservedNodes.includes('existing_node');
   const workflowDraft = {
     operators: [
       {
@@ -1086,6 +1088,63 @@ function buildResultContractPayload(overrides = {}) {
     ],
     metadataOnly: true
   };
+  const canonicalFlow = {
+    id: 'flow_build_contract',
+    name: 'Vision Agent build contract flow',
+    operators: [
+      ...(preserveExistingNode ? [{
+        id: 'existing_node',
+        type: 'ImageAcquisition',
+        name: 'existing_node',
+        inputPorts: [],
+        outputPorts: [{ id: 'existing_node_out_0', name: 'Image', dataType: 'Image', direction: 1 }],
+        parameters: [{ name: 'SourceType', displayName: '采集源', dataType: 'string', value: 'Camera', defaultValue: 'Camera', isRequired: true }],
+        isEnabled: true
+      }] : []),
+      {
+        id: 'op_acq',
+        type: 'ImageAcquisition',
+        name: 'op_acq',
+        inputPorts: [],
+        outputPorts: [{ id: 'op_acq_out_image', name: 'Image', dataType: 'Image', direction: 1 }],
+        parameters: [{ name: 'SourceType', displayName: '采集源', dataType: 'enum', value: sourceType, defaultValue: 'File', isRequired: true }],
+        isEnabled: true
+      },
+      {
+        id: 'op_detect',
+        type: 'SurfaceDefectDetection',
+        name: 'op_detect',
+        inputPorts: [{ id: 'op_detect_in_image', name: 'Image', dataType: 'Image', direction: 0, isRequired: true }],
+        outputPorts: [{ id: 'op_detect_out_result', name: 'Result', dataType: 'Object', direction: 1 }],
+        parameters: [{ name: 'ModelId', displayName: '模型资源', dataType: 'string', value: '<pending-model-resource>', defaultValue: '', isRequired: true }],
+        isEnabled: true
+      },
+      {
+        id: 'op_judge',
+        type: 'ResultJudgment',
+        name: 'op_judge',
+        inputPorts: [{ id: 'op_judge_in_value', name: 'Value', dataType: 'Object', direction: 0, isRequired: true }],
+        outputPorts: [{ id: 'op_judge_out_result', name: 'JudgmentResult', dataType: 'Boolean', direction: 1 }],
+        parameters: [{ name: 'Rule', displayName: '判定规则', dataType: 'string', value: 'NG when scratch candidate exceeds pending threshold.', defaultValue: '', isRequired: true }],
+        isEnabled: true
+      },
+      {
+        id: 'op_output',
+        type: 'ResultOutput',
+        name: 'op_output',
+        inputPorts: [{ id: 'op_output_in_result', name: 'Result', dataType: 'Boolean', direction: 0, isRequired: true }],
+        outputPorts: [],
+        parameters: [{ name: 'Channel', displayName: '输出通道', dataType: 'string', value: '<pending-output-channel>', defaultValue: '', isRequired: true }],
+        isEnabled: true
+      }
+    ],
+    connections: [
+      { id: 'conn_acq_detect', sourceOperatorId: 'op_acq', sourcePortId: 'op_acq_out_image', targetOperatorId: 'op_detect', targetPortId: 'op_detect_in_image' },
+      { id: 'conn_detect_judge', sourceOperatorId: 'op_detect', sourcePortId: 'op_detect_out_result', targetOperatorId: 'op_judge', targetPortId: 'op_judge_in_value' },
+      { id: 'conn_judge_output', sourceOperatorId: 'op_judge', sourcePortId: 'op_judge_out_result', targetOperatorId: 'op_output', targetPortId: 'op_output_in_result' }
+    ],
+    metadataOnly: true
+  };
   const evidence = [
     'plan_generation',
     'template_strategy',
@@ -1107,7 +1166,6 @@ function buildResultContractPayload(overrides = {}) {
     metadataOnly: true,
     redactionPass: true
   }));
-  const sourceType = overrides.sourceType || 'File';
   const buildResult = {
     buildId: 'build-contract-1',
     planId: 'plan-contract-1',
@@ -1120,6 +1178,7 @@ function buildResultContractPayload(overrides = {}) {
     strategyConfirmationSource: overrides.strategyConfirmationSource || 'accepted_recommended',
     unresolvedStrategyBlockers: overrides.unresolvedStrategyBlockers || [],
     parameterStrategy: overrides.parameterStrategy || 'deep_learning_classification',
+    flow: canonicalFlow,
     workflowDraft,
     operatorPipeline: [
       { tempId: 'op_acq', operatorType: 'ImageAcquisition', source: 'template_skeleton', status: 'selected', repairNote: '' },
@@ -1173,6 +1232,7 @@ function buildResultContractPayload(overrides = {}) {
     sessionId: 'session-build-contract',
     success: true,
     completionStatus: 'completed',
+    flow: canonicalFlow,
     buildResult,
     aiExplanation: 'Build completed with public metadata.',
     metadataOnly: true
@@ -1187,6 +1247,7 @@ function buildResultContractPayload(overrides = {}) {
     SessionId: payload.sessionId,
     Success: payload.success,
     CompletionStatus: payload.completionStatus,
+    Flow: canonicalFlow,
     BuildResult: {
       BuildId: buildResult.buildId,
       PlanId: buildResult.planId,
@@ -1199,6 +1260,7 @@ function buildResultContractPayload(overrides = {}) {
       StrategyConfirmationSource: buildResult.strategyConfirmationSource,
       UnresolvedStrategyBlockers: buildResult.unresolvedStrategyBlockers,
       ParameterStrategy: buildResult.parameterStrategy,
+      Flow: canonicalFlow,
       WorkflowDraft: workflowDraft,
       OperatorPipeline: buildResult.operatorPipeline.map(item => ({
         TempId: item.tempId,
@@ -5796,6 +5858,43 @@ test('AgentRun completed payload restores BuildResult fallback flow and keeps Ap
   assert.match(elements['#ai-build-checks'].innerHTML, /部署：阻断/);
 });
 
+test('AgentRun completed payload without canonical flow fails closed despite WorkflowDraft and OperatorPipeline', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const { elements, container } = createBuildWorkspaceContainer();
+  panel.container = container;
+  panel.flowCanvas = createFakeFlowCanvas();
+  panel.activeAgentRunId = 'ar_missing_canonical_flow';
+  panel.agentWorkspaceMode = 'build';
+  const payload = buildResultContractPayload();
+  delete payload.flow;
+  delete payload.buildResult.flow;
+  assert.ok(payload.buildResult.workflowDraft);
+  assert.ok(payload.buildResult.operatorPipeline.length > 0);
+
+  const completedEvent = {
+    runId: 'ar_missing_canonical_flow',
+    sequence: 31,
+    eventType: 'run.completed',
+    stage: 'run',
+    title: 'Run completed',
+    summary: 'Build completed.',
+    status: 'completed',
+    payload,
+    metadataOnly: true,
+    redactionPass: true
+  };
+  panel.activeAgentRunEvents = [completedEvent];
+
+  assert.equal(panel._getResultFlowForCanvas(payload), null);
+  assert.equal(panel._applyAgentRunResultPayload(completedEvent), false);
+
+  panel._renderBuildWorkspaceFromAgentRun();
+
+  assert.doesNotMatch(elements['#ai-build-final-draft'].innerHTML, /可编辑草稿已就绪/);
+  assert.doesNotMatch(elements['#ai-btn-apply'].innerHTML, /应用到画布/);
+});
+
 test('Legacy WebMessage fallback does not overwrite AgentRun completed BuildResult draft', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
@@ -6921,6 +7020,81 @@ test('response mapping displays validationPreview sections', async () => {
   assert.match(validation.innerHTML, /deploymentPrecheck/);
 });
 
+test('DryRun structure simulation uses dryRunSucceeded contract without legacy coverage failure', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+
+  panel._renderValidationConsole({
+    dryRunResult: {
+      dryRunSucceeded: true,
+      executedOperators: ['op_acq', 'op_detect'],
+      skippedOperators: [],
+      warnings: [],
+      blockingIssues: [],
+      missingResources: [{ resourceKey: 'op_detect.ModelId', description: 'model metadata pending' }],
+      dryRunSummary: 'Structure simulation completed.'
+    }
+  });
+
+  assert.match(validation.innerHTML, /data-dryrun-contract="structure-simulation"/);
+  assert.match(validation.innerHTML, /结构预演通过/);
+  assert.match(validation.innerHTML, /Structure simulation completed/);
+  assert.doesNotMatch(validation.innerHTML, /DryRun 失败/);
+  assert.doesNotMatch(validation.innerHTML, /分支覆盖 0\/0/);
+});
+
+test('validationPreview dryRun hides duplicate top-level DryRunResult card', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+  const response = agentResponse();
+  response.dryRunResult = {
+    dryRunSucceeded: true,
+    executedOperators: ['op_detect'],
+    dryRunSummary: 'Duplicate top-level structure simulation.'
+  };
+
+  panel._renderValidationConsole(response);
+
+  assert.match(validation.innerHTML, /data-validation-preview-section="dryRun"/);
+  assert.doesNotMatch(validation.innerHTML, /data-dryrun-contract=/);
+  assert.doesNotMatch(validation.innerHTML, /Duplicate top-level structure simulation/);
+});
+
+test('unknown DryRun contract displays unavailable instead of default failure', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+
+  panel._renderValidationConsole({ dryRunResult: { metadataOnly: true } });
+
+  assert.match(validation.innerHTML, /data-dryrun-contract="unknown"/);
+  assert.match(validation.innerHTML, /DryRun 状态不可用/);
+  assert.doesNotMatch(validation.innerHTML, /is-failed/);
+  assert.doesNotMatch(validation.innerHTML, /分支覆盖 0\/0/);
+});
+
+test('legacy execution DryRun still renders explicit coverage contract', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+
+  panel._renderValidationConsole({
+    dryRunResult: {
+      IsSuccess: true,
+      CoveredBranches: 0,
+      TotalBranches: 0,
+      CoveragePercentage: 0,
+      DurationMs: 4
+    }
+  });
+
+  assert.match(validation.innerHTML, /data-dryrun-contract="execution-stub"/);
+  assert.match(validation.innerHTML, /DryRun 通过/);
+  assert.match(validation.innerHTML, /分支覆盖 0\/0 \(0\.0%\)/);
+});
+
 test('response mapping displays RuntimePreview adapter summary', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel);
@@ -7084,6 +7258,30 @@ test('response mapping displays folded toolTrace summary only', async () => {
   assert.match(validation.innerHTML, /工具 已通过 7ms/);
   assert.doesNotMatch(validation.innerHTML, /运行预演回放工具/);
   assert.doesNotMatch(validation.innerHTML, /validate_flow:Simulation/);
+});
+
+test('tool evidence status contract maps completed warning skipped denied and unknown without fake failures', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const { validation } = attachValidationPanel(panel);
+
+  panel._renderValidationConsole({
+    toolTrace: [
+      { ToolName: 'validate_flow', Status: 'completed', DurationMs: 3 },
+      { toolName: 'dryrun_flow', status: 'warning', durationMs: 5 },
+      { toolName: 'runtime_package_precheck', status: 'skipped', durationMs: 0 },
+      { toolName: 'write_project_file', status: 'denied', durationMs: 1 },
+      { toolName: 'station_compatibility_checker', durationMs: 2 }
+    ]
+  });
+
+  assert.match(validation.innerHTML, /流程校验工具 已完成 3ms/);
+  assert.match(validation.innerHTML, /title="dryrun_flow">dryrun_flow/);
+  assert.match(validation.innerHTML, /title="warning">警告/);
+  assert.match(validation.innerHTML, /已跳过 0ms/);
+  assert.match(validation.innerHTML, /拒绝 1ms/);
+  assert.match(validation.innerHTML, /已记录\/状态不可用 2ms/);
+  assert.doesNotMatch(validation.innerHTML, /流程校验工具 失败 3ms/);
 });
 
 test('pendingParameters can locate operator parameter from missingResources', async () => {
@@ -7463,7 +7661,7 @@ test('applied workspace tells users to review details on the flow page without b
   panel.flowCanvas = createFakeFlowCanvas();
   panel.currentResult = {
     ...payload,
-    flow: panel._getResultFlowForCanvas(payload, { allowMergeFallback: false })
+    flow: panel._getResultFlowForCanvas(payload)
   };
   panel.currentResultVersion = 1;
   panel.agentWorkspaceMode = 'build';
@@ -9499,6 +9697,24 @@ test('RuntimePreview v1.3 source guard keeps manifest dry-run from creating pack
   assert.match(sources, /DeploymentExecuted = false|deploymentExecuted: manifestDryRun\.deploymentExecuted/);
   assert.match(sources, /RealResourcesTouched = false|realResourcesTouched/);
   assert.doesNotMatch(sources, /ZipArchive|CreatePackage|deployPackage|HotLoad|write_plc|StationPackage/i);
+});
+
+test('Vision Agent build canvas source guard only applies canonical Flow artifacts', () => {
+  const source = fs.readFileSync(
+    path.resolve(getRepoRoot(), 'ClearVision.Product', 'src', 'ClearVision.Product.Desktop', 'wwwroot', 'src', 'features', 'ai', 'aiPanelAgentWorkspace.js'),
+    'utf8'
+  );
+
+  assert.match(source, /buildResult\.flow \|\| buildResult\.Flow/);
+  const getFlowStart = source.indexOf('\n    _getResultFlowForCanvas');
+  const getFlowEnd = source.indexOf('\n    _normalizeWorkflowDraftForCanvas', getFlowStart);
+  const getFlowSource = source.slice(getFlowStart, getFlowEnd);
+  assert.doesNotMatch(source, /_buildCanvasFlowFromOperatorPipeline/);
+  assert.doesNotMatch(source, /_buildLinearCanvasConnections/);
+  assert.doesNotMatch(source, /_mergeBuildFallbackWithCurrentCanvas/);
+  assert.doesNotMatch(getFlowSource, /operatorPipeline|OperatorPipeline/);
+  assert.doesNotMatch(getFlowSource, /buildResult\.(workflowDraft|WorkflowDraft)|obj\.(workflowDraft|WorkflowDraft)/);
+  assert.doesNotMatch(source, /connections:\s*connections\.length\s*\?\s*connections\s*:/);
 });
 
 test('RuntimePreview governance contracts expose v1.2 corpus package readiness export and explanation records', () => {

@@ -119,6 +119,7 @@ public sealed class BuildResultAssembler
             ParameterStrategy = string.IsNullOrWhiteSpace(input.ParameterMapping.ParameterStrategy)
                 ? input.Selection.ParameterStrategy
                 : input.ParameterMapping.ParameterStrategy,
+            Flow = input.CurrentDraft.CanvasFlow,
             WorkflowDraft = input.CurrentDraft.WorkflowDraft,
             OperatorPipeline = input.Pipeline.Steps,
             ParameterMapping = input.ParameterMapping.Mappings,

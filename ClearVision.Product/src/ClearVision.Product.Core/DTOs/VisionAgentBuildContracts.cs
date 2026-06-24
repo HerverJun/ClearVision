@@ -21,6 +21,7 @@ public sealed record VisionAgentBuildResult
     public string StrategyConfirmationSource { get; init; } = string.Empty;
     public List<string> UnresolvedStrategyBlockers { get; init; } = [];
     public string ParameterStrategy { get; init; } = string.Empty;
+    public object? Flow { get; init; }
     public object? WorkflowDraft { get; init; }
     public List<VisionAgentOperatorPipelineStep> OperatorPipeline { get; init; } = [];
     public List<VisionAgentParameterMapping> ParameterMapping { get; init; } = [];
