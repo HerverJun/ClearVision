@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.ProjectVariables;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 
 namespace ClearVision.Product.Tests.ProjectVariables;
@@ -181,6 +182,37 @@ public sealed class ProjectVariableSessionTests
         session.SetValue(variableId, 2L, ProjectVariableUpdatedBy.StudioManual);
         session.TryGetValue(variableId, out var value).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(value).Should().Be(2L);
+    }
+
+    [Fact]
+    public void Registry_WhenStateStoreContainsSnapshot_ShouldLoadCurrentValueAcrossRegistryInstances()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var projectId = Guid.NewGuid();
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            var firstRegistry = new ProjectVariableSessionRegistry(new JsonFileProjectVariableStateStore(root));
+            var firstSession = firstRegistry.GetOrCreate(projectId, schema);
+            firstSession.SetValue(variableId, long.MaxValue, ProjectVariableUpdatedBy.StudioManual);
+            firstRegistry.Save(projectId, firstSession);
+
+            var secondRegistry = new ProjectVariableSessionRegistry(new JsonFileProjectVariableStateStore(root));
+            var secondSession = secondRegistry.GetOrCreate(projectId, CreateSchema(variableId, 1));
+
+            secondSession.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+            ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(long.MaxValue);
+            snapshot.Version.Should().Be(1);
+            snapshot.UpdatedBy.Should().Be(ProjectVariableUpdatedBy.StudioManual);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue)

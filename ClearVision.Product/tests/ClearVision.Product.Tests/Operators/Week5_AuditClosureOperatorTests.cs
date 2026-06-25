@@ -1,5 +1,7 @@
+using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Operators;
 using FluentAssertions;
@@ -136,6 +138,44 @@ public class VariableReadOperatorTests
         result.OutputData!["Exists"].Should().Be(true);
         result.OutputData["Value"].Should().Be(42.5);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenProjectScopeUsesExpressionAndFloorConversion_ShouldReadProjectedInt64Value()
+    {
+        var variableId = Guid.NewGuid();
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "stats.score",
+                    DisplayName = "Score",
+                    ValueType = ProjectGlobalVariableValueType.Double,
+                    InitialValue = JsonSerializer.SerializeToElement(2.5)
+                }
+            ]
+        };
+        using var session = new ProjectVariableSession(schema);
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        using var scope = accessor.BeginScope(new ProjectVariableExecutionContext(session, ProjectVariableBindingIndex.Build(schema), Guid.NewGuid()));
+        var sut = new VariableReadOperator(Substitute.For<ILogger<VariableReadOperator>>(), new VariableContext(), accessor);
+        var op = new Operator("read", OperatorType.VariableRead, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Scope", "Project", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableId", variableId.ToString(), "string"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "stats.score", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DefaultValue", "0", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Int", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ConversionMode", "Floor", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("Expression", "value * 2 + 0.5", "string"));
+
+        var result = await sut.ExecuteAsync(op);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData!["Value"].Should().Be(5L);
+        result.OutputData["Exists"].Should().Be(true);
+    }
 }
 
 public class VariableWriteOperatorTests
@@ -156,6 +196,48 @@ public class VariableWriteOperatorTests
 
         result.IsSuccess.Should().BeTrue();
         context.GetValue<string>("batchId").Should().Be("LAB-001");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenProjectScopeUsesExpressionAndRoundConversion_ShouldWriteRoundedInt64Value()
+    {
+        var variableId = Guid.NewGuid();
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "stats.count",
+                    DisplayName = "Count",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(0L)
+                }
+            ]
+        };
+        using var session = new ProjectVariableSession(schema);
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        using var scope = accessor.BeginScope(new ProjectVariableExecutionContext(session, ProjectVariableBindingIndex.Build(schema), Guid.NewGuid()));
+        var sut = new VariableWriteOperator(Substitute.For<ILogger<VariableWriteOperator>>(), new VariableContext(), accessor);
+        var op = new Operator("write", OperatorType.VariableWrite, 0, 0);
+        op.AddParameter(TestHelpers.CreateParameter("Scope", "Project", "enum"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableId", variableId.ToString(), "string"));
+        op.AddParameter(TestHelpers.CreateParameter("VariableName", "stats.count", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("DataType", "Double", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("UseInputValue", true, "bool"));
+        op.AddParameter(TestHelpers.CreateParameter("StaticValue", "0", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("ConversionMode", "Round", "string"));
+        op.AddParameter(TestHelpers.CreateParameter("Expression", "value * 1.5", "string"));
+
+        var result = await sut.ExecuteAsync(op, new Dictionary<string, object>
+        {
+            ["Value"] = 2.25
+        });
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(3L);
     }
 }
 

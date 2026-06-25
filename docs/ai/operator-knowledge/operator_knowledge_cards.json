@@ -23526,6 +23526,34 @@
           "\u6D6E\u70B9\u6570",
           "\u5E03\u5C14\u503C"
         ]
+      },
+      {
+        "Name": "ConversionMode",
+        "DisplayName": "Conversion Mode",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Exact",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "Exact",
+          "Round",
+          "Floor",
+          "Ceiling",
+          "Truncate"
+        ]
+      },
+      {
+        "Name": "Expression",
+        "DisplayName": "Expression",
+        "DataType": "string",
+        "Description": "Optional controlled expression evaluated after Project variable read. Use value for the current variable value.",
+        "DefaultValue": "",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
       }
     ],
     "RequiredResources": [],
@@ -23663,6 +23691,34 @@
         "DataType": "string",
         "Description": "\u6CA1\u6709\u4E0A\u6E38\u8F93\u5165\u65F6\u4F7F\u7528\u7684\u503C",
         "DefaultValue": "0",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": []
+      },
+      {
+        "Name": "ConversionMode",
+        "DisplayName": "Conversion Mode",
+        "DataType": "enum",
+        "Description": "",
+        "DefaultValue": "Exact",
+        "MinValue": null,
+        "MaxValue": null,
+        "IsRequired": true,
+        "AllowedValues": [
+          "Exact",
+          "Round",
+          "Floor",
+          "Ceiling",
+          "Truncate"
+        ]
+      },
+      {
+        "Name": "Expression",
+        "DisplayName": "Expression",
+        "DataType": "string",
+        "Description": "Optional controlled expression evaluated before Project variable write. Use value for the raw input.",
+        "DefaultValue": "",
         "MinValue": null,
         "MaxValue": null,
         "IsRequired": true,

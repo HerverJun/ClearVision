@@ -53,6 +53,15 @@ public interface IProjectVariableSession : IDisposable
     void ResetAll(ProjectVariableUpdatedBy updatedBy);
 }
 
+public interface IProjectVariableStateStore
+{
+    IReadOnlyList<ProjectVariableValueSnapshot> Load(string scopeId, ProjectGlobalVariableSchema schema);
+
+    void Save(string scopeId, ProjectGlobalVariableSchema schema, IReadOnlyList<ProjectVariableValueSnapshot> snapshots);
+
+    void Delete(string scopeId);
+}
+
 public sealed class ProjectVariableSession : IProjectVariableSession
 {
     private readonly ConcurrentDictionary<Guid, ProjectVariableState> _states = new();
@@ -62,6 +71,13 @@ public sealed class ProjectVariableSession : IProjectVariableSession
     private bool _disposed;
 
     public ProjectVariableSession(ProjectGlobalVariableSchema? schema)
+        : this(schema, snapshots: null)
+    {
+    }
+
+    public ProjectVariableSession(
+        ProjectGlobalVariableSchema? schema,
+        IEnumerable<ProjectVariableValueSnapshot>? snapshots)
     {
         Schema = schema ?? new ProjectGlobalVariableSchema();
         _definitionsById = Schema.Variables.ToDictionary(variable => variable.Id);
@@ -70,27 +86,50 @@ public sealed class ProjectVariableSession : IProjectVariableSession
             .GroupBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         ResetAll(ProjectVariableUpdatedBy.Initial);
+        if (snapshots != null)
+        {
+            ApplySnapshots(snapshots);
+        }
     }
 
-    private ProjectVariableSession(ProjectGlobalVariableSchema schema, IEnumerable<ProjectVariableValueSnapshot> snapshots)
+    private void ApplySnapshots(IEnumerable<ProjectVariableValueSnapshot> snapshots)
     {
-        Schema = schema;
-        _definitionsById = Schema.Variables.ToDictionary(variable => variable.Id);
-        _definitionsByName = Schema.Variables
-            .Where(variable => !string.IsNullOrWhiteSpace(variable.Name))
-            .GroupBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
-
-        foreach (var snapshot in snapshots)
+        lock (_stateGate)
         {
-            _states[snapshot.VariableId] = new ProjectVariableState(
-                snapshot.VariableId,
-                snapshot.Value.Clone(),
-                snapshot.Version,
-                snapshot.UpdatedAtUtc,
-                snapshot.UpdatedBy,
-                snapshot.RunId,
-                snapshot.OperatorId);
+            foreach (var snapshot in snapshots)
+            {
+                if (!_definitionsById.TryGetValue(snapshot.VariableId, out var definition))
+                {
+                    continue;
+                }
+
+                if (!ProjectVariableValueConverter.TryConvertToVariableValue(
+                        snapshot.Value,
+                        definition.ValueType,
+                        out var converted,
+                        out _))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    ValidateRange(definition, converted);
+                }
+                catch (InvalidOperationException)
+                {
+                    continue;
+                }
+
+                _states[snapshot.VariableId] = new ProjectVariableState(
+                    snapshot.VariableId,
+                    converted.Clone(),
+                    Math.Max(0, snapshot.Version),
+                    snapshot.UpdatedAtUtc == default ? DateTimeOffset.UtcNow : snapshot.UpdatedAtUtc,
+                    snapshot.UpdatedBy,
+                    snapshot.RunId,
+                    snapshot.OperatorId);
+            }
         }
     }
 

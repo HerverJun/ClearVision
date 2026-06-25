@@ -1431,7 +1431,9 @@ class PropertyPanel {
                     operatorId,
                     parameterId,
                     operatorName: this.currentOperator.name || this.currentOperator.title || this.currentOperator.type || '',
-                    parameterName
+                    parameterName,
+                    conversionMode: 'Exact',
+                    expression: ''
                 });
                 changed = true;
             }

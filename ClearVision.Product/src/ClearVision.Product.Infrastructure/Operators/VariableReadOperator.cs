@@ -21,6 +21,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("VariableName", "变量名", "string", Description = "要读取的变量名称", DefaultValue = "")]
 [OperatorParam("DefaultValue", "默认值", "string", Description = "变量不存在时的默认值", DefaultValue = "0")]
 [OperatorParam("DataType", "数据类型", "enum", DefaultValue = "String", Options = new[] { "String|字符串", "Int|整数", "Double|浮点数", "Bool|布尔值" })]
+[OperatorParam("ConversionMode", "Conversion Mode", "enum", DefaultValue = "Exact", Options = new[] { "Exact|Exact", "Round|Round", "Floor|Floor", "Ceiling|Ceiling", "Truncate|Truncate" })]
+[OperatorParam("Expression", "Expression", "string", Description = "Optional controlled expression evaluated after Project variable read. Use value for the current variable value.", DefaultValue = "")]
 public class VariableReadOperator : OperatorBase
 {
     private readonly IVariableContext _variableContext;
@@ -47,10 +49,12 @@ public class VariableReadOperator : OperatorBase
         var variableName = GetStringParam(@operator, "VariableName", "");
         var defaultValue = GetStringParam(@operator, "DefaultValue", "0");
         var dataType = GetStringParam(@operator, "DataType", "String");
+        var conversionMode = GetConversionMode(@operator);
+        var expression = GetStringParam(@operator, "Expression", "");
 
         if (scope.Equals("Project", StringComparison.OrdinalIgnoreCase))
         {
-            return Task.FromResult(ReadProjectVariable(variableIdText, variableName, defaultValue, dataType));
+            return Task.FromResult(ReadProjectVariable(variableIdText, variableName, defaultValue, dataType, conversionMode, expression));
         }
 
         if (string.IsNullOrWhiteSpace(variableName))
@@ -116,7 +120,9 @@ public class VariableReadOperator : OperatorBase
         string variableIdText,
         string variableName,
         string defaultValue,
-        string dataType)
+        string dataType,
+        ProjectVariableConversionMode conversionMode,
+        string? expression)
     {
         var context = _projectVariableContextAccessor.Current;
         if (context == null)
@@ -142,7 +148,16 @@ public class VariableReadOperator : OperatorBase
         object value = defaultValue;
         if (exists)
         {
-            if (!ProjectVariableValueConverter.TryConvertForParameter(valueElement, ToParameterType(dataType), out var converted, out var error))
+            var expressionVariables = ProjectVariableValueTransform.BuildExpressionVariables(context.Session, ProjectVariableValueConverter.ToObject(valueElement));
+            if (!ProjectVariableValueTransform.TryConvertForParameter(
+                    valueElement,
+                    definition.ValueType,
+                    ToParameterType(dataType),
+                    conversionMode,
+                    expression,
+                    expressionVariables,
+                    out var converted,
+                    out var error))
             {
                 return OperatorExecutionOutput.Failure($"Project variable '{definition.Name}' cannot be read as {dataType}: {error}");
             }
@@ -168,5 +183,13 @@ public class VariableReadOperator : OperatorBase
             "double" or "float" => "double",
             _ => "string"
         };
+    }
+
+    private ProjectVariableConversionMode GetConversionMode(Operator @operator)
+    {
+        var text = GetStringParam(@operator, "ConversionMode", "Exact");
+        return Enum.TryParse<ProjectVariableConversionMode>(text, ignoreCase: true, out var mode)
+            ? mode
+            : ProjectVariableConversionMode.Exact;
     }
 }

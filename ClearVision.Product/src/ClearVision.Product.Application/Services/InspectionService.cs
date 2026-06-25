@@ -491,6 +491,11 @@ public class InspectionService : IInspectionService
             var flowResult = projectVariables == null
                 ? await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs)
                 : await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs, projectVariables);
+            if (projectVariables != null && flowResult.IsSuccess && !flowResult.WasShortCircuited)
+            {
+                _projectVariableSessions?.Save(projectId, projectVariables.Session);
+            }
+
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;
 

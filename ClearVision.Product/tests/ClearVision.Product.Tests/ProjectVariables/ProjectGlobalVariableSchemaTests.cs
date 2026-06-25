@@ -105,6 +105,69 @@ public sealed class ProjectGlobalVariableSchemaTests
     }
 
     [Fact]
+    public void Validate_WhenDoubleVariableTargetsIntegerParameterWithoutExplicitConversion_ReturnsGv022()
+    {
+        var variableId = Guid.NewGuid();
+        var parameterId = Guid.NewGuid();
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultJudgment, 10, 0);
+        target.AddParameter(new Parameter(parameterId, "ExpectedCount", "ExpectedCount", "", "int", 0));
+        var flow = new OperatorFlow("flow");
+        flow.AddOperator(target);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.score", ProjectGlobalVariableValueType.Double, 4.25, variableId)],
+            TargetBindings =
+            [
+                new ProjectGlobalVariableTargetBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = target.Id,
+                    ParameterId = parameterId,
+                    OperatorName = target.Name,
+                    ParameterName = "ExpectedCount"
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Should().Contain(item => item.Code == "GV022");
+    }
+
+    [Fact]
+    public void Validate_WhenDoubleVariableTargetsIntegerParameterWithExplicitConversion_ReturnsNoErrors()
+    {
+        var variableId = Guid.NewGuid();
+        var parameterId = Guid.NewGuid();
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultJudgment, 10, 0);
+        target.AddParameter(new Parameter(parameterId, "ExpectedCount", "ExpectedCount", "", "int", 0));
+        var flow = new OperatorFlow("flow");
+        flow.AddOperator(target);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.score", ProjectGlobalVariableValueType.Double, 4.25, variableId)],
+            TargetBindings =
+            [
+                new ProjectGlobalVariableTargetBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = target.Id,
+                    ParameterId = parameterId,
+                    OperatorName = target.Name,
+                    ParameterName = "ExpectedCount",
+                    ConversionMode = ProjectVariableConversionMode.Floor
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Validate_WhenImageOutputIsBoundToVariable_ReturnsDiagnostic()
     {
         var variableId = Guid.NewGuid();
@@ -221,6 +284,39 @@ public sealed class ProjectGlobalVariableSchemaTests
         var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
 
         diagnostics.Should().Contain(item => item.Code == "GV026");
+    }
+
+    [Fact]
+    public void Validate_WhenBindingExpressionIsInvalid_ReturnsGv033()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Count", PortDataType.Integer);
+        var flow = new OperatorFlow("expression");
+        flow.AddOperator(source);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.count", ProjectGlobalVariableValueType.Int64, 0, variableId)],
+            SourceBindings =
+            [
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = source.Id,
+                    OutputPortId = sourcePortId,
+                    OperatorName = source.Name,
+                    OutputPortName = "Count",
+                    ConversionMode = ProjectVariableConversionMode.Floor,
+                    Expression = "value ** 2"
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Should().Contain(item => item.Code == "GV033");
     }
 
     [Fact]

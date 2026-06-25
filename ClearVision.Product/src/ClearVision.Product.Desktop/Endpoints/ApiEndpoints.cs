@@ -267,6 +267,7 @@ public static class ApiEndpoints
             try
             {
                 session.SetValue(variableId, request.Value, ProjectVariableUpdatedBy.StudioManual);
+                sessions.Save(id, session);
                 return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
             }
             catch (Exception ex)
@@ -306,6 +307,7 @@ public static class ApiEndpoints
             }
 
             session.ResetAll(ProjectVariableUpdatedBy.Reset);
+            sessions.Save(id, session);
             return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
         });
 
@@ -339,6 +341,7 @@ public static class ApiEndpoints
             }
 
             session.Reset(variableId, ProjectVariableUpdatedBy.Reset);
+            sessions.Save(id, session);
             return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
         });
 

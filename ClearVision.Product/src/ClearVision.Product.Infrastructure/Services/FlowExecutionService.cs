@@ -497,14 +497,6 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         CancellationToken cancellationToken = default)
     {
         var projectVariableContext = _projectVariableContextAccessor.Current;
-        if (projectVariableContext != null && enableParallel)
-        {
-            enableParallel = false;
-            _logger.LogDebug(
-                "[FlowExecution] Project global variables are active for flow {FlowId}; falling back to sequential execution.",
-                flow.Id);
-        }
-
         using var variableScope = _variableContext.BeginScope(new VariableContextScope(
             flow.Id,
             projectVariableContext?.RunId ?? Guid.NewGuid(),
@@ -529,7 +521,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             var plan = GetFlowExecutionPlan(flow);
 
             // 获取执行顺序（拓扑排序）
-            var executionOrder = CreateProjectVariableExecutionOrder(plan, _projectVariableContextAccessor.Current);
+            var executionOrder = CreateProjectVariableExecutionOrder(plan, projectVariableContext);
+            var executionLayers = CreateProjectVariableExecutionLayers(plan, projectVariableContext, executionOrder);
             var inputPreparationIndex = plan.CreateInputPreparationIndex();
 
             // 鍒濆鍖栨墽琛岀姸鎬?
@@ -555,12 +548,12 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (enableParallel && executionOrder.Count > 1)
             {
                 // 并行执行模式
-                await ExecuteFlowParallelAsync(plan, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
+                await ExecuteFlowParallelAsync(plan, executionOrder, executionLayers, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
             }
             else
             {
                 // 顺序执行模式
-                await ExecuteFlowSequentialAsync(flow, plan, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
+                await ExecuteFlowSequentialAsync(flow, plan, executionOrder, operatorOutputs, result, status, cts.Token, inputPreparationIndex);
             }
 
             stopwatch.Stop();
@@ -673,13 +666,13 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     private async Task ExecuteFlowSequentialAsync(
         OperatorFlow flow,
         FlowExecutionPlan plan,
+        IReadOnlyList<Operator> executionOrder,
         ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs,
         FlowExecutionResult result,
         FlowExecutionStatus status,
         CancellationToken cancellationToken,
         FlowInputPreparationIndex inputPreparationIndex)
     {
-        var executionOrder = CreateProjectVariableExecutionOrder(plan, _projectVariableContextAccessor.Current);
         int completedCount = 0;
         foreach (var op in executionOrder)
         {
@@ -797,6 +790,16 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         return ordered;
     }
 
+    private static List<List<Operator>> CreateProjectVariableExecutionLayers(
+        FlowExecutionPlan plan,
+        ProjectVariableExecutionContext? projectVariables,
+        IReadOnlyList<Operator> executionOrder)
+    {
+        return projectVariables == null || !projectVariables.BindingIndex.HasBindings
+            ? plan.ExecutionLayers
+            : BuildExecutionLayers(executionOrder, plan.Flow, projectVariables.Session.Schema);
+    }
+
     private bool TryApplyProjectVariableTargetBindings(
         Operator op,
         Dictionary<string, object> inputs,
@@ -830,7 +833,16 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 return false;
             }
 
-            if (!ProjectVariableValueConverter.TryConvertForParameter(value, definition.ValueType, parameter.DataType, out var converted, out var convertError))
+            var expressionVariables = ProjectVariableValueTransform.BuildExpressionVariables(context.Session, ProjectVariableValueConverter.ToObject(value));
+            if (!ProjectVariableValueTransform.TryConvertForParameter(
+                    value,
+                    definition.ValueType,
+                    parameter.DataType,
+                    binding.ConversionMode,
+                    binding.Expression,
+                    expressionVariables,
+                    out var converted,
+                    out var convertError))
             {
                 error = $"GV022: project global variable '{definition.Name}' cannot be applied to parameter '{parameter.Name}' ({parameter.DataType}): {convertError}";
                 return false;
@@ -883,9 +895,23 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             try
             {
+                var expressionVariables = ProjectVariableValueTransform.BuildExpressionVariables(context.Session, value);
+                if (!ProjectVariableValueTransform.TryConvertToVariableValue(
+                        value,
+                        definition.ValueType,
+                        binding.ConversionMode,
+                        binding.Expression,
+                        expressionVariables,
+                        out var converted,
+                        out var convertError))
+                {
+                    error = $"GV029: source output '{port.Name}' cannot update project global variable '{definition.Name}': {convertError}";
+                    return false;
+                }
+
                 context.Session.SetValue(
                     binding.VariableId,
-                    value,
+                    converted,
                     ProjectVariableUpdatedBy.OperatorOutput,
                     context.RunId,
                     op.Id);
@@ -905,6 +931,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     /// </summary>
     private async Task ExecuteFlowParallelAsync(
         FlowExecutionPlan plan,
+        IReadOnlyList<Operator> executionOrder,
+        IReadOnlyList<List<Operator>> executionLayers,
         ConcurrentDictionary<Guid, Dictionary<string, object>> operatorOutputs,
         FlowExecutionResult result,
         FlowExecutionStatus status,
@@ -912,8 +940,6 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         FlowInputPreparationIndex inputPreparationIndex)
     {
         // 构建执行层级（哪些算子可以并行执行）
-        var executionOrder = plan.ExecutionOrder;
-        var executionLayers = plan.ExecutionLayers;
         var completedOperators = new HashSet<Guid>();
         var failed = false;
 
@@ -1006,6 +1032,24 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
 
         var inputs = PrepareOperatorInputs(plan.Flow, op, operatorOutputs, inputPreparationIndex);
+        if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
+        {
+            var targetBindingResult = new OperatorExecutionResult
+            {
+                OperatorId = op.Id,
+                OperatorName = op.Name,
+                IsSuccess = false,
+                ErrorMessage = targetBindingError
+            };
+
+            if (!cancellationToken.IsCancellationRequested && signalLayerFailure(targetBindingResult))
+            {
+                await CancelLayerAsync(layerCts);
+            }
+
+            return targetBindingResult;
+        }
+
         var opResult = await ExecuteOperatorInternalAsync(op, executor, inputs, layerCts.Token);
 
         if (opResult.IsSuccess)
@@ -1014,6 +1058,23 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             operatorOutputs[op.Id] = outputs;
 
             ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);
+            if (!TryCommitProjectVariableSourceBindings(op, outputs, out var sourceBindingError))
+            {
+                var sourceBindingResult = new OperatorExecutionResult
+                {
+                    OperatorId = op.Id,
+                    OperatorName = op.Name,
+                    IsSuccess = false,
+                    ErrorMessage = sourceBindingError
+                };
+
+                if (!cancellationToken.IsCancellationRequested && signalLayerFailure(sourceBindingResult))
+                {
+                    await CancelLayerAsync(layerCts);
+                }
+
+                return sourceBindingResult;
+            }
 
             if (opResult.ShortCircuitedFlow)
             {
@@ -1105,6 +1166,97 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 }
 
                 nextLayer = remaining;
+            }
+
+            currentLayer = nextLayer;
+        }
+
+        return layers;
+    }
+
+    private static List<List<Operator>> BuildExecutionLayers(
+        IReadOnlyList<Operator> executionOrder,
+        OperatorFlow flow,
+        ProjectGlobalVariableSchema schema)
+    {
+        var operatorIds = executionOrder.Select(op => op.Id).ToHashSet();
+        var operatorsById = executionOrder.ToDictionary(op => op.Id);
+        var outgoing = executionOrder.ToDictionary(op => op.Id, _ => new HashSet<Guid>());
+        var inDegree = executionOrder.ToDictionary(op => op.Id, _ => 0);
+
+        void AddDependency(Guid sourceOperatorId, Guid targetOperatorId)
+        {
+            if (sourceOperatorId == targetOperatorId ||
+                !operatorIds.Contains(sourceOperatorId) ||
+                !operatorIds.Contains(targetOperatorId))
+            {
+                return;
+            }
+
+            if (outgoing[sourceOperatorId].Add(targetOperatorId))
+            {
+                inDegree[targetOperatorId]++;
+            }
+        }
+
+        foreach (var connection in flow.Connections)
+        {
+            AddDependency(connection.SourceOperatorId, connection.TargetOperatorId);
+        }
+
+        var sourceByVariableId = schema.SourceBindings
+            .GroupBy(binding => binding.VariableId)
+            .ToDictionary(group => group.Key, group => group.First());
+        foreach (var target in schema.TargetBindings)
+        {
+            if (sourceByVariableId.TryGetValue(target.VariableId, out var source))
+            {
+                AddDependency(source.OperatorId, target.OperatorId);
+            }
+        }
+
+        var scheduled = new HashSet<Guid>();
+        var layers = new List<List<Operator>>();
+        var currentLayer = executionOrder
+            .Where(op => inDegree[op.Id] == 0)
+            .ToList();
+        if (currentLayer.Count == 0)
+        {
+            currentLayer = executionOrder.ToList();
+        }
+
+        while (currentLayer.Count > 0)
+        {
+            layers.Add(currentLayer);
+            foreach (var op in currentLayer)
+            {
+                scheduled.Add(op.Id);
+            }
+
+            var nextLayer = new List<Operator>();
+            foreach (var op in currentLayer)
+            {
+                foreach (var targetOperatorId in outgoing[op.Id])
+                {
+                    inDegree[targetOperatorId]--;
+                    if (inDegree[targetOperatorId] == 0 &&
+                        !scheduled.Contains(targetOperatorId) &&
+                        operatorsById.TryGetValue(targetOperatorId, out var nextOperator))
+                    {
+                        nextLayer.Add(nextOperator);
+                    }
+                }
+            }
+
+            if (nextLayer.Count == 0)
+            {
+                nextLayer = executionOrder
+                    .Where(op => !scheduled.Contains(op.Id))
+                    .ToList();
+                if (nextLayer.Count == 0)
+                {
+                    break;
+                }
             }
 
             currentLayer = nextLayer;

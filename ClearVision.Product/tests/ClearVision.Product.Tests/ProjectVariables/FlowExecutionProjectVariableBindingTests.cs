@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
@@ -358,6 +359,205 @@ public sealed class FlowExecutionProjectVariableBindingTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_WhenSourceBindingUsesFloorConversion_ShouldStoreInt64()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Score", PortDataType.Float);
+        var flow = new OperatorFlow("source-floor-conversion");
+        flow.AddOperator(source);
+        var schema = CreateSingleInt64Schema(variableId, 0L);
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = source.Id,
+            OutputPortId = sourcePortId,
+            OperatorName = source.Name,
+            OutputPortName = "Score",
+            ConversionMode = ProjectVariableConversionMode.Floor
+        });
+        using var session = new ProjectVariableSession(schema);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid());
+        var sourceExecutor = Substitute.For<IOperatorExecutor>();
+        sourceExecutor.OperatorType.Returns(OperatorType.Thresholding);
+        sourceExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        sourceExecutor.ExecuteAsync(source, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Score"] = 7.9
+            })));
+        using var service = new FlowExecutionService(
+            [sourceExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            new ProjectVariableExecutionContextAccessor());
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(7L);
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_WhenTargetBindingUsesRoundExpression_ShouldApplyIntegerParameter()
+    {
+        var variableId = Guid.NewGuid();
+        var targetParameterId = Guid.NewGuid();
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultJudgment, 0, 0);
+        target.AddParameter(new Parameter(targetParameterId, "ExpectedCount", "ExpectedCount", "", "int", 0));
+        var flow = new OperatorFlow("target-round-expression");
+        flow.AddOperator(target);
+        var schema = CreateSingleDoubleSchema(variableId, 2.25);
+        schema.TargetBindings.Add(new ProjectGlobalVariableTargetBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = target.Id,
+            ParameterId = targetParameterId,
+            OperatorName = target.Name,
+            ParameterName = "ExpectedCount",
+            ConversionMode = ProjectVariableConversionMode.Round,
+            Expression = "value * 2 + 0.25"
+        });
+        using var session = new ProjectVariableSession(schema);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid());
+        var targetExecutor = Substitute.For<IOperatorExecutor>();
+        targetExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
+        targetExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        targetExecutor.ExecuteAsync(
+                target,
+                Arg.Is<Dictionary<string, object>>(inputs => Convert.ToInt64(inputs["ExpectedCount"]) == 5L),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+            {
+                ["Seen"] = 5L
+            })));
+        using var service = new FlowExecutionService(
+            [targetExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            new ProjectVariableExecutionContextAccessor());
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().ContainKey("Seen");
+        Convert.ToInt64(result.OutputData!["Seen"]).Should().Be(5L);
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_WhenParallelModeUsesProjectVariables_ShouldRunIndependentLayerConcurrentlyAndRespectImplicitEdge()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var targetParameterId = Guid.NewGuid();
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultJudgment, 20, 0);
+        target.AddParameter(new Parameter(targetParameterId, "ExpectedCount", "ExpectedCount", "", "int", 0));
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Count", PortDataType.Integer);
+        var independent = new Operator(Guid.NewGuid(), "Independent", OperatorType.BlobAnalysis, 10, 0);
+        var flow = new OperatorFlow("parallel-project-variable-flow");
+        flow.AddOperator(target);
+        flow.AddOperator(source);
+        flow.AddOperator(independent);
+        var schema = CreateSingleInt64Schema(variableId, 0L);
+        schema.SourceBindings.Add(new ProjectGlobalVariableSourceBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = source.Id,
+            OutputPortId = sourcePortId,
+            OperatorName = source.Name,
+            OutputPortName = "Count"
+        });
+        schema.TargetBindings.Add(new ProjectGlobalVariableTargetBinding
+        {
+            Id = Guid.NewGuid(),
+            VariableId = variableId,
+            OperatorId = target.Id,
+            ParameterId = targetParameterId,
+            OperatorName = target.Name,
+            ParameterName = "ExpectedCount"
+        });
+        using var session = new ProjectVariableSession(schema);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid());
+        var clock = Stopwatch.StartNew();
+        long sourceStartedAt = -1;
+        long sourceCompletedAt = -1;
+        long independentStartedAt = -1;
+        long targetStartedAt = -1;
+        var sourceExecutor = Substitute.For<IOperatorExecutor>();
+        sourceExecutor.OperatorType.Returns(OperatorType.Thresholding);
+        sourceExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        sourceExecutor.ExecuteAsync(source, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                sourceStartedAt = clock.ElapsedMilliseconds;
+                await Task.Delay(150);
+                sourceCompletedAt = clock.ElapsedMilliseconds;
+                return OperatorExecutionOutput.Success(new Dictionary<string, object>
+                {
+                    ["Count"] = 11L
+                });
+            });
+        var independentExecutor = Substitute.For<IOperatorExecutor>();
+        independentExecutor.OperatorType.Returns(OperatorType.BlobAnalysis);
+        independentExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        independentExecutor.ExecuteAsync(independent, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                independentStartedAt = clock.ElapsedMilliseconds;
+                await Task.Delay(10);
+                return OperatorExecutionOutput.Success(new Dictionary<string, object>());
+            });
+        var targetExecutor = Substitute.For<IOperatorExecutor>();
+        targetExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
+        targetExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        targetExecutor.ExecuteAsync(
+                target,
+                Arg.Is<Dictionary<string, object>>(inputs => Convert.ToInt64(inputs["ExpectedCount"]) == 11L),
+                Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                targetStartedAt = clock.ElapsedMilliseconds;
+                return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>
+                {
+                    ["Seen"] = 11L
+                }));
+            });
+        using var service = new FlowExecutionService(
+            [sourceExecutor, independentExecutor, targetExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            new ProjectVariableExecutionContextAccessor());
+
+        var result = await service.ExecuteFlowAsync(flow, null, context, enableParallel: true);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().ContainKey("Seen");
+        Convert.ToInt64(result.OutputData!["Seen"]).Should().Be(11L);
+        await sourceExecutor.Received(1).ExecuteAsync(source, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>());
+        await independentExecutor.Received(1).ExecuteAsync(independent, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>());
+        await targetExecutor.Received(1).ExecuteAsync(target, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>());
+        independentStartedAt.Should().BeGreaterThanOrEqualTo(0);
+        sourceCompletedAt.Should().BeGreaterThan(sourceStartedAt);
+        independentStartedAt.Should().BeLessThan(sourceCompletedAt);
+        targetStartedAt.Should().BeGreaterThanOrEqualTo(sourceCompletedAt);
+    }
+
+    [Fact]
     public async Task ExecuteFlowDebugAsync_WhenProjectVariableReadUsesSameDebugSession_ShouldReadFreshFormalSnapshot()
     {
         var variableId = Guid.NewGuid();
@@ -664,6 +864,25 @@ public sealed class FlowExecutionProjectVariableBindingTests
                     Name = "stats.count",
                     DisplayName = "Count",
                     ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(initialValue),
+                    ManualWriteAllowed = true
+                }
+            ]
+        };
+    }
+
+    private static ProjectGlobalVariableSchema CreateSingleDoubleSchema(Guid variableId, double initialValue)
+    {
+        return new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "stats.score",
+                    DisplayName = "Score",
+                    ValueType = ProjectGlobalVariableValueType.Double,
                     InitialValue = JsonSerializer.SerializeToElement(initialValue),
                     ManualWriteAllowed = true
                 }

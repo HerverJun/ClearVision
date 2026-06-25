@@ -198,6 +198,66 @@ test('global variable drafts validate type, range, duplicate names and serialize
   assert.equal(store.coerceGlobalVariableValue('Double', '9.007199254740992e15').value, 9007199254740992);
 });
 
+test('global variable schema preserves conversion expressions and matches backend compatibility rules', async () => {
+  installDom();
+  const store = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariableStore.js');
+
+  const schema = store.normalizeGlobalVariableSchema({
+    variables: [],
+    SourceBindings: [
+      {
+        Id: 'source-bind',
+        VariableId: 'var-count',
+        OperatorId: 'op-count',
+        OutputPortId: 'out-score',
+        OperatorName: 'Counter',
+        OutputPortName: 'Score',
+        ConversionMode: 'floor',
+        Expression: 'value * 1.5'
+      }
+    ],
+    TargetBindings: [
+      {
+        Id: 'target-bind',
+        VariableId: 'var-score',
+        OperatorId: 'op-judge',
+        ParameterId: 'param-count',
+        OperatorName: 'Judge',
+        ParameterName: 'ExpectedCount',
+        ConversionMode: 'Round',
+        Expression: 'value + 0.25'
+      }
+    ]
+  });
+
+  assert.equal(schema.sourceBindings[0].conversionMode, 'Floor');
+  assert.equal(schema.sourceBindings[0].expression, 'value * 1.5');
+  assert.equal(schema.targetBindings[0].conversionMode, 'Round');
+  assert.equal(schema.targetBindings[0].expression, 'value + 0.25');
+  assert.deepEqual(store.GLOBAL_VARIABLE_CONVERSION_MODES, ['Exact', 'Round', 'Floor', 'Ceiling', 'Truncate']);
+  assert.equal(store.isVariableCompatibleWithDataType('Double', 'int'), false);
+  assert.equal(store.isVariableCompatibleWithDataType('Double', 'int', 'Floor'), true);
+  assert.equal(store.isVariableCompatibleWithDataType('String', 'int', 'Floor'), false);
+
+  const invalidHyphen = store.validateVariableDraft({
+    name: 'stats-bad',
+    valueType: 'Int64',
+    initialValueText: '1',
+    minText: '',
+    maxText: ''
+  }, { variables: [] });
+  assert.match(invalidHyphen.name, /每段必须以字母开头/);
+
+  const invalidSegment = store.validateVariableDraft({
+    name: 'stats._bad',
+    valueType: 'Int64',
+    initialValueText: '1',
+    minText: '',
+    maxText: ''
+  }, { variables: [] });
+  assert.match(invalidSegment.name, /每段必须以字母开头/);
+});
+
 test('global variable panel saves edited schema, keeps id and preserves dirty draft after backend failure', async () => {
   installDom();
   const { default: projectManager } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/project/projectManager.js');
@@ -428,7 +488,11 @@ test('property panel binding control is Chinese, filters incompatible variables 
 
   assert.equal(projectManager.currentProject.globalVariables.targetBindings.length, 1);
   assert.equal(projectManager.currentProject.globalVariables.targetBindings[0].variableId, 'var-count');
+  assert.equal(projectManager.currentProject.globalVariables.targetBindings[0].conversionMode, 'Exact');
+  assert.equal(projectManager.currentProject.globalVariables.targetBindings[0].expression, '');
   assert.equal(externalSchema.targetBindings.length, 1);
+  assert.equal(externalSchema.targetBindings[0].conversionMode, 'Exact');
+  assert.equal(externalSchema.targetBindings[0].expression, '');
 });
 
 test('global variable UI has no browser prompt, alert or confirm calls and Station text is Chinese', () => {
@@ -926,10 +990,11 @@ test('browser interaction preserves draft and dirty state after save, refresh, w
 });
 
 test('browser interaction restores deleted variables, source changes and removed targets on discard', async () => {
-  const harness = await startBrowserHarness();
+    const harness = await startBrowserHarness();
   try {
     const project = createInteractiveProject();
-    const expected = clone(project.globalVariables);
+    const { normalizeGlobalVariableSchema } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariableStore.js');
+    const expected = normalizeGlobalVariableSchema(project.globalVariables);
     await setupGlobalVariablePanel(harness.page, project, { choices: ['delete'] });
 
     await harness.page.click('[data-variable-id="var-temp"]');

@@ -244,7 +244,7 @@ public static partial class ProjectGlobalVariableSchemaValidator
         }
 
         if (variable != null &&
-            !ProjectGlobalVariableTypeCompatibility.IsCompatibleWithOutputPort(variable.ValueType, outputPort.DataType))
+            !ProjectVariableValueTransform.IsCompatibleWithOutputPort(variable.ValueType, outputPort.DataType, binding.ConversionMode))
         {
             diagnostics.Add(new ProjectGlobalVariableDiagnostic(
                 "GV017",
@@ -253,6 +253,8 @@ public static partial class ProjectGlobalVariableSchemaValidator
                 binding.OperatorId,
                 binding.OutputPortId));
         }
+
+        ValidateExpression(binding.Expression, variablesById.Values, binding.VariableId, binding.OperatorId, binding.OutputPortId, null, diagnostics);
     }
 
     private static void ValidateTargetBinding(
@@ -296,7 +298,7 @@ public static partial class ProjectGlobalVariableSchemaValidator
         }
 
         if (variable != null &&
-            !ProjectGlobalVariableTypeCompatibility.IsCompatibleWithParameter(variable.ValueType, parameter.DataType))
+            !ProjectVariableValueTransform.IsCompatibleWithParameter(variable.ValueType, parameter.DataType, binding.ConversionMode))
         {
             diagnostics.Add(new ProjectGlobalVariableDiagnostic(
                 "GV022",
@@ -304,6 +306,53 @@ public static partial class ProjectGlobalVariableSchemaValidator
                 binding.VariableId,
                 binding.OperatorId,
                 ParameterId: binding.ParameterId));
+        }
+
+        ValidateExpression(binding.Expression, variablesById.Values, binding.VariableId, binding.OperatorId, null, binding.ParameterId, diagnostics);
+    }
+
+    private static void ValidateExpression(
+        string? expression,
+        IEnumerable<ProjectGlobalVariableDefinition> variables,
+        Guid? variableId,
+        Guid? operatorId,
+        Guid? portId,
+        Guid? parameterId,
+        List<ProjectGlobalVariableDiagnostic> diagnostics)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+        {
+            return;
+        }
+
+        var sampleVariables = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["value"] = 1.25d
+        };
+        foreach (var variable in variables)
+        {
+            if (string.IsNullOrWhiteSpace(variable.Name))
+            {
+                continue;
+            }
+
+            sampleVariables[variable.Name] = variable.ValueType switch
+            {
+                ProjectGlobalVariableValueType.Boolean => true,
+                ProjectGlobalVariableValueType.String => "1",
+                _ => 1.25d
+            };
+        }
+
+        if (!ProjectVariableExpressionEvaluator.TryEvaluate(expression, sampleVariables, out _, out var error))
+        {
+            diagnostics.Add(new ProjectGlobalVariableDiagnostic(
+                "GV033",
+                $"Project global variable expression is invalid: {error}",
+                variableId,
+                operatorId,
+                portId,
+                parameterId));
         }
     }
 

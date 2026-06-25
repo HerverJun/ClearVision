@@ -23,6 +23,8 @@ namespace ClearVision.Product.Infrastructure.Operators;
 [OperatorParam("DataType", "数据类型", "enum", DefaultValue = "String", Options = new[] { "String|字符串", "Int|整数", "Double|浮点数", "Bool|布尔值" })]
 [OperatorParam("UseInputValue", "使用输入值", "bool", Description = "优先使用上游输入值，否则使用静态值", DefaultValue = true)]
 [OperatorParam("StaticValue", "静态值", "string", Description = "没有上游输入时使用的值", DefaultValue = "0")]
+[OperatorParam("ConversionMode", "Conversion Mode", "enum", DefaultValue = "Exact", Options = new[] { "Exact|Exact", "Round|Round", "Floor|Floor", "Ceiling|Ceiling", "Truncate|Truncate" })]
+[OperatorParam("Expression", "Expression", "string", Description = "Optional controlled expression evaluated before Project variable write. Use value for the raw input.", DefaultValue = "")]
 public class VariableWriteOperator : OperatorBase
 {
     private readonly IVariableContext _variableContext;
@@ -48,11 +50,13 @@ public class VariableWriteOperator : OperatorBase
         var variableIdText = GetStringParam(@operator, "VariableId", "");
         var variableName = GetStringParam(@operator, "VariableName", "");
         var dataType = GetStringParam(@operator, "DataType", "String");
+        var conversionMode = GetConversionMode(@operator);
+        var expression = GetStringParam(@operator, "Expression", "");
         var value = ResolveWriteValue(@operator, inputs, variableName, dataType);
 
         if (scope.Equals("Project", StringComparison.OrdinalIgnoreCase))
         {
-            return Task.FromResult(WriteProjectVariable(@operator.Id, variableIdText, variableName, value));
+            return Task.FromResult(WriteProjectVariable(@operator.Id, variableIdText, variableName, value, conversionMode, expression));
         }
 
         if (string.IsNullOrWhiteSpace(variableName))
@@ -120,7 +124,13 @@ public class VariableWriteOperator : OperatorBase
         return GetStaticValue(@operator, dataType);
     }
 
-    private OperatorExecutionOutput WriteProjectVariable(Guid operatorId, string variableIdText, string variableName, object value)
+    private OperatorExecutionOutput WriteProjectVariable(
+        Guid operatorId,
+        string variableIdText,
+        string variableName,
+        object value,
+        ProjectVariableConversionMode conversionMode,
+        string? expression)
     {
         var context = _projectVariableContextAccessor.Current;
         if (context == null)
@@ -144,9 +154,22 @@ public class VariableWriteOperator : OperatorBase
 
         try
         {
+            var expressionVariables = ProjectVariableValueTransform.BuildExpressionVariables(context.Session, value);
+            if (!ProjectVariableValueTransform.TryConvertToVariableValue(
+                    value,
+                    definition.ValueType,
+                    conversionMode,
+                    expression,
+                    expressionVariables,
+                    out var converted,
+                    out var convertError))
+            {
+                return OperatorExecutionOutput.Failure(convertError ?? "Project variable value conversion failed.");
+            }
+
             var snapshot = context.Session.SetValue(
                 definition.Id,
-                value,
+                converted,
                 ProjectVariableUpdatedBy.VariableWrite,
                 context.RunId,
                 operatorId);
@@ -178,5 +201,13 @@ public class VariableWriteOperator : OperatorBase
             "bool" or "boolean" => Convert.ToBoolean(value),
             _ => value?.ToString() ?? string.Empty
         };
+    }
+
+    private ProjectVariableConversionMode GetConversionMode(Operator @operator)
+    {
+        var text = GetStringParam(@operator, "ConversionMode", "Exact");
+        return Enum.TryParse<ProjectVariableConversionMode>(text, ignoreCase: true, out var mode)
+            ? mode
+            : ProjectVariableConversionMode.Exact;
     }
 }

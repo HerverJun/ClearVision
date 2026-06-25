@@ -1,6 +1,7 @@
 ﻿import httpClient from '../../core/messaging/httpClient.js';
 
 export const GLOBAL_VARIABLE_TYPES = Object.freeze(['String', 'Int64', 'Double', 'Boolean']);
+export const GLOBAL_VARIABLE_CONVERSION_MODES = Object.freeze(['Exact', 'Round', 'Floor', 'Ceiling', 'Truncate']);
 const MIN_INT64 = -9223372036854775808n;
 const MAX_INT64 = 9223372036854775807n;
 const INT64_RANGE_ERROR = '超出 Int64 范围。';
@@ -51,7 +52,9 @@ export function normalizeSourceBinding(binding = {}) {
         operatorId: binding.operatorId ?? binding.OperatorId ?? '',
         outputPortId: binding.outputPortId ?? binding.OutputPortId ?? '',
         operatorName: binding.operatorName ?? binding.OperatorName ?? '',
-        outputPortName: binding.outputPortName ?? binding.OutputPortName ?? ''
+        outputPortName: binding.outputPortName ?? binding.OutputPortName ?? '',
+        conversionMode: normalizeConversionMode(binding.conversionMode ?? binding.ConversionMode),
+        expression: String(binding.expression ?? binding.Expression ?? '')
     };
 }
 
@@ -62,7 +65,9 @@ export function normalizeTargetBinding(binding = {}) {
         operatorId: binding.operatorId ?? binding.OperatorId ?? '',
         parameterId: binding.parameterId ?? binding.ParameterId ?? '',
         operatorName: binding.operatorName ?? binding.OperatorName ?? '',
-        parameterName: binding.parameterName ?? binding.ParameterName ?? ''
+        parameterName: binding.parameterName ?? binding.ParameterName ?? '',
+        conversionMode: normalizeConversionMode(binding.conversionMode ?? binding.ConversionMode),
+        expression: String(binding.expression ?? binding.Expression ?? '')
     };
 }
 
@@ -268,9 +273,11 @@ export function coerceGlobalVariableValue(valueType, rawValue) {
     }
 }
 
-export function isVariableCompatibleWithDataType(valueType, dataType) {
+export function isVariableCompatibleWithDataType(valueType, dataType, conversionMode = 'Exact') {
     const variableType = normalizeValueType(valueType).toLowerCase();
     const normalizedDataType = String(dataType || '').trim().toLowerCase();
+    const normalizedConversionMode = normalizeConversionMode(conversionMode);
+    const hasExplicitIntegerConversion = ['Round', 'Floor', 'Ceiling', 'Truncate'].includes(normalizedConversionMode);
     if (!normalizedDataType || normalizedDataType === 'any' || normalizedDataType === 'object') {
         return true;
     }
@@ -282,12 +289,22 @@ export function isVariableCompatibleWithDataType(valueType, dataType) {
         return ['int', 'integer', 'long', 'int64', 'double', 'float', 'number', 'decimal'].includes(normalizedDataType);
     }
     if (variableType === 'double') {
-        return ['double', 'float', 'number', 'decimal'].includes(normalizedDataType);
+        return ['double', 'float', 'number', 'decimal'].includes(normalizedDataType) ||
+            (hasExplicitIntegerConversion && ['int', 'integer', 'long', 'int64'].includes(normalizedDataType));
     }
     if (variableType === 'boolean') {
         return ['bool', 'boolean'].includes(normalizedDataType);
     }
     return false;
+}
+
+export function normalizeConversionMode(value) {
+    const text = String(value || 'Exact').trim().toLowerCase();
+    if (text === 'round') return 'Round';
+    if (text === 'floor') return 'Floor';
+    if (text === 'ceiling' || text === 'ceil') return 'Ceiling';
+    if (text === 'truncate' || text === 'trunc') return 'Truncate';
+    return 'Exact';
 }
 
 export function normalizeValueType(valueType) {

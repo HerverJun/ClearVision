@@ -66,7 +66,11 @@ public static class ProjectGlobalVariableFlowValidator
                 TryGetParameterId(op, "VariableName"),
                 GetParameterText(op, "VariableName"),
                 TryGetParameterId(op, "DataType"),
-                GetParameterText(op, "DataType")));
+                GetParameterText(op, "DataType"),
+                TryGetParameterId(op, "ConversionMode"),
+                GetParameterText(op, "ConversionMode"),
+                TryGetParameterId(op, "Expression"),
+                GetParameterText(op, "Expression")));
         }
 
         return new ProjectVariableReferenceIndex(references);
@@ -246,7 +250,7 @@ public static class ProjectGlobalVariableFlowValidator
 
         if (reference.OperatorType is OperatorType.VariableRead or OperatorType.VariableWrite &&
             !string.IsNullOrWhiteSpace(reference.DataType) &&
-            !ProjectGlobalVariableTypeCompatibility.IsCompatibleWithVariableOperatorDataType(variable.ValueType, reference.DataType))
+            !ProjectVariableValueTransform.IsCompatibleWithVariableOperatorDataType(variable.ValueType, reference.DataType, reference.ConversionMode))
         {
             diagnostics.Add(new ProjectGlobalVariableDiagnostic(
                 "GV028",
@@ -254,6 +258,26 @@ public static class ProjectGlobalVariableFlowValidator
                 variable.Id,
                 reference.OperatorId,
                 ParameterId: reference.DataTypeParameterId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(reference.Expression))
+        {
+            var sampleVariables = variablesByName.Values
+                .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+                .ToDictionary(
+                    item => item.Name,
+                    item => (object?)(item.ValueType == ProjectGlobalVariableValueType.Boolean ? true : 1.25d),
+                    StringComparer.OrdinalIgnoreCase);
+            sampleVariables["value"] = 1.25d;
+            if (!ProjectVariableExpressionEvaluator.TryEvaluate(reference.Expression, sampleVariables, out _, out var expressionError))
+            {
+                diagnostics.Add(new ProjectGlobalVariableDiagnostic(
+                    "GV033",
+                    $"{reference.OperatorType} expression is invalid: {expressionError}",
+                    variable.Id,
+                    reference.OperatorId,
+                    ParameterId: reference.ExpressionParameterId));
+            }
         }
     }
 
@@ -375,7 +399,17 @@ public sealed record ProjectVariableOperatorReference(
     Guid? VariableNameParameterId,
     string? VariableName,
     Guid? DataTypeParameterId,
-    string? DataType);
+    string? DataType,
+    Guid? ConversionModeParameterId,
+    string? ConversionModeText,
+    Guid? ExpressionParameterId,
+    string? Expression)
+{
+    public ProjectVariableConversionMode ConversionMode =>
+        Enum.TryParse<ProjectVariableConversionMode>(ConversionModeText, ignoreCase: true, out var mode)
+            ? mode
+            : ProjectVariableConversionMode.Exact;
+}
 
 public sealed record ProjectVariableFlowEdge(
     Guid SourceOperatorId,

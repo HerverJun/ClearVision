@@ -239,6 +239,53 @@ public class RuntimeMvpTests
     }
 
     [Fact]
+    public async Task RuntimeHost_ProjectVariables_ShouldPersistManualWritesAcrossHostReloads()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var stateRoot = Path.Combine(root, "state");
+            var variableId = Guid.NewGuid();
+            var project = CreateProjectDto("station-global-variable-persist");
+            project.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 4L, manualWriteAllowed: true);
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await using (var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                projectVariableStateStore: new JsonFileProjectVariableStateStore(stateRoot)))
+            {
+                await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+                await runtimeHost.SetProjectVariableValueAsync(variableId, 9L);
+            }
+
+            await using var reloadedHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                projectVariableStateStore: new JsonFileProjectVariableStateStore(stateRoot));
+
+            await reloadedHost.LoadPackageAsync(export.PackageRootPath);
+
+            reloadedHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
+                snapshot.VariableId == variableId &&
+                Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 9L);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task RuntimeHost_ProjectVariables_ShouldRejectStationEditAndResetWhileRunning()
     {
         var root = CreateTempDirectory();

@@ -214,6 +214,7 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddSingleton<IImageCacheRepository>(sp => sp.GetRequiredService<LruImageCacheRepository>());
         services.AddHostedService(sp => sp.GetRequiredService<LruImageCacheRepository>());
         services.AddSingleton<IProjectFlowStorage, JsonFileProjectFlowStorage>();
+        services.AddSingleton<IProjectVariableStateStore, JsonFileProjectVariableStateStore>();
 
         services.AddSingleton<InspectionResultBackgroundService>();
         services.AddHostedService(sp => sp.GetRequiredService<InspectionResultBackgroundService>());

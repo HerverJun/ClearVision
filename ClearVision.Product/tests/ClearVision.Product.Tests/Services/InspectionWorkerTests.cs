@@ -827,6 +827,7 @@ public class InspectionWorkerTests
                 imageAcquisition,
                 null,
                 null,
+                null,
                 cancellationToken
         })!;
         return await task;
@@ -865,6 +866,7 @@ public class InspectionWorkerTests
                 imageAcquisition,
                 resultChannelWriter,
                 configurationService,
+                null,
                 null,
                 null,
                 cancellationToken

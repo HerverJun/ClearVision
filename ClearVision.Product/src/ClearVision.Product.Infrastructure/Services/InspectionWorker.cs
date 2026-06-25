@@ -404,6 +404,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     imageAcquisition,
                     resultChannelWriter,
                     configurationService,
+                    projectVariableSessions,
                     projectVariableSession,
                     projectVariableBindingIndex,
                     ct);
@@ -449,6 +450,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         IImageAcquisitionService imageAcquisition,
         IInspectionResultChannelWriter resultChannelWriter,
         IConfigurationService? configurationService,
+        ProjectVariableSessionRegistry? projectVariableSessions,
         IProjectVariableSession? projectVariableSession,
         ProjectVariableBindingIndex? projectVariableBindingIndex,
         CancellationToken ct)
@@ -510,11 +512,12 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         blockingSoftwareTriggerExecution,
                         flowExecution,
                         imageAcquisition,
-                        resultChannelWriter,
-                        configurationService,
-                        projectVariableSession,
-                        projectVariableBindingIndex,
-                        ct);
+                    resultChannelWriter,
+                    configurationService,
+                    projectVariableSessions,
+                    projectVariableSession,
+                    projectVariableBindingIndex,
+                    ct);
                     return;
                 }
 
@@ -536,6 +539,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                         streamCoordinator,
                         flowExecution,
                         imageAcquisition,
+                        projectVariableSessions,
                         projectVariableSession,
                         projectVariableBindingIndex,
                         ct);
@@ -916,6 +920,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         ICameraFrameStreamCoordinator? streamCoordinator,
         IFlowExecutionService flowExecution,
         IImageAcquisitionService imageAcquisition,
+        ProjectVariableSessionRegistry? projectVariableSessions,
         IProjectVariableSession? projectVariableSession,
         ProjectVariableBindingIndex? projectVariableBindingIndex,
         CancellationToken ct)
@@ -985,6 +990,14 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     inputData,
                     new ProjectVariableExecutionContext(projectVariableSession, projectVariableBindingIndex, Guid.NewGuid()),
                     cancellationToken: ct);
+            if (projectVariableSessions != null &&
+                projectVariableSession != null &&
+                flowResult.IsSuccess &&
+                !flowResult.WasShortCircuited)
+            {
+                projectVariableSessions.Save(projectId, projectVariableSession);
+            }
+
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;
 

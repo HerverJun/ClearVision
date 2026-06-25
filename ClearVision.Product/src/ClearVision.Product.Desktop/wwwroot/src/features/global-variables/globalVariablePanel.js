@@ -892,7 +892,9 @@ export default class GlobalVariablePanel {
             operatorId: output.operatorId,
             outputPortId: output.outputPortId,
             operatorName: output.operatorName,
-            outputPortName: output.outputPortName
+            outputPortName: output.outputPortName,
+            conversionMode: 'Exact',
+            expression: ''
         });
         this.updateDirtyState();
         this.render();

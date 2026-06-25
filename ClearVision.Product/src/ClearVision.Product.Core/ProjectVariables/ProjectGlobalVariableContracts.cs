@@ -23,6 +23,15 @@ public enum ProjectVariableUpdatedBy
     Reset = 6
 }
 
+public enum ProjectVariableConversionMode
+{
+    Exact = 0,
+    Round = 1,
+    Floor = 2,
+    Ceiling = 3,
+    Truncate = 4
+}
+
 [JsonConverter(typeof(ProjectGlobalVariableDefinitionJsonConverter))]
 public sealed class ProjectGlobalVariableDefinition
 {
@@ -89,6 +98,10 @@ public sealed class ProjectGlobalVariableSourceBinding
     public string OperatorName { get; set; } = string.Empty;
 
     public string OutputPortName { get; set; } = string.Empty;
+
+    public ProjectVariableConversionMode ConversionMode { get; set; } = ProjectVariableConversionMode.Exact;
+
+    public string? Expression { get; set; }
 }
 
 public sealed class ProjectGlobalVariableTargetBinding
@@ -104,6 +117,10 @@ public sealed class ProjectGlobalVariableTargetBinding
     public string OperatorName { get; set; } = string.Empty;
 
     public string ParameterName { get; set; } = string.Empty;
+
+    public ProjectVariableConversionMode ConversionMode { get; set; } = ProjectVariableConversionMode.Exact;
+
+    public string? Expression { get; set; }
 }
 
 public sealed class ProjectGlobalVariableSchema

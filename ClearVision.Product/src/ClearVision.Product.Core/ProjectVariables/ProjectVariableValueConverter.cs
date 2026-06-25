@@ -88,17 +88,33 @@ public static class ProjectVariableValueConverter
 
     public static object? ToObject(JsonElement value)
     {
-        return value.ValueKind switch
+        switch (value.ValueKind)
         {
-            JsonValueKind.String => value.GetString(),
-            JsonValueKind.Number => value.TryGetInt64(out var longValue)
-                ? longValue
-                : value.GetDouble(),
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.Null or JsonValueKind.Undefined => null,
-            _ => value.GetRawText()
-        };
+            case JsonValueKind.String:
+                return value.GetString();
+            case JsonValueKind.Number:
+                if (value.TryGetInt64(out var longValue))
+                {
+                    return longValue;
+                }
+
+                var raw = value.GetRawText();
+                if (long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rawLongValue))
+                {
+                    return rawLongValue;
+                }
+
+                return value.GetDouble();
+            case JsonValueKind.True:
+                return true;
+            case JsonValueKind.False:
+                return false;
+            case JsonValueKind.Null:
+            case JsonValueKind.Undefined:
+                return null;
+            default:
+                return value.GetRawText();
+        }
     }
 
     public static string ToStableJson(ProjectGlobalVariableSchema schema)
