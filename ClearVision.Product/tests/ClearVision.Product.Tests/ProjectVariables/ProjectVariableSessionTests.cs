@@ -362,6 +362,41 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_Load_WhenInterruptedCommitSchemaMismatches_ShouldDiscardTemp()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableTempSchemaMismatch", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var oldSchema = CreateSchema(variableId, 1);
+            var requestedSchema = CreateSchema(variableId, 2);
+            var store = new JsonFileProjectVariableStateStore(root);
+            store.Save(
+                scopeId,
+                oldSchema,
+                [new ProjectVariableValueSnapshot(variableId, JsonSerializer.SerializeToElement(42L), 1, DateTimeOffset.UtcNow, ProjectVariableUpdatedBy.StudioManual, null, null)]);
+            var filePath = Directory.EnumerateFiles(root, "*.json").Single(path => !path.EndsWith(".last-good.json", StringComparison.Ordinal));
+            var tempPath = filePath + ".tmp";
+            File.Move(filePath, tempPath);
+
+            var restartedStore = new JsonFileProjectVariableStateStore(root);
+            var snapshots = restartedStore.Load(scopeId, requestedSchema);
+
+            snapshots.Should().BeEmpty();
+            File.Exists(filePath).Should().BeFalse();
+            File.Exists(tempPath).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void JsonFileStateStore_Load_WhenMainAndTempExist_ShouldKeepCommittedFileAndDeleteTemp()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableTempDiscard", Guid.NewGuid().ToString("N"));

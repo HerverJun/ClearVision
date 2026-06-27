@@ -60,7 +60,8 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         try
         {
             var filePath = GetFilePath(scopeId);
-            RecoverInterruptedSave(scopeId, filePath);
+            var expectedSchemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema);
+            RecoverInterruptedSave(scopeId, filePath, expectedSchemaHash);
             if (!_fileSystem.FileExists(filePath))
             {
                 var legacyFilePath = GetLegacyFilePath(scopeId);
@@ -101,7 +102,6 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
                 throw new InvalidDataException($"Project variable state JSON is corrupt and no valid last-good copy exists. ScopeId={scopeId}");
             }
 
-            var expectedSchemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema);
             if (!string.Equals(state.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
             {
                 var lastGoodPath = GetLastGoodPath(scopeId);
@@ -230,7 +230,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         return legacyFilePath == null ? null : legacyFilePath + ".tmp";
     }
 
-    private void RecoverInterruptedSave(string scopeId, string filePath)
+    private void RecoverInterruptedSave(string scopeId, string filePath, string expectedSchemaHash)
     {
         var tempPath = GetTempPath(scopeId);
         if (!_fileSystem.FileExists(tempPath))
@@ -245,7 +245,8 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         }
 
         var tempJson = _fileSystem.ReadAllText(tempPath, Encoding.UTF8);
-        if (!TryDeserialize(tempJson, out _))
+        if (!TryDeserialize(tempJson, out var tempState) ||
+            !string.Equals(tempState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
         {
             _fileSystem.DeleteFile(tempPath);
             return;
