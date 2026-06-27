@@ -28,6 +28,11 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
     {
     }
 
+    public JsonFileProjectVariableStateStore(string basePath, string? legacyBasePath)
+        : this(basePath, legacyBasePath, PhysicalProjectVariableStateFileSystem.Instance)
+    {
+    }
+
     public JsonFileProjectVariableStateStore(string basePath, IProjectVariableStateFileSystem fileSystem)
         : this(basePath, null, fileSystem)
     {
@@ -64,39 +69,23 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             RecoverInterruptedSave(scopeId, filePath, expectedSchemaHash);
             if (!_fileSystem.FileExists(filePath))
             {
-                var legacyFilePath = GetLegacyFilePath(scopeId);
-                if (legacyFilePath != null && _fileSystem.FileExists(legacyFilePath))
-                {
-                    var legacyJson = _fileSystem.ReadAllText(legacyFilePath, Encoding.UTF8);
-                    if (TryDeserialize(legacyJson, out var legacyState))
-                    {
-                        _fileSystem.CreateDirectory(_basePath);
-                        _fileSystem.Copy(legacyFilePath, filePath, overwrite: true);
-                        var legacyLastGoodPath = GetLegacyLastGoodPath(scopeId);
-                        if (legacyLastGoodPath != null && _fileSystem.FileExists(legacyLastGoodPath))
-                        {
-                            _fileSystem.Copy(legacyLastGoodPath, GetLastGoodPath(scopeId), overwrite: true);
-                        }
-
-                        return ToSnapshots(legacyState);
-                    }
-                }
-
-                return [];
+                return TryLoadLegacyState(scopeId, expectedSchemaHash, out var legacySnapshots)
+                    ? legacySnapshots
+                    : [];
             }
 
             var json = _fileSystem.ReadAllText(filePath, Encoding.UTF8);
             if (!TryDeserialize(json, out var state))
             {
                 _fileSystem.Copy(filePath, filePath + ".corrupt", overwrite: true);
-                var lastGoodPath = GetLastGoodPath(scopeId);
-                if (_fileSystem.FileExists(lastGoodPath))
+                if (TryLoadMatchingLastGood(scopeId, expectedSchemaHash, out var lastGoodSnapshots))
                 {
-                    var lastGood = _fileSystem.ReadAllText(lastGoodPath, Encoding.UTF8);
-                    if (TryDeserialize(lastGood, out state))
-                    {
-                        return ToSnapshots(state);
-                    }
+                    return lastGoodSnapshots;
+                }
+
+                if (TryLoadLegacyState(scopeId, expectedSchemaHash, out var legacySnapshots))
+                {
+                    return legacySnapshots;
                 }
 
                 throw new InvalidDataException($"Project variable state JSON is corrupt and no valid last-good copy exists. ScopeId={scopeId}");
@@ -104,15 +93,14 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
             if (!string.Equals(state.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
             {
-                var lastGoodPath = GetLastGoodPath(scopeId);
-                if (_fileSystem.FileExists(lastGoodPath))
+                if (TryLoadMatchingLastGood(scopeId, expectedSchemaHash, out var lastGoodSnapshots))
                 {
-                    var lastGoodJson = _fileSystem.ReadAllText(lastGoodPath, Encoding.UTF8);
-                    if (TryDeserialize(lastGoodJson, out var lastGoodState) &&
-                        string.Equals(lastGoodState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
-                    {
-                        return ToSnapshots(lastGoodState);
-                    }
+                    return lastGoodSnapshots;
+                }
+
+                if (TryLoadLegacyState(scopeId, expectedSchemaHash, out var legacySnapshots))
+                {
+                    return legacySnapshots;
                 }
             }
 
@@ -228,6 +216,71 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
     {
         var legacyFilePath = GetLegacyFilePath(scopeId);
         return legacyFilePath == null ? null : legacyFilePath + ".tmp";
+    }
+
+    private bool TryLoadMatchingLastGood(
+        string scopeId,
+        string expectedSchemaHash,
+        out IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
+    {
+        snapshots = [];
+        var lastGoodPath = GetLastGoodPath(scopeId);
+        if (!_fileSystem.FileExists(lastGoodPath))
+        {
+            return false;
+        }
+
+        var lastGoodJson = _fileSystem.ReadAllText(lastGoodPath, Encoding.UTF8);
+        if (!TryDeserialize(lastGoodJson, out var lastGoodState) ||
+            !string.Equals(lastGoodState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        snapshots = ToSnapshots(lastGoodState);
+        return true;
+    }
+
+    private bool TryLoadLegacyState(
+        string scopeId,
+        string expectedSchemaHash,
+        out IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
+    {
+        snapshots = [];
+        var legacyFilePath = GetLegacyFilePath(scopeId);
+        if (legacyFilePath == null || !_fileSystem.FileExists(legacyFilePath))
+        {
+            return false;
+        }
+
+        var legacyJson = _fileSystem.ReadAllText(legacyFilePath, Encoding.UTF8);
+        if (!TryDeserialize(legacyJson, out var legacyState) ||
+            !string.Equals(legacyState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        _fileSystem.CreateDirectory(_basePath);
+        _fileSystem.Copy(legacyFilePath, GetFilePath(scopeId), overwrite: true);
+        TryCopyMatchingLegacyLastGood(scopeId, expectedSchemaHash);
+        snapshots = ToSnapshots(legacyState);
+        return true;
+    }
+
+    private void TryCopyMatchingLegacyLastGood(string scopeId, string expectedSchemaHash)
+    {
+        var legacyLastGoodPath = GetLegacyLastGoodPath(scopeId);
+        if (legacyLastGoodPath == null || !_fileSystem.FileExists(legacyLastGoodPath))
+        {
+            return;
+        }
+
+        var legacyLastGoodJson = _fileSystem.ReadAllText(legacyLastGoodPath, Encoding.UTF8);
+        if (TryDeserialize(legacyLastGoodJson, out var legacyLastGoodState) &&
+            string.Equals(legacyLastGoodState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
+        {
+            _fileSystem.Copy(legacyLastGoodPath, GetLastGoodPath(scopeId), overwrite: true);
+        }
     }
 
     private void RecoverInterruptedSave(string scopeId, string filePath, string expectedSchemaHash)

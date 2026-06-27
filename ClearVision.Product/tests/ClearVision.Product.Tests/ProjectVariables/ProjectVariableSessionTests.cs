@@ -466,6 +466,71 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_Load_WhenCurrentSchemaMismatchesAndLegacyMatches_ShouldMigrateLegacyBySchemaHash()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableLegacySchemaHash", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var currentRoot = Path.Combine(root, "current");
+            var legacyRoot = Path.Combine(root, "legacy");
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var currentSchema = CreateSchema(variableId, 1);
+            var requestedSchema = CreateSchema(variableId, 2);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(currentRoot), scopeId, currentSchema, variableId, 11L, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, requestedSchema, variableId, 22L, 2);
+
+            var store = new JsonFileProjectVariableStateStore(currentRoot, legacyRoot);
+
+            LoadLongAndVersion(store, scopeId, requestedSchema, variableId).Should().Be((22L, 2L));
+            LoadLongAndVersion(new JsonFileProjectVariableStateStore(currentRoot), scopeId, requestedSchema, variableId)
+                .Should()
+                .Be((22L, 2L));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenCurrentIsCorruptAndLegacyMatches_ShouldMigrateLegacy()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableLegacyCorruptCurrent", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var currentRoot = Path.Combine(root, "current");
+            var legacyRoot = Path.Combine(root, "legacy");
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(currentRoot), scopeId, schema, variableId, 11L, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, schema, variableId, 33L, 3);
+            var currentFilePath = Directory.EnumerateFiles(currentRoot, "*.json")
+                .Single(path => !path.EndsWith(".last-good.json", StringComparison.Ordinal));
+            File.WriteAllText(currentFilePath, "{not-json", Encoding.UTF8);
+
+            var store = new JsonFileProjectVariableStateStore(currentRoot, legacyRoot);
+
+            LoadLong(store, scopeId, schema, variableId).Should().Be(33L);
+            File.Exists(currentFilePath + ".corrupt").Should().BeTrue();
+            LoadLongAndVersion(new JsonFileProjectVariableStateStore(currentRoot), scopeId, schema, variableId)
+                .Should()
+                .Be((33L, 3L));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void JsonFileStateStore_Save_WhenWriteTempFails_ShouldKeepCommittedFile()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableWriteFailure", Guid.NewGuid().ToString("N"));
@@ -618,9 +683,18 @@ public sealed class ProjectVariableSessionTests
         ProjectGlobalVariableSchema schema,
         Guid variableId)
     {
+        return LoadLongAndVersion(store, scopeId, schema, variableId).Value;
+    }
+
+    private static (long Value, long Version) LoadLongAndVersion(
+        IProjectVariableStateStore store,
+        string scopeId,
+        ProjectGlobalVariableSchema schema,
+        Guid variableId)
+    {
         using var session = new ProjectVariableSession(schema, store.Load(scopeId, schema));
         session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
-        return Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value));
+        return (Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)), snapshot.Version);
     }
 
     private sealed class RecordingStateStore : IProjectVariableStateStore
