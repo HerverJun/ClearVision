@@ -128,6 +128,34 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
+    public async Task ProjectGlobalVariableEndpoints_WhenResetAllSucceeds_ShouldAdvanceVersion()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+        var session = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
+        session.TryGetSnapshot(variableId, out var initial).Should().BeTrue();
+        initial.Version.Should().Be(0);
+
+        using var write = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
+            new { value = 8L, expectedVersion = initial.Version });
+        write.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetSnapshot(variableId, out var written).Should().BeTrue();
+        written.Version.Should().Be(1);
+
+        using var resetAll = await host.Client.PostAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/reset",
+            new { expectedVersions = new Dictionary<Guid, long> { [variableId] = written.Version } });
+
+        resetAll.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetSnapshot(variableId, out var reset).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(reset.Value).Should().Be(1L);
+        reset.Version.Should().Be(2);
+        reset.UpdatedBy.Should().Be(ProjectVariableUpdatedBy.Reset);
+    }
+
+    [Fact]
     public async Task ProjectGlobalVariableEndpoints_ShouldRejectInvalidSchemaAndKeepOldSession()
     {
         var variableId = Guid.NewGuid();

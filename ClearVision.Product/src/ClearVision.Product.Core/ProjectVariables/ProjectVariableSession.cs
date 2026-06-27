@@ -389,14 +389,17 @@ public sealed class ProjectVariableSession : IProjectVariableSession
                 }
 
                 ValidateRange(definition, converted);
-                _states[definition.Id] = new ProjectVariableState(
-                    definition.Id,
-                    converted,
-                    0,
-                    DateTimeOffset.UtcNow,
-                    updatedBy,
-                    null,
-                    null);
+                _states[definition.Id] = _states.TryGetValue(definition.Id, out var current) &&
+                    updatedBy != ProjectVariableUpdatedBy.Initial
+                        ? current.Next(converted, updatedBy, null, null)
+                        : new ProjectVariableState(
+                            definition.Id,
+                            converted,
+                            updatedBy == ProjectVariableUpdatedBy.Initial ? 0 : 1,
+                            DateTimeOffset.UtcNow,
+                            updatedBy,
+                            null,
+                            null);
             }
         }
     }
