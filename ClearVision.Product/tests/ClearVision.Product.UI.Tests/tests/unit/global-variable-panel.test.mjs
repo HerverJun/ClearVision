@@ -315,10 +315,10 @@ test('global variable panel saves edited schema, keeps id and preserves dirty dr
   projectManager.currentProject = project;
   const savedBodies = [];
   global.fetch = async (url, options = {}) => {
-    if (String(url).match(/\/projects\/[^/]+$/) && options.method === 'PUT') {
+    if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
       const body = JSON.parse(options.body);
-      savedBodies.push(body.globalVariables);
-      return jsonResponse({ ...project, ...body, globalVariables: body.globalVariables });
+      savedBodies.push(body);
+      return jsonResponse(body);
     }
     if (String(url).includes('/global-variable-values')) {
       return jsonResponse([]);
@@ -348,10 +348,11 @@ test('global variable panel saves edited schema, keeps id and preserves dirty dr
   assert.equal(savedBodies[0].variables[0].id, 'var-count');
   assert.equal(savedBodies[0].variables[0].displayName, '鐩爣鏁伴噺');
   assert.equal(savedBodies[0].variables[0].initialValue, '6');
+  assert.equal(Object.hasOwn(savedBodies[0], 'flow'), false);
   assert.equal(projectManager.currentProject.globalVariables.variables[0].displayName, '鐩爣鏁伴噺');
 
   global.fetch = async (url, options = {}) => {
-    if (String(url).match(/\/projects\/[^/]+$/) && options.method === 'PUT') {
+    if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
       return jsonResponse({ Error: 'server says no' }, 400);
     }
     return jsonResponse([]);
@@ -640,7 +641,7 @@ test('running states disable schema and value mutations and 409 refreshes values
   const project = createProject();
   let getValuesCalled = 0;
   global.fetch = async (url, options = {}) => {
-    if (String(url).match(/\/projects\/[^/]+$/) && options.method === 'PUT') {
+    if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
       return jsonResponse({ Error: 'Project is currently running.' }, 409);
     }
     if (String(url).includes('/global-variable-values')) {
@@ -867,6 +868,16 @@ async function startBrowserHarness(initialState = {}) {
     if (url.pathname.startsWith('/api/projects/')) {
       if (url.pathname.endsWith('/global-variable-values') && request.method === 'GET') {
         return state.failValues ? sendJson(response, 500, { error: 'values failed' }) : sendJson(response, 200, state.values);
+      }
+      if (url.pathname.endsWith('/global-variables') && request.method === 'PUT') {
+        const schema = await readBody(request);
+        state.savedSchemas.push(schema);
+        if (state.conflictSave) {
+          return sendJson(response, 409, { error: 'Project is currently running.' });
+        }
+        return state.failSave
+          ? sendJson(response, 500, { error: 'save failed' })
+          : sendJson(response, 200, schema);
       }
       if (/\/api\/projects\/[^/]+$/.test(url.pathname) && request.method === 'PUT') {
         const body = await readBody(request);

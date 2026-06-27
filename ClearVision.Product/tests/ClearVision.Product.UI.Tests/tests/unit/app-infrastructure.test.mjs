@@ -504,6 +504,65 @@ test('project manager includes changed global variables in aggregate save payloa
   assert.equal(getCurrentProject().globalVariables, changedSchema);
 });
 
+test('project manager global variable save uses schema endpoint without flow payload', async (t) => {
+  const originalPut = httpClient.put;
+  const previousDocument = globalThis.document;
+  const project = {
+    id: 'project-schema-only',
+    name: 'Schema Only',
+    description: '',
+    flow: { operators: [{ id: 'node-1' }], connections: [] },
+    globalVariables: {
+      schemaVersion: '1.0',
+      variables: [{ id: 'var-count', name: 'judge.count', valueType: 'Int64', initialValue: '1' }],
+      sourceBindings: [],
+      targetBindings: []
+    }
+  };
+  const changedSchema = {
+    ...project.globalVariables,
+    targetBindings: [{ id: 'bind-target', variableId: 'var-count', operatorId: 'op-1', parameterId: 'p-1' }]
+  };
+  const puts = [];
+
+  t.after(() => {
+    httpClient.put = originalPut;
+    projectManager.currentProject = null;
+    projectManager.savedGlobalVariablesSignature = '';
+    setCurrentProject(null);
+    if (previousDocument === undefined) {
+      delete globalThis.document;
+    } else {
+      globalThis.document = previousDocument;
+    }
+  });
+
+  globalThis.document = {
+    title: '',
+    getElementById() {
+      return null;
+    }
+  };
+  projectManager.currentProject = project;
+  projectManager.rememberGlobalVariableBaseline(project);
+  setCurrentProject(project);
+  httpClient.put = async (url, body) => {
+    puts.push({ url, body });
+    return body;
+  };
+
+  const saved = await projectManager.saveGlobalVariables(changedSchema);
+
+  assert.equal(puts.length, 1);
+  assert.equal(puts[0].url, '/projects/project-schema-only/global-variables');
+  assert.equal(Object.hasOwn(puts[0].body, 'flow'), false);
+  assert.equal(puts[0].body.variables[0].id, 'var-count');
+  assert.equal(puts[0].body.targetBindings[0].id, 'bind-target');
+  assert.equal(saved.targetBindings[0].id, 'bind-target');
+  assert.equal(getCurrentProject().flow, project.flow);
+  assert.equal(getCurrentProject().globalVariables.targetBindings[0].id, 'bind-target');
+});
+
 test('project manager close waits for confirmed save before clearing current project', async (t) => {
   const originalPut = httpClient.put;
   const previousDocument = globalThis.document;

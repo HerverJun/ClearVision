@@ -5,6 +5,7 @@
 
 import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
+import { saveGlobalVariableSchema } from '../global-variables/globalVariableStore.js';
 
 // 宸ョ▼鐘舵€?
 const [getCurrentProject, setCurrentProject, subscribeProject] = createSignal(null);
@@ -361,17 +362,9 @@ class ProjectManager {
             sourceBindings: [],
             targetBindings: []
         };
-        const savedProject = await httpClient.put(`/projects/${this.currentProject.id}`, {
-            name: this.currentProject.name,
-            description: this.currentProject.description,
-            flow: this.currentProject.flow || this.currentProject.Flow || null,
-            globalVariables: schema
-        });
-        const saved = savedProject.globalVariables || savedProject.GlobalVariables || schema;
+        const saved = await saveGlobalVariableSchema(this.currentProject.id, schema);
         this.currentProject = {
             ...this.currentProject,
-            ...savedProject,
-            flow: savedProject.flow || this.currentProject.flow,
             globalVariables: saved
         };
         this.rememberGlobalVariableBaseline(this.currentProject);
