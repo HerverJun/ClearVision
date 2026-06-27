@@ -530,6 +530,33 @@ public sealed class ProjectGlobalVariableSchemaTests
     }
 
     [Fact]
+    public void ExpressionEvaluator_WhenDoubleFunctionWouldLoseLargeInt64Precision_ShouldReject()
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            "sqrt(9007199254740993)",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out _,
+            out var error);
+
+        ok.Should().BeFalse();
+        error.Should().StartWith("GV038");
+        error.Should().Contain("precision loss");
+    }
+
+    [Fact]
+    public void ExpressionEvaluator_WhenDoubleFunctionUsesExactlyRepresentableInteger_ShouldEvaluate()
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            "sqrt(144)",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out var value,
+            out var error);
+
+        ok.Should().BeTrue(error);
+        value.Should().Be(12d);
+    }
+
+    [Fact]
     public void ExpressionEvaluator_WhenInt64ArithmeticOverflows_ShouldReject()
     {
         var ok = ProjectVariableExpressionEvaluator.TryEvaluate(

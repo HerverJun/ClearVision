@@ -82,6 +82,7 @@ public static class ProjectVariableExpressionEvaluator
             InvalidOperationException when
                 message.Contains("must be finite", StringComparison.OrdinalIgnoreCase) ||
                 message.Contains("not numeric", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("precision", StringComparison.OrdinalIgnoreCase) ||
                 message.Contains("requires numeric", StringComparison.OrdinalIgnoreCase) => "GV038",
             _ => "GV034"
         };
@@ -665,17 +666,51 @@ public static class ProjectVariableExpressionEvaluator
             {
                 double doubleValue => doubleValue,
                 float floatValue => floatValue,
-                decimal decimalValue => (double)decimalValue,
-                long longValue => longValue,
+                decimal decimalValue => ToExactDouble(decimalValue),
+                long longValue => ToExactDouble(longValue),
                 int intValue => intValue,
                 short shortValue => shortValue,
                 byte byteValue => byteValue,
                 bool boolValue => boolValue ? 1.0d : 0.0d,
+                string text when decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue) =>
+                    ToExactDouble(decimalValue),
                 string text when double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
                 _ => throw new InvalidOperationException($"Value type '{value.GetType().Name}' is not numeric.")
             };
 
             return EnsureFinite(result);
+        }
+
+        private static double ToExactDouble(long value)
+        {
+            var result = (double)value;
+            if ((decimal)result != value)
+            {
+                throw new InvalidOperationException($"Int64 value '{value}' cannot be converted to Double without precision loss.");
+            }
+
+            return result;
+        }
+
+        private static double ToExactDouble(decimal value)
+        {
+            var result = (double)value;
+            try
+            {
+                if (Convert.ToDecimal(result, CultureInfo.InvariantCulture) != value)
+                {
+                    throw new InvalidOperationException(
+                        $"Decimal value '{value.ToString(CultureInfo.InvariantCulture)}' cannot be converted to Double without precision loss.");
+                }
+            }
+            catch (OverflowException ex)
+            {
+                throw new InvalidOperationException(
+                    $"Decimal value '{value.ToString(CultureInfo.InvariantCulture)}' cannot be converted to Double without range loss.",
+                    ex);
+            }
+
+            return result;
         }
 
         private static double EnsureFinite(double value)
