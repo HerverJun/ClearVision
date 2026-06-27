@@ -455,6 +455,43 @@ public sealed class ProjectVariableSessionTests
             session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
             ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(3L);
             snapshot.Version.Should().Be(1);
+            LoadLongAndVersion(new JsonFileProjectVariableStateStore(root), scopeId, newSchema, variableId)
+                .Should()
+                .Be((9L, 2L));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenCurrentIsCorruptAndLastGoodMatches_ShouldRestoreCommittedFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableCorruptRestore", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            var store = new JsonFileProjectVariableStateStore(root);
+            SaveSnapshot(store, scopeId, schema, variableId, 3L, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 9L, 2);
+            var filePath = GetCommittedStateFilePath(root);
+            var lastGoodPath = GetLastGoodStateFilePath(filePath);
+            File.Exists(lastGoodPath).Should().BeTrue();
+            File.WriteAllText(filePath, "{not-json", Encoding.UTF8);
+
+            LoadLongAndVersion(store, scopeId, schema, variableId).Should().Be((3L, 1L));
+
+            File.Exists(filePath + ".corrupt").Should().BeTrue();
+            File.Delete(lastGoodPath);
+            LoadLongAndVersion(new JsonFileProjectVariableStateStore(root), scopeId, schema, variableId)
+                .Should()
+                .Be((3L, 1L));
         }
         finally
         {
@@ -802,6 +839,13 @@ public sealed class ProjectVariableSessionTests
     {
         return Directory.EnumerateFiles(root, "*.json")
             .Single(path => !path.EndsWith(".last-good.json", StringComparison.Ordinal));
+    }
+
+    private static string GetLastGoodStateFilePath(string committedFilePath)
+    {
+        return Path.Combine(
+            Path.GetDirectoryName(committedFilePath)!,
+            $"{Path.GetFileNameWithoutExtension(committedFilePath)}.last-good.json");
     }
 
     private static void WriteRecoveryArtifacts(string filePath)

@@ -78,7 +78,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             if (!TryDeserialize(json, out var state))
             {
                 _fileSystem.Copy(filePath, GetCorruptPath(scopeId), overwrite: true);
-                if (TryLoadMatchingLastGood(scopeId, expectedSchemaHash, out var lastGoodSnapshots))
+                if (TryLoadMatchingLastGood(scopeId, expectedSchemaHash, restoreCommittedFile: true, out var lastGoodSnapshots))
                 {
                     return lastGoodSnapshots;
                 }
@@ -93,7 +93,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
             if (!string.Equals(state.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
             {
-                if (TryLoadMatchingLastGood(scopeId, expectedSchemaHash, out var lastGoodSnapshots))
+                if (TryLoadMatchingLastGood(scopeId, expectedSchemaHash, restoreCommittedFile: false, out var lastGoodSnapshots))
                 {
                     return lastGoodSnapshots;
                 }
@@ -251,6 +251,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
     private bool TryLoadMatchingLastGood(
         string scopeId,
         string expectedSchemaHash,
+        bool restoreCommittedFile,
         out IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
     {
         snapshots = [];
@@ -268,6 +269,11 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         }
 
         snapshots = ToSnapshots(lastGoodState);
+        if (restoreCommittedFile)
+        {
+            _fileSystem.Copy(lastGoodPath, GetFilePath(scopeId), overwrite: true);
+        }
+
         return true;
     }
 
