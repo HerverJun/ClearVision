@@ -190,6 +190,32 @@ public sealed class ProjectGlobalVariableEndpointsTests
         ProjectVariableValueConverter.ToObject(current).Should().Be(1L);
     }
 
+    [Theory]
+    [InlineData(RuntimeStatus.Starting)]
+    [InlineData(RuntimeStatus.Running)]
+    [InlineData(RuntimeStatus.Stopping)]
+    public async Task FlowPut_WhenRuntimeBusy_ShouldRejectWithoutPartialUpdate(RuntimeStatus status)
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            status: status);
+        var oldSession = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
+        oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/flow",
+            new UpdateFlowRequest());
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("GV031");
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).Should().BeSameAs(oldSession);
+        oldSession.TryGetValue(variableId, out var current).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(current).Should().Be(9L);
+        await host.Repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
     [Fact]
     public async Task ProjectDelete_ShouldRejectWhileProjectIsRunning()
     {
