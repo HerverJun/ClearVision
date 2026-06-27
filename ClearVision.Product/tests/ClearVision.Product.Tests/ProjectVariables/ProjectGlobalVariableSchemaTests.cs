@@ -298,6 +298,60 @@ public sealed class ProjectGlobalVariableSchemaTests
     }
 
     [Fact]
+    public void Validate_WhenSourceBindingExpressionsCreateReadWriteCycle_ReturnsGv024()
+    {
+        var variableA = Guid.NewGuid();
+        var variableB = Guid.NewGuid();
+        var portA = Guid.NewGuid();
+        var portB = Guid.NewGuid();
+        var opA = new Operator(Guid.NewGuid(), "OperatorA", OperatorType.Thresholding, 0, 0);
+        opA.LoadOutputPort(portA, "OutA", PortDataType.Integer);
+        var opB = new Operator(Guid.NewGuid(), "OperatorB", OperatorType.Thresholding, 10, 0);
+        opB.LoadOutputPort(portB, "OutB", PortDataType.Integer);
+        var flow = new OperatorFlow("expression-cycle");
+        flow.AddOperator(opA);
+        flow.AddOperator(opB);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                Variable("stats.a", ProjectGlobalVariableValueType.Int64, 0, variableA),
+                Variable("stats.b", ProjectGlobalVariableValueType.Int64, 0, variableB)
+            ],
+            SourceBindings =
+            [
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableA,
+                    OperatorId = opA.Id,
+                    OutputPortId = portA,
+                    OperatorName = opA.Name,
+                    OutputPortName = "OutA",
+                    Expression = "value + stats.b"
+                },
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableB,
+                    OperatorId = opB.Id,
+                    OutputPortId = portB,
+                    OperatorName = opB.Name,
+                    OutputPortName = "OutB",
+                    Expression = "value + stats.a"
+                }
+            ]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Should().Contain(item =>
+            item.Code == "GV024" &&
+            item.Message.Contains("stats.a") &&
+            item.Message.Contains("stats.b"));
+    }
+
+    [Fact]
     public void Validate_WhenVariableIncrementReferencesNonInt64Variable_ReturnsGv027()
     {
         var variableId = Guid.NewGuid();
