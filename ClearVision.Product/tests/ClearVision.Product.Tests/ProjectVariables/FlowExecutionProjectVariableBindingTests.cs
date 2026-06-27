@@ -312,6 +312,111 @@ public sealed class FlowExecutionProjectVariableBindingTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_WhenRunIsCanceledAfterProjectVariableWrite_ShouldNotCommitWorkingCopy()
+    {
+        var variableId = Guid.NewGuid();
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        var write = CreateProjectVariableWriteOperator(variableId, 12);
+        var canceling = new Operator(Guid.NewGuid(), "CancelingPlc", OperatorType.ResultJudgment, 10, 0);
+        var flow = new OperatorFlow("write-cancel-rollback");
+        flow.AddOperator(write);
+        flow.AddOperator(canceling);
+        var schema = CreateSingleInt64Schema(variableId, 1L);
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var commitCalls = 0;
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            commitHandler: (_, _) =>
+            {
+                commitCalls++;
+                return ProjectVariableCommitResult.Success();
+            });
+        using var cancellation = new CancellationTokenSource();
+        var cancelingExecutor = Substitute.For<IOperatorExecutor>();
+        cancelingExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
+        cancelingExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        cancelingExecutor.ExecuteAsync(canceling, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                cancellation.Cancel();
+                return Task.FromResult(OperatorExecutionOutput.Success(new Dictionary<string, object>()));
+            });
+        using var service = new FlowExecutionService(
+            [
+                new VariableWriteOperator(
+                    NullLogger<VariableWriteOperator>.Instance,
+                    new VariableContext(),
+                    accessor),
+                cancelingExecutor
+            ],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            accessor);
+
+        var result = await service.ExecuteFlowAsync(flow, null, context, cancellationToken: cancellation.Token);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Be("Flow was canceled.");
+        commitCalls.Should().Be(0);
+        session.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(4L);
+        formal.Version.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ExecuteFlowAsync_WhenRunShortCircuitsAfterProjectVariableWrite_ShouldNotCommitWorkingCopy()
+    {
+        var variableId = Guid.NewGuid();
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        var write = CreateProjectVariableWriteOperator(variableId, 12);
+        var shortCircuit = new Operator(Guid.NewGuid(), "ShortCircuitTrigger", OperatorType.FrameChangeTrigger, 10, 0);
+        var flow = new OperatorFlow("write-short-circuit-rollback");
+        flow.AddOperator(write);
+        flow.AddOperator(shortCircuit);
+        var schema = CreateSingleInt64Schema(variableId, 1L);
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var commitCalls = 0;
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            commitHandler: (_, _) =>
+            {
+                commitCalls++;
+                return ProjectVariableCommitResult.Success();
+            });
+        var shortCircuitExecutor = Substitute.For<IOperatorExecutor>();
+        shortCircuitExecutor.OperatorType.Returns(OperatorType.FrameChangeTrigger);
+        shortCircuitExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
+        shortCircuitExecutor.ExecuteAsync(shortCircuit, Arg.Any<Dictionary<string, object>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(OperatorExecutionOutput.ShortCircuit(new Dictionary<string, object>())));
+        using var service = new FlowExecutionService(
+            [
+                new VariableWriteOperator(
+                    NullLogger<VariableWriteOperator>.Instance,
+                    new VariableContext(),
+                    accessor),
+                shortCircuitExecutor
+            ],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            accessor);
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.WasShortCircuited.Should().BeTrue();
+        commitCalls.Should().Be(0);
+        session.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(4L);
+        formal.Version.Should().Be(1);
+    }
+
+    [Fact]
     public async Task ExecuteFlowAsync_WhenAuthorityChangesBeforeCommit_ShouldRejectStaleTransaction()
     {
         var variableId = Guid.NewGuid();
