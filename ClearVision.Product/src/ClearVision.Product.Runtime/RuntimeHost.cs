@@ -123,6 +123,15 @@ public sealed class RuntimeHost : IAsyncDisposable
         object? value,
         CancellationToken cancellationToken = default)
     {
+        return await SetProjectVariableValueAsync(variableId, value, expectedVersion: null, cancellationToken);
+    }
+
+    public async Task<ProjectVariableValueSnapshot> SetProjectVariableValueAsync(
+        Guid variableId,
+        object? value,
+        long? expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
         await _stateGate.WaitAsync(cancellationToken);
         try
         {
@@ -139,7 +148,7 @@ public sealed class RuntimeHost : IAsyncDisposable
                 throw new RuntimePackageException($"Project global variable '{definition.Name}' does not allow manual Station writes.");
             }
 
-            var expectedVersions = CaptureProjectVariableVersions(session);
+            var expectedVersions = CaptureProjectVariableVersions(session, variableId, expectedVersion);
             using var candidate = session.CreateSnapshotClone();
             var snapshot = candidate.SetValue(variableId, value, ProjectVariableUpdatedBy.StationManual);
             var commitResult = CommitLoadedProjectVariableSessionNoLock(candidate, expectedVersions);
@@ -161,6 +170,14 @@ public sealed class RuntimeHost : IAsyncDisposable
         Guid variableId,
         CancellationToken cancellationToken = default)
     {
+        return await ResetProjectVariableAsync(variableId, expectedVersion: null, cancellationToken);
+    }
+
+    public async Task<ProjectVariableValueSnapshot> ResetProjectVariableAsync(
+        Guid variableId,
+        long? expectedVersion,
+        CancellationToken cancellationToken = default)
+    {
         await _stateGate.WaitAsync(cancellationToken);
         try
         {
@@ -177,7 +194,7 @@ public sealed class RuntimeHost : IAsyncDisposable
                 throw new RuntimePackageException($"Project global variable '{definition.Name}' does not allow manual Station resets.");
             }
 
-            var expectedVersions = CaptureProjectVariableVersions(session);
+            var expectedVersions = CaptureProjectVariableVersions(session, variableId, expectedVersion);
             using var candidate = session.CreateSnapshotClone();
             var snapshot = candidate.Reset(variableId, ProjectVariableUpdatedBy.Reset);
             var commitResult = CommitLoadedProjectVariableSessionNoLock(candidate, expectedVersions);
@@ -943,9 +960,18 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
     }
 
-    private static IReadOnlyDictionary<Guid, long> CaptureProjectVariableVersions(IProjectVariableSession session)
+    private static IReadOnlyDictionary<Guid, long> CaptureProjectVariableVersions(
+        IProjectVariableSession session,
+        Guid? callerVariableId = null,
+        long? callerExpectedVersion = null)
     {
-        return session.GetSnapshots().ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        var versions = session.GetSnapshots().ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        if (callerVariableId.HasValue && callerExpectedVersion.HasValue)
+        {
+            versions[callerVariableId.Value] = callerExpectedVersion.Value;
+        }
+
+        return versions;
     }
 
     private void PersistLoadedProjectVariableSession(IProjectVariableSession session)

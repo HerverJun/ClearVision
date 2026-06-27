@@ -801,7 +801,7 @@ public sealed class MainForm : Form
 
         try
         {
-            await _runtimeHost.SetProjectVariableValueAsync(definition.Id, typedValue);
+            await _runtimeHost.SetProjectVariableValueAsync(definition.Id, typedValue, snapshot.Version);
             RefreshProjectVariableMonitor();
             UpdateButtonStates();
         }
@@ -813,7 +813,7 @@ public sealed class MainForm : Form
 
     private async Task ResetSelectedProjectVariableAsync()
     {
-        if (!TryGetSelectedProjectVariable(out var definition, out _))
+        if (!TryGetSelectedProjectVariable(out var definition, out var snapshot))
         {
             return;
         }
@@ -836,7 +836,7 @@ public sealed class MainForm : Form
 
         try
         {
-            await _runtimeHost.ResetProjectVariableAsync(definition.Id);
+            await _runtimeHost.ResetProjectVariableAsync(definition.Id, snapshot.Version);
             RefreshProjectVariableMonitor();
             UpdateButtonStates();
         }

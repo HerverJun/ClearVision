@@ -329,6 +329,53 @@ public class RuntimeMvpTests
     }
 
     [Fact]
+    public async Task RuntimeHost_ProjectVariables_WhenStationExpectedVersionIsStale_ShouldRejectAndKeepCurrentValue()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var project = CreateProjectDto("station-global-variable-stale-version");
+            project.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 4L, manualWriteAllowed: true);
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance);
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            var initial = runtimeHost.GetProjectVariableSnapshots()
+                .Single(snapshot => snapshot.VariableId == variableId);
+            initial.Version.Should().Be(0);
+            var edited = await runtimeHost.SetProjectVariableValueAsync(variableId, 6L, initial.Version);
+            edited.Version.Should().Be(1);
+
+            var staleEdit = async () => await runtimeHost.SetProjectVariableValueAsync(variableId, 9L, initial.Version);
+            var staleReset = async () => await runtimeHost.ResetProjectVariableAsync(variableId, initial.Version);
+
+            await staleEdit.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*GV025*changed from version 0 to 1*");
+            await staleReset.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*GV025*changed from version 0 to 1*");
+            runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
+                snapshot.VariableId == variableId &&
+                Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 6L &&
+                snapshot.Version == 1);
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task RuntimeHost_ProjectVariables_ShouldRejectStationEditAndResetWhileRunning()
     {
         var root = CreateTempDirectory();
