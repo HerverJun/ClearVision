@@ -6,6 +6,7 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Events;
 using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Core.Streaming;
 using ClearVision.Product.Infrastructure.Continuous;
@@ -373,6 +374,68 @@ public class ContinuousRuntimeTests
         writer.Results[0].Status.Should().Be(InspectionStatus.OK);
     }
 
+    [Fact]
+    public async Task ContinuousInspectionWorker_Shadow_WithProjectVariables_ShouldUsePreviewContextAndNotCommit()
+    {
+        var frames = new[]
+        {
+            CreateFrame(1, new Scalar(0, 0, 0), 32),
+            CreateFrame(2, new Scalar(255, 255, 255), 32)
+        };
+        var stream = new FakeStreamCoordinator(frames);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var flow = new FakeFlowExecutionService(
+            "OK",
+            onProjectVariables: _ => cts.Cancel());
+        var writer = new CapturingResultWriter();
+        var eventBus = new CapturingEventBus();
+        var variableId = Guid.NewGuid();
+        var schema = CreateProjectVariableSchema(variableId);
+        using var session = new ProjectVariableSession(schema);
+        var commitCalls = 0;
+        ProjectVariableCommitHandler commitHandler = (_, _) =>
+        {
+            commitCalls++;
+            return ProjectVariableCommitResult.Success();
+        };
+
+        var worker = new ContinuousInspectionWorker(NullLogger.Instance);
+        await worker.RunAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new OperatorFlow("continuous-shadow-project-variables"),
+            "cam-1",
+            new ContinuousInspectionConfig
+            {
+                Mode = ContinuousInspectionMode.Shadow,
+                DetectEveryNFrames = 1,
+                MinConsensusFrames = 1,
+                ConsensusThreshold = 1,
+                PreEventFrames = 0,
+                PostEventFrames = 0,
+                SaveReplayOnNgOnly = true
+            },
+            ContinuousInspectionMode.Shadow,
+            stream,
+            flow,
+            writer,
+            NullInspectionImagePersistenceService.Instance,
+            eventBus,
+            cts.Token,
+            projectVariableSession: session,
+            projectVariableBindingIndex: ProjectVariableBindingIndex.Build(schema),
+            projectVariableCommitHandler: commitHandler);
+
+        flow.ProjectVariableContexts.Should().ContainSingle();
+        var capturedContext = flow.ProjectVariableContexts[0];
+        capturedContext.IsPreview.Should().BeTrue();
+        capturedContext.Session.Should().BeSameAs(session);
+        capturedContext.CommitHandler.Should().BeNull();
+        commitCalls.Should().Be(0);
+        writer.Results.Should().BeEmpty();
+        eventBus.Results.Should().BeEmpty();
+    }
+
     private static FrameEnvelope CreateFrame(long sequence, Scalar color, int size = 8)
     {
         using var mat = new Mat(size, size, MatType.CV_8UC3, color);
@@ -387,6 +450,25 @@ public class ContinuousRuntimeTests
             mat.ToBytes(".png"),
             TimestampSource: FrameTimestampSource.HostFallback,
             CorrelationId: $"corr-{sequence}");
+    }
+
+    private static ProjectGlobalVariableSchema CreateProjectVariableSchema(Guid variableId)
+    {
+        return new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = variableId,
+                    Name = "stats.count",
+                    DisplayName = "Count",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(1L),
+                    ManualWriteAllowed = true
+                }
+            ]
+        };
     }
 
     private static ArrivalSignal CreateSignal(long sequence, DateTimeOffset eventTimeUtc) =>
@@ -482,12 +564,18 @@ public class ContinuousRuntimeTests
     {
         private readonly string _judgment;
         private readonly byte[]? _outputImage;
+        private readonly Action<ProjectVariableExecutionContext>? _onProjectVariables;
         public List<FrameEnvelope> InputFrames { get; } = new();
+        public List<ProjectVariableExecutionContext> ProjectVariableContexts { get; } = new();
 
-        public FakeFlowExecutionService(string judgment, byte[]? outputImage = null)
+        public FakeFlowExecutionService(
+            string judgment,
+            byte[]? outputImage = null,
+            Action<ProjectVariableExecutionContext>? onProjectVariables = null)
         {
             _judgment = judgment;
             _outputImage = outputImage;
+            _onProjectVariables = onProjectVariables;
         }
 
         public Task<FlowExecutionResult> ExecuteFlowAsync(OperatorFlow flow, Dictionary<string, object>? inputData = null, bool enableParallel = false, CancellationToken cancellationToken = default)
@@ -509,6 +597,18 @@ public class ContinuousRuntimeTests
                         ["Image"] = _outputImage
                     }
             });
+        }
+
+        public Task<FlowExecutionResult> ExecuteFlowAsync(
+            OperatorFlow flow,
+            Dictionary<string, object>? inputData,
+            ProjectVariableExecutionContext projectVariables,
+            bool enableParallel = false,
+            CancellationToken cancellationToken = default)
+        {
+            ProjectVariableContexts.Add(projectVariables);
+            _onProjectVariables?.Invoke(projectVariables);
+            return ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
         }
 
         public Task<OperatorExecutionResult> ExecuteOperatorAsync(Operator @operator, Dictionary<string, object>? inputs = null) => throw new NotSupportedException();
