@@ -95,8 +95,16 @@ public sealed class RuntimePackageExporter
                 "缺失资源：\n• " + string.Join("\n• ", missingResources));
         }
 
-        var packageId = $"cvpkg-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..32];
         var targetRoot = RuntimePathGuard.ResolveControlledExportRoot(request.TargetRootDirectory);
+        var globalVariableValidationErrors = FindGlobalVariableValidationErrors(project.GlobalVariables, flow).ToList();
+        if (globalVariableValidationErrors.Count > 0)
+        {
+            throw new RuntimePackageException(
+                "Export blocked: project global variable validation failed.\n- " +
+                string.Join("\n- ", globalVariableValidationErrors));
+        }
+
+        var packageId = $"cvpkg-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..32];
 
         var safeProjectName = RuntimePathGuard.SanitizeFileName(project.Name, "runtime-package");
         var packageRoot = Path.Combine(targetRoot, $"{safeProjectName}-{packageId}");
@@ -106,8 +114,6 @@ public sealed class RuntimePackageExporter
 
         var packagedFlow = CloneFlow(flow);
         var bundledAssets = await BundleFlowResourcesAsync(packagedFlow, packageRoot, cancellationToken);
-        var packagedFlowEntity = packagedFlow.ToEntity();
-        ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(project.GlobalVariables, packagedFlowEntity);
         var flowBytes = JsonSerializer.SerializeToUtf8Bytes(packagedFlow, RuntimeJson.StableSerializerOptions);
         var flowHash = RuntimePathGuard.ComputeSha256(flowBytes);
         var profile = new RuntimeProfile();
@@ -788,6 +794,27 @@ public sealed class RuntimePackageExporter
         }
 
         return errors;
+    }
+
+    private static IEnumerable<string> FindGlobalVariableValidationErrors(
+        ProjectGlobalVariableSchema? globalVariables,
+        OperatorFlowDto flow)
+    {
+        OperatorFlow entityFlow;
+        try
+        {
+            entityFlow = flow.ToEntity();
+        }
+        catch (Exception ex)
+        {
+            return [$"Flow: {ex.Message}"];
+        }
+
+        return ProjectGlobalVariableSchemaValidator
+            .Validate(globalVariables, entityFlow)
+            .Where(diagnostic => diagnostic.Severity == ProjectGlobalVariableDiagnosticSeverity.Error)
+            .Select(diagnostic => $"{diagnostic.Code}: {diagnostic.Message}")
+            .ToList();
     }
 
     private static IEnumerable<string> FindMissingResources(OperatorFlowDto flow)

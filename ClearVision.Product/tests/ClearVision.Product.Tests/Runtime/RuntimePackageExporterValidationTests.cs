@@ -5,6 +5,7 @@ using ClearVision.Product.Core.Cameras;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
+using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.Services;
 using ClearVision.Product.Runtime;
@@ -318,6 +319,32 @@ public class RuntimePackageExporterValidationTests
         }
     }
 
+    [Fact]
+    public async Task ExportAsync_WhenProjectGlobalVariableGraphHasCycle_ShouldRejectBeforeCreatingPackageDirectory()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var exporter = CreateExporter();
+            var project = CreateProjectWithGlobalVariableCycle("global-variable-cycle");
+
+            var act = () => exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+
+            await act.Should()
+                .ThrowAsync<RuntimePackageException>()
+                .WithMessage("*GV024*");
+            Directory.EnumerateDirectories(root).Should().BeEmpty();
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
     private static RuntimePackageExporter CreateExporter()
     {
         var cameraManager = Substitute.For<ICameraManager>();
@@ -357,6 +384,101 @@ public class RuntimePackageExporterValidationTests
         };
     }
 
+    private static ProjectDto CreateProjectWithGlobalVariableCycle(string name)
+    {
+        var variableA = Guid.NewGuid();
+        var variableB = Guid.NewGuid();
+        var portA = Guid.NewGuid();
+        var portB = Guid.NewGuid();
+        var paramA = Guid.NewGuid();
+        var paramB = Guid.NewGuid();
+        var operatorA = CreateOperatorDto("OperatorA", OperatorType.ResultJudgment,
+            CreateParameter("InA", "int", 0));
+        operatorA.Parameters[0].Id = paramA;
+        operatorA.OutputPorts.Add(CreatePort(portA, "OutA", PortDirection.Output, PortDataType.Integer));
+
+        var operatorB = CreateOperatorDto("OperatorB", OperatorType.ResultJudgment,
+            CreateParameter("InB", "int", 0));
+        operatorB.Parameters[0].Id = paramB;
+        operatorB.OutputPorts.Add(CreatePort(portB, "OutB", PortDirection.Output, PortDataType.Integer));
+
+        return new ProjectDto
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Flow = new OperatorFlowDto
+            {
+                Id = Guid.NewGuid(),
+                Name = "main",
+                Operators = [operatorA, operatorB],
+                Connections = []
+            },
+            GlobalVariables = new ProjectGlobalVariableSchema
+            {
+                Variables =
+                [
+                    CreateGlobalVariable(variableA, "stats.a"),
+                    CreateGlobalVariable(variableB, "stats.b")
+                ],
+                SourceBindings =
+                [
+                    new ProjectGlobalVariableSourceBinding
+                    {
+                        Id = Guid.NewGuid(),
+                        VariableId = variableA,
+                        OperatorId = operatorA.Id,
+                        OutputPortId = portA,
+                        OperatorName = operatorA.Name,
+                        OutputPortName = "OutA"
+                    },
+                    new ProjectGlobalVariableSourceBinding
+                    {
+                        Id = Guid.NewGuid(),
+                        VariableId = variableB,
+                        OperatorId = operatorB.Id,
+                        OutputPortId = portB,
+                        OperatorName = operatorB.Name,
+                        OutputPortName = "OutB"
+                    }
+                ],
+                TargetBindings =
+                [
+                    new ProjectGlobalVariableTargetBinding
+                    {
+                        Id = Guid.NewGuid(),
+                        VariableId = variableA,
+                        OperatorId = operatorB.Id,
+                        ParameterId = paramB,
+                        OperatorName = operatorB.Name,
+                        ParameterName = "InB"
+                    },
+                    new ProjectGlobalVariableTargetBinding
+                    {
+                        Id = Guid.NewGuid(),
+                        VariableId = variableB,
+                        OperatorId = operatorA.Id,
+                        ParameterId = paramA,
+                        OperatorName = operatorA.Name,
+                        ParameterName = "InA"
+                    }
+                ]
+            }
+        };
+    }
+
+    private static ProjectGlobalVariableDefinition CreateGlobalVariable(Guid id, string name)
+    {
+        return new ProjectGlobalVariableDefinition
+        {
+            Id = id,
+            Name = name,
+            DisplayName = name,
+            ValueType = ProjectGlobalVariableValueType.Int64,
+            InitialValue = JsonSerializer.SerializeToElement(0L),
+            ManualWriteAllowed = true
+        };
+    }
+
     private static OperatorDto CreateOperatorDto(string name, OperatorType type, params ParameterDto[] parameters)
     {
         return new OperatorDto
@@ -368,6 +490,18 @@ public class RuntimePackageExporterValidationTests
             Y = 0,
             Parameters = parameters.ToList(),
             ExecutionStatus = OperatorExecutionStatus.NotExecuted
+        };
+    }
+
+    private static PortDto CreatePort(Guid id, string name, PortDirection direction, PortDataType dataType)
+    {
+        return new PortDto
+        {
+            Id = id,
+            Name = name,
+            Direction = direction,
+            DataType = dataType,
+            IsRequired = direction == PortDirection.Input
         };
     }
 
