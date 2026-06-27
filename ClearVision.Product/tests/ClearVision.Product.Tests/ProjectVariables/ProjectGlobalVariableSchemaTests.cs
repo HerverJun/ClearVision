@@ -27,6 +27,43 @@ public sealed class ProjectGlobalVariableSchemaTests
     }
 
     [Fact]
+    public void Validate_WhenVariableIdsDuplicateWithFlowBindings_ReturnsGv003WithoutThrowing()
+    {
+        var variableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var source = new Operator(Guid.NewGuid(), "Source", OperatorType.Thresholding, 0, 0);
+        source.LoadOutputPort(sourcePortId, "Count", PortDataType.Integer);
+        var flow = new OperatorFlow("duplicate-variable-id");
+        flow.AddOperator(source);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                Variable("stats.first", ProjectGlobalVariableValueType.Int64, 4, variableId),
+                Variable("stats.second", ProjectGlobalVariableValueType.Int64, 5, variableId)
+            ],
+            SourceBindings =
+            [
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = source.Id,
+                    OutputPortId = sourcePortId,
+                    OperatorName = source.Name,
+                    OutputPortName = "Count"
+                }
+            ]
+        };
+        IReadOnlyList<ProjectGlobalVariableDiagnostic> diagnostics = [];
+
+        var act = () => diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        act.Should().NotThrow();
+        diagnostics.Should().Contain(item => item.Code == "GV003");
+    }
+
+    [Fact]
     public void Validate_WhenBindingReferencesFlowMembers_ReturnsNoErrors()
     {
         var variableId = Guid.NewGuid();
