@@ -787,7 +787,7 @@ export default class GlobalVariablePanel {
 
         return await this.runMutation('write', async () => {
             const projectId = this.project.id;
-            const values = await writeGlobalVariableValue(projectId, variable.id, coerced.value);
+            const values = await writeGlobalVariableValue(projectId, variable.id, coerced.value, this.getExpectedVersion(variable.id));
             if (this.project?.id !== projectId) {
                 return false;
             }
@@ -810,7 +810,7 @@ export default class GlobalVariablePanel {
 
         return await this.runMutation('reset-one', async () => {
             const projectId = this.project.id;
-            const values = await resetGlobalVariableValue(projectId, variable.id);
+            const values = await resetGlobalVariableValue(projectId, variable.id, this.getExpectedVersion(variable.id));
             if (this.project?.id !== projectId) {
                 return false;
             }
@@ -842,7 +842,7 @@ export default class GlobalVariablePanel {
 
         return await this.runMutation('reset-all', async () => {
             const projectId = this.project.id;
-            const values = await resetGlobalVariableValues(projectId);
+            const values = await resetGlobalVariableValues(projectId, this.getExpectedVersions());
             if (this.project?.id !== projectId) {
                 return false;
             }
@@ -972,7 +972,17 @@ export default class GlobalVariablePanel {
             }
             return result;
         } catch (error) {
-            if (this.isConflict(error)) {
+            if (this.isVersionConflict(error)) {
+                this.errorMessage = '当前变量值已被其他操作更新。正在重新获取当前值。';
+                const valuesResult = await Promise.allSettled([
+                    this.refreshValues({ requestId: this.requestSerial, render: false })
+                ]);
+                if (projectId === this.project?.id) {
+                    this.errorMessage = valuesResult[0].status === 'fulfilled'
+                        ? '当前变量值已被其他操作更新。已重新获取当前值，请确认后重试。'
+                        : '当前变量值已被其他操作更新。当前值刷新失败，请稍后重试。';
+                }
+            } else if (this.isConflict(error)) {
                 this.errorMessage = '工程正在运行，变量结构和值不可修改。正在重新获取当前状态和值。';
                 const [valuesResult, stateResult] = await Promise.allSettled([
                     this.refreshValues({ requestId: this.requestSerial, render: false }),
@@ -1130,6 +1140,18 @@ export default class GlobalVariablePanel {
 
     getCurrentValue(variableId) {
         return this.values.find(item => sameId(item.variableId, variableId)) || null;
+    }
+
+    getExpectedVersion(variableId) {
+        const current = this.getCurrentValue(variableId);
+        const version = Number(current?.version);
+        return Number.isFinite(version) ? version : null;
+    }
+
+    getExpectedVersions() {
+        return Object.fromEntries(this.schema.variables
+            .map(variable => [variable.id, this.getExpectedVersion(variable.id)])
+            .filter(([variableId, version]) => variableId && version !== null));
     }
 
     getSourceBinding(variableId) {
@@ -1550,10 +1572,21 @@ export default class GlobalVariablePanel {
             message.includes('正在运行');
     }
 
+    isVersionConflict(error) {
+        const message = String(error?.message || error || '').toLowerCase();
+        return message.includes('gv025') ||
+            message.includes('changed from version') ||
+            message.includes('before this mutation could commit') ||
+            message.includes('before this run could commit');
+    }
+
     toUserMessage(error, fallback) {
         const message = String(error?.message || error || '').trim();
         if (!message) {
             return fallback;
+        }
+        if (this.isVersionConflict(error)) {
+            return '当前变量值已被其他操作更新，请刷新后重试。';
         }
         if (this.isConflict(error)) {
             return '工程正在运行，变量结构和值不可修改。';

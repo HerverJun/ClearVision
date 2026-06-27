@@ -247,6 +247,94 @@ test('global variable panel disables reset controls when manual writes are forbi
   assert.equal(toasts.every(item => item.type === 'warning'), true);
 });
 
+test('global variable panel sends expected versions for write and reset requests', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const project = createProject();
+  const bodies = {};
+  global.fetch = async (url, options = {}) => {
+    const pathname = new URL(String(url)).pathname;
+    const body = options.body ? JSON.parse(options.body) : {};
+    if (pathname.endsWith('/global-variable-values/var-count') && options.method === 'PUT') {
+      bodies.write = body;
+      return jsonResponse([{ variableId: 'var-count', value: 6, version: 4 }]);
+    }
+    if (pathname.endsWith('/global-variable-values/var-count/reset') && options.method === 'POST') {
+      bodies.resetOne = body;
+      return jsonResponse([{ variableId: 'var-count', value: 4, version: 5 }]);
+    }
+    if (pathname.endsWith('/global-variable-values/reset') && options.method === 'POST') {
+      bodies.resetAll = body;
+      return jsonResponse([{ variableId: 'var-count', value: 4, version: 6 }]);
+    }
+    return jsonResponse([]);
+  };
+
+  const panel = new GlobalVariablePanel('global-variables-root', {
+    requestChoice: () => 'reset',
+    showToast() {}
+  });
+  panel.project = project;
+  panel.schema = project.globalVariables;
+  panel.selectedVariableId = 'var-count';
+  panel.values = [{ variableId: 'var-count', value: 4, version: 3 }];
+  panel.dialog = {
+    querySelector(selector) {
+      return selector === '#gv-write-value' ? { value: '6' } : null;
+    }
+  };
+  panel.render = () => {};
+
+  assert.equal(await panel.writeSelectedValue(), true);
+  assert.equal(await panel.resetSelectedValue(), true);
+  assert.equal(await panel.resetAllValues(), true);
+
+  assert.deepEqual(bodies.write, { value: '6', expectedVersion: 3 });
+  assert.deepEqual(bodies.resetOne, { expectedVersion: 4 });
+  assert.deepEqual(bodies.resetAll, { expectedVersions: { 'var-count': 5 } });
+});
+
+test('global variable panel refreshes values after stale expected-version conflict without dropping draft', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const project = createProject();
+  let valueRefreshCount = 0;
+  global.fetch = async (url, options = {}) => {
+    const pathname = new URL(String(url)).pathname;
+    if (pathname.endsWith('/global-variable-values/var-count') && options.method === 'PUT') {
+      return jsonResponse({ error: "GV025: project global variable 'var-count' changed from version 3 to 4 before this mutation could commit." }, 409);
+    }
+    if (pathname.endsWith('/global-variable-values') && (!options.method || options.method === 'GET')) {
+      valueRefreshCount += 1;
+      return jsonResponse([{ variableId: 'var-count', value: 9, version: 4 }]);
+    }
+    throw new Error(`Unexpected request ${options.method || 'GET'} ${pathname}`);
+  };
+
+  const panel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
+  panel.project = project;
+  panel.schema = project.globalVariables;
+  panel.selectedVariableId = 'var-count';
+  panel.values = [{ variableId: 'var-count', value: 4, version: 3 }];
+  panel.draft = { ...project.globalVariables.variables[0], displayName: 'Unsaved Draft' };
+  panel.dialog = {
+    querySelector(selector) {
+      return selector === '#gv-write-value' ? { value: '8' } : null;
+    }
+  };
+  panel.render = () => {};
+
+  const result = await panel.writeSelectedValue();
+
+  assert.equal(result, false);
+  assert.equal(valueRefreshCount, 1);
+  assert.equal(panel.values[0].value, 9);
+  assert.equal(panel.values[0].version, 4);
+  assert.equal(panel.draft.displayName, 'Unsaved Draft');
+  assert.match(panel.errorMessage, /已重新获取当前值/);
+  assert.equal(panel.isRuntimeLocked(), false);
+});
+
 test('global variable schema preserves conversion expressions and matches backend compatibility rules', async () => {
   installDom();
   const store = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariableStore.js');

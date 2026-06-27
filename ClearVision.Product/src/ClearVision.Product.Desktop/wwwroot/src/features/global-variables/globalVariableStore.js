@@ -90,18 +90,29 @@ export async function saveGlobalVariableSchema(projectId, schema) {
     );
 }
 
-export async function writeGlobalVariableValue(projectId, variableId, value) {
-    const values = await httpClient.put(`/projects/${projectId}/global-variable-values/${variableId}`, { value });
+export async function writeGlobalVariableValue(projectId, variableId, value, expectedVersion = null) {
+    const body = { value };
+    if (expectedVersion !== null && expectedVersion !== undefined) {
+        body.expectedVersion = expectedVersion;
+    }
+
+    const values = await httpClient.put(`/projects/${projectId}/global-variable-values/${variableId}`, body);
     return normalizeArray(values).map(normalizeGlobalVariableValue);
 }
 
-export async function resetGlobalVariableValues(projectId) {
-    const values = await httpClient.post(`/projects/${projectId}/global-variable-values/reset`, {});
+export async function resetGlobalVariableValues(projectId, expectedVersions = null) {
+    const body = expectedVersions && Object.keys(expectedVersions).length > 0
+        ? { expectedVersions }
+        : {};
+    const values = await httpClient.post(`/projects/${projectId}/global-variable-values/reset`, body);
     return normalizeArray(values).map(normalizeGlobalVariableValue);
 }
 
-export async function resetGlobalVariableValue(projectId, variableId) {
-    const values = await httpClient.post(`/projects/${projectId}/global-variable-values/${variableId}/reset`, {});
+export async function resetGlobalVariableValue(projectId, variableId, expectedVersion = null) {
+    const body = expectedVersion !== null && expectedVersion !== undefined
+        ? { expectedVersion }
+        : {};
+    const values = await httpClient.post(`/projects/${projectId}/global-variable-values/${variableId}/reset`, body);
     return normalizeArray(values).map(normalizeGlobalVariableValue);
 }
 
