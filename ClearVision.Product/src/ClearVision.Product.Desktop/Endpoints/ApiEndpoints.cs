@@ -143,10 +143,11 @@ public static class ApiEndpoints
             ProjectService service,
             IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
-            await using var mutationLease = request.GlobalVariables != null
+            var requiresMutationLease = request.Flow != null || request.GlobalVariables != null;
+            await using var mutationLease = requiresMutationLease
                 ? await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "project-update", CancellationToken.None)
                 : null;
-            if (request.GlobalVariables != null && mutationLease == null)
+            if (requiresMutationLease && mutationLease == null)
             {
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
