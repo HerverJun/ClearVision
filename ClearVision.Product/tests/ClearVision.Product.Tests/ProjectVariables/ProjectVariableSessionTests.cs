@@ -687,6 +687,40 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_Delete_ShouldRemoveCurrentLegacyAndRecoveryArtifacts()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableDeleteCleanup", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var currentRoot = Path.Combine(root, "current");
+            var legacyRoot = Path.Combine(root, "legacy");
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(currentRoot), scopeId, schema, variableId, 3L, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(currentRoot), scopeId, schema, variableId, 4L, 2);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, schema, variableId, 5L, 3);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, schema, variableId, 6L, 4);
+            WriteRecoveryArtifacts(GetCommittedStateFilePath(currentRoot));
+            WriteRecoveryArtifacts(GetCommittedStateFilePath(legacyRoot));
+
+            var store = new JsonFileProjectVariableStateStore(currentRoot, legacyRoot);
+
+            store.Delete(scopeId);
+
+            Directory.EnumerateFileSystemEntries(currentRoot).Should().BeEmpty();
+            Directory.EnumerateFileSystemEntries(legacyRoot).Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void JsonFileStateStore_DefaultPath_ShouldUseLocalAppDataProjectVariableStates()
     {
         var store = new JsonFileProjectVariableStateStore();
@@ -762,6 +796,19 @@ public sealed class ProjectVariableSessionTests
         using var session = new ProjectVariableSession(schema, store.Load(scopeId, schema));
         session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
         return (Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)), snapshot.Version);
+    }
+
+    private static string GetCommittedStateFilePath(string root)
+    {
+        return Directory.EnumerateFiles(root, "*.json")
+            .Single(path => !path.EndsWith(".last-good.json", StringComparison.Ordinal));
+    }
+
+    private static void WriteRecoveryArtifacts(string filePath)
+    {
+        File.WriteAllText(filePath + ".tmp", "temp", Encoding.UTF8);
+        File.WriteAllText(filePath + ".corrupt", "corrupt", Encoding.UTF8);
+        File.WriteAllText(filePath + ".journal", "journal", Encoding.UTF8);
     }
 
     private sealed class RecordingStateStore : IProjectVariableStateStore

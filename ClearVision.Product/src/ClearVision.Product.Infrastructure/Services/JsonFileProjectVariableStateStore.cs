@@ -77,7 +77,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             var json = _fileSystem.ReadAllText(filePath, Encoding.UTF8);
             if (!TryDeserialize(json, out var state))
             {
-                _fileSystem.Copy(filePath, filePath + ".corrupt", overwrite: true);
+                _fileSystem.Copy(filePath, GetCorruptPath(scopeId), overwrite: true);
                 if (TryLoadMatchingLastGood(scopeId, expectedSchemaHash, out var lastGoodSnapshots))
                 {
                     return lastGoodSnapshots;
@@ -177,6 +177,8 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             _fileSystem.DeleteFile(GetFilePath(scopeId));
             _fileSystem.DeleteFile(GetLastGoodPath(scopeId));
             _fileSystem.DeleteFile(GetTempPath(scopeId));
+            _fileSystem.DeleteFile(GetCorruptPath(scopeId));
+            _fileSystem.DeleteFile(GetJournalPath(scopeId));
             var legacyFilePath = GetLegacyFilePath(scopeId);
             if (legacyFilePath != null)
             {
@@ -192,6 +194,18 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
                 {
                     _fileSystem.DeleteFile(legacyTempPath);
                 }
+
+                var legacyCorruptPath = GetLegacyCorruptPath(scopeId);
+                if (legacyCorruptPath != null)
+                {
+                    _fileSystem.DeleteFile(legacyCorruptPath);
+                }
+
+                var legacyJournalPath = GetLegacyJournalPath(scopeId);
+                if (legacyJournalPath != null)
+                {
+                    _fileSystem.DeleteFile(legacyJournalPath);
+                }
             }
         }
         finally
@@ -206,6 +220,10 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
     private string GetTempPath(string scopeId) => GetFilePath(scopeId) + ".tmp";
 
+    private string GetCorruptPath(string scopeId) => GetFilePath(scopeId) + ".corrupt";
+
+    private string GetJournalPath(string scopeId) => GetFilePath(scopeId) + ".journal";
+
     private string? GetLegacyFilePath(string scopeId) =>
         _legacyBasePath == null ? null : Path.Combine(_legacyBasePath, $"{BuildStableFileName(scopeId)}.json");
 
@@ -216,6 +234,18 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
     {
         var legacyFilePath = GetLegacyFilePath(scopeId);
         return legacyFilePath == null ? null : legacyFilePath + ".tmp";
+    }
+
+    private string? GetLegacyCorruptPath(string scopeId)
+    {
+        var legacyFilePath = GetLegacyFilePath(scopeId);
+        return legacyFilePath == null ? null : legacyFilePath + ".corrupt";
+    }
+
+    private string? GetLegacyJournalPath(string scopeId)
+    {
+        var legacyFilePath = GetLegacyFilePath(scopeId);
+        return legacyFilePath == null ? null : legacyFilePath + ".journal";
     }
 
     private bool TryLoadMatchingLastGood(
