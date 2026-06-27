@@ -198,6 +198,14 @@ export default class GlobalVariablePanel {
             : '';
         const listHtml = this.renderVariableListHtml();
         const schemaIsEmpty = this.schema.variables.length === 0 && !this.draft;
+        const hasManualWriteBlockedVariable = this.schema.variables.some(variable => !variable.manualWriteAllowed);
+        const resetAllDisabled = locked ||
+            this.schema.variables.length === 0 ||
+            hasManualWriteBlockedVariable ||
+            this.pendingAction === 'reset-all';
+        const resetAllTitle = hasManualWriteBlockedVariable
+            ? '存在未允许人工写入的变量，不能全部重置'
+            : '全部重置';
 
         return `
             <div class="gv-manager" role="dialog" aria-modal="true" aria-labelledby="gv-manager-title" tabindex="-1">
@@ -220,7 +228,7 @@ export default class GlobalVariablePanel {
                     </select>
                     ${schemaIsEmpty ? '' : `<button type="button" class="btn btn-primary" data-action="new" ${locked ? 'disabled' : ''} title="新建变量">新建变量</button>`}
                     <button type="button" class="btn btn-secondary" data-action="refresh" ${this.pendingAction === 'refresh' ? 'disabled' : ''} title="刷新当前值">${this.pendingAction === 'refresh' ? '刷新中...' : '刷新'}</button>
-                    <button type="button" class="btn btn-secondary" data-action="reset-all" ${locked || this.schema.variables.length === 0 || this.pendingAction === 'reset-all' ? 'disabled' : ''} title="全部重置">${this.pendingAction === 'reset-all' ? '重置中...' : '全部重置'}</button>
+                    <button type="button" class="btn btn-secondary" data-action="reset-all" ${resetAllDisabled ? 'disabled' : ''} title="${escapeHtml(resetAllTitle)}">${this.pendingAction === 'reset-all' ? '重置中...' : '全部重置'}</button>
                 </section>
                 <main class="gv-manager-body ${schemaIsEmpty ? 'gv-manager-body-empty' : ''}">
                     <aside class="gv-variable-list" aria-label="变量列表">
@@ -498,7 +506,7 @@ export default class GlobalVariablePanel {
             <div class="gv-write-row">
                 ${inputHtml}
                 <button type="button" class="btn btn-primary" data-action="write" ${disableMutation || this.pendingAction === 'write' ? 'disabled' : ''}>${this.pendingAction === 'write' ? '写入中...' : '写入'}</button>
-                <button type="button" class="btn btn-secondary" data-action="reset-one" ${locked || this.pendingAction === 'reset-one' ? 'disabled' : ''}>${this.pendingAction === 'reset-one' ? '重置中...' : '重置'}</button>
+                <button type="button" class="btn btn-secondary" data-action="reset-one" ${disableMutation || this.pendingAction === 'reset-one' ? 'disabled' : ''}>${this.pendingAction === 'reset-one' ? '重置中...' : '重置'}</button>
             </div>
             ${reason ? `<p class="gv-muted">${escapeHtml(reason)}</p>` : ''}
         `;
@@ -795,6 +803,10 @@ export default class GlobalVariablePanel {
         if (!variable || this.isRuntimeLocked()) {
             return false;
         }
+        if (!variable.manualWriteAllowed) {
+            this.toast('该变量未允许人工写入，不能重置。', 'warning');
+            return false;
+        }
 
         return await this.runMutation('reset-one', async () => {
             const projectId = this.project.id;
@@ -812,6 +824,11 @@ export default class GlobalVariablePanel {
     async resetAllValues() {
         if (this.isRuntimeLocked()) {
             this.toast('工程运行中，变量结构和值不可修改。', 'warning');
+            return false;
+        }
+        const blockedVariable = this.schema.variables.find(variable => !variable.manualWriteAllowed);
+        if (blockedVariable) {
+            this.toast(`变量 ${blockedVariable.displayName || blockedVariable.name} 未允许人工写入，不能全部重置。`, 'warning');
             return false;
         }
 

@@ -198,6 +198,55 @@ test('global variable drafts validate type, range, duplicate names and serialize
   assert.equal(store.coerceGlobalVariableValue('Double', '9.007199254740992e15').value, 9007199254740992);
 });
 
+test('global variable panel disables reset controls when manual writes are forbidden', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const project = createProject();
+  project.globalVariables.variables[0].manualWriteAllowed = false;
+  project.globalVariables.variables.push({
+    id: 'var-allowed',
+    name: 'judge.allowed_count',
+    displayName: '允许数量',
+    description: '',
+    valueType: 'Int64',
+    initialValue: '1',
+    min: null,
+    max: null,
+    manualWriteAllowed: true,
+    includeInResultMetadata: false,
+    order: 2
+  });
+  const toasts = [];
+  const panel = new GlobalVariablePanel('global-variables-root', {
+    showToast(message, type) {
+      toasts.push({ message, type });
+    }
+  });
+  panel.project = project;
+  panel.schema = project.globalVariables;
+  panel.selectedVariableId = 'var-count';
+  panel.requestChoice = async () => {
+    throw new Error('reset-all should not prompt when a variable forbids manual writes');
+  };
+  global.fetch = async () => {
+    throw new Error('reset endpoints should not be called for forbidden variables');
+  };
+
+  const dialogHtml = panel.renderDialogHtml();
+  const editorHtml = panel.renderEditorHtml();
+  const resetOne = await panel.resetSelectedValue();
+  const resetAll = await panel.resetAllValues();
+
+  assert.match(dialogHtml, /data-action="reset-all"[^>]*disabled/);
+  assert.match(dialogHtml, /存在未允许人工写入的变量/);
+  assert.match(editorHtml, /data-action="write"[^>]*disabled/);
+  assert.match(editorHtml, /data-action="reset-one"[^>]*disabled/);
+  assert.equal(resetOne, false);
+  assert.equal(resetAll, false);
+  assert.equal(toasts.length, 2);
+  assert.equal(toasts.every(item => item.type === 'warning'), true);
+});
+
 test('global variable schema preserves conversion expressions and matches backend compatibility rules', async () => {
   installDom();
   const store = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariableStore.js');
