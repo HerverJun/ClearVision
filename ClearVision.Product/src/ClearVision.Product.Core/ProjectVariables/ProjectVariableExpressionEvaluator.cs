@@ -410,7 +410,7 @@ public static class ProjectVariableExpressionEvaluator
                 "sqrt" when args.Count == 1 => EnsureFinite(Math.Sqrt(ToDouble(args[0]))),
                 "min" when args.Count == 2 => LessThanOrEqual(args[0], args[1]) ? args[0] : args[1],
                 "max" when args.Count == 2 => LessThanOrEqual(args[0], args[1]) ? args[1] : args[0],
-                "pow" when args.Count == 2 => EnsureFinite(Math.Pow(ToDouble(args[0]), ToDouble(args[1]))),
+                "pow" when args.Count == 2 => PowValue(args[0], args[1]),
                 _ => throw Error($"Unsupported expression function '{name}' or wrong argument count.")
             };
         }
@@ -607,6 +607,43 @@ public static class ProjectVariableExpressionEvaluator
             }
 
             return Math.Abs(ToDecimal(value));
+        }
+
+        private static object PowValue(object left, object right)
+        {
+            if (TryGetInt64(left, out var baseValue) &&
+                TryGetInt64(right, out var exponentValue) &&
+                exponentValue >= 0)
+            {
+                return PowInt64(baseValue, exponentValue);
+            }
+
+            return EnsureFinite(Math.Pow(ToDouble(left), ToDouble(right)));
+        }
+
+        private static long PowInt64(long baseValue, long exponentValue)
+        {
+            var result = 1L;
+            var factor = baseValue;
+            var exponent = exponentValue;
+
+            while (exponent > 0)
+            {
+                if ((exponent & 1L) == 1L)
+                {
+                    result = checked(result * factor);
+                }
+
+                exponent >>= 1;
+                if (exponent == 0)
+                {
+                    break;
+                }
+
+                factor = checked(factor * factor);
+            }
+
+            return result;
         }
 
         private static bool LessThanOrEqual(object left, object right) => CompareValues(left, right) <= 0;

@@ -557,6 +557,46 @@ public sealed class ProjectGlobalVariableSchemaTests
     }
 
     [Fact]
+    public void ExpressionEvaluator_WhenPowUsesNonNegativeInt64Exponent_ShouldReturnInt64()
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            "pow(2, 10)",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out var value,
+            out var error);
+
+        ok.Should().BeTrue(error);
+        value.Should().Be(1024L);
+    }
+
+    [Fact]
+    public void ExpressionEvaluator_WhenInt64PowOverflows_ShouldReject()
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            "pow(2, 63)",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out _,
+            out var error);
+
+        ok.Should().BeFalse();
+        error.Should().StartWith("GV037");
+        error.Should().Contain("overflow");
+    }
+
+    [Fact]
+    public void ExpressionEvaluator_WhenPowUsesNegativeExponent_ShouldUseDouble()
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            "pow(2, -1)",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out var value,
+            out var error);
+
+        ok.Should().BeTrue(error);
+        value.Should().Be(0.5d);
+    }
+
+    [Fact]
     public void ExpressionEvaluator_WhenInt64ArithmeticOverflows_ShouldReject()
     {
         var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
