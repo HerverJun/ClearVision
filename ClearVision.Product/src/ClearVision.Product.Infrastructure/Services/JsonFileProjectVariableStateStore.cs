@@ -248,23 +248,55 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
     {
         snapshots = [];
         var legacyFilePath = GetLegacyFilePath(scopeId);
-        if (legacyFilePath == null || !_fileSystem.FileExists(legacyFilePath))
+        var legacyLastGoodPath = GetLegacyLastGoodPath(scopeId);
+        if (legacyFilePath == null && legacyLastGoodPath == null)
         {
             return false;
         }
 
-        var legacyJson = _fileSystem.ReadAllText(legacyFilePath, Encoding.UTF8);
-        if (!TryDeserialize(legacyJson, out var legacyState) ||
-            !string.Equals(legacyState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
+        if (legacyFilePath != null &&
+            TryLoadMatchingStateFile(legacyFilePath, expectedSchemaHash, out var legacyState))
+        {
+            MigrateLegacyState(scopeId, legacyFilePath, expectedSchemaHash);
+            snapshots = ToSnapshots(legacyState);
+            return true;
+        }
+
+        if (legacyLastGoodPath != null &&
+            TryLoadMatchingStateFile(legacyLastGoodPath, expectedSchemaHash, out var legacyLastGoodState))
+        {
+            MigrateLegacyState(scopeId, legacyLastGoodPath, expectedSchemaHash);
+            snapshots = ToSnapshots(legacyLastGoodState);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryLoadMatchingStateFile(
+        string path,
+        string expectedSchemaHash,
+        out ProjectVariableStateFile state)
+    {
+        state = new ProjectVariableStateFile();
+        if (!_fileSystem.FileExists(path))
         {
             return false;
         }
 
+        var json = _fileSystem.ReadAllText(path, Encoding.UTF8);
+        return TryDeserialize(json, out state) &&
+            string.Equals(state.SchemaHash, expectedSchemaHash, StringComparison.Ordinal);
+    }
+
+    private void MigrateLegacyState(
+        string scopeId,
+        string sourcePath,
+        string expectedSchemaHash)
+    {
         _fileSystem.CreateDirectory(_basePath);
-        _fileSystem.Copy(legacyFilePath, GetFilePath(scopeId), overwrite: true);
+        _fileSystem.Copy(sourcePath, GetFilePath(scopeId), overwrite: true);
         TryCopyMatchingLegacyLastGood(scopeId, expectedSchemaHash);
-        snapshots = ToSnapshots(legacyState);
-        return true;
     }
 
     private void TryCopyMatchingLegacyLastGood(string scopeId, string expectedSchemaHash)

@@ -531,6 +531,73 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_Load_WhenLegacyMainSchemaMismatchesButLastGoodMatches_ShouldMigrateLastGood()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableLegacyLastGoodSchemaHash", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var currentRoot = Path.Combine(root, "current");
+            var legacyRoot = Path.Combine(root, "legacy");
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var oldSchema = CreateSchema(variableId, 1);
+            var requestedSchema = CreateSchema(variableId, 2);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, requestedSchema, variableId, 44L, 4);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, oldSchema, variableId, 11L, 1);
+
+            var store = new JsonFileProjectVariableStateStore(currentRoot, legacyRoot);
+
+            LoadLongAndVersion(store, scopeId, requestedSchema, variableId).Should().Be((44L, 4L));
+            LoadLongAndVersion(new JsonFileProjectVariableStateStore(currentRoot), scopeId, requestedSchema, variableId)
+                .Should()
+                .Be((44L, 4L));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenLegacyMainIsCorruptButLastGoodMatches_ShouldMigrateLastGood()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableLegacyLastGoodCorrupt", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var currentRoot = Path.Combine(root, "current");
+            var legacyRoot = Path.Combine(root, "legacy");
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, schema, variableId, 55L, 5);
+            var legacyFilePath = Directory.EnumerateFiles(legacyRoot, "*.json")
+                .Single(path => !path.EndsWith(".last-good.json", StringComparison.Ordinal));
+            var legacyLastGoodPath = Path.Combine(
+                legacyRoot,
+                $"{Path.GetFileNameWithoutExtension(legacyFilePath)}.last-good.json");
+            File.Copy(legacyFilePath, legacyLastGoodPath);
+            File.WriteAllText(legacyFilePath, "{not-json", Encoding.UTF8);
+
+            var store = new JsonFileProjectVariableStateStore(currentRoot, legacyRoot);
+
+            LoadLongAndVersion(store, scopeId, schema, variableId).Should().Be((55L, 5L));
+            LoadLongAndVersion(new JsonFileProjectVariableStateStore(currentRoot), scopeId, schema, variableId)
+                .Should()
+                .Be((55L, 5L));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void JsonFileStateStore_Save_WhenWriteTempFails_ShouldKeepCommittedFile()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableWriteFailure", Guid.NewGuid().ToString("N"));
