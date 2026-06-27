@@ -706,7 +706,7 @@ export default class GlobalVariablePanel {
         }
 
         const impact = original && prepared.variable && normalizeValueType(original.valueType) !== normalizeValueType(prepared.variable.valueType)
-            ? this.getIncompatibleBindings(original, prepared.variable.valueType)
+            ? this.getTypeChangeImpact(original, prepared.variable.valueType)
             : [];
         if (impact.length) {
             const choice = await this.requestChoice('类型变更影响绑定', this.describeBindingImpact(impact), [
@@ -1255,8 +1255,33 @@ export default class GlobalVariablePanel {
         return impacts;
     }
 
+    getTypeChangeImpact(variable, nextType) {
+        const incompatible = new Map(
+            this.getIncompatibleBindings(variable, nextType)
+                .map(item => [normalizeImpactKey(item), item])
+        );
+        const impacts = [];
+        const seen = new Set();
+        const addImpact = (text, key = normalizeImpactKey(text)) => {
+            if (!text || seen.has(key)) {
+                return;
+            }
+            seen.add(key);
+            impacts.push(text);
+        };
+
+        this.getVariableReferences(variable.id).forEach(reference => {
+            const key = normalizeImpactKey(reference);
+            const suffix = incompatible.has(key) ? '（类型不兼容）' : '';
+            addImpact(`${reference}${suffix}`, key);
+            incompatible.delete(key);
+        });
+        incompatible.forEach((item, key) => addImpact(`${item}（类型不兼容）`, key));
+        return impacts;
+    }
+
     describeBindingImpact(impact) {
-        return `类型变更会影响以下绑定，请确认后再保存：${impact.join('；')}`;
+        return `类型变更会影响以下引用/绑定，请确认后再保存：${impact.join('；')}`;
     }
 
     getFlowOutputs() {
@@ -1652,6 +1677,14 @@ function expressionReferencesVariable(expression, variableName) {
 
     const identifiers = String(expression || '').match(/[A-Za-z_][A-Za-z0-9_.]*/g) || [];
     return identifiers.some(identifier => identifier.toLowerCase() === normalizedName);
+}
+
+function normalizeImpactKey(value) {
+    return String(value || '')
+        .replace(/[：:]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
 }
 
 function groupBy(items, getKey) {

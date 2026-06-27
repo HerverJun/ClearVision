@@ -213,27 +213,36 @@ class ProjectManager {
 
         const targetProjectId = this.currentProject.id;
         const data = projectData || this.currentProject;
+        const flow = data.flow || data.Flow || this.currentProject.flow || this.currentProject.Flow || null;
+        const globalVariables = data.globalVariables || data.GlobalVariables || this.currentProject.globalVariables || this.currentProject.GlobalVariables;
 
         try {
-            const saved = await httpClient.put(`/projects/${targetProjectId}`, {
+            const updatePayload = {
                 name: data.name,
-                description: data.description,
-                flow: data.flow || data.Flow || this.currentProject.flow || this.currentProject.Flow || null,
-                globalVariables: data.globalVariables || data.GlobalVariables || { schemaVersion: '1.0', variables: [], sourceBindings: [], targetBindings: [] }
-            });
+                description: data.description
+            };
+            if (globalVariables) {
+                updatePayload.globalVariables = globalVariables;
+            }
+
+            const saved = await httpClient.put(`/projects/${targetProjectId}`, updatePayload);
+            if (flow) {
+                await httpClient.put(`/projects/${targetProjectId}/flow`, toUpdateFlowRequest(flow));
+            }
 
             if (!this.currentProject || this.currentProject.id !== targetProjectId) {
                 return true;
             }
 
-            this.currentProject = {
-                ...this.currentProject,
-                ...saved,
-                name: saved.name ?? data.name ?? this.currentProject.name,
-                description: saved.description ?? data.description ?? this.currentProject.description,
-                flow: saved.flow || data.flow || data.Flow || this.currentProject.flow,
-                globalVariables: saved.globalVariables || saved.GlobalVariables || data.globalVariables || data.GlobalVariables || this.currentProject.globalVariables
-            };
+            const savedProject = isProjectPayload(saved) ? saved : {};
+            Object.assign(this.currentProject, savedProject);
+            this.currentProject.name = savedProject.name ?? savedProject.Name ?? data.name ?? this.currentProject.name;
+            this.currentProject.description = savedProject.description ?? savedProject.Description ?? data.description ?? this.currentProject.description;
+            this.currentProject.flow = savedProject.flow || savedProject.Flow || flow || this.currentProject.flow;
+            const savedGlobalVariables = savedProject.globalVariables || savedProject.GlobalVariables || globalVariables || this.currentProject.globalVariables;
+            if (savedGlobalVariables) {
+                this.currentProject.globalVariables = savedGlobalVariables;
+            }
             setCurrentProject(this.currentProject);
             this.currentProject.modifiedAt = new Date().toISOString();
             this.unsavedChanges = false;
@@ -466,6 +475,32 @@ class ProjectManager {
             throw error;
         }
     }
+}
+
+function toUpdateFlowRequest(flow) {
+    return {
+        operators: Array.isArray(flow?.operators) ? flow.operators : (flow?.Operators || []),
+        connections: Array.isArray(flow?.connections) ? flow.connections : (flow?.Connections || [])
+    };
+}
+
+function isProjectPayload(value) {
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+
+    return Boolean(
+        value.id ||
+        value.Id ||
+        value.name ||
+        value.Name ||
+        Object.prototype.hasOwnProperty.call(value, 'description') ||
+        Object.prototype.hasOwnProperty.call(value, 'Description') ||
+        value.flow ||
+        value.Flow ||
+        value.globalVariables ||
+        value.GlobalVariables
+    );
 }
 
 // 鍒涘缓鍗曚緥

@@ -480,6 +480,127 @@ test('delete is blocked with binding, operator and expression references and exp
   ]);
 });
 
+test('type change impact preview includes bindings, variable operators and expression references', async () => {
+  installDom();
+  const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
+  const project = createProject();
+  project.globalVariables.variables.push({
+    id: 'var-other',
+    name: 'judge.other_count',
+    displayName: '其他数量',
+    description: '',
+    valueType: 'Int64',
+    initialValue: '0',
+    manualWriteAllowed: true,
+    includeInResultMetadata: false,
+    order: 2
+  });
+  project.globalVariables.sourceBindings.push(
+    {
+      id: 'bind-source',
+      variableId: 'var-count',
+      operatorId: 'op-counter',
+      outputPortId: 'out-image',
+      operatorName: '计数算子',
+      outputPortName: '图像'
+    },
+    {
+      id: 'bind-expression-source',
+      variableId: 'var-other',
+      operatorId: 'op-counter',
+      outputPortId: 'out-count',
+      operatorName: '表达式来源',
+      outputPortName: '数量',
+      expression: 'value + judge.expected_count'
+    }
+  );
+  project.globalVariables.targetBindings.push({
+    id: 'bind-target',
+    variableId: 'var-count',
+    operatorId: 'op-counter',
+    parameterId: 'param-threshold',
+    operatorName: '计数算子',
+    parameterName: '阈值'
+  });
+  project.flow.operators.push(
+    {
+      id: 'op-read',
+      type: 'VariableRead',
+      name: '读取变量',
+      parameters: [
+        { name: 'Scope', value: 'Project' },
+        { name: 'VariableId', value: 'var-count' },
+        { name: 'VariableName', value: 'judge.expected_count' }
+      ]
+    },
+    {
+      id: 'op-write',
+      type: 'VariableWrite',
+      name: '写入变量',
+      parameters: [
+        { name: 'Scope', value: 'Project' },
+        { name: 'VariableId', value: 'var-count' },
+        { name: 'VariableName', value: 'judge.expected_count' }
+      ]
+    },
+    {
+      id: 'op-increment',
+      type: 'VariableIncrement',
+      name: '递增变量',
+      parameters: [
+        { name: 'Scope', value: 'Project' },
+        { name: 'VariableName', value: 'judge.expected_count' }
+      ]
+    },
+    {
+      id: 'op-expression',
+      type: 'VariableWrite',
+      name: '表达式写入',
+      parameters: [
+        { name: 'Scope', value: 'Project' },
+        { name: 'VariableId', value: 'var-other' },
+        { name: 'VariableName', value: 'judge.other_count' },
+        { name: 'Expression', value: 'judge.expected_count + value' }
+      ]
+    }
+  );
+
+  let impactTitle = '';
+  let impactMessage = '';
+  const panel = new GlobalVariablePanel('global-variables-root', {
+    showToast() {},
+    requestChoice(title, message) {
+      impactTitle = title;
+      impactMessage = message;
+      return 'cancel';
+    }
+  });
+  panel.project = project;
+  panel.schema = project.globalVariables;
+  panel.selectedVariableId = 'var-count';
+  panel.draft = {
+    ...project.globalVariables.variables[0],
+    valueType: 'Boolean',
+    initialValueText: 'true',
+    minText: '',
+    maxText: ''
+  };
+  panel.renderDialog = () => {};
+
+  const saved = await panel.save();
+
+  assert.equal(saved, false);
+  assert.match(impactTitle, /类型变更影响/);
+  assert.match(impactMessage, /来源：计数算子\.图像/);
+  assert.match(impactMessage, /类型不兼容/);
+  assert.match(impactMessage, /目标：计数算子\.阈值/);
+  assert.match(impactMessage, /算子：读取变量\.读取/);
+  assert.match(impactMessage, /算子：写入变量\.写入/);
+  assert.match(impactMessage, /算子：递增变量\.递增/);
+  assert.match(impactMessage, /表达式：来源：表达式来源\.数量/);
+  assert.match(impactMessage, /表达式：算子：表达式写入/);
+});
+
 test('source and target bindings use compatible filtering and locate canvas nodes', async () => {
   installDom();
   const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
