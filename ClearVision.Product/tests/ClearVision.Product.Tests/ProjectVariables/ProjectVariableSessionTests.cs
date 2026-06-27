@@ -538,6 +538,13 @@ public sealed class ProjectVariableSessionTests
             LoadLongAndVersion(store, scopeId, schema, variableId).Should().Be((3L, 1L));
 
             File.Exists(filePath + ".corrupt").Should().BeTrue();
+            var recoveryJournal = ReadSingleRecoveryJournalEntry(GetRecoveryJournalPath(filePath));
+            recoveryJournal.GetProperty("eventType").GetString().Should().Be("main-corrupt-restored-last-good");
+            recoveryJournal.GetProperty("scopeId").GetString().Should().Be(scopeId);
+            recoveryJournal.GetProperty("schemaHash").GetString().Should()
+                .Be(ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema));
+            recoveryJournal.GetProperty("sourcePath").GetString().Should().Be(lastGoodPath);
+            recoveryJournal.GetProperty("targetPath").GetString().Should().Be(filePath);
             File.Delete(lastGoodPath);
             LoadLongAndVersion(new JsonFileProjectVariableStateStore(root), scopeId, schema, variableId)
                 .Should()
@@ -943,6 +950,16 @@ public sealed class ProjectVariableSessionTests
         return Path.Combine(
             Path.GetDirectoryName(committedFilePath)!,
             $"{Path.GetFileNameWithoutExtension(committedFilePath)}.last-good.json");
+    }
+
+    private static string GetRecoveryJournalPath(string committedFilePath) => committedFilePath + ".journal";
+
+    private static JsonElement ReadSingleRecoveryJournalEntry(string journalPath)
+    {
+        File.Exists(journalPath).Should().BeTrue();
+        var line = File.ReadLines(journalPath).Single();
+        using var document = JsonDocument.Parse(line);
+        return document.RootElement.Clone();
     }
 
     private static void WriteRecoveryArtifacts(string filePath)

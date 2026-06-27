@@ -11,6 +11,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
     private readonly string? _legacyBasePath;
     private readonly IProjectVariableStateFileSystem _fileSystem;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private static readonly JsonSerializerOptions RecoveryJournalJsonOptions = new(JsonSerializerDefaults.Web);
 
     public JsonFileProjectVariableStateStore()
         : this(
@@ -78,7 +79,12 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             if (!TryDeserialize(json, out var state))
             {
                 _fileSystem.Copy(filePath, GetCorruptPath(scopeId), overwrite: true);
-                if (TryLoadMatchingLastGood(scopeId, expectedSchemaHash, restoreCommittedFile: true, out var lastGoodSnapshots))
+                if (TryLoadMatchingLastGood(
+                        scopeId,
+                        expectedSchemaHash,
+                        restoreCommittedFile: true,
+                        "main-corrupt-restored-last-good",
+                        out var lastGoodSnapshots))
                 {
                     return lastGoodSnapshots;
                 }
@@ -93,7 +99,12 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
             if (!string.Equals(state.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
             {
-                if (TryLoadMatchingLastGood(scopeId, expectedSchemaHash, restoreCommittedFile: false, out var lastGoodSnapshots))
+                if (TryLoadMatchingLastGood(
+                        scopeId,
+                        expectedSchemaHash,
+                        restoreCommittedFile: false,
+                        "schema-hash-mismatch-used-last-good",
+                        out var lastGoodSnapshots))
                 {
                     return lastGoodSnapshots;
                 }
@@ -252,6 +263,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         string scopeId,
         string expectedSchemaHash,
         bool restoreCommittedFile,
+        string recoveryReason,
         out IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
     {
         snapshots = [];
@@ -274,6 +286,12 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             _fileSystem.Copy(lastGoodPath, GetFilePath(scopeId), overwrite: true);
         }
 
+        WriteRecoveryJournal(
+            scopeId,
+            recoveryReason,
+            expectedSchemaHash,
+            sourcePath: lastGoodPath,
+            targetPath: restoreCommittedFile ? GetFilePath(scopeId) : null);
         return true;
     }
 
@@ -333,6 +351,12 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         _fileSystem.CreateDirectory(_basePath);
         _fileSystem.Copy(sourcePath, GetFilePath(scopeId), overwrite: true);
         TryCopyMatchingLegacyLastGood(scopeId, expectedSchemaHash);
+        WriteRecoveryJournal(
+            scopeId,
+            "legacy-state-migrated",
+            expectedSchemaHash,
+            sourcePath,
+            GetFilePath(scopeId));
     }
 
     private void TryCopyMatchingLegacyLastGood(string scopeId, string expectedSchemaHash)
@@ -362,6 +386,12 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         if (_fileSystem.FileExists(filePath))
         {
             _fileSystem.DeleteFile(tempPath);
+            WriteRecoveryJournal(
+                scopeId,
+                "interrupted-save-discarded-temp-main-present",
+                expectedSchemaHash,
+                sourcePath: tempPath,
+                targetPath: filePath);
             return;
         }
 
@@ -370,10 +400,56 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             !string.Equals(tempState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
         {
             _fileSystem.DeleteFile(tempPath);
+            WriteRecoveryJournal(
+                scopeId,
+                "interrupted-save-discarded-temp-invalid",
+                expectedSchemaHash,
+                sourcePath: tempPath,
+                targetPath: null);
             return;
         }
 
         _fileSystem.Move(tempPath, filePath, overwrite: true);
+        WriteRecoveryJournal(
+            scopeId,
+            "interrupted-save-promoted-temp",
+            expectedSchemaHash,
+            sourcePath: tempPath,
+            targetPath: filePath);
+    }
+
+    private void WriteRecoveryJournal(
+        string scopeId,
+        string eventType,
+        string schemaHash,
+        string? sourcePath,
+        string? targetPath)
+    {
+        try
+        {
+            var journalPath = GetJournalPath(scopeId);
+            var existing = _fileSystem.FileExists(journalPath)
+                ? _fileSystem.ReadAllText(journalPath, Encoding.UTF8).TrimEnd('\r', '\n')
+                : string.Empty;
+            var entry = new ProjectVariableStateRecoveryJournalEntry
+            {
+                EventType = eventType,
+                ScopeId = scopeId,
+                SchemaHash = schemaHash,
+                SourcePath = sourcePath,
+                TargetPath = targetPath,
+                RecordedAtUtc = DateTimeOffset.UtcNow
+            };
+            var line = JsonSerializer.Serialize(entry, RecoveryJournalJsonOptions);
+            var contents = string.IsNullOrWhiteSpace(existing)
+                ? line + Environment.NewLine
+                : existing + Environment.NewLine + line + Environment.NewLine;
+            _fileSystem.WriteAllText(journalPath, contents, new UTF8Encoding(false));
+        }
+        catch
+        {
+            // Recovery must not fail because the recovery audit trail could not be written.
+        }
     }
 
     private static string BuildStableFileName(string scopeId)
@@ -455,6 +531,21 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         public Guid? RunId { get; init; }
 
         public Guid? OperatorId { get; init; }
+    }
+
+    private sealed class ProjectVariableStateRecoveryJournalEntry
+    {
+        public string EventType { get; init; } = string.Empty;
+
+        public string ScopeId { get; init; } = string.Empty;
+
+        public string SchemaHash { get; init; } = string.Empty;
+
+        public string? SourcePath { get; init; }
+
+        public string? TargetPath { get; init; }
+
+        public DateTimeOffset RecordedAtUtc { get; init; }
     }
 }
 
