@@ -9,6 +9,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 {
     private readonly string _basePath;
     private readonly string? _legacyBasePath;
+    private readonly IProjectVariableStateFileSystem _fileSystem;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public JsonFileProjectVariableStateStore()
@@ -17,16 +18,25 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "ClearVision",
                 "ProjectVariableStates"),
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "ProjectVariableStates"))
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "ProjectVariableStates"),
+            PhysicalProjectVariableStateFileSystem.Instance)
     {
     }
 
     public JsonFileProjectVariableStateStore(string basePath)
-        : this(basePath, null)
+        : this(basePath, null, PhysicalProjectVariableStateFileSystem.Instance)
     {
     }
 
-    private JsonFileProjectVariableStateStore(string basePath, string? legacyBasePath)
+    public JsonFileProjectVariableStateStore(string basePath, IProjectVariableStateFileSystem fileSystem)
+        : this(basePath, null, fileSystem)
+    {
+    }
+
+    private JsonFileProjectVariableStateStore(
+        string basePath,
+        string? legacyBasePath,
+        IProjectVariableStateFileSystem fileSystem)
     {
         if (string.IsNullOrWhiteSpace(basePath))
         {
@@ -35,7 +45,8 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
         _basePath = basePath;
         _legacyBasePath = legacyBasePath;
-        Directory.CreateDirectory(_basePath);
+        _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+        _fileSystem.CreateDirectory(_basePath);
     }
 
     public string BasePath => _basePath;
@@ -50,20 +61,20 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         {
             var filePath = GetFilePath(scopeId);
             RecoverInterruptedSave(scopeId, filePath);
-            if (!File.Exists(filePath))
+            if (!_fileSystem.FileExists(filePath))
             {
                 var legacyFilePath = GetLegacyFilePath(scopeId);
-                if (legacyFilePath != null && File.Exists(legacyFilePath))
+                if (legacyFilePath != null && _fileSystem.FileExists(legacyFilePath))
                 {
-                    var legacyJson = File.ReadAllText(legacyFilePath, Encoding.UTF8);
+                    var legacyJson = _fileSystem.ReadAllText(legacyFilePath, Encoding.UTF8);
                     if (TryDeserialize(legacyJson, out var legacyState))
                     {
-                        Directory.CreateDirectory(_basePath);
-                        File.Copy(legacyFilePath, filePath, overwrite: true);
+                        _fileSystem.CreateDirectory(_basePath);
+                        _fileSystem.Copy(legacyFilePath, filePath, overwrite: true);
                         var legacyLastGoodPath = GetLegacyLastGoodPath(scopeId);
-                        if (legacyLastGoodPath != null && File.Exists(legacyLastGoodPath))
+                        if (legacyLastGoodPath != null && _fileSystem.FileExists(legacyLastGoodPath))
                         {
-                            File.Copy(legacyLastGoodPath, GetLastGoodPath(scopeId), overwrite: true);
+                            _fileSystem.Copy(legacyLastGoodPath, GetLastGoodPath(scopeId), overwrite: true);
                         }
 
                         return ToSnapshots(legacyState);
@@ -73,14 +84,14 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
                 return [];
             }
 
-            var json = File.ReadAllText(filePath, Encoding.UTF8);
+            var json = _fileSystem.ReadAllText(filePath, Encoding.UTF8);
             if (!TryDeserialize(json, out var state))
             {
-                File.Copy(filePath, filePath + ".corrupt", overwrite: true);
+                _fileSystem.Copy(filePath, filePath + ".corrupt", overwrite: true);
                 var lastGoodPath = GetLastGoodPath(scopeId);
-                if (File.Exists(lastGoodPath))
+                if (_fileSystem.FileExists(lastGoodPath))
                 {
-                    var lastGood = File.ReadAllText(lastGoodPath, Encoding.UTF8);
+                    var lastGood = _fileSystem.ReadAllText(lastGoodPath, Encoding.UTF8);
                     if (TryDeserialize(lastGood, out state))
                     {
                         return ToSnapshots(state);
@@ -94,9 +105,9 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             if (!string.Equals(state.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
             {
                 var lastGoodPath = GetLastGoodPath(scopeId);
-                if (File.Exists(lastGoodPath))
+                if (_fileSystem.FileExists(lastGoodPath))
                 {
-                    var lastGoodJson = File.ReadAllText(lastGoodPath, Encoding.UTF8);
+                    var lastGoodJson = _fileSystem.ReadAllText(lastGoodPath, Encoding.UTF8);
                     if (TryDeserialize(lastGoodJson, out var lastGoodState) &&
                         string.Equals(lastGoodState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
                     {
@@ -122,7 +133,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         _gate.Wait();
         try
         {
-            Directory.CreateDirectory(_basePath);
+            _fileSystem.CreateDirectory(_basePath);
             var definitionsById = schema.Variables
                 .Where(variable => variable.Id != Guid.Empty)
                 .GroupBy(variable => variable.Id)
@@ -154,13 +165,13 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             var tempPath = GetTempPath(scopeId);
             var lastGoodPath = GetLastGoodPath(scopeId);
 
-            File.WriteAllText(tempPath, json, new UTF8Encoding(false));
-            if (File.Exists(filePath))
+            _fileSystem.WriteAllText(tempPath, json, new UTF8Encoding(false));
+            if (_fileSystem.FileExists(filePath))
             {
-                File.Copy(filePath, lastGoodPath, overwrite: true);
+                _fileSystem.Copy(filePath, lastGoodPath, overwrite: true);
             }
 
-            File.Move(tempPath, filePath, overwrite: true);
+            _fileSystem.Move(tempPath, filePath, overwrite: true);
         }
         finally
         {
@@ -175,23 +186,23 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         _gate.Wait();
         try
         {
-            File.Delete(GetFilePath(scopeId));
-            File.Delete(GetLastGoodPath(scopeId));
-            File.Delete(GetTempPath(scopeId));
+            _fileSystem.DeleteFile(GetFilePath(scopeId));
+            _fileSystem.DeleteFile(GetLastGoodPath(scopeId));
+            _fileSystem.DeleteFile(GetTempPath(scopeId));
             var legacyFilePath = GetLegacyFilePath(scopeId);
             if (legacyFilePath != null)
             {
-                File.Delete(legacyFilePath);
+                _fileSystem.DeleteFile(legacyFilePath);
                 var legacyLastGoodPath = GetLegacyLastGoodPath(scopeId);
                 if (legacyLastGoodPath != null)
                 {
-                    File.Delete(legacyLastGoodPath);
+                    _fileSystem.DeleteFile(legacyLastGoodPath);
                 }
 
                 var legacyTempPath = GetLegacyTempPath(scopeId);
                 if (legacyTempPath != null)
                 {
-                    File.Delete(legacyTempPath);
+                    _fileSystem.DeleteFile(legacyTempPath);
                 }
             }
         }
@@ -222,25 +233,25 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
     private void RecoverInterruptedSave(string scopeId, string filePath)
     {
         var tempPath = GetTempPath(scopeId);
-        if (!File.Exists(tempPath))
+        if (!_fileSystem.FileExists(tempPath))
         {
             return;
         }
 
-        if (File.Exists(filePath))
+        if (_fileSystem.FileExists(filePath))
         {
-            File.Delete(tempPath);
+            _fileSystem.DeleteFile(tempPath);
             return;
         }
 
-        var tempJson = File.ReadAllText(tempPath, Encoding.UTF8);
+        var tempJson = _fileSystem.ReadAllText(tempPath, Encoding.UTF8);
         if (!TryDeserialize(tempJson, out _))
         {
-            File.Delete(tempPath);
+            _fileSystem.DeleteFile(tempPath);
             return;
         }
 
-        File.Move(tempPath, filePath, overwrite: true);
+        _fileSystem.Move(tempPath, filePath, overwrite: true);
     }
 
     private static string BuildStableFileName(string scopeId)
@@ -323,4 +334,47 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
         public Guid? OperatorId { get; init; }
     }
+}
+
+public interface IProjectVariableStateFileSystem
+{
+    void CreateDirectory(string path);
+
+    bool FileExists(string path);
+
+    string ReadAllText(string path, Encoding encoding);
+
+    void WriteAllText(string path, string contents, Encoding encoding);
+
+    void Copy(string sourceFileName, string destFileName, bool overwrite);
+
+    void Move(string sourceFileName, string destFileName, bool overwrite);
+
+    void DeleteFile(string path);
+}
+
+internal sealed class PhysicalProjectVariableStateFileSystem : IProjectVariableStateFileSystem
+{
+    public static PhysicalProjectVariableStateFileSystem Instance { get; } = new();
+
+    private PhysicalProjectVariableStateFileSystem()
+    {
+    }
+
+    public void CreateDirectory(string path) => Directory.CreateDirectory(path);
+
+    public bool FileExists(string path) => File.Exists(path);
+
+    public string ReadAllText(string path, Encoding encoding) => File.ReadAllText(path, encoding);
+
+    public void WriteAllText(string path, string contents, Encoding encoding) =>
+        File.WriteAllText(path, contents, encoding);
+
+    public void Copy(string sourceFileName, string destFileName, bool overwrite) =>
+        File.Copy(sourceFileName, destFileName, overwrite);
+
+    public void Move(string sourceFileName, string destFileName, bool overwrite) =>
+        File.Move(sourceFileName, destFileName, overwrite);
+
+    public void DeleteFile(string path) => File.Delete(path);
 }

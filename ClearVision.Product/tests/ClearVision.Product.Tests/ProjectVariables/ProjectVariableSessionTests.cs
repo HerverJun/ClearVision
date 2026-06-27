@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.ProjectVariables;
@@ -430,6 +431,95 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_Save_WhenWriteTempFails_ShouldKeepCommittedFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableWriteFailure", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var fileSystem = new PhaseFailingProjectVariableStateFileSystem();
+            var store = new JsonFileProjectVariableStateStore(root, fileSystem);
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 3L, 1);
+
+            fileSystem.FailWrites = true;
+            var act = () => SaveSnapshot(store, scopeId, schema, variableId, 9L, 2);
+
+            act.Should().Throw<IOException>().WithMessage("*write failed*");
+            fileSystem.FailWrites = false;
+            LoadLong(store, scopeId, schema, variableId).Should().Be(3L);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Save_WhenLastGoodCopyFails_ShouldKeepCommittedFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableCopyFailure", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var fileSystem = new PhaseFailingProjectVariableStateFileSystem();
+            var store = new JsonFileProjectVariableStateStore(root, fileSystem);
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 3L, 1);
+
+            fileSystem.FailCopies = true;
+            var act = () => SaveSnapshot(store, scopeId, schema, variableId, 9L, 2);
+
+            act.Should().Throw<IOException>().WithMessage("*copy failed*");
+            fileSystem.FailCopies = false;
+            LoadLong(store, scopeId, schema, variableId).Should().Be(3L);
+            Directory.EnumerateFiles(root, "*.tmp").Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Save_WhenMoveFails_ShouldKeepCommittedFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableMoveFailure", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var fileSystem = new PhaseFailingProjectVariableStateFileSystem();
+            var store = new JsonFileProjectVariableStateStore(root, fileSystem);
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 3L, 1);
+
+            fileSystem.FailMoves = true;
+            var act = () => SaveSnapshot(store, scopeId, schema, variableId, 9L, 2);
+
+            act.Should().Throw<IOException>().WithMessage("*move failed*");
+            fileSystem.FailMoves = false;
+            LoadLong(store, scopeId, schema, variableId).Should().Be(3L);
+            Directory.EnumerateFiles(root, "*.tmp").Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void JsonFileStateStore_DefaultPath_ShouldUseLocalAppDataProjectVariableStates()
     {
         var store = new JsonFileProjectVariableStateStore();
@@ -473,6 +563,31 @@ public sealed class ProjectVariableSessionTests
         };
     }
 
+    private static void SaveSnapshot(
+        IProjectVariableStateStore store,
+        string scopeId,
+        ProjectGlobalVariableSchema schema,
+        Guid variableId,
+        long value,
+        long version)
+    {
+        store.Save(
+            scopeId,
+            schema,
+            [new ProjectVariableValueSnapshot(variableId, JsonSerializer.SerializeToElement(value), version, DateTimeOffset.UtcNow, ProjectVariableUpdatedBy.StudioManual, null, null)]);
+    }
+
+    private static long LoadLong(
+        IProjectVariableStateStore store,
+        string scopeId,
+        ProjectGlobalVariableSchema schema,
+        Guid variableId)
+    {
+        using var session = new ProjectVariableSession(schema, store.Load(scopeId, schema));
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        return Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value));
+    }
+
     private sealed class RecordingStateStore : IProjectVariableStateStore
     {
         public bool FailSaves { get; set; }
@@ -503,5 +618,52 @@ public sealed class ProjectVariableSessionTests
         {
             return snapshot with { Value = snapshot.Value.Clone() };
         }
+    }
+
+    private sealed class PhaseFailingProjectVariableStateFileSystem : IProjectVariableStateFileSystem
+    {
+        public bool FailWrites { get; set; }
+
+        public bool FailCopies { get; set; }
+
+        public bool FailMoves { get; set; }
+
+        public void CreateDirectory(string path) => Directory.CreateDirectory(path);
+
+        public bool FileExists(string path) => File.Exists(path);
+
+        public string ReadAllText(string path, Encoding encoding) => File.ReadAllText(path, encoding);
+
+        public void WriteAllText(string path, string contents, Encoding encoding)
+        {
+            if (FailWrites)
+            {
+                throw new IOException("write failed");
+            }
+
+            File.WriteAllText(path, contents, encoding);
+        }
+
+        public void Copy(string sourceFileName, string destFileName, bool overwrite)
+        {
+            if (FailCopies)
+            {
+                throw new IOException("copy failed");
+            }
+
+            File.Copy(sourceFileName, destFileName, overwrite);
+        }
+
+        public void Move(string sourceFileName, string destFileName, bool overwrite)
+        {
+            if (FailMoves)
+            {
+                throw new IOException("move failed");
+            }
+
+            File.Move(sourceFileName, destFileName, overwrite);
+        }
+
+        public void DeleteFile(string path) => File.Delete(path);
     }
 }
