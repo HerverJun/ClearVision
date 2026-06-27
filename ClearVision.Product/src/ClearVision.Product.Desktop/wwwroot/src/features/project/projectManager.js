@@ -16,6 +16,7 @@ class ProjectManager {
         this.currentProject = null;
         this.unsavedChanges = false;
         this.openProjectRequestId = 0;
+        this.savedGlobalVariablesSignature = '';
     }
 
     invalidateOpenProjectRequests() {
@@ -123,6 +124,7 @@ class ProjectManager {
             });
             
             this.currentProject = project;
+            this.rememberGlobalVariableBaseline(project);
             setCurrentProject(project);
             this.unsavedChanges = false;
             this.updateStatusBar(project);
@@ -145,6 +147,7 @@ class ProjectManager {
             const project = await httpClient.post(endpoint);
 
             this.currentProject = project;
+            this.rememberGlobalVariableBaseline(project);
             setCurrentProject(project);
             this.unsavedChanges = false;
             this.updateStatusBar(project);
@@ -189,6 +192,7 @@ class ProjectManager {
             }
             
             this.currentProject = project;
+            this.rememberGlobalVariableBaseline(project);
             setCurrentProject(project);
             this.unsavedChanges = false;
             
@@ -215,13 +219,14 @@ class ProjectManager {
         const data = projectData || this.currentProject;
         const flow = data.flow || data.Flow || this.currentProject.flow || this.currentProject.Flow || null;
         const globalVariables = data.globalVariables || data.GlobalVariables || this.currentProject.globalVariables || this.currentProject.GlobalVariables;
+        const globalVariablesChanged = this.haveGlobalVariablesChanged(globalVariables);
 
         try {
             const updatePayload = {
                 name: data.name,
                 description: data.description
             };
-            if (globalVariables) {
+            if (globalVariablesChanged) {
                 updatePayload.globalVariables = globalVariables;
             }
 
@@ -246,6 +251,7 @@ class ProjectManager {
             setCurrentProject(this.currentProject);
             this.currentProject.modifiedAt = new Date().toISOString();
             this.unsavedChanges = false;
+            this.rememberGlobalVariableBaseline(this.currentProject);
             this.rememberProjectInCaches(this.currentProject);
             this.updateStatusBar(this.currentProject);
             this.updateTitle();
@@ -295,6 +301,7 @@ class ProjectManager {
         }
 
         this.currentProject = null;
+        this.savedGlobalVariablesSignature = '';
         setCurrentProject(null);
         this.unsavedChanges = false;
         this.updateStatusBar(null);
@@ -367,6 +374,7 @@ class ProjectManager {
             flow: savedProject.flow || this.currentProject.flow,
             globalVariables: saved
         };
+        this.rememberGlobalVariableBaseline(this.currentProject);
         setCurrentProject(this.currentProject);
         this.unsavedChanges = false;
         this.rememberProjectInCaches(this.currentProject);
@@ -385,6 +393,15 @@ class ProjectManager {
      */
     getCurrentProject() {
         return this.currentProject;
+    }
+
+    rememberGlobalVariableBaseline(project = this.currentProject) {
+        this.savedGlobalVariablesSignature = getGlobalVariablesSignature(project?.globalVariables || project?.GlobalVariables);
+    }
+
+    haveGlobalVariablesChanged(globalVariables) {
+        const signature = getGlobalVariablesSignature(globalVariables);
+        return Boolean(signature) && signature !== this.savedGlobalVariablesSignature;
     }
 
     /**
@@ -482,6 +499,14 @@ function toUpdateFlowRequest(flow) {
         operators: Array.isArray(flow?.operators) ? flow.operators : (flow?.Operators || []),
         connections: Array.isArray(flow?.connections) ? flow.connections : (flow?.Connections || [])
     };
+}
+
+function getGlobalVariablesSignature(globalVariables) {
+    if (!globalVariables) {
+        return '';
+    }
+
+    return JSON.stringify(globalVariables);
 }
 
 function isProjectPayload(value) {
