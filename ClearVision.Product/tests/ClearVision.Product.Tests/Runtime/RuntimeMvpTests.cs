@@ -286,6 +286,49 @@ public class RuntimeMvpTests
     }
 
     [Fact]
+    public async Task RuntimeHost_ProjectVariables_WhenStateStoreSaveFails_ShouldKeepManualWriteOutOfMemory()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var project = CreateProjectDto("station-global-variable-save-failure");
+            project.GlobalVariables = CreateSingleInt64GlobalVariableSchema(variableId, 4L, manualWriteAllowed: true);
+            var exporter = new RuntimePackageExporter(new OperatorFactory(), NullLogger<RuntimePackageExporter>.Instance);
+            var export = await exporter.ExportAsync(new RuntimePackageExportRequest
+            {
+                Project = project,
+                TargetRootDirectory = root
+            });
+            var stateStore = new FailingRuntimeProjectVariableStateStore();
+
+            await using var runtimeHost = new RuntimeHost(
+                CreateFlowExecutionService(new DeterministicJudgmentExecutor()),
+                new RuntimePackageLoader(new RuntimePackageValidator(), NullLogger<RuntimePackageLoader>.Instance),
+                new RuntimeResultNormalizer(),
+                NullLogger<RuntimeHost>.Instance,
+                projectVariableStateStore: stateStore);
+
+            await runtimeHost.LoadPackageAsync(export.PackageRootPath);
+            stateStore.FailSaves = true;
+
+            var edit = async () => await runtimeHost.SetProjectVariableValueAsync(variableId, 9L);
+
+            await edit.Should().ThrowAsync<RuntimePackageException>()
+                .WithMessage("*GV030*");
+            runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
+                snapshot.VariableId == variableId &&
+                Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 4L &&
+                snapshot.Version == 0);
+            stateStore.SavedSnapshots.Should().BeEmpty();
+        }
+        finally
+        {
+            SafeDeleteDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task RuntimeHost_ProjectVariables_ShouldRejectStationEditAndResetWhileRunning()
     {
         var root = CreateTempDirectory();
@@ -765,6 +808,38 @@ public class RuntimeMvpTests
             executors,
             NullLogger<FlowExecutionService>.Instance,
             new VariableContext());
+    }
+
+    private sealed class FailingRuntimeProjectVariableStateStore : IProjectVariableStateStore
+    {
+        public bool FailSaves { get; set; }
+
+        public IReadOnlyList<ProjectVariableValueSnapshot> SavedSnapshots { get; private set; } = [];
+
+        public IReadOnlyList<ProjectVariableValueSnapshot> Load(string scopeId, ProjectGlobalVariableSchema schema)
+        {
+            return SavedSnapshots.Select(CloneSnapshot).ToList();
+        }
+
+        public void Save(string scopeId, ProjectGlobalVariableSchema schema, IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
+        {
+            if (FailSaves)
+            {
+                throw new IOException("simulated runtime state-store failure");
+            }
+
+            SavedSnapshots = snapshots.Select(CloneSnapshot).ToList();
+        }
+
+        public void Delete(string scopeId)
+        {
+            SavedSnapshots = [];
+        }
+
+        private static ProjectVariableValueSnapshot CloneSnapshot(ProjectVariableValueSnapshot snapshot)
+        {
+            return snapshot with { Value = snapshot.Value.Clone() };
+        }
     }
 
     private static async Task WaitForStateAsync(RuntimeHost runtimeHost, RuntimeHostState state, TimeSpan timeout)

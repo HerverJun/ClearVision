@@ -74,6 +74,63 @@ public sealed class ProjectGlobalVariableSchemaTests
     }
 
     [Fact]
+    public void BuildDependencyEdges_WhenBindingExpressionReadsVariable_AddsWriterToReaderEdge()
+    {
+        var sourceVariableId = Guid.NewGuid();
+        var targetVariableId = Guid.NewGuid();
+        var sourcePortId = Guid.NewGuid();
+        var targetParameterId = Guid.NewGuid();
+        var writer = new Operator(Guid.NewGuid(), "Writer", OperatorType.Thresholding, 0, 0);
+        writer.LoadOutputPort(sourcePortId, "Count", PortDataType.Integer);
+        var reader = new Operator(Guid.NewGuid(), "Reader", OperatorType.ResultJudgment, 10, 0);
+        reader.AddParameter(new Parameter(targetParameterId, "ExpectedCount", "ExpectedCount", "", "int", 0));
+        var flow = new OperatorFlow("flow");
+        flow.AddOperator(writer);
+        flow.AddOperator(reader);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                Variable("stats.source", ProjectGlobalVariableValueType.Int64, 0, sourceVariableId),
+                Variable("stats.target", ProjectGlobalVariableValueType.Int64, 0, targetVariableId)
+            ],
+            SourceBindings =
+            [
+                new ProjectGlobalVariableSourceBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = sourceVariableId,
+                    OperatorId = writer.Id,
+                    OutputPortId = sourcePortId,
+                    OperatorName = writer.Name,
+                    OutputPortName = "Count"
+                }
+            ],
+            TargetBindings =
+            [
+                new ProjectGlobalVariableTargetBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = targetVariableId,
+                    OperatorId = reader.Id,
+                    ParameterId = targetParameterId,
+                    OperatorName = reader.Name,
+                    ParameterName = "ExpectedCount",
+                    Expression = "value + stats.source"
+                }
+            ]
+        };
+
+        var edges = ProjectGlobalVariableFlowValidator.BuildDependencyEdges(flow, schema, [writer, reader]);
+
+        edges.Should().Contain(edge =>
+            edge.SourceOperatorId == writer.Id &&
+            edge.TargetOperatorId == reader.Id &&
+            edge.VariableName == "stats.source" &&
+            edge.Kind == ProjectVariableFlowEdgeKind.GlobalVariable);
+    }
+
+    [Fact]
     public void Validate_WhenStringVariableTargetsNumericParameter_ReturnsDiagnostic()
     {
         var variableId = Guid.NewGuid();
@@ -287,6 +344,27 @@ public sealed class ProjectGlobalVariableSchemaTests
     }
 
     [Fact]
+    public void Validate_WhenVariableIdExistsButNameIsStale_ShouldUseIdAsAuthoritative()
+    {
+        var variableId = Guid.NewGuid();
+        var read = new Operator(Guid.NewGuid(), "Read", OperatorType.VariableRead, 0, 0);
+        read.AddParameter(new Parameter(Guid.NewGuid(), "Scope", "Scope", "", "enum", "Project"));
+        read.AddParameter(new Parameter(Guid.NewGuid(), "VariableId", "VariableId", "", "string", variableId.ToString()));
+        read.AddParameter(new Parameter(Guid.NewGuid(), "VariableName", "VariableName", "", "string", "stats.old"));
+        read.AddParameter(new Parameter(Guid.NewGuid(), "DataType", "DataType", "", "enum", "Int"));
+        var flow = new OperatorFlow("stale-name");
+        flow.AddOperator(read);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.current", ProjectGlobalVariableValueType.Int64, 1, variableId)]
+        };
+
+        var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
+
+        diagnostics.Select(item => item.Code).Should().NotContain("GV008").And.NotContain("GV026");
+    }
+
+    [Fact]
     public void Validate_WhenBindingExpressionIsInvalid_ReturnsGv033()
     {
         var variableId = Guid.NewGuid();
@@ -317,6 +395,89 @@ public sealed class ProjectGlobalVariableSchemaTests
         var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema, flow);
 
         diagnostics.Should().Contain(item => item.Code == "GV033");
+    }
+
+    [Theory]
+    [InlineData("true || missing.value")]
+    [InlineData("false && missing.value")]
+    public void ExpressionEvaluator_WhenShortCircuitRhsReferencesUnknownVariable_ShouldReject(string expression)
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            expression,
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out _,
+            out var error);
+
+        ok.Should().BeFalse();
+        error.Should().Contain("Unknown variable");
+    }
+
+    [Fact]
+    public void ExpressionEvaluator_WhenInt64ExceedsDoublePrecision_ShouldPreserveExactInteger()
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            "9007199254740993 + 1",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out var value,
+            out var error);
+
+        ok.Should().BeTrue(error);
+        value.Should().Be(9007199254740994L);
+    }
+
+    [Fact]
+    public void ExpressionEvaluator_WhenComparingLargeIntegers_ShouldPreserveOrdering()
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            "9007199254740993 > 9007199254740992",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out var value,
+            out var error);
+
+        ok.Should().BeTrue(error);
+        value.Should().Be(true);
+    }
+
+    [Fact]
+    public void ExpressionEvaluator_WhenInt64ArithmeticOverflows_ShouldReject()
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            $"{long.MaxValue} + 1",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out _,
+            out var error);
+
+        ok.Should().BeFalse();
+        error.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void ExpressionEvaluator_WhenDividingByZero_ShouldReject()
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            "10 / 0",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out _,
+            out var error);
+
+        ok.Should().BeFalse();
+        error.Should().Contain("Division by zero");
+    }
+
+    [Fact]
+    public void ValueTransform_WhenFlooringLargeFractionalNumericText_ShouldPreserveExactInt64()
+    {
+        var ok = ProjectVariableValueTransform.TryConvertToVariableValue(
+            "9007199254740993.75",
+            ProjectGlobalVariableValueType.Int64,
+            ProjectVariableConversionMode.Floor,
+            expression: null,
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out var converted,
+            out var error);
+
+        ok.Should().BeTrue(error);
+        converted.GetInt64().Should().Be(9007199254740993L);
     }
 
     [Fact]

@@ -143,7 +143,10 @@ public static class ApiEndpoints
             ProjectService service,
             IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
-            if (request.GlobalVariables != null && IsProjectRuntimeBusy(id, runtimeCoordinator))
+            await using var mutationLease = request.GlobalVariables != null
+                ? await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "project-update", CancellationToken.None)
+                : null;
+            if (request.GlobalVariables != null && mutationLease == null)
             {
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
@@ -155,13 +158,22 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
             }
         });
 
         // 鍒犻櫎宸ョ▼
-        app.MapDelete("/api/projects/{id:guid}", async (Guid id, ProjectService service) =>
+        app.MapDelete("/api/projects/{id:guid}", async (
+            Guid id,
+            ProjectService service,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "project-delete", CancellationToken.None);
+            if (mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
             try
             {
                 await service.DeleteAsync(id);
@@ -169,13 +181,23 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
             }
         });
 
         // 鏇存柊娴佺▼
-        app.MapPut("/api/projects/{id:guid}/flow", async (Guid id, UpdateFlowRequest request, ProjectService service) =>
+        app.MapPut("/api/projects/{id:guid}/flow", async (
+            Guid id,
+            UpdateFlowRequest request,
+            ProjectService service,
+            IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "flow-update", CancellationToken.None);
+            if (mutationLease == null)
+            {
+                return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
+            }
+
             try
             {
                 // 浣跨敤 ProjectService 澶勭悊鏇存柊锛屽畠鐜板湪浣跨敤鏂囦欢瀛樺偍
@@ -187,7 +209,7 @@ public static class ApiEndpoints
             catch (Exception ex)
             {
                 // 鏃ュ織宸茬敱鍏ㄥ眬寮傚父涓棿浠惰褰?
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
             }
         });
 
@@ -203,7 +225,8 @@ public static class ApiEndpoints
             ProjectService service,
             IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
-            if (IsProjectRuntimeBusy(id, runtimeCoordinator))
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-schema-update", CancellationToken.None);
+            if (mutationLease == null)
             {
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
@@ -215,7 +238,7 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
             }
         });
 
@@ -242,7 +265,8 @@ public static class ApiEndpoints
             ProjectVariableSessionRegistry sessions,
             IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
-            if (IsProjectRuntimeBusy(id, runtimeCoordinator))
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-manual-write", CancellationToken.None);
+            if (mutationLease == null)
             {
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
@@ -266,13 +290,21 @@ public static class ApiEndpoints
 
             try
             {
-                session.SetValue(variableId, request.Value, ProjectVariableUpdatedBy.StudioManual);
-                sessions.Save(id, session);
-                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
+                if (!sessions.TryMutateAndPersist(
+                        id,
+                        project.GlobalVariables,
+                        candidate => candidate.SetValue(variableId, request.Value, ProjectVariableUpdatedBy.StudioManual),
+                        out var updatedSession,
+                        out var error))
+                {
+                    return Results.BadRequest(new { Code = "GV032", Error = error });
+                }
+
+                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
             }
         });
 
@@ -282,7 +314,8 @@ public static class ApiEndpoints
             ProjectVariableSessionRegistry sessions,
             IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
-            if (IsProjectRuntimeBusy(id, runtimeCoordinator))
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-reset-all", CancellationToken.None);
+            if (mutationLease == null)
             {
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
@@ -293,7 +326,6 @@ public static class ApiEndpoints
                 return Results.NotFound();
             }
 
-            var session = sessions.GetOrCreate(project);
             var blockedVariable = project.GlobalVariables.Variables.FirstOrDefault(variable => !variable.ManualWriteAllowed);
             if (blockedVariable != null)
             {
@@ -306,9 +338,17 @@ public static class ApiEndpoints
                 });
             }
 
-            session.ResetAll(ProjectVariableUpdatedBy.Reset);
-            sessions.Save(id, session);
-            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
+            if (!sessions.TryMutateAndPersist(
+                    id,
+                    project.GlobalVariables,
+                    candidate => candidate.ResetAll(ProjectVariableUpdatedBy.Reset),
+                    out var updatedSession,
+                    out var error))
+            {
+                return Results.BadRequest(new { Code = "GV032", Error = error });
+            }
+
+            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
         });
 
         app.MapPost("/api/projects/{id:guid}/global-variable-values/{variableId:guid}/reset", async (
@@ -318,7 +358,8 @@ public static class ApiEndpoints
             ProjectVariableSessionRegistry sessions,
             IInspectionRuntimeCoordinator runtimeCoordinator) =>
         {
-            if (IsProjectRuntimeBusy(id, runtimeCoordinator))
+            await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-reset-one", CancellationToken.None);
+            if (mutationLease == null)
             {
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
@@ -340,9 +381,17 @@ public static class ApiEndpoints
                 return Results.BadRequest(new { Code = "GV030", Error = "Manual reset is not allowed for this variable." });
             }
 
-            session.Reset(variableId, ProjectVariableUpdatedBy.Reset);
-            sessions.Save(id, session);
-            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
+            if (!sessions.TryMutateAndPersist(
+                    id,
+                    project.GlobalVariables,
+                    candidate => candidate.Reset(variableId, ProjectVariableUpdatedBy.Reset),
+                    out var updatedSession,
+                    out var error))
+            {
+                return Results.BadRequest(new { Code = "GV032", Error = error });
+            }
+
+            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
         });
 
         app.MapPost("/api/projects/{id:guid}/runtime-package/export", async (
@@ -351,6 +400,7 @@ public static class ApiEndpoints
             ProjectService service,
             RuntimePackageExporter exporter,
             StationPackageStore packageStore,
+            IInspectionRuntimeCoordinator runtimeCoordinator,
             HttpContext context,
             CancellationToken cancellationToken) =>
         {
@@ -359,6 +409,12 @@ public static class ApiEndpoints
                 if (!IsAdmin(context))
                 {
                     return Results.Json(new { Error = "AdminRequired" }, statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "runtime-package-export", cancellationToken);
+                if (mutationLease == null)
+                {
+                    return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
                 }
 
                 var project = await service.GetByIdAsync(id);
@@ -411,7 +467,7 @@ public static class ApiEndpoints
             }
             catch (Exception ex)
             {
-                return Results.BadRequest(new { Error = ex.Message });
+                return ToBadRequest(ex);
             }
         });
     }
@@ -626,6 +682,32 @@ public static class ApiEndpoints
         }
 
         return ProjectVariableValueConverter.ToObject(value);
+    }
+
+    private static IResult ToBadRequest(Exception ex)
+    {
+        return TryParseStableError(ex.Message, out var code, out var message)
+            ? Results.BadRequest(new { Code = code, Error = message })
+            : Results.BadRequest(new { Error = ex.Message });
+    }
+
+    private static bool TryParseStableError(string? message, out string code, out string error)
+    {
+        code = string.Empty;
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(message) ||
+            message.Length < 5 ||
+            message[0] != 'G' ||
+            message[1] != 'V')
+        {
+            return false;
+        }
+
+        code = message[..5];
+        error = message.Length > 5 && message[5] == ':'
+            ? message[6..].TrimStart()
+            : message;
+        return true;
     }
 
     private static bool IsProjectRuntimeBusy(Guid projectId, IInspectionRuntimeCoordinator runtimeCoordinator)

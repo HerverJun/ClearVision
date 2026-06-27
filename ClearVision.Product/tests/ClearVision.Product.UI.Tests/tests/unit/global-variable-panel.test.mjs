@@ -317,10 +317,38 @@ test('global variable panel saves edited schema, keeps id and preserves dirty dr
   assert.match(panel.errorMessage, /server says no/);
 });
 
-test('delete is blocked with source or target references and exposes binding details', async () => {
+test('delete is blocked with binding, operator and expression references and exposes details', async () => {
   installDom();
   const { default: GlobalVariablePanel } = await import('../../../../src/ClearVision.Product.Desktop/wwwroot/src/features/global-variables/globalVariablePanel.js');
   const project = createProject();
+  project.globalVariables.variables.push({
+    id: 'var-other',
+    name: 'judge.other_count',
+    displayName: '其他数量',
+    description: '',
+    valueType: 'Int64',
+    initialValue: '0',
+    manualWriteAllowed: true,
+    includeInResultMetadata: false,
+    order: 2
+  });
+  project.globalVariables.sourceBindings.push({
+    id: 'bind-source',
+    variableId: 'var-count',
+    operatorId: 'op-counter',
+    outputPortId: 'out-count',
+    operatorName: '计数算子',
+    outputPortName: '数量'
+  });
+  project.globalVariables.sourceBindings.push({
+    id: 'bind-expression-source',
+    variableId: 'var-other',
+    operatorId: 'op-counter',
+    outputPortId: 'out-count',
+    operatorName: '表达式来源',
+    outputPortName: '数量',
+    expression: 'value + judge.expected_count'
+  });
   project.globalVariables.targetBindings.push({
     id: 'bind-target',
     variableId: 'var-count',
@@ -329,6 +357,57 @@ test('delete is blocked with source or target references and exposes binding det
     operatorName: '计数算子',
     parameterName: '阈值'
   });
+  project.globalVariables.targetBindings.push({
+    id: 'bind-expression-target',
+    variableId: 'var-other',
+    operatorId: 'op-counter',
+    parameterId: 'param-threshold',
+    operatorName: '表达式目标',
+    parameterName: '阈值',
+    expression: 'judge.expected_count + 1'
+  });
+  project.flow.operators.push(
+    {
+      id: 'op-read',
+      type: 'VariableRead',
+      name: '读取变量',
+      parameters: [
+        { name: 'Scope', value: 'Project' },
+        { name: 'VariableId', value: 'var-count' },
+        { name: 'VariableName', value: 'judge.expected_count' }
+      ]
+    },
+    {
+      id: 'op-write',
+      type: 81,
+      name: '写入变量',
+      parameters: [
+        { name: 'Scope', value: 'Project' },
+        { name: 'VariableId', value: 'var-count' },
+        { name: 'VariableName', value: 'judge.expected_count' }
+      ]
+    },
+    {
+      id: 'op-increment',
+      type: 'VariableIncrement',
+      name: '递增变量',
+      parameters: [
+        { name: 'Scope', value: 'Project' },
+        { name: 'VariableName', value: 'judge.expected_count' }
+      ]
+    },
+    {
+      id: 'op-expression',
+      type: 'VariableWrite',
+      name: '表达式写入',
+      parameters: [
+        { name: 'Scope', value: 'Project' },
+        { name: 'VariableId', value: 'var-other' },
+        { name: 'VariableName', value: 'judge.other_count' },
+        { name: 'Expression', value: 'judge.expected_count + value' }
+      ]
+    }
+  );
   const panel = new GlobalVariablePanel('global-variables-root', { showToast() {} });
   panel.project = project;
   panel.schema = project.globalVariables;
@@ -338,9 +417,18 @@ test('delete is blocked with source or target references and exposes binding det
   const deleted = await panel.deleteSelectedVariable();
 
   assert.equal(deleted, false);
-  assert.equal(panel.schema.variables.length, 1);
+  assert.equal(panel.schema.variables.length, 2);
   assert.match(panel.errorMessage, /仍被引用/);
-  assert.deepEqual(panel.getVariableReferences('var-count'), ['目标：计数算子.阈值']);
+  assert.deepEqual(panel.getVariableReferences('var-count'), [
+    '来源：计数算子.数量',
+    '目标：计数算子.阈值',
+    '算子：读取变量.读取',
+    '算子：写入变量.写入',
+    '算子：递增变量.递增',
+    '表达式：来源：表达式来源.数量',
+    '表达式：目标：表达式目标.阈值',
+    '表达式：算子：表达式写入'
+  ]);
 });
 
 test('source and target bindings use compatible filtering and locate canvas nodes', async () => {

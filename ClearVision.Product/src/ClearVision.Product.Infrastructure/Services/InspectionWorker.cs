@@ -483,7 +483,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                     () => ResolveContinuousInspectionMode(flow, cameraId),
                     _imageCacheRepository,
                     projectVariableSession,
-                    projectVariableBindingIndex);
+                    projectVariableBindingIndex,
+                    CreateProjectVariableCommitHandler(projectId, projectVariableSessions));
                 return;
             }
         }
@@ -911,6 +912,21 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         return ImageAcquisitionFlowAnalyzer.TryResolveCameraId(flow, cameraId, out resolvedCameraId);
     }
 
+    private static ProjectVariableCommitHandler? CreateProjectVariableCommitHandler(
+        Guid projectId,
+        ProjectVariableSessionRegistry? projectVariableSessions)
+    {
+        if (projectVariableSessions == null)
+        {
+            return null;
+        }
+
+        return (workingSession, expectedVersions) =>
+            projectVariableSessions.TryCommitAndPersist(projectId, workingSession, expectedVersions, out _, out var error)
+                ? ProjectVariableCommitResult.Success()
+                : ProjectVariableCommitResult.Failure(error);
+    }
+
     private async Task<InspectionResult> ExecuteCycleAsync(
         Guid projectId,
         Guid sessionId,
@@ -988,15 +1004,12 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
                 : await flowExecution.ExecuteFlowAsync(
                     flow,
                     inputData,
-                    new ProjectVariableExecutionContext(projectVariableSession, projectVariableBindingIndex, Guid.NewGuid()),
+                    new ProjectVariableExecutionContext(
+                        projectVariableSession,
+                        projectVariableBindingIndex,
+                        Guid.NewGuid(),
+                        commitHandler: CreateProjectVariableCommitHandler(projectId, projectVariableSessions)),
                     cancellationToken: ct);
-            if (projectVariableSessions != null &&
-                projectVariableSession != null &&
-                flowResult.IsSuccess &&
-                !flowResult.WasShortCircuited)
-            {
-                projectVariableSessions.Save(projectId, projectVariableSession);
-            }
 
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;

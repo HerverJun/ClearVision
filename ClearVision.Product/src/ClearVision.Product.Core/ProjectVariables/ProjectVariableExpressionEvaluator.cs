@@ -5,6 +5,34 @@ namespace ClearVision.Product.Core.ProjectVariables;
 
 public static class ProjectVariableExpressionEvaluator
 {
+    public const int MaxExpressionLength = 2048;
+    public const int MaxTokenCount = 512;
+    public const int MaxAstDepth = 64;
+    public const int MaxFunctionArgumentCount = 8;
+
+    public static bool TryCompile(
+        string expression,
+        IEnumerable<string> knownVariableNames,
+        out string? error)
+    {
+        error = null;
+        try
+        {
+            var variables = knownVariableNames
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(name => name, _ => (object?)null, StringComparer.OrdinalIgnoreCase);
+            var parser = new Parser(expression, variables, parseOnly: true);
+            parser.Parse();
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or OverflowException or DivideByZeroException)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
     public static bool TryEvaluate(
         string expression,
         IReadOnlyDictionary<string, object?> variables,
@@ -22,11 +50,11 @@ public static class ProjectVariableExpressionEvaluator
 
         try
         {
-            var parser = new Parser(expression, variables);
+            var parser = new Parser(expression, variables, parseOnly: false);
             value = parser.Parse();
             return true;
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or OverflowException or DivideByZeroException)
         {
             error = ex.Message;
             return false;
@@ -37,12 +65,21 @@ public static class ProjectVariableExpressionEvaluator
     {
         private readonly string _text;
         private readonly IReadOnlyDictionary<string, object?> _variables;
+        private readonly bool _parseOnly;
         private int _position;
+        private int _tokenCount;
+        private int _depth;
 
-        public Parser(string text, IReadOnlyDictionary<string, object?> variables)
+        public Parser(string text, IReadOnlyDictionary<string, object?> variables, bool parseOnly)
         {
+            if (text.Length > MaxExpressionLength)
+            {
+                throw new InvalidOperationException($"Expression exceeds maximum length {MaxExpressionLength}.");
+            }
+
             _text = text;
             _variables = variables;
+            _parseOnly = parseOnly;
         }
 
         public object Parse()
@@ -62,7 +99,8 @@ public static class ProjectVariableExpressionEvaluator
             var left = ParseAnd();
             while (Match("||"))
             {
-                left = ToBool(left) || ToBool(ParseAnd());
+                var right = ParseAnd();
+                left = _parseOnly ? true : ToBool(left) || ToBool(right);
             }
 
             return left;
@@ -73,7 +111,8 @@ public static class ProjectVariableExpressionEvaluator
             var left = ParseEquality();
             while (Match("&&"))
             {
-                left = ToBool(left) && ToBool(ParseEquality());
+                var right = ParseEquality();
+                left = _parseOnly ? true : ToBool(left) && ToBool(right);
             }
 
             return left;
@@ -86,11 +125,13 @@ public static class ProjectVariableExpressionEvaluator
             {
                 if (Match("=="))
                 {
-                    left = AreEqual(left, ParseComparison());
+                    var right = ParseComparison();
+                    left = _parseOnly ? true : AreEqual(left, right);
                 }
                 else if (Match("!="))
                 {
-                    left = !AreEqual(left, ParseComparison());
+                    var right = ParseComparison();
+                    left = _parseOnly ? true : !AreEqual(left, right);
                 }
                 else
                 {
@@ -106,19 +147,23 @@ public static class ProjectVariableExpressionEvaluator
             {
                 if (Match(">="))
                 {
-                    left = ToDouble(left) >= ToDouble(ParseAdditive());
+                    var right = ParseAdditive();
+                    left = _parseOnly ? true : CompareValues(left, right) >= 0;
                 }
                 else if (Match("<="))
                 {
-                    left = ToDouble(left) <= ToDouble(ParseAdditive());
+                    var right = ParseAdditive();
+                    left = _parseOnly ? true : CompareValues(left, right) <= 0;
                 }
                 else if (Match(">"))
                 {
-                    left = ToDouble(left) > ToDouble(ParseAdditive());
+                    var right = ParseAdditive();
+                    left = _parseOnly ? true : CompareValues(left, right) > 0;
                 }
                 else if (Match("<"))
                 {
-                    left = ToDouble(left) < ToDouble(ParseAdditive());
+                    var right = ParseAdditive();
+                    left = _parseOnly ? true : CompareValues(left, right) < 0;
                 }
                 else
                 {
@@ -134,11 +179,13 @@ public static class ProjectVariableExpressionEvaluator
             {
                 if (Match("+"))
                 {
-                    left = EnsureFinite(ToDouble(left) + ToDouble(ParseMultiplicative()));
+                    var right = ParseMultiplicative();
+                    left = _parseOnly ? 0L : AddValues(left, right);
                 }
                 else if (Match("-"))
                 {
-                    left = EnsureFinite(ToDouble(left) - ToDouble(ParseMultiplicative()));
+                    var right = ParseMultiplicative();
+                    left = _parseOnly ? 0L : SubtractValues(left, right);
                 }
                 else
                 {
@@ -154,15 +201,18 @@ public static class ProjectVariableExpressionEvaluator
             {
                 if (Match("*"))
                 {
-                    left = EnsureFinite(ToDouble(left) * ToDouble(ParseUnary()));
+                    var right = ParseUnary();
+                    left = _parseOnly ? 0L : MultiplyValues(left, right);
                 }
                 else if (Match("/"))
                 {
-                    left = EnsureFinite(ToDouble(left) / ToDouble(ParseUnary()));
+                    var right = ParseUnary();
+                    left = _parseOnly ? 0L : DivideValues(left, right);
                 }
                 else if (Match("%"))
                 {
-                    left = EnsureFinite(ToDouble(left) % ToDouble(ParseUnary()));
+                    var right = ParseUnary();
+                    left = _parseOnly ? 0L : ModuloValues(left, right);
                 }
                 else
                 {
@@ -175,17 +225,20 @@ public static class ProjectVariableExpressionEvaluator
         {
             if (Match("+"))
             {
-                return EnsureFinite(ToDouble(ParseUnary()));
+                var value = ParseUnary();
+                return _parseOnly ? 0L : NormalizeNumeric(value);
             }
 
             if (Match("-"))
             {
-                return EnsureFinite(-ToDouble(ParseUnary()));
+                var value = ParseUnary();
+                return _parseOnly ? 0L : NegateValue(value);
             }
 
             if (Match("!"))
             {
-                return !ToBool(ParseUnary());
+                var value = ParseUnary();
+                return _parseOnly ? true : !ToBool(value);
             }
 
             return ParsePrimary();
@@ -196,9 +249,12 @@ public static class ProjectVariableExpressionEvaluator
             SkipWhiteSpace();
             if (Match("("))
             {
-                var value = ParseOr();
-                Expect(")");
-                return value;
+                return WithDepth(() =>
+                {
+                    var value = ParseOr();
+                    Expect(")");
+                    return value;
+                });
             }
 
             if (PeekNumberStart())
@@ -217,6 +273,10 @@ public static class ProjectVariableExpressionEvaluator
                         do
                         {
                             args.Add(ParseOr());
+                            if (args.Count > MaxFunctionArgumentCount)
+                            {
+                                throw Error($"Expression function argument count exceeds {MaxFunctionArgumentCount}.");
+                            }
                         }
                         while (Match(","));
                         Expect(")");
@@ -240,15 +300,16 @@ public static class ProjectVariableExpressionEvaluator
                     throw Error($"Unknown variable '{identifier}'.");
                 }
 
-                return NormalizeValue(variableValue, identifier);
+                return _parseOnly ? 0L : NormalizeValue(variableValue, identifier);
             }
 
             throw Error("Expected expression.");
         }
 
-        private double ParseNumber()
+        private object ParseNumber()
         {
             SkipWhiteSpace();
+            CountToken();
             var start = _position;
             while (_position < _text.Length &&
                    (char.IsDigit(_text[_position]) ||
@@ -263,18 +324,31 @@ public static class ProjectVariableExpressionEvaluator
             }
 
             var token = _text[start.._position];
-            if (!double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ||
-                !double.IsFinite(value))
+            var isIntegerLiteral = token.IndexOfAny(['.', 'e', 'E']) < 0;
+            if (isIntegerLiteral &&
+                long.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longValue))
+            {
+                return longValue;
+            }
+
+            if (decimal.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out var decimalValue))
+            {
+                return decimalValue;
+            }
+
+            if (!double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out var doubleValue) ||
+                !double.IsFinite(doubleValue))
             {
                 throw Error($"Invalid numeric literal '{token}'.");
             }
 
-            return value;
+            return doubleValue;
         }
 
         private string ParseIdentifier()
         {
             SkipWhiteSpace();
+            CountToken();
             var start = _position;
             while (_position < _text.Length &&
                    (char.IsLetterOrDigit(_text[_position]) || _text[_position] is '_' or '.'))
@@ -287,16 +361,26 @@ public static class ProjectVariableExpressionEvaluator
 
         private object EvaluateFunction(string name, IReadOnlyList<object> args)
         {
+            if (_parseOnly)
+            {
+                return name.ToLowerInvariant() switch
+                {
+                    "round" or "floor" or "ceil" or "ceiling" or "truncate" or "trunc" or "abs" or "sqrt" when args.Count == 1 => 0L,
+                    "min" or "max" or "pow" when args.Count == 2 => 0L,
+                    _ => throw Error($"Unsupported expression function '{name}' or wrong argument count.")
+                };
+            }
+
             return name.ToLowerInvariant() switch
             {
                 "round" when args.Count == 1 => Math.Round(ToDouble(args[0]), MidpointRounding.AwayFromZero),
                 "floor" when args.Count == 1 => Math.Floor(ToDouble(args[0])),
                 "ceil" or "ceiling" when args.Count == 1 => Math.Ceiling(ToDouble(args[0])),
                 "truncate" or "trunc" when args.Count == 1 => Math.Truncate(ToDouble(args[0])),
-                "abs" when args.Count == 1 => Math.Abs(ToDouble(args[0])),
+                "abs" when args.Count == 1 => AbsValue(args[0]),
                 "sqrt" when args.Count == 1 => EnsureFinite(Math.Sqrt(ToDouble(args[0]))),
-                "min" when args.Count == 2 => Math.Min(ToDouble(args[0]), ToDouble(args[1])),
-                "max" when args.Count == 2 => Math.Max(ToDouble(args[0]), ToDouble(args[1])),
+                "min" when args.Count == 2 => LessThanOrEqual(args[0], args[1]) ? args[0] : args[1],
+                "max" when args.Count == 2 => LessThanOrEqual(args[0], args[1]) ? args[1] : args[0],
                 "pow" when args.Count == 2 => EnsureFinite(Math.Pow(ToDouble(args[0]), ToDouble(args[1]))),
                 _ => throw Error($"Unsupported expression function '{name}' or wrong argument count.")
             };
@@ -311,6 +395,7 @@ public static class ProjectVariableExpressionEvaluator
             }
 
             _position += token.Length;
+            CountToken();
             return true;
         }
 
@@ -344,6 +429,33 @@ public static class ProjectVariableExpressionEvaluator
 
         private InvalidOperationException Error(string message) => new($"{message} Position={_position}.");
 
+        private void CountToken()
+        {
+            _tokenCount++;
+            if (_tokenCount > MaxTokenCount)
+            {
+                throw Error($"Expression token count exceeds {MaxTokenCount}.");
+            }
+        }
+
+        private object WithDepth(Func<object> parse)
+        {
+            _depth++;
+            if (_depth > MaxAstDepth)
+            {
+                throw Error($"Expression AST depth exceeds {MaxAstDepth}.");
+            }
+
+            try
+            {
+                return parse();
+            }
+            finally
+            {
+                _depth--;
+            }
+        }
+
         private static object NormalizeValue(object? value, string name)
         {
             if (value is JsonElement element)
@@ -362,7 +474,7 @@ public static class ProjectVariableExpressionEvaluator
                 return ToBool(left) == ToBool(right);
             }
 
-            return Math.Abs(ToDouble(left) - ToDouble(right)) < 1e-12;
+            return ToDecimal(left) == ToDecimal(right);
         }
 
         private static bool ToBool(object value)
@@ -371,8 +483,152 @@ public static class ProjectVariableExpressionEvaluator
             {
                 bool boolean => boolean,
                 string text when bool.TryParse(text, out var parsed) => parsed,
+                long longValue => longValue != 0,
+                int intValue => intValue != 0,
+                decimal decimalValue => decimalValue != 0m,
                 _ => Math.Abs(ToDouble(value)) > double.Epsilon
             };
+        }
+
+        private static object NormalizeNumeric(object value)
+        {
+            _ = ToDecimal(value);
+            return value;
+        }
+
+        private static object AddValues(object left, object right)
+        {
+            if (TryGetInt64(left, out var leftLong) && TryGetInt64(right, out var rightLong))
+            {
+                return checked(leftLong + rightLong);
+            }
+
+            return checked(ToDecimal(left) + ToDecimal(right));
+        }
+
+        private static object SubtractValues(object left, object right)
+        {
+            if (TryGetInt64(left, out var leftLong) && TryGetInt64(right, out var rightLong))
+            {
+                return checked(leftLong - rightLong);
+            }
+
+            return checked(ToDecimal(left) - ToDecimal(right));
+        }
+
+        private static object MultiplyValues(object left, object right)
+        {
+            if (TryGetInt64(left, out var leftLong) && TryGetInt64(right, out var rightLong))
+            {
+                return checked(leftLong * rightLong);
+            }
+
+            return checked(ToDecimal(left) * ToDecimal(right));
+        }
+
+        private static object DivideValues(object left, object right)
+        {
+            var rightDecimal = ToDecimal(right);
+            if (rightDecimal == 0m)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            if (TryGetInt64(left, out var leftLong) &&
+                TryGetInt64(right, out var rightLong) &&
+                leftLong % rightLong == 0)
+            {
+                return checked(leftLong / rightLong);
+            }
+
+            return checked(ToDecimal(left) / rightDecimal);
+        }
+
+        private static object ModuloValues(object left, object right)
+        {
+            var rightDecimal = ToDecimal(right);
+            if (rightDecimal == 0m)
+            {
+                throw new DivideByZeroException("Division by zero.");
+            }
+
+            if (TryGetInt64(left, out var leftLong) && TryGetInt64(right, out var rightLong))
+            {
+                return checked(leftLong % rightLong);
+            }
+
+            return checked(ToDecimal(left) % rightDecimal);
+        }
+
+        private static object NegateValue(object value)
+        {
+            if (TryGetInt64(value, out var longValue))
+            {
+                return checked(-longValue);
+            }
+
+            return checked(-ToDecimal(value));
+        }
+
+        private static object AbsValue(object value)
+        {
+            if (TryGetInt64(value, out var longValue))
+            {
+                return checked(Math.Abs(longValue));
+            }
+
+            return Math.Abs(ToDecimal(value));
+        }
+
+        private static bool LessThanOrEqual(object left, object right) => CompareValues(left, right) <= 0;
+
+        private static bool TryGetInt64(object value, out long result)
+        {
+            switch (value)
+            {
+                case long longValue:
+                    result = longValue;
+                    return true;
+                case int intValue:
+                    result = intValue;
+                    return true;
+                case short shortValue:
+                    result = shortValue;
+                    return true;
+                case byte byteValue:
+                    result = byteValue;
+                    return true;
+                default:
+                    result = 0;
+                    return false;
+            }
+        }
+
+        private static decimal ToDecimal(object value)
+        {
+            return value switch
+            {
+                decimal decimalValue => decimalValue,
+                long longValue => longValue,
+                int intValue => intValue,
+                short shortValue => shortValue,
+                byte byteValue => byteValue,
+                double doubleValue when double.IsFinite(doubleValue) => Convert.ToDecimal(doubleValue, CultureInfo.InvariantCulture),
+                float floatValue when float.IsFinite(floatValue) => Convert.ToDecimal(floatValue, CultureInfo.InvariantCulture),
+                bool boolValue => boolValue ? 1m : 0m,
+                string text when decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
+                _ => throw new InvalidOperationException($"Value type '{value.GetType().Name}' is not numeric.")
+            };
+        }
+
+        private static int CompareValues(object left, object right)
+        {
+            if (left is bool or string || right is bool or string)
+            {
+                throw new InvalidOperationException("Relational comparison requires numeric values.");
+            }
+
+            return ToDecimal(left).CompareTo(ToDecimal(right));
         }
 
         private static double ToDouble(object value)

@@ -1124,10 +1124,100 @@ export default class GlobalVariablePanel {
     }
 
     getVariableReferences(variableId) {
-        return [
+        const variable = this.schema.variables.find(item => sameId(item.id, variableId)) || null;
+        const references = [
             ...this.schema.sourceBindings.filter(item => sameId(item.variableId, variableId)).map(item => `来源：${item.operatorName || item.operatorId}.${item.outputPortName || item.outputPortId}`),
             ...this.schema.targetBindings.filter(item => sameId(item.variableId, variableId)).map(item => `目标：${item.operatorName || item.operatorId}.${item.parameterName || item.parameterId}`)
         ];
+        const addReference = reference => {
+            if (reference && !references.includes(reference)) {
+                references.push(reference);
+            }
+        };
+        this.getFlowVariableOperatorReferences(variable).forEach(addReference);
+        this.getExpressionReferences(variable).forEach(addReference);
+        return references;
+    }
+
+    getFlowVariableOperatorReferences(variable) {
+        if (!variable) {
+            return [];
+        }
+
+        return this.getFlowOperators()
+            .filter(operator => this.getProjectVariableOperatorKind(operator))
+            .filter(operator => String(this.getOperatorParameterValue(operator, 'Scope') || '').toLowerCase() === 'project')
+            .filter(operator => {
+                const variableId = this.getOperatorParameterValue(operator, 'VariableId');
+                if (variableId) {
+                    return sameId(variableId, variable.id);
+                }
+                return sameId(this.getOperatorParameterValue(operator, 'VariableName'), variable.name);
+            })
+            .map(operator => {
+                const kind = this.getProjectVariableOperatorKind(operator);
+                const label = kind === 'VariableRead' ? '读取' : kind === 'VariableWrite' ? '写入' : '递增';
+                return `算子：${this.getOperatorDisplayName(operator)}.${label}`;
+            });
+    }
+
+    getExpressionReferences(variable) {
+        if (!variable?.name) {
+            return [];
+        }
+
+        const references = [];
+        this.schema.sourceBindings
+            .filter(item => expressionReferencesVariable(item.expression, variable.name))
+            .forEach(item => references.push(`表达式：来源：${item.operatorName || item.operatorId}.${item.outputPortName || item.outputPortId}`));
+        this.schema.targetBindings
+            .filter(item => expressionReferencesVariable(item.expression, variable.name))
+            .forEach(item => references.push(`表达式：目标：${item.operatorName || item.operatorId}.${item.parameterName || item.parameterId}`));
+        this.getFlowOperators()
+            .filter(operator => expressionReferencesVariable(this.getOperatorParameterValue(operator, 'Expression'), variable.name))
+            .forEach(operator => references.push(`表达式：算子：${this.getOperatorDisplayName(operator)}`));
+        return references;
+    }
+
+    getFlowOperators() {
+        const flow = this.project?.flow || this.project?.Flow;
+        return normalizeArray(flow?.operators ?? flow?.Operators);
+    }
+
+    getProjectVariableOperatorKind(operator) {
+        const rawType = operator?.type ?? operator?.Type ?? operator?.operatorType ?? operator?.OperatorType;
+        const text = String(rawType || '').toLowerCase();
+        if (text.endsWith('variableread')) {
+            return 'VariableRead';
+        }
+        if (text.endsWith('variablewrite')) {
+            return 'VariableWrite';
+        }
+        if (text.endsWith('variableincrement')) {
+            return 'VariableIncrement';
+        }
+
+        switch (Number(rawType)) {
+            case 80:
+                return 'VariableRead';
+            case 81:
+                return 'VariableWrite';
+            case 82:
+                return 'VariableIncrement';
+            default:
+                return '';
+        }
+    }
+
+    getOperatorParameterValue(operator, parameterName) {
+        const lowerName = String(parameterName || '').toLowerCase();
+        const parameter = normalizeArray(operator?.parameters ?? operator?.Parameters)
+            .find(item => String(item.name ?? item.Name ?? '').toLowerCase() === lowerName);
+        return parameter?.value ?? parameter?.Value ?? parameter?.defaultValue ?? parameter?.DefaultValue ?? '';
+    }
+
+    getOperatorDisplayName(operator) {
+        return operator?.name || operator?.Name || operator?.title || operator?.Title || operator?.type || operator?.Type || operator?.id || operator?.Id || '未命名算子';
     }
 
     getIncompatibleBindings(variable, nextType) {
@@ -1153,13 +1243,11 @@ export default class GlobalVariablePanel {
     }
 
     getFlowOutputs() {
-        const flow = this.project?.flow || this.project?.Flow;
-        const operators = normalizeArray(flow?.operators ?? flow?.Operators);
-        return operators.flatMap(operator => {
+        return this.getFlowOperators().flatMap(operator => {
             const outputs = normalizeArray(operator.outputPorts ?? operator.OutputPorts);
             return outputs.map(port => ({
                 operatorId: operator.id || operator.Id,
-                operatorName: operator.name || operator.Name || operator.title || operator.Title || operator.type || operator.Type || '',
+                operatorName: this.getOperatorDisplayName(operator),
                 outputPortId: port.id || port.Id,
                 outputPortName: port.name || port.Name || port.displayName || port.DisplayName || '',
                 dataType: port.dataType || port.DataType || port.type || port.Type || ''
@@ -1178,9 +1266,7 @@ export default class GlobalVariablePanel {
     }
 
     resolveTargetBinding(binding) {
-        const flow = this.project?.flow || this.project?.Flow;
-        const operators = normalizeArray(flow?.operators ?? flow?.Operators);
-        const operator = operators.find(item => sameId(item.id || item.Id, binding.operatorId));
+        const operator = this.getFlowOperators().find(item => sameId(item.id || item.Id, binding.operatorId));
         const parameters = normalizeArray(operator?.parameters ?? operator?.Parameters);
         const parameter = parameters.find(item => sameId(item.id || item.Id, binding.parameterId));
         return {
@@ -1539,6 +1625,16 @@ function schemaEquals(left, right) {
 
 function normalizeArray(value) {
     return Array.isArray(value) ? value : [];
+}
+
+function expressionReferencesVariable(expression, variableName) {
+    const normalizedName = String(variableName || '').toLowerCase();
+    if (!normalizedName) {
+        return false;
+    }
+
+    const identifiers = String(expression || '').match(/[A-Za-z_][A-Za-z0-9_.]*/g) || [];
+    return identifiers.some(identifier => identifier.toLowerCase() === normalizedName);
 }
 
 function groupBy(items, getKey) {

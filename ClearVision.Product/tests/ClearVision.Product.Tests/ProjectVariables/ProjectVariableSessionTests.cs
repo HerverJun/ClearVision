@@ -132,7 +132,7 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
-    public async Task RegistryReplace_ShouldPublishNewSessionWithoutDisposingOldReferences()
+    public async Task RegistryTryPublishSchemaAndPersist_ShouldMigrateCurrentValueWithoutDisposingOldReferences()
     {
         var registry = new ProjectVariableSessionRegistry();
         var projectId = Guid.NewGuid();
@@ -140,20 +140,22 @@ public sealed class ProjectVariableSessionTests
         var oldSession = registry.GetOrCreate(projectId, CreateSchema(variableId, 1));
         oldSession.SetValue(variableId, 3L, ProjectVariableUpdatedBy.StudioManual);
 
-        var newSession = registry.Replace(projectId, CreateSchema(variableId, 5));
+        registry.TryPublishSchemaAndPersist(projectId, CreateSchema(variableId, 5), out var newSession, out var error)
+            .Should()
+            .BeTrue(error);
 
         registry.GetOrCreate(projectId, CreateSchema(variableId, 9)).Should().BeSameAs(newSession);
         oldSession.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
         oldSession.TryGetValue(variableId, out var oldValue).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(oldValue).Should().Be(4L);
         newSession.TryGetValue(variableId, out var newValue).Should().BeTrue();
-        ProjectVariableValueConverter.ToObject(newValue).Should().Be(5L);
+        ProjectVariableValueConverter.ToObject(newValue).Should().Be(3L);
 
         var tasks = Enumerable.Range(0, 200).Select(index => Task.Run(() =>
         {
             if (index % 3 == 0)
             {
-                registry.Replace(projectId, CreateSchema(variableId, index));
+                registry.TryPublishSchemaAndPersist(projectId, CreateSchema(variableId, index), out _, out _);
             }
             else
             {
@@ -167,6 +169,111 @@ public sealed class ProjectVariableSessionTests
             .TryGetValue(variableId, out _)
             .Should()
             .BeTrue();
+    }
+
+    [Fact]
+    public void RegistryTryPublishSchemaAndPersist_WhenSchemaHashUnchanged_ShouldReuseSessionAndSkipReset()
+    {
+        var registry = new ProjectVariableSessionRegistry();
+        var projectId = Guid.NewGuid();
+        var variableId = Guid.NewGuid();
+        var session = registry.GetOrCreate(projectId, CreateSchema(variableId, 1));
+        session.SetValue(variableId, 128L, ProjectVariableUpdatedBy.StudioManual);
+
+        registry.TryPublishSchemaAndPersist(projectId, CreateSchema(variableId, 1), out var after, out var error)
+            .Should()
+            .BeTrue(error);
+
+        after.Should().BeSameAs(session);
+        after.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(128L);
+        snapshot.Version.Should().Be(1);
+    }
+
+    [Fact]
+    public void RegistryTryPublishSchemaAndPersist_WhenCurrentValueIsIncompatible_ShouldResetWithMigrationMetadata()
+    {
+        var registry = new ProjectVariableSessionRegistry();
+        var projectId = Guid.NewGuid();
+        var variableId = Guid.NewGuid();
+        var session = registry.GetOrCreate(projectId, CreateSchema(variableId, 1));
+        session.SetValue(variableId, 10L, ProjectVariableUpdatedBy.StudioManual);
+
+        registry.TryPublishSchemaAndPersist(
+                projectId,
+                CreateSchema(variableId, 25, min: 20),
+                out var migrated,
+                out var error)
+            .Should()
+            .BeTrue(error);
+
+        migrated.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(25L);
+        snapshot.Version.Should().Be(2);
+        snapshot.UpdatedBy.Should().Be(ProjectVariableUpdatedBy.Reset);
+        snapshot.RunId.Should().BeNull();
+        snapshot.OperatorId.Should().BeNull();
+    }
+
+    [Fact]
+    public void RegistryTryCommitAndPersist_WhenSaveFails_ShouldKeepAuthoritativeMemoryAndStoredState()
+    {
+        var store = new RecordingStateStore();
+        var registry = new ProjectVariableSessionRegistry(store);
+        var projectId = Guid.NewGuid();
+        var variableId = Guid.NewGuid();
+        var schema = CreateSchema(variableId, 1);
+        registry.TryMutateAndPersist(
+                projectId,
+                schema,
+                session => session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual),
+                out var authoritative,
+                out var seedError)
+            .Should()
+            .BeTrue(seedError);
+        var expectedVersions = authoritative.GetSnapshots()
+            .ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        using var working = authoritative.CreateSnapshotClone();
+        working.SetValue(variableId, 12L, ProjectVariableUpdatedBy.OperatorOutput);
+        store.FailSaves = true;
+
+        var committed = registry.TryCommitAndPersist(projectId, working, expectedVersions, out var current, out var error);
+
+        committed.Should().BeFalse();
+        error.Should().Contain("GV030");
+        current.Should().BeSameAs(authoritative);
+        registry.GetOrCreate(projectId, schema).TryGetSnapshot(variableId, out var memorySnapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(memorySnapshot.Value).Should().Be(4L);
+        memorySnapshot.Version.Should().Be(1);
+        var storedSnapshot = store.SavedSnapshots.Should().ContainSingle().Subject;
+        ProjectVariableValueConverter.ToObject(storedSnapshot.Value).Should().Be(4L);
+        storedSnapshot.Version.Should().Be(1);
+    }
+
+    [Fact]
+    public void RegistryTryCommitAndPersist_WhenSaveSucceeds_ShouldPublishPersistedCandidate()
+    {
+        var store = new RecordingStateStore();
+        var registry = new ProjectVariableSessionRegistry(store);
+        var projectId = Guid.NewGuid();
+        var variableId = Guid.NewGuid();
+        var schema = CreateSchema(variableId, 1);
+        var authoritative = registry.GetOrCreate(projectId, schema);
+        var expectedVersions = authoritative.GetSnapshots()
+            .ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        using var working = authoritative.CreateSnapshotClone();
+        working.SetValue(variableId, 12L, ProjectVariableUpdatedBy.OperatorOutput);
+
+        var committed = registry.TryCommitAndPersist(projectId, working, expectedVersions, out var published, out var error);
+
+        committed.Should().BeTrue(error);
+        registry.GetOrCreate(projectId, schema).Should().BeSameAs(published);
+        published.TryGetSnapshot(variableId, out var memorySnapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(memorySnapshot.Value).Should().Be(12L);
+        memorySnapshot.Version.Should().Be(1);
+        var storedSnapshot = store.SavedSnapshots.Should().ContainSingle().Subject;
+        ProjectVariableValueConverter.ToObject(storedSnapshot.Value).Should().Be(12L);
+        storedSnapshot.Version.Should().Be(1);
     }
 
     [Fact]
@@ -194,9 +301,14 @@ public sealed class ProjectVariableSessionTests
             var variableId = Guid.NewGuid();
             var schema = CreateSchema(variableId, 1);
             var firstRegistry = new ProjectVariableSessionRegistry(new JsonFileProjectVariableStateStore(root));
-            var firstSession = firstRegistry.GetOrCreate(projectId, schema);
-            firstSession.SetValue(variableId, long.MaxValue, ProjectVariableUpdatedBy.StudioManual);
-            firstRegistry.Save(projectId, firstSession);
+            firstRegistry.TryMutateAndPersist(
+                    projectId,
+                    schema,
+                    session => session.SetValue(variableId, long.MaxValue, ProjectVariableUpdatedBy.StudioManual),
+                    out _,
+                    out var error)
+                .Should()
+                .BeTrue(error);
 
             var secondRegistry = new ProjectVariableSessionRegistry(new JsonFileProjectVariableStateStore(root));
             var secondSession = secondRegistry.GetOrCreate(projectId, CreateSchema(variableId, 1));
@@ -215,22 +327,181 @@ public sealed class ProjectVariableSessionTests
         }
     }
 
-    private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue)
+    [Fact]
+    public void JsonFileStateStore_Load_WhenTempExistsAndMainIsMissing_ShouldPromoteInterruptedCommit()
     {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableTempRecovery", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            var store = new JsonFileProjectVariableStateStore(root);
+            store.Save(
+                scopeId,
+                schema,
+                [new ProjectVariableValueSnapshot(variableId, JsonSerializer.SerializeToElement(42L), 1, DateTimeOffset.UtcNow, ProjectVariableUpdatedBy.StudioManual, null, null)]);
+            var filePath = Directory.EnumerateFiles(root, "*.json").Single(path => !path.EndsWith(".last-good.json", StringComparison.Ordinal));
+            var tempPath = filePath + ".tmp";
+            File.Move(filePath, tempPath);
+
+            var snapshots = store.Load(scopeId, schema);
+
+            snapshots.Should().ContainSingle().Which.Version.Should().Be(1);
+            File.Exists(filePath).Should().BeTrue();
+            File.Exists(tempPath).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenMainAndTempExist_ShouldKeepCommittedFileAndDeleteTemp()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableTempDiscard", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            var store = new JsonFileProjectVariableStateStore(root);
+            store.Save(
+                scopeId,
+                schema,
+                [new ProjectVariableValueSnapshot(variableId, JsonSerializer.SerializeToElement(42L), 1, DateTimeOffset.UtcNow, ProjectVariableUpdatedBy.StudioManual, null, null)]);
+            var filePath = Directory.EnumerateFiles(root, "*.json").Single(path => !path.EndsWith(".last-good.json", StringComparison.Ordinal));
+            var tempPath = filePath + ".tmp";
+            File.WriteAllText(tempPath, File.ReadAllText(filePath));
+
+            var snapshots = store.Load(scopeId, schema);
+
+            snapshots.Should().ContainSingle().Which.Version.Should().Be(1);
+            File.Exists(filePath).Should().BeTrue();
+            File.Exists(tempPath).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenLastGoodMatchesRequestedSchema_ShouldPreferLastGoodOverMismatchedCurrent()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableSchemaHashRecovery", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var oldSchema = CreateSchema(variableId, 1);
+            var newSchema = CreateSchema(variableId, 2);
+            var store = new JsonFileProjectVariableStateStore(root);
+            store.Save(
+                scopeId,
+                oldSchema,
+                [new ProjectVariableValueSnapshot(variableId, JsonSerializer.SerializeToElement(3L), 1, DateTimeOffset.UtcNow, ProjectVariableUpdatedBy.StudioManual, null, null)]);
+            store.Save(
+                scopeId,
+                newSchema,
+                [new ProjectVariableValueSnapshot(variableId, JsonSerializer.SerializeToElement(9L), 2, DateTimeOffset.UtcNow, ProjectVariableUpdatedBy.StudioManual, null, null)]);
+
+            var snapshots = store.Load(scopeId, oldSchema);
+
+            using var session = new ProjectVariableSession(oldSchema, snapshots);
+            session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+            ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(3L);
+            snapshot.Version.Should().Be(1);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_DefaultPath_ShouldUseLocalAppDataProjectVariableStates()
+    {
+        var store = new JsonFileProjectVariableStateStore();
+        var expectedRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ClearVision",
+            "ProjectVariableStates");
+
+        store.BasePath.Should().Be(expectedRoot);
+        store.BasePath.Should().NotContain(AppDomain.CurrentDomain.BaseDirectory);
+        store.BasePath.Should().NotContain("App_Data");
+    }
+
+    private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, long? min = null, long? max = null)
+    {
+        var variable = new ProjectGlobalVariableDefinition
+        {
+            Id = variableId,
+            Name = "stats.count",
+            DisplayName = "Count",
+            ValueType = ProjectGlobalVariableValueType.Int64,
+            InitialValue = JsonSerializer.SerializeToElement(initialValue),
+            ManualWriteAllowed = true
+        };
+        if (min.HasValue)
+        {
+            variable.Min = min.Value;
+        }
+
+        if (max.HasValue)
+        {
+            variable.Max = max.Value;
+        }
+
         return new ProjectGlobalVariableSchema
         {
             Variables =
             [
-                new ProjectGlobalVariableDefinition
-                {
-                    Id = variableId,
-                    Name = "stats.count",
-                    DisplayName = "Count",
-                    ValueType = ProjectGlobalVariableValueType.Int64,
-                    InitialValue = JsonSerializer.SerializeToElement(initialValue),
-                    ManualWriteAllowed = true
-                }
+                variable
             ]
         };
+    }
+
+    private sealed class RecordingStateStore : IProjectVariableStateStore
+    {
+        public bool FailSaves { get; set; }
+
+        public IReadOnlyList<ProjectVariableValueSnapshot> SavedSnapshots { get; private set; } = [];
+
+        public IReadOnlyList<ProjectVariableValueSnapshot> Load(string scopeId, ProjectGlobalVariableSchema schema)
+        {
+            return SavedSnapshots.Select(CloneSnapshot).ToList();
+        }
+
+        public void Save(string scopeId, ProjectGlobalVariableSchema schema, IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
+        {
+            if (FailSaves)
+            {
+                throw new IOException("simulated state-store failure");
+            }
+
+            SavedSnapshots = snapshots.Select(CloneSnapshot).ToList();
+        }
+
+        public void Delete(string scopeId)
+        {
+            SavedSnapshots = [];
+        }
+
+        private static ProjectVariableValueSnapshot CloneSnapshot(ProjectVariableValueSnapshot snapshot)
+        {
+            return snapshot with { Value = snapshot.Value.Clone() };
+        }
     }
 }

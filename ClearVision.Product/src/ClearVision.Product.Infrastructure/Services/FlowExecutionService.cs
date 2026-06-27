@@ -650,14 +650,38 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         var result = await ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
         if (!projectVariables.IsPreview && result.IsSuccess && !result.WasShortCircuited)
         {
-            if (!authoritativeSession.TryCommitFrom(workingSession, expectedVersions, out var commitError))
+            var commitResult = CommitProjectVariableChanges(projectVariables, authoritativeSession, workingSession, expectedVersions);
+            if (!commitResult.Succeeded)
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = commitError;
+                result.ErrorMessage = commitResult.Error;
             }
         }
 
         return result;
+    }
+
+    private static ProjectVariableCommitResult CommitProjectVariableChanges(
+        ProjectVariableExecutionContext projectVariables,
+        IProjectVariableSession authoritativeSession,
+        IProjectVariableSession workingSession,
+        IReadOnlyDictionary<Guid, long> expectedVersions)
+    {
+        if (projectVariables.CommitHandler != null)
+        {
+            try
+            {
+                return projectVariables.CommitHandler(workingSession, expectedVersions);
+            }
+            catch (Exception ex)
+            {
+                return ProjectVariableCommitResult.Failure($"GV030: project global variable commit failed: {ex.Message}");
+            }
+        }
+
+        return authoritativeSession.TryCommitFrom(workingSession, expectedVersions, out var commitError)
+            ? ProjectVariableCommitResult.Success()
+            : ProjectVariableCommitResult.Failure(commitError);
     }
 
     /// <summary>
@@ -1204,15 +1228,9 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             AddDependency(connection.SourceOperatorId, connection.TargetOperatorId);
         }
 
-        var sourceByVariableId = schema.SourceBindings
-            .GroupBy(binding => binding.VariableId)
-            .ToDictionary(group => group.Key, group => group.First());
-        foreach (var target in schema.TargetBindings)
+        foreach (var edge in ProjectGlobalVariableFlowValidator.BuildDependencyEdges(flow, schema, executionOrder))
         {
-            if (sourceByVariableId.TryGetValue(target.VariableId, out var source))
-            {
-                AddDependency(source.OperatorId, target.OperatorId);
-            }
+            AddDependency(edge.SourceOperatorId, edge.TargetOperatorId);
         }
 
         var scheduled = new HashSet<Guid>();
@@ -2097,10 +2115,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             !result.BreakpointHit &&
             !result.PausedOperatorId.HasValue)
         {
-            if (!authoritativeSession.TryCommitFrom(workingSession, expectedVersions, out var commitError))
+            var commitResult = CommitProjectVariableChanges(projectVariables, authoritativeSession, workingSession, expectedVersions);
+            if (!commitResult.Succeeded)
             {
                 result.IsSuccess = false;
-                result.ErrorMessage = commitError;
+                result.ErrorMessage = commitResult.Error;
             }
         }
 

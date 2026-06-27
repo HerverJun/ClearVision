@@ -330,6 +330,10 @@ public class InspectionService : IInspectionService
                 _logger.LogWarning("[InspectionService] 实时检测已在运行: {ProjectId}", projectId);
                 throw new InvalidOperationException("实时检测已在运行");
 
+            case StartResult.MutationInProgress:
+                _logger.LogWarning("[InspectionService] 项目正在配置变更，无法启动: {ProjectId}", projectId);
+                throw new InvalidOperationException("项目正在配置变更，请稍后重试");
+
             case StartResult.ShutdownInProgress:
                 _logger.LogWarning("[InspectionService] 系统正在关机，无法启动: {ProjectId}", projectId);
                 throw new InvalidOperationException("系统正在关机，请稍后重试");
@@ -453,7 +457,7 @@ public class InspectionService : IInspectionService
         var startResult = await _coordinator.TryStartAsync(projectId, sessionId, CancellationToken.None);
         if (startResult != StartResult.Success)
         {
-            throw new InvalidOperationException(startResult == StartResult.AlreadyRunning
+            throw new InvalidOperationException(startResult is StartResult.AlreadyRunning or StartResult.MutationInProgress
                 ? "Project is currently running."
                 : "Runtime coordinator is shutting down.");
         }
@@ -491,10 +495,6 @@ public class InspectionService : IInspectionService
             var flowResult = projectVariables == null
                 ? await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs)
                 : await _flowExecutionService.ExecuteFlowAsync(actualFlow, executionInputs, projectVariables);
-            if (projectVariables != null && flowResult.IsSuccess && !flowResult.WasShortCircuited)
-            {
-                _projectVariableSessions?.Save(projectId, projectVariables.Session);
-            }
 
             var outputData = flowResult.OutputData ?? new Dictionary<string, object>();
             flowResult.OutputData = outputData;
@@ -669,11 +669,16 @@ public class InspectionService : IInspectionService
         }
 
         ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(schema, flow);
-        var session = _projectVariableSessions.GetOrCreate(projectId, schema);
+        var registry = _projectVariableSessions;
+        var session = registry.GetOrCreate(projectId, schema);
         return new ProjectVariableExecutionContext(
             session,
             ProjectVariableBindingIndex.Build(schema),
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            commitHandler: (workingSession, expectedVersions) =>
+                registry.TryCommitAndPersist(projectId, workingSession, expectedVersions, out _, out var error)
+                    ? ProjectVariableCommitResult.Success()
+                    : ProjectVariableCommitResult.Failure(error));
     }
 
     private async Task<OperatorFlow?> LoadFlowFromStorageAsync(Guid projectId)

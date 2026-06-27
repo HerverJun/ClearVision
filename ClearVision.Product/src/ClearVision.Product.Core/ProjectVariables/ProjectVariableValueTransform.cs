@@ -207,7 +207,7 @@ public static class ProjectVariableValueTransform
         converted = 0;
         error = null;
 
-        if (!TryReadDouble(value, out var number))
+        if (!TryReadDecimal(value, out var number))
         {
             error = $"Value type '{value?.GetType().Name ?? "null"}' is not numeric.";
             return false;
@@ -221,10 +221,10 @@ public static class ProjectVariableValueTransform
 
         var rounded = conversionMode switch
         {
-            ProjectVariableConversionMode.Round => Math.Round(number, MidpointRounding.AwayFromZero),
-            ProjectVariableConversionMode.Floor => Math.Floor(number),
-            ProjectVariableConversionMode.Ceiling => Math.Ceiling(number),
-            ProjectVariableConversionMode.Truncate => Math.Truncate(number),
+            ProjectVariableConversionMode.Round => decimal.Round(number, 0, MidpointRounding.AwayFromZero),
+            ProjectVariableConversionMode.Floor => decimal.Floor(number),
+            ProjectVariableConversionMode.Ceiling => decimal.Ceiling(number),
+            ProjectVariableConversionMode.Truncate => decimal.Truncate(number),
             _ => number
         };
 
@@ -234,11 +234,11 @@ public static class ProjectVariableValueTransform
             return false;
         }
 
-        converted = Convert.ToInt64(rounded, CultureInfo.InvariantCulture);
+        converted = decimal.ToInt64(rounded);
         return true;
     }
 
-    private static bool TryReadDouble(object? value, out double number)
+    private static bool TryReadDecimal(object? value, out decimal number)
     {
         number = 0;
         if (value is JsonElement element)
@@ -248,18 +248,32 @@ public static class ProjectVariableValueTransform
 
         var ok = value switch
         {
-            double doubleValue => (number = doubleValue) == doubleValue,
-            float floatValue => (number = floatValue) == floatValue,
-            decimal decimalValue => (number = (double)decimalValue) == (double)decimalValue,
+            double doubleValue when double.IsFinite(doubleValue) => TryConvertFiniteDouble(doubleValue, out number),
+            float floatValue when float.IsFinite(floatValue) => TryConvertFiniteDouble(floatValue, out number),
+            decimal decimalValue => (number = decimalValue) == decimalValue,
             long longValue => (number = longValue) == longValue,
             int intValue => (number = intValue) == intValue,
             short shortValue => (number = shortValue) == shortValue,
             byte byteValue => (number = byteValue) == byteValue,
-            string text => double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out number),
+            string text => decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out number),
             _ => false
         };
 
-        return ok && double.IsFinite(number);
+        return ok;
+    }
+
+    private static bool TryConvertFiniteDouble(double value, out decimal number)
+    {
+        try
+        {
+            number = Convert.ToDecimal(value, CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch (OverflowException)
+        {
+            number = 0;
+            return false;
+        }
     }
 
     private static bool IsExplicitIntegerConversion(ProjectVariableConversionMode conversionMode) =>

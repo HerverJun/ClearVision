@@ -359,6 +359,42 @@ public sealed class FlowExecutionProjectVariableBindingTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_WhenCommitHandlerFails_ShouldFailRunAndKeepFormalSessionUnchanged()
+    {
+        var variableId = Guid.NewGuid();
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        var write = CreateProjectVariableWriteOperator(variableId, 12);
+        var flow = new OperatorFlow("write-persist-failure");
+        flow.AddOperator(write);
+        var schema = CreateSingleInt64Schema(variableId, 1L);
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid(),
+            commitHandler: (_, _) => ProjectVariableCommitResult.Failure("GV030: simulated state-store failure"));
+        using var service = new FlowExecutionService(
+            [
+                new VariableWriteOperator(
+                    NullLogger<VariableWriteOperator>.Instance,
+                    new VariableContext(),
+                    accessor)
+            ],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            accessor);
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("GV030");
+        session.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(4L);
+        formal.Version.Should().Be(1);
+    }
+
+    [Fact]
     public async Task ExecuteFlowAsync_WhenSourceBindingUsesFloorConversion_ShouldStoreInt64()
     {
         var variableId = Guid.NewGuid();
@@ -850,6 +886,48 @@ public sealed class FlowExecutionProjectVariableBindingTests
         Convert.ToInt64(first.IntermediateResults[target.Id]["Seen"]).Should().Be(4L);
         Convert.ToInt64(second.IntermediateResults[target.Id]["Seen"]).Should().Be(10L);
         executeCount.Should().Be(2, "target binding values are part of prepared inputs and should change the fingerprint");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteFlowAsync_WhenVariableWriteAppearsAfterRead_ShouldUseDependencyGraphOrder(bool enableParallel)
+    {
+        var variableId = Guid.NewGuid();
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        var read = CreateProjectVariableReadOperator(variableId);
+        var write = CreateProjectVariableWriteOperator(variableId, 42);
+        var flow = new OperatorFlow("write-read-graph-order");
+        flow.AddOperator(read);
+        flow.AddOperator(write);
+        var schema = CreateSingleInt64Schema(variableId, 1L);
+        using var session = new ProjectVariableSession(schema);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid());
+        using var service = new FlowExecutionService(
+            [
+                new VariableReadOperator(
+                    NullLogger<VariableReadOperator>.Instance,
+                    new VariableContext(),
+                    accessor),
+                new VariableWriteOperator(
+                    NullLogger<VariableWriteOperator>.Instance,
+                    new VariableContext(),
+                    accessor)
+            ],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            accessor);
+
+        var result = await service.ExecuteFlowAsync(flow, null, context, enableParallel);
+
+        result.IsSuccess.Should().BeTrue(result.ErrorMessage);
+        result.OutputData.Should().ContainKey("Value");
+        Convert.ToInt64(result.OutputData!["Value"]).Should().Be(42L);
+        session.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(42L);
     }
 
     private static ProjectGlobalVariableSchema CreateSingleInt64Schema(Guid variableId, long initialValue)

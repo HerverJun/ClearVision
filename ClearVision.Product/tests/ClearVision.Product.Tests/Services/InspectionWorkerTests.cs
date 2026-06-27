@@ -226,7 +226,7 @@ public class InspectionWorkerTests
     }
 
     [Fact]
-    public async Task RunWithScopeAsync_WhenRegistrySessionIsReplaced_CurrentRunKeepsOldSessionAndNextRunGetsNewSession()
+    public async Task RunWithScopeAsync_WhenRegistrySessionIsReplaced_CurrentRunKeepsOldSessionAndNextRunGetsMigratedSession()
     {
         var registry = new ProjectVariableSessionRegistry();
         var sessionId = Guid.NewGuid();
@@ -294,7 +294,9 @@ public class InspectionWorkerTests
         await flowStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
         capturedContext.Should().NotBeNull();
-        var newSession = registry.Replace(projectId, CreateProjectVariableSchema(variableId, 5));
+        registry.TryPublishSchemaAndPersist(projectId, CreateProjectVariableSchema(variableId, 5), out var newSession, out var publishError)
+            .Should()
+            .BeTrue(publishError);
 
         capturedContext!.Session.SetValue(variableId, 2L, ProjectVariableUpdatedBy.VariableWrite);
         capturedContext.Session.TryGetSnapshot(variableId, out var oldSnapshot).Should().BeTrue();
@@ -302,7 +304,7 @@ public class InspectionWorkerTests
 
         registry.GetOrCreate(projectId, CreateProjectVariableSchema(variableId, 5)).Should().BeSameAs(newSession);
         newSession.TryGetSnapshot(variableId, out var newSnapshot).Should().BeTrue();
-        ProjectVariableValueConverter.ToObject(newSnapshot.Value).Should().Be(5L);
+        ProjectVariableValueConverter.ToObject(newSnapshot.Value).Should().Be(1L);
 
         allowFlowToFinish.SetResult();
         (await coordinator.TryStopAsync(projectId, CancellationToken.None)).Should().BeTrue();

@@ -8,12 +8,14 @@ public sealed class ProjectVariableExecutionContext
         IProjectVariableSession session,
         ProjectVariableBindingIndex bindingIndex,
         Guid runId,
-        bool isPreview = false)
+        bool isPreview = false,
+        ProjectVariableCommitHandler? commitHandler = null)
     {
         Session = session ?? throw new ArgumentNullException(nameof(session));
         BindingIndex = bindingIndex ?? throw new ArgumentNullException(nameof(bindingIndex));
         RunId = runId;
         IsPreview = isPreview;
+        CommitHandler = commitHandler;
     }
 
     public IProjectVariableSession Session { get; }
@@ -23,6 +25,19 @@ public sealed class ProjectVariableExecutionContext
     public Guid RunId { get; }
 
     public bool IsPreview { get; }
+
+    public ProjectVariableCommitHandler? CommitHandler { get; }
+}
+
+public delegate ProjectVariableCommitResult ProjectVariableCommitHandler(
+    IProjectVariableSession workingSession,
+    IReadOnlyDictionary<Guid, long> expectedVersions);
+
+public sealed record ProjectVariableCommitResult(bool Succeeded, string? Error)
+{
+    public static ProjectVariableCommitResult Success() => new(true, null);
+
+    public static ProjectVariableCommitResult Failure(string? error) => new(false, error);
 }
 
 public interface IProjectVariableExecutionContextAccessor

@@ -8,14 +8,25 @@ namespace ClearVision.Product.Infrastructure.Services;
 public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateStore
 {
     private readonly string _basePath;
+    private readonly string? _legacyBasePath;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public JsonFileProjectVariableStateStore()
-        : this(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "ProjectVariableStates"))
+        : this(
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "ClearVision",
+                "ProjectVariableStates"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App_Data", "ProjectVariableStates"))
     {
     }
 
     public JsonFileProjectVariableStateStore(string basePath)
+        : this(basePath, null)
+    {
+    }
+
+    private JsonFileProjectVariableStateStore(string basePath, string? legacyBasePath)
     {
         if (string.IsNullOrWhiteSpace(basePath))
         {
@@ -23,8 +34,11 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         }
 
         _basePath = basePath;
+        _legacyBasePath = legacyBasePath;
         Directory.CreateDirectory(_basePath);
     }
+
+    public string BasePath => _basePath;
 
     public IReadOnlyList<ProjectVariableValueSnapshot> Load(string scopeId, ProjectGlobalVariableSchema schema)
     {
@@ -35,8 +49,27 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         try
         {
             var filePath = GetFilePath(scopeId);
+            RecoverInterruptedSave(scopeId, filePath);
             if (!File.Exists(filePath))
             {
+                var legacyFilePath = GetLegacyFilePath(scopeId);
+                if (legacyFilePath != null && File.Exists(legacyFilePath))
+                {
+                    var legacyJson = File.ReadAllText(legacyFilePath, Encoding.UTF8);
+                    if (TryDeserialize(legacyJson, out var legacyState))
+                    {
+                        Directory.CreateDirectory(_basePath);
+                        File.Copy(legacyFilePath, filePath, overwrite: true);
+                        var legacyLastGoodPath = GetLegacyLastGoodPath(scopeId);
+                        if (legacyLastGoodPath != null && File.Exists(legacyLastGoodPath))
+                        {
+                            File.Copy(legacyLastGoodPath, GetLastGoodPath(scopeId), overwrite: true);
+                        }
+
+                        return ToSnapshots(legacyState);
+                    }
+                }
+
                 return [];
             }
 
@@ -55,6 +88,21 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
                 }
 
                 throw new InvalidDataException($"Project variable state JSON is corrupt and no valid last-good copy exists. ScopeId={scopeId}");
+            }
+
+            var expectedSchemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema);
+            if (!string.Equals(state.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
+            {
+                var lastGoodPath = GetLastGoodPath(scopeId);
+                if (File.Exists(lastGoodPath))
+                {
+                    var lastGoodJson = File.ReadAllText(lastGoodPath, Encoding.UTF8);
+                    if (TryDeserialize(lastGoodJson, out var lastGoodState) &&
+                        string.Equals(lastGoodState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
+                    {
+                        return ToSnapshots(lastGoodState);
+                    }
+                }
             }
 
             return ToSnapshots(state);
@@ -77,7 +125,8 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             Directory.CreateDirectory(_basePath);
             var definitionsById = schema.Variables
                 .Where(variable => variable.Id != Guid.Empty)
-                .ToDictionary(variable => variable.Id);
+                .GroupBy(variable => variable.Id)
+                .ToDictionary(group => group.Key, group => group.First());
             var state = new ProjectVariableStateFile
             {
                 ScopeId = scopeId,
@@ -102,7 +151,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             using var _ = JsonDocument.Parse(json);
 
             var filePath = GetFilePath(scopeId);
-            var tempPath = filePath + ".tmp";
+            var tempPath = GetTempPath(scopeId);
             var lastGoodPath = GetLastGoodPath(scopeId);
 
             File.WriteAllText(tempPath, json, new UTF8Encoding(false));
@@ -128,6 +177,23 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         {
             File.Delete(GetFilePath(scopeId));
             File.Delete(GetLastGoodPath(scopeId));
+            File.Delete(GetTempPath(scopeId));
+            var legacyFilePath = GetLegacyFilePath(scopeId);
+            if (legacyFilePath != null)
+            {
+                File.Delete(legacyFilePath);
+                var legacyLastGoodPath = GetLegacyLastGoodPath(scopeId);
+                if (legacyLastGoodPath != null)
+                {
+                    File.Delete(legacyLastGoodPath);
+                }
+
+                var legacyTempPath = GetLegacyTempPath(scopeId);
+                if (legacyTempPath != null)
+                {
+                    File.Delete(legacyTempPath);
+                }
+            }
         }
         finally
         {
@@ -138,6 +204,44 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
     private string GetFilePath(string scopeId) => Path.Combine(_basePath, $"{BuildStableFileName(scopeId)}.json");
 
     private string GetLastGoodPath(string scopeId) => Path.Combine(_basePath, $"{BuildStableFileName(scopeId)}.last-good.json");
+
+    private string GetTempPath(string scopeId) => GetFilePath(scopeId) + ".tmp";
+
+    private string? GetLegacyFilePath(string scopeId) =>
+        _legacyBasePath == null ? null : Path.Combine(_legacyBasePath, $"{BuildStableFileName(scopeId)}.json");
+
+    private string? GetLegacyLastGoodPath(string scopeId) =>
+        _legacyBasePath == null ? null : Path.Combine(_legacyBasePath, $"{BuildStableFileName(scopeId)}.last-good.json");
+
+    private string? GetLegacyTempPath(string scopeId)
+    {
+        var legacyFilePath = GetLegacyFilePath(scopeId);
+        return legacyFilePath == null ? null : legacyFilePath + ".tmp";
+    }
+
+    private void RecoverInterruptedSave(string scopeId, string filePath)
+    {
+        var tempPath = GetTempPath(scopeId);
+        if (!File.Exists(tempPath))
+        {
+            return;
+        }
+
+        if (File.Exists(filePath))
+        {
+            File.Delete(tempPath);
+            return;
+        }
+
+        var tempJson = File.ReadAllText(tempPath, Encoding.UTF8);
+        if (!TryDeserialize(tempJson, out _))
+        {
+            File.Delete(tempPath);
+            return;
+        }
+
+        File.Move(tempPath, filePath, overwrite: true);
+    }
 
     private static string BuildStableFileName(string scopeId)
     {

@@ -180,14 +180,17 @@ public class ProjectService
         var previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
         var nextFlow = request.Flow ?? await LoadStoredFlowDtoAsync(id);
         var nextSchema = request.GlobalVariables ?? project.GlobalVariables;
+        var flowChanged = request.Flow != null;
         if (nextFlow != null)
         {
-            MigrateFlowDto(nextFlow);
+            flowChanged |= MigrateFlowDto(nextFlow);
             EnrichFlowDtoWithMetadata(nextFlow);
+            flowChanged |= NormalizeProjectVariableOperatorNames(nextFlow, nextSchema);
         }
 
         ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(nextSchema, nextFlow?.ToEntity());
-        var nextFlowJson = request.Flow == null ? null : JsonSerializer.Serialize(nextFlow, _jsonOptions);
+        var nextFlowJson = flowChanged && nextFlow != null ? JsonSerializer.Serialize(nextFlow, _jsonOptions) : null;
+        var repositoryUpdated = false;
 
         // 濡傛灉鏈夋祦绋嬫暟鎹紝鏇存柊鍒版枃浠?
         try
@@ -204,11 +207,25 @@ public class ProjectService
             }
 
             await _projectRepository.UpdateAsync(project);
+            repositoryUpdated = true;
+            if (request.GlobalVariables != null)
+            {
+                if (_projectVariableSessions != null &&
+                    !_projectVariableSessions.TryPublishSchemaAndPersist(id, project.GlobalVariables, out _, out var publishError))
+                {
+                    throw new InvalidOperationException(publishError);
+                }
+            }
         }
         catch
         {
             project.UpdateInfo(previousName, previousDescription);
             project.UpdateGlobalVariables(previousGlobalVariables);
+            if (repositoryUpdated)
+            {
+                await _projectRepository.UpdateAsync(project);
+            }
+
             if (nextFlowJson != null && previousFlowJson != null)
             {
                 await _flowStorage.SaveFlowJsonAsync(id, previousFlowJson);
@@ -219,11 +236,6 @@ public class ProjectService
             }
 
             throw;
-        }
-
-        if (request.GlobalVariables != null)
-        {
-            _projectVariableSessions?.Replace(id, project.GlobalVariables);
         }
 
         var dto = MapToDto(project);
@@ -252,8 +264,7 @@ public class ProjectService
         {
             Name = project.Name,
             Description = project.Description,
-            Flow = flowDto,
-            GlobalVariables = project.GlobalVariables
+            Flow = flowDto
         });
 
         // 4. 鏇存柊宸ョ▼淇敼鏃堕棿 (鍙€夛紝浣嗘帹鑽?
@@ -369,6 +380,7 @@ public class ProjectService
 
         project.MarkAsDeleted();
         await _projectRepository.UpdateAsync(project);
+        _projectVariableSessions?.Delete(id);
     }
 
     /// <summary>
@@ -395,14 +407,14 @@ public class ProjectService
         if (project == null)
             throw new ProjectNotFoundException(id);
 
-        await UpdateAsync(id, new UpdateProjectRequest
+        var updated = await UpdateAsync(id, new UpdateProjectRequest
         {
             Name = project.Name,
             Description = project.Description,
             Flow = await LoadStoredFlowDtoAsync(id),
             GlobalVariables = schema
         });
-        return project.GlobalVariables;
+        return updated.GlobalVariables;
     }
 
     private static ProjectGlobalVariableSchema CloneSchema(ProjectGlobalVariableSchema schema)
@@ -577,6 +589,102 @@ public class ProjectService
         }
 
         return changed;
+    }
+
+    private static bool NormalizeProjectVariableOperatorNames(
+        OperatorFlowDto flowDto,
+        ProjectGlobalVariableSchema schema)
+    {
+        var variablesById = schema.Variables
+            .Where(variable => variable.Id != Guid.Empty)
+            .GroupBy(variable => variable.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+        var variablesByName = schema.Variables
+            .Where(variable => !string.IsNullOrWhiteSpace(variable.Name))
+            .GroupBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        if (variablesById.Count == 0)
+        {
+            return false;
+        }
+
+        var changed = false;
+        foreach (var opDto in flowDto.Operators)
+        {
+            if (opDto.Type is not (OperatorType.VariableRead or OperatorType.VariableWrite or OperatorType.VariableIncrement))
+            {
+                continue;
+            }
+
+            if (!string.Equals(GetParameterString(opDto, "Scope"), "Project", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var variableIdParameter = GetParameter(opDto, "VariableId");
+            var variableNameParameter = GetParameter(opDto, "VariableName");
+            ProjectGlobalVariableDefinition? definition = null;
+            var variableIdText = variableIdParameter?.Value?.ToString();
+            if (Guid.TryParse(variableIdText, out var variableId))
+            {
+                variablesById.TryGetValue(variableId, out definition);
+            }
+
+            if (definition == null)
+            {
+                var variableNameText = variableNameParameter?.Value?.ToString();
+                if (string.IsNullOrWhiteSpace(variableNameText) ||
+                    !variablesByName.TryGetValue(variableNameText, out definition))
+                {
+                    continue;
+                }
+            }
+
+            variableIdParameter ??= AddParameter(opDto, "VariableId");
+            var currentId = variableIdParameter.Value?.ToString();
+            var nextId = definition.Id.ToString("D");
+            if (!string.Equals(currentId, nextId, StringComparison.OrdinalIgnoreCase))
+            {
+                variableIdParameter.Value = nextId;
+                changed = true;
+            }
+
+            variableNameParameter ??= AddParameter(opDto, "VariableName");
+            var currentName = variableNameParameter.Value?.ToString();
+            if (string.Equals(currentName, definition.Name, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            variableNameParameter.Value = definition.Name;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private static ParameterDto AddParameter(OperatorDto opDto, string name)
+    {
+        var parameter = new ParameterDto
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            DisplayName = name,
+            DataType = "string"
+        };
+        opDto.Parameters.Add(parameter);
+        return parameter;
+    }
+
+    private static ParameterDto? GetParameter(OperatorDto opDto, string name)
+    {
+        return opDto.Parameters.FirstOrDefault(parameter =>
+            string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? GetParameterString(OperatorDto opDto, string name)
+    {
+        return GetParameter(opDto, name)?.Value?.ToString();
     }
 
     private static bool NormalizePorts(List<PortDto> ports, List<PortDefinition> metadataPorts, PortDirection direction)

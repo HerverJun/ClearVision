@@ -80,7 +80,10 @@ public sealed class ProjectVariableSession : IProjectVariableSession
         IEnumerable<ProjectVariableValueSnapshot>? snapshots)
     {
         Schema = schema ?? new ProjectGlobalVariableSchema();
-        _definitionsById = Schema.Variables.ToDictionary(variable => variable.Id);
+        _definitionsById = Schema.Variables
+            .Where(variable => variable.Id != Guid.Empty)
+            .GroupBy(variable => variable.Id)
+            .ToDictionary(group => group.Key, group => group.First());
         _definitionsByName = Schema.Variables
             .Where(variable => !string.IsNullOrWhiteSpace(variable.Name))
             .GroupBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase)
@@ -109,6 +112,7 @@ public sealed class ProjectVariableSession : IProjectVariableSession
                         out var converted,
                         out _))
                 {
+                    ResetIncompatibleSnapshot(definition, snapshot.Version);
                     continue;
                 }
 
@@ -118,6 +122,7 @@ public sealed class ProjectVariableSession : IProjectVariableSession
                 }
                 catch (InvalidOperationException)
                 {
+                    ResetIncompatibleSnapshot(definition, snapshot.Version);
                     continue;
                 }
 
@@ -131,6 +136,27 @@ public sealed class ProjectVariableSession : IProjectVariableSession
                     snapshot.OperatorId);
             }
         }
+    }
+
+    private void ResetIncompatibleSnapshot(ProjectGlobalVariableDefinition definition, long previousVersion)
+    {
+        if (!ProjectVariableValueConverter.TryConvertToVariableValue(definition.InitialValue, definition.ValueType, out var converted, out var error))
+        {
+            throw new InvalidOperationException($"Project global variable '{definition.Name}' has invalid initial value: {error}");
+        }
+
+        ValidateRange(definition, converted);
+        var nextVersion = previousVersion >= long.MaxValue
+            ? long.MaxValue
+            : Math.Max(0, previousVersion) + 1;
+        _states[definition.Id] = new ProjectVariableState(
+            definition.Id,
+            converted,
+            nextVersion,
+            DateTimeOffset.UtcNow,
+            ProjectVariableUpdatedBy.Reset,
+            null,
+            null);
     }
 
     public ProjectGlobalVariableSchema Schema { get; }

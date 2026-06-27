@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.ValueObjects;
@@ -7,6 +8,10 @@ namespace ClearVision.Product.Core.ProjectVariables;
 
 public static class ProjectGlobalVariableFlowValidator
 {
+    private static readonly Regex ExpressionIdentifierRegex = new(
+        @"[A-Za-z_][A-Za-z0-9_.]*",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     public static IReadOnlyList<ProjectGlobalVariableDiagnostic> Validate(
         ProjectGlobalVariableSchema? schema,
         OperatorFlow? flow)
@@ -92,10 +97,13 @@ public static class ProjectGlobalVariableFlowValidator
 
         var orderByOperatorId = baseOrder
             .Select((op, index) => (op.Id, Index: index))
-            .ToDictionary(item => item.Id, item => item.Index);
-        var operatorsById = baseOrder.ToDictionary(op => op.Id);
-        var edgesBySource = baseOrder.ToDictionary(op => op.Id, _ => new List<ProjectVariableFlowEdge>());
-        var indegree = baseOrder.ToDictionary(op => op.Id, _ => 0);
+            .GroupBy(item => item.Id)
+            .ToDictionary(group => group.Key, group => group.First().Index);
+        var operatorsById = baseOrder
+            .GroupBy(op => op.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+        var edgesBySource = operatorsById.ToDictionary(item => item.Key, _ => new List<ProjectVariableFlowEdge>());
+        var indegree = operatorsById.ToDictionary(item => item.Key, _ => 0);
 
         void AddEdge(ProjectVariableFlowEdge edge)
         {
@@ -116,30 +124,9 @@ public static class ProjectGlobalVariableFlowValidator
             indegree[edge.TargetOperatorId]++;
         }
 
-        foreach (var connection in flow.Connections)
+        foreach (var edge in BuildDependencyEdges(flow, schema, baseOrder))
         {
-            AddEdge(new ProjectVariableFlowEdge(
-                connection.SourceOperatorId,
-                connection.TargetOperatorId,
-                null,
-                ProjectVariableFlowEdgeKind.Canvas));
-        }
-
-        var variablesById = schema.Variables.ToDictionary(variable => variable.Id);
-        var sourceByVariableId = schema.SourceBindings
-            .GroupBy(binding => binding.VariableId)
-            .ToDictionary(group => group.Key, group => group.First());
-        foreach (var target in schema.TargetBindings)
-        {
-            if (sourceByVariableId.TryGetValue(target.VariableId, out var source))
-            {
-                variablesById.TryGetValue(target.VariableId, out var variable);
-                AddEdge(new ProjectVariableFlowEdge(
-                    source.OperatorId,
-                    target.OperatorId,
-                    variable?.Name ?? target.VariableId.ToString("D"),
-                    ProjectVariableFlowEdgeKind.GlobalVariable));
-            }
+            AddEdge(edge);
         }
 
         var ready = new SortedSet<Guid>(Comparer<Guid>.Create((left, right) =>
@@ -182,6 +169,168 @@ public static class ProjectGlobalVariableFlowValidator
         return false;
     }
 
+    public static IReadOnlyList<ProjectVariableFlowEdge> BuildDependencyEdges(
+        OperatorFlow flow,
+        ProjectGlobalVariableSchema? schema,
+        IReadOnlyList<Operator> baseOrder)
+    {
+        ArgumentNullException.ThrowIfNull(flow);
+        ArgumentNullException.ThrowIfNull(baseOrder);
+        schema ??= new ProjectGlobalVariableSchema();
+
+        var orderByOperatorId = baseOrder
+            .Select((op, index) => (op.Id, Index: index))
+            .GroupBy(item => item.Id)
+            .ToDictionary(group => group.Key, group => group.First().Index);
+        var operatorIds = orderByOperatorId.Keys.ToHashSet();
+        var variablesById = schema.Variables
+            .Where(variable => variable.Id != Guid.Empty)
+            .GroupBy(variable => variable.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+        var variablesByName = schema.Variables
+            .Where(variable => !string.IsNullOrWhiteSpace(variable.Name))
+            .GroupBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var readersByVariableId = new Dictionary<Guid, HashSet<Guid>>();
+        var writersByVariableId = new Dictionary<Guid, HashSet<Guid>>();
+        var edges = new List<ProjectVariableFlowEdge>();
+        var seenEdges = new HashSet<(Guid Source, Guid Target, ProjectVariableFlowEdgeKind Kind, string? VariableName)>();
+
+        void AddEdge(Guid sourceOperatorId, Guid targetOperatorId, Guid? variableId, ProjectVariableFlowEdgeKind kind)
+        {
+            if (sourceOperatorId == targetOperatorId ||
+                !operatorIds.Contains(sourceOperatorId) ||
+                !operatorIds.Contains(targetOperatorId))
+            {
+                return;
+            }
+
+            var variableName = variableId.HasValue && variablesById.TryGetValue(variableId.Value, out var variable)
+                ? variable.Name
+                : variableId?.ToString("D");
+            if (!seenEdges.Add((sourceOperatorId, targetOperatorId, kind, variableName)))
+            {
+                return;
+            }
+
+            edges.Add(new ProjectVariableFlowEdge(sourceOperatorId, targetOperatorId, variableName, kind));
+        }
+
+        void AddAccess(Dictionary<Guid, HashSet<Guid>> accessByVariableId, Guid variableId, Guid operatorId)
+        {
+            if (!operatorIds.Contains(operatorId))
+            {
+                return;
+            }
+
+            if (!accessByVariableId.TryGetValue(variableId, out var operators))
+            {
+                operators = [];
+                accessByVariableId[variableId] = operators;
+            }
+
+            operators.Add(operatorId);
+        }
+
+        foreach (var connection in flow.Connections)
+        {
+            AddEdge(connection.SourceOperatorId, connection.TargetOperatorId, null, ProjectVariableFlowEdgeKind.Canvas);
+        }
+
+        foreach (var source in schema.SourceBindings)
+        {
+            AddAccess(writersByVariableId, source.VariableId, source.OperatorId);
+            foreach (var expressionVariableId in ResolveExpressionVariableIds(source.Expression, variablesByName))
+            {
+                AddAccess(readersByVariableId, expressionVariableId, source.OperatorId);
+            }
+        }
+
+        foreach (var target in schema.TargetBindings)
+        {
+            AddAccess(readersByVariableId, target.VariableId, target.OperatorId);
+            foreach (var expressionVariableId in ResolveExpressionVariableIds(target.Expression, variablesByName))
+            {
+                AddAccess(readersByVariableId, expressionVariableId, target.OperatorId);
+            }
+        }
+
+        foreach (var reference in BuildReferenceIndex(flow).References)
+        {
+            foreach (var expressionVariableId in ResolveExpressionVariableIds(reference.Expression, variablesByName))
+            {
+                AddAccess(readersByVariableId, expressionVariableId, reference.OperatorId);
+            }
+
+            if (!TryResolveVariableId(reference, variablesById, variablesByName, out var variableId))
+            {
+                continue;
+            }
+
+            switch (reference.OperatorType)
+            {
+                case OperatorType.VariableRead:
+                    AddAccess(readersByVariableId, variableId, reference.OperatorId);
+                    break;
+                case OperatorType.VariableWrite:
+                    AddAccess(writersByVariableId, variableId, reference.OperatorId);
+                    break;
+                case OperatorType.VariableIncrement:
+                    AddAccess(readersByVariableId, variableId, reference.OperatorId);
+                    AddAccess(writersByVariableId, variableId, reference.OperatorId);
+                    break;
+            }
+        }
+
+        foreach (var (variableId, writers) in writersByVariableId)
+        {
+            var orderedWriters = writers
+                .OrderBy(operatorId => orderByOperatorId.GetValueOrDefault(operatorId, int.MaxValue))
+                .ThenBy(operatorId => operatorId)
+                .ToList();
+            for (var index = 0; index < orderedWriters.Count - 1; index++)
+            {
+                AddEdge(orderedWriters[index], orderedWriters[index + 1], variableId, ProjectVariableFlowEdgeKind.GlobalVariable);
+            }
+
+            if (!readersByVariableId.TryGetValue(variableId, out var readers))
+            {
+                continue;
+            }
+
+            foreach (var writer in orderedWriters)
+            {
+                foreach (var reader in readers)
+                {
+                    AddEdge(writer, reader, variableId, ProjectVariableFlowEdgeKind.GlobalVariable);
+                }
+            }
+        }
+
+        return edges;
+    }
+
+    private static IEnumerable<Guid> ResolveExpressionVariableIds(
+        string? expression,
+        IReadOnlyDictionary<string, ProjectGlobalVariableDefinition> variablesByName)
+    {
+        if (string.IsNullOrWhiteSpace(expression) || variablesByName.Count == 0)
+        {
+            yield break;
+        }
+
+        var seen = new HashSet<Guid>();
+        foreach (Match match in ExpressionIdentifierRegex.Matches(expression))
+        {
+            if (variablesByName.TryGetValue(match.Value, out var variable) &&
+                variable.Id != Guid.Empty &&
+                seen.Add(variable.Id))
+            {
+                yield return variable.Id;
+            }
+        }
+    }
+
     private static void ValidateOperatorReference(
         ProjectVariableOperatorReference reference,
         IReadOnlyDictionary<Guid, ProjectGlobalVariableDefinition> variablesById,
@@ -211,7 +360,7 @@ public static class ProjectGlobalVariableFlowValidator
                 ParameterId: reference.VariableIdParameterId));
         }
 
-        if (!string.IsNullOrWhiteSpace(reference.VariableName) && byName == null)
+        if (!hasId && !string.IsNullOrWhiteSpace(reference.VariableName) && byName == null)
         {
             diagnostics.Add(new ProjectGlobalVariableDiagnostic(
                 "GV008",
@@ -262,14 +411,11 @@ public static class ProjectGlobalVariableFlowValidator
 
         if (!string.IsNullOrWhiteSpace(reference.Expression))
         {
-            var sampleVariables = variablesByName.Values
-                .Where(item => !string.IsNullOrWhiteSpace(item.Name))
-                .ToDictionary(
-                    item => item.Name,
-                    item => (object?)(item.ValueType == ProjectGlobalVariableValueType.Boolean ? true : 1.25d),
-                    StringComparer.OrdinalIgnoreCase);
-            sampleVariables["value"] = 1.25d;
-            if (!ProjectVariableExpressionEvaluator.TryEvaluate(reference.Expression, sampleVariables, out _, out var expressionError))
+            var knownVariables = variablesByName.Values
+                .Select(item => item.Name)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Append("value");
+            if (!ProjectVariableExpressionEvaluator.TryCompile(reference.Expression, knownVariables!, out var expressionError))
             {
                 diagnostics.Add(new ProjectGlobalVariableDiagnostic(
                     "GV033",
@@ -279,6 +425,36 @@ public static class ProjectGlobalVariableFlowValidator
                     ParameterId: reference.ExpressionParameterId));
             }
         }
+    }
+
+    private static bool TryResolveVariableId(
+        ProjectVariableOperatorReference reference,
+        IReadOnlyDictionary<Guid, ProjectGlobalVariableDefinition> variablesById,
+        IReadOnlyDictionary<string, ProjectGlobalVariableDefinition> variablesByName,
+        out Guid variableId)
+    {
+        ProjectGlobalVariableDefinition? byId = null;
+        ProjectGlobalVariableDefinition? byName = null;
+        var hasId = Guid.TryParse(reference.VariableIdText, out var parsedId);
+        if (hasId)
+        {
+            variablesById.TryGetValue(parsedId, out byId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(reference.VariableName))
+        {
+            variablesByName.TryGetValue(reference.VariableName, out byName);
+        }
+
+        var variable = byId ?? byName;
+        if (variable == null || (byId != null && byName != null && byId.Id != byName.Id))
+        {
+            variableId = default;
+            return false;
+        }
+
+        variableId = variable.Id;
+        return true;
     }
 
     private static string BuildCycleDiagnostic(

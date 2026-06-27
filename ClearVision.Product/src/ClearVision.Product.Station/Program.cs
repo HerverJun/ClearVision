@@ -33,7 +33,11 @@ internal static class Program
                 services.AddSingleton<RuntimePackageValidator>();
                 services.AddSingleton<RuntimePackageLoader>();
                 services.AddSingleton<RuntimeResultNormalizer>();
-                services.AddSingleton<IProjectVariableStateStore, JsonFileProjectVariableStateStore>();
+                services.AddSingleton<IProjectVariableStateStore>(_ => new JsonFileProjectVariableStateStore(
+                    Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        StationSettingsPaths.StationAppDataDirectoryName,
+                        "ProjectVariableStates")));
                 services.AddSingleton<RuntimeHost>();
                 services.AddSingleton<IConfigurationService, JsonConfigurationService>();
                 services.AddSingleton<StationHardwareSettingsService>();

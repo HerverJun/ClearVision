@@ -44,7 +44,8 @@ public sealed class ContinuousInspectionWorker
         Func<ContinuousInspectionMode>? resolveCurrentMode = null,
         IImageCacheRepository? imageCacheRepository = null,
         IProjectVariableSession? projectVariableSession = null,
-        ProjectVariableBindingIndex? projectVariableBindingIndex = null)
+        ProjectVariableBindingIndex? projectVariableBindingIndex = null,
+        ProjectVariableCommitHandler? projectVariableCommitHandler = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(cameraId);
         ArgumentNullException.ThrowIfNull(config);
@@ -162,10 +163,13 @@ public sealed class ContinuousInspectionWorker
                                             return flowExecution.ExecuteFlowAsync(flow, inputs, cancellationToken: ct);
                                         }
 
+                                        var isPreview = mode != ContinuousInspectionMode.Primary;
                                         var context = new ProjectVariableExecutionContext(
                                             projectVariableSession,
                                             projectVariableBindingIndex,
-                                            Guid.NewGuid());
+                                            Guid.NewGuid(),
+                                            isPreview,
+                                            isPreview ? null : projectVariableCommitHandler);
                                         return flowExecution.ExecuteFlowAsync(flow, inputs, context, cancellationToken: ct);
                                     }));
                                 if (scheduled)

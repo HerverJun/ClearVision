@@ -37,7 +37,7 @@ public sealed class RuntimeHost : IAsyncDisposable
     private int _pendingCount;
     private IRuntimeResultRecordWriter? _resultWriter;
     private IRuntimeImageWriter? _imageWriter;
-    private ProjectVariableSession? _projectVariableSession;
+    private IProjectVariableSession? _projectVariableSession;
     private readonly IProjectVariableStateStore? _projectVariableStateStore;
     private string? _projectVariableStateScopeId;
     private readonly Func<RuntimeProfile, ValueTask<RuntimePreparedWriters>> _writerFactory;
@@ -139,8 +139,15 @@ public sealed class RuntimeHost : IAsyncDisposable
                 throw new RuntimePackageException($"Project global variable '{definition.Name}' does not allow manual Station writes.");
             }
 
-            var snapshot = session.SetValue(variableId, value, ProjectVariableUpdatedBy.StationManual);
-            PersistLoadedProjectVariableSession(session);
+            var expectedVersions = CaptureProjectVariableVersions(session);
+            using var candidate = session.CreateSnapshotClone();
+            var snapshot = candidate.SetValue(variableId, value, ProjectVariableUpdatedBy.StationManual);
+            var commitResult = CommitLoadedProjectVariableSessionNoLock(candidate, expectedVersions);
+            if (!commitResult.Succeeded)
+            {
+                throw new RuntimePackageException(commitResult.Error ?? "Project global variable state could not be persisted.");
+            }
+
             EmitLog($"Station updated project global variable '{definition.Name}'.");
             return snapshot;
         }
@@ -170,8 +177,15 @@ public sealed class RuntimeHost : IAsyncDisposable
                 throw new RuntimePackageException($"Project global variable '{definition.Name}' does not allow manual Station resets.");
             }
 
-            var snapshot = session.Reset(variableId, ProjectVariableUpdatedBy.Reset);
-            PersistLoadedProjectVariableSession(session);
+            var expectedVersions = CaptureProjectVariableVersions(session);
+            using var candidate = session.CreateSnapshotClone();
+            var snapshot = candidate.Reset(variableId, ProjectVariableUpdatedBy.Reset);
+            var commitResult = CommitLoadedProjectVariableSessionNoLock(candidate, expectedVersions);
+            if (!commitResult.Succeeded)
+            {
+                throw new RuntimePackageException(commitResult.Error ?? "Project global variable state could not be persisted.");
+            }
+
             EmitLog($"Station reset project global variable '{definition.Name}' to its initial value.");
             return snapshot;
         }
@@ -189,7 +203,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         var projectVariableSession = new ProjectVariableSession(package.GlobalVariables, persistedSnapshots);
         var nextSiteProfile = RuntimeParameterOverrideApplier.CloneProfile(package.DefaultSiteProfile);
         RuntimePreparedWriters? preparedWriters = null;
-        ProjectVariableSession? oldProjectVariableSession = null;
+        IProjectVariableSession? oldProjectVariableSession = null;
         IRuntimeResultRecordWriter? oldResultWriter = null;
         IRuntimeImageWriter? oldImageWriter = null;
 
@@ -312,7 +326,9 @@ public sealed class RuntimeHost : IAsyncDisposable
             _stopTimeoutPending = false;
             _activeRunCts = runCts;
             _state = RuntimeHostState.Running;
-            backgroundRunTask = ExecuteSingleCoreAsync(imagePath, runCts.Token);
+            backgroundRunTask = Task.Run(
+                () => ExecuteSingleCoreAsync(imagePath, runCts.Token),
+                CancellationToken.None);
             _backgroundRunTask = backgroundRunTask;
         }
         finally
@@ -602,7 +618,8 @@ public sealed class RuntimeHost : IAsyncDisposable
             var variableContext = new ProjectVariableExecutionContext(
                 variableSession,
                 ProjectVariableBindingIndex.Build(package.GlobalVariables),
-                Guid.TryParse(runId, out var parsedRunId) ? parsedRunId : Guid.NewGuid());
+                Guid.TryParse(runId, out var parsedRunId) ? parsedRunId : Guid.NewGuid(),
+                commitHandler: CommitLoadedProjectVariableSession);
 
             var validation = _flowExecutionService.ValidateFlow(flow);
             if (!validation.IsValid)
@@ -628,10 +645,7 @@ public sealed class RuntimeHost : IAsyncDisposable
                 BuildFlowInputData(sourceImageBytes),
                 variableContext,
                 cancellationToken: timeoutCts.Token);
-            if (flowResult.IsSuccess && !flowResult.WasShortCircuited)
-            {
-                PersistLoadedProjectVariableSession(variableSession);
-            }
+            var resultVariableSession = _projectVariableSession ?? variableSession;
 
             var normalizedResult = _resultNormalizer.Normalize(
                 package,
@@ -643,7 +657,7 @@ public sealed class RuntimeHost : IAsyncDisposable
                 startedAt,
                 DateTimeOffset.UtcNow,
                 timeoutCts.IsCancellationRequested);
-            AttachPublicGlobalVariables(normalizedResult, package.GlobalVariables, variableSession);
+            AttachPublicGlobalVariables(normalizedResult, package.GlobalVariables, resultVariableSession);
 
             await PersistResultAsync(normalizedResult, cancellationToken);
             return normalizedResult;
@@ -862,7 +876,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         }
     }
 
-    private void DisposeOldProjectVariableSession(ProjectVariableSession? session)
+    private void DisposeOldProjectVariableSession(IProjectVariableSession? session)
     {
         if (session == null)
         {
@@ -877,6 +891,61 @@ public sealed class RuntimeHost : IAsyncDisposable
         {
             _logger.LogWarning(ex, "Failed to dispose old project variable session after runtime package commit.");
         }
+    }
+
+    private ProjectVariableCommitResult CommitLoadedProjectVariableSession(
+        IProjectVariableSession workingSession,
+        IReadOnlyDictionary<Guid, long> expectedVersions)
+    {
+        _stateGate.Wait();
+        try
+        {
+            return CommitLoadedProjectVariableSessionNoLock(workingSession, expectedVersions);
+        }
+        finally
+        {
+            _stateGate.Release();
+        }
+    }
+
+    private ProjectVariableCommitResult CommitLoadedProjectVariableSessionNoLock(
+        IProjectVariableSession workingSession,
+        IReadOnlyDictionary<Guid, long> expectedVersions)
+    {
+        var authoritative = _projectVariableSession;
+        if (authoritative == null)
+        {
+            return ProjectVariableCommitResult.Failure("GV025: project global variable session is not initialized.");
+        }
+
+        var authoritativeHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(authoritative.Schema);
+        var workingHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(workingSession.Schema);
+        if (!string.Equals(authoritativeHash, workingHash, StringComparison.Ordinal))
+        {
+            return ProjectVariableCommitResult.Failure("GV025: project global variable schema changed before this run could commit.");
+        }
+
+        using var candidate = authoritative.CreateSnapshotClone();
+        if (!candidate.TryCommitFrom(workingSession, expectedVersions, out var commitError))
+        {
+            return ProjectVariableCommitResult.Failure(commitError);
+        }
+
+        try
+        {
+            PersistLoadedProjectVariableSession(candidate);
+            _projectVariableSession = candidate.CreateSnapshotClone();
+            return ProjectVariableCommitResult.Success();
+        }
+        catch (Exception ex)
+        {
+            return ProjectVariableCommitResult.Failure($"GV030: project global variable state could not be persisted: {ex.Message}");
+        }
+    }
+
+    private static IReadOnlyDictionary<Guid, long> CaptureProjectVariableVersions(IProjectVariableSession session)
+    {
+        return session.GetSnapshots().ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
     }
 
     private void PersistLoadedProjectVariableSession(IProjectVariableSession session)

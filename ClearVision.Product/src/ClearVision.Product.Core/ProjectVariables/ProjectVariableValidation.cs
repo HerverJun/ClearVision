@@ -47,7 +47,10 @@ public static partial class ProjectGlobalVariableSchemaValidator
             }
         }
 
-        var operatorsById = flow?.Operators.ToDictionary(op => op.Id) ?? [];
+        var operatorsById = flow?.Operators
+            .Where(op => op.Id != Guid.Empty)
+            .GroupBy(op => op.Id)
+            .ToDictionary(group => group.Key, group => group.First()) ?? [];
         foreach (var binding in schema.SourceBindings)
         {
             ValidateSourceBinding(binding, variablesById, operatorsById, diagnostics);
@@ -325,26 +328,11 @@ public static partial class ProjectGlobalVariableSchemaValidator
             return;
         }
 
-        var sampleVariables = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["value"] = 1.25d
-        };
-        foreach (var variable in variables)
-        {
-            if (string.IsNullOrWhiteSpace(variable.Name))
-            {
-                continue;
-            }
-
-            sampleVariables[variable.Name] = variable.ValueType switch
-            {
-                ProjectGlobalVariableValueType.Boolean => true,
-                ProjectGlobalVariableValueType.String => "1",
-                _ => 1.25d
-            };
-        }
-
-        if (!ProjectVariableExpressionEvaluator.TryEvaluate(expression, sampleVariables, out _, out var error))
+        var knownVariables = variables
+            .Select(variable => variable.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Append("value");
+        if (!ProjectVariableExpressionEvaluator.TryCompile(expression, knownVariables!, out var error))
         {
             diagnostics.Add(new ProjectGlobalVariableDiagnostic(
                 "GV033",
@@ -395,7 +383,10 @@ public sealed class ProjectVariableBindingIndex
 
     public IEnumerable<(Guid SourceOperatorId, Guid TargetOperatorId, Guid VariableId)> GetImplicitEdges(ProjectGlobalVariableSchema schema)
     {
-        var sourceByVariableId = schema.SourceBindings.ToDictionary(binding => binding.VariableId);
+        var sourceByVariableId = schema.SourceBindings
+            .Where(binding => binding.VariableId != Guid.Empty)
+            .GroupBy(binding => binding.VariableId)
+            .ToDictionary(group => group.Key, group => group.First());
         foreach (var target in schema.TargetBindings)
         {
             if (sourceByVariableId.TryGetValue(target.VariableId, out var source) &&

@@ -101,6 +101,31 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
+    public async Task ProjectGlobalVariableEndpoints_WhenStatePersistFails_ShouldReturnGv030AndRollback()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            stateStore: new FailingProjectVariableStateStore());
+        var oldSession = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
+        oldSession.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
+
+        using var response = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variables",
+            CreateSchema(variableId, 5, manualWriteAllowed: true));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("GV030");
+        body.GetProperty("error").GetString().Should().Contain("state failed");
+        host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).Should().BeSameAs(oldSession);
+        oldSession.TryGetValue(variableId, out var current).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(current).Should().Be(9L);
+        await host.Repository.Received(2).UpdateAsync(host.Project);
+    }
+
+    [Fact]
     public async Task ProjectGlobalVariableEndpoints_ShouldRejectForbiddenWrite()
     {
         var variableId = Guid.NewGuid();
@@ -163,6 +188,39 @@ public sealed class ProjectGlobalVariableEndpointsTests
         resetOneResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
         host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetValue(variableId, out var current).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(current).Should().Be(1L);
+    }
+
+    [Fact]
+    public async Task ProjectDelete_ShouldRejectWhileProjectIsRunning()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            status: RuntimeStatus.Running);
+
+        using var response = await host.Client.DeleteAsync($"/api/projects/{host.Project.Id}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task RuntimePackageExport_ShouldRejectWhileProjectIsRunning()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true),
+            status: RuntimeStatus.Running);
+
+        using var response = await host.Client.PostAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/runtime-package/export",
+            new ApiEndpoints.ExportRuntimePackageRequest
+            {
+                RegisterForStationDeployment = false
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("GV031");
     }
 
     [Theory]
@@ -244,7 +302,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
         var newSession = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
         newSession.Should().NotBeSameAs(oldSession);
         newSession.TryGetValue(variableId, out var current).Should().BeTrue();
-        ProjectVariableValueConverter.ToObject(current).Should().Be(5L);
+        ProjectVariableValueConverter.ToObject(current).Should().Be(9L);
     }
 
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, bool manualWriteAllowed)
@@ -294,7 +352,8 @@ public sealed class ProjectGlobalVariableEndpointsTests
         public static async Task<ProjectGlobalVariableEndpointHost> CreateAsync(
             ProjectGlobalVariableSchema schema,
             string? storedFlowJson = null,
-            RuntimeStatus? status = null)
+            RuntimeStatus? status = null,
+            IProjectVariableStateStore? stateStore = null)
         {
             var project = new Project("demo");
             project.UpdateGlobalVariables(schema);
@@ -317,7 +376,14 @@ public sealed class ProjectGlobalVariableEndpointsTests
                 });
             }
 
-            var registry = new ProjectVariableSessionRegistry();
+            coordinator
+                .TryAcquireMutationLeaseAsync(project.Id, Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(_ => Task.FromResult<ProjectMutationLease?>(
+                    status is RuntimeStatus.Starting or RuntimeStatus.Running or RuntimeStatus.Stopping
+                        ? null
+                        : new ProjectMutationLease(project.Id, "test", () => ValueTask.CompletedTask)));
+
+            var registry = new ProjectVariableSessionRegistry(stateStore);
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
                 EnvironmentName = Environments.Development
@@ -337,6 +403,17 @@ public sealed class ProjectGlobalVariableEndpointsTests
                 NullLogger<StationPackageStore>.Instance));
             builder.Services.AddScoped<ProjectService>();
             var app = builder.Build();
+            app.Use(async (context, next) =>
+            {
+                context.Items["CurrentUser"] = new UserSession
+                {
+                    UserId = "test-admin",
+                    Username = "test-admin",
+                    Role = UserRole.Admin.ToString(),
+                    ExpiresAt = DateTime.UtcNow.AddHours(1)
+                };
+                await next();
+            });
             MapProjectEndpoints(app);
             await app.StartAsync();
             return new ProjectGlobalVariableEndpointHost(app, project, registry, repository);
@@ -357,5 +434,19 @@ public sealed class ProjectGlobalVariableEndpointsTests
             BindingFlags.NonPublic | BindingFlags.Static);
         method.Should().NotBeNull();
         method!.Invoke(null, [app]);
+    }
+
+    private sealed class FailingProjectVariableStateStore : IProjectVariableStateStore
+    {
+        public IReadOnlyList<ProjectVariableValueSnapshot> Load(string scopeId, ProjectGlobalVariableSchema schema) => [];
+
+        public void Save(string scopeId, ProjectGlobalVariableSchema schema, IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
+        {
+            throw new IOException("state failed");
+        }
+
+        public void Delete(string scopeId)
+        {
+        }
     }
 }
