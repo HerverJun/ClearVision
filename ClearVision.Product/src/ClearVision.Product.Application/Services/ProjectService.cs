@@ -411,7 +411,6 @@ public class ProjectService
         {
             Name = project.Name,
             Description = project.Description,
-            Flow = await LoadStoredFlowDtoAsync(id),
             GlobalVariables = schema
         });
         return updated.GlobalVariables;
@@ -836,19 +835,19 @@ public class ProjectService
                 changed = true;
             }
 
-            if (!Equals(parameter.DefaultValue, definition.DefaultValue))
+            if (!ParameterMetadataValueEquals(parameter.DefaultValue, definition.DefaultValue))
             {
                 parameter.DefaultValue = definition.DefaultValue;
                 changed = true;
             }
 
-            if (!Equals(parameter.MinValue, definition.MinValue))
+            if (!ParameterMetadataValueEquals(parameter.MinValue, definition.MinValue))
             {
                 parameter.MinValue = definition.MinValue;
                 changed = true;
             }
 
-            if (!Equals(parameter.MaxValue, definition.MaxValue))
+            if (!ParameterMetadataValueEquals(parameter.MaxValue, definition.MaxValue))
             {
                 parameter.MaxValue = definition.MaxValue;
                 changed = true;
@@ -868,5 +867,20 @@ public class ProjectService
         }
 
         return changed;
+    }
+
+    private static bool ParameterMetadataValueEquals(object? current, object? expected)
+    {
+        if (current == null || expected == null)
+        {
+            return current == null && expected == null;
+        }
+
+        if (Equals(current, expected))
+        {
+            return true;
+        }
+
+        return JsonSerializer.Serialize(current, _jsonOptions) == JsonSerializer.Serialize(expected, _jsonOptions);
     }
 }

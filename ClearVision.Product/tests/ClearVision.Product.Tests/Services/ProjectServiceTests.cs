@@ -247,6 +247,39 @@ public class ProjectServiceTests
     }
 
     [Fact]
+    public async Task UpdateGlobalVariablesAsync_WhenStoredFlowNeedsNoNormalization_ShouldNotRewriteFlow()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var registry = new ProjectVariableSessionRegistry();
+        var variableId = Guid.NewGuid();
+        var project = new Project("demo");
+        project.UpdateGlobalVariables(CreateSchema(variableId, 1, "stats.count"));
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
+        string? canonicalFlowJson = null;
+        storage
+            .When(item => item.SaveFlowJsonAsync(project.Id, Arg.Any<string>()))
+            .Do(callInfo => canonicalFlowJson = callInfo.ArgAt<string>(1));
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+        await sut.UpdateAsync(project.Id, new UpdateProjectRequest
+        {
+            Name = "demo",
+            Flow = CreateVariableReadFlow(variableId, "stats.count")
+        });
+        canonicalFlowJson.Should().NotBeNull();
+        storage.ClearReceivedCalls();
+        repository.ClearReceivedCalls();
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(canonicalFlowJson));
+
+        await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 1, "stats.count"));
+
+        await storage.DidNotReceive().SaveFlowJsonAsync(project.Id, Arg.Any<string>());
+        await repository.Received(1).UpdateAsync(project);
+    }
+
+    [Fact]
     public async Task UpdateAsync_WhenVariableIdAndNamePointToDifferentVariables_ShouldReturnGv026()
     {
         var repository = Substitute.For<IProjectRepository>();
