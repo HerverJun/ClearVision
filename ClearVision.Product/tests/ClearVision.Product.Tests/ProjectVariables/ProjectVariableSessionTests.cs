@@ -252,6 +252,55 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void RegistryTryMutateAndPersist_WhenStateDirectoryIsReadOnly_ShouldReturnGv030AndKeepAuthoritativeState()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableReadOnlyRegistry", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var fileSystem = new PhaseFailingProjectVariableStateFileSystem();
+            var store = new JsonFileProjectVariableStateStore(root, fileSystem);
+            var registry = new ProjectVariableSessionRegistry(store);
+            var projectId = Guid.NewGuid();
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            registry.TryMutateAndPersist(
+                    projectId,
+                    schema,
+                    session => session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual),
+                    out var authoritative,
+                    out var seedError)
+                .Should()
+                .BeTrue(seedError);
+
+            fileSystem.FailCreateDirectories = true;
+            var mutated = registry.TryMutateAndPersist(
+                projectId,
+                schema,
+                session => session.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual),
+                out var current,
+                out var error);
+
+            mutated.Should().BeFalse();
+            error.Should().Contain("GV030");
+            current.Should().BeSameAs(authoritative);
+            fileSystem.FailCreateDirectories = false;
+            LoadLongAndVersion(store, ProjectVariableSessionRegistry.ToProjectScopeId(projectId), schema, variableId)
+                .Should()
+                .Be((4L, 1L));
+            registry.GetOrCreate(projectId, schema).TryGetSnapshot(variableId, out var memorySnapshot).Should().BeTrue();
+            ProjectVariableValueConverter.ToObject(memorySnapshot.Value).Should().Be(4L);
+            memorySnapshot.Version.Should().Be(1);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void RegistryTryCommitAndPersist_WhenSaveSucceeds_ShouldPublishPersistedCandidate()
     {
         var store = new RecordingStateStore();
@@ -664,6 +713,36 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_Save_WhenCreateDirectoryFails_ShouldKeepCommittedFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableReadOnlyDirectory", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var fileSystem = new PhaseFailingProjectVariableStateFileSystem();
+            var store = new JsonFileProjectVariableStateStore(root, fileSystem);
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 3L, 1);
+
+            fileSystem.FailCreateDirectories = true;
+            var act = () => SaveSnapshot(store, scopeId, schema, variableId, 9L, 2);
+
+            act.Should().Throw<UnauthorizedAccessException>().WithMessage("*read-only*");
+            fileSystem.FailCreateDirectories = false;
+            LoadLongAndVersion(store, scopeId, schema, variableId).Should().Be((3L, 1L));
+            Directory.EnumerateFiles(root, "*.tmp").Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void JsonFileStateStore_Save_WhenLastGoodCopyFails_ShouldKeepCommittedFile()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableCopyFailure", Guid.NewGuid().ToString("N"));
@@ -889,13 +968,23 @@ public sealed class ProjectVariableSessionTests
 
     private sealed class PhaseFailingProjectVariableStateFileSystem : IProjectVariableStateFileSystem
     {
+        public bool FailCreateDirectories { get; set; }
+
         public bool FailWrites { get; set; }
 
         public bool FailCopies { get; set; }
 
         public bool FailMoves { get; set; }
 
-        public void CreateDirectory(string path) => Directory.CreateDirectory(path);
+        public void CreateDirectory(string path)
+        {
+            if (FailCreateDirectories)
+            {
+                throw new UnauthorizedAccessException("read-only directory");
+            }
+
+            Directory.CreateDirectory(path);
+        }
 
         public bool FileExists(string path) => File.Exists(path);
 
