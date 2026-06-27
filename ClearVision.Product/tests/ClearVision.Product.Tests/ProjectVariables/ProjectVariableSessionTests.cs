@@ -772,6 +772,7 @@ public sealed class ProjectVariableSessionTests
             var act = () => SaveSnapshot(store, scopeId, schema, variableId, 9L, 2);
 
             act.Should().Throw<IOException>().WithMessage("*write failed*");
+            Directory.EnumerateFiles(root, "*.tmp").Should().BeEmpty();
             fileSystem.FailWrites = false;
             LoadLong(store, scopeId, schema, variableId).Should().Be(3L);
         }
@@ -831,9 +832,9 @@ public sealed class ProjectVariableSessionTests
             var act = () => SaveSnapshot(store, scopeId, schema, variableId, 9L, 2);
 
             act.Should().Throw<IOException>().WithMessage("*copy failed*");
+            Directory.EnumerateFiles(root, "*.tmp").Should().BeEmpty();
             fileSystem.FailCopies = false;
             LoadLong(store, scopeId, schema, variableId).Should().Be(3L);
-            Directory.EnumerateFiles(root, "*.tmp").Should().BeEmpty();
         }
         finally
         {
@@ -861,9 +862,9 @@ public sealed class ProjectVariableSessionTests
             var act = () => SaveSnapshot(store, scopeId, schema, variableId, 9L, 2);
 
             act.Should().Throw<IOException>().WithMessage("*move failed*");
+            Directory.EnumerateFiles(root, "*.tmp").Should().BeEmpty();
             fileSystem.FailMoves = false;
             LoadLong(store, scopeId, schema, variableId).Should().Be(3L);
-            Directory.EnumerateFiles(root, "*.tmp").Should().BeEmpty();
         }
         finally
         {

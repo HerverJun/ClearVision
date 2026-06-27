@@ -172,13 +172,21 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             var tempPath = GetTempPath(scopeId);
             var lastGoodPath = GetLastGoodPath(scopeId);
 
-            _fileSystem.WriteAllText(tempPath, json, new UTF8Encoding(false));
-            if (_fileSystem.FileExists(filePath))
+            try
             {
-                _fileSystem.Copy(filePath, lastGoodPath, overwrite: true);
-            }
+                _fileSystem.WriteAllText(tempPath, json, new UTF8Encoding(false));
+                if (_fileSystem.FileExists(filePath))
+                {
+                    _fileSystem.Copy(filePath, lastGoodPath, overwrite: true);
+                }
 
-            _fileSystem.Move(tempPath, filePath, overwrite: true);
+                _fileSystem.Move(tempPath, filePath, overwrite: true);
+            }
+            catch
+            {
+                TryDeleteTempFile(tempPath);
+                throw;
+            }
         }
         finally
         {
@@ -484,6 +492,21 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         catch
         {
             // Recovery must not fail because the recovery audit trail could not be written.
+        }
+    }
+
+    private void TryDeleteTempFile(string tempPath)
+    {
+        try
+        {
+            if (_fileSystem.FileExists(tempPath))
+            {
+                _fileSystem.DeleteFile(tempPath);
+            }
+        }
+        catch
+        {
+            // Preserve the original persistence error; a future Load can still recover any remaining temp file.
         }
     }
 
