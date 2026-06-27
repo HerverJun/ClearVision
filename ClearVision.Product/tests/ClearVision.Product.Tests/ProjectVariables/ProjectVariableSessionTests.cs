@@ -356,6 +356,40 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void RegistryTryCommitAndPersist_WhenSchemaGenerationChangedBackToSameHash_ShouldRejectStaleWorkingCopy()
+    {
+        var registry = new ProjectVariableSessionRegistry();
+        var projectId = Guid.NewGuid();
+        var variableId = Guid.NewGuid();
+        var schemaA = CreateSchema(variableId, 1);
+        var schemaB = CreateSchema(variableId, 2);
+        var authoritative = registry.GetOrCreate(projectId, schemaA);
+        authoritative.SchemaGeneration.Should().Be(0);
+        var expectedVersions = authoritative.GetSnapshots()
+            .ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
+        using var staleWorking = authoritative.CreateSnapshotClone();
+        staleWorking.SetValue(variableId, 12L, ProjectVariableUpdatedBy.OperatorOutput);
+
+        registry.TryPublishSchemaAndPersist(projectId, schemaB, out var schemaBSession, out var schemaBError)
+            .Should()
+            .BeTrue(schemaBError);
+        schemaBSession.SchemaGeneration.Should().Be(1);
+        registry.TryPublishSchemaAndPersist(projectId, schemaA, out var schemaASession, out var schemaAError)
+            .Should()
+            .BeTrue(schemaAError);
+        schemaASession.SchemaGeneration.Should().Be(2);
+
+        var committed = registry.TryCommitAndPersist(projectId, staleWorking, expectedVersions, out var current, out var error);
+
+        committed.Should().BeFalse();
+        error.Should().Contain("GV025").And.Contain("schema generation");
+        current.Should().BeSameAs(schemaASession);
+        current.TryGetSnapshot(variableId, out var snapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(snapshot.Value).Should().Be(1L);
+        snapshot.Version.Should().Be(0);
+    }
+
+    [Fact]
     public void RegistryTryRemove_ShouldNotDisposeActiveReference()
     {
         var registry = new ProjectVariableSessionRegistry();

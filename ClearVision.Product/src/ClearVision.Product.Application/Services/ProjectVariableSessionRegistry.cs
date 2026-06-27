@@ -62,7 +62,7 @@ public sealed class ProjectVariableSessionRegistry
                     return true;
                 }
 
-                var migrated = new ProjectVariableSession(schema, current.GetSnapshots());
+                var migrated = new ProjectVariableSession(schema, current.GetSnapshots(), current.SchemaGeneration + 1);
                 try
                 {
                     Save(projectId, migrated);
@@ -172,6 +172,13 @@ public sealed class ProjectVariableSessionRegistry
 
             var authoritativeHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(authoritative.Schema);
             var workingHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(workingSession.Schema);
+            if (authoritative.SchemaGeneration != workingSession.SchemaGeneration)
+            {
+                session = authoritative;
+                error = "GV025: project global variable schema generation changed before this run could commit.";
+                return false;
+            }
+
             if (!string.Equals(authoritativeHash, workingHash, StringComparison.Ordinal))
             {
                 session = authoritative;

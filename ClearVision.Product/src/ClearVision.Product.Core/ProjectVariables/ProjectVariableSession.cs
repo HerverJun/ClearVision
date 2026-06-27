@@ -7,6 +7,8 @@ public interface IProjectVariableSession : IDisposable
 {
     ProjectGlobalVariableSchema Schema { get; }
 
+    long SchemaGeneration { get; }
+
     IReadOnlyList<ProjectVariableValueSnapshot> GetSnapshots();
 
     IProjectVariableSession CreateSnapshotClone();
@@ -71,15 +73,24 @@ public sealed class ProjectVariableSession : IProjectVariableSession
     private bool _disposed;
 
     public ProjectVariableSession(ProjectGlobalVariableSchema? schema)
-        : this(schema, snapshots: null)
+        : this(schema, snapshots: null, schemaGeneration: 0)
     {
     }
 
     public ProjectVariableSession(
         ProjectGlobalVariableSchema? schema,
         IEnumerable<ProjectVariableValueSnapshot>? snapshots)
+        : this(schema, snapshots, schemaGeneration: 0)
+    {
+    }
+
+    public ProjectVariableSession(
+        ProjectGlobalVariableSchema? schema,
+        IEnumerable<ProjectVariableValueSnapshot>? snapshots,
+        long schemaGeneration)
     {
         Schema = schema ?? new ProjectGlobalVariableSchema();
+        SchemaGeneration = Math.Max(0, schemaGeneration);
         _definitionsById = Schema.Variables
             .Where(variable => variable.Id != Guid.Empty)
             .GroupBy(variable => variable.Id)
@@ -161,6 +172,8 @@ public sealed class ProjectVariableSession : IProjectVariableSession
 
     public ProjectGlobalVariableSchema Schema { get; }
 
+    public long SchemaGeneration { get; }
+
     public IReadOnlyList<ProjectVariableValueSnapshot> GetSnapshots()
     {
         lock (_stateGate)
@@ -175,7 +188,7 @@ public sealed class ProjectVariableSession : IProjectVariableSession
     public IProjectVariableSession CreateSnapshotClone()
     {
         ThrowIfDisposed();
-        return new ProjectVariableSession(Schema, GetSnapshots());
+        return new ProjectVariableSession(Schema, GetSnapshots(), SchemaGeneration);
     }
 
     public bool TryGetValue(Guid variableId, out JsonElement value)
