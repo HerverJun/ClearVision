@@ -34,6 +34,8 @@ namespace ClearVision.Product.Desktop.Endpoints;
 /// </summary>
 public static class ApiEndpoints
 {
+    private static readonly JsonSerializerOptions OptionalRequestJsonOptions = new(JsonSerializerDefaults.Web);
+
     public static IEndpointRouteBuilder MapVisionApiEndpoints(this IEndpointRouteBuilder app)
     {
         // 鍋ュ悍妫€鏌?
@@ -92,6 +94,16 @@ public static class ApiEndpoints
         public object? Value { get; set; }
 
         public long? ExpectedVersion { get; set; }
+    }
+
+    public sealed class ProjectVariableResetRequest
+    {
+        public long? ExpectedVersion { get; set; }
+    }
+
+    public sealed class ProjectVariableResetAllRequest
+    {
+        public Dictionary<Guid, long>? ExpectedVersions { get; set; }
     }
 
     private static void MapProjectEndpoints(IEndpointRouteBuilder app)
@@ -318,7 +330,8 @@ public static class ApiEndpoints
             Guid id,
             ProjectService service,
             ProjectVariableSessionRegistry sessions,
-            IInspectionRuntimeCoordinator runtimeCoordinator) =>
+            IInspectionRuntimeCoordinator runtimeCoordinator,
+            HttpContext context) =>
         {
             await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-reset-all", CancellationToken.None);
             if (mutationLease == null)
@@ -344,10 +357,12 @@ public static class ApiEndpoints
                 });
             }
 
+            var request = await ReadOptionalJsonBodyAsync<ProjectVariableResetAllRequest>(context);
             if (!sessions.TryMutateAndPersist(
                     id,
                     project.GlobalVariables,
                     candidate => candidate.ResetAll(ProjectVariableUpdatedBy.Reset),
+                    request?.ExpectedVersions?.Count > 0 ? request.ExpectedVersions : null,
                     out var updatedSession,
                     out var error))
             {
@@ -362,7 +377,8 @@ public static class ApiEndpoints
             Guid variableId,
             ProjectService service,
             ProjectVariableSessionRegistry sessions,
-            IInspectionRuntimeCoordinator runtimeCoordinator) =>
+            IInspectionRuntimeCoordinator runtimeCoordinator,
+            HttpContext context) =>
         {
             await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-reset-one", CancellationToken.None);
             if (mutationLease == null)
@@ -387,10 +403,14 @@ public static class ApiEndpoints
                 return Results.BadRequest(new { Code = "GV030", Error = "Manual reset is not allowed for this variable." });
             }
 
+            var request = await ReadOptionalJsonBodyAsync<ProjectVariableResetRequest>(context);
             if (!sessions.TryMutateAndPersist(
                     id,
                     project.GlobalVariables,
                     candidate => candidate.Reset(variableId, ProjectVariableUpdatedBy.Reset),
+                    request?.ExpectedVersion.HasValue == true
+                        ? new Dictionary<Guid, long> { [variableId] = request.ExpectedVersion.Value }
+                        : null,
                     out var updatedSession,
                     out var error))
             {
@@ -707,6 +727,19 @@ public static class ApiEndpoints
         }
 
         return Results.BadRequest(new { Code = "GV032", Error = error });
+    }
+
+    private static async ValueTask<T?> ReadOptionalJsonBodyAsync<T>(HttpContext context)
+        where T : class
+    {
+        using var reader = new StreamReader(context.Request.Body, leaveOpen: true);
+        var body = await reader.ReadToEndAsync();
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        return JsonSerializer.Deserialize<T>(body, OptionalRequestJsonOptions);
     }
 
     private static bool TryParseStableError(string? message, out string code, out string error)
