@@ -3,6 +3,7 @@ using System.Text.Json;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Runtime.Abstractions;
 using FluentAssertions;
 
 namespace ClearVision.Product.Tests.ProjectVariables;
@@ -848,6 +849,23 @@ public sealed class ProjectVariableSessionTests
         store.BasePath.Should().Be(expectedRoot);
         store.BasePath.Should().NotContain(AppDomain.CurrentDomain.BaseDirectory);
         store.BasePath.Should().NotContain("App_Data");
+    }
+
+    [Fact]
+    public void StationSettingsPaths_ProjectVariableStates_ShouldUseStationDataRoot()
+    {
+        var localAppDataRoot = Path.Combine(Path.GetTempPath(), "ClearVisionStationPathTests", Guid.NewGuid().ToString("N"));
+        var expectedRoot = Path.Combine(
+            localAppDataRoot,
+            StationSettingsPaths.StationAppDataDirectoryName,
+            StationSettingsPaths.ProjectVariableStatesDirectoryName);
+
+        var stateRoot = StationSettingsPaths.GetStationProjectVariableStatesPath(localAppDataRoot);
+
+        stateRoot.Should().Be(expectedRoot);
+        stateRoot.Should().Contain(StationSettingsPaths.StationAppDataDirectoryName);
+        stateRoot.Should().NotContain(AppDomain.CurrentDomain.BaseDirectory);
+        stateRoot.Should().NotContain("App_Data");
     }
 
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, long? min = null, long? max = null)
