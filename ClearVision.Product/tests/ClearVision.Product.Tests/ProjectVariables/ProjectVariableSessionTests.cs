@@ -330,6 +330,42 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void RegistryTryMutateAndPersist_WhenExpectedVersionIsStale_ShouldRejectBeforeChangingState()
+    {
+        var store = new RecordingStateStore();
+        var registry = new ProjectVariableSessionRegistry(store);
+        var projectId = Guid.NewGuid();
+        var variableId = Guid.NewGuid();
+        var schema = CreateSchema(variableId, 1);
+        registry.TryMutateAndPersist(
+                projectId,
+                schema,
+                session => session.SetValue(variableId, 7L, ProjectVariableUpdatedBy.StudioManual),
+                out var authoritative,
+                out var seedError)
+            .Should()
+            .BeTrue(seedError);
+
+        var mutated = registry.TryMutateAndPersist(
+            projectId,
+            schema,
+            session => session.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual),
+            new Dictionary<Guid, long> { [variableId] = 0 },
+            out var current,
+            out var error);
+
+        mutated.Should().BeFalse();
+        error.Should().Contain("GV025").And.Contain("changed from version 0 to 1");
+        current.Should().BeSameAs(authoritative);
+        registry.GetOrCreate(projectId, schema).TryGetSnapshot(variableId, out var memorySnapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(memorySnapshot.Value).Should().Be(7L);
+        memorySnapshot.Version.Should().Be(1);
+        var storedSnapshot = store.SavedSnapshots.Should().ContainSingle().Subject;
+        ProjectVariableValueConverter.ToObject(storedSnapshot.Value).Should().Be(7L);
+        storedSnapshot.Version.Should().Be(1);
+    }
+
+    [Fact]
     public void RegistryTryCommitAndPersist_WhenSaveSucceeds_ShouldPublishPersistedCandidate()
     {
         var store = new RecordingStateStore();

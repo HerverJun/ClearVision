@@ -68,6 +68,33 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
+    public async Task ProjectGlobalVariableEndpoints_WhenManualWriteExpectedVersionIsStale_ShouldReturnGv025AndKeepValue()
+    {
+        var variableId = Guid.NewGuid();
+        await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
+            CreateSchema(variableId, 1, manualWriteAllowed: true));
+        var session = host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables);
+        session.TryGetSnapshot(variableId, out var initial).Should().BeTrue();
+        initial.Version.Should().Be(0);
+
+        using var firstWrite = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
+            new { value = 8L, expectedVersion = initial.Version });
+        firstWrite.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var staleWrite = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
+            new { value = 11L, expectedVersion = initial.Version });
+
+        staleWrite.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await staleWrite.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("code").GetString().Should().Be("GV025");
+        host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).TryGetSnapshot(variableId, out var current).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(current.Value).Should().Be(8L);
+        current.Version.Should().Be(1);
+    }
+
+    [Fact]
     public async Task ProjectGlobalVariableEndpoints_ShouldRejectInvalidSchemaAndKeepOldSession()
     {
         var variableId = Guid.NewGuid();

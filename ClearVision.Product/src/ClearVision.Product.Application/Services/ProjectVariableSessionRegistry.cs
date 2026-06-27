@@ -106,6 +106,17 @@ public sealed class ProjectVariableSessionRegistry
         out IProjectVariableSession session,
         out string? error)
     {
+        return TryMutateAndPersist(projectId, schema, mutate, expectedVersions: null, out session, out error);
+    }
+
+    public bool TryMutateAndPersist(
+        Guid projectId,
+        ProjectGlobalVariableSchema schema,
+        Action<IProjectVariableSession> mutate,
+        IReadOnlyDictionary<Guid, long>? expectedVersions,
+        out IProjectVariableSession session,
+        out string? error)
+    {
         ArgumentNullException.ThrowIfNull(schema);
         ArgumentNullException.ThrowIfNull(mutate);
 
@@ -118,6 +129,13 @@ public sealed class ProjectVariableSessionRegistry
             {
                 session = authoritative;
                 error = "GV025: project global variable schema changed before this mutation could commit.";
+                return false;
+            }
+
+            if (expectedVersions != null &&
+                !ValidateExpectedVersions(authoritative, expectedVersions, out error))
+            {
+                session = authoritative;
                 return false;
             }
 
@@ -149,6 +167,30 @@ public sealed class ProjectVariableSessionRegistry
                 return false;
             }
         }
+    }
+
+    private static bool ValidateExpectedVersions(
+        IProjectVariableSession authoritative,
+        IReadOnlyDictionary<Guid, long> expectedVersions,
+        out string? error)
+    {
+        foreach (var (variableId, expectedVersion) in expectedVersions)
+        {
+            if (!authoritative.TryGetSnapshot(variableId, out var current))
+            {
+                error = $"GV025: project global variable '{variableId}' no longer exists in the authoritative session.";
+                return false;
+            }
+
+            if (current.Version != expectedVersion)
+            {
+                error = $"GV025: project global variable '{variableId}' changed from version {expectedVersion} to {current.Version} before this mutation could commit.";
+                return false;
+            }
+        }
+
+        error = null;
+        return true;
     }
 
     public bool TryCommitAndPersist(

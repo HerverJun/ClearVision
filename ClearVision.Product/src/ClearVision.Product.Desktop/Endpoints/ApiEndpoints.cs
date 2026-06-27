@@ -90,6 +90,8 @@ public static class ApiEndpoints
     public sealed class ProjectVariableValueWriteRequest
     {
         public object? Value { get; set; }
+
+        public long? ExpectedVersion { get; set; }
     }
 
     private static void MapProjectEndpoints(IEndpointRouteBuilder app)
@@ -295,10 +297,13 @@ public static class ApiEndpoints
                         id,
                         project.GlobalVariables,
                         candidate => candidate.SetValue(variableId, request.Value, ProjectVariableUpdatedBy.StudioManual),
+                        request.ExpectedVersion.HasValue
+                            ? new Dictionary<Guid, long> { [variableId] = request.ExpectedVersion.Value }
+                            : null,
                         out var updatedSession,
                         out var error))
                 {
-                    return Results.BadRequest(new { Code = "GV032", Error = error });
+                    return ToProjectVariableMutationFailure(error);
                 }
 
                 return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
@@ -346,7 +351,7 @@ public static class ApiEndpoints
                     out var updatedSession,
                     out var error))
             {
-                return Results.BadRequest(new { Code = "GV032", Error = error });
+                return ToProjectVariableMutationFailure(error);
             }
 
             return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
@@ -389,7 +394,7 @@ public static class ApiEndpoints
                     out var updatedSession,
                     out var error))
             {
-                return Results.BadRequest(new { Code = "GV032", Error = error });
+                return ToProjectVariableMutationFailure(error);
             }
 
             return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
@@ -690,6 +695,18 @@ public static class ApiEndpoints
         return TryParseStableError(ex.Message, out var code, out var message)
             ? Results.BadRequest(new { Code = code, Error = message })
             : Results.BadRequest(new { Error = ex.Message });
+    }
+
+    private static IResult ToProjectVariableMutationFailure(string? error)
+    {
+        if (TryParseStableError(error, out var code, out var message))
+        {
+            return code == "GV025"
+                ? Results.Conflict(new { Code = code, Error = message })
+                : Results.BadRequest(new { Code = code, Error = message });
+        }
+
+        return Results.BadRequest(new { Code = "GV032", Error = error });
     }
 
     private static bool TryParseStableError(string? message, out string code, out string error)
