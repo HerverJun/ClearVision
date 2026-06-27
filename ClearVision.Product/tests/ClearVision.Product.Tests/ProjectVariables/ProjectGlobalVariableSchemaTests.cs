@@ -465,6 +465,39 @@ public sealed class ProjectGlobalVariableSchemaTests
     }
 
     [Fact]
+    public void ExpressionEvaluator_TryCompile_ShouldParseWithoutEvaluatingRuntimeArithmetic()
+    {
+        var compiled = ProjectVariableExpressionEvaluator.TryCompile(
+            "1 / 0",
+            [],
+            out var compileError);
+
+        var evaluated = ProjectVariableExpressionEvaluator.TryEvaluate(
+            "1 / 0",
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out _,
+            out var evaluateError);
+
+        compiled.Should().BeTrue(compileError);
+        evaluated.Should().BeFalse();
+        evaluateError.Should().Contain("Division by zero");
+    }
+
+    [Theory]
+    [MemberData(nameof(ExpressionLimitCases))]
+    public void ExpressionEvaluator_WhenExpressionExceedsSafetyLimits_ShouldReject(string expression, string expectedError)
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            expression,
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out _,
+            out var error);
+
+        ok.Should().BeFalse();
+        error.Should().Contain(expectedError);
+    }
+
+    [Fact]
     public void ValueTransform_WhenFlooringLargeFractionalNumericText_ShouldPreserveExactInt64()
     {
         var ok = ProjectVariableValueTransform.TryConvertToVariableValue(
@@ -541,6 +574,32 @@ public sealed class ProjectGlobalVariableSchemaTests
         var diagnostics = ProjectGlobalVariableSchemaValidator.Validate(schema);
 
         diagnostics.Should().Contain(item => item.Code == "GV018");
+    }
+
+    public static IEnumerable<object[]> ExpressionLimitCases()
+    {
+        yield return
+        [
+            new string('1', ProjectVariableExpressionEvaluator.MaxExpressionLength + 1),
+            $"maximum length {ProjectVariableExpressionEvaluator.MaxExpressionLength}"
+        ];
+        yield return
+        [
+            string.Join("+", Enumerable.Repeat("1", ProjectVariableExpressionEvaluator.MaxTokenCount + 1)),
+            $"token count exceeds {ProjectVariableExpressionEvaluator.MaxTokenCount}"
+        ];
+        yield return
+        [
+            new string('(', ProjectVariableExpressionEvaluator.MaxAstDepth + 1) +
+                "1" +
+                new string(')', ProjectVariableExpressionEvaluator.MaxAstDepth + 1),
+            $"AST depth exceeds {ProjectVariableExpressionEvaluator.MaxAstDepth}"
+        ];
+        yield return
+        [
+            "max(" + string.Join(", ", Enumerable.Range(1, ProjectVariableExpressionEvaluator.MaxFunctionArgumentCount + 1)) + ")",
+            $"function argument count exceeds {ProjectVariableExpressionEvaluator.MaxFunctionArgumentCount}"
+        ];
     }
 
     private static ProjectGlobalVariableDefinition Variable(
