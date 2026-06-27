@@ -112,6 +112,15 @@ public sealed class ProjectVariableSessionRegistry
         lock (GetProjectGate(projectId))
         {
             var authoritative = _sessions.GetOrAdd(projectId, _ => CreateSession(projectId, schema));
+            var authoritativeHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(authoritative.Schema);
+            var requestedHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema);
+            if (!string.Equals(authoritativeHash, requestedHash, StringComparison.Ordinal))
+            {
+                session = authoritative;
+                error = "GV025: project global variable schema changed before this mutation could commit.";
+                return false;
+            }
+
             using var candidate = authoritative.CreateSnapshotClone();
             try
             {

@@ -302,6 +302,34 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void RegistryTryMutateAndPersist_WhenSchemaGenerationIsStale_ShouldRejectBeforeChangingState()
+    {
+        var store = new RecordingStateStore();
+        var registry = new ProjectVariableSessionRegistry(store);
+        var projectId = Guid.NewGuid();
+        var variableId = Guid.NewGuid();
+        var authoritativeSchema = CreateSchema(variableId, 1);
+        var staleCallerSchema = CreateSchema(variableId, 5);
+        var authoritative = registry.GetOrCreate(projectId, authoritativeSchema);
+        authoritative.SetValue(variableId, 7L, ProjectVariableUpdatedBy.StudioManual);
+
+        var mutated = registry.TryMutateAndPersist(
+            projectId,
+            staleCallerSchema,
+            session => session.SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual),
+            out var current,
+            out var error);
+
+        mutated.Should().BeFalse();
+        error.Should().Contain("GV025");
+        current.Should().BeSameAs(authoritative);
+        store.SavedSnapshots.Should().BeEmpty();
+        registry.GetOrCreate(projectId, authoritativeSchema).TryGetSnapshot(variableId, out var memorySnapshot).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(memorySnapshot.Value).Should().Be(7L);
+        memorySnapshot.Version.Should().Be(1);
+    }
+
+    [Fact]
     public void RegistryTryCommitAndPersist_WhenSaveSucceeds_ShouldPublishPersistedCandidate()
     {
         var store = new RecordingStateStore();
