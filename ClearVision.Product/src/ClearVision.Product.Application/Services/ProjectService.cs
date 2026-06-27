@@ -625,19 +625,39 @@ public class ProjectService
             var variableNameParameter = GetParameter(opDto, "VariableName");
             ProjectGlobalVariableDefinition? definition = null;
             var variableIdText = variableIdParameter?.Value?.ToString();
-            if (Guid.TryParse(variableIdText, out var variableId))
+            var hasParsedVariableId = Guid.TryParse(variableIdText, out var variableId);
+            if (hasParsedVariableId)
             {
                 variablesById.TryGetValue(variableId, out definition);
             }
 
-            if (definition == null)
+            var variableNameText = variableNameParameter?.Value?.ToString();
+            ProjectGlobalVariableDefinition? definitionByName = null;
+            if (!string.IsNullOrWhiteSpace(variableNameText))
             {
-                var variableNameText = variableNameParameter?.Value?.ToString();
-                if (string.IsNullOrWhiteSpace(variableNameText) ||
-                    !variablesByName.TryGetValue(variableNameText, out definition))
+                variablesByName.TryGetValue(variableNameText, out definitionByName);
+            }
+
+            if (definition != null &&
+                definitionByName != null &&
+                definition.Id != definitionByName.Id)
+            {
+                continue;
+            }
+
+            if (definition == null && !hasParsedVariableId)
+            {
+                if (definitionByName == null)
                 {
                     continue;
                 }
+
+                definition = definitionByName;
+            }
+
+            if (definition == null)
+            {
+                continue;
             }
 
             variableIdParameter ??= AddParameter(opDto, "VariableId");

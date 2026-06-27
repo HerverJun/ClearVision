@@ -247,6 +247,33 @@ public class ProjectServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_WhenVariableIdAndNamePointToDifferentVariables_ShouldReturnGv026()
+    {
+        var repository = Substitute.For<IProjectRepository>();
+        var storage = Substitute.For<IProjectFlowStorage>();
+        var registry = new ProjectVariableSessionRegistry();
+        var firstVariableId = Guid.NewGuid();
+        var secondVariableId = Guid.NewGuid();
+        var schema = CreateTwoVariableSchema(firstVariableId, secondVariableId);
+        var project = new Project("demo");
+        project.UpdateGlobalVariables(schema);
+        repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
+        var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
+
+        var act = async () => await sut.UpdateAsync(project.Id, new UpdateProjectRequest
+        {
+            Name = "demo",
+            GlobalVariables = schema,
+            Flow = CreateVariableReadFlow(firstVariableId, "stats.second")
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*GV026*");
+        await storage.DidNotReceive().SaveFlowJsonAsync(project.Id, Arg.Any<string>());
+        await repository.DidNotReceive().UpdateAsync(Arg.Any<Project>());
+    }
+
+    [Fact]
     public async Task UpdateAsync_WhenRepositoryFailsAfterFlowSave_ShouldRestoreFlowSchemaAndSession()
     {
         var repository = Substitute.For<IProjectRepository>();
@@ -342,6 +369,34 @@ public class ProjectServiceTests
                     DisplayName = "Count",
                     ValueType = ProjectGlobalVariableValueType.Int64,
                     InitialValue = JsonSerializer.SerializeToElement(initialValue),
+                    ManualWriteAllowed = true
+                }
+            ]
+        };
+    }
+
+    private static ProjectGlobalVariableSchema CreateTwoVariableSchema(Guid firstVariableId, Guid secondVariableId)
+    {
+        return new ProjectGlobalVariableSchema
+        {
+            Variables =
+            [
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = firstVariableId,
+                    Name = "stats.first",
+                    DisplayName = "First",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(1L),
+                    ManualWriteAllowed = true
+                },
+                new ProjectGlobalVariableDefinition
+                {
+                    Id = secondVariableId,
+                    Name = "stats.second",
+                    DisplayName = "Second",
+                    ValueType = ProjectGlobalVariableValueType.Int64,
+                    InitialValue = JsonSerializer.SerializeToElement(2L),
                     ManualWriteAllowed = true
                 }
             ]
