@@ -591,6 +591,42 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_Load_WhenCurrentAndLegacyMatchSchema_ShouldMigrateHigherGenerationLegacy()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableLegacyGeneration", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var currentRoot = Path.Combine(root, "current");
+            var legacyRoot = Path.Combine(root, "legacy");
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(Guid.NewGuid());
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(currentRoot), scopeId, schema, variableId, 11L, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, schema, variableId, 44L, 4);
+            var legacyFilePath = GetCommittedStateFilePath(legacyRoot);
+            ReadStateFileGeneration(GetCommittedStateFilePath(currentRoot)).Should().Be(1);
+            ReadStateFileGeneration(legacyFilePath).Should().Be(4);
+
+            var store = new JsonFileProjectVariableStateStore(currentRoot, legacyRoot);
+
+            LoadLongAndVersion(store, scopeId, schema, variableId).Should().Be((44L, 4L));
+            var migratedFilePath = GetCommittedStateFilePath(currentRoot);
+            ReadStateFileGeneration(migratedFilePath).Should().Be(4);
+            var recoveryJournal = ReadSingleRecoveryJournalEntry(GetRecoveryJournalPath(migratedFilePath));
+            recoveryJournal.GetProperty("eventType").GetString().Should().Be("legacy-state-migrated");
+            recoveryJournal.GetProperty("sourcePath").GetString().Should().Be(legacyFilePath);
+            recoveryJournal.GetProperty("targetPath").GetString().Should().Be(migratedFilePath);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void JsonFileStateStore_Load_WhenCurrentIsCorruptAndLegacyMatches_ShouldMigrateLegacy()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableLegacyCorruptCurrent", Guid.NewGuid().ToString("N"));
@@ -953,6 +989,12 @@ public sealed class ProjectVariableSessionTests
     }
 
     private static string GetRecoveryJournalPath(string committedFilePath) => committedFilePath + ".journal";
+
+    private static long ReadStateFileGeneration(string filePath)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(filePath, Encoding.UTF8));
+        return document.RootElement.GetProperty("generation").GetInt64();
+    }
 
     private static JsonElement ReadSingleRecoveryJournalEntry(string journalPath)
     {

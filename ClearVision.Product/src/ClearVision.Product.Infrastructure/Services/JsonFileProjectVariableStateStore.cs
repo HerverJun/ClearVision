@@ -115,6 +115,13 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
                 }
             }
 
+            if (TrySelectMatchingLegacyState(scopeId, expectedSchemaHash, out var legacyState, out var legacySourcePath) &&
+                GetGeneration(legacyState) > GetGeneration(state))
+            {
+                MigrateLegacyState(scopeId, legacySourcePath, expectedSchemaHash);
+                return ToSnapshots(legacyState);
+            }
+
             return ToSnapshots(state);
         }
         finally
@@ -141,6 +148,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             {
                 ScopeId = scopeId,
                 SchemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema),
+                Generation = ComputeGeneration(snapshots),
                 SavedAtUtc = DateTimeOffset.UtcNow,
                 Variables = snapshots
                     .OrderBy(snapshot => snapshot.VariableId)
@@ -308,23 +316,50 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             return false;
         }
 
+        if (TrySelectMatchingLegacyState(scopeId, expectedSchemaHash, out var legacyState, out var legacySourcePath))
+        {
+            MigrateLegacyState(scopeId, legacySourcePath, expectedSchemaHash);
+            snapshots = ToSnapshots(legacyState);
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TrySelectMatchingLegacyState(
+        string scopeId,
+        string expectedSchemaHash,
+        out ProjectVariableStateFile state,
+        out string sourcePath)
+    {
+        state = new ProjectVariableStateFile();
+        sourcePath = string.Empty;
+        var legacyFilePath = GetLegacyFilePath(scopeId);
+        var legacyLastGoodPath = GetLegacyLastGoodPath(scopeId);
+        var candidates = new List<(ProjectVariableStateFile State, string SourcePath)>();
         if (legacyFilePath != null &&
             TryLoadMatchingStateFile(legacyFilePath, expectedSchemaHash, out var legacyState))
         {
-            MigrateLegacyState(scopeId, legacyFilePath, expectedSchemaHash);
-            snapshots = ToSnapshots(legacyState);
-            return true;
+            candidates.Add((legacyState, legacyFilePath));
         }
 
         if (legacyLastGoodPath != null &&
             TryLoadMatchingStateFile(legacyLastGoodPath, expectedSchemaHash, out var legacyLastGoodState))
         {
-            MigrateLegacyState(scopeId, legacyLastGoodPath, expectedSchemaHash);
-            snapshots = ToSnapshots(legacyLastGoodState);
-            return true;
+            candidates.Add((legacyLastGoodState, legacyLastGoodPath));
         }
 
-        return false;
+        if (candidates.Count == 0)
+        {
+            return false;
+        }
+
+        var selected = candidates
+            .OrderByDescending(candidate => GetGeneration(candidate.State))
+            .First();
+        state = selected.State;
+        sourcePath = selected.SourcePath;
+        return true;
     }
 
     private bool TryLoadMatchingStateFile(
@@ -488,6 +523,23 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             .ToList();
     }
 
+    private static long ComputeGeneration(IEnumerable<ProjectVariableValueSnapshot> snapshots)
+    {
+        return snapshots
+            .Select(snapshot => Math.Max(0, snapshot.Version))
+            .DefaultIfEmpty(0)
+            .Max();
+    }
+
+    private static long GetGeneration(ProjectVariableStateFile state)
+    {
+        var variableGeneration = state.Variables
+            .Select(entry => Math.Max(0, entry.Version))
+            .DefaultIfEmpty(0)
+            .Max();
+        return Math.Max(Math.Max(0, state.Generation), variableGeneration);
+    }
+
     private static JsonElement SerializeSnapshotValue(
         ProjectVariableValueSnapshot snapshot,
         IReadOnlyDictionary<Guid, ProjectGlobalVariableDefinition> definitionsById)
@@ -510,6 +562,8 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         public string ScopeId { get; init; } = string.Empty;
 
         public string SchemaHash { get; init; } = string.Empty;
+
+        public long Generation { get; init; }
 
         public DateTimeOffset SavedAtUtc { get; init; }
 
