@@ -28,7 +28,7 @@ public static class ProjectVariableExpressionEvaluator
         }
         catch (Exception ex) when (ex is InvalidOperationException or OverflowException or DivideByZeroException)
         {
-            error = ex.Message;
+            error = NormalizeError(ex);
             return false;
         }
     }
@@ -56,9 +56,37 @@ public static class ProjectVariableExpressionEvaluator
         }
         catch (Exception ex) when (ex is InvalidOperationException or OverflowException or DivideByZeroException)
         {
-            error = ex.Message;
+            error = NormalizeError(ex);
             return false;
         }
+    }
+
+    private static string NormalizeError(Exception exception)
+    {
+        var message = exception.Message;
+        if (message.StartsWith("GV", StringComparison.Ordinal))
+        {
+            return message;
+        }
+
+        var code = exception switch
+        {
+            DivideByZeroException => "GV036",
+            OverflowException => "GV037",
+            InvalidOperationException when message.Contains("Unknown variable", StringComparison.OrdinalIgnoreCase) => "GV035",
+            InvalidOperationException when
+                message.Contains("maximum length", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("token count", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("AST depth", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("function argument count", StringComparison.OrdinalIgnoreCase) => "GV039",
+            InvalidOperationException when
+                message.Contains("must be finite", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("not numeric", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("requires numeric", StringComparison.OrdinalIgnoreCase) => "GV038",
+            _ => "GV034"
+        };
+
+        return $"{code}: {message}";
     }
 
     private sealed class Parser

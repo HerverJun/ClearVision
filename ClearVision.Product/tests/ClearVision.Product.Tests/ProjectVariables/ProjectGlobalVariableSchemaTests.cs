@@ -555,6 +555,28 @@ public sealed class ProjectGlobalVariableSchemaTests
         error.Should().Contain("Division by zero");
     }
 
+    [Theory]
+    [InlineData("1 +", "GV034", "Expected expression")]
+    [InlineData("missing.value + 1", "GV035", "Unknown variable")]
+    [InlineData("10 / 0", "GV036", "Division by zero")]
+    [InlineData("9223372036854775807 + 1", "GV037", "overflow")]
+    [InlineData("sqrt(-1)", "GV038", "finite")]
+    public void ExpressionEvaluator_WhenEvaluationFails_ShouldReturnStableErrorCode(
+        string expression,
+        string expectedCode,
+        string expectedMessage)
+    {
+        var ok = ProjectVariableExpressionEvaluator.TryEvaluate(
+            expression,
+            new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase),
+            out _,
+            out var error);
+
+        ok.Should().BeFalse();
+        error.Should().StartWith(expectedCode);
+        error.Should().Contain(expectedMessage);
+    }
+
     [Fact]
     public void ExpressionEvaluator_TryCompile_ShouldParseWithoutEvaluatingRuntimeArithmetic()
     {
@@ -585,6 +607,7 @@ public sealed class ProjectGlobalVariableSchemaTests
             out var error);
 
         ok.Should().BeFalse();
+        error.Should().StartWith("GV039");
         error.Should().Contain(expectedError);
     }
 
