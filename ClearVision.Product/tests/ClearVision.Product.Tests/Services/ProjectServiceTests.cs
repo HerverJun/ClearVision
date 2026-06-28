@@ -44,7 +44,8 @@ public class ProjectServiceTests
         var repository = Substitute.For<IProjectRepository>();
         var storage = Substitute.For<IProjectFlowStorage>();
         var factory = new OperatorFactory();
-        var registry = new ProjectVariableSessionRegistry();
+        using var registryScope = CreateRegistryWithStateStore();
+        var registry = registryScope.Registry;
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
         project.UpdateGlobalVariables(CreateSchema(variableId, 1));
@@ -116,7 +117,7 @@ public class ProjectServiceTests
 
         var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 5, "stats.renamed"));
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("GV030:*state failed*");
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV012*state failed*");
         project.GlobalVariables.Variables.Single().Name.Should().Be("stats.renamed");
         project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(5L);
         project.PersistenceRevision.Should().Be(1);
@@ -132,7 +133,8 @@ public class ProjectServiceTests
         var repository = Substitute.For<IProjectRepository>();
         var storage = new RecordingProjectFlowStorage();
         var factory = new OperatorFactory();
-        var registry = new ProjectVariableSessionRegistry();
+        using var registryScope = CreateRegistryWithStateStore();
+        var registry = registryScope.Registry;
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
@@ -162,7 +164,8 @@ public class ProjectServiceTests
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = new RecordingProjectFlowStorage();
-        var registry = new ProjectVariableSessionRegistry();
+        using var registryScope = CreateRegistryWithStateStore();
+        var registry = registryScope.Registry;
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
         project.UpdateGlobalVariables(CreateSchema(variableId, 1));
@@ -200,7 +203,8 @@ public class ProjectServiceTests
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = new RecordingProjectFlowStorage();
-        var registry = new ProjectVariableSessionRegistry();
+        using var registryScope = CreateRegistryWithStateStore();
+        var registry = registryScope.Registry;
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
         project.UpdateGlobalVariables(CreateSchema(variableId, 1, "stats.old"));
@@ -486,6 +490,33 @@ public class ProjectServiceTests
 
         public void Delete(string scopeId)
         {
+        }
+    }
+
+    private static RegistryScope CreateRegistryWithStateStore()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVision.ProjectServiceTests.VariableState", Guid.NewGuid().ToString("N"));
+        return new RegistryScope(root);
+    }
+
+    private sealed class RegistryScope : IDisposable
+    {
+        private readonly string _root;
+
+        public RegistryScope(string root)
+        {
+            _root = root;
+            Registry = new ProjectVariableSessionRegistry(new JsonFileProjectVariableStateStore(root));
+        }
+
+        public ProjectVariableSessionRegistry Registry { get; }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(_root))
+            {
+                Directory.Delete(_root, recursive: true);
+            }
         }
     }
 

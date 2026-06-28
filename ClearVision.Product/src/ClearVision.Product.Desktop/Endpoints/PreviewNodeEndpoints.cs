@@ -55,6 +55,7 @@ public static class PreviewNodeEndpoints
             IServiceProvider serviceProvider,
             ILogger<object> logger) =>
         {
+            ProjectAccessLease? projectAccess = null;
             try
             {
                 logger.LogInformation(
@@ -63,7 +64,13 @@ public static class PreviewNodeEndpoints
 
                 if (request.ProjectId != Guid.Empty)
                 {
-                    serviceProvider.GetService<ProjectSaveCoordinator>()?.EnsureProjectAvailable(request.ProjectId);
+                    var projectSaveCoordinator = serviceProvider.GetService<ProjectSaveCoordinator>();
+                    if (projectSaveCoordinator != null)
+                    {
+                        projectAccess = await projectSaveCoordinator.AcquireProjectAccessAsync(
+                            request.ProjectId,
+                            context.RequestAborted);
+                    }
                 }
 
                 // 从数据库加载流程，或直接使用前端传来的流程数据
@@ -139,6 +146,11 @@ public static class PreviewNodeEndpoints
                     flow,
                     projectRepository,
                     projectVariableSessions);
+                if (projectAccess != null)
+                {
+                    await projectAccess.DisposeAsync();
+                    projectAccess = null;
+                }
 
                 // 执行调试流程（自动执行上游子图到目标节点）
                 var result = projectVariables == null
@@ -237,6 +249,13 @@ public static class PreviewNodeEndpoints
                 return Results.Problem(
                     detail: $"预览节点失败: {ex.Message}",
                     statusCode: 500);
+            }
+            finally
+            {
+                if (projectAccess != null)
+                {
+                    await projectAccess.DisposeAsync();
+                }
             }
         });
 

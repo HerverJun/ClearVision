@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Desktop.Configuration;
 using ClearVision.Product.Desktop.Data;
 using ClearVision.Product.Desktop.Endpoints;
@@ -199,6 +200,10 @@ static class Program
             {
                 var services = scope.ServiceProvider;
                 InitializeVisionDatabase(services);
+                services.GetRequiredService<ProjectSaveCoordinator>()
+                    .RunStartupRecoveryAsync()
+                    .GetAwaiter()
+                    .GetResult();
 
                 var cameraManager = services.GetRequiredService<ClearVision.Product.Core.Cameras.ICameraManager>();
                 var configService = services.GetRequiredService<ClearVision.Product.Core.Interfaces.IConfigurationService>();

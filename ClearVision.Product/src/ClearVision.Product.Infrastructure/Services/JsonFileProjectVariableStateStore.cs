@@ -132,9 +132,21 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
     public void Save(string scopeId, ProjectGlobalVariableSchema schema, IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
     {
+        var metadata = LoadMetadata(scopeId);
+        Save(scopeId, schema, snapshots, metadata?.PersistenceRevision ?? 0, metadata?.SaveId);
+    }
+
+    public void Save(
+        string scopeId,
+        ProjectGlobalVariableSchema schema,
+        IReadOnlyList<ProjectVariableValueSnapshot> snapshots,
+        long persistenceRevision,
+        Guid? saveId)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(scopeId);
         ArgumentNullException.ThrowIfNull(schema);
         ArgumentNullException.ThrowIfNull(snapshots);
+        ArgumentOutOfRangeException.ThrowIfNegative(persistenceRevision);
 
         _gate.Wait();
         try
@@ -148,6 +160,9 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             {
                 ScopeId = scopeId,
                 SchemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema),
+                StateHash = ProjectVariableStateHash.Compute(schema, snapshots),
+                PersistenceRevision = persistenceRevision,
+                SaveId = saveId,
                 Generation = ComputeGeneration(snapshots),
                 SavedAtUtc = DateTimeOffset.UtcNow,
                 Variables = snapshots
@@ -187,6 +202,33 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
                 TryDeleteTempFile(tempPath);
                 throw;
             }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public ProjectVariableStateMetadata? LoadMetadata(string scopeId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scopeId);
+
+        _gate.Wait();
+        try
+        {
+            var filePath = GetFilePath(scopeId);
+            if (!_fileSystem.FileExists(filePath))
+            {
+                return null;
+            }
+
+            var json = _fileSystem.ReadAllText(filePath, Encoding.UTF8);
+            if (!TryDeserialize(json, out var state))
+            {
+                return null;
+            }
+
+            return ToMetadata(state);
         }
         finally
         {
@@ -546,6 +588,47 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             .ToList();
     }
 
+    private static ProjectVariableStateMetadata ToMetadata(ProjectVariableStateFile state)
+    {
+        var snapshots = ToSnapshots(state);
+        var schema = new ProjectGlobalVariableSchema();
+        var stateHash = string.IsNullOrWhiteSpace(state.StateHash)
+            ? ComputeLegacyStateHash(state)
+            : state.StateHash;
+        return new ProjectVariableStateMetadata(
+            state.SchemaVersion,
+            state.ScopeId,
+            Math.Max(0, state.PersistenceRevision),
+            state.SchemaHash,
+            stateHash,
+            state.SavedAtUtc,
+            state.SaveId);
+    }
+
+    private static string ComputeLegacyStateHash(ProjectVariableStateFile state)
+    {
+        var payload = new
+        {
+            schemaHash = state.SchemaHash,
+            variables = state.Variables
+                .OrderBy(entry => entry.VariableId)
+                .Select(entry => new
+                {
+                    variableId = entry.VariableId,
+                    value = entry.Value,
+                    version = entry.Version,
+                    updatedAtUtc = entry.UpdatedAtUtc,
+                    updatedBy = entry.UpdatedBy,
+                    runId = entry.RunId,
+                    operatorId = entry.OperatorId
+                })
+                .ToList()
+        };
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, ProjectVariableJson.Options);
+        var hash = SHA256.HashData(bytes);
+        return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
     private static long ComputeGeneration(IEnumerable<ProjectVariableValueSnapshot> snapshots)
     {
         return snapshots
@@ -585,6 +668,12 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         public string ScopeId { get; init; } = string.Empty;
 
         public string SchemaHash { get; init; } = string.Empty;
+
+        public string StateHash { get; init; } = string.Empty;
+
+        public long PersistenceRevision { get; init; }
+
+        public Guid? SaveId { get; init; }
 
         public long Generation { get; init; }
 

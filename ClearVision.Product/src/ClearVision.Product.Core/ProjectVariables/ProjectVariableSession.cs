@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace ClearVision.Product.Core.ProjectVariables;
@@ -61,7 +63,65 @@ public interface IProjectVariableStateStore
 
     void Save(string scopeId, ProjectGlobalVariableSchema schema, IReadOnlyList<ProjectVariableValueSnapshot> snapshots);
 
+    void Save(
+        string scopeId,
+        ProjectGlobalVariableSchema schema,
+        IReadOnlyList<ProjectVariableValueSnapshot> snapshots,
+        long persistenceRevision,
+        Guid? saveId)
+    {
+        Save(scopeId, schema, snapshots);
+    }
+
+    ProjectVariableStateMetadata? LoadMetadata(string scopeId)
+    {
+        return null;
+    }
+
     void Delete(string scopeId);
+}
+
+public sealed record ProjectVariableStateMetadata(
+    int SchemaVersion,
+    string ScopeId,
+    long PersistenceRevision,
+    string SchemaHash,
+    string StateHash,
+    DateTimeOffset SavedAtUtc,
+    Guid? SaveId);
+
+public static class ProjectVariableStateHash
+{
+    private static readonly JsonSerializerOptions HashJsonOptions = new(JsonSerializerDefaults.Web);
+
+    public static string Compute(
+        ProjectGlobalVariableSchema schema,
+        IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        ArgumentNullException.ThrowIfNull(snapshots);
+
+        var payload = new
+        {
+            schemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema),
+            variables = snapshots
+                .OrderBy(snapshot => snapshot.VariableId)
+                .Select(snapshot => new
+                {
+                    variableId = snapshot.VariableId,
+                    value = snapshot.Value,
+                    version = snapshot.Version,
+                    updatedAtUtc = snapshot.UpdatedAtUtc,
+                    updatedBy = snapshot.UpdatedBy,
+                    runId = snapshot.RunId,
+                    operatorId = snapshot.OperatorId
+                })
+                .ToList()
+        };
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, HashJsonOptions);
+        var hash = SHA256.HashData(bytes);
+        return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
+    }
 }
 
 public sealed class ProjectVariableSession : IProjectVariableSession

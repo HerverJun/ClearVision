@@ -627,7 +627,11 @@ public class InspectionService : IInspectionService
         Guid projectId,
         OperatorFlow? flow)
     {
-        _projectSaveCoordinator?.EnsureProjectAvailable(projectId);
+        var access = _projectSaveCoordinator == null
+            ? null
+            : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
+        await using (access)
+        {
         if (HasExecutableFlow(flow))
         {
             _logger.LogInformation(
@@ -658,6 +662,7 @@ public class InspectionService : IInspectionService
         }
 
         throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
+        }
     }
 
     private ProjectVariableExecutionContext? CreateProjectVariableContext(

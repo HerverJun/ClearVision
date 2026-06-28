@@ -91,7 +91,12 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto?> GetByIdAsync(Guid id)
     {
-        _saveCoordinator.EnsureProjectAvailable(id);
+        await using var access = await _saveCoordinator.AcquireProjectAccessAsync(id);
+        return await GetByIdUnderProjectAccessAsync(id);
+    }
+
+    public async Task<ProjectDto?> GetByIdUnderProjectAccessAsync(Guid id)
+    {
         var project = await _projectRepository.GetByIdAsync(id);
         if (project == null)
             return null;
@@ -175,15 +180,22 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectRequest request)
     {
-        _saveCoordinator.EnsureProjectAvailable(id);
-        var project = await _projectRepository.GetByIdAsync(id);
-        if (project == null)
-            throw new ProjectNotFoundException(id);
+        Project project;
+        ProjectGlobalVariableSchema previousGlobalVariables;
+        string? previousFlowJson;
+        OperatorFlowDto? nextFlow;
+        long expectedRevision;
+        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
+        {
+            project = await _projectRepository.GetByIdAsync(id)
+                ?? throw new ProjectNotFoundException(id);
+            expectedRevision = project.PersistenceRevision;
+            previousGlobalVariables = CloneSchema(project.GlobalVariables);
+            previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
+            nextFlow = request.Flow ?? await LoadStoredFlowDtoAsync(id);
+        }
 
-        var previousGlobalVariables = CloneSchema(project.GlobalVariables);
-        var previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
-        var nextFlow = request.Flow ?? await LoadStoredFlowDtoAsync(id);
-        var nextSchema = request.GlobalVariables ?? project.GlobalVariables;
+        var nextSchema = request.GlobalVariables ?? previousGlobalVariables;
         var flowChanged = request.Flow != null;
         if (nextFlow != null)
         {
@@ -197,6 +209,7 @@ public class ProjectService
 
         var saveResult = await _saveCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
             project,
+            expectedRevision,
             request.Name,
             request.Description,
             previousGlobalVariables,
@@ -215,11 +228,13 @@ public class ProjectService
     /// </summary>
     public async Task UpdateFlowAsync(Guid id, UpdateFlowRequest request)
     {
-        _saveCoordinator.EnsureProjectAvailable(id);
         // 1. 楠岃瘉宸ョ▼瀛樺湪
-        var project = await _projectRepository.GetByIdAsync(id);
-        if (project == null)
-            throw new ProjectNotFoundException(id);
+        Project project;
+        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
+        {
+            project = await _projectRepository.GetByIdAsync(id)
+                ?? throw new ProjectNotFoundException(id);
+        }
 
         // 2. 鏋勯€犳祦绋婦TO
         var flowDto = new OperatorFlowDto
@@ -342,10 +357,9 @@ public class ProjectService
     /// </summary>
     public async Task DeleteAsync(Guid id)
     {
-        _saveCoordinator.EnsureProjectAvailable(id);
-        var project = await _projectRepository.GetByIdAsync(id);
-        if (project == null)
-            throw new ProjectNotFoundException(id);
+        await using var access = await _saveCoordinator.AcquireProjectAccessAsync(id);
+        var project = await _projectRepository.GetByIdAsync(id)
+            ?? throw new ProjectNotFoundException(id);
 
         project.MarkAsDeleted();
         await _projectRepository.UpdateAsync(project);
@@ -372,10 +386,12 @@ public class ProjectService
 
     public async Task<ProjectGlobalVariableSchema> UpdateGlobalVariablesAsync(Guid id, ProjectGlobalVariableSchema schema)
     {
-        _saveCoordinator.EnsureProjectAvailable(id);
-        var project = await _projectRepository.GetByIdAsync(id);
-        if (project == null)
-            throw new ProjectNotFoundException(id);
+        Project project;
+        await using (await _saveCoordinator.AcquireProjectAccessAsync(id))
+        {
+            project = await _projectRepository.GetByIdAsync(id)
+                ?? throw new ProjectNotFoundException(id);
+        }
 
         var updated = await UpdateAsync(id, new UpdateProjectRequest
         {

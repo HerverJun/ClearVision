@@ -189,7 +189,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
     }
 
     [Fact]
-    public async Task ProjectGlobalVariableEndpoints_WhenStatePersistFails_ShouldReturnGv030AndRollback()
+    public async Task ProjectGlobalVariableEndpoints_WhenStatePersistFailsAfterCommitIntent_ShouldReturnPsv012AndFence()
     {
         var variableId = Guid.NewGuid();
         await using var host = await ProjectGlobalVariableEndpointHost.CreateAsync(
@@ -204,13 +204,14 @@ public sealed class ProjectGlobalVariableEndpointsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("code").GetString().Should().Be("GV030");
+        body.GetProperty("code").GetString().Should().Be("PSV012");
         body.GetProperty("error").GetString().Should().Contain("state failed");
-        host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
+        host.Project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(5L);
+        host.Project.PersistenceRevision.Should().Be(1);
         host.Registry.GetOrCreate(host.Project.Id, host.Project.GlobalVariables).Should().BeSameAs(oldSession);
         oldSession.TryGetValue(variableId, out var current).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(current).Should().Be(9L);
-        await host.Repository.Received(2).UpdateAsync(host.Project);
+        await host.Repository.Received(1).UpdateAsync(host.Project);
     }
 
     [Fact]
@@ -479,14 +480,17 @@ public sealed class ProjectGlobalVariableEndpointsTests
     private sealed class ProjectGlobalVariableEndpointHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
+        private readonly string? _ownedStateStoreRoot;
 
         private ProjectGlobalVariableEndpointHost(
             WebApplication app,
             Project project,
             ProjectVariableSessionRegistry registry,
-            IProjectRepository repository)
+            IProjectRepository repository,
+            string? ownedStateStoreRoot)
         {
             _app = app;
+            _ownedStateStoreRoot = ownedStateStoreRoot;
             Project = project;
             Registry = registry;
             Repository = repository;
@@ -535,6 +539,10 @@ public sealed class ProjectGlobalVariableEndpointsTests
                         ? null
                         : new ProjectMutationLease(project.Id, "test", () => ValueTask.CompletedTask)));
 
+            var ownedStateStoreRoot = stateStore == null
+                ? Path.Combine(Path.GetTempPath(), "ClearVision.ProjectGlobalVariableEndpointTests", Guid.NewGuid().ToString("N"))
+                : null;
+            stateStore ??= new JsonFileProjectVariableStateStore(ownedStateStoreRoot!);
             var registry = new ProjectVariableSessionRegistry(stateStore);
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -568,7 +576,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             });
             MapProjectEndpoints(app);
             await app.StartAsync();
-            return new ProjectGlobalVariableEndpointHost(app, project, registry, repository);
+            return new ProjectGlobalVariableEndpointHost(app, project, registry, repository, ownedStateStoreRoot);
         }
 
         public async ValueTask DisposeAsync()
@@ -576,6 +584,10 @@ public sealed class ProjectGlobalVariableEndpointsTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+            if (_ownedStateStoreRoot != null && Directory.Exists(_ownedStateStoreRoot))
+            {
+                Directory.Delete(_ownedStateStoreRoot, recursive: true);
+            }
         }
     }
 

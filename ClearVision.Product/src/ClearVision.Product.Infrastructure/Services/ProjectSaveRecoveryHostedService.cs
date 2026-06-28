@@ -18,7 +18,7 @@ public sealed class ProjectSaveRecoveryHostedService : IHostedService
         cancellationToken.ThrowIfCancellationRequested();
         using var scope = _scopeFactory.CreateScope();
         var coordinator = scope.ServiceProvider.GetRequiredService<ProjectSaveCoordinator>();
-        await coordinator.RecoverAllAsync();
+        await coordinator.RunStartupRecoveryAsync(cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

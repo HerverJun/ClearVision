@@ -224,6 +224,10 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddHostedService(sp => sp.GetRequiredService<QueuedInspectionImagePersistenceService>());
         services.AddSingleton<IInspectionImagePersistenceService>(sp => sp.GetRequiredService<QueuedInspectionImagePersistenceService>());
 
+        services.AddSingleton<ProjectVariableSessionRegistry>();
+        services.AddScoped<ProjectSaveCoordinator>();
+        services.AddHostedService<ProjectSaveRecoveryHostedService>();
+
         services.AddSingleton<IInspectionRuntimeCoordinator, InspectionRuntimeCoordinator>();
         services.AddSingleton<InspectionWorker>();
         services.AddHostedService(sp => sp.GetRequiredService<InspectionWorker>());
@@ -239,9 +243,6 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IFlowNodePreviewService, FlowNodePreviewService>();
         services.AddScoped<IAutoTuneService, AutoTuneService>();
 
-        services.AddSingleton<ProjectVariableSessionRegistry>();
-        services.AddScoped<ProjectSaveCoordinator>();
-        services.AddHostedService<ProjectSaveRecoveryHostedService>();
         services.AddScoped<ProjectService>();
         services.AddSingleton<IAnalysisDataBuilder, AnalysisDataBuilder>();
         services.AddScoped<IInspectionService, InspectionService>();

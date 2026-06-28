@@ -361,21 +361,29 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var configurationService = scope.ServiceProvider.GetService<IConfigurationService>();
             var projectVariableSessions = scope.ServiceProvider.GetService<ProjectVariableSessionRegistry>();
             var projectSaveCoordinator = scope.ServiceProvider.GetService<ProjectSaveCoordinator>();
-            projectSaveCoordinator?.EnsureProjectAvailable(projectId);
-            var project = await projectRepository.GetByIdAsync(projectId);
-            var globalVariables = project?.GlobalVariables ?? new ProjectGlobalVariableSchema();
-            if (projectVariableSessions == null && globalVariables.Variables.Count > 0)
+            ProjectGlobalVariableSchema globalVariables;
+            IProjectVariableSession? projectVariableSession;
+            ProjectVariableBindingIndex? projectVariableBindingIndex;
+            var access = projectSaveCoordinator == null
+                ? null
+                : await projectSaveCoordinator.AcquireProjectAccessAsync(projectId, ct);
+            await using (access)
             {
-                throw new InvalidOperationException(
-                    "GV040: project global variable formal execution requires ProjectVariableSessionRegistry.");
-            }
+                var project = await projectRepository.GetByIdAsync(projectId);
+                globalVariables = project?.GlobalVariables ?? new ProjectGlobalVariableSchema();
+                if (projectVariableSessions == null && globalVariables.Variables.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        "GV040: project global variable formal execution requires ProjectVariableSessionRegistry.");
+                }
 
-            var projectVariableSession = globalVariables.Variables.Count == 0
-                ? null
-                : projectVariableSessions?.GetOrCreate(projectId, globalVariables);
-            var projectVariableBindingIndex = projectVariableSession == null
-                ? null
-                : ProjectVariableBindingIndex.Build(globalVariables);
+                projectVariableSession = globalVariables.Variables.Count == 0
+                    ? null
+                    : projectVariableSessions?.GetOrCreate(projectId, globalVariables);
+                projectVariableBindingIndex = projectVariableSession == null
+                    ? null
+                    : ProjectVariableBindingIndex.Build(globalVariables);
+            }
 
             // 创建日志上下文
             // Create the logging / correlation scope for this run.

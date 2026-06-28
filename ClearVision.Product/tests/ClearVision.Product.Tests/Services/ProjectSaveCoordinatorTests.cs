@@ -33,6 +33,7 @@ public sealed class ProjectSaveCoordinatorTests
 
             var result = await sut.SaveExistingProjectAsync(new ProjectSaveRequest(
                 project,
+                project.PersistenceRevision,
                 "renamed",
                 "updated",
                 new ProjectGlobalVariableSchema(),
@@ -57,7 +58,7 @@ public sealed class ProjectSaveCoordinatorTests
     }
 
     [Fact]
-    public async Task RecoverAllAsync_WhenCommitIntentJournalExists_ShouldApplyForward()
+    public async Task SaveExistingProjectAsync_WhenAfterCommitIntentFailsOnce_ShouldRecoverImmediatelyAndReturnSuccess()
     {
         var root = CreateTempPath();
         try
@@ -70,10 +71,11 @@ public sealed class ProjectSaveCoordinatorTests
             var nextFlowJson = JsonSerializer.Serialize(nextFlow);
             await flowStorage.SaveFlowJsonAsync(project.Id, previousFlow, 0);
             var crash = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.AfterCommitIntent, failAlways: false);
-            var interrupted = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root, failureInjector: crash);
+            var coordinator = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root, failureInjector: crash);
 
-            var act = async () => await interrupted.SaveExistingProjectAsync(new ProjectSaveRequest(
+            var result = await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
                 project,
+                project.PersistenceRevision,
                 "renamed",
                 null,
                 new ProjectGlobalVariableSchema(),
@@ -82,14 +84,7 @@ public sealed class ProjectSaveCoordinatorTests
                 nextFlow,
                 nextFlowJson));
 
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*injected*");
-            project.PersistenceRevision.Should().Be(0);
-            flowStorage.FlowJson.Should().Be(previousFlow);
-            Directory.EnumerateFiles(root, "manifest.json", SearchOption.AllDirectories).Should().ContainSingle();
-
-            var recovered = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root);
-            await recovered.RecoverAllAsync();
-
+            result.Changed.Should().BeTrue();
             project.Name.Should().Be("renamed");
             project.PersistenceRevision.Should().Be(1);
             flowStorage.FlowJson.Should().Be(nextFlowJson);
@@ -116,6 +111,7 @@ public sealed class ProjectSaveCoordinatorTests
 
             var act = async () => await coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
                 project,
+                project.PersistenceRevision,
                 "renamed",
                 null,
                 new ProjectGlobalVariableSchema(),
@@ -133,6 +129,80 @@ public sealed class ProjectSaveCoordinatorTests
             var service = new ProjectService(repository, flowStorage, new OperatorFactory(), null, null, coordinator);
             var read = async () => await service.GetByIdAsync(project.Id);
             await read.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV001*");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task SaveExistingProjectAsync_WhenExpectedRevisionIsStale_ShouldFailBeforeCommitIntent()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("demo");
+            project.SetPersistenceRevision(1);
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var sut = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root);
+
+            var act = async () => await sut.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                0,
+                "stale",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null));
+
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV011*");
+            project.Name.Should().Be("demo");
+            project.PersistenceRevision.Should().Be(1);
+            Directory.Exists(root).Should().BeFalse();
+            sut.Invoking(item => item.EnsureProjectAvailable(project.Id)).Should().NotThrow();
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task AcquireProjectAccessAsync_WhenSaveIsInProgress_ShouldWaitForProjectGate()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var project = new Project("demo");
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var blocker = new BlockingProjectSaveFailureInjector(ProjectSaveFailurePoint.AfterProjectApply);
+            var coordinator = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root, failureInjector: blocker);
+
+            var saveTask = coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "renamed",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null));
+            await blocker.WaitUntilHitAsync();
+
+            var accessTask = coordinator.AcquireProjectAccessAsync(project.Id);
+            await Task.Delay(75);
+            accessTask.IsCompleted.Should().BeFalse();
+
+            blocker.Release();
+            await saveTask;
+            await using var access = await accessTask;
+            project.Name.Should().Be("renamed");
         }
         finally
         {
@@ -181,6 +251,33 @@ public sealed class ProjectSaveCoordinatorTests
             }
 
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class BlockingProjectSaveFailureInjector : IProjectSaveFailureInjector
+    {
+        private readonly ProjectSaveFailurePoint _point;
+        private readonly TaskCompletionSource _hit = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public BlockingProjectSaveFailureInjector(ProjectSaveFailurePoint point)
+        {
+            _point = point;
+        }
+
+        public Task WaitUntilHitAsync() => _hit.Task;
+
+        public void Release() => _release.TrySetResult();
+
+        public async Task OnPointAsync(ProjectSaveFailurePoint point, ProjectSaveManifest manifest)
+        {
+            if (point != _point)
+            {
+                return;
+            }
+
+            _hit.TrySetResult();
+            await _release.Task;
         }
     }
 

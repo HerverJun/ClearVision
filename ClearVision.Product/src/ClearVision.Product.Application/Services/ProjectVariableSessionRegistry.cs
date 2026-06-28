@@ -138,13 +138,69 @@ public sealed class ProjectVariableSessionRegistry
         out IProjectVariableSession? publishedSession,
         out string? error)
     {
+        return TryPersistMigrationCandidate(
+            projectId,
+            candidate,
+            persistenceRevision: null,
+            saveId: null,
+            expectedStateHash: null,
+            out publishedSession,
+            out error);
+    }
+
+    public bool TryPersistMigrationCandidate(
+        Guid projectId,
+        ProjectVariableSessionMigrationCandidate candidate,
+        long? persistenceRevision,
+        Guid? saveId,
+        string? expectedStateHash,
+        out IProjectVariableSession? publishedSession,
+        out string? error)
+    {
         ArgumentNullException.ThrowIfNull(candidate);
 
         lock (GetProjectGate(projectId))
         {
             try
             {
-                _stateStore?.Save(ToProjectScopeId(projectId), candidate.Schema, candidate.Snapshots);
+                if (_stateStore == null && !string.IsNullOrWhiteSpace(expectedStateHash))
+                {
+                    publishedSession = null;
+                    error = "GV030: project global variable state persistence is unavailable.";
+                    return false;
+                }
+
+                if (_stateStore != null)
+                {
+                    if (persistenceRevision.HasValue)
+                    {
+                        _stateStore.Save(
+                            ToProjectScopeId(projectId),
+                            candidate.Schema,
+                            candidate.Snapshots,
+                            persistenceRevision.Value,
+                            saveId);
+                    }
+                    else
+                    {
+                        _stateStore.Save(ToProjectScopeId(projectId), candidate.Schema, candidate.Snapshots);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(expectedStateHash))
+                    {
+                        var metadata = _stateStore.LoadMetadata(ToProjectScopeId(projectId));
+                        if (!persistenceRevision.HasValue ||
+                            metadata == null ||
+                            metadata.PersistenceRevision != persistenceRevision.Value ||
+                            !string.Equals(metadata.StateHash, expectedStateHash, StringComparison.Ordinal))
+                        {
+                            publishedSession = null;
+                            error = "GV030: project global variable state persistence verification failed.";
+                            return false;
+                        }
+                    }
+                }
+
                 if (_sessions.ContainsKey(projectId))
                 {
                     var published = new ProjectVariableSession(
@@ -168,6 +224,14 @@ public sealed class ProjectVariableSessionRegistry
                 error = $"GV030: project global variable state could not be persisted: {ex.Message}";
                 return false;
             }
+        }
+    }
+
+    public ProjectVariableStateMetadata? LoadStateMetadata(Guid projectId)
+    {
+        lock (GetProjectGate(projectId))
+        {
+            return _stateStore?.LoadMetadata(ToProjectScopeId(projectId));
         }
     }
 

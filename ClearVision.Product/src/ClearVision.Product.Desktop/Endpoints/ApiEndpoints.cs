@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OpenCvSharp;
 
 namespace ClearVision.Product.Desktop.Endpoints;
@@ -230,7 +231,7 @@ public static class ApiEndpoints
 
         app.MapGet("/api/projects/{id:guid}/global-variables", async (Guid id, ProjectService service) =>
         {
-            var project = await service.GetByIdAsync(id);
+            var project = await service.GetByIdUnderProjectAccessAsync(id);
             return project != null ? Results.Ok(project.GlobalVariables) : Results.NotFound();
         });
 
@@ -260,9 +261,11 @@ public static class ApiEndpoints
         app.MapGet("/api/projects/{id:guid}/global-variable-values", async (
             Guid id,
             ProjectService service,
-            ProjectVariableSessionRegistry sessions) =>
+            ProjectVariableSessionRegistry sessions,
+            IServiceProvider serviceProvider) =>
         {
-            var project = await service.GetByIdAsync(id);
+            await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+            var project = await service.GetByIdUnderProjectAccessAsync(id);
             if (project == null)
             {
                 return Results.NotFound();
@@ -278,7 +281,8 @@ public static class ApiEndpoints
             ProjectVariableValueWriteRequest request,
             ProjectService service,
             ProjectVariableSessionRegistry sessions,
-            IInspectionRuntimeCoordinator runtimeCoordinator) =>
+            IInspectionRuntimeCoordinator runtimeCoordinator,
+            IServiceProvider serviceProvider) =>
         {
             await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-manual-write", CancellationToken.None);
             if (mutationLease == null)
@@ -286,7 +290,8 @@ public static class ApiEndpoints
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
 
-            var project = await service.GetByIdAsync(id);
+            await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+            var project = await service.GetByIdUnderProjectAccessAsync(id);
             if (project == null)
             {
                 return Results.NotFound();
@@ -331,6 +336,7 @@ public static class ApiEndpoints
             ProjectService service,
             ProjectVariableSessionRegistry sessions,
             IInspectionRuntimeCoordinator runtimeCoordinator,
+            IServiceProvider serviceProvider,
             HttpContext context) =>
         {
             await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-reset-all", CancellationToken.None);
@@ -339,7 +345,8 @@ public static class ApiEndpoints
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
 
-            var project = await service.GetByIdAsync(id);
+            await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+            var project = await service.GetByIdUnderProjectAccessAsync(id);
             if (project == null)
             {
                 return Results.NotFound();
@@ -378,6 +385,7 @@ public static class ApiEndpoints
             ProjectService service,
             ProjectVariableSessionRegistry sessions,
             IInspectionRuntimeCoordinator runtimeCoordinator,
+            IServiceProvider serviceProvider,
             HttpContext context) =>
         {
             await using var mutationLease = await runtimeCoordinator.TryAcquireMutationLeaseAsync(id, "global-variable-reset-one", CancellationToken.None);
@@ -386,6 +394,7 @@ public static class ApiEndpoints
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
 
+            await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
             var project = await service.GetByIdAsync(id);
             if (project == null)
             {
@@ -729,6 +738,17 @@ public static class ApiEndpoints
         return Results.BadRequest(new { Code = "GV032", Error = error });
     }
 
+    private static async ValueTask<ProjectAccessLease?> AcquireProjectAccessAsync(
+        IServiceProvider serviceProvider,
+        Guid projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var coordinator = serviceProvider.GetService<ProjectSaveCoordinator>();
+        return coordinator == null
+            ? null
+            : await coordinator.AcquireProjectAccessAsync(projectId, cancellationToken);
+    }
+
     private static async ValueTask<T?> ReadOptionalJsonBodyAsync<T>(HttpContext context)
         where T : class
     {
@@ -746,17 +766,22 @@ public static class ApiEndpoints
     {
         code = string.Empty;
         error = string.Empty;
-        if (string.IsNullOrWhiteSpace(message) ||
-            message.Length < 5 ||
-            message[0] != 'G' ||
-            message[1] != 'V')
+        if (string.IsNullOrWhiteSpace(message))
         {
             return false;
         }
 
-        code = message[..5];
-        error = message.Length > 5 && message[5] == ':'
-            ? message[6..].TrimStart()
+        var separatorIndex = message.IndexOf(':', StringComparison.Ordinal);
+        var candidateCode = separatorIndex > 0 ? message[..separatorIndex] : message;
+        if (!candidateCode.StartsWith("GV", StringComparison.OrdinalIgnoreCase) &&
+            !candidateCode.StartsWith("PSV", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        code = candidateCode;
+        error = separatorIndex >= 0
+            ? message[(separatorIndex + 1)..].TrimStart()
             : message;
         return true;
     }

@@ -994,6 +994,48 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_SaveWithPersistenceRevision_ShouldWriteMetadataEnvelope()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            var saveId = Guid.NewGuid();
+            var snapshots = new[]
+            {
+                new ProjectVariableValueSnapshot(
+                    variableId,
+                    JsonSerializer.SerializeToElement(42L),
+                    3,
+                    DateTimeOffset.UtcNow,
+                    ProjectVariableUpdatedBy.StudioManual,
+                    Guid.NewGuid(),
+                    Guid.NewGuid())
+            };
+
+            store.Save(scopeId, schema, snapshots, persistenceRevision: 7, saveId);
+
+            var metadata = store.LoadMetadata(scopeId);
+            metadata.Should().NotBeNull();
+            metadata!.ScopeId.Should().Be(scopeId);
+            metadata.PersistenceRevision.Should().Be(7);
+            metadata.SchemaHash.Should().Be(ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema));
+            metadata.StateHash.Should().Be(ProjectVariableStateHash.Compute(schema, snapshots));
+            metadata.SaveId.Should().Be(saveId);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void StationSettingsPaths_ProjectVariableStates_ShouldUseStationDataRoot()
     {
         var localAppDataRoot = Path.Combine(Path.GetTempPath(), "ClearVisionStationPathTests", Guid.NewGuid().ToString("N"));
