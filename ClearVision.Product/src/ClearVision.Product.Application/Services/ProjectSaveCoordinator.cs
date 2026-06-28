@@ -129,20 +129,89 @@ public sealed class ProjectSaveCoordinator
         }
     }
 
-    public async Task RecoverAllAsync()
+    public async Task<ProjectSaveRecoverySummary> RecoverAllAsync()
     {
+        var recoveredCount = 0;
+        var discardedPreparedCount = 0;
+        var recoveryRequiredProjectIds = new HashSet<Guid>();
+        var failures = new List<ProjectSaveRecoveryFailure>();
         if (!Directory.Exists(_transactionRoot))
         {
-            return;
+            return new ProjectSaveRecoverySummary(
+                recoveredCount,
+                discardedPreparedCount,
+                recoveryRequiredProjectIds.ToList(),
+                failures,
+                SystemFailure: null);
         }
 
-        foreach (var projectDirectory in Directory.EnumerateDirectories(_transactionRoot))
+        IReadOnlyList<string> projectDirectories;
+        try
         {
-            foreach (var saveDirectory in Directory.EnumerateDirectories(projectDirectory))
+            projectDirectories = Directory.EnumerateDirectories(_transactionRoot).ToList();
+        }
+        catch (Exception ex)
+        {
+            var summary = new ProjectSaveRecoverySummary(
+                recoveredCount,
+                discardedPreparedCount,
+                recoveryRequiredProjectIds.ToList(),
+                failures,
+                SystemFailure: ex.Message);
+            throw new ProjectSaveRecoverySystemException("PSV015: project save transaction root could not be enumerated.", summary, ex);
+        }
+
+        foreach (var projectDirectory in projectDirectories)
+        {
+            IReadOnlyList<string> saveDirectories;
+            try
             {
-                await RecoverDirectoryAsync(saveDirectory);
+                saveDirectories = Directory.EnumerateDirectories(projectDirectory).ToList();
+            }
+            catch (Exception ex)
+            {
+                var summary = new ProjectSaveRecoverySummary(
+                    recoveredCount,
+                    discardedPreparedCount,
+                    recoveryRequiredProjectIds.ToList(),
+                    failures,
+                    SystemFailure: ex.Message);
+                throw new ProjectSaveRecoverySystemException("PSV015: project save transaction directory could not be enumerated.", summary, ex);
+            }
+
+            var projectFailed = false;
+            foreach (var saveDirectory in saveDirectories)
+            {
+                if (projectFailed)
+                {
+                    break;
+                }
+
+                try
+                {
+                    var result = await RecoverDirectoryAsync(saveDirectory);
+                    recoveredCount += result.RecoveredCount;
+                    discardedPreparedCount += result.DiscardedPreparedCount;
+                }
+                catch (ProjectSaveRecoveryProjectException ex)
+                {
+                    recoveryRequiredProjectIds.Add(ex.ProjectId);
+                    failures.Add(new ProjectSaveRecoveryFailure(
+                        ex.ProjectId,
+                        ex.SaveId,
+                        ex.Phase,
+                        ex.InnerException?.Message ?? ex.Message));
+                    projectFailed = true;
+                }
             }
         }
+
+        return new ProjectSaveRecoverySummary(
+            recoveredCount,
+            discardedPreparedCount,
+            recoveryRequiredProjectIds.ToList(),
+            failures,
+            SystemFailure: null);
     }
 
     private async Task<ProjectSaveResult> SaveExistingProjectUnderGateAsync(ProjectSaveRequest request)
@@ -270,12 +339,12 @@ public sealed class ProjectSaveCoordinator
         return new ProjectSaveResult(project, request.NextFlow, Changed: true);
     }
 
-    private async Task RecoverDirectoryAsync(string saveDirectory)
+    private async Task<ProjectSaveRecoveryDirectoryResult> RecoverDirectoryAsync(string saveDirectory)
     {
         var manifestPath = Path.Combine(saveDirectory, ManifestFileName);
         if (!File.Exists(manifestPath))
         {
-            return;
+            return new ProjectSaveRecoveryDirectoryResult(0, 0);
         }
 
         var manifest = DeserializeFile<ProjectSaveManifest>(manifestPath);
@@ -287,24 +356,25 @@ public sealed class ProjectSaveCoordinator
             if (manifest.Phase == ProjectSavePhase.Prepared)
             {
                 Directory.Delete(saveDirectory, recursive: true);
-                return;
+                return new ProjectSaveRecoveryDirectoryResult(0, 1);
             }
 
             if (manifest.Phase == ProjectSavePhase.Completed)
             {
                 Directory.Delete(saveDirectory, recursive: true);
                 RecoveryRequired.TryRemove(manifest.ProjectId, out _);
-                return;
+                return new ProjectSaveRecoveryDirectoryResult(1, 0);
             }
 
             ValidateStagedArtifacts(saveDirectory, manifest);
             await ApplyCommittedIntentAsync(saveDirectory, manifest);
             RecoveryRequired.TryRemove(manifest.ProjectId, out _);
+            return new ProjectSaveRecoveryDirectoryResult(1, 0);
         }
         catch (Exception ex)
         {
             RecoveryRequired[manifest.ProjectId] = ex.Message;
-            throw;
+            throw new ProjectSaveRecoveryProjectException(manifest.ProjectId, manifest.SaveId, manifest.Phase, ex);
         }
         finally
         {
@@ -642,6 +712,56 @@ public sealed record ProjectSaveRequest(
     string? NextFlowJson);
 
 public sealed record ProjectSaveResult(Project Project, OperatorFlowDto? Flow, bool Changed);
+
+public sealed record ProjectSaveRecoverySummary(
+    int RecoveredCount,
+    int DiscardedPreparedCount,
+    IReadOnlyList<Guid> RecoveryRequiredProjectIds,
+    IReadOnlyList<ProjectSaveRecoveryFailure> Failures,
+    string? SystemFailure);
+
+public sealed record ProjectSaveRecoveryFailure(
+    Guid ProjectId,
+    Guid SaveId,
+    ProjectSavePhase Phase,
+    string Error);
+
+internal sealed record ProjectSaveRecoveryDirectoryResult(int RecoveredCount, int DiscardedPreparedCount);
+
+public sealed class ProjectSaveRecoverySystemException : InvalidOperationException
+{
+    public ProjectSaveRecoverySystemException(
+        string message,
+        ProjectSaveRecoverySummary summary,
+        Exception innerException)
+        : base(message, innerException)
+    {
+        Summary = summary;
+    }
+
+    public ProjectSaveRecoverySummary Summary { get; }
+}
+
+public sealed class ProjectSaveRecoveryProjectException : InvalidOperationException
+{
+    public ProjectSaveRecoveryProjectException(
+        Guid projectId,
+        Guid saveId,
+        ProjectSavePhase phase,
+        Exception innerException)
+        : base($"PSV016: project '{projectId}' recovery failed for save '{saveId}' in phase '{phase}': {innerException.Message}", innerException)
+    {
+        ProjectId = projectId;
+        SaveId = saveId;
+        Phase = phase;
+    }
+
+    public Guid ProjectId { get; }
+
+    public Guid SaveId { get; }
+
+    public ProjectSavePhase Phase { get; }
+}
 
 public sealed record ProjectSaveManifest(
     int SchemaVersion,

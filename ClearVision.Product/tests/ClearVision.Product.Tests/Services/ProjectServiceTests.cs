@@ -16,6 +16,56 @@ namespace ClearVision.Product.Tests.Services;
 public class ProjectServiceTests
 {
     [Fact]
+    public async Task ListSearchAndRecent_ShouldSkipRecoveryRequiredProjectAndReturnHealthyProjects()
+    {
+        ProjectSaveCoordinator.ResetStaticStateForTests();
+        try
+        {
+            var repository = Substitute.For<IProjectRepository>();
+            var storage = Substitute.For<IProjectFlowStorage>();
+            var factory = new OperatorFactory();
+            var badProject = new Project("bad");
+            var healthyProject = new Project("healthy");
+            repository.GetByIdAsync(badProject.Id).Returns(Task.FromResult<Project?>(badProject));
+            repository.GetByIdAsync(healthyProject.Id).Returns(Task.FromResult<Project?>(healthyProject));
+            repository.GetAllAsync().Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
+            repository.SearchAsync("project").Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
+            repository.GetRecentlyOpenedAsync(10).Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
+            repository
+                .When(item => item.UpdateAsync(badProject))
+                .Do(_ => throw new InvalidOperationException("db failed"));
+            storage.LoadFlowJsonAsync(Arg.Any<Guid>()).Returns(Task.FromResult<string?>(null));
+            var coordinator = new ProjectSaveCoordinator(repository, storage);
+            var service = new ProjectService(repository, storage, factory, null, null, coordinator);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                badProject,
+                badProject.PersistenceRevision,
+                "bad-renamed",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                null,
+                null,
+                null)));
+
+            var all = (await service.GetAllAsync()).ToList();
+            var search = (await service.SearchAsync("project")).ToList();
+            var recent = (await service.GetRecentlyOpenedAsync()).ToList();
+
+            all.Should().ContainSingle(item => item.Id == healthyProject.Id);
+            search.Should().ContainSingle(item => item.Id == healthyProject.Id);
+            recent.Should().ContainSingle(item => item.Id == healthyProject.Id);
+            all.Should().NotContain(item => item.Id == badProject.Id);
+            search.Should().NotContain(item => item.Id == badProject.Id);
+            recent.Should().NotContain(item => item.Id == badProject.Id);
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+        }
+    }
+
+    [Fact]
     public async Task GetByIdAsync_WhenFlowJsonIsCorrupt_ShouldLogWarningAndFallBackToDatabase()
     {
         var repository = Substitute.For<IProjectRepository>();

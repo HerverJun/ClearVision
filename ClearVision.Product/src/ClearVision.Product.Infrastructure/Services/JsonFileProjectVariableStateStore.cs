@@ -156,28 +156,30 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
                 .Where(variable => variable.Id != Guid.Empty)
                 .GroupBy(variable => variable.Id)
                 .ToDictionary(group => group.Key, group => group.First());
+            var schemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema);
+            var entries = snapshots
+                .OrderBy(snapshot => snapshot.VariableId)
+                .Select(snapshot => new ProjectVariableStateFileEntry
+                {
+                    VariableId = snapshot.VariableId,
+                    Value = SerializeSnapshotValue(snapshot, definitionsById),
+                    Version = snapshot.Version,
+                    UpdatedAtUtc = snapshot.UpdatedAtUtc,
+                    UpdatedBy = snapshot.UpdatedBy,
+                    RunId = snapshot.RunId,
+                    OperatorId = snapshot.OperatorId
+                })
+                .ToList();
             var state = new ProjectVariableStateFile
             {
                 ScopeId = scopeId,
-                SchemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema),
-                StateHash = ProjectVariableStateHash.Compute(schema, snapshots),
+                SchemaHash = schemaHash,
+                StateHash = ComputeStateHash(schemaHash, entries),
                 PersistenceRevision = persistenceRevision,
                 SaveId = saveId,
                 Generation = ComputeGeneration(snapshots),
                 SavedAtUtc = DateTimeOffset.UtcNow,
-                Variables = snapshots
-                    .OrderBy(snapshot => snapshot.VariableId)
-                    .Select(snapshot => new ProjectVariableStateFileEntry
-                    {
-                        VariableId = snapshot.VariableId,
-                        Value = SerializeSnapshotValue(snapshot, definitionsById),
-                        Version = snapshot.Version,
-                        UpdatedAtUtc = snapshot.UpdatedAtUtc,
-                        UpdatedBy = snapshot.UpdatedBy,
-                        RunId = snapshot.RunId,
-                        OperatorId = snapshot.OperatorId
-                    })
-                    .ToList()
+                Variables = entries
             };
 
             var json = JsonSerializer.Serialize(state, ProjectVariableJson.Options);
@@ -590,44 +592,37 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
     private static ProjectVariableStateMetadata ToMetadata(ProjectVariableStateFile state)
     {
-        var snapshots = ToSnapshots(state);
-        var schema = new ProjectGlobalVariableSchema();
-        var stateHash = string.IsNullOrWhiteSpace(state.StateHash)
-            ? ComputeLegacyStateHash(state)
-            : state.StateHash;
+        var actualStateHash = ComputeStateHash(state.SchemaHash, state.Variables);
+        if (!string.IsNullOrWhiteSpace(state.StateHash) &&
+            !string.Equals(state.StateHash, actualStateHash, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("GV041: project global variable state hash does not match persisted content.");
+        }
+
         return new ProjectVariableStateMetadata(
             state.SchemaVersion,
             state.ScopeId,
             Math.Max(0, state.PersistenceRevision),
             state.SchemaHash,
-            stateHash,
+            actualStateHash,
             state.SavedAtUtc,
             state.SaveId);
     }
 
-    private static string ComputeLegacyStateHash(ProjectVariableStateFile state)
-    {
-        var payload = new
-        {
-            schemaHash = state.SchemaHash,
-            variables = state.Variables
-                .OrderBy(entry => entry.VariableId)
-                .Select(entry => new
-                {
-                    variableId = entry.VariableId,
-                    value = entry.Value,
-                    version = entry.Version,
-                    updatedAtUtc = entry.UpdatedAtUtc,
-                    updatedBy = entry.UpdatedBy,
-                    runId = entry.RunId,
-                    operatorId = entry.OperatorId
-                })
-                .ToList()
-        };
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, ProjectVariableJson.Options);
-        var hash = SHA256.HashData(bytes);
-        return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
-    }
+    private static string ComputeStateHash(string schemaHash, IReadOnlyList<ProjectVariableStateFileEntry> entries) =>
+        ProjectVariableStateHash.Compute(
+            schemaHash,
+            entries
+                .Where(entry => entry.VariableId != Guid.Empty)
+                .Select(entry => new ProjectVariableValueSnapshot(
+                    entry.VariableId,
+                    entry.Value.Clone(),
+                    entry.Version,
+                    entry.UpdatedAtUtc,
+                    entry.UpdatedBy,
+                    entry.RunId,
+                    entry.OperatorId))
+                .ToList());
 
     private static long ComputeGeneration(IEnumerable<ProjectVariableValueSnapshot> snapshots)
     {

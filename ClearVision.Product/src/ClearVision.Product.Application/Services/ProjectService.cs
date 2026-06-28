@@ -172,7 +172,7 @@ public class ProjectService
         var projects = await _projectRepository.GetAllAsync();
         // GetAll 閫氬父涓嶈繑鍥炶缁嗙殑 Flow 鍐呭浠ヤ紭鍖栨€ц兘锛屾垨鑰呮垜浠彲浠ラ€夋嫨鍔犺浇
         // 杩欓噷鏆傛椂淇濇寔鍘熸牱锛屼粎杩斿洖杞婚噺绾у垪琛?
-        return projects.Select(MapToDto);
+        return await MapProjectListWithAccessAsync(projects);
     }
 
     /// <summary>
@@ -372,7 +372,7 @@ public class ProjectService
     public async Task<IEnumerable<ProjectDto>> SearchAsync(string keyword)
     {
         var projects = await _projectRepository.SearchAsync(keyword);
-        return projects.Select(MapToDto);
+        return await MapProjectListWithAccessAsync(projects);
     }
 
     /// <summary>
@@ -381,7 +381,7 @@ public class ProjectService
     public async Task<IEnumerable<ProjectDto>> GetRecentlyOpenedAsync(int count = 10)
     {
         var projects = await _projectRepository.GetRecentlyOpenedAsync(count);
-        return projects.Select(MapToDto);
+        return await MapProjectListWithAccessAsync(projects);
     }
 
     public async Task<ProjectGlobalVariableSchema> UpdateGlobalVariablesAsync(Guid id, ProjectGlobalVariableSchema schema)
@@ -407,6 +407,35 @@ public class ProjectService
         var bytes = JsonSerializer.SerializeToUtf8Bytes(schema, _jsonOptions);
         return JsonSerializer.Deserialize<ProjectGlobalVariableSchema>(bytes, _jsonOptions) ?? new ProjectGlobalVariableSchema();
     }
+
+    private async Task<IReadOnlyList<ProjectDto>> MapProjectListWithAccessAsync(IEnumerable<Project> candidates)
+    {
+        var result = new List<ProjectDto>();
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                await using var access = await _saveCoordinator.AcquireProjectAccessAsync(candidate.Id);
+                var current = await _projectRepository.GetByIdAsync(candidate.Id);
+                if (current != null)
+                {
+                    result.Add(MapToDto(current));
+                }
+            }
+            catch (InvalidOperationException ex) when (IsProjectRecoveryRequired(ex))
+            {
+                _logger?.LogWarning(
+                    ex,
+                    "Skipping project {ProjectId} in project list because save recovery is required.",
+                    candidate.Id);
+            }
+        }
+
+        return result;
+    }
+
+    private static bool IsProjectRecoveryRequired(InvalidOperationException ex) =>
+        ex.Message.StartsWith("PSV001:", StringComparison.Ordinal);
 
     private async Task<OperatorFlowDto?> LoadStoredFlowDtoAsync(Guid projectId)
     {

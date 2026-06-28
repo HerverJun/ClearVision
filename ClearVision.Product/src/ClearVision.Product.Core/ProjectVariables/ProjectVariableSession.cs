@@ -100,10 +100,28 @@ public static class ProjectVariableStateHash
     {
         ArgumentNullException.ThrowIfNull(schema);
         ArgumentNullException.ThrowIfNull(snapshots);
+        var definitionsById = schema.Variables
+            .Where(variable => variable.Id != Guid.Empty)
+            .GroupBy(variable => variable.Id)
+            .ToDictionary(group => group.Key, group => group.First());
 
+        return Compute(
+            ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema),
+            snapshots.Select(snapshot => snapshot with
+            {
+                Value = NormalizeSnapshotValue(snapshot, definitionsById)
+            }).ToList());
+    }
+
+    public static string Compute(
+        string schemaHash,
+        IReadOnlyList<ProjectVariableValueSnapshot> snapshots)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(schemaHash);
+        ArgumentNullException.ThrowIfNull(snapshots);
         var payload = new
         {
-            schemaHash = ProjectGlobalVariableSchemaValidator.ComputeSchemaHash(schema),
+            schemaHash,
             variables = snapshots
                 .OrderBy(snapshot => snapshot.VariableId)
                 .Select(snapshot => new
@@ -121,6 +139,21 @@ public static class ProjectVariableStateHash
         var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, HashJsonOptions);
         var hash = SHA256.HashData(bytes);
         return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static JsonElement NormalizeSnapshotValue(
+        ProjectVariableValueSnapshot snapshot,
+        IReadOnlyDictionary<Guid, ProjectGlobalVariableDefinition> definitionsById)
+    {
+        if (definitionsById.TryGetValue(snapshot.VariableId, out var definition) &&
+            definition.ValueType == ProjectGlobalVariableValueType.Int64)
+        {
+            return snapshot.Value.ValueKind == JsonValueKind.String
+                ? JsonSerializer.SerializeToElement(snapshot.Value.GetString() ?? string.Empty)
+                : JsonSerializer.SerializeToElement(snapshot.Value.GetRawText());
+        }
+
+        return snapshot.Value.Clone();
     }
 }
 

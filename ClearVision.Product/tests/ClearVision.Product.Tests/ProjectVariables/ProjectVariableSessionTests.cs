@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Services;
@@ -1036,6 +1037,197 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_LoadMetadata_WhenValueChangesButStateHashIsOld_ShouldThrowGv041()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            var snapshots = new[]
+            {
+                new ProjectVariableValueSnapshot(
+                    variableId,
+                    JsonSerializer.SerializeToElement(42L),
+                    3,
+                    DateTimeOffset.UtcNow,
+                    ProjectVariableUpdatedBy.StudioManual,
+                    Guid.NewGuid(),
+                    Guid.NewGuid())
+            };
+            store.Save(scopeId, schema, snapshots, persistenceRevision: 7, Guid.NewGuid());
+            var filePath = GetCommittedStateFilePath(root);
+            MutateFirstVariable(filePath, variable => variable["value"] = "43");
+
+            var act = () => store.LoadMetadata(scopeId);
+
+            act.Should().Throw<InvalidOperationException>().WithMessage("*GV041*");
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("version")]
+    [InlineData("updatedBy")]
+    [InlineData("runId")]
+    [InlineData("operatorId")]
+    public void JsonFileStateStore_LoadMetadata_WhenStateIdentityFieldsChangeButStateHashIsOld_ShouldThrowGv041(string fieldName)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            var snapshots = new[]
+            {
+                new ProjectVariableValueSnapshot(
+                    variableId,
+                    JsonSerializer.SerializeToElement(42L),
+                    3,
+                    DateTimeOffset.UtcNow,
+                    ProjectVariableUpdatedBy.StudioManual,
+                    Guid.NewGuid(),
+                    Guid.NewGuid())
+            };
+            store.Save(scopeId, schema, snapshots, persistenceRevision: 7, Guid.NewGuid());
+            var filePath = GetCommittedStateFilePath(root);
+            MutateFirstVariable(filePath, variable =>
+            {
+                variable[fieldName] = fieldName switch
+                {
+                    "version" => 4,
+                    "updatedBy" => nameof(ProjectVariableUpdatedBy.Reset),
+                    _ => Guid.NewGuid().ToString("D")
+                };
+            });
+
+            var act = () => store.LoadMetadata(scopeId);
+
+            act.Should().Throw<InvalidOperationException>().WithMessage("*GV041*");
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_LoadMetadata_WhenStateHashIsMissing_ShouldReturnLegacyComputedHash()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            var snapshots = new[]
+            {
+                new ProjectVariableValueSnapshot(
+                    variableId,
+                    JsonSerializer.SerializeToElement(42L),
+                    3,
+                    DateTimeOffset.UtcNow,
+                    ProjectVariableUpdatedBy.StudioManual,
+                    Guid.NewGuid(),
+                    Guid.NewGuid())
+            };
+            store.Save(scopeId, schema, snapshots, persistenceRevision: 0, saveId: null);
+            var filePath = GetCommittedStateFilePath(root);
+            var node = LoadStateNode(filePath);
+            node.Remove("stateHash");
+            SaveStateNode(filePath, node);
+
+            var metadata = store.LoadMetadata(scopeId);
+
+            metadata.Should().NotBeNull();
+            metadata!.StateHash.Should().Be(ProjectVariableStateHash.Compute(schema, snapshots));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_LoadMetadata_ShouldComputeHashIndependentOfVariableFileOrder()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var firstVariableId = Guid.NewGuid();
+            var secondVariableId = Guid.NewGuid();
+            var schema = new ProjectGlobalVariableSchema
+            {
+                Variables =
+                [
+                    CreateDefinition(firstVariableId, 1, "stats.first"),
+                    CreateDefinition(secondVariableId, 2, "stats.second")
+                ]
+            };
+            var snapshots = new[]
+            {
+                new ProjectVariableValueSnapshot(
+                    secondVariableId,
+                    JsonSerializer.SerializeToElement(22L),
+                    2,
+                    DateTimeOffset.UtcNow,
+                    ProjectVariableUpdatedBy.StudioManual,
+                    Guid.NewGuid(),
+                    Guid.NewGuid()),
+                new ProjectVariableValueSnapshot(
+                    firstVariableId,
+                    JsonSerializer.SerializeToElement(11L),
+                    1,
+                    DateTimeOffset.UtcNow,
+                    ProjectVariableUpdatedBy.OperatorOutput,
+                    Guid.NewGuid(),
+                    Guid.NewGuid())
+            };
+            store.Save(scopeId, schema, snapshots, persistenceRevision: 7, Guid.NewGuid());
+            var before = store.LoadMetadata(scopeId);
+            var filePath = GetCommittedStateFilePath(root);
+            var node = LoadStateNode(filePath);
+            var variables = node["variables"]!.AsArray();
+            var first = variables[0];
+            variables.RemoveAt(0);
+            variables.Add(first);
+            SaveStateNode(filePath, node);
+
+            var after = store.LoadMetadata(scopeId);
+
+            after.Should().NotBeNull();
+            after!.StateHash.Should().Be(before!.StateHash);
+            after.StateHash.Should().Be(ProjectVariableStateHash.Compute(schema, snapshots));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void StationSettingsPaths_ProjectVariableStates_ShouldUseStationDataRoot()
     {
         var localAppDataRoot = Path.Combine(Path.GetTempPath(), "ClearVisionStationPathTests", Guid.NewGuid().ToString("N"));
@@ -1054,15 +1246,7 @@ public sealed class ProjectVariableSessionTests
 
     private static ProjectGlobalVariableSchema CreateSchema(Guid variableId, long initialValue, long? min = null, long? max = null)
     {
-        var variable = new ProjectGlobalVariableDefinition
-        {
-            Id = variableId,
-            Name = "stats.count",
-            DisplayName = "Count",
-            ValueType = ProjectGlobalVariableValueType.Int64,
-            InitialValue = JsonSerializer.SerializeToElement(initialValue),
-            ManualWriteAllowed = true
-        };
+        var variable = CreateDefinition(variableId, initialValue, "stats.count");
         if (min.HasValue)
         {
             variable.Min = min.Value;
@@ -1081,6 +1265,17 @@ public sealed class ProjectVariableSessionTests
             ]
         };
     }
+
+    private static ProjectGlobalVariableDefinition CreateDefinition(Guid variableId, long initialValue, string name) =>
+        new()
+        {
+            Id = variableId,
+            Name = name,
+            DisplayName = "Count",
+            ValueType = ProjectGlobalVariableValueType.Int64,
+            InitialValue = JsonSerializer.SerializeToElement(initialValue),
+            ManualWriteAllowed = true
+        };
 
     private static void SaveSnapshot(
         IProjectVariableStateStore store,
@@ -1130,6 +1325,22 @@ public sealed class ProjectVariableSessionTests
     }
 
     private static string GetRecoveryJournalPath(string committedFilePath) => committedFilePath + ".journal";
+
+    private static JsonObject LoadStateNode(string filePath) =>
+        JsonNode.Parse(File.ReadAllText(filePath, Encoding.UTF8))!.AsObject();
+
+    private static void SaveStateNode(string filePath, JsonObject node)
+    {
+        File.WriteAllText(filePath, node.ToJsonString(ProjectVariableJson.Options), Encoding.UTF8);
+    }
+
+    private static void MutateFirstVariable(string filePath, Action<JsonObject> mutate)
+    {
+        var node = LoadStateNode(filePath);
+        var variable = node["variables"]!.AsArray()[0]!.AsObject();
+        mutate(variable);
+        SaveStateNode(filePath, node);
+    }
 
     private static long ReadStateFileGeneration(string filePath)
     {

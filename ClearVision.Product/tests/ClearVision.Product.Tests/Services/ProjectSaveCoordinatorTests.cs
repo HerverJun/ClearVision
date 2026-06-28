@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
@@ -433,9 +434,13 @@ public sealed class ProjectSaveCoordinatorTests
                 saveId: Guid.NewGuid());
             var recovery = new ProjectSaveCoordinator(repository, flowStorage, registry, root);
 
-            var act = async () => await recovery.RecoverAllAsync();
+            var summary = await recovery.RecoverAllAsync();
 
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV013*");
+            summary.RecoveredCount.Should().Be(0);
+            summary.RecoveryRequiredProjectIds.Should().Contain(project.Id);
+            summary.Failures.Should().ContainSingle(item =>
+                item.ProjectId == project.Id &&
+                item.Error.Contains("PSV013", StringComparison.Ordinal));
             recovery.Invoking(item => item.EnsureProjectAvailable(project.Id)).Should().Throw<InvalidOperationException>().WithMessage("*PSV001*");
         }
         finally
@@ -492,15 +497,187 @@ public sealed class ProjectSaveCoordinatorTests
                 saveId: Guid.NewGuid());
             var recovery = new ProjectSaveCoordinator(repository, flowStorage, registry, root);
 
-            var act = async () => await recovery.RecoverAllAsync();
+            var summary = await recovery.RecoverAllAsync();
 
-            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*PSV014*");
+            summary.RecoveredCount.Should().Be(0);
+            summary.RecoveryRequiredProjectIds.Should().Contain(project.Id);
+            summary.Failures.Should().ContainSingle(item =>
+                item.ProjectId == project.Id &&
+                item.Error.Contains("PSV014", StringComparison.Ordinal));
             recovery.Invoking(item => item.EnsureProjectAvailable(project.Id)).Should().Throw<InvalidOperationException>().WithMessage("*PSV001*");
         }
         finally
         {
             DeleteDirectoryIfExists(root);
             DeleteDirectoryIfExists(stateRoot);
+        }
+    }
+
+    [Fact]
+    public async Task RecoverAllAsync_WhenVariableStateFileHashIsTampered_ShouldFenceProject()
+    {
+        var root = CreateTempPath();
+        var stateRoot = CreateTempPath();
+        try
+        {
+            var variableId = Guid.NewGuid();
+            var project = new Project("demo");
+            var previousSchema = CreateSchema(variableId, 1, "stats.count");
+            var nextSchema = CreateSchema(variableId, 5, "stats.renamed");
+            project.UpdateGlobalVariables(previousSchema);
+            var repository = new InMemoryProjectRepository(project);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            var stateStore = new JsonFileProjectVariableStateStore(stateRoot);
+            var registry = new ProjectVariableSessionRegistry(stateStore);
+            registry.GetOrCreate(project.Id, previousSchema).SetValue(variableId, 9L, ProjectVariableUpdatedBy.StudioManual);
+            var failure = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.BeforeComplete, failAlways: true);
+            var coordinator = new ProjectSaveCoordinator(repository, flowStorage, registry, root, failure);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                project,
+                project.PersistenceRevision,
+                "demo",
+                null,
+                previousSchema,
+                nextSchema,
+                null,
+                null,
+                null)));
+            var stateFile = Directory.EnumerateFiles(stateRoot, "*.json").Single(path => !path.EndsWith(".last-good.json", StringComparison.Ordinal));
+            var node = JsonNode.Parse(File.ReadAllText(stateFile, Encoding.UTF8))!.AsObject();
+            node["variables"]!.AsArray()[0]!.AsObject()["value"] = "123";
+            File.WriteAllText(stateFile, node.ToJsonString(ProjectVariableJson.Options), Encoding.UTF8);
+            var recovery = new ProjectSaveCoordinator(repository, flowStorage, registry, root);
+
+            var summary = await recovery.RecoverAllAsync();
+
+            summary.RecoveredCount.Should().Be(0);
+            summary.RecoveryRequiredProjectIds.Should().Contain(project.Id);
+            summary.Failures.Should().ContainSingle(item =>
+                item.ProjectId == project.Id &&
+                item.Error.Contains("GV041", StringComparison.Ordinal));
+            recovery.Invoking(item => item.EnsureProjectAvailable(project.Id)).Should().Throw<InvalidOperationException>().WithMessage("*PSV001*");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(root);
+            DeleteDirectoryIfExists(stateRoot);
+        }
+    }
+
+    [Fact]
+    public async Task RecoverAllAsync_WhenOneProjectRecoveryFails_ShouldFenceOnlyThatProjectAndContinueOthers()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var badProject = new Project("bad");
+            var healthyProject = new Project("healthy");
+            var repository = new InMemoryProjectRepository(badProject, healthyProject);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            await flowStorage.SaveFlowJsonAsync(badProject.Id, SerializeFlow("bad-old"), 0);
+            await flowStorage.SaveFlowJsonAsync(healthyProject.Id, SerializeFlow("healthy-old"), 0);
+            var badCrash = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.BeforeComplete, failAlways: true);
+            var badCoordinator = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root, failureInjector: badCrash);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => badCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                badProject,
+                badProject.PersistenceRevision,
+                "bad-renamed",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                SerializeFlow("bad-old"),
+                CreateFlow("bad-new"),
+                SerializeFlow("bad-new"))));
+            var healthyCrash = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.BeforeComplete, failAlways: true);
+            var healthyCoordinator = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root, failureInjector: healthyCrash);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => healthyCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                healthyProject,
+                healthyProject.PersistenceRevision,
+                "healthy-renamed",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                SerializeFlow("healthy-old"),
+                CreateFlow("healthy-new"),
+                SerializeFlow("healthy-new"))));
+            var badFlowArtifact = Directory
+                .EnumerateFiles(Path.Combine(root, badProject.Id.ToString("D")), "flow.json", SearchOption.AllDirectories)
+                .Single();
+            File.WriteAllText(badFlowArtifact, "{\"tampered\":true}", Encoding.UTF8);
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+
+            var recovery = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root);
+            var summary = await recovery.RecoverAllAsync();
+
+            summary.RecoveredCount.Should().Be(1);
+            summary.RecoveryRequiredProjectIds.Should().ContainSingle().Which.Should().Be(badProject.Id);
+            summary.SystemFailure.Should().BeNull();
+            recovery.Invoking(item => item.EnsureProjectAvailable(badProject.Id)).Should().Throw<InvalidOperationException>().WithMessage("*PSV001*");
+            recovery.Invoking(item => item.EnsureProjectAvailable(healthyProject.Id)).Should().NotThrow();
+            healthyProject.Name.Should().Be("healthy-renamed");
+            Directory.EnumerateFiles(Path.Combine(root, healthyProject.Id.ToString("D")), "manifest.json", SearchOption.AllDirectories).Should().BeEmpty();
+            Directory.EnumerateFiles(Path.Combine(root, badProject.Id.ToString("D")), "manifest.json", SearchOption.AllDirectories).Should().NotBeEmpty();
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
+        }
+    }
+
+    [Fact]
+    public async Task RunStartupRecoveryAsync_WhenOneProjectRecoveryFails_ShouldLeaveBarrierReadyAndFenceOnlyThatProject()
+    {
+        var root = CreateTempPath();
+        try
+        {
+            var badProject = new Project("bad");
+            var healthyProject = new Project("healthy");
+            var repository = new InMemoryProjectRepository(badProject, healthyProject);
+            var flowStorage = new InMemoryProjectFlowStorage();
+            await flowStorage.SaveFlowJsonAsync(badProject.Id, SerializeFlow("bad-old"), 0);
+            await flowStorage.SaveFlowJsonAsync(healthyProject.Id, SerializeFlow("healthy-old"), 0);
+            var badCrash = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.BeforeComplete, failAlways: true);
+            var badCoordinator = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root, failureInjector: badCrash);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => badCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                badProject,
+                badProject.PersistenceRevision,
+                "bad-renamed",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                SerializeFlow("bad-old"),
+                CreateFlow("bad-new"),
+                SerializeFlow("bad-new"))));
+            var healthyCrash = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.BeforeComplete, failAlways: true);
+            var healthyCoordinator = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root, failureInjector: healthyCrash);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => healthyCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+                healthyProject,
+                healthyProject.PersistenceRevision,
+                "healthy-renamed",
+                null,
+                new ProjectGlobalVariableSchema(),
+                new ProjectGlobalVariableSchema(),
+                SerializeFlow("healthy-old"),
+                CreateFlow("healthy-new"),
+                SerializeFlow("healthy-new"))));
+            var badFlowArtifact = Directory
+                .EnumerateFiles(Path.Combine(root, badProject.Id.ToString("D")), "flow.json", SearchOption.AllDirectories)
+                .Single();
+            File.WriteAllText(badFlowArtifact, "{\"tampered\":true}", Encoding.UTF8);
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+
+            var recovery = new ProjectSaveCoordinator(repository, flowStorage, transactionRoot: root);
+            await recovery.RunStartupRecoveryAsync();
+
+            await using var healthyAccess = await recovery.AcquireProjectAccessAsync(healthyProject.Id);
+            healthyProject.Name.Should().Be("healthy-renamed");
+            await Assert.ThrowsAsync<InvalidOperationException>(() => recovery.AcquireProjectAccessAsync(badProject.Id));
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
         }
     }
 
@@ -597,6 +774,9 @@ public sealed class ProjectSaveCoordinatorTests
 
     private sealed class InMemoryProjectFlowStorage : IProjectFlowStorage
     {
+        private readonly Dictionary<Guid, string> _flowJsonByProject = new();
+        private readonly Dictionary<Guid, ProjectFlowStorageMetadata> _metadataByProject = new();
+
         public string? FlowJson { get; private set; }
 
         public ProjectFlowStorageMetadata? Metadata { get; private set; }
@@ -612,8 +792,10 @@ public sealed class ProjectSaveCoordinatorTests
 
         public Task SaveFlowJsonAsync(Guid projectId, string flowJson)
         {
+            _flowJsonByProject[projectId] = flowJson;
             FlowJson = flowJson;
             Metadata = CreateMetadata(projectId, flowJson, 0);
+            _metadataByProject[projectId] = Metadata;
             return Task.CompletedTask;
         }
 
@@ -626,21 +808,27 @@ public sealed class ProjectSaveCoordinatorTests
                 throw new IOException("flow save failed");
             }
 
+            _flowJsonByProject[projectId] = flowJson;
             FlowJson = flowJson;
             Metadata = CreateMetadata(projectId, flowJson, persistenceRevision);
+            _metadataByProject[projectId] = Metadata;
             return Task.CompletedTask;
         }
 
-        public Task<string?> LoadFlowJsonAsync(Guid projectId) => Task.FromResult(FlowJson);
+        public Task<string?> LoadFlowJsonAsync(Guid projectId) =>
+            Task.FromResult(_flowJsonByProject.GetValueOrDefault(projectId));
 
         public Task DeleteFlowJsonAsync(Guid projectId)
         {
+            _flowJsonByProject.Remove(projectId);
+            _metadataByProject.Remove(projectId);
             FlowJson = null;
             Metadata = null;
             return Task.CompletedTask;
         }
 
-        public Task<ProjectFlowStorageMetadata?> LoadMetadataAsync(Guid projectId) => Task.FromResult(Metadata);
+        public Task<ProjectFlowStorageMetadata?> LoadMetadataAsync(Guid projectId) =>
+            Task.FromResult(_metadataByProject.GetValueOrDefault(projectId));
 
         private static ProjectFlowStorageMetadata CreateMetadata(Guid projectId, string flowJson, long revision) =>
             new(1, projectId, revision, ComputeSha256(flowJson), DateTimeOffset.UtcNow);
