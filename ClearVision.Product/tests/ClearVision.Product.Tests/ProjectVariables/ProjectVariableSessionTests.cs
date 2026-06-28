@@ -1076,6 +1076,7 @@ public sealed class ProjectVariableSessionTests
 
     [Theory]
     [InlineData("version")]
+    [InlineData("updatedAtUtc")]
     [InlineData("updatedBy")]
     [InlineData("runId")]
     [InlineData("operatorId")]
@@ -1106,6 +1107,7 @@ public sealed class ProjectVariableSessionTests
                 variable[fieldName] = fieldName switch
                 {
                     "version" => 4,
+                    "updatedAtUtc" => DateTimeOffset.UtcNow.AddMinutes(5).ToString("O"),
                     "updatedBy" => nameof(ProjectVariableUpdatedBy.Reset),
                     _ => Guid.NewGuid().ToString("D")
                 };
@@ -1228,6 +1230,239 @@ public sealed class ProjectVariableSessionTests
     }
 
     [Fact]
+    public void JsonFileStateStore_LoadAndRegistry_WhenValueChangesButStateHashIsOld_ShouldThrowGv041()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var projectId = Guid.NewGuid();
+            var scopeId = ProjectVariableSessionRegistry.ToProjectScopeId(projectId);
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            store.Save(scopeId, schema, [CreateSnapshot(variableId, 42L, 3)]);
+            var filePath = GetCommittedStateFilePath(root);
+            MutateFirstVariable(filePath, variable => variable["value"] = "43");
+
+            var metadataAct = () => store.LoadMetadata(scopeId);
+            var loadAct = () => store.Load(scopeId, schema);
+            var registry = new ProjectVariableSessionRegistry(store);
+            var registryAct = () => registry.GetOrCreate(projectId, schema);
+
+            metadataAct.Should().Throw<InvalidOperationException>().WithMessage("*GV041*");
+            loadAct.Should().Throw<InvalidOperationException>().WithMessage("*GV041*");
+            registryAct.Should().Throw<InvalidOperationException>().WithMessage("*GV041*");
+            registry.TryRemove(projectId).Should().BeFalse();
+            File.Exists(filePath + ".corrupt").Should().BeTrue();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("version")]
+    [InlineData("updatedAtUtc")]
+    [InlineData("updatedBy")]
+    [InlineData("runId")]
+    [InlineData("operatorId")]
+    public void JsonFileStateStore_Load_WhenStateIdentityFieldsChangeButStateHashIsOld_ShouldThrowGv041(string fieldName)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            store.Save(scopeId, schema, [CreateSnapshot(variableId, 42L, 3)]);
+            var filePath = GetCommittedStateFilePath(root);
+            MutateFirstVariable(filePath, variable =>
+            {
+                variable[fieldName] = fieldName switch
+                {
+                    "version" => 4,
+                    "updatedAtUtc" => DateTimeOffset.UtcNow.AddMinutes(5).ToString("O"),
+                    "updatedBy" => nameof(ProjectVariableUpdatedBy.Reset),
+                    _ => Guid.NewGuid().ToString("D")
+                };
+            });
+
+            var act = () => store.Load(scopeId, schema);
+
+            act.Should().Throw<InvalidOperationException>().WithMessage("*GV041*");
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenMainHashIsTamperedAndLastGoodIsValid_ShouldRestoreLastGoodAndKeepCorruptEvidence()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 11L, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 22L, 2);
+            var filePath = GetCommittedStateFilePath(root);
+            var lastGoodPath = GetLastGoodStateFilePath(filePath);
+            MutateFirstVariable(filePath, variable => variable["value"] = "99");
+
+            var loaded = LoadLongAndVersion(store, scopeId, schema, variableId);
+
+            loaded.Should().Be((11L, 1L));
+            File.Exists(filePath + ".corrupt").Should().BeTrue();
+            File.ReadAllText(filePath, Encoding.UTF8).Should().Be(File.ReadAllText(lastGoodPath, Encoding.UTF8));
+            var recoveryJournal = ReadSingleRecoveryJournalEntry(GetRecoveryJournalPath(filePath));
+            recoveryJournal.GetProperty("eventType").GetString().Should().Be("main-hash-mismatch-restored-last-good");
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenMainAndLastGoodHashesAreTampered_ShouldThrowGv041()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 11L, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 22L, 2);
+            var filePath = GetCommittedStateFilePath(root);
+            MutateFirstVariable(filePath, variable => variable["value"] = "99");
+            MutateFirstVariable(GetLastGoodStateFilePath(filePath), variable => variable["value"] = "88");
+
+            var act = () => store.Load(scopeId, schema);
+
+            act.Should().Throw<InvalidOperationException>().WithMessage("*GV041*");
+            File.Exists(filePath + ".corrupt").Should().BeTrue();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenLegacyStateHashIsMissing_ShouldLoadAndMigrateWithComputedHash()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var currentRoot = Path.Combine(root, "current");
+            var legacyRoot = Path.Combine(root, "legacy");
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, schema, variableId, 55L, 5);
+            var legacyFilePath = GetCommittedStateFilePath(legacyRoot);
+            var node = LoadStateNode(legacyFilePath);
+            node.Remove("stateHash");
+            SaveStateNode(legacyFilePath, node);
+            var store = new JsonFileProjectVariableStateStore(currentRoot, legacyRoot);
+
+            var loaded = LoadLongAndVersion(store, scopeId, schema, variableId);
+            var metadata = store.LoadMetadata(scopeId);
+
+            loaded.Should().Be((55L, 5L));
+            metadata.Should().NotBeNull();
+            metadata!.StateHash.Should().NotBeNullOrWhiteSpace();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenLegacyStateHashIsTampered_ShouldRejectLegacyCandidate()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var currentRoot = Path.Combine(root, "current");
+            var legacyRoot = Path.Combine(root, "legacy");
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(new JsonFileProjectVariableStateStore(legacyRoot), scopeId, schema, variableId, 55L, 5);
+            MutateFirstVariable(GetCommittedStateFilePath(legacyRoot), variable => variable["value"] = "77");
+            var store = new JsonFileProjectVariableStateStore(currentRoot, legacyRoot);
+
+            var act = () => store.Load(scopeId, schema);
+
+            act.Should().Throw<InvalidOperationException>().WithMessage("*GV041*");
+            Directory.EnumerateFiles(currentRoot, "*.json").Should().BeEmpty();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void JsonFileStateStore_Load_WhenInterruptedTempHashIsTampered_ShouldDiscardTemp()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ClearVisionProjectVariableState", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new JsonFileProjectVariableStateStore(root);
+            var scopeId = $"project:{Guid.NewGuid():D}";
+            var variableId = Guid.NewGuid();
+            var schema = CreateSchema(variableId, 1);
+            SaveSnapshot(store, scopeId, schema, variableId, 55L, 5);
+            var filePath = GetCommittedStateFilePath(root);
+            var tempPath = filePath + ".tmp";
+            File.Move(filePath, tempPath);
+            MutateFirstVariable(tempPath, variable => variable["value"] = "77");
+
+            var snapshots = store.Load(scopeId, schema);
+
+            snapshots.Should().BeEmpty();
+            File.Exists(tempPath).Should().BeFalse();
+            File.Exists(filePath).Should().BeFalse();
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void StationSettingsPaths_ProjectVariableStates_ShouldUseStationDataRoot()
     {
         var localAppDataRoot = Path.Combine(Path.GetTempPath(), "ClearVisionStationPathTests", Guid.NewGuid().ToString("N"));
@@ -1276,6 +1511,16 @@ public sealed class ProjectVariableSessionTests
             InitialValue = JsonSerializer.SerializeToElement(initialValue),
             ManualWriteAllowed = true
         };
+
+    private static ProjectVariableValueSnapshot CreateSnapshot(Guid variableId, long value, long version) =>
+        new(
+            variableId,
+            JsonSerializer.SerializeToElement(value),
+            version,
+            DateTimeOffset.UtcNow,
+            ProjectVariableUpdatedBy.StudioManual,
+            Guid.NewGuid(),
+            Guid.NewGuid());
 
     private static void SaveSnapshot(
         IProjectVariableStateStore store,

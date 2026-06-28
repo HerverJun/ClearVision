@@ -28,6 +28,8 @@ public class ProjectServiceTests
             var healthyProject = new Project("healthy");
             repository.GetByIdAsync(badProject.Id).Returns(Task.FromResult<Project?>(badProject));
             repository.GetByIdAsync(healthyProject.Id).Returns(Task.FromResult<Project?>(healthyProject));
+            repository.GetByIdFreshAsync(badProject.Id).Returns(Task.FromResult<Project?>(badProject));
+            repository.GetByIdFreshAsync(healthyProject.Id).Returns(Task.FromResult<Project?>(healthyProject));
             repository.GetAllAsync().Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
             repository.SearchAsync("project").Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
             repository.GetRecentlyOpenedAsync(10).Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));

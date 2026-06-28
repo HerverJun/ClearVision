@@ -416,7 +416,7 @@ public class ProjectService
             try
             {
                 await using var access = await _saveCoordinator.AcquireProjectAccessAsync(candidate.Id);
-                var current = await _projectRepository.GetByIdAsync(candidate.Id);
+                var current = await _projectRepository.GetByIdFreshAsync(candidate.Id);
                 if (current != null)
                 {
                     result.Add(MapToDto(current));

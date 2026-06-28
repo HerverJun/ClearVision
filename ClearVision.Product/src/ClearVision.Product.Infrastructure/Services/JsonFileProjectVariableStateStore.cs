@@ -115,6 +115,31 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
                 }
             }
 
+            try
+            {
+                ValidateOrComputeStateHash(state);
+            }
+            catch (InvalidOperationException ex) when (IsStateHashMismatch(ex))
+            {
+                _fileSystem.Copy(filePath, GetCorruptPath(scopeId), overwrite: true);
+                if (TryLoadMatchingLastGood(
+                        scopeId,
+                        expectedSchemaHash,
+                        restoreCommittedFile: true,
+                        "main-hash-mismatch-restored-last-good",
+                        out var lastGoodSnapshots))
+                {
+                    return lastGoodSnapshots;
+                }
+
+                if (TryLoadLegacyState(scopeId, expectedSchemaHash, out var legacySnapshots))
+                {
+                    return legacySnapshots;
+                }
+
+                throw;
+            }
+
             if (TrySelectMatchingLegacyState(scopeId, expectedSchemaHash, out var legacyState, out var legacySourcePath) &&
                 GetGeneration(legacyState) > GetGeneration(state))
             {
@@ -340,6 +365,15 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             return false;
         }
 
+        try
+        {
+            ValidateOrComputeStateHash(lastGoodState);
+        }
+        catch (InvalidOperationException ex) when (IsStateHashMismatch(ex))
+        {
+            return false;
+        }
+
         snapshots = ToSnapshots(lastGoodState);
         if (restoreCommittedFile)
         {
@@ -368,7 +402,12 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             return false;
         }
 
-        if (TrySelectMatchingLegacyState(scopeId, expectedSchemaHash, out var legacyState, out var legacySourcePath))
+        if (TrySelectMatchingLegacyState(
+                scopeId,
+                expectedSchemaHash,
+                out var legacyState,
+                out var legacySourcePath,
+                throwIfOnlyHashInvalid: true))
         {
             MigrateLegacyState(scopeId, legacySourcePath, expectedSchemaHash);
             snapshots = ToSnapshots(legacyState);
@@ -382,27 +421,46 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         string scopeId,
         string expectedSchemaHash,
         out ProjectVariableStateFile state,
-        out string sourcePath)
+        out string sourcePath,
+        bool throwIfOnlyHashInvalid = false)
     {
         state = new ProjectVariableStateFile();
         sourcePath = string.Empty;
         var legacyFilePath = GetLegacyFilePath(scopeId);
         var legacyLastGoodPath = GetLegacyLastGoodPath(scopeId);
         var candidates = new List<(ProjectVariableStateFile State, string SourcePath)>();
-        if (legacyFilePath != null &&
-            TryLoadMatchingStateFile(legacyFilePath, expectedSchemaHash, out var legacyState))
+        var hashMismatchFound = false;
+        if (legacyFilePath != null)
         {
-            candidates.Add((legacyState, legacyFilePath));
+            if (TryLoadMatchingStateFile(legacyFilePath, expectedSchemaHash, out var legacyState, out var legacyHashMismatch))
+            {
+                candidates.Add((legacyState, legacyFilePath));
+            }
+            else
+            {
+                hashMismatchFound |= legacyHashMismatch;
+            }
         }
 
-        if (legacyLastGoodPath != null &&
-            TryLoadMatchingStateFile(legacyLastGoodPath, expectedSchemaHash, out var legacyLastGoodState))
+        if (legacyLastGoodPath != null)
         {
-            candidates.Add((legacyLastGoodState, legacyLastGoodPath));
+            if (TryLoadMatchingStateFile(legacyLastGoodPath, expectedSchemaHash, out var legacyLastGoodState, out var legacyLastGoodHashMismatch))
+            {
+                candidates.Add((legacyLastGoodState, legacyLastGoodPath));
+            }
+            else
+            {
+                hashMismatchFound |= legacyLastGoodHashMismatch;
+            }
         }
 
         if (candidates.Count == 0)
         {
+            if (throwIfOnlyHashInvalid && hashMismatchFound)
+            {
+                throw CreateStateHashMismatchException();
+            }
+
             return false;
         }
 
@@ -417,17 +475,33 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
     private bool TryLoadMatchingStateFile(
         string path,
         string expectedSchemaHash,
-        out ProjectVariableStateFile state)
+        out ProjectVariableStateFile state,
+        out bool stateHashMismatch)
     {
         state = new ProjectVariableStateFile();
+        stateHashMismatch = false;
         if (!_fileSystem.FileExists(path))
         {
             return false;
         }
 
         var json = _fileSystem.ReadAllText(path, Encoding.UTF8);
-        return TryDeserialize(json, out state) &&
-            string.Equals(state.SchemaHash, expectedSchemaHash, StringComparison.Ordinal);
+        if (!TryDeserialize(json, out state) ||
+            !string.Equals(state.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        try
+        {
+            ValidateOrComputeStateHash(state);
+            return true;
+        }
+        catch (InvalidOperationException ex) when (IsStateHashMismatch(ex))
+        {
+            stateHashMismatch = true;
+            return false;
+        }
     }
 
     private void MigrateLegacyState(
@@ -458,7 +532,14 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
         if (TryDeserialize(legacyLastGoodJson, out var legacyLastGoodState) &&
             string.Equals(legacyLastGoodState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
         {
-            _fileSystem.Copy(legacyLastGoodPath, GetLastGoodPath(scopeId), overwrite: true);
+            try
+            {
+                ValidateOrComputeStateHash(legacyLastGoodState);
+                _fileSystem.Copy(legacyLastGoodPath, GetLastGoodPath(scopeId), overwrite: true);
+            }
+            catch (InvalidOperationException ex) when (IsStateHashMismatch(ex))
+            {
+            }
         }
     }
 
@@ -484,7 +565,8 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
         var tempJson = _fileSystem.ReadAllText(tempPath, Encoding.UTF8);
         if (!TryDeserialize(tempJson, out var tempState) ||
-            !string.Equals(tempState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal))
+            !string.Equals(tempState.SchemaHash, expectedSchemaHash, StringComparison.Ordinal) ||
+            !IsStateHashValid(tempState))
         {
             _fileSystem.DeleteFile(tempPath);
             WriteRecoveryJournal(
@@ -592,12 +674,7 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
 
     private static ProjectVariableStateMetadata ToMetadata(ProjectVariableStateFile state)
     {
-        var actualStateHash = ComputeStateHash(state.SchemaHash, state.Variables);
-        if (!string.IsNullOrWhiteSpace(state.StateHash) &&
-            !string.Equals(state.StateHash, actualStateHash, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("GV041: project global variable state hash does not match persisted content.");
-        }
+        var actualStateHash = ValidateOrComputeStateHash(state);
 
         return new ProjectVariableStateMetadata(
             state.SchemaVersion,
@@ -608,6 +685,37 @@ public sealed class JsonFileProjectVariableStateStore : IProjectVariableStateSto
             state.SavedAtUtc,
             state.SaveId);
     }
+
+    private static string ValidateOrComputeStateHash(ProjectVariableStateFile state)
+    {
+        var actualStateHash = ComputeStateHash(state.SchemaHash, state.Variables);
+        if (!string.IsNullOrWhiteSpace(state.StateHash) &&
+            !string.Equals(state.StateHash, actualStateHash, StringComparison.Ordinal))
+        {
+            throw CreateStateHashMismatchException();
+        }
+
+        return actualStateHash;
+    }
+
+    private static bool IsStateHashValid(ProjectVariableStateFile state)
+    {
+        try
+        {
+            ValidateOrComputeStateHash(state);
+            return true;
+        }
+        catch (InvalidOperationException ex) when (IsStateHashMismatch(ex))
+        {
+            return false;
+        }
+    }
+
+    private static InvalidOperationException CreateStateHashMismatchException() =>
+        new("GV041: project global variable state hash does not match persisted content.");
+
+    private static bool IsStateHashMismatch(InvalidOperationException ex) =>
+        ex.Message.StartsWith("GV041:", StringComparison.Ordinal);
 
     private static string ComputeStateHash(string schemaHash, IReadOnlyList<ProjectVariableStateFileEntry> entries) =>
         ProjectVariableStateHash.Compute(

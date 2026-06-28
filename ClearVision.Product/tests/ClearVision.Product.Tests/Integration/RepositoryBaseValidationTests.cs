@@ -1,15 +1,20 @@
 using ClearVision.Product.Core.Entities;
+using ClearVision.Product.Core.Interfaces;
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Repositories;
+using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace ClearVision.Product.Tests.Integration;
 
 public sealed class RepositoryBaseValidationTests : IDisposable
 {
     private readonly SqliteConnection _connection;
+    private readonly DbContextOptions<VisionDbContext> _options;
     private readonly VisionDbContext _context;
     private readonly ProjectRepository _repository;
 
@@ -18,11 +23,11 @@ public sealed class RepositoryBaseValidationTests : IDisposable
         _connection = new SqliteConnection("DataSource=:memory:");
         _connection.Open();
 
-        var options = new DbContextOptionsBuilder<VisionDbContext>()
+        _options = new DbContextOptionsBuilder<VisionDbContext>()
             .UseSqlite(_connection)
             .Options;
 
-        _context = new VisionDbContext(options);
+        _context = new VisionDbContext(_options);
         _context.Database.EnsureCreated();
 
         _repository = new ProjectRepository(_context);
@@ -53,6 +58,75 @@ public sealed class RepositoryBaseValidationTests : IDisposable
 
         await act.Should().ThrowAsync<ArgumentNullException>()
             .WithParameterName("entity");
+    }
+
+    [Fact]
+    public async Task GetByIdFreshAsync_WhenContextTracksOldProject_ShouldReturnDatabaseState()
+    {
+        var project = new Project("demo");
+        await _repository.AddAsync(project);
+        var tracked = await _repository.GetByIdAsync(project.Id);
+        tracked.Should().NotBeNull();
+        tracked!.PersistenceRevision.Should().Be(0);
+        await using (var updateContext = new VisionDbContext(_options))
+        {
+            var updateRepository = new ProjectRepository(updateContext);
+            var latest = await updateRepository.GetByIdAsync(project.Id);
+            latest.Should().NotBeNull();
+            latest!.SetPersistenceRevision(1);
+            await updateRepository.UpdateAsync(latest);
+        }
+
+        var staleRead = await _repository.GetByIdAsync(project.Id);
+        var freshRead = await _repository.GetByIdFreshAsync(project.Id);
+
+        staleRead.Should().BeSameAs(tracked);
+        staleRead!.PersistenceRevision.Should().Be(0);
+        freshRead.Should().NotBeNull();
+        freshRead.Should().NotBeSameAs(tracked);
+        freshRead!.PersistenceRevision.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ProjectServiceLists_WhenContextTracksOldProject_ShouldMapFreshEntityInsideProjectGate()
+    {
+        ProjectSaveCoordinator.ResetStaticStateForTests();
+        try
+        {
+            var project = new Project("demo");
+            project.RecordOpen();
+            await _repository.AddAsync(project);
+            var tracked = await _repository.GetByIdAsync(project.Id);
+            tracked.Should().NotBeNull();
+            tracked!.PersistenceRevision.Should().Be(0);
+            await using (var updateContext = new VisionDbContext(_options))
+            {
+                var updateRepository = new ProjectRepository(updateContext);
+                var latest = await updateRepository.GetByIdAsync(project.Id);
+                latest.Should().NotBeNull();
+                latest!.SetPersistenceRevision(1);
+                await updateRepository.UpdateAsync(latest);
+            }
+
+            var staleRead = await _repository.GetByIdAsync(project.Id);
+            staleRead.Should().BeSameAs(tracked);
+            staleRead!.PersistenceRevision.Should().Be(0);
+            var flowStorage = Substitute.For<IProjectFlowStorage>();
+            flowStorage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
+            var service = new ProjectService(_repository, flowStorage, new OperatorFactory());
+
+            var all = (await service.GetAllAsync()).ToList();
+            var search = (await service.SearchAsync("demo")).ToList();
+            var recent = (await service.GetRecentlyOpenedAsync()).ToList();
+
+            all.Should().ContainSingle(item => item.Id == project.Id).Which.PersistenceRevision.Should().Be(1);
+            search.Should().ContainSingle(item => item.Id == project.Id).Which.PersistenceRevision.Should().Be(1);
+            recent.Should().ContainSingle(item => item.Id == project.Id).Which.PersistenceRevision.Should().Be(1);
+        }
+        finally
+        {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
+        }
     }
 
     [Fact]

@@ -851,6 +851,8 @@ public sealed class ProjectSaveCoordinatorTests
 
         public Task<Project?> GetByIdAsync(Guid id) => Task.FromResult(_projects.GetValueOrDefault(id));
 
+        public Task<Project?> GetByIdFreshAsync(Guid id) => GetByIdAsync(id);
+
         public Task<IEnumerable<Project>> GetAllAsync() => Task.FromResult<IEnumerable<Project>>(_projects.Values);
 
         public Task<IEnumerable<Project>> FindAsync(Expression<Func<Project, bool>> predicate) =>

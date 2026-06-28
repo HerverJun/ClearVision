@@ -12,6 +12,11 @@ namespace ClearVision.Product.Core.Interfaces;
 public interface IProjectRepository : IRepository<Project>
 {
     /// <summary>
+    /// Re-read a project from the database without returning an already tracked instance.
+    /// </summary>
+    Task<Project?> GetByIdFreshAsync(Guid id);
+
+    /// <summary>
     /// 根据名称查找工程
     /// </summary>
     Task<Project?> GetByNameAsync(string name);
