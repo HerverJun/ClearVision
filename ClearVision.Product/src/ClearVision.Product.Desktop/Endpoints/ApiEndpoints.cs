@@ -133,8 +133,15 @@ public static class ApiEndpoints
         // 鑾峰彇宸ョ▼璇︽儏
         app.MapGet("/api/projects/{id:guid}", async (Guid id, ProjectService service) =>
         {
-            var project = await service.GetByIdAsync(id);
-            return project != null ? Results.Ok(project) : Results.NotFound();
+            try
+            {
+                var project = await service.GetByIdAsync(id);
+                return project != null ? Results.Ok(project) : Results.NotFound();
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
+            }
         });
 
         // 鍒涘缓宸ョ▼
@@ -229,10 +236,21 @@ public static class ApiEndpoints
             }
         });
 
-        app.MapGet("/api/projects/{id:guid}/global-variables", async (Guid id, ProjectService service) =>
+        app.MapGet("/api/projects/{id:guid}/global-variables", async (
+            Guid id,
+            ProjectService service,
+            IServiceProvider serviceProvider) =>
         {
-            var project = await service.GetByIdUnderProjectAccessAsync(id);
-            return project != null ? Results.Ok(project.GlobalVariables) : Results.NotFound();
+            try
+            {
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                return project != null ? Results.Ok(project.GlobalVariables) : Results.NotFound();
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
+            }
         });
 
         app.MapPut("/api/projects/{id:guid}/global-variables", async (
@@ -264,15 +282,22 @@ public static class ApiEndpoints
             ProjectVariableSessionRegistry sessions,
             IServiceProvider serviceProvider) =>
         {
-            await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
-            var project = await service.GetByIdUnderProjectAccessAsync(id);
-            if (project == null)
+            try
             {
-                return Results.NotFound();
-            }
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                if (project == null)
+                {
+                    return Results.NotFound();
+                }
 
-            var session = sessions.GetOrCreate(project);
-            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
+                var session = sessions.GetOrCreate(project);
+                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, session));
+            }
+            catch (Exception ex)
+            {
+                return ToBadRequest(ex);
+            }
         });
 
         app.MapPut("/api/projects/{id:guid}/global-variable-values/{variableId:guid}", async (
@@ -290,26 +315,26 @@ public static class ApiEndpoints
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
 
-            await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
-            var project = await service.GetByIdUnderProjectAccessAsync(id);
-            if (project == null)
-            {
-                return Results.NotFound();
-            }
-
-            var session = sessions.GetOrCreate(project);
-            if (!session.TryGetDefinition(variableId, out var definition))
-            {
-                return Results.NotFound(new { Error = "Variable not found." });
-            }
-
-            if (!definition.ManualWriteAllowed)
-            {
-                return Results.BadRequest(new { Code = "GV030", Error = "Manual write is not allowed for this variable." });
-            }
-
             try
             {
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                if (project == null)
+                {
+                    return Results.NotFound();
+                }
+
+                var session = sessions.GetOrCreate(project);
+                if (!session.TryGetDefinition(variableId, out var definition))
+                {
+                    return Results.NotFound(new { Error = "Variable not found." });
+                }
+
+                if (!definition.ManualWriteAllowed)
+                {
+                    return Results.BadRequest(new { Code = "GV030", Error = "Manual write is not allowed for this variable." });
+                }
+
                 if (!sessions.TryMutateAndPersist(
                         id,
                         project.GlobalVariables,
@@ -345,38 +370,45 @@ public static class ApiEndpoints
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
 
-            await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
-            var project = await service.GetByIdUnderProjectAccessAsync(id);
-            if (project == null)
+            try
             {
-                return Results.NotFound();
-            }
-
-            var blockedVariable = project.GlobalVariables.Variables.FirstOrDefault(variable => !variable.ManualWriteAllowed);
-            if (blockedVariable != null)
-            {
-                return Results.BadRequest(new
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                if (project == null)
                 {
-                    Code = "GV030",
-                    Error = "Manual reset is not allowed for one or more variables.",
-                    blockedVariable.Id,
-                    blockedVariable.Name
-                });
-            }
+                    return Results.NotFound();
+                }
 
-            var request = await ReadOptionalJsonBodyAsync<ProjectVariableResetAllRequest>(context);
-            if (!sessions.TryMutateAndPersist(
-                    id,
-                    project.GlobalVariables,
-                    candidate => candidate.ResetAll(ProjectVariableUpdatedBy.Reset),
-                    request?.ExpectedVersions?.Count > 0 ? request.ExpectedVersions : null,
-                    out var updatedSession,
-                    out var error))
+                var blockedVariable = project.GlobalVariables.Variables.FirstOrDefault(variable => !variable.ManualWriteAllowed);
+                if (blockedVariable != null)
+                {
+                    return Results.BadRequest(new
+                    {
+                        Code = "GV030",
+                        Error = "Manual reset is not allowed for one or more variables.",
+                        blockedVariable.Id,
+                        blockedVariable.Name
+                    });
+                }
+
+                var request = await ReadOptionalJsonBodyAsync<ProjectVariableResetAllRequest>(context);
+                if (!sessions.TryMutateAndPersist(
+                        id,
+                        project.GlobalVariables,
+                        candidate => candidate.ResetAll(ProjectVariableUpdatedBy.Reset),
+                        request?.ExpectedVersions?.Count > 0 ? request.ExpectedVersions : null,
+                        out var updatedSession,
+                        out var error))
+                {
+                    return ToProjectVariableMutationFailure(error);
+                }
+
+                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
+            }
+            catch (Exception ex)
             {
-                return ToProjectVariableMutationFailure(error);
+                return ToBadRequest(ex);
             }
-
-            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
         });
 
         app.MapPost("/api/projects/{id:guid}/global-variable-values/{variableId:guid}/reset", async (
@@ -394,39 +426,46 @@ public static class ApiEndpoints
                 return Results.Conflict(new { Code = "GV031", Error = "Project is currently running." });
             }
 
-            await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
-            var project = await service.GetByIdAsync(id);
-            if (project == null)
+            try
             {
-                return Results.NotFound();
-            }
+                await using var projectAccess = await AcquireProjectAccessAsync(serviceProvider, id);
+                var project = await service.GetByIdUnderProjectAccessAsync(id);
+                if (project == null)
+                {
+                    return Results.NotFound();
+                }
 
-            var session = sessions.GetOrCreate(project);
-            if (!session.TryGetDefinition(variableId, out var definition))
+                var session = sessions.GetOrCreate(project);
+                if (!session.TryGetDefinition(variableId, out var definition))
+                {
+                    return Results.NotFound(new { Error = "Variable not found." });
+                }
+
+                if (!definition.ManualWriteAllowed)
+                {
+                    return Results.BadRequest(new { Code = "GV030", Error = "Manual reset is not allowed for this variable." });
+                }
+
+                var request = await ReadOptionalJsonBodyAsync<ProjectVariableResetRequest>(context);
+                if (!sessions.TryMutateAndPersist(
+                        id,
+                        project.GlobalVariables,
+                        candidate => candidate.Reset(variableId, ProjectVariableUpdatedBy.Reset),
+                        request?.ExpectedVersion.HasValue == true
+                            ? new Dictionary<Guid, long> { [variableId] = request.ExpectedVersion.Value }
+                            : null,
+                        out var updatedSession,
+                        out var error))
+                {
+                    return ToProjectVariableMutationFailure(error);
+                }
+
+                return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
+            }
+            catch (Exception ex)
             {
-                return Results.NotFound(new { Error = "Variable not found." });
+                return ToBadRequest(ex);
             }
-
-            if (!definition.ManualWriteAllowed)
-            {
-                return Results.BadRequest(new { Code = "GV030", Error = "Manual reset is not allowed for this variable." });
-            }
-
-            var request = await ReadOptionalJsonBodyAsync<ProjectVariableResetRequest>(context);
-            if (!sessions.TryMutateAndPersist(
-                    id,
-                    project.GlobalVariables,
-                    candidate => candidate.Reset(variableId, ProjectVariableUpdatedBy.Reset),
-                    request?.ExpectedVersion.HasValue == true
-                        ? new Dictionary<Guid, long> { [variableId] = request.ExpectedVersion.Value }
-                        : null,
-                    out var updatedSession,
-                    out var error))
-            {
-                return ToProjectVariableMutationFailure(error);
-            }
-
-            return Results.Ok(ToProjectVariableValueDtos(project.GlobalVariables, updatedSession));
         });
 
         app.MapPost("/api/projects/{id:guid}/runtime-package/export", async (
@@ -542,6 +581,11 @@ public static class ApiEndpoints
             }
             catch (InvalidOperationException ex)
             {
+                if (TryParseStableError(ex.Message, out var code, out var message))
+                {
+                    return Results.BadRequest(new { Code = code, Error = message });
+                }
+
                 return Results.Conflict(new { Code = "GV031", Error = ex.Message });
             }
             catch (Exception ex)
@@ -647,6 +691,11 @@ public static class ApiEndpoints
             }
             catch (InvalidOperationException ex)
             {
+                if (TryParseStableError(ex.Message, out var code, out var message))
+                {
+                    return Results.BadRequest(new { Code = code, Error = message });
+                }
+
                 return Results.Conflict(new { Error = ex.Message });
             }
             catch (Exception ex)

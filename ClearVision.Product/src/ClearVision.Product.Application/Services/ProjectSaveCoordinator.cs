@@ -413,7 +413,7 @@ public sealed class ProjectSaveCoordinator
             }
             else if (metadata == null ||
                 metadata.PersistenceRevision == manifest.FromRevision ||
-                metadata.PersistenceRevision == 0)
+                (metadata.PersistenceRevision == 0 && manifest.FromRevision == 0))
             {
                 if (!_projectVariableSessions.TryPersistMigrationCandidate(
                         manifest.ProjectId,
@@ -530,6 +530,19 @@ public sealed class ProjectSaveCoordinator
         var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         source.SetResult();
         return source;
+    }
+
+    internal static void ResetStaticStateForTests()
+    {
+        ProjectGates.Clear();
+        RecoveryRequired.Clear();
+        ProjectStates.Clear();
+        lock (StartupRecoveryGate)
+        {
+            StartupRecoveryReady = CreateCompletedStartupBarrier();
+            StartupRecoveryCompleted = true;
+            StartupRecoveryHasRun = false;
+        }
     }
 
     private static void VerifyProjectAtCandidate(Project project, ProjectCandidate candidate)

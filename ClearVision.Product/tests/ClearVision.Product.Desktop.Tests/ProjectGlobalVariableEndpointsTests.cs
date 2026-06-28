@@ -212,6 +212,46 @@ public sealed class ProjectGlobalVariableEndpointsTests
         oldSession.TryGetValue(variableId, out var current).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(current).Should().Be(9L);
         await host.Repository.Received(1).UpdateAsync(host.Project);
+
+        using var projectRead = await host.Client.GetAsync($"/api/projects/{host.Project.Id}");
+        using var schemaRead = await host.Client.GetAsync($"/api/projects/{host.Project.Id}/global-variables");
+        using var valuesRead = await host.Client.GetAsync($"/api/projects/{host.Project.Id}/global-variable-values");
+        using var valueWrite = await host.Client.PutAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}",
+            new { value = 10L });
+        using var resetOne = await host.Client.PostAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/{variableId}/reset",
+            null);
+        using var resetAll = await host.Client.PostAsync(
+            $"/api/projects/{host.Project.Id}/global-variable-values/reset",
+            null);
+        using var export = await host.Client.PostAsJsonAsync(
+            $"/api/projects/{host.Project.Id}/runtime-package/export",
+            new ApiEndpoints.ExportRuntimePackageRequest
+            {
+                RegisterForStationDeployment = false
+            });
+        projectRead.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        schemaRead.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        valuesRead.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        valueWrite.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        resetOne.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        resetAll.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        export.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var projectBody = await projectRead.Content.ReadFromJsonAsync<JsonElement>();
+        var readBody = await schemaRead.Content.ReadFromJsonAsync<JsonElement>();
+        var valuesBody = await valuesRead.Content.ReadFromJsonAsync<JsonElement>();
+        var writeBody = await valueWrite.Content.ReadFromJsonAsync<JsonElement>();
+        var resetOneBody = await resetOne.Content.ReadFromJsonAsync<JsonElement>();
+        var resetAllBody = await resetAll.Content.ReadFromJsonAsync<JsonElement>();
+        var exportBody = await export.Content.ReadFromJsonAsync<JsonElement>();
+        projectBody.GetProperty("code").GetString().Should().Be("PSV001");
+        readBody.GetProperty("code").GetString().Should().Be("PSV001");
+        valuesBody.GetProperty("code").GetString().Should().Be("PSV001");
+        writeBody.GetProperty("code").GetString().Should().Be("PSV001");
+        resetOneBody.GetProperty("code").GetString().Should().Be("PSV001");
+        resetAllBody.GetProperty("code").GetString().Should().Be("PSV001");
+        exportBody.GetProperty("code").GetString().Should().Be("PSV001");
     }
 
     [Fact]
@@ -511,6 +551,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             RuntimeStatus? status = null,
             IProjectVariableStateStore? stateStore = null)
         {
+            ProjectSaveCoordinator.ResetStaticStateForTests();
             var project = new Project("demo");
             project.UpdateGlobalVariables(schema);
             var repository = Substitute.For<IProjectRepository>();
@@ -555,6 +596,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             builder.Services.AddSingleton(registry);
             builder.Services.AddSingleton(coordinator);
             builder.Services.AddSingleton<ILogger<ProjectService>>(NullLogger<ProjectService>.Instance);
+            builder.Services.AddScoped<ProjectSaveCoordinator>();
             builder.Services.AddScoped(sp => new RuntimePackageExporter(
                 sp.GetRequiredService<IOperatorFactory>(),
                 NullLogger<RuntimePackageExporter>.Instance));
@@ -584,6 +626,7 @@ public sealed class ProjectGlobalVariableEndpointsTests
             Client.Dispose();
             await _app.StopAsync();
             await _app.DisposeAsync();
+            ProjectSaveCoordinator.ResetStaticStateForTests();
             if (_ownedStateStoreRoot != null && Directory.Exists(_ownedStateStoreRoot))
             {
                 Directory.Delete(_ownedStateStoreRoot, recursive: true);
