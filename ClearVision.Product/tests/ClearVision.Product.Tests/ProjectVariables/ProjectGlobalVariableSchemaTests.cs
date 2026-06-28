@@ -168,6 +168,68 @@ public sealed class ProjectGlobalVariableSchemaTests
     }
 
     [Fact]
+    public void BuildDependencyEdges_WhenOnlyVariableOperatorsExist_AddsWriteToReadEdgeAndEnablesCanonicalGraph()
+    {
+        var variableId = Guid.NewGuid();
+        var read = CreateProjectVariableOperator(OperatorType.VariableRead, variableId, "Read");
+        var write = CreateProjectVariableOperator(OperatorType.VariableWrite, variableId, "Write");
+        var flow = new OperatorFlow("variable-operators-only");
+        flow.AddOperator(read);
+        flow.AddOperator(write);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.count", ProjectGlobalVariableValueType.Int64, 0, variableId)]
+        };
+
+        var edges = ProjectGlobalVariableFlowValidator.BuildDependencyEdges(flow, schema, [read, write]);
+
+        ProjectGlobalVariableFlowValidator.HasProjectVariableSemantics(flow, schema).Should().BeTrue();
+        ProjectGlobalVariableFlowValidator.HasProjectVariableWriteCapability(flow, schema).Should().BeTrue();
+        edges.Should().Contain(edge =>
+            edge.SourceOperatorId == write.Id &&
+            edge.TargetOperatorId == read.Id &&
+            edge.VariableName == "stats.count" &&
+            edge.Kind == ProjectVariableFlowEdgeKind.GlobalVariable);
+    }
+
+    [Fact]
+    public void BuildDependencyEdges_WhenVariableIncrementFeedsTargetBinding_AddsIncrementToTargetEdge()
+    {
+        var variableId = Guid.NewGuid();
+        var targetParameterId = Guid.NewGuid();
+        var increment = CreateProjectVariableOperator(OperatorType.VariableIncrement, variableId, "Increment");
+        var target = new Operator(Guid.NewGuid(), "Target", OperatorType.ResultJudgment, 10, 0);
+        target.AddParameter(new Parameter(targetParameterId, "ExpectedCount", "ExpectedCount", "", "int", 0));
+        var flow = new OperatorFlow("increment-target");
+        flow.AddOperator(increment);
+        flow.AddOperator(target);
+        var schema = new ProjectGlobalVariableSchema
+        {
+            Variables = [Variable("stats.count", ProjectGlobalVariableValueType.Int64, 0, variableId)],
+            TargetBindings =
+            [
+                new ProjectGlobalVariableTargetBinding
+                {
+                    Id = Guid.NewGuid(),
+                    VariableId = variableId,
+                    OperatorId = target.Id,
+                    ParameterId = targetParameterId,
+                    OperatorName = target.Name,
+                    ParameterName = "ExpectedCount"
+                }
+            ]
+        };
+
+        var edges = ProjectGlobalVariableFlowValidator.BuildDependencyEdges(flow, schema, [increment, target]);
+
+        edges.Should().Contain(edge =>
+            edge.SourceOperatorId == increment.Id &&
+            edge.TargetOperatorId == target.Id &&
+            edge.VariableName == "stats.count" &&
+            edge.Kind == ProjectVariableFlowEdgeKind.GlobalVariable);
+    }
+
+    [Fact]
     public void Validate_WhenStringVariableTargetsNumericParameter_ReturnsDiagnostic()
     {
         var variableId = Guid.NewGuid();
@@ -797,5 +859,15 @@ public sealed class ProjectGlobalVariableSchemaTests
             ValueType = type,
             InitialValue = JsonSerializer.SerializeToElement(initialValue)
         };
+    }
+
+    private static Operator CreateProjectVariableOperator(OperatorType type, Guid variableId, string name)
+    {
+        var op = new Operator(Guid.NewGuid(), name, type, 0, 0);
+        op.AddParameter(new Parameter(Guid.NewGuid(), "Scope", "Scope", "", "enum", "Project"));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "VariableId", "VariableId", "", "string", variableId.ToString()));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "VariableName", "VariableName", "", "string", "stats.count"));
+        op.AddParameter(new Parameter(Guid.NewGuid(), "DataType", "DataType", "", "enum", "Int"));
+        return op;
     }
 }

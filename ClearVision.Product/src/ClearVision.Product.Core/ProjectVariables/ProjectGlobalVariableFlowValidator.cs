@@ -81,6 +81,36 @@ public static class ProjectGlobalVariableFlowValidator
         return new ProjectVariableReferenceIndex(references);
     }
 
+    public static bool HasProjectVariableSemantics(OperatorFlow flow, ProjectGlobalVariableSchema? schema)
+    {
+        ArgumentNullException.ThrowIfNull(flow);
+        schema ??= new ProjectGlobalVariableSchema();
+
+        var operatorIds = flow.Operators.Select(op => op.Id).ToHashSet();
+        if (schema.SourceBindings.Any(binding => operatorIds.Contains(binding.OperatorId)) ||
+            schema.TargetBindings.Any(binding => operatorIds.Contains(binding.OperatorId)))
+        {
+            return true;
+        }
+
+        return BuildReferenceIndex(flow).References.Count > 0;
+    }
+
+    public static bool HasProjectVariableWriteCapability(OperatorFlow flow, ProjectGlobalVariableSchema? schema)
+    {
+        ArgumentNullException.ThrowIfNull(flow);
+        schema ??= new ProjectGlobalVariableSchema();
+
+        var operatorIds = flow.Operators.Select(op => op.Id).ToHashSet();
+        if (schema.SourceBindings.Any(binding => operatorIds.Contains(binding.OperatorId)))
+        {
+            return true;
+        }
+
+        return BuildReferenceIndex(flow).References.Any(reference =>
+            reference.OperatorType is OperatorType.VariableWrite or OperatorType.VariableIncrement);
+    }
+
     public static bool TryBuildExecutionOrder(
         OperatorFlow flow,
         ProjectGlobalVariableSchema? schema,

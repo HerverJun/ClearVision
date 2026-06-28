@@ -73,7 +73,8 @@ public sealed class FlowExecutionProjectVariableBindingTests
         var context = new ProjectVariableExecutionContext(
             session,
             ProjectVariableBindingIndex.Build(schema),
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
 
         var sourceExecutor = Substitute.For<IOperatorExecutor>();
         sourceExecutor.OperatorType.Returns(OperatorType.Thresholding);
@@ -269,6 +270,41 @@ public sealed class FlowExecutionProjectVariableBindingTests
     }
 
     [Fact]
+    public async Task ExecuteFlowAsync_WhenFormalWriteMissingCommitHandler_ShouldRejectBeforeFirstOperator()
+    {
+        var variableId = Guid.NewGuid();
+        var accessor = new ProjectVariableExecutionContextAccessor();
+        var write = CreateProjectVariableWriteOperator(variableId, 12);
+        var flow = new OperatorFlow("formal-write-without-commit-handler");
+        flow.AddOperator(write);
+        var schema = CreateSingleInt64Schema(variableId, 1L);
+        using var session = new ProjectVariableSession(schema);
+        session.SetValue(variableId, 4L, ProjectVariableUpdatedBy.StudioManual);
+        var context = new ProjectVariableExecutionContext(
+            session,
+            ProjectVariableBindingIndex.Build(schema),
+            Guid.NewGuid());
+        var writeExecutor = new CountingExecutor(new VariableWriteOperator(
+            NullLogger<VariableWriteOperator>.Instance,
+            new VariableContext(),
+            accessor));
+        using var service = new FlowExecutionService(
+            [writeExecutor],
+            NullLogger<FlowExecutionService>.Instance,
+            new VariableContext(),
+            accessor);
+
+        var result = await service.ExecuteFlowAsync(flow, null, context);
+
+        result.IsSuccess.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("GV040");
+        writeExecutor.ExecuteCount.Should().Be(0);
+        session.TryGetSnapshot(variableId, out var formal).Should().BeTrue();
+        ProjectVariableValueConverter.ToObject(formal.Value).Should().Be(4L);
+        formal.Version.Should().Be(1);
+    }
+
+    [Fact]
     public async Task ExecuteFlowAsync_WhenVariableIncrementSucceedsButLaterOperatorFails_ShouldDiscardWorkingCopy()
     {
         var variableId = Guid.NewGuid();
@@ -284,7 +320,8 @@ public sealed class FlowExecutionProjectVariableBindingTests
         var context = new ProjectVariableExecutionContext(
             session,
             ProjectVariableBindingIndex.Build(schema),
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
         var failingExecutor = Substitute.For<IOperatorExecutor>();
         failingExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
         failingExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
@@ -432,7 +469,8 @@ public sealed class FlowExecutionProjectVariableBindingTests
         var context = new ProjectVariableExecutionContext(
             session,
             ProjectVariableBindingIndex.Build(schema),
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
         var concurrentExecutor = Substitute.For<IOperatorExecutor>();
         concurrentExecutor.OperatorType.Returns(OperatorType.ResultJudgment);
         concurrentExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
@@ -523,7 +561,8 @@ public sealed class FlowExecutionProjectVariableBindingTests
         var context = new ProjectVariableExecutionContext(
             session,
             ProjectVariableBindingIndex.Build(schema),
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
         var sourceExecutor = Substitute.For<IOperatorExecutor>();
         sourceExecutor.OperatorType.Returns(OperatorType.Thresholding);
         sourceExecutor.ValidateParameters(Arg.Any<Operator>()).Returns(ValidationResult.Valid());
@@ -633,7 +672,8 @@ public sealed class FlowExecutionProjectVariableBindingTests
         var context = new ProjectVariableExecutionContext(
             session,
             ProjectVariableBindingIndex.Build(schema),
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
         var clock = Stopwatch.StartNew();
         long sourceStartedAt = -1;
         long sourceCompletedAt = -1;
@@ -1010,7 +1050,8 @@ public sealed class FlowExecutionProjectVariableBindingTests
         var context = new ProjectVariableExecutionContext(
             session,
             ProjectVariableBindingIndex.Build(schema),
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            commitHandler: CreateInMemoryCommitHandler(session));
         using var service = new FlowExecutionService(
             [
                 new VariableReadOperator(
@@ -1052,6 +1093,14 @@ public sealed class FlowExecutionProjectVariableBindingTests
                 }
             ]
         };
+    }
+
+    private static ProjectVariableCommitHandler CreateInMemoryCommitHandler(IProjectVariableSession session)
+    {
+        return (workingSession, expectedVersions) =>
+            session.TryCommitFrom(workingSession, expectedVersions, out var error)
+                ? ProjectVariableCommitResult.Success()
+                : ProjectVariableCommitResult.Failure(error);
     }
 
     private static ProjectGlobalVariableSchema CreateSingleDoubleSchema(Guid variableId, double initialValue)

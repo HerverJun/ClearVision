@@ -637,6 +637,16 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         CancellationToken cancellationToken = default)
     {
         var authoritativeSession = projectVariables.Session;
+        var requiresAuthoritativeCommit = ProjectGlobalVariableFlowValidator.HasProjectVariableWriteCapability(
+            flow,
+            authoritativeSession.Schema);
+        if (!projectVariables.IsPreview &&
+            requiresAuthoritativeCommit &&
+            projectVariables.CommitHandler == null)
+        {
+            return CreateProjectVariableCommitCapabilityFailureResult();
+        }
+
         var expectedVersions = authoritativeSession.GetSnapshots()
             .ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
         using var workingSession = authoritativeSession.CreateSnapshotClone();
@@ -648,7 +658,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         using var scope = _projectVariableContextAccessor.BeginScope(effectiveContext);
         var result = await ExecuteFlowAsync(flow, inputData, enableParallel, cancellationToken);
-        if (!projectVariables.IsPreview && result.IsSuccess && !result.WasShortCircuited)
+        if (!projectVariables.IsPreview && requiresAuthoritativeCommit && result.IsSuccess && !result.WasShortCircuited)
         {
             var commitResult = CommitProjectVariableChanges(projectVariables, authoritativeSession, workingSession, expectedVersions);
             if (!commitResult.Succeeded)
@@ -660,6 +670,12 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         return result;
     }
+
+    private static FlowExecutionResult CreateProjectVariableCommitCapabilityFailureResult() => new()
+    {
+        IsSuccess = false,
+        ErrorMessage = "GV040: project global variable formal writes require a persistence-capable commit handler before execution."
+    };
 
     private static ProjectVariableCommitResult CommitProjectVariableChanges(
         ProjectVariableExecutionContext projectVariables,
@@ -679,9 +695,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
         }
 
-        return authoritativeSession.TryCommitFrom(workingSession, expectedVersions, out var commitError)
-            ? ProjectVariableCommitResult.Success()
-            : ProjectVariableCommitResult.Failure(commitError);
+        return ProjectVariableCommitResult.Failure(
+            "GV040: project global variable formal writes require a persistence-capable commit handler before execution.");
     }
 
     /// <summary>
@@ -795,7 +810,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         ProjectVariableExecutionContext? projectVariables)
     {
         var baseOrder = plan.ExecutionOrder;
-        if (projectVariables == null || !projectVariables.BindingIndex.HasBindings)
+        if (projectVariables == null ||
+            !ProjectGlobalVariableFlowValidator.HasProjectVariableSemantics(plan.Flow, projectVariables.Session.Schema))
         {
             return baseOrder.ToList();
         }
@@ -819,7 +835,8 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         ProjectVariableExecutionContext? projectVariables,
         IReadOnlyList<Operator> executionOrder)
     {
-        return projectVariables == null || !projectVariables.BindingIndex.HasBindings
+        return projectVariables == null ||
+            !ProjectGlobalVariableFlowValidator.HasProjectVariableSemantics(plan.Flow, projectVariables.Session.Schema)
             ? plan.ExecutionLayers
             : BuildExecutionLayers(executionOrder, plan.Flow, projectVariables.Session.Schema);
     }
@@ -1240,7 +1257,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             .ToList();
         if (currentLayer.Count == 0)
         {
-            currentLayer = executionOrder.ToList();
+            throw new InvalidOperationException("GV024: Project global variable bindings create an execution cycle.");
         }
 
         while (currentLayer.Count > 0)
@@ -1268,16 +1285,15 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
             if (nextLayer.Count == 0)
             {
-                nextLayer = executionOrder
-                    .Where(op => !scheduled.Contains(op.Id))
-                    .ToList();
-                if (nextLayer.Count == 0)
-                {
-                    break;
-                }
+                break;
             }
 
             currentLayer = nextLayer;
+        }
+
+        if (scheduled.Count != executionOrder.Count)
+        {
+            throw new InvalidOperationException("GV024: Project global variable bindings create an execution cycle.");
         }
 
         return layers;
@@ -2098,6 +2114,21 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         CancellationToken cancellationToken = default)
     {
         var authoritativeSession = projectVariables.Session;
+        var requiresAuthoritativeCommit = ProjectGlobalVariableFlowValidator.HasProjectVariableWriteCapability(
+            flow,
+            authoritativeSession.Schema);
+        if (!projectVariables.IsPreview &&
+            requiresAuthoritativeCommit &&
+            projectVariables.CommitHandler == null)
+        {
+            return new FlowDebugExecutionResult
+            {
+                DebugSessionId = options.DebugSessionId,
+                IsSuccess = false,
+                ErrorMessage = "GV040: project global variable formal writes require a persistence-capable commit handler before execution."
+            };
+        }
+
         var expectedVersions = authoritativeSession.GetSnapshots()
             .ToDictionary(snapshot => snapshot.VariableId, snapshot => snapshot.Version);
         using var workingSession = authoritativeSession.CreateSnapshotClone();
@@ -2110,6 +2141,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         using var scope = _projectVariableContextAccessor.BeginScope(effectiveContext);
         var result = await ExecuteFlowDebugAsync(flow, options, inputData, cancellationToken);
         if (!projectVariables.IsPreview &&
+            requiresAuthoritativeCommit &&
             result.IsSuccess &&
             !result.WasShortCircuited &&
             !result.BreakpointHit &&

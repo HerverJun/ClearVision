@@ -362,12 +362,15 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var projectVariableSessions = scope.ServiceProvider.GetService<ProjectVariableSessionRegistry>();
             var project = await projectRepository.GetByIdAsync(projectId);
             var globalVariables = project?.GlobalVariables ?? new ProjectGlobalVariableSchema();
-            using var localProjectVariableSession = projectVariableSessions == null && globalVariables.Variables.Count > 0
-                ? new ProjectVariableSession(globalVariables)
-                : null;
+            if (projectVariableSessions == null && globalVariables.Variables.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "GV040: project global variable formal execution requires ProjectVariableSessionRegistry.");
+            }
+
             var projectVariableSession = globalVariables.Variables.Count == 0
                 ? null
-                : projectVariableSessions?.GetOrCreate(projectId, globalVariables) ?? localProjectVariableSession;
+                : projectVariableSessions?.GetOrCreate(projectId, globalVariables);
             var projectVariableBindingIndex = projectVariableSession == null
                 ? null
                 : ProjectVariableBindingIndex.Build(globalVariables);
