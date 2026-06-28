@@ -17,6 +17,7 @@ using ClearVision.Product.Infrastructure.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 
@@ -51,6 +52,7 @@ public static class PreviewNodeEndpoints
             IProjectRepository projectRepository,
             IProjectFlowStorage flowStorage,
             ProjectVariableSessionRegistry projectVariableSessions,
+            IServiceProvider serviceProvider,
             ILogger<object> logger) =>
         {
             try
@@ -58,6 +60,11 @@ public static class PreviewNodeEndpoints
                 logger.LogInformation(
                     "[PreviewNode] 请求预览节点: Project={ProjectId}, Node={NodeId}, Session={DebugSessionId}",
                     request.ProjectId, request.TargetNodeId, request.DebugSessionId);
+
+                if (request.ProjectId != Guid.Empty)
+                {
+                    serviceProvider.GetService<ProjectSaveCoordinator>()?.EnsureProjectAvailable(request.ProjectId);
+                }
 
                 // 从数据库加载流程，或直接使用前端传来的流程数据
                 ClearVision.Product.Core.Entities.OperatorFlow? flow;

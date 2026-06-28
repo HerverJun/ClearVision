@@ -31,6 +31,8 @@ public class ProjectDto
     /// </summary>
     public string Version { get; set; } = "1.0.0";
 
+    public long PersistenceRevision { get; set; }
+
     /// <summary>
     /// 算子流程
     /// </summary>

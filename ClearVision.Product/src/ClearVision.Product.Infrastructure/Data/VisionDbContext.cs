@@ -74,6 +74,7 @@ public class VisionDbContext : DbContext
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(1000);
             entity.Property(e => e.Version).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.PersistenceRevision).IsRequired().HasDefaultValue(0L);
             entity.Property(e => e.GlobalSettings).HasConversion(
                 v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
                 v => System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new Dictionary<string, string>());

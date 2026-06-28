@@ -239,8 +239,10 @@ public static class VisionRuntimeServiceCollectionExtensions
         services.AddScoped<IFlowNodePreviewService, FlowNodePreviewService>();
         services.AddScoped<IAutoTuneService, AutoTuneService>();
 
-        services.AddScoped<ProjectService>();
         services.AddSingleton<ProjectVariableSessionRegistry>();
+        services.AddScoped<ProjectSaveCoordinator>();
+        services.AddHostedService<ProjectSaveRecoveryHostedService>();
+        services.AddScoped<ProjectService>();
         services.AddSingleton<IAnalysisDataBuilder, AnalysisDataBuilder>();
         services.AddScoped<IInspectionService, InspectionService>();
 

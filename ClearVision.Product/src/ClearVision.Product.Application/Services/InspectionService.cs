@@ -40,6 +40,7 @@ public class InspectionService : IInspectionService
     private readonly IProjectFlowStorage _flowStorage;
     private readonly IInspectionImagePersistenceService? _imagePersistenceService;
     private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
+    private readonly ProjectSaveCoordinator? _projectSaveCoordinator;
     private readonly ILogger<InspectionService> _logger;
     private static readonly JsonSerializerOptions FlowJsonOptions = new()
     {
@@ -60,7 +61,8 @@ public class InspectionService : IInspectionService
         IProjectFlowStorage flowStorage,
         ILogger<InspectionService> logger,
         IInspectionImagePersistenceService? imagePersistenceService = null,
-        ProjectVariableSessionRegistry? projectVariableSessions = null)
+        ProjectVariableSessionRegistry? projectVariableSessions = null,
+        ProjectSaveCoordinator? projectSaveCoordinator = null)
     {
         _resultRepository = resultRepository;
         _projectRepository = projectRepository;
@@ -76,6 +78,7 @@ public class InspectionService : IInspectionService
         _flowStorage = flowStorage;
         _imagePersistenceService = imagePersistenceService;
         _projectVariableSessions = projectVariableSessions;
+        _projectSaveCoordinator = projectSaveCoordinator;
         _logger = logger;
     }
 
@@ -624,6 +627,7 @@ public class InspectionService : IInspectionService
         Guid projectId,
         OperatorFlow? flow)
     {
+        _projectSaveCoordinator?.EnsureProjectAvailable(projectId);
         if (HasExecutableFlow(flow))
         {
             _logger.LogInformation(

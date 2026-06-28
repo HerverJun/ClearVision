@@ -239,6 +239,11 @@ namespace ClearVision.Product.Infrastructure.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<long>("PersistenceRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(0L);
+
                     b.Property<string>("Version")
                         .IsRequired()
                         .HasMaxLength(50)

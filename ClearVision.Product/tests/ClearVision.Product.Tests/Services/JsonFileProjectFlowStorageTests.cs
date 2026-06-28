@@ -75,6 +75,31 @@ public class JsonFileProjectFlowStorageTests
     }
 
     [Fact]
+    public async Task SaveFlowJsonAsync_WithPersistenceRevision_ShouldWriteReadableMetadataRevision()
+    {
+        var basePath = CreateTempPath();
+
+        try
+        {
+            var storage = new JsonFileProjectFlowStorage(basePath);
+            var projectId = Guid.NewGuid();
+            const string flowJson = """{"nodes":[{"id":"rev"}],"connections":[]}""";
+
+            await storage.SaveFlowJsonAsync(projectId, flowJson, 7);
+
+            var metadata = await storage.LoadMetadataAsync(projectId);
+            metadata.Should().NotBeNull();
+            metadata!.ProjectId.Should().Be(projectId);
+            metadata.PersistenceRevision.Should().Be(7);
+            metadata.FlowHash.Should().StartWith("sha256:");
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(basePath);
+        }
+    }
+
+    [Fact]
     public async Task LoadFlowJsonAsync_ShouldRestoreLastGoodAndMarkCorruptFile()
     {
         var basePath = CreateTempPath();

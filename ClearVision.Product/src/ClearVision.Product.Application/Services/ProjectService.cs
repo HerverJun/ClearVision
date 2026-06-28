@@ -25,6 +25,7 @@ public class ProjectService
     private readonly IOperatorFactory _operatorFactory;
     private readonly ILogger<ProjectService>? _logger;
     private readonly ProjectVariableSessionRegistry? _projectVariableSessions;
+    private readonly ProjectSaveCoordinator _saveCoordinator;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -53,13 +54,15 @@ public class ProjectService
         IProjectFlowStorage flowStorage,
         IOperatorFactory operatorFactory,
         ILogger<ProjectService>? logger,
-        ProjectVariableSessionRegistry? projectVariableSessions)
+        ProjectVariableSessionRegistry? projectVariableSessions,
+        ProjectSaveCoordinator? saveCoordinator = null)
     {
         _projectRepository = projectRepository;
         _flowStorage = flowStorage;
         _operatorFactory = operatorFactory;
         _logger = logger;
         _projectVariableSessions = projectVariableSessions;
+        _saveCoordinator = saveCoordinator ?? new ProjectSaveCoordinator(projectRepository, flowStorage, projectVariableSessions);
     }
 
     /// <summary>
@@ -88,6 +91,7 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto?> GetByIdAsync(Guid id)
     {
+        _saveCoordinator.EnsureProjectAvailable(id);
         var project = await _projectRepository.GetByIdAsync(id);
         if (project == null)
             return null;
@@ -121,8 +125,9 @@ public class ProjectService
 
             if (migrated)
             {
-                var json = JsonSerializer.Serialize(dto.Flow, _jsonOptions);
-                await _flowStorage.SaveFlowJsonAsync(id, json);
+                _logger?.LogInformation(
+                    "Project {ProjectId} flow DTO was migrated in memory; migration will persist on next explicit save.",
+                    id);
             }
         }
 
@@ -170,12 +175,11 @@ public class ProjectService
     /// </summary>
     public async Task<ProjectDto> UpdateAsync(Guid id, UpdateProjectRequest request)
     {
+        _saveCoordinator.EnsureProjectAvailable(id);
         var project = await _projectRepository.GetByIdAsync(id);
         if (project == null)
             throw new ProjectNotFoundException(id);
 
-        var previousName = project.Name;
-        var previousDescription = project.Description;
         var previousGlobalVariables = CloneSchema(project.GlobalVariables);
         var previousFlowJson = await _flowStorage.LoadFlowJsonAsync(id);
         var nextFlow = request.Flow ?? await LoadStoredFlowDtoAsync(id);
@@ -190,55 +194,18 @@ public class ProjectService
 
         ProjectGlobalVariableSchemaValidator.ThrowIfInvalid(nextSchema, nextFlow?.ToEntity());
         var nextFlowJson = flowChanged && nextFlow != null ? JsonSerializer.Serialize(nextFlow, _jsonOptions) : null;
-        var repositoryUpdated = false;
 
-        // 濡傛灉鏈夋祦绋嬫暟鎹紝鏇存柊鍒版枃浠?
-        try
-        {
-            if (nextFlowJson != null)
-            {
-                await _flowStorage.SaveFlowJsonAsync(id, nextFlowJson);
-            }
+        var saveResult = await _saveCoordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
+            project,
+            request.Name,
+            request.Description,
+            previousGlobalVariables,
+            nextSchema,
+            previousFlowJson,
+            nextFlow,
+            nextFlowJson));
 
-            project.UpdateInfo(request.Name, request.Description);
-            if (request.GlobalVariables != null)
-            {
-                project.UpdateGlobalVariables(nextSchema);
-            }
-
-            await _projectRepository.UpdateAsync(project);
-            repositoryUpdated = true;
-            if (request.GlobalVariables != null)
-            {
-                if (_projectVariableSessions != null &&
-                    !_projectVariableSessions.TryPublishSchemaAndPersist(id, project.GlobalVariables, out _, out var publishError))
-                {
-                    throw new InvalidOperationException(publishError);
-                }
-            }
-        }
-        catch
-        {
-            project.UpdateInfo(previousName, previousDescription);
-            project.UpdateGlobalVariables(previousGlobalVariables);
-            if (repositoryUpdated)
-            {
-                await _projectRepository.UpdateAsync(project);
-            }
-
-            if (nextFlowJson != null && previousFlowJson != null)
-            {
-                await _flowStorage.SaveFlowJsonAsync(id, previousFlowJson);
-            }
-            else if (nextFlowJson != null)
-            {
-                await _flowStorage.DeleteFlowJsonAsync(id);
-            }
-
-            throw;
-        }
-
-        var dto = MapToDto(project);
+        var dto = MapToDto(saveResult.Project);
         dto.Flow = nextFlow;
         return dto;
     }
@@ -248,6 +215,7 @@ public class ProjectService
     /// </summary>
     public async Task UpdateFlowAsync(Guid id, UpdateFlowRequest request)
     {
+        _saveCoordinator.EnsureProjectAvailable(id);
         // 1. 楠岃瘉宸ョ▼瀛樺湪
         var project = await _projectRepository.GetByIdAsync(id);
         if (project == null)
@@ -374,6 +342,7 @@ public class ProjectService
     /// </summary>
     public async Task DeleteAsync(Guid id)
     {
+        _saveCoordinator.EnsureProjectAvailable(id);
         var project = await _projectRepository.GetByIdAsync(id);
         if (project == null)
             throw new ProjectNotFoundException(id);
@@ -403,6 +372,7 @@ public class ProjectService
 
     public async Task<ProjectGlobalVariableSchema> UpdateGlobalVariablesAsync(Guid id, ProjectGlobalVariableSchema schema)
     {
+        _saveCoordinator.EnsureProjectAvailable(id);
         var project = await _projectRepository.GetByIdAsync(id);
         if (project == null)
             throw new ProjectNotFoundException(id);
@@ -453,6 +423,7 @@ public class ProjectService
             Name = project.Name,
             Description = project.Description,
             Version = project.Version,
+            PersistenceRevision = project.PersistenceRevision,
             CreatedAt = project.CreatedAt,
             ModifiedAt = project.ModifiedAt,
             LastOpenedAt = project.LastOpenedAt,

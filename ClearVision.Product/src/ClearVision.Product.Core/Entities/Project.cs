@@ -42,6 +42,8 @@ public class Project : AggregateRoot
 
     public ProjectGlobalVariableSchema GlobalVariables { get; private set; }
 
+    public long PersistenceRevision { get; private set; }
+
     /// <summary>
     /// 最后打开时间
     /// </summary>
@@ -55,6 +57,7 @@ public class Project : AggregateRoot
         Flow = new OperatorFlow(Id, "默认流程");
         GlobalSettings = new Dictionary<string, string>();
         GlobalVariables = new ProjectGlobalVariableSchema();
+        PersistenceRevision = 0;
     }
 
     public Project(string name, string? description = null) : this()
@@ -123,6 +126,16 @@ public class Project : AggregateRoot
     {
         GlobalVariables = globalVariables ?? new ProjectGlobalVariableSchema();
         MarkAsModified();
+    }
+
+    public void SetPersistenceRevision(long revision)
+    {
+        if (revision < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(revision));
+        }
+
+        PersistenceRevision = revision;
     }
 
     /// <summary>

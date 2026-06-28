@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
@@ -70,7 +72,7 @@ public class ProjectServiceTests
     }
 
     [Fact]
-    public async Task UpdateGlobalVariablesAsync_WhenRepositorySaveFails_ShouldKeepExistingSession()
+    public async Task UpdateGlobalVariablesAsync_WhenRepositorySaveFails_ShouldFenceAndKeepExistingSession()
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = Substitute.For<IProjectFlowStorage>();
@@ -90,13 +92,14 @@ public class ProjectServiceTests
         var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 5));
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*save failed*");
+        project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
         registry.GetOrCreate(project.Id, project.GlobalVariables).Should().BeSameAs(oldSession);
         oldSession.TryGetValue(variableId, out var value).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(value).Should().Be(9L);
     }
 
     [Fact]
-    public async Task UpdateGlobalVariablesAsync_WhenStatePersistFailsAfterRepositorySave_ShouldRollbackProjectAndKeepSession()
+    public async Task UpdateGlobalVariablesAsync_WhenStatePersistFailsAfterRepositorySave_ShouldFenceAndKeepExistingSession()
     {
         var repository = Substitute.For<IProjectRepository>();
         var storage = Substitute.For<IProjectFlowStorage>();
@@ -114,9 +117,10 @@ public class ProjectServiceTests
         var act = async () => await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 5, "stats.renamed"));
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("GV030:*state failed*");
-        project.GlobalVariables.Variables.Single().Name.Should().Be("stats.count");
-        project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
-        await repository.Received(2).UpdateAsync(project);
+        project.GlobalVariables.Variables.Single().Name.Should().Be("stats.renamed");
+        project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(5L);
+        project.PersistenceRevision.Should().Be(1);
+        await repository.Received(1).UpdateAsync(project);
         registry.GetOrCreate(project.Id, project.GlobalVariables).Should().BeSameAs(oldSession);
         oldSession.TryGetValue(variableId, out var value).Should().BeTrue();
         ProjectVariableValueConverter.ToObject(value).Should().Be(9L);
@@ -126,14 +130,13 @@ public class ProjectServiceTests
     public async Task UpdateAsync_WhenNewFlowReferencesNewSchemaVariable_ShouldSaveTogether()
     {
         var repository = Substitute.For<IProjectRepository>();
-        var storage = Substitute.For<IProjectFlowStorage>();
+        var storage = new RecordingProjectFlowStorage();
         var factory = new OperatorFactory();
         var registry = new ProjectVariableSessionRegistry();
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
         var sut = new ProjectService(repository, storage, factory, null, registry);
         var schema = CreateSchema(variableId, 3);
         var flow = CreateVariableReadFlow(variableId, "stats.count");
@@ -149,7 +152,8 @@ public class ProjectServiceTests
         saved.Flow.Should().NotBeNull();
         project.Description.Should().Be("updated");
         project.GlobalVariables.Variables.Single().Id.Should().Be(variableId);
-        await storage.Received(1).SaveFlowJsonAsync(project.Id, Arg.Is<string>(json => json.Contains("VariableRead")));
+        storage.LastSavedFlowJson.Should().Contain("VariableRead");
+        storage.LastPersistenceRevision.Should().Be(1);
         await repository.Received(1).UpdateAsync(project);
     }
 
@@ -157,14 +161,13 @@ public class ProjectServiceTests
     public async Task UpdateFlowAsync_WhenSchemaUnchanged_ShouldKeepCurrentVariableValueAndVersion()
     {
         var repository = Substitute.For<IProjectRepository>();
-        var storage = Substitute.For<IProjectFlowStorage>();
+        var storage = new RecordingProjectFlowStorage();
         var registry = new ProjectVariableSessionRegistry();
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
         project.UpdateGlobalVariables(CreateSchema(variableId, 1));
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
         var session = registry.GetOrCreate(project.Id, project.GlobalVariables);
         session.SetValue(variableId, 128L, ProjectVariableUpdatedBy.StudioManual);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
@@ -196,7 +199,7 @@ public class ProjectServiceTests
     public async Task UpdateGlobalVariablesAsync_WhenVariableIsRenamed_ShouldNormalizeStoredFlowVariableName()
     {
         var repository = Substitute.For<IProjectRepository>();
-        var storage = Substitute.For<IProjectFlowStorage>();
+        var storage = new RecordingProjectFlowStorage();
         var registry = new ProjectVariableSessionRegistry();
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
@@ -205,25 +208,21 @@ public class ProjectServiceTests
         var storedFlowJson = JsonSerializer.Serialize(storedFlow);
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(storedFlowJson));
-        string? savedFlowJson = null;
-        storage
-            .When(item => item.SaveFlowJsonAsync(project.Id, Arg.Any<string>()))
-            .Do(callInfo => savedFlowJson = callInfo.ArgAt<string>(1));
+        storage.Seed(project.Id, storedFlowJson, 0);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
 
         await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 1, "stats.current"));
 
-        savedFlowJson.Should().NotBeNull();
-        savedFlowJson.Should().Contain("stats.current");
-        savedFlowJson.Should().NotContain("stats.old");
+        storage.LastSavedFlowJson.Should().NotBeNull();
+        storage.LastSavedFlowJson.Should().Contain("stats.current");
+        storage.LastSavedFlowJson.Should().NotContain("stats.old");
     }
 
     [Fact]
     public async Task UpdateGlobalVariablesAsync_WhenStoredFlowUsesOnlyVariableName_ShouldNormalizeVariableId()
     {
         var repository = Substitute.For<IProjectRepository>();
-        var storage = Substitute.For<IProjectFlowStorage>();
+        var storage = new RecordingProjectFlowStorage();
         var registry = new ProjectVariableSessionRegistry();
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
@@ -232,51 +231,41 @@ public class ProjectServiceTests
         var storedFlowJson = JsonSerializer.Serialize(storedFlow);
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(storedFlowJson));
-        string? savedFlowJson = null;
-        storage
-            .When(item => item.SaveFlowJsonAsync(project.Id, Arg.Any<string>()))
-            .Do(callInfo => savedFlowJson = callInfo.ArgAt<string>(1));
+        storage.Seed(project.Id, storedFlowJson, 0);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
 
         await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 1, "stats.count"));
 
-        savedFlowJson.Should().NotBeNull();
-        savedFlowJson.Should().Contain(variableId.ToString("D"));
-        savedFlowJson.Should().Contain("stats.count");
+        storage.LastSavedFlowJson.Should().NotBeNull();
+        storage.LastSavedFlowJson.Should().Contain(variableId.ToString("D"));
+        storage.LastSavedFlowJson.Should().Contain("stats.count");
     }
 
     [Fact]
     public async Task UpdateGlobalVariablesAsync_WhenStoredFlowNeedsNoNormalization_ShouldNotRewriteFlow()
     {
         var repository = Substitute.For<IProjectRepository>();
-        var storage = Substitute.For<IProjectFlowStorage>();
+        var storage = new RecordingProjectFlowStorage();
         var registry = new ProjectVariableSessionRegistry();
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
         project.UpdateGlobalVariables(CreateSchema(variableId, 1, "stats.count"));
         repository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
         repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
-        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(null));
-        string? canonicalFlowJson = null;
-        storage
-            .When(item => item.SaveFlowJsonAsync(project.Id, Arg.Any<string>()))
-            .Do(callInfo => canonicalFlowJson = callInfo.ArgAt<string>(1));
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
         await sut.UpdateAsync(project.Id, new UpdateProjectRequest
         {
             Name = "demo",
             Flow = CreateVariableReadFlow(variableId, "stats.count")
         });
-        canonicalFlowJson.Should().NotBeNull();
-        storage.ClearReceivedCalls();
+        var saveCount = storage.SaveCount;
+        storage.LastSavedFlowJson.Should().NotBeNull();
         repository.ClearReceivedCalls();
-        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(canonicalFlowJson));
 
         await sut.UpdateGlobalVariablesAsync(project.Id, CreateSchema(variableId, 1, "stats.count"));
 
-        await storage.DidNotReceive().SaveFlowJsonAsync(project.Id, Arg.Any<string>());
-        await repository.Received(1).UpdateAsync(project);
+        storage.SaveCount.Should().Be(saveCount);
+        await repository.DidNotReceive().UpdateAsync(project);
     }
 
     [Fact]
@@ -307,10 +296,10 @@ public class ProjectServiceTests
     }
 
     [Fact]
-    public async Task UpdateAsync_WhenRepositoryFailsAfterFlowSave_ShouldRestoreFlowSchemaAndSession()
+    public async Task UpdateAsync_WhenRepositoryFailsAfterCommitIntent_ShouldFenceWithoutSavingFlowOrPublishingSession()
     {
         var repository = Substitute.For<IProjectRepository>();
-        var storage = Substitute.For<IProjectFlowStorage>();
+        var storage = new RecordingProjectFlowStorage();
         var registry = new ProjectVariableSessionRegistry();
         var variableId = Guid.NewGuid();
         var project = new Project("demo");
@@ -320,7 +309,7 @@ public class ProjectServiceTests
         repository
             .When(item => item.UpdateAsync(Arg.Any<Project>()))
             .Do(_ => throw new InvalidOperationException("db failed"));
-        storage.LoadFlowJsonAsync(project.Id).Returns(Task.FromResult<string?>(oldFlowJson));
+        storage.Seed(project.Id, oldFlowJson, 0);
         var oldSession = registry.GetOrCreate(project.Id, project.GlobalVariables);
         oldSession.SetValue(variableId, 8L, ProjectVariableUpdatedBy.StudioManual);
         var sut = new ProjectService(repository, storage, new OperatorFactory(), null, registry);
@@ -335,7 +324,8 @@ public class ProjectServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*db failed*");
         project.Name.Should().Be("demo");
         project.GlobalVariables.Variables.Single().InitialValue.GetInt64().Should().Be(1L);
-        await storage.Received().SaveFlowJsonAsync(project.Id, oldFlowJson);
+        storage.LastSavedFlowJson.Should().Be(oldFlowJson);
+        storage.SaveCount.Should().Be(0);
         registry.GetOrCreate(project.Id, project.GlobalVariables).Should().BeSameAs(oldSession);
     }
 
@@ -496,6 +486,61 @@ public class ProjectServiceTests
 
         public void Delete(string scopeId)
         {
+        }
+    }
+
+    private sealed class RecordingProjectFlowStorage : IProjectFlowStorage
+    {
+        private string? _flowJson;
+        private ProjectFlowStorageMetadata? _metadata;
+
+        public string? LastSavedFlowJson { get; private set; }
+
+        public long LastPersistenceRevision { get; private set; }
+
+        public int SaveCount { get; private set; }
+
+        public void Seed(Guid projectId, string flowJson, long persistenceRevision)
+        {
+            _flowJson = flowJson;
+            LastSavedFlowJson = flowJson;
+            LastPersistenceRevision = persistenceRevision;
+            _metadata = CreateMetadata(projectId, flowJson, persistenceRevision);
+        }
+
+        public Task SaveFlowJsonAsync(Guid projectId, string flowJson)
+        {
+            Seed(projectId, flowJson, 0);
+            return Task.CompletedTask;
+        }
+
+        public Task SaveFlowJsonAsync(Guid projectId, string flowJson, long persistenceRevision)
+        {
+            SaveCount += 1;
+            Seed(projectId, flowJson, persistenceRevision);
+            return Task.CompletedTask;
+        }
+
+        public Task<string?> LoadFlowJsonAsync(Guid projectId) => Task.FromResult(_flowJson);
+
+        public Task DeleteFlowJsonAsync(Guid projectId)
+        {
+            _flowJson = null;
+            _metadata = null;
+            LastSavedFlowJson = null;
+            LastPersistenceRevision = 0;
+            return Task.CompletedTask;
+        }
+
+        public Task<ProjectFlowStorageMetadata?> LoadMetadataAsync(Guid projectId) => Task.FromResult(_metadata);
+
+        private static ProjectFlowStorageMetadata CreateMetadata(Guid projectId, string flowJson, long revision) =>
+            new(1, projectId, revision, ComputeSha256(flowJson), DateTimeOffset.UtcNow);
+
+        private static string ComputeSha256(string value)
+        {
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+            return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
         }
     }
 }

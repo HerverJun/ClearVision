@@ -27,51 +27,63 @@ public class WebMessageHandlerTests
     {
         var operatorFactory = new OperatorFactory();
         var projectRepository = Substitute.For<IProjectRepository>();
-        var flowStorage = Substitute.For<IProjectFlowStorage>();
+        var flowStorageRoot = Path.Combine(Path.GetTempPath(), "ClearVision.WebMessageHandlerTests", Guid.NewGuid().ToString("N"));
+        var flowStorage = new JsonFileProjectFlowStorage(flowStorageRoot);
         var project = new Project("WebMessage Flow");
 
         projectRepository.GetByIdAsync(project.Id).Returns(Task.FromResult<Project?>(project));
+        projectRepository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
 
-        await using var serviceProvider = BuildServiceProvider(services =>
+        try
         {
-            services.AddSingleton(projectRepository);
-            services.AddSingleton(flowStorage);
-            services.AddSingleton<IOperatorFactory>(operatorFactory);
-            services.AddScoped<ProjectService>();
-        });
-
-        var handler = CreateHandler(serviceProvider, operatorFactory);
-        var payload = JsonSerializer.Serialize(new UpdateFlowCommand
-        {
-            ProjectId = project.Id,
-            Flow = new FlowData
+            await using var serviceProvider = BuildServiceProvider(services =>
             {
-                Operators =
-                [
-                    new OperatorData
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "ResultOutput",
-                        Type = nameof(OperatorType.ResultOutput),
-                        X = 120,
-                        Y = 80
-                    }
-                ],
-                Connections = []
-            }
-        });
+                services.AddSingleton(projectRepository);
+                services.AddSingleton<IProjectFlowStorage>(flowStorage);
+                services.AddSingleton<IOperatorFactory>(operatorFactory);
+                services.AddScoped<ProjectService>();
+            });
 
-        var response = await handler.HandleAsync(new WebMessage
+            var handler = CreateHandler(serviceProvider, operatorFactory);
+            var payload = JsonSerializer.Serialize(new UpdateFlowCommand
+            {
+                ProjectId = project.Id,
+                Flow = new FlowData
+                {
+                    Operators =
+                    [
+                        new OperatorData
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "ResultOutput",
+                            Type = nameof(OperatorType.ResultOutput),
+                            X = 120,
+                            Y = 80
+                        }
+                    ],
+                    Connections = []
+                }
+            });
+
+            var response = await handler.HandleAsync(new WebMessage
+            {
+                Type = nameof(UpdateFlowCommand),
+                Id = "req-update-flow",
+                Payload = payload
+            });
+
+            response.Success.Should().BeTrue();
+            var savedFlow = await flowStorage.LoadFlowJsonAsync(project.Id);
+            savedFlow.Should().Contain("ResultOutput").And.Contain("MainFlow");
+            (await flowStorage.LoadMetadataAsync(project.Id))!.PersistenceRevision.Should().Be(1);
+        }
+        finally
         {
-            Type = nameof(UpdateFlowCommand),
-            Id = "req-update-flow",
-            Payload = payload
-        });
-
-        response.Success.Should().BeTrue();
-        await flowStorage.Received(1).SaveFlowJsonAsync(
-            project.Id,
-            Arg.Is<string>(json => json.Contains("ResultOutput") && json.Contains("MainFlow")));
+            if (Directory.Exists(flowStorageRoot))
+            {
+                Directory.Delete(flowStorageRoot, recursive: true);
+            }
+        }
     }
 
     [Fact]

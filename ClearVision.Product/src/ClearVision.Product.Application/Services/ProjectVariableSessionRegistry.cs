@@ -99,6 +99,98 @@ public sealed class ProjectVariableSessionRegistry
         }
     }
 
+    public ProjectVariableSessionMigrationCandidate BuildSchemaMigrationCandidate(
+        Guid projectId,
+        ProjectGlobalVariableSchema previousSchema,
+        ProjectGlobalVariableSchema nextSchema)
+    {
+        ArgumentNullException.ThrowIfNull(previousSchema);
+        ArgumentNullException.ThrowIfNull(nextSchema);
+
+        lock (GetProjectGate(projectId))
+        {
+            IReadOnlyList<ProjectVariableValueSnapshot> previousSnapshots;
+            long schemaGeneration;
+            var sessionWasLoaded = _sessions.TryGetValue(projectId, out var current);
+            if (sessionWasLoaded)
+            {
+                previousSnapshots = current!.GetSnapshots();
+                schemaGeneration = current.SchemaGeneration + 1;
+            }
+            else
+            {
+                previousSnapshots = _stateStore?.Load(ToProjectScopeId(projectId), previousSchema) ?? [];
+                schemaGeneration = 0;
+            }
+
+            using var migrated = new ProjectVariableSession(nextSchema, previousSnapshots, schemaGeneration);
+            return new ProjectVariableSessionMigrationCandidate(
+                nextSchema,
+                migrated.GetSnapshots(),
+                schemaGeneration,
+                sessionWasLoaded);
+        }
+    }
+
+    public bool TryPersistMigrationCandidate(
+        Guid projectId,
+        ProjectVariableSessionMigrationCandidate candidate,
+        out IProjectVariableSession? publishedSession,
+        out string? error)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+
+        lock (GetProjectGate(projectId))
+        {
+            try
+            {
+                _stateStore?.Save(ToProjectScopeId(projectId), candidate.Schema, candidate.Snapshots);
+                if (_sessions.ContainsKey(projectId))
+                {
+                    var published = new ProjectVariableSession(
+                        candidate.Schema,
+                        candidate.Snapshots,
+                        candidate.SchemaGeneration).CreateSnapshotClone();
+                    _sessions[projectId] = published;
+                    publishedSession = published;
+                }
+                else
+                {
+                    publishedSession = null;
+                }
+
+                error = null;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                publishedSession = null;
+                error = $"GV030: project global variable state could not be persisted: {ex.Message}";
+                return false;
+            }
+        }
+    }
+
+    public void PublishRecoveredSessionIfLoaded(
+        Guid projectId,
+        ProjectVariableSessionMigrationCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+
+        lock (GetProjectGate(projectId))
+        {
+            if (!_sessions.ContainsKey(projectId))
+            {
+                return;
+            }
+
+            _sessions[projectId] = new ProjectVariableSession(
+                candidate.Schema,
+                candidate.Snapshots,
+                candidate.SchemaGeneration).CreateSnapshotClone();
+        }
+    }
+
     public bool TryMutateAndPersist(
         Guid projectId,
         ProjectGlobalVariableSchema schema,
@@ -287,3 +379,9 @@ public sealed class ProjectVariableSessionRegistry
 
     public static string ToProjectScopeId(Guid projectId) => $"project:{projectId:D}";
 }
+
+public sealed record ProjectVariableSessionMigrationCandidate(
+    ProjectGlobalVariableSchema Schema,
+    IReadOnlyList<ProjectVariableValueSnapshot> Snapshots,
+    long SchemaGeneration,
+    bool SessionWasLoaded);

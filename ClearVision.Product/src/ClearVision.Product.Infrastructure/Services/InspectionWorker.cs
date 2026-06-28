@@ -360,6 +360,8 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
             var streamCoordinator = scope.ServiceProvider.GetService<ICameraFrameStreamCoordinator>();
             var configurationService = scope.ServiceProvider.GetService<IConfigurationService>();
             var projectVariableSessions = scope.ServiceProvider.GetService<ProjectVariableSessionRegistry>();
+            var projectSaveCoordinator = scope.ServiceProvider.GetService<ProjectSaveCoordinator>();
+            projectSaveCoordinator?.EnsureProjectAvailable(projectId);
             var project = await projectRepository.GetByIdAsync(projectId);
             var globalVariables = project?.GlobalVariables ?? new ProjectGlobalVariableSchema();
             if (projectVariableSessions == null && globalVariables.Variables.Count > 0)
