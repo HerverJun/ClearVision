@@ -3087,7 +3087,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
     return true;
   };
 
-  const started = panel._startBuildFromCurrentPlan();
+  const started = await panel._startBuildFromCurrentPlan();
 
   assert.equal(started, true);
   assert.equal(panel.agentWorkspaceMode, 'build');
@@ -3138,16 +3138,16 @@ test('Recommended strategy is not selected until accepted for Build', async () =
   assert.match(planWorkspace.innerHTML, /is-recommended/);
   assert.match(planWorkspace.innerHTML, /aria-pressed="false"/);
 
-  const started = panel._startBuildFromCurrentPlan();
+  const started = await panel._startBuildFromCurrentPlan();
   assert.equal(started, false);
   assert.equal(captured, null);
 
-  const acceptedStarted = panel._startBuildFromCurrentPlan({ acceptedRecommended: true });
+  const acceptedStarted = await panel._startBuildFromCurrentPlan({ acceptedRecommended: true });
   assert.equal(acceptedStarted, false);
   assert.equal(captured, null);
   assert.equal(panel.planAcceptedRecommendedDefaults, true);
 
-  const startedAfterPreview = panel._startBuildFromCurrentPlan();
+  const startedAfterPreview = await panel._startBuildFromCurrentPlan();
   assert.equal(startedAfterPreview, true);
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, true);
@@ -3272,7 +3272,7 @@ test('Draft Plan can start Build with legal Planner route without accepting stra
   assert.deepEqual(panel.planQuestionSelections, {});
   assert.deepEqual(panel.planQuestionAnswers, {});
 
-  const started = panel._startBuildFromCurrentPlan();
+  const started = await panel._startBuildFromCurrentPlan();
 
   assert.equal(started, true);
   assert.equal(panel.agentWorkspaceMode, 'build');
@@ -3302,7 +3302,7 @@ test('Explicit strategy switch is submitted through unified Build button', async
 
   panel._renderPlanWorkspace(panel.pendingVisionPlan);
   panel._selectPlanQuestionOption('model_or_rule_strategy', 'traditional_rule');
-  const started = panel._startBuildFromCurrentPlan();
+  const started = await panel._startBuildFromCurrentPlan();
 
   assert.equal(started, true);
   assert.equal(captured.skipPlan, true);
@@ -3454,7 +3454,7 @@ test('Aliased medical requirement answers unblock Plan Build button', async () =
   assert.equal(inlineBuildButton.disabled, false);
   assert.equal(planActionButton.disabled, false);
 
-  const started = panel._startBuildFromCurrentPlan();
+  const started = await panel._startBuildFromCurrentPlan();
   assert.equal(started, true);
   assert.equal(captured.skipPlan, true);
   assert.deepEqual(captured.buildFromPlan.confirmedAnswers, [
@@ -3557,7 +3557,7 @@ test('Unknown strategy confirmation question id is resolved from matching blocke
   assert.equal(panel.pendingVisionPlan.executable, true);
   assert.equal(inlineBuildButton.disabled, false);
 
-  assert.equal(panel._startBuildFromCurrentPlan(), true);
+  assert.equal(await panel._startBuildFromCurrentPlan(), true);
   assert.equal(captured.buildFromPlan.confirmedAnswers[0].questionId, 'line_guidance_profile');
   assert.equal(captured.buildFromPlan.confirmedAnswers[0].field, 'line_guidance_profile');
   assert.equal(captured.buildFromPlan.confirmedAnswers[0].value, 'profile_a');
@@ -4071,10 +4071,10 @@ test('External output target blocker shows concrete label and recommended output
   assert.match(panel._getPlanBuildBlockedReason(plan), /请选择输出目标/);
   assert.equal(panel._getPlanBuildActionState(plan).canAcceptRecommended, false);
 
-  assert.equal(panel._startBuildFromCurrentPlan({ acceptedRecommended: true }), false);
+  assert.equal(await panel._startBuildFromCurrentPlan({ acceptedRecommended: true }), false);
   assert.equal(captured, null);
   panel._selectPlanQuestionOption('output_target', 'local_result_payload');
-  assert.equal(panel._startBuildFromCurrentPlan(), true);
+  assert.equal(await panel._startBuildFromCurrentPlan(), true);
   assert.equal(captured.buildFromPlan.confirmedAnswers[0].field, 'output_target');
   assert.equal(captured.buildFromPlan.confirmedAnswers[0].value, 'local_result_payload');
 });
@@ -4898,7 +4898,7 @@ test('Plan with pending image source and acquisition route can start editable dr
   assert.equal(plan.executable, true);
   assert.equal(inlineBuildButton.disabled, false);
   assert.equal(planActionButton.disabled, false);
-  assert.equal(panel._startBuildFromCurrentPlan(), true);
+  assert.equal(await panel._startBuildFromCurrentPlan(), true);
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.buildFromPlan.planId, plan.planId);
   assert.equal(captured.buildFromPlan.planHash, plan.planHash);
@@ -5212,7 +5212,7 @@ test('Start Build from non-executable Plan is blocked before dispatch', async ()
     throw new Error('Build should not dispatch for a non-executable Plan');
   };
 
-  const started = panel._startBuildFromCurrentPlan();
+  const started = await panel._startBuildFromCurrentPlan();
 
   assert.equal(started, false);
   assert.equal(panel.agentWorkspaceMode, 'plan');
@@ -5236,7 +5236,7 @@ test('Start Build without pending Plan is blocked with Plan-first prompt', async
     throw new Error('Build should not dispatch without a pending Plan');
   };
 
-  const started = panel._startBuildFromCurrentPlan();
+  const started = await panel._startBuildFromCurrentPlan();
 
   assert.equal(started, false);
   assert.equal(panel.agentWorkspaceMode, 'plan');

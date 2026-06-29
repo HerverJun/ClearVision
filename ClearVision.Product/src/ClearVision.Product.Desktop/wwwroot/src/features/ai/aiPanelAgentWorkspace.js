@@ -1,4 +1,5 @@
 import httpClient from '../../core/messaging/httpClient.js';
+import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 
 export const AgentWorkspaceModes = Object.freeze({
@@ -522,6 +523,93 @@ export const aiPanelAgentWorkspaceMixin = {
             this._renderAgentWorkspaceOverview();
             this._renderPlanWorkspace(this.pendingVisionPlan);
             this._renderBuildWorkspaceFromAgentRun();
+        }
+    },
+
+    _isPlanSnapshotReadOnly() {
+        return Boolean(
+            String(this.workspaceBuildRunId || this.activeAgentRunId || '').trim() ||
+            String(this.workspaceSubmittedBuildFingerprint || '').trim()
+        );
+    },
+
+    _warnPlanReadOnly() {
+        this._setResultStatusNote?.('Build 已提交，当前 Plan 快照只读。请新建 Plan 修订后再调整。', 'warning');
+        this._addMessage?.('system', 'Build 已提交，当前 Plan 快照只读。请新建 Plan 修订后再调整。');
+    },
+
+    _buildWorkspaceSnapshotDelta() {
+        return {
+            lifecycleState: this._getAgentWorkspacePhase?.() || AgentWorkspaceModes.PLAN,
+            planQuestionSelections: { ...(this.planQuestionSelections || {}) },
+            confirmedPlanAnswers: this._buildConfirmedPlanAnswers?.(this.pendingVisionPlan) || [],
+            requirementMode: this.requirementMode || 'strict',
+            planAcceptedRecommendedDefaults: this.planAcceptedRecommendedDefaults === true,
+            submittedBuildFingerprint: this.workspaceSubmittedBuildFingerprint || ''
+        };
+    },
+
+    _queueWorkspaceSnapshotFlush(reason = 'edit') {
+        if (!this.sessionId || !this.pendingVisionPlan) {
+            return Promise.resolve({ skipped: true });
+        }
+        if (!Number.isFinite(Number(this.workspaceSnapshotRevision)) || Number(this.workspaceSnapshotRevision) <= 0) {
+            return Promise.resolve({ skipped: true, missingBaseline: true });
+        }
+        if (this._isPlanSnapshotReadOnly()) {
+            return Promise.resolve({ skipped: true, readOnly: true });
+        }
+
+        this.workspaceSnapshotDirty = true;
+        const mutationId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const delta = this._buildWorkspaceSnapshotDelta();
+        const run = async () => {
+            try {
+                const expectedRevision = Number(this.workspaceSnapshotRevision || 0);
+                const result = await httpClient.post(`/ai/sessions/${encodeURIComponent(this.sessionId)}/workspace-snapshot`, {
+                    expectedRevision,
+                    clientMutationId: mutationId,
+                    ...delta
+                });
+                this._applyWorkspaceSnapshotSummary?.(result?.snapshot || result?.Snapshot || null);
+                this._handleWorkspacePersistenceStatus?.(result?.persistenceStatus || result?.PersistenceStatus || null);
+                this.workspaceSnapshotDirty = false;
+                return result;
+            } catch (error) {
+                const message = String(error?.message || '').toLowerCase();
+                if (message.includes('workspace_revision_conflict') || message.includes('409')) {
+                    this._setResultStatusNote?.('工作台状态已在其他操作中更新，正在恢复最新快照。', 'warning');
+                    if (this.sessionId) {
+                        webMessageBridge.sendMessage('GetAiSession', {
+                            payload: { sessionId: this.sessionId }
+                        });
+                    }
+                } else {
+                    this._setResultStatusNote?.('Plan 修改尚未成功保存，切换前请重试。', 'warning');
+                }
+                throw error;
+            }
+        };
+
+        this.workspaceSnapshotSaveQueue = (this.workspaceSnapshotSaveQueue || Promise.resolve())
+            .catch(() => undefined)
+            .then(run);
+        return this.workspaceSnapshotSaveQueue;
+    },
+
+    async _flushWorkspaceSnapshotBeforeBoundary(reason = 'boundary') {
+        if (!this.sessionId || !this.pendingVisionPlan || this._isPlanSnapshotReadOnly()) {
+            return true;
+        }
+        if (!this.workspaceSnapshotDirty) {
+            return true;
+        }
+
+        try {
+            await this._queueWorkspaceSnapshotFlush(reason);
+            return true;
+        } catch {
+            return false;
         }
     },
 
@@ -1866,7 +1954,15 @@ export const aiPanelAgentWorkspaceMixin = {
     },
 
     async _requestBackendVisionPlan(request) {
-        return await httpClient.post('/ai/agent-plan', request);
+        const response = await httpClient.post('/ai/agent-plan', request);
+        const sessionId = String(response?.sessionId || response?.SessionId || '').trim();
+        if (sessionId) {
+            this.sessionId = sessionId;
+            this._saveSessionId?.(sessionId);
+        }
+        this._applyWorkspaceSnapshotSummary?.(response?.workspaceSnapshot || response?.WorkspaceSnapshot || null);
+        this._handleWorkspacePersistenceStatus?.(response?.persistenceStatus || response?.PersistenceStatus || null);
+        return response?.planResult || response?.PlanResult || response?.planModeResult || response?.PlanModeResult || response;
     },
 
     _shouldUsePlanRunEventStream() {
@@ -1920,6 +2016,13 @@ export const aiPanelAgentWorkspaceMixin = {
     async _requestBackendVisionPlanRun(request, { planRequestId, turn, fallbackDescription = '' } = {}) {
         const createResult = await httpClient.post('/ai/agent-plan-runs', request);
         const runId = String(createResult?.runId || createResult?.RunId || '').trim();
+        const sessionId = String(createResult?.sessionId || createResult?.SessionId || '').trim();
+        if (sessionId) {
+            this.sessionId = sessionId;
+            this._saveSessionId?.(sessionId);
+        }
+        this._applyWorkspaceSnapshotSummary?.(createResult?.workspaceSnapshot || createResult?.WorkspaceSnapshot || null);
+        this._handleWorkspacePersistenceStatus?.(createResult?.persistenceStatus || createResult?.PersistenceStatus || null);
         if (!runId) {
             throw new Error('Plan Run 创建接口没有返回 runId。');
         }
@@ -1953,6 +2056,37 @@ export const aiPanelAgentWorkspaceMixin = {
         const lastSequence = this._getPlanRunLastSequence();
         this._startAgentRunEventSource?.(runId, { lastSequence });
         return await completion;
+    },
+
+    _applyWorkspaceSnapshotSummary(snapshot) {
+        if (!snapshot || typeof snapshot !== 'object') return;
+        const revision = Number(snapshot.revision ?? snapshot.Revision);
+        if (Number.isFinite(revision)) {
+            this.workspaceSnapshotRevision = revision;
+            this.workspaceSnapshotDirty = false;
+        }
+        const buildRunId = String(snapshot.buildRunId ?? snapshot.BuildRunId ?? '').trim();
+        const submittedBuildFingerprint = String(snapshot.submittedBuildFingerprint ?? snapshot.SubmittedBuildFingerprint ?? '').trim();
+        if (buildRunId) {
+            this.workspaceBuildRunId = buildRunId;
+        }
+        if (submittedBuildFingerprint) {
+            this.workspaceSubmittedBuildFingerprint = submittedBuildFingerprint;
+        }
+    },
+
+    _handleWorkspacePersistenceStatus(status) {
+        if (!status || typeof status !== 'object') return;
+        const primarySaved = status.primaryStoreSaved ?? status.PrimaryStoreSaved;
+        const backupSaved = status.recoveryBackupSaved ?? status.RecoveryBackupSaved;
+        const message = String(status.publicMessage ?? status.PublicMessage ?? '').trim();
+        if (primarySaved === false) {
+            this._setResultStatusNote?.(message || '结果已生成，但本次会话尚未成功保存。', 'warning');
+            return;
+        }
+        if (backupSaved === false && message) {
+            this._setResultStatusNote?.(message, 'info');
+        }
     },
 
     _isActivePlanRunEvent(evt) {
@@ -3364,6 +3498,10 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _acceptRecommendedPlanAnswers(plan) {
         if (!plan) return false;
+        if (this._isPlanSnapshotReadOnly()) {
+            this._warnPlanReadOnly();
+            return false;
+        }
         const nextAnswers = { ...(this.planQuestionAnswers || {}) };
         const nextSelections = { ...(this.planQuestionSelections || {}) };
         let changed = false;
@@ -3396,6 +3534,7 @@ export const aiPanelAgentWorkspaceMixin = {
             this.planQuestionSelections = nextSelections;
             this.planAcceptedRecommendedDefaults = true;
             this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+            this._queueWorkspaceSnapshotFlush?.('accept_recommended');
             this._requestPlanReadinessPreview?.(plan, { acceptedRecommended: true, reason: 'accepted_recommended' });
         }
 
@@ -4381,6 +4520,14 @@ export const aiPanelAgentWorkspaceMixin = {
                             </button>
                         `;
                     }).join('')}
+                    <button type="button"
+                        role="tab"
+                        aria-selected="${phase === 'applied' ? 'true' : 'false'}"
+                        disabled aria-disabled="true"
+                        class="${phase === 'applied' ? 'is-active is-selected' : ''} ${terminal || phase === 'applied' ? 'is-completed' : ''}">
+                        <span>Applied 复核</span>
+                        <small>${phase === 'applied' ? '已应用' : (terminal ? '可复核' : '暂无')}</small>
+                    </button>
                 </div>
             </section>
         `;
@@ -4639,6 +4786,7 @@ export const aiPanelAgentWorkspaceMixin = {
             : '严格确认模式';
         const readinessStats = this._getPlanReadinessStats(plan);
         const actionState = this._getPlanBuildActionState(plan);
+        const isPlanReadOnly = this._isPlanSnapshotReadOnly?.() === true;
         const currentPreview = this._getCurrentCanonicalPreview?.(plan);
         const hasDeferredStrictBlock = (this._normalizeRequirementMode?.(this.requirementMode) || 'strict') === 'strict' &&
             this._toArray(currentPreview?.deferredQuestionIds).length > 0 &&
@@ -4670,7 +4818,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     <div class="ai-build-compact-row"><b>待确认</b><span>${this._escapeHtml(String(readinessStats.pendingConfirmationCount))}</span></div>
                     <div class="ai-build-compact-row"><b>后补资源</b><span>${this._escapeHtml(String(readinessStats.resourcePendingCount))}</span></div>
                 </div>
-                ${modeToggle}
+                ${isPlanReadOnly ? modeToggle.replaceAll('<button type="button" data-requirement-mode=', '<button type="button" disabled data-requirement-mode=') : modeToggle}
                 ${plan.buildReadiness?.primaryMessage ? `<div class="ai-build-note">${this._escapeHtml(plan.buildReadiness.primaryMessage)}</div>` : ''}
             </section>
             ${semanticPanel}
@@ -4900,6 +5048,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const isCustomValue = selectedValue && !question.options.some(opt => opt.value === selectedValue);
         const selectionFeedback = this._formatPlanSelectionFeedback(question, selectedValue);
         const resourceBlocker = this._getPlanQuestionResourceBlocker(question);
+        const isPlanReadOnly = this._isPlanSnapshotReadOnly?.() === true;
         return `
             <article class="ai-plan-question">
                 <div class="ai-plan-question-head">
@@ -4914,7 +5063,7 @@ export const aiPanelAgentWorkspaceMixin = {
                     ${question.options.map(option => {
                         const selected = String(selectedValue || '') === option.value;
                         const tag = this._formatPlanOptionTag(option);
-                        const disabled = this._isInformationalOption(option);
+                        const disabled = this._isInformationalOption(option) || isPlanReadOnly;
                         return `
                             <button
                                 class="ai-plan-option ${selected ? 'is-selected' : ''} ${option.recommended ? 'is-recommended' : ''} ${disabled ? 'is-informational' : ''}"
@@ -4937,11 +5086,13 @@ export const aiPanelAgentWorkspaceMixin = {
                         type="text"
                         placeholder="输入自定义回答..."
                         value="${isCustomValue ? this._escapeHtml(selectedValue) : ''}"
-                        data-plan-question="${this._escapeHtml(question.id)}" />
+                        data-plan-question="${this._escapeHtml(question.id)}"
+                        ${isPlanReadOnly ? 'readonly disabled' : ''} />
                     <button
                         class="ai-plan-custom-input-btn"
                         type="button"
-                        data-plan-question="${this._escapeHtml(question.id)}">
+                        data-plan-question="${this._escapeHtml(question.id)}"
+                        ${isPlanReadOnly ? 'disabled' : ''}>
                         确定
                     </button>
                 </div>
@@ -4952,6 +5103,10 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _customInputPlanQuestion(questionId, value) {
         if (!questionId || !this.pendingVisionPlan) return;
+        if (this._isPlanSnapshotReadOnly()) {
+            this._warnPlanReadOnly();
+            return;
+        }
         const cleanedValue = String(value || '').trim();
         if (!cleanedValue) return;
         if (this._isPlanPlaceholderValue(cleanedValue)) return;
@@ -4979,6 +5134,7 @@ export const aiPanelAgentWorkspaceMixin = {
         };
         this.planAcceptedRecommendedDefaults = false;
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+        this._queueWorkspaceSnapshotFlush?.('custom_answer');
         this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'custom_answer' });
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderAgentWorkspaceOverview();
@@ -4986,6 +5142,10 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _selectPlanQuestionOption(questionId, value) {
         if (!questionId || !value || !this.pendingVisionPlan) return;
+        if (this._isPlanSnapshotReadOnly()) {
+            this._warnPlanReadOnly();
+            return;
+        }
         const selectedValue = String(value || '').trim();
         const question = this._toArray(this.pendingVisionPlan.questions)
             .find(item => String(item?.id || '').trim() === String(questionId || '').trim());
@@ -5017,6 +5177,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this.planQuestionAnswers = nextAnswers;
         this.planAcceptedRecommendedDefaults = false;
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+        this._queueWorkspaceSnapshotFlush?.('question_option');
         this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'question_option' });
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderAgentWorkspaceOverview();
@@ -5058,7 +5219,7 @@ export const aiPanelAgentWorkspaceMixin = {
         return selections;
     },
 
-    _startBuildFromCurrentPlan({ acceptedRecommended = false } = {}) {
+    async _startBuildFromCurrentPlan({ acceptedRecommended = false } = {}) {
         if (this.isGenerating) return false;
 
         if (!this.pendingVisionPlan) {
@@ -5111,6 +5272,12 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         this.activePlanRequestId = null;
+        const flushed = (await this._flushWorkspaceSnapshotBeforeBoundary?.('before_build')) ?? true;
+        if (!flushed) {
+            this._setResultStatusNote?.('Plan 修改尚未成功保存，已阻止创建 BuildRun。', 'warning');
+            return false;
+        }
+
         const buildFromPlan = this._buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended: false });
         this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
         this._setWorkspaceViewMode?.(AgentWorkspaceModes.BUILD, { render: false });

@@ -358,6 +358,51 @@ public class ConversationalFlowServiceTests : IDisposable
     }
 
     [Fact]
+    public void TryUpdateWorkspaceSnapshot_ShouldRejectStaleRevisionWithoutOverwritingLatest()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        var initial = service.UpdateWorkspaceSnapshot("revision-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready",
+            RequirementMode = AiRequirementModes.Strict,
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["q1"] = "camera"
+            }
+        });
+
+        var accepted = service.TryUpdateWorkspaceSnapshot("revision-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = initial.WorkspaceSnapshot!.Revision,
+            ClientMutationId = "mutation-1",
+            RequirementMode = AiRequirementModes.Draft,
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["q1"] = "file"
+            }
+        });
+        var rejected = service.TryUpdateWorkspaceSnapshot("revision-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = initial.WorkspaceSnapshot.Revision,
+            ClientMutationId = "mutation-stale",
+            RequirementMode = AiRequirementModes.Strict,
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["q1"] = "stale"
+            }
+        });
+
+        accepted.Success.Should().BeTrue();
+        accepted.Revision.Should().Be(initial.WorkspaceSnapshot.Revision + 1);
+        rejected.Success.Should().BeFalse();
+        rejected.Conflict.Should().BeTrue();
+        rejected.ErrorCode.Should().Be("workspace_revision_conflict");
+        rejected.Snapshot!.RequirementMode.Should().Be(AiRequirementModes.Draft);
+        rejected.Snapshot.PlanQuestionSelections["q1"].Should().Be("file");
+        service.GetSession("revision-session")!.WorkspaceSnapshot!.PlanQuestionSelections["q1"].Should().Be("file");
+    }
+
+    [Fact]
     public void LoadSessionsFromStore_WhenMainFileIsCorrupt_ShouldRecoverLastGood()
     {
         var service = new ConversationalFlowService(_tempRoot);

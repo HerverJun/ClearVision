@@ -94,6 +94,8 @@ public sealed class VisionAgentWorkspaceSnapshot
 
 public sealed class VisionAgentWorkspaceSnapshotUpdate
 {
+    public long? ExpectedRevision { get; set; }
+    public string? ClientMutationId { get; set; }
     public string? ProjectId { get; set; }
     public string? LifecycleState { get; set; }
     public VisionAgentPlanModeResult? PendingPlanSnapshot { get; set; }
@@ -110,6 +112,36 @@ public sealed class VisionAgentWorkspaceSnapshotUpdate
     public string? SubmittedBuildFingerprint { get; set; }
     public string? UserTurnId { get; set; }
     public string? UserMessage { get; set; }
+}
+
+public sealed class ConversationPersistenceStatus
+{
+    public bool PrimaryStoreSaved { get; set; } = true;
+    public bool RecoveryBackupSaved { get; set; } = true;
+    public string ErrorCode { get; set; } = string.Empty;
+    public string PublicMessage { get; set; } = string.Empty;
+}
+
+public sealed class VisionAgentWorkspaceSnapshotMutationResult
+{
+    public bool Success { get; set; }
+    public bool Conflict { get; set; }
+    public string ErrorCode { get; set; } = string.Empty;
+    public string PublicMessage { get; set; } = string.Empty;
+    public VisionAgentWorkspaceSnapshot? Snapshot { get; set; }
+    public long Revision => Snapshot?.Revision ?? 0;
+    public ConversationPersistenceStatus PersistenceStatus { get; set; } = new();
+}
+
+public sealed class VisionAgentTerminalProjectionRequest
+{
+    public string SessionId { get; set; } = string.Empty;
+    public string AssistantTurnId { get; set; } = string.Empty;
+    public string AssistantMessage { get; set; } = string.Empty;
+    public string? LatestFlowJson { get; set; }
+    public string? LatestCanvasFlowJson { get; set; }
+    public ConversationTurnPayload? Payload { get; set; }
+    public VisionAgentWorkspaceSnapshotUpdate WorkspaceUpdate { get; set; } = new();
 }
 
 public sealed class ConversationSessionSummary
@@ -145,6 +177,11 @@ public interface IConversationalFlowService
     ConversationSession? GetSession(string sessionId);
     bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson);
     ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update);
+    VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+        string sessionId,
+        VisionAgentWorkspaceSnapshotUpdate update);
+    VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request);
+    ConversationPersistenceStatus GetLastPersistenceStatus();
     bool DeleteSession(string sessionId);
 }
 
@@ -193,6 +230,7 @@ public class ConversationalFlowService : IConversationalFlowService
     private readonly string _storagePath;
     private readonly string _lastGoodStoragePath;
     private readonly Microsoft.Extensions.Logging.ILogger<ConversationalFlowService>? _logger;
+    private ConversationPersistenceStatus _lastPersistenceStatus = new();
 
     public ConversationalFlowService(
         string? storageRootPath = null,
@@ -504,32 +542,102 @@ public class ConversationalFlowService : IConversationalFlowService
         var session = GetOrCreateSession(sessionId);
         lock (session)
         {
-            var snapshot = session.WorkspaceSnapshot ?? new VisionAgentWorkspaceSnapshot();
-            ApplyWorkspaceUpdate(snapshot, update);
-            session.WorkspaceSnapshot = snapshot;
-
-            var userMessage = update.UserMessage?.Trim();
-            var userTurnId = update.UserTurnId?.Trim();
-            if (!string.IsNullOrWhiteSpace(userMessage) &&
-                !string.IsNullOrWhiteSpace(userTurnId) &&
-                !session.History.Any(turn => string.Equals(turn.TurnId, userTurnId, StringComparison.OrdinalIgnoreCase)))
-            {
-                session.History.Add(new ConversationTurn
-                {
-                    TurnId = userTurnId,
-                    Role = "user",
-                    Message = userMessage,
-                    TimestampUtc = DateTime.UtcNow
-                });
-                TrimHistory(session);
-            }
-
-            session.UpdatedAtUtc = snapshot.UpdatedAtUtc;
+            ApplyWorkspaceUpdateLocked(session, update);
         }
 
         PersistSessions();
         return CloneSession(session);
     }
+
+    public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+        string sessionId,
+        VisionAgentWorkspaceSnapshotUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        var session = GetOrCreateSession(sessionId);
+
+        lock (session)
+        {
+            var snapshot = session.WorkspaceSnapshot ??= new VisionAgentWorkspaceSnapshot();
+            var expected = update.ExpectedRevision.GetValueOrDefault(-1);
+            if (expected != snapshot.Revision)
+            {
+                return new VisionAgentWorkspaceSnapshotMutationResult
+                {
+                    Success = false,
+                    Conflict = true,
+                    ErrorCode = "workspace_revision_conflict",
+                    PublicMessage = "工作台状态已更新，请刷新后重试本次修改。",
+                    Snapshot = CloneWorkspaceSnapshot(snapshot),
+                    PersistenceStatus = ClonePersistenceStatus(_lastPersistenceStatus)
+                };
+            }
+
+            ApplyWorkspaceUpdateLocked(session, update);
+        }
+
+        var persistence = PersistSessions();
+        var latest = GetSession(session.SessionId)?.WorkspaceSnapshot;
+        return new VisionAgentWorkspaceSnapshotMutationResult
+        {
+            Success = persistence.PrimaryStoreSaved,
+            Conflict = false,
+            ErrorCode = persistence.PrimaryStoreSaved ? string.Empty : persistence.ErrorCode,
+            PublicMessage = persistence.PublicMessage,
+            Snapshot = latest,
+            PersistenceStatus = persistence
+        };
+    }
+
+    public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var session = GetOrCreateSession(request.SessionId);
+        var assistantTurnId = string.IsNullOrWhiteSpace(request.AssistantTurnId)
+            ? Guid.NewGuid().ToString("N")
+            : request.AssistantTurnId.Trim();
+
+        lock (session)
+        {
+            if (!string.IsNullOrWhiteSpace(request.LatestFlowJson))
+                session.CurrentFlowJson = request.LatestFlowJson;
+
+            if (!string.IsNullOrWhiteSpace(request.LatestCanvasFlowJson))
+                session.CurrentCanvasFlowJson = request.LatestCanvasFlowJson;
+            else if (IsCanvasFlowJson(request.LatestFlowJson))
+                session.CurrentCanvasFlowJson = request.LatestFlowJson;
+
+            if (!session.History.Any(turn => string.Equals(turn.TurnId, assistantTurnId, StringComparison.OrdinalIgnoreCase)))
+            {
+                session.History.Add(new ConversationTurn
+                {
+                    TurnId = assistantTurnId,
+                    Role = "assistant",
+                    Message = request.AssistantMessage,
+                    TimestampUtc = DateTime.UtcNow,
+                    Payload = CloneTurnPayload(request.Payload)
+                });
+                TrimHistory(session);
+            }
+
+            ApplyWorkspaceUpdateLocked(session, request.WorkspaceUpdate);
+        }
+
+        var persistence = PersistSessions();
+        var latest = GetSession(session.SessionId)?.WorkspaceSnapshot;
+        return new VisionAgentWorkspaceSnapshotMutationResult
+        {
+            Success = persistence.PrimaryStoreSaved,
+            Conflict = false,
+            ErrorCode = persistence.PrimaryStoreSaved ? string.Empty : persistence.ErrorCode,
+            PublicMessage = persistence.PublicMessage,
+            Snapshot = latest,
+            PersistenceStatus = persistence
+        };
+    }
+
+    public ConversationPersistenceStatus GetLastPersistenceStatus() =>
+        ClonePersistenceStatus(_lastPersistenceStatus);
 
     public bool DeleteSession(string sessionId)
     {
@@ -642,10 +750,12 @@ public class ConversationalFlowService : IConversationalFlowService
         }
     }
 
-    private void PersistSessions()
+    private ConversationPersistenceStatus PersistSessions()
     {
         lock (_persistLock)
         {
+            var status = new ConversationPersistenceStatus();
+            string? tempPath = null;
             try
             {
                 PruneInMemorySessions();
@@ -663,7 +773,7 @@ public class ConversationalFlowService : IConversationalFlowService
 
                 var directory = Path.GetDirectoryName(_storagePath) ?? AppContext.BaseDirectory;
                 Directory.CreateDirectory(directory);
-                var tempPath = Path.Combine(directory, $"{Path.GetFileName(_storagePath)}.{Guid.NewGuid():N}.tmp");
+                tempPath = Path.Combine(directory, $"{Path.GetFileName(_storagePath)}.{Guid.NewGuid():N}.tmp");
                 WriteAllTextDurably(tempPath, json);
 
                 if (File.Exists(_storagePath))
@@ -672,21 +782,52 @@ public class ConversationalFlowService : IConversationalFlowService
                     if (File.Exists(replaceBackupPath))
                         File.Delete(replaceBackupPath);
                     File.Replace(tempPath, _storagePath, replaceBackupPath, ignoreMetadataErrors: true);
-                    File.Copy(_storagePath, _lastGoodStoragePath, overwrite: true);
                     if (File.Exists(replaceBackupPath))
                         File.Delete(replaceBackupPath);
                 }
                 else
                 {
                     File.Move(tempPath, _storagePath);
+                }
+
+                status.PrimaryStoreSaved = true;
+                try
+                {
                     File.Copy(_storagePath, _lastGoodStoragePath, overwrite: true);
+                    status.RecoveryBackupSaved = true;
+                }
+                catch (Exception backupEx) when (backupEx is IOException or UnauthorizedAccessException)
+                {
+                    status.RecoveryBackupSaved = false;
+                    status.ErrorCode = "recovery_backup_save_failed";
+                    status.PublicMessage = "会话已保存，但恢复备份未更新；下次保存会继续重试。";
+                    if (_logger != null)
+                    {
+                        LoggerExtensions.LogWarning(
+                            _logger,
+                            backupEx,
+                            "Conversation session primary store saved but last-good backup failed. Path={StoragePath}, LastGoodPath={LastGoodPath}",
+                            _storagePath,
+                            _lastGoodStoragePath);
+                    }
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
+                status.PrimaryStoreSaved = false;
+                status.RecoveryBackupSaved = File.Exists(_lastGoodStoragePath);
+                status.ErrorCode = "primary_store_save_failed";
+                status.PublicMessage = "结果已生成，但本次会话尚未成功保存。";
                 if (_logger != null)
                     LoggerExtensions.LogError(_logger, ex, "Failed to persist conversation session store. Path={StoragePath}", _storagePath);
+                if (!string.IsNullOrWhiteSpace(tempPath) && File.Exists(tempPath))
+                {
+                    try { File.Delete(tempPath); } catch (IOException) { }
+                }
             }
+
+            _lastPersistenceStatus = ClonePersistenceStatus(status);
+            return status;
         }
     }
 
@@ -843,6 +984,44 @@ public class ConversationalFlowService : IConversationalFlowService
             snapshot.BuildTerminalSequence = update.BuildTerminalSequence;
         if (!string.IsNullOrWhiteSpace(update.SubmittedBuildFingerprint))
             snapshot.SubmittedBuildFingerprint = update.SubmittedBuildFingerprint.Trim();
+    }
+
+    private static void ApplyWorkspaceUpdateLocked(
+        ConversationSession session,
+        VisionAgentWorkspaceSnapshotUpdate update)
+    {
+        var snapshot = session.WorkspaceSnapshot ?? new VisionAgentWorkspaceSnapshot();
+        ApplyWorkspaceUpdate(snapshot, update);
+        session.WorkspaceSnapshot = snapshot;
+
+        var userMessage = update.UserMessage?.Trim();
+        var userTurnId = update.UserTurnId?.Trim();
+        if (!string.IsNullOrWhiteSpace(userMessage) &&
+            !string.IsNullOrWhiteSpace(userTurnId) &&
+            !session.History.Any(turn => string.Equals(turn.TurnId, userTurnId, StringComparison.OrdinalIgnoreCase)))
+        {
+            session.History.Add(new ConversationTurn
+            {
+                TurnId = userTurnId,
+                Role = "user",
+                Message = userMessage,
+                TimestampUtc = DateTime.UtcNow
+            });
+            TrimHistory(session);
+        }
+
+        session.UpdatedAtUtc = snapshot.UpdatedAtUtc;
+    }
+
+    private static ConversationPersistenceStatus ClonePersistenceStatus(ConversationPersistenceStatus status)
+    {
+        return new ConversationPersistenceStatus
+        {
+            PrimaryStoreSaved = status.PrimaryStoreSaved,
+            RecoveryBackupSaved = status.RecoveryBackupSaved,
+            ErrorCode = status.ErrorCode,
+            PublicMessage = status.PublicMessage
+        };
     }
 
     private static VisionAgentWorkspaceSnapshot? CloneWorkspaceSnapshot(VisionAgentWorkspaceSnapshot? snapshot)

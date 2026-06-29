@@ -142,8 +142,15 @@ public sealed class AgentRunEndpointsTests
         wireResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         using var scratchDoc = JsonDocument.Parse(await scratchResponse.Content.ReadAsStringAsync());
         using var wireDoc = JsonDocument.Parse(await wireResponse.Content.ReadAsStringAsync());
-        var scratch = scratchDoc.RootElement;
-        var wire = wireDoc.RootElement;
+        var scratchEnvelope = scratchDoc.RootElement;
+        var wireEnvelope = wireDoc.RootElement;
+        var scratch = scratchEnvelope.GetProperty("planResult");
+        var wire = wireEnvelope.GetProperty("planResult");
+
+        scratchEnvelope.GetProperty("sessionId").GetString().Should().NotBeNullOrWhiteSpace();
+        scratchEnvelope.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64().Should().BeGreaterThan(0);
+        scratchEnvelope.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeTrue();
+        scratchEnvelope.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
 
         scratch.GetProperty("intent").GetString().Should().Be("surface_defect");
         scratch.GetProperty("recommendedRoute").GetProperty("routeId").GetString().Should().Be("surface_defect_detection");
@@ -168,6 +175,13 @@ public sealed class AgentRunEndpointsTests
                     !string.IsNullOrWhiteSpace(option.GetProperty("description").GetString()) &&
                     !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));
         scratch.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        var recovered = new ConversationalFlowService(Path.Combine(host.RootDirectory, "sessions"));
+        var recoveredSession = recovered.GetSession(scratchEnvelope.GetProperty("sessionId").GetString()!);
+        recoveredSession.Should().NotBeNull();
+        recoveredSession!.History.Should().ContainSingle(turn => turn.Role == "user");
+        recoveredSession.WorkspaceSnapshot.Should().NotBeNull();
+        recoveredSession.WorkspaceSnapshot!.PendingPlanSnapshot.Should().NotBeNull();
+        recoveredSession.WorkspaceSnapshot.PlanRunStatus.Should().Be(AgentRunEventStatuses.Completed);
 
         wire.GetProperty("intent").GetString().Should().Be("wire_sequence");
         wire.GetProperty("clarificationQuestions").EnumerateArray()
@@ -1481,6 +1495,8 @@ public sealed class AgentRunEndpointsTests
         }
 
         public HttpClient Client { get; }
+
+        public string RootDirectory => _directory;
 
         public FakeAiFlowGenerationService Generation { get; }
 

@@ -143,6 +143,23 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         reloaded.IsRunOwner(run.RunId, "usr_other").Should().BeFalse();
     }
 
+    [Fact(DisplayName = "AgentRun restart recovery fails non-terminal runs closed")]
+    public void Replay_ShouldFailClosedForNonTerminalRunAfterRestart()
+    {
+        var run = _service.CreateRun("restart recovery", ownerHash: "usr_owner_restart");
+        _service.Append(run.RunId, Draft(AgentRunEventTypes.StageStarted, "planner"));
+
+        var reloaded = new AgentRunEventStreamService(new AgentRunEventStore(_directory, _redactor), _redactor);
+        var replay = reloaded.Replay(run.RunId);
+        var appended = reloaded.Append(run.RunId, Draft(AgentRunEventTypes.StageCompleted, "planner"));
+
+        replay.Should().NotBeNull();
+        replay!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
+        replay.Events.Last().EventType.Should().Be(AgentRunEventTypes.RunFailed);
+        JsonSerializer.Serialize(replay.Events.Last().Payload).Should().Contain("host_instance_restarted");
+        appended.Should().BeNull();
+    }
+
     [Fact(DisplayName = "AgentRun replay returns replay-safe snapshot and diagnostics")]
     public void Replay_ShouldReturnSnapshotAndDiagnostics()
     {

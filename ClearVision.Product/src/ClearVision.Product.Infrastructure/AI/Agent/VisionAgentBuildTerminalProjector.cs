@@ -84,15 +84,6 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         try
         {
             var session = _conversationalFlowService.GetOrCreateSession(sessionId);
-            if (HasProjectedTerminal(session, runId, projection.TerminalEvent.Sequence))
-            {
-                _journal.MarkProjected(
-                    runId,
-                    session.SessionId,
-                    projection.TerminalEvent.Sequence,
-                    projection.TerminalEvent.EventType);
-                return false;
-            }
 
             projection.Result.SessionId = session.SessionId;
             var result = projection.Result;
@@ -138,33 +129,47 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
                         Diagnostics = result.LastAttemptDiagnostics.ToList()
                     }
             };
-            _conversationalFlowService.RecordAssistantResponse(
-                session.SessionId,
-                assistantMessage,
-                flowJson,
-                flowJson,
-                payload);
-            _conversationalFlowService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+            var projectionResult = _conversationalFlowService.ProjectBuildTerminal(new VisionAgentTerminalProjectionRequest
             {
-                LifecycleState = result.Success
-                    ? "build_completed"
-                    : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
-                        ? "build_cancelled"
-                        : "build_failed"),
-                PendingPlanSnapshot = projection.Request.BuildFromPlan?.PlanSnapshot,
-                PlanQuestionSelections = projection.Request.BuildFromPlan?.UserSelections,
-                ConfirmedPlanAnswers = projection.Request.BuildFromPlan?.ConfirmedAnswers,
-                RequirementMode = projection.Request.RequirementMode,
-                PlanAcceptedRecommendedDefaults = projection.Request.BuildFromPlan?.AcceptedRecommendedDefaults,
-                BuildRunId = runId,
-                BuildRunStatus = result.Success
-                    ? AgentRunEventStatuses.Completed
-                    : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
-                        ? AgentRunEventStatuses.Cancelled
-                        : AgentRunEventStatuses.Failed),
-                BuildTerminalSequence = terminal.Sequence,
-                SubmittedBuildFingerprint = FirstNonBlank(result.AnswerSetFingerprint, result.PlanHash, projection.Request.BuildFromPlan?.PlanHash)
+                SessionId = session.SessionId,
+                AssistantTurnId = $"build:{runId}:terminal:{terminal.Sequence}:assistant",
+                AssistantMessage = assistantMessage,
+                LatestFlowJson = flowJson,
+                LatestCanvasFlowJson = flowJson,
+                Payload = payload,
+                WorkspaceUpdate = new VisionAgentWorkspaceSnapshotUpdate
+                {
+                    LifecycleState = result.Success
+                        ? "build_completed"
+                        : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
+                            ? "build_cancelled"
+                            : "build_failed"),
+                    PendingPlanSnapshot = projection.Request.BuildFromPlan?.PlanSnapshot,
+                    PlanQuestionSelections = projection.Request.BuildFromPlan?.UserSelections,
+                    ConfirmedPlanAnswers = projection.Request.BuildFromPlan?.ConfirmedAnswers,
+                    RequirementMode = projection.Request.RequirementMode,
+                    PlanAcceptedRecommendedDefaults = projection.Request.BuildFromPlan?.AcceptedRecommendedDefaults,
+                    BuildRunId = runId,
+                    BuildRunStatus = result.Success
+                        ? AgentRunEventStatuses.Completed
+                        : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
+                            ? AgentRunEventStatuses.Cancelled
+                            : AgentRunEventStatuses.Failed),
+                    BuildTerminalSequence = terminal.Sequence,
+                    SubmittedBuildFingerprint = FirstNonBlank(result.AnswerSetFingerprint, result.PlanHash, projection.Request.BuildFromPlan?.PlanHash)
+                }
             });
+            if (!projectionResult.PersistenceStatus.PrimaryStoreSaved)
+            {
+                _journal.MarkFailed(
+                    runId,
+                    session.SessionId,
+                    terminal.Sequence,
+                    terminal.EventType,
+                    new IOException(projectionResult.PublicMessage));
+                return false;
+            }
+
             _journal.MarkProjected(
                 runId,
                 session.SessionId,
@@ -431,15 +436,6 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             (runId ?? string.Empty)
             .Where(ch => char.IsLetterOrDigit(ch) || ch is '_' or '-' or '.'));
         return $"agent-run-{(string.IsNullOrWhiteSpace(safeRunId) ? "unknown" : safeRunId)}";
-    }
-
-    private static bool HasProjectedTerminal(ConversationSession session, string runId, long terminalSequence)
-    {
-        var runMarker = $"agent_run:{runId}";
-        var terminalMarker = $"terminal:{terminalSequence}";
-        return session.History.Any(turn =>
-            turn.Payload?.Progress.Any(item => string.Equals(item, runMarker, StringComparison.OrdinalIgnoreCase)) == true &&
-            turn.Payload.Progress.Any(item => string.Equals(item, terminalMarker, StringComparison.OrdinalIgnoreCase)));
     }
 
     private static bool IsTerminalEvent(AgentRunEvent evt)

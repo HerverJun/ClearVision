@@ -143,6 +143,16 @@ public partial class MainForm : Form
     {
         try
         {
+            try
+            {
+                await _webView2Host.ExecuteScriptAsync(
+                    "(async()=>{try{return await (window.__clearVisionFlushAiPanelWorkspace?.('host_close') ?? true);}catch{return false;}})()");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainForm] AI workspace flush before close failed: {ex}");
+            }
+
             _messageHandler?.Dispose();
             await _webView2Host.DisposeAsync();
         }

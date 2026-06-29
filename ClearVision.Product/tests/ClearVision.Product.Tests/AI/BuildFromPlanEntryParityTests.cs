@@ -217,7 +217,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     }
 
     [Fact]
-    public void ProjectorRetry_ShouldRepairPendingJournalWithoutDuplicatingExistingSessionTurn()
+    public void ProjectorRetry_ShouldRepairPartialProjectionWithoutDuplicatingStableAssistantTurn()
     {
         using var harness = CreateHarness();
         var run = harness.Stream.CreateRun("partial projection", new { sessionId = "session-partial", metadataOnly = true });
@@ -236,27 +236,10 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             buildReadiness = result.BuildReadiness,
             metadataOnly = true
         })!;
-        harness.Journal.Begin(run.RunId, request.SessionId, terminal.Sequence, terminal.EventType);
-        harness.Conversation.GetOrCreateSession(request.SessionId);
-        harness.Conversation.RecordAssistantResponse(
-            request.SessionId,
-            "already written",
-            null,
-            null,
-            new ConversationTurnPayload
-            {
-                Progress =
-                [
-                    BuildCommandTransports.AgentRun,
-                    $"agent_run:{run.RunId}",
-                    $"terminal:{terminal.Sequence}"
-                ]
-            });
-
-        var reloadedJournal = new VisionAgentBuildProjectionJournal(harness.Store, harness.Redactor);
+        var partialConversation = new PartialProjectionConversationService(harness.Conversation);
         var projector = new VisionAgentBuildTerminalProjector(
-            harness.Conversation,
-            reloadedJournal,
+            partialConversation,
+            harness.Journal,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>());
 
         projector.Project(new VisionAgentBuildTerminalProjection(
@@ -265,12 +248,21 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             request,
             result,
             terminal)).Should().BeFalse();
+        projector.Project(new VisionAgentBuildTerminalProjection(
+            run.RunId,
+            BuildCommandTransports.AgentRun,
+            request,
+            result,
+            terminal)).Should().BeTrue();
 
-        harness.Conversation.GetSession("session-partial")!.History.Should().HaveCount(1);
-        reloadedJournal.LoadCheckpoints()
-            .Single(item => item.RunId == run.RunId)
-            .Status.Should()
-            .Be(VisionAgentBuildProjectionStatuses.Projected);
+        var session = harness.Conversation.GetSession("session-partial")!;
+        session.History.Should().HaveCount(1);
+        session.WorkspaceSnapshot!.BuildRunId.Should().Be(run.RunId);
+        session.WorkspaceSnapshot.BuildRunStatus.Should().Be(AgentRunEventStatuses.Completed);
+        session.WorkspaceSnapshot.BuildTerminalSequence.Should().Be(terminal.Sequence);
+        var checkpoint = harness.Journal.LoadCheckpoints().Single(item => item.RunId == run.RunId);
+        checkpoint.Status.Should().Be(VisionAgentBuildProjectionStatuses.Projected);
+        checkpoint.Attempts.Should().Be(2);
     }
 
     [Fact]
@@ -857,6 +849,108 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
 
         public ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update) =>
             _inner.UpdateWorkspaceSnapshot(sessionId, update);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.TryUpdateWorkspaceSnapshot(sessionId, update);
+
+        public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request)
+        {
+            if (_throw)
+            {
+                _throw = false;
+                throw new InvalidOperationException("public failure");
+            }
+
+            return _inner.ProjectBuildTerminal(request);
+        }
+
+        public ConversationPersistenceStatus GetLastPersistenceStatus() => _inner.GetLastPersistenceStatus();
+
+        public bool DeleteSession(string sessionId) => _inner.DeleteSession(sessionId);
+    }
+
+    private sealed class PartialProjectionConversationService : IConversationalFlowService
+    {
+        private readonly IConversationalFlowService _inner;
+        private bool _failOnce = true;
+
+        public PartialProjectionConversationService(IConversationalFlowService inner)
+        {
+            _inner = inner;
+        }
+
+        public ConversationSession GetOrCreateSession(string? sessionId) => _inner.GetOrCreateSession(sessionId);
+
+        public ConversationIntent DetectIntent(string userDescription, bool hasExistingFlow) =>
+            _inner.DetectIntent(userDescription, hasExistingFlow);
+
+        public ConversationContext PrepareContext(AiFlowGenerationRequest request) =>
+            _inner.PrepareContext(request);
+
+        public void RecordAssistantResponse(
+            string sessionId,
+            string assistantMessage,
+            string? latestFlowJson,
+            string? latestCanvasFlowJson = null,
+            ConversationTurnPayload? payload = null) =>
+            _inner.RecordAssistantResponse(sessionId, assistantMessage, latestFlowJson, latestCanvasFlowJson, payload);
+
+        public IReadOnlyList<ConversationSessionSummary> ListSessions() => _inner.ListSessions();
+
+        public ConversationSession? GetSession(string sessionId) => _inner.GetSession(sessionId);
+
+        public bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson) =>
+            _inner.TryBackfillCanvasFlowJson(sessionId, canvasFlowJson);
+
+        public ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.UpdateWorkspaceSnapshot(sessionId, update);
+
+        public VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
+            string sessionId,
+            VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.TryUpdateWorkspaceSnapshot(sessionId, update);
+
+        public VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request)
+        {
+            if (!_failOnce)
+            {
+                return _inner.ProjectBuildTerminal(request);
+            }
+
+            _failOnce = false;
+            var partial = _inner.ProjectBuildTerminal(new VisionAgentTerminalProjectionRequest
+            {
+                SessionId = request.SessionId,
+                AssistantTurnId = request.AssistantTurnId,
+                AssistantMessage = request.AssistantMessage,
+                LatestFlowJson = request.LatestFlowJson,
+                LatestCanvasFlowJson = request.LatestCanvasFlowJson,
+                Payload = request.Payload,
+                WorkspaceUpdate = new VisionAgentWorkspaceSnapshotUpdate
+                {
+                    LifecycleState = "build_projection_partial"
+                }
+            });
+
+            return new VisionAgentWorkspaceSnapshotMutationResult
+            {
+                Success = false,
+                ErrorCode = "primary_store_save_failed",
+                PublicMessage = "simulated snapshot failure",
+                Snapshot = partial.Snapshot,
+                PersistenceStatus = new ConversationPersistenceStatus
+                {
+                    PrimaryStoreSaved = false,
+                    RecoveryBackupSaved = true,
+                    ErrorCode = "primary_store_save_failed",
+                    PublicMessage = "simulated snapshot failure"
+                }
+            };
+        }
+
+        public ConversationPersistenceStatus GetLastPersistenceStatus() => _inner.GetLastPersistenceStatus();
 
         public bool DeleteSession(string sessionId) => _inner.DeleteSession(sessionId);
     }

@@ -129,10 +129,16 @@ export const aiPanelSessionHistoryMixin = {
         this._filterHistory(this.historyKeyword);
     },
 
-    _switchToSession(sessionId) {
+    async _switchToSession(sessionId) {
         if (!sessionId) return;
         if (this.isGenerating) {
             this._addMessage('system', '正在生成中，暂时无法切换历史会话。');
+            return;
+        }
+
+        const flushed = (await this._flushWorkspaceSnapshotBeforeBoundary?.('history_switch')) ?? true;
+        if (!flushed) {
+            this._setResultStatusNote?.('Plan 修改尚未成功保存，已阻止切换历史。', 'warning');
             return;
         }
 

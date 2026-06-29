@@ -44,6 +44,8 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
     public Func<DateTimeOffset> UtcNowProvider { get; set; } = static () => DateTimeOffset.UtcNow;
 
+    public string HostInstanceId { get; } = Guid.NewGuid().ToString("N");
+
     public AgentRunCreateResult CreateRun(string description, object? payload = null, string? ownerHash = null)
     {
         var runId = $"ar_{Guid.NewGuid():N}";
@@ -538,7 +540,37 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             RedactionPass = summary?.RedactionPass ?? events.All(evt => evt.RedactionPass)
         };
         restored.Events.AddRange(events.OrderBy(evt => evt.Sequence));
-        return _runs.GetOrAdd(runId, restored);
+        restored = _runs.GetOrAdd(runId, restored);
+        if (!restored.IsTerminal)
+        {
+            lock (restored.Gate)
+            {
+                if (!restored.IsTerminal)
+                {
+                    var recoveryEvent = BuildSafeEvent(restored.RunId, restored.NextSequence(), new AgentRunEventDraft
+                    {
+                        EventType = AgentRunEventTypes.RunFailed,
+                        Stage = "run",
+                        Title = "Run failed after host restart",
+                        Summary = "The previous host process ended before this AgentRun reached a terminal event. Submit the request again to continue.",
+                        Status = AgentRunEventStatuses.Failed,
+                        Payload = new
+                        {
+                            hostInstanceId = HostInstanceId,
+                            recoveryReason = "host_instance_restarted",
+                            firstFixRecommendation = "Submit the request again so a live host can execute it from the beginning."
+                        }
+                    });
+                    restored.Events.Add(recoveryEvent);
+                    UpdateSummaryFromEvent(restored, recoveryEvent);
+                    restored.IsTerminal = true;
+                    _store.AppendEvent(recoveryEvent);
+                    _store.AppendSummary(restored.ToSummary());
+                }
+            }
+        }
+
+        return restored;
     }
 
     private static void UpdateSummaryFromEvent(AgentRunState state, AgentRunEvent evt)

@@ -12,6 +12,11 @@ export const aiPanelRequirementBriefMixin = {
     },
 
     _setRequirementMode(mode, { silent = false } = {}) {
+        if (this._isPlanSnapshotReadOnly?.()) {
+            this._warnPlanReadOnly?.();
+            this._updateRequirementModeUI();
+            return;
+        }
         const normalized = this._normalizeRequirementMode(mode);
         if (normalized === this.requirementMode) {
             this._updateRequirementModeUI();
@@ -24,6 +29,7 @@ export const aiPanelRequirementBriefMixin = {
             this._rememberRequirementModeForPlan?.(this.pendingVisionPlan, normalized);
         }
         this.planAnswerRevision = (Number(this.planAnswerRevision) || 0) + 1;
+        this._queueWorkspaceSnapshotFlush?.('requirement_mode');
         this._requestPlanReadinessPreview?.(this.pendingVisionPlan, { reason: 'requirement_mode' });
         this._updateRequirementModeUI();
         this._renderPlanWorkspace?.(this.pendingVisionPlan);

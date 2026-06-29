@@ -55,6 +55,7 @@ public static class AgentRunEndpoints
     public static IEndpointRouteBuilder MapAgentRunEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/ai/agent-plan", HandleCreatePlanAsync);
+        app.MapPost("/api/ai/sessions/{sessionId}/workspace-snapshot", HandleUpdateWorkspaceSnapshot);
         app.MapPost("/api/ai/agent-plan/readiness-preview", HandlePreviewPlanReadinessAsync);
         app.MapPost("/api/ai/agent-intent-router-runs", HandleCreateIntentRouterRunAsync);
         app.MapPost("/api/ai/agent-plan-runs", HandleCreatePlanRunAsync);
@@ -95,6 +96,7 @@ public static class AgentRunEndpoints
 
     private static async Task<IResult> HandleCreatePlanAsync(
         VisionAgentPlanModeRequest request,
+        IConversationalFlowService conversationService,
         IVisionAgentOrchestrator orchestrator,
         CancellationToken ct)
     {
@@ -106,8 +108,70 @@ public static class AgentRunEndpoints
             });
         }
 
+        var session = conversationService.GetOrCreateSession(request.SessionId);
+        request = request with { SessionId = session.SessionId };
+        conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "planning",
+            RequirementMode = request.RequirementMode,
+            ConfirmedPlanAnswers = request.ConfirmedPlanAnswers,
+            UserTurnId = $"plan:fallback:{Guid.NewGuid():N}:user",
+            UserMessage = request.Description
+        });
+
         var result = await orchestrator.CreatePlanAsync(request, ct);
-        return Results.Ok(result);
+        var snapshot = conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = result.CanBuild ? "plan_ready" : "plan_blocked",
+            PendingPlanSnapshot = BuildReplaySafePlanResult(result),
+            PlanRunStatus = AgentRunEventStatuses.Completed,
+            RequirementMode = request.RequirementMode,
+            ConfirmedPlanAnswers = result.ConfirmedPlanAnswers.Count > 0
+                ? result.ConfirmedPlanAnswers
+                : request.ConfirmedPlanAnswers
+        }).WorkspaceSnapshot;
+
+        return Results.Ok(new
+        {
+            sessionId = session.SessionId,
+            planResult = BuildReplaySafePlanResult(result),
+            workspaceSnapshot = snapshot,
+            persistenceStatus = conversationService.GetLastPersistenceStatus(),
+            metadataOnly = true
+        });
+    }
+
+    private static IResult HandleUpdateWorkspaceSnapshot(
+        string sessionId,
+        VisionAgentWorkspaceSnapshotDeltaRequest request,
+        IConversationalFlowService conversationService)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return Results.BadRequest(new { error = "sessionId is required." });
+        }
+
+        var result = conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = request.ExpectedRevision,
+            ClientMutationId = request.ClientMutationId,
+            ProjectId = request.ProjectId,
+            LifecycleState = request.LifecycleState,
+            PlanQuestionSelections = request.PlanQuestionSelections,
+            ConfirmedPlanAnswers = request.ConfirmedPlanAnswers,
+            RequirementMode = request.RequirementMode,
+            PlanAcceptedRecommendedDefaults = request.PlanAcceptedRecommendedDefaults,
+            SubmittedBuildFingerprint = request.SubmittedBuildFingerprint
+        });
+
+        if (result.Conflict)
+        {
+            return Results.Conflict(result);
+        }
+
+        return result.Success
+            ? Results.Ok(result)
+            : Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
     }
 
     private static Task<IResult> HandleCreatePlanRunAsync(
@@ -134,7 +198,7 @@ public static class AgentRunEndpoints
             request.Description,
             BuildPlanCreatePayload(request),
             ownerHash);
-        conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var workspaceSnapshot = conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             LifecycleState = "planning",
             PlanRunId = createResult.RunId,
@@ -143,7 +207,7 @@ public static class AgentRunEndpoints
             ConfirmedPlanAnswers = request.ConfirmedPlanAnswers,
             UserTurnId = $"plan:{createResult.RunId}:user",
             UserMessage = request.Description
-        });
+        }).WorkspaceSnapshot;
 
         AppendPlanEvent(streamService, createResult.RunId, AgentRunEventTypes.PlanCreated, "plan", "规划已创建",
             "已创建 Plan Run，公开进度将通过事件流更新。", AgentRunEventStatuses.Completed, new
@@ -175,7 +239,9 @@ public static class AgentRunEndpoints
             runId = createResult.RunId,
             sessionId = session.SessionId,
             brief = createResult.Brief,
-            events = replay?.Events ?? createResult.Events
+            events = replay?.Events ?? createResult.Events,
+            workspaceSnapshot,
+            persistenceStatus = conversationService.GetLastPersistenceStatus()
         }));
     }
 
@@ -1177,4 +1243,17 @@ public sealed record AgentRunCreateRequest
             BuildCommandTransports.AgentRun,
             persistResult);
     }
+}
+
+public sealed record VisionAgentWorkspaceSnapshotDeltaRequest
+{
+    public long ExpectedRevision { get; init; }
+    public string ClientMutationId { get; init; } = string.Empty;
+    public string? ProjectId { get; init; }
+    public string? LifecycleState { get; init; }
+    public Dictionary<string, string>? PlanQuestionSelections { get; init; }
+    public List<VisionAgentPlanAnswer>? ConfirmedPlanAnswers { get; init; }
+    public string? RequirementMode { get; init; }
+    public bool? PlanAcceptedRecommendedDefaults { get; init; }
+    public string? SubmittedBuildFingerprint { get; init; }
 }

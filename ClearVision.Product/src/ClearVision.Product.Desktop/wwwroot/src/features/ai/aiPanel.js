@@ -115,6 +115,11 @@ export class AiPanel {
         this.directBuildDebugNextRequest = false;
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
         this.workspaceViewMode = this._loadWorkspaceViewMode?.() || AgentWorkspaceModes.PLAN;
+        this.workspaceSnapshotRevision = 0;
+        this.workspaceSnapshotDirty = false;
+        this.workspaceSnapshotSaveQueue = Promise.resolve();
+        this.workspaceBuildRunId = '';
+        this.workspaceSubmittedBuildFingerprint = '';
         this.pendingVisionPlan = null;
         this.pendingClarificationPayload = null;
         this.planQuestionSelections = {};
@@ -159,6 +164,10 @@ export class AiPanel {
         
         // 初始化
         this._init();
+        if (typeof window !== 'undefined') {
+            window.__clearVisionFlushAiPanelWorkspace = async (reason = 'host_close') =>
+                (await this._flushWorkspaceSnapshotBeforeBoundary?.(reason)) ?? true;
+        }
     }
 
     _init() {
@@ -196,7 +205,13 @@ export class AiPanel {
         }
     }
     
-    _handleNewConversation() {
+    async _handleNewConversation() {
+        const flushed = (await this._flushWorkspaceSnapshotBeforeBoundary?.('new_conversation')) ?? true;
+        if (!flushed) {
+            this._setResultStatusNote?.('Plan 修改尚未成功保存，已阻止新建会话。', 'warning');
+            return;
+        }
+
         this.sessionId = null;
         this._saveSessionId(null);
         this.currentResult = null;
@@ -228,6 +243,11 @@ export class AiPanel {
         this.canvasManualEditSignature = '';
         this.activeAssistantTurn = null;
         this.directBuildDebugNextRequest = false;
+        this.workspaceSnapshotRevision = 0;
+        this.workspaceSnapshotDirty = false;
+        this.workspaceSnapshotSaveQueue = Promise.resolve();
+        this.workspaceBuildRunId = '';
+        this.workspaceSubmittedBuildFingerprint = '';
         this._preApplySnapshot = null;
         this._lastAttachmentReport = null;
         this._lastModelSupportsVision = null;
