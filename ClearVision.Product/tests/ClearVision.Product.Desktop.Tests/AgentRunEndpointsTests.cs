@@ -201,6 +201,80 @@ public sealed class AgentRunEndpointsTests
                     !string.IsNullOrWhiteSpace(option.GetProperty("impact").GetString())));
     }
 
+    [Fact(DisplayName = "POST Agent plan primary persistence failure returns 503 before planner executes")]
+    public async Task CreatePlan_PrimaryPersistenceFailure_ShouldReturn503AndNotExecutePlanner()
+    {
+        var plannerCalled = false;
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
+        {
+            plannerCalled = true;
+            return Task.FromResult(baseline);
+        });
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan", new VisionAgentPlanModeRequest
+        {
+            Description = "detect scratches on metal",
+            OriginalUserPrompt = "detect scratches on metal",
+            SessionId = "session-plan-create-primary-fail"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("session_persistence_failed");
+        root.GetProperty("publicMessage").GetString().Should().Contain("模型规划未启动");
+        root.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeFalse();
+        root.GetProperty("metadataOnly").GetBoolean().Should().BeTrue();
+        plannerCalled.Should().BeFalse();
+        host.ConversationService.GetSession("session-plan-create-primary-fail").Should().BeNull();
+    }
+
+    [Fact(DisplayName = "POST Agent plan terminal persistence failure returns plan with warning")]
+    public async Task CreatePlan_TerminalPersistenceFailure_ShouldReturnPlanWithWarning()
+    {
+        var plannerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releasePlanner = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var plannerCalled = false;
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, ct) =>
+        {
+            plannerCalled = true;
+            plannerStarted.TrySetResult();
+            await releasePlanner.Task.WaitAsync(ct);
+            return baseline with
+            {
+                PlanSource = "planner",
+                FallbackReason = string.Empty,
+                Goal = "terminal warning plan"
+            };
+        });
+
+        var responseTask = host.Client.PostAsJsonAsync("/api/ai/agent-plan", new VisionAgentPlanModeRequest
+        {
+            Description = "detect scratches on metal",
+            OriginalUserPrompt = "detect scratches on metal",
+            SessionId = "session-plan-create-terminal-fail"
+        });
+        await plannerStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => throw new IOException("terminal primary failed");
+        releasePlanner.SetResult();
+        using var response = await responseTask;
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("planResult").GetProperty("goal").GetString().Should().Be("terminal warning plan");
+        root.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeFalse();
+        root.GetProperty("persistenceWarning").GetProperty("code").GetString().Should().Be("primary_store_save_failed");
+        root.GetProperty("workspaceSnapshot").GetProperty("lifecycleState").GetString().Should().Be("planning");
+        plannerCalled.Should().BeTrue();
+        host.ConversationService.GetSession("session-plan-create-terminal-fail")!
+            .WorkspaceSnapshot!
+            .PendingPlanSnapshot
+            .Should()
+            .BeNull();
+    }
+
     [Fact(DisplayName = "POST Agent plan readiness preview returns canonical readiness without creating AgentRun")]
     public async Task PreviewPlanReadiness_ShouldNotCreateRunOrProjectSession()
     {
@@ -465,6 +539,17 @@ public sealed class AgentRunEndpointsTests
         session.WorkspaceSnapshot.RequirementMode.Should().Be(AiRequirementModes.Draft);
         session.WorkspaceSnapshot.PendingPlanSnapshot.Should().NotBeNull();
         session.WorkspaceSnapshot.PendingPlanSnapshot!.MetadataOnly.Should().BeTrue();
+
+        var completed = host.StreamService.Replay(runId!)!.Events.Last(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+        using var completedPayload = JsonDocument.Parse(JsonSerializer.Serialize(completed.Payload, AgentRunEventJson.Options));
+        var payload = completedPayload.RootElement;
+        payload.GetProperty("planResult").GetProperty("planId").GetString().Should().NotBeNullOrWhiteSpace();
+        payload.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64()
+            .Should()
+            .Be(session.WorkspaceSnapshot.Revision);
+        payload.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeTrue();
+        payload.TryGetProperty("persistenceWarning", out var warning).Should().BeTrue();
+        warning.ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact(DisplayName = "POST PlanRun primary persistence failure returns 503 before planner executes")]
@@ -533,6 +618,13 @@ public sealed class AgentRunEndpointsTests
         var completedJson = JsonSerializer.Serialize(completed, AgentRunEventJson.Options);
         completedJson.Should().Contain("\"persistenceWarning\"");
         completedJson.Should().Contain("primary_store_save_failed");
+        using var completedPayload = JsonDocument.Parse(JsonSerializer.Serialize(completed.Payload, AgentRunEventJson.Options));
+        var payload = completedPayload.RootElement;
+        payload.GetProperty("planResult").GetProperty("planId").GetString().Should().NotBeNullOrWhiteSpace();
+        payload.GetProperty("workspaceSnapshot").GetProperty("planRunStatus").GetString()
+            .Should()
+            .Be(AgentRunEventStatuses.Running);
+        payload.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeFalse();
         host.ConversationService.GetSession("session-plan-terminal-fail")!
             .WorkspaceSnapshot!
             .PlanRunStatus

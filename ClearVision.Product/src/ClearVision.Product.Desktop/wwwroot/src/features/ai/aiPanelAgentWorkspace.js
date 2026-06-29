@@ -1915,7 +1915,12 @@ export const aiPanelAgentWorkspaceMixin = {
                             ? '规划已完成，已使用规则兜底方案。请确认推荐项或手动回答后开始构建。'
                             : '规划已完成，请确认推荐项或手动回答后开始构建。'
                 );
-                this._setResultStatusNote('规划模式等待确认，确认后进入构建模式。', 'info');
+                const persistenceWarning = this._getPersistenceWarning?.(this.pendingVisionPlan?.rawPlanSnapshot || result);
+                if (persistenceWarning) {
+                    this._setResultStatusNote(persistenceWarning.message || '规划结果已生成，但本次 Plan 工作台状态未能保存。', 'warning');
+                } else {
+                    this._setResultStatusNote('规划模式等待确认，确认后进入构建模式。', 'info');
+                }
                 this._renderAgentWorkspaceOverview();
                 this._renderPlanWorkspace(this.pendingVisionPlan);
                 this._updatePlanBuildActionState();
@@ -1925,16 +1930,19 @@ export const aiPanelAgentWorkspaceMixin = {
                 if (!this._isActivePlanRequest(planRequestId)) return;
                 this._clearActivePlanRequest(planRequestId);
                 this._setGeneratingState?.(false);
-                this.pendingVisionPlan = null;
+                if (clearInput && input) {
+                    input.value = userMessage || normalizedDescription;
+                    input.style.height = 'auto';
+                }
                 this._setAssistantTurnStatus(turn, '规划失败', 'failed');
                 this._setAssistantSectionText(
                     turn,
                     'reply',
                     `规划模式失败：${error?.message || String(error || '未知错误')}`
                 );
-                this._setResultStatusNote('规划模式失败，请检查后端连接后重试。', 'warning');
+                this._setResultStatusNote(error?.message || '规划模式失败，请检查后端连接后重试。', 'warning');
                 this._renderAgentWorkspaceOverview();
-                this._renderPlanWorkspace(null);
+                this._renderPlanWorkspace(this.pendingVisionPlan);
                 this._updatePlanBuildActionState();
                 this.activeAssistantTurn = null;
             });
@@ -2071,36 +2079,11 @@ export const aiPanelAgentWorkspaceMixin = {
             return await this._requestBackendVisionPlan(request);
         }
 
-        try {
-            return await this._requestBackendVisionPlanRun(request, {
-                planRequestId,
-                turn,
-                fallbackDescription
-            });
-        } catch (error) {
-            if (!this._isActivePlanRequest(planRequestId)) {
-                throw error;
-            }
-
-            if (this.activePlanRunId || this.activePlanRunCompletion) {
-                throw error;
-            }
-
-            this._closeAgentRunEventSource?.();
-            this.activePlanRunId = null;
-            this.activePlanRunRequestId = null;
-            this.activePlanRunEvents = [];
-            this.activePlanRunEventKeys = new Set();
-            this.activePlanRunCompletion = null;
-            this._setAssistantTurnStatus(turn, '普通规划请求', 'warning');
-            this._setAssistantSectionText(
-                turn,
-                'reply',
-                '事件流不可用，已切换为普通规划请求。'
-            );
-            this._setResultStatusNote('事件流不可用，已切换为普通规划请求。', 'warning');
-            return await this._requestBackendVisionPlan(request);
-        }
+        return await this._requestBackendVisionPlanRun(request, {
+            planRequestId,
+            turn,
+            fallbackDescription
+        });
     },
 
     async _requestBackendVisionPlanRun(request, { planRequestId, turn, fallbackDescription = '' } = {}) {
@@ -2253,7 +2236,6 @@ export const aiPanelAgentWorkspaceMixin = {
         this._renderPlanWorkspace(this.pendingVisionPlan);
 
         if (evt.eventType === 'plan.completed') {
-            this._resolveActivePlanRun(evt);
             return;
         }
 
@@ -2288,6 +2270,18 @@ export const aiPanelAgentWorkspaceMixin = {
                 this._rejectActivePlanRun(new Error('Plan Run 完成事件缺少 PlanModeResult。'));
             }
             return;
+        }
+
+        if (evt.eventType === 'run.completed') {
+            this._applyWorkspaceSnapshotSummary?.(payload.workspaceSnapshot || payload.WorkspaceSnapshot || null);
+            this._handleWorkspacePersistenceStatus?.(payload.persistenceStatus || payload.PersistenceStatus || null);
+            const persistenceWarning = payload.persistenceWarning || payload.PersistenceWarning || null;
+            if (persistenceWarning) {
+                result.persistenceWarning = persistenceWarning;
+                result.PersistenceWarning = persistenceWarning;
+                const warning = this._getPersistenceWarning?.({ persistenceWarning }) || {};
+                this._setResultStatusNote?.(warning.message || '规划结果已生成，但本次 Plan 工作台状态未能保存。', 'warning');
+            }
         }
 
         this._closeAgentRunEventSource?.();

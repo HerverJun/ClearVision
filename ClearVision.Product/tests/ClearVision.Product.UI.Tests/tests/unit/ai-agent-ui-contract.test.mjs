@@ -796,6 +796,39 @@ function backendPlanResult(overrides = {}) {
   };
 }
 
+function planRunCompletedEvent({
+  runId,
+  sequence,
+  planResult,
+  revision = 9,
+  persistenceStatus = { primaryStoreSaved: true, recoveryBackupSaved: true },
+  persistenceWarning = null
+} = {}) {
+  return {
+    runId,
+    sequence,
+    eventType: 'run.completed',
+    stage: 'run',
+    title: 'Run completed',
+    summary: 'Plan run completed.',
+    status: 'completed',
+    payload: {
+      planResult,
+      workspaceSnapshot: {
+        revision,
+        lifecycleState: 'plan_ready',
+        planRunId: runId,
+        planRunStatus: 'completed'
+      },
+      persistenceStatus,
+      persistenceWarning,
+      metadataOnly: true
+    },
+    metadataOnly: true,
+    redactionPass: true
+  };
+}
+
 async function waitFor(predicate, message = 'condition', attempts = 20) {
   for (let i = 0; i < attempts; i += 1) {
     if (predicate()) {
@@ -1866,18 +1899,26 @@ test('Intent Router semanticExtraction is passed to PlanRun and rendered from Pl
   const requests = installFetchStream([
     { json: { runId: 'ar_router_semantic_reuse', events: [] } },
     {
-      body: encodeSseEvent({
-        runId: 'ar_router_semantic_reuse',
-        sequence: 3,
-        eventType: 'plan.completed',
-        stage: 'plan_ready',
-        title: 'Plan ready',
-        summary: 'Plan completed with semantic extraction.',
-        status: 'completed',
-        payload: { planResult, metadataOnly: true },
-        metadataOnly: true,
-        redactionPass: true
-      })
+      body: [
+        encodeSseEvent({
+          runId: 'ar_router_semantic_reuse',
+          sequence: 3,
+          eventType: 'plan.completed',
+          stage: 'plan_ready',
+          title: 'Plan ready',
+          summary: 'Plan completed with semantic extraction.',
+          status: 'completed',
+          payload: { planResult, metadataOnly: true },
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent(planRunCompletedEvent({
+          runId: 'ar_router_semantic_reuse',
+          sequence: 4,
+          planResult,
+          revision: 14
+        }))
+      ].join('')
     }
   ]);
 
@@ -2120,6 +2161,7 @@ test('abstract visual goal with canonical shouldOpenPlan enters requirement deco
     metadataOnly: true
   });
   let planRequest = null;
+  panel._shouldUsePlanRunEventStream = () => false;
   panel._requestBackendVisionPlan = async request => {
     planRequest = request;
     return backendPlanResult({
@@ -2577,7 +2619,13 @@ test('Plan Mode streams public Plan progress into the assistant message', async 
           payload: { planResult, metadataOnly: true },
           metadataOnly: true,
           redactionPass: true
-        })
+        }),
+        encodeSseEvent(planRunCompletedEvent({
+          runId: 'ar_plan_stream',
+          sequence: 8,
+          planResult,
+          revision: 18
+        }))
       ].join('')
     }
   ]);
@@ -3030,7 +3078,13 @@ test('Plan Mode timeout stream shows rule fallback copy', async () => {
           payload: { planResult, metadataOnly: true },
           metadataOnly: true,
           redactionPass: true
-        })
+        }),
+        encodeSseEvent(planRunCompletedEvent({
+          runId: 'ar_plan_timeout',
+          sequence: 6,
+          planResult,
+          revision: 19
+        }))
       ].join('')
     }
   ]);
@@ -3046,7 +3100,7 @@ test('Plan Mode timeout stream shows rule fallback copy', async () => {
   assert.match(panel.pendingVisionPlan.fallbackReason, /模型规划超时/);
 });
 
-test('Plan Mode falls back to ordinary POST when Plan run creation is unavailable', async () => {
+test('Plan Mode falls back to ordinary POST only when PlanRun event mode is unavailable before request', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   panel.container = createContainer({
@@ -3057,24 +3111,74 @@ test('Plan Mode falls back to ordinary POST when Plan run creation is unavailabl
     '#ai-build-workspace': createFakeElement(),
     '#ai-result-status-note': createFakeElement()
   });
+  panel._shouldUsePlanRunEventStream = () => false;
   let fallbackCalls = 0;
   panel._requestBackendVisionPlan = async () => {
     fallbackCalls += 1;
     return backendPlanResult({ planId: 'plan_fallback_post', goal: 'ordinary fallback plan' });
   };
+  const originalFetch = global.fetch;
+  global.fetch = () => {
+    throw new Error('PlanRun fetch should not start when event mode is unavailable');
+  };
+
+  try {
+    panel._dispatchGenerateRequest({ description: 'fallback to post', userMessage: 'fallback to post' });
+    const turn = panel.activeAssistantTurn;
+    await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_fallback_post', 'ordinary plan fallback');
+
+    assert.equal(fallbackCalls, 1);
+    assert.match(turn.replyBody.textContent, /规划已完成|已使用规则兜底方案/);
+    assert.match(panel.lastResultStatusNote.text, /规划模式等待确认/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('PlanRun create 503 keeps Plan input and does not fall back to ordinary Plan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  const input = createFakeElement();
+  input.value = 'detect scratches';
+  panel.container = createContainer({
+    '#ai-input': input,
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  let fallbackCalls = 0;
+  panel._requestBackendVisionPlan = async () => {
+    fallbackCalls += 1;
+    throw new Error('ordinary Plan must not be called after PlanRun create failure');
+  };
   const requests = installFetchStream([
-    { status: 404, json: { error: 'missing endpoint' } }
+    {
+      status: 503,
+      json: {
+        errorCode: 'session_persistence_failed',
+        publicMessage: 'Plan Run 创建失败：会话状态未能保存，模型规划未启动。'
+      }
+    }
   ]);
 
-  panel._dispatchGenerateRequest({ description: 'fallback to post', userMessage: 'fallback to post' });
+  panel._enterPlanModeFromPrompt({
+    description: 'detect scratches',
+    userMessage: 'detect scratches',
+    input,
+    clearInput: true
+  });
   const turn = panel.activeAssistantTurn;
-  await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_fallback_post', 'ordinary plan fallback');
+  await waitFor(() => panel.isGenerating === false, 'PlanRun create failure handled');
 
-  assert.equal(fallbackCalls, 1);
+  assert.equal(fallbackCalls, 0);
   assert.equal(requests.length, 1);
   assert.match(requests[0].url, /\/api\/ai\/agent-plan-runs$/);
-  assert.match(turn.replyBody.textContent, /规划已完成|已使用规则兜底方案/);
-  assert.match(panel.lastResultStatusNote.text, /规划模式等待确认/);
+  assert.doesNotMatch(requests[0].url, /\/api\/ai\/agent-plan$/);
+  assert.equal(input.value, 'detect scratches');
+  assert.match(turn.replyBody.textContent, /Plan Run 创建失败：会话状态未能保存，模型规划未启动。/);
+  assert.match(panel.lastResultStatusNote.text, /Plan Run 创建失败：会话状态未能保存，模型规划未启动。/);
 });
 
 test('Start Build from Plan enters Build request with skipPlan', async () => {
@@ -5363,6 +5467,267 @@ test('Plan Mode ignores stale Plan run events when a newer run is active', async
   assert.equal(panel.pendingVisionPlan.planId, 'plan_new_active');
   assert.equal(panel.pendingVisionPlan.goal, 'new active plan');
   assert.equal(panel.activePlanRunEvents.length, 0);
+});
+
+test('PlanRun plan.completed records timeline but does not close or resolve stream', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  attachAgentRunTurn(panel);
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.activePlanRequestId = 'plan-request-open';
+  panel.activePlanRunId = 'ar_plan_open';
+  panel.activePlanRunRequestId = 'plan-request-open';
+  const completion = deferred();
+  let resolved = false;
+  let rejected = false;
+  completion.promise.then(
+    () => { resolved = true; },
+    () => { rejected = true; }
+  );
+  panel.activePlanRunCompletion = {
+    runId: 'ar_plan_open',
+    resolve: completion.resolve,
+    reject: completion.reject
+  };
+  let closed = false;
+  panel._closeAgentRunEventSource = () => {
+    closed = true;
+  };
+  const planResult = backendPlanResult({ planId: 'plan_intermediate_only', goal: 'intermediate plan' });
+
+  panel._handlePlanRunEvent({
+    runId: 'ar_plan_open',
+    sequence: 7,
+    eventType: 'plan.completed',
+    stage: 'plan_ready',
+    title: '规划已就绪',
+    summary: '规划已完成，可以开始构建。',
+    status: 'completed',
+    payload: { planResult, metadataOnly: true },
+    metadataOnly: true,
+    redactionPass: true
+  });
+  await flushAsync();
+
+  assert.equal(closed, false);
+  assert.equal(resolved, false);
+  assert.equal(rejected, false);
+  assert.equal(panel.activePlanRunCompletion?.runId, 'ar_plan_open');
+  assert.equal(panel.activePlanRunEvents.length, 1);
+});
+
+test('PlanRun run.completed applies final revision before resolving Plan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  attachAgentRunTurn(panel);
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.workspaceSnapshotRevision = 3;
+  panel.activePlanRequestId = 'plan-request-final';
+  panel.activePlanRunId = 'ar_plan_final';
+  panel.activePlanRunRequestId = 'plan-request-final';
+  let revisionAtResolve = 0;
+  let resolvedPlan = null;
+  let rejectedError = null;
+  panel.activePlanRunCompletion = {
+    runId: 'ar_plan_final',
+    resolve(result) {
+      revisionAtResolve = panel.workspaceSnapshotRevision;
+      resolvedPlan = result;
+    },
+    reject(error) {
+      rejectedError = error;
+    }
+  };
+  let closed = false;
+  panel._closeAgentRunEventSource = () => {
+    closed = true;
+  };
+  const planResult = backendPlanResult({ planId: 'plan_final_revision', goal: 'final revision plan' });
+
+  panel._handlePlanRunEvent(planRunCompletedEvent({
+    runId: 'ar_plan_final',
+    sequence: 9,
+    planResult,
+    revision: 42
+  }));
+
+  assert.equal(rejectedError, null);
+  assert.equal(closed, true);
+  assert.equal(panel.workspaceSnapshotRevision, 42);
+  assert.equal(revisionAtResolve, 42);
+  assert.equal(resolvedPlan.planId, 'plan_final_revision');
+  assert.equal(panel.activePlanRunCompletion, null);
+});
+
+test('PlanRun first Build after completion uses final workspace revision and starts Build', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.useVisionAgentGenerateFlow = true;
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._requestPlanReadinessPreview = () => null;
+  const startedBuildStreams = [];
+  const planResult = backendPlanResult({
+    planId: 'plan_revision_gate',
+    planHash: 'sha256:plan-revision-gate',
+    goal: 'revision gate plan',
+    canPlan: true,
+    canBuild: true,
+    buildReadiness: {
+      canBuild: true,
+      blockers: [],
+      resolvedFields: ['inspection_object', 'task_type'],
+      remainingFields: [],
+      primaryMessage: '当前确认项已满足构建条件。',
+      contractVersion: 'v2'
+    }
+  });
+  const requests = installFetchStream([
+    { json: { runId: 'ar_plan_revision_gate', sessionId: 'session-plan-revision', events: [] } },
+    {
+      body: [
+        encodeSseEvent({
+          runId: 'ar_plan_revision_gate',
+          sequence: 4,
+          eventType: 'plan.completed',
+          stage: 'plan_ready',
+          title: '规划已就绪',
+          summary: '规划已完成，可以开始构建。',
+          status: 'completed',
+          payload: { planResult, metadataOnly: true },
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent(planRunCompletedEvent({
+          runId: 'ar_plan_revision_gate',
+          sequence: 5,
+          planResult,
+          revision: 31
+        }))
+      ].join('')
+    },
+    {
+      json: {
+        runId: 'ar_build_revision_gate',
+        sessionId: 'session-plan-revision',
+        events: [],
+        workspaceSnapshot: {
+          revision: 32,
+          lifecycleState: 'building',
+          buildRunId: 'ar_build_revision_gate',
+          submittedBuildFingerprint: 'sha256:submitted'
+        },
+        persistenceStatus: { primaryStoreSaved: true, recoveryBackupSaved: true }
+      }
+    }
+  ]);
+
+  panel._enterPlanModeFromPrompt({
+    description: 'revision gate plan',
+    userMessage: 'revision gate plan',
+    clearInput: false
+  });
+  await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_revision_gate', 'PlanRun final plan');
+  assert.equal(panel.workspaceSnapshotRevision, 31);
+  panel._startAgentRunEventSource = (runId, options) => {
+    startedBuildStreams.push({ runId, options });
+  };
+
+  const started = await panel._startBuildFromCurrentPlan();
+  await waitFor(() => panel.activeAgentRunId === 'ar_build_revision_gate', 'Build run created');
+
+  assert.equal(started, true);
+  const buildRequest = requests.find(item => /\/api\/ai\/agent-runs$/.test(item.url));
+  assert.ok(buildRequest, 'Build create request was sent');
+  const buildBody = JSON.parse(buildRequest.options.body);
+  assert.equal(buildBody.buildFromPlan.workspaceExpectedRevision, 31);
+  assert.equal(panel.activeAgentRunId, 'ar_build_revision_gate');
+  assert.equal(panel.agentWorkspaceMode, 'build');
+  assert.deepEqual(startedBuildStreams.map(item => item.runId), ['ar_build_revision_gate']);
+});
+
+test('PlanRun terminal persistence warning is visible and plan result remains available', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._requestPlanReadinessPreview = () => null;
+  const planResult = backendPlanResult({
+    planId: 'plan_terminal_warning',
+    goal: 'terminal warning plan',
+    canPlan: true,
+    canBuild: false
+  });
+  installFetchStream([
+    { json: { runId: 'ar_plan_terminal_warning', sessionId: 'session-terminal-warning', events: [] } },
+    {
+      body: [
+        encodeSseEvent({
+          runId: 'ar_plan_terminal_warning',
+          sequence: 4,
+          eventType: 'plan.completed',
+          stage: 'plan_ready',
+          title: '规划已就绪',
+          summary: '规划已完成，可以开始构建。',
+          status: 'completed',
+          payload: { planResult, metadataOnly: true },
+          metadataOnly: true,
+          redactionPass: true
+        }),
+        encodeSseEvent(planRunCompletedEvent({
+          runId: 'ar_plan_terminal_warning',
+          sequence: 5,
+          planResult,
+          revision: 22,
+          persistenceStatus: {
+            primaryStoreSaved: false,
+            recoveryBackupSaved: true,
+            errorCode: 'primary_store_save_failed',
+            publicMessage: '规划结果已生成，但本次 Plan 工作台状态未能保存。'
+          },
+          persistenceWarning: {
+            code: 'primary_store_save_failed',
+            message: '规划结果已生成，但本次 Plan 工作台状态未能保存。'
+          }
+        }))
+      ].join('')
+    }
+  ]);
+
+  panel._enterPlanModeFromPrompt({
+    description: 'terminal warning plan',
+    userMessage: 'terminal warning plan',
+    clearInput: false
+  });
+  await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_terminal_warning', 'warning plan result');
+
+  assert.equal(panel.pendingVisionPlan.goal, 'terminal warning plan');
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+  assert.match(panel.lastResultStatusNote.text, /Plan 工作台状态未能保存/);
+  assert.equal(panel._workspacePersistenceStatusNoteActive, true);
+  assert.match(panel.workspacePersistenceWarning.message, /Plan 工作台状态未能保存/);
 });
 
 test('BuildFromPlan prefers Plan templateSelection over raw snapshot and queued selection', async () => {

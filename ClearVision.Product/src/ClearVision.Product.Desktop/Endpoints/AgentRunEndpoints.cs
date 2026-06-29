@@ -110,7 +110,7 @@ public static class AgentRunEndpoints
 
         var session = conversationService.GetOrCreateSession(request.SessionId);
         request = request with { SessionId = session.SessionId };
-        conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var initialPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             LifecycleState = "planning",
             RequirementMode = request.RequirementMode,
@@ -118,9 +118,25 @@ public static class AgentRunEndpoints
             UserTurnId = $"plan:fallback:{Guid.NewGuid():N}:user",
             UserMessage = request.Description
         });
+        if (!initialPersistence.Success)
+        {
+            return Results.Json(new
+            {
+                errorCode = initialPersistence.Conflict
+                    ? initialPersistence.ErrorCode
+                    : "session_persistence_failed",
+                publicMessage = "Plan 创建失败：会话状态未能保存，模型规划未启动。",
+                sessionId = session.SessionId,
+                workspaceSnapshot = initialPersistence.Snapshot,
+                persistenceStatus = initialPersistence.PersistenceStatus,
+                metadataOnly = true
+            }, statusCode: initialPersistence.Conflict
+                ? StatusCodes.Status409Conflict
+                : StatusCodes.Status503ServiceUnavailable);
+        }
 
         var result = await orchestrator.CreatePlanAsync(request, ct);
-        var snapshot = conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             LifecycleState = result.CanBuild ? "plan_ready" : "plan_blocked",
             PendingPlanSnapshot = BuildReplaySafePlanResult(result),
@@ -129,14 +145,18 @@ public static class AgentRunEndpoints
             ConfirmedPlanAnswers = result.ConfirmedPlanAnswers.Count > 0
                 ? result.ConfirmedPlanAnswers
                 : request.ConfirmedPlanAnswers
-        }).WorkspaceSnapshot;
+        });
+        var persistenceWarning = terminalPersistence.Success
+            ? null
+            : BuildPlanPersistenceWarning(terminalPersistence);
 
         return Results.Ok(new
         {
             sessionId = session.SessionId,
             planResult = BuildReplaySafePlanResult(result),
-            workspaceSnapshot = snapshot,
-            persistenceStatus = conversationService.GetLastPersistenceStatus(),
+            workspaceSnapshot = terminalPersistence.Snapshot,
+            persistenceStatus = terminalPersistence.PersistenceStatus,
+            persistenceWarning,
             metadataOnly = true
         });
     }
@@ -565,6 +585,8 @@ public static class AgentRunEndpoints
             var completedEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCompleted, "plan_ready",
                 "规划已就绪", BuildPlanCompletionSummary(result), AgentRunEventStatuses.Completed, completedPayload);
             object? persistenceWarning = null;
+            VisionAgentWorkspaceSnapshot? finalWorkspaceSnapshot = null;
+            ConversationPersistenceStatus? finalPersistenceStatus = null;
             if (!string.IsNullOrWhiteSpace(request.SessionId))
             {
                 var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
@@ -579,6 +601,8 @@ public static class AgentRunEndpoints
                         ? result.ConfirmedPlanAnswers
                         : request.ConfirmedPlanAnswers
                 });
+                finalWorkspaceSnapshot = terminalPersistence.Snapshot;
+                finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
                 {
                     persistenceWarning = BuildPlanPersistenceWarning(terminalPersistence);
@@ -589,7 +613,13 @@ public static class AgentRunEndpoints
             streamService.Complete(
                 runId,
                 BuildPlanCompletionSummary(result),
-                BuildPlanCompletedPayload(result, request.SessionId, runId, persistenceWarning));
+                BuildPlanCompletedPayload(
+                    result,
+                    request.SessionId,
+                    runId,
+                    finalWorkspaceSnapshot,
+                    finalPersistenceStatus,
+                    persistenceWarning));
         }
         catch (OperationCanceledException)
         {
@@ -739,6 +769,8 @@ public static class AgentRunEndpoints
         VisionAgentPlanModeResult result,
         string? sessionId,
         string runId,
+        VisionAgentWorkspaceSnapshot? workspaceSnapshot = null,
+        ConversationPersistenceStatus? persistenceStatus = null,
         object? persistenceWarning = null)
     {
         var replaySafePlan = BuildReplaySafePlanResult(result);
@@ -761,6 +793,8 @@ public static class AgentRunEndpoints
             canBuild = replaySafePlan.CanBuild,
             questionCount = replaySafePlan.ClarificationQuestions.Count,
             publicEventCount = replaySafePlan.PublicEvents.Count,
+            workspaceSnapshot,
+            persistenceStatus,
             persistenceWarning,
             metadataOnly = true
         };
