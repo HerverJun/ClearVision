@@ -30,7 +30,7 @@ public class ProgramCorsTests
     }
 
     [Fact]
-    public void BuildSingleInstanceMutexName_ShouldBeStableForSameUserDataAndInstall()
+    public void BuildSingleInstanceMutexName_ShouldBeStableForSameUserData()
     {
         var first = Program.BuildSingleInstanceMutexName(
             "DOMAIN\\operator",
@@ -42,14 +42,14 @@ public class ProgramCorsTests
             @"C:\Program Files\ClearVision");
 
         second.Should().Be(first);
-        first.Should().StartWith("Local\\ClearVision.Desktop.");
+        first.Should().StartWith("Global\\ClearVision.Desktop.StoreLease.");
         first.Should().NotContain("DOMAIN");
         first.Should().NotContain("Data");
         first.Should().NotContain("Program Files");
     }
 
     [Fact]
-    public void BuildSingleInstanceMutexName_ShouldBeIsolatedByUserDataAndInstall()
+    public void BuildSingleInstanceMutexName_ShouldBeIsolatedByUserAndDataOnly()
     {
         var baseline = Program.BuildSingleInstanceMutexName(
             "DOMAIN\\operator-a",
@@ -61,7 +61,27 @@ public class ProgramCorsTests
         Program.BuildSingleInstanceMutexName("DOMAIN\\operator-a", @"C:\Data\B\settings.json", @"C:\Install\A")
             .Should().NotBe(baseline);
         Program.BuildSingleInstanceMutexName("DOMAIN\\operator-a", @"C:\Data\A\settings.json", @"C:\Install\B")
-            .Should().NotBe(baseline);
+            .Should().Be(baseline);
+    }
+
+    [Fact]
+    public void BuildStoreLeaseMutexName_ShouldConflictWhenAnyStorePathOverlaps()
+    {
+        var conversation = Program.BuildStoreLeaseMutexName(
+            "conversation",
+            @"C:\Data\ClearVision\store.json",
+            "DOMAIN\\operator");
+        var agentRun = Program.BuildStoreLeaseMutexName(
+            "agent-run",
+            @"C:\Data\ClearVision\store.json",
+            "DOMAIN\\operator");
+        var independent = Program.BuildStoreLeaseMutexName(
+            "agent-run",
+            @"C:\Data\ClearVision\agent-runs",
+            "DOMAIN\\operator");
+
+        agentRun.Should().Be(conversation);
+        independent.Should().NotBe(conversation);
     }
 
     [Fact]

@@ -139,13 +139,26 @@ export const aiPanelGenerateRequestMixin = {
 
             this._dispatchAgentRunGenerateRequest(agentRunPayload, { clearInput, input })
                 .catch(err => {
+                    const payload = err?.payload || {};
+                    const errorCode = String(payload?.errorCode ?? payload?.ErrorCode ?? '').trim();
+                    const isBuildRevisionConflict = buildFromPlan && (
+                        err?.status === 409 ||
+                        err?.statusCode === 409 ||
+                        errorCode === 'workspace_revision_conflict' ||
+                        errorCode === 'workspace_revision_required');
                     this._handleError(err?.message || String(err || 'AgentRun 创建失败'));
                     if (buildFromPlan) {
+                        this._applyWorkspaceSnapshotSummary?.(payload?.workspaceSnapshot || payload?.WorkspaceSnapshot || null);
+                        this._handleWorkspacePersistenceStatus?.(payload?.persistenceStatus || payload?.PersistenceStatus || null);
                         this.agentWorkspaceMode = 'plan';
                         this._setWorkspaceViewMode?.('plan', { render: false });
                         this._renderAgentWorkspaceOverview?.();
                         this._renderPlanWorkspace?.(this.pendingVisionPlan);
                         this._renderBuildWorkspaceFromAgentRun?.();
+                        if (isBuildRevisionConflict) {
+                            this._setResultStatusNote?.('Plan 状态已变化，请确认后重新构建', 'warning');
+                            return;
+                        }
                         this._setResultStatusNote?.('Build 创建失败，已返回 Plan 视图，当前 Plan 仍可编辑。', 'warning');
                     }
                 });

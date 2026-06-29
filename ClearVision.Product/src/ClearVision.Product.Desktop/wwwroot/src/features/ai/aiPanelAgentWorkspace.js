@@ -548,6 +548,32 @@ export const aiPanelAgentWorkspaceMixin = {
         };
     },
 
+    _syncWorkspaceSnapshotDirty() {
+        this.workspaceSnapshotDirty =
+            Number(this.workspacePersistedGeneration || 0) < Number(this.workspaceMutationGeneration || 0);
+        return this.workspaceSnapshotDirty;
+    },
+
+    _isCurrentWorkspaceSaveTask(task) {
+        if (!task) return false;
+        const currentPlanIdentity = this._getPlanIdentity?.(this.pendingVisionPlan) || '';
+        return String(task.sessionId || '').trim().toLowerCase() === String(this.sessionId || '').trim().toLowerCase() &&
+            Number(task.sessionNavigationEpoch || 0) === Number(this.sessionNavigationEpoch || 0) &&
+            String(task.planIdentity || '') === String(currentPlanIdentity || '');
+    },
+
+    _isWorkspaceMutationBlocked() {
+        if (this.workspaceBoundaryInProgress) {
+            this._setResultStatusNote?.('Plan 修改正在保存，请稍后再编辑。', 'warning');
+            return true;
+        }
+        if (this._isPlanSnapshotReadOnly()) {
+            this._warnPlanReadOnly();
+            return true;
+        }
+        return false;
+    },
+
     _queueWorkspaceSnapshotFlush(reason = 'edit') {
         if (!this.sessionId || !this.pendingVisionPlan) {
             return Promise.resolve({ skipped: true });
@@ -558,25 +584,44 @@ export const aiPanelAgentWorkspaceMixin = {
         if (this._isPlanSnapshotReadOnly()) {
             return Promise.resolve({ skipped: true, readOnly: true });
         }
+        if (this.workspaceBoundaryInProgress && reason !== 'boundary_retry') {
+            return Promise.reject(new Error('workspace_boundary_in_progress'));
+        }
 
-        this.workspaceSnapshotDirty = true;
         const mutationId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         const delta = this._buildWorkspaceSnapshotDelta();
         const planIdentity = this._getPlanIdentity?.(this.pendingVisionPlan) || '';
+        const task = Object.freeze({
+            sessionId: String(this.sessionId || '').trim(),
+            sessionNavigationEpoch: Number(this.sessionNavigationEpoch || 0),
+            planIdentity,
+            generation: Number(this.workspaceMutationGeneration || 0) + 1,
+            mutationId,
+            delta: Object.freeze({ ...delta }),
+            reason
+        });
+        this.workspaceMutationGeneration = task.generation;
+        this.workspacePendingMutationCount = Number(this.workspacePendingMutationCount || 0) + 1;
+        this._syncWorkspaceSnapshotDirty();
         const run = async () => {
             let expectedRevision = Number(this.workspaceSnapshotRevision || 0);
             let rebased = false;
             try {
                 while (true) {
                     try {
-                        const result = await httpClient.post(`/ai/sessions/${encodeURIComponent(this.sessionId)}/workspace-snapshot`, {
+                        const result = await httpClient.post(`/ai/sessions/${encodeURIComponent(task.sessionId)}/workspace-snapshot`, {
                             expectedRevision,
-                            clientMutationId: mutationId,
-                            ...delta
+                            clientMutationId: task.mutationId,
+                            ...task.delta
                         });
-                        this._applyWorkspaceSnapshotSummary?.(result?.snapshot || result?.Snapshot || null);
-                        this._handleWorkspacePersistenceStatus?.(result?.persistenceStatus || result?.PersistenceStatus || null);
-                        this.workspaceSnapshotDirty = false;
+                        if (this._isCurrentWorkspaceSaveTask(task)) {
+                            this._applyWorkspaceSnapshotSummary?.(result?.snapshot || result?.Snapshot || null);
+                            this._handleWorkspacePersistenceStatus?.(result?.persistenceStatus || result?.PersistenceStatus || null);
+                            this.workspacePersistedGeneration = Math.max(
+                                Number(this.workspacePersistedGeneration || 0),
+                                task.generation);
+                            this._syncWorkspaceSnapshotDirty();
+                        }
                         return result;
                     } catch (error) {
                         const payload = error?.payload || {};
@@ -588,22 +633,33 @@ export const aiPanelAgentWorkspaceMixin = {
                             throw error;
                         }
 
+                        if (!this._isCurrentWorkspaceSaveTask(task)) {
+                            return { ignored: true, stale: true };
+                        }
+
                         this._applyWorkspaceSnapshotSummary?.(payload?.snapshot || payload?.Snapshot || null);
                         this._handleWorkspacePersistenceStatus?.(payload?.persistenceStatus || payload?.PersistenceStatus || null);
                         const currentPlanIdentity = this._getPlanIdentity?.(this.pendingVisionPlan) || '';
-                        const samePlan = Boolean(planIdentity && currentPlanIdentity && planIdentity === currentPlanIdentity);
+                        const samePlan = Boolean(task.planIdentity && currentPlanIdentity && task.planIdentity === currentPlanIdentity);
                         if (!rebased && samePlan && !this._isPlanSnapshotReadOnly()) {
                             rebased = true;
                             expectedRevision = Number(this.workspaceSnapshotRevision || 0);
                             continue;
                         }
 
-                        this.workspaceSnapshotDirty = true;
+                        this._syncWorkspaceSnapshotDirty();
                         this._setResultStatusNote?.('工作台状态已更新，当前未保存修改已保留，请确认后重试。', 'warning');
                         throw error;
                     }
                 }
             } catch (error) {
+                if (!this._isCurrentWorkspaceSaveTask(task)) {
+                    return { ignored: true, stale: true };
+                }
+                this.workspaceSaveErrorGeneration = Math.max(
+                    Number(this.workspaceSaveErrorGeneration || 0),
+                    task.generation);
+                this._syncWorkspaceSnapshotDirty();
                 const payload = error?.payload || {};
                 const errorCode = String(payload?.errorCode ?? payload?.ErrorCode ?? '').trim();
                 const isConflict = error?.status === 409 ||
@@ -613,6 +669,10 @@ export const aiPanelAgentWorkspaceMixin = {
                     this._setResultStatusNote?.('Plan 修改尚未成功保存，切换前请重试。', 'warning');
                 }
                 throw error;
+            } finally {
+                this.workspacePendingMutationCount = Math.max(
+                    0,
+                    Number(this.workspacePendingMutationCount || 0) - 1);
             }
         };
 
@@ -626,15 +686,21 @@ export const aiPanelAgentWorkspaceMixin = {
         if (!this.sessionId || !this.pendingVisionPlan || this._isPlanSnapshotReadOnly()) {
             return true;
         }
+        this._syncWorkspaceSnapshotDirty();
         if (!this.workspaceSnapshotDirty) {
             return true;
         }
 
+        const targetGeneration = Number(this.workspaceMutationGeneration || 0);
+        this.workspaceBoundaryInProgress = true;
         try {
-            await this._queueWorkspaceSnapshotFlush(reason);
-            return true;
+            await (this.workspaceSnapshotSaveQueue || Promise.resolve());
+            return Number(this.workspacePersistedGeneration || 0) >= targetGeneration;
         } catch {
-            return false;
+            return Number(this.workspacePersistedGeneration || 0) >= targetGeneration;
+        } finally {
+            this.workspaceBoundaryInProgress = false;
+            this._syncWorkspaceSnapshotDirty();
         }
     },
 
@@ -2086,7 +2152,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const revision = Number(snapshot.revision ?? snapshot.Revision);
         if (Number.isFinite(revision)) {
             this.workspaceSnapshotRevision = revision;
-            this.workspaceSnapshotDirty = false;
+            this._syncWorkspaceSnapshotDirty?.();
         }
         const buildRunId = String(snapshot.buildRunId ?? snapshot.BuildRunId ?? '').trim();
         const submittedBuildFingerprint = String(snapshot.submittedBuildFingerprint ?? snapshot.SubmittedBuildFingerprint ?? '').trim();
@@ -3546,8 +3612,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _acceptRecommendedPlanAnswers(plan) {
         if (!plan) return false;
-        if (this._isPlanSnapshotReadOnly()) {
-            this._warnPlanReadOnly();
+        if (this._isWorkspaceMutationBlocked?.()) {
             return false;
         }
         const nextAnswers = { ...(this.planQuestionAnswers || {}) };
@@ -5151,8 +5216,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _customInputPlanQuestion(questionId, value) {
         if (!questionId || !this.pendingVisionPlan) return;
-        if (this._isPlanSnapshotReadOnly()) {
-            this._warnPlanReadOnly();
+        if (this._isWorkspaceMutationBlocked?.()) {
             return;
         }
         const cleanedValue = String(value || '').trim();
@@ -5190,8 +5254,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
     _selectPlanQuestionOption(questionId, value) {
         if (!questionId || !value || !this.pendingVisionPlan) return;
-        if (this._isPlanSnapshotReadOnly()) {
-            this._warnPlanReadOnly();
+        if (this._isWorkspaceMutationBlocked?.()) {
             return;
         }
         const selectedValue = String(value || '').trim();

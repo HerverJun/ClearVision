@@ -320,6 +320,11 @@ function createPanel(AiPanel, overrides = {}) {
   panel.workspaceSnapshotRevision = 0;
   panel.workspaceSnapshotDirty = false;
   panel.workspaceSnapshotSaveQueue = Promise.resolve();
+  panel.workspaceMutationGeneration = 0;
+  panel.workspacePersistedGeneration = 0;
+  panel.workspacePendingMutationCount = 0;
+  panel.workspaceSaveErrorGeneration = 0;
+  panel.workspaceBoundaryInProgress = false;
   panel.workspaceBuildRunId = '';
   panel.workspaceSubmittedBuildFingerprint = '';
   panel.workspacePersistenceWarning = null;
@@ -10359,6 +10364,71 @@ test('AI session restore ignores late auto restore after user switches session',
   assert.deepEqual(panel.currentResult, { aiExplanation: 'current' });
 });
 
+test('AI session restore keeps manual B pending when auto A failure arrives late', async () => {
+  const { AiPanel } = await loadAiPanel();
+  global.localStorage.setItem('cv_ai_session_id', 'session-a');
+  const panel = createPanel(AiPanel);
+  panel.container = createContainer({
+    '#ai-history-list': createFakeElement(),
+    '#ai-chat-container': createFakeElement()
+  });
+  panel._displayResult = result => {
+    panel.restoredResult = result;
+  };
+  panel.sessionId = 'session-a';
+  panel.initialAutoRestoreSessionId = 'session-a';
+  panel._createSessionLoadRequestId = () => `req-${(panel._requestCounter = (panel._requestCounter || 0) + 1)}`;
+  const requests = [];
+  panel._sendGetAiSession = (sessionId, request) => requests.push({ sessionId, ...request });
+
+  panel._handleListAiSessionsResult({
+    success: true,
+    sessions: [
+      { sessionId: 'session-a', lastMessage: 'A', updatedAtUtc: '2026-01-01T00:00:00Z', turnCount: 1 },
+      { sessionId: 'session-b', lastMessage: 'B', updatedAtUtc: '2026-01-02T00:00:00Z', turnCount: 1 }
+    ]
+  });
+  const autoA = { ...panel.pendingSessionLoad };
+  panel.sessionNavigationEpoch += 1;
+  panel._requestSessionLoad('session-b', 'history_switch');
+  const manualB = { ...panel.pendingSessionLoad };
+
+  panel._handleGetAiSessionResult({
+    success: false,
+    sessionId: 'session-a',
+    requestId: autoA.requestId,
+    navigationEpoch: autoA.epoch,
+    errorMessage: 'not found'
+  });
+
+  assert.equal(panel.pendingSessionLoad.sessionId, 'session-b');
+  assert.equal(panel.pendingSessionLoad.requestId, manualB.requestId);
+  assert.equal(global.localStorage.getItem('cv_ai_session_id'), 'session-a');
+
+  panel._handleGetAiSessionResult({
+    success: true,
+    sessionId: 'session-b',
+    requestId: manualB.requestId,
+    navigationEpoch: manualB.epoch,
+    session: {
+      sessionId: 'session-b',
+      history: [],
+      workspaceSnapshot: {
+        revision: 7,
+        lifecycleState: 'plan_ready',
+        buildRunId: '',
+        submittedBuildFingerprint: ''
+      }
+    }
+  });
+
+  assert.deepEqual(requests.map(item => item.sessionId), ['session-a', 'session-b']);
+  assert.equal(panel.pendingSessionLoad, null);
+  assert.equal(panel.sessionId, 'session-b');
+  assert.equal(global.localStorage.getItem('cv_ai_session_id'), 'session-b');
+  assert.equal(panel.workspaceSnapshotRevision, 7);
+});
+
 test('AI session restore resets workspace fields and clears stale build readonly state', async () => {
   installDom();
   const { AiPanel } = await loadAiPanel();
@@ -10445,6 +10515,134 @@ test('AI workspace conflict rebases same plan once without fetching full session
   assert.equal(panel.workspaceSnapshotDirty, false);
 });
 
+test('AI workspace consecutive mutations keep dirty until latest generation persists', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel.pendingVisionPlan = testPlan();
+  panel.sessionId = 'session-generations';
+  panel.workspaceSnapshotRevision = 1;
+  panel.planQuestionSelections = { image_source: 'camera' };
+
+  const pending = [];
+  const originalFetch = global.fetch;
+  global.fetch = async (url, options = {}) => {
+    const body = JSON.parse(options.body);
+    return new Promise(resolve => {
+      pending.push({
+        body,
+        resolve(snapshot) {
+          resolve(jsonResponse({
+            success: true,
+            snapshot,
+            persistenceStatus: { primaryStoreSaved: true, recoveryBackupSaved: true }
+          }));
+        }
+      });
+    });
+  };
+
+  try {
+    const firstFlush = panel._queueWorkspaceSnapshotFlush('first');
+    panel.planQuestionSelections = { image_source: 'folder' };
+    const secondFlush = panel._queueWorkspaceSnapshotFlush('second');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(panel.workspaceMutationGeneration, 2);
+    assert.equal(panel.workspaceSnapshotDirty, true);
+    assert.equal(pending.length, 1);
+
+    pending[0].resolve({ revision: 2, lifecycleState: 'plan_ready' });
+    await firstFlush;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(panel.workspacePersistedGeneration, 1);
+    assert.equal(panel.workspaceSnapshotDirty, true);
+    assert.equal(pending.length, 2);
+
+    pending[1].resolve({ revision: 3, lifecycleState: 'plan_ready' });
+    await secondFlush;
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  assert.equal(panel.workspacePersistedGeneration, 2);
+  assert.equal(panel.workspaceSnapshotRevision, 3);
+  assert.equal(panel.workspaceSnapshotDirty, false);
+});
+
+test('AI workspace stale save response cannot update a new session', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel.pendingVisionPlan = testPlan();
+  panel.sessionId = 'session-old';
+  panel.workspaceSnapshotRevision = 1;
+  panel.planQuestionSelections = { image_source: 'camera' };
+  let releaseFetch;
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Promise(resolve => {
+    releaseFetch = () => resolve(jsonResponse({
+      success: true,
+      snapshot: { revision: 9, lifecycleState: 'building', buildRunId: 'ar_old' },
+      persistenceStatus: { primaryStoreSaved: true, recoveryBackupSaved: true }
+    }));
+  });
+
+  try {
+    const flush = panel._queueWorkspaceSnapshotFlush('old-session');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    panel.sessionId = 'session-new';
+    panel.sessionNavigationEpoch += 1;
+    panel.workspaceSnapshotRevision = 0;
+    panel.workspaceBuildRunId = '';
+    releaseFetch();
+    await flush;
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  assert.equal(panel.sessionId, 'session-new');
+  assert.equal(panel.workspaceSnapshotRevision, 0);
+  assert.equal(panel.workspaceBuildRunId, '');
+});
+
+test('AI workspace boundary waits for target generation before continuing', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel.pendingVisionPlan = testPlan();
+  panel.sessionId = 'session-boundary';
+  panel.workspaceSnapshotRevision = 1;
+  panel.planQuestionSelections = { image_source: 'camera' };
+  let releaseFetch;
+  const originalFetch = global.fetch;
+  global.fetch = async () => new Promise(resolve => {
+    releaseFetch = () => resolve(jsonResponse({
+      success: true,
+      snapshot: { revision: 2, lifecycleState: 'plan_ready' },
+      persistenceStatus: { primaryStoreSaved: true, recoveryBackupSaved: true }
+    }));
+  });
+
+  try {
+    panel._queueWorkspaceSnapshotFlush('edit');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const boundary = panel._flushWorkspaceSnapshotBeforeBoundary('build');
+    assert.equal(panel.workspaceBoundaryInProgress, true);
+    let completed = false;
+    boundary.then(() => { completed = true; });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(completed, false);
+    releaseFetch();
+    assert.equal(await boundary, true);
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  assert.equal(panel.workspaceBoundaryInProgress, false);
+  assert.equal(panel.workspacePersistedGeneration, panel.workspaceMutationGeneration);
+  assert.equal(panel.workspaceSnapshotDirty, false);
+});
+
 test('AI AgentRun Build success applies canonical session and snapshot before SSE', async () => {
   installDom();
   const { AiPanel } = await loadAiPanel();
@@ -10527,4 +10725,53 @@ test('AI Build 503 keeps Plan mode and does not start SSE', async () => {
   assert.equal(panel.agentWorkspaceMode, 'plan');
   assert.equal(panel.activeAgentRunId, null);
   assert.equal(panel.lastResultStatusNote.tone, 'warning');
+});
+
+test('AI Build 409 applies latest workspace revision and stays in Plan without SSE', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel.useVisionAgentGenerateFlow = true;
+  panel.pendingVisionPlan = testPlan();
+  panel.agentWorkspaceMode = 'plan';
+  panel.workspaceSnapshotRevision = 4;
+  panel.container = createContainer({ '#ai-input': { value: 'keep this prompt', style: {} } });
+  panel._startAssistantTurn = () => {};
+  panel._createGenerateRequestId = () => 'request-build-409';
+  panel._startAgentRunEventSource = () => {
+    throw new Error('SSE should not start');
+  };
+  const originalFetch = global.fetch;
+  global.fetch = async () => jsonResponse({
+    errorCode: 'workspace_revision_conflict',
+    publicMessage: 'Plan 状态已变化，请确认后重新构建',
+    runId: 'ar_conflict',
+    workspaceSnapshot: {
+      revision: 11,
+      lifecycleState: 'plan_ready',
+      buildRunId: '',
+      submittedBuildFingerprint: ''
+    },
+    persistenceStatus: { primaryStoreSaved: true, recoveryBackupSaved: true }
+  }, 409);
+
+  try {
+    const dispatched = panel._dispatchGenerateRequest({
+      description: 'build',
+      buildFromPlan: { planId: 'plan-a' },
+      skipPlan: true,
+      clearInput: false
+    });
+    assert.equal(dispatched, true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  assert.equal(panel.workspaceSnapshotRevision, 11);
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.equal(panel.activeAgentRunId, null);
+  assert.equal(panel.container.querySelector('#ai-input').value, 'keep this prompt');
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+  assert.equal(panel.lastResultStatusNote.text, 'Plan 状态已变化，请确认后重新构建');
 });

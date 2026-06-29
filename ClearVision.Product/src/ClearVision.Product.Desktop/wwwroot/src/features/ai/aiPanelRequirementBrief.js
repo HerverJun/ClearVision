@@ -12,8 +12,7 @@ export const aiPanelRequirementBriefMixin = {
     },
 
     _setRequirementMode(mode, { silent = false } = {}) {
-        if (this._isPlanSnapshotReadOnly?.()) {
-            this._warnPlanReadOnly?.();
+        if (this._isWorkspaceMutationBlocked?.()) {
             this._updateRequirementModeUI();
             return;
         }

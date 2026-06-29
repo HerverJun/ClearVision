@@ -143,6 +143,40 @@ public sealed class VisionAgentWorkspaceSnapshotMutationResult
     public ConversationPersistenceStatus PersistenceStatus { get; set; } = new();
 }
 
+public enum ConversationSessionDeleteStatus
+{
+    Deleted,
+    NotFound,
+    PersistenceFailed
+}
+
+public enum ConversationBackfillStatus
+{
+    Applied,
+    AlreadyPresent,
+    NotFound,
+    PersistenceFailed
+}
+
+public sealed class ConversationSessionWriteResult
+{
+    public bool Success { get; set; }
+    public ConversationSession? Session { get; set; }
+    public ConversationPersistenceStatus PersistenceStatus { get; set; } = new();
+}
+
+public sealed class ConversationSessionDeleteResult
+{
+    public ConversationSessionDeleteStatus Status { get; set; }
+    public ConversationPersistenceStatus PersistenceStatus { get; set; } = new();
+}
+
+public sealed class ConversationBackfillResult
+{
+    public ConversationBackfillStatus Status { get; set; }
+    public ConversationPersistenceStatus PersistenceStatus { get; set; } = new();
+}
+
 public sealed class VisionAgentTerminalProjectionRequest
 {
     public string SessionId { get; set; } = string.Empty;
@@ -183,9 +217,16 @@ public interface IConversationalFlowService
         string? latestFlowJson,
         string? latestCanvasFlowJson = null,
         ConversationTurnPayload? payload = null);
+    ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
+        string sessionId,
+        string assistantMessage,
+        string? latestFlowJson,
+        string? latestCanvasFlowJson = null,
+        ConversationTurnPayload? payload = null);
     IReadOnlyList<ConversationSessionSummary> ListSessions();
     ConversationSession? GetSession(string sessionId);
     bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson);
+    ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(string sessionId, string canvasFlowJson);
     ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update);
     VisionAgentWorkspaceSnapshotMutationResult TryUpdateWorkspaceSnapshot(
         string sessionId,
@@ -193,6 +234,7 @@ public interface IConversationalFlowService
     VisionAgentWorkspaceSnapshotMutationResult ProjectBuildTerminal(VisionAgentTerminalProjectionRequest request);
     ConversationPersistenceStatus GetLastPersistenceStatus();
     bool DeleteSession(string sessionId);
+    ConversationSessionDeleteResult DeleteSessionWithResult(string sessionId);
 }
 
 internal sealed class ConversationStore
@@ -251,15 +293,21 @@ public class ConversationalFlowService : IConversationalFlowService
         Microsoft.Extensions.Logging.ILogger<ConversationalFlowService>? logger = null)
     {
         _logger = logger;
-        var rootPath = string.IsNullOrWhiteSpace(storageRootPath)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClearVision")
-            : storageRootPath;
+        var rootPath = ResolveStorageRootPath(storageRootPath);
 
         Directory.CreateDirectory(rootPath);
-        _storagePath = Path.Combine(rootPath, "conversation_sessions.json");
+        _storagePath = ResolveStoragePath(storageRootPath);
         _lastGoodStoragePath = _storagePath + ".last-good";
         LoadSessionsFromStore();
     }
+
+    public static string ResolveStorageRootPath(string? storageRootPath = null) =>
+        Path.GetFullPath(string.IsNullOrWhiteSpace(storageRootPath)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClearVision")
+            : storageRootPath.Trim());
+
+    public static string ResolveStoragePath(string? storageRootPath = null) =>
+        Path.Combine(ResolveStorageRootPath(storageRootPath), "conversation_sessions.json");
 
     public ConversationSession GetOrCreateSession(string? sessionId)
     {
@@ -267,11 +315,14 @@ public class ConversationalFlowService : IConversationalFlowService
             ? Guid.NewGuid().ToString("N")
             : sessionId.Trim();
 
-        return _sessions.GetOrAdd(normalizedSessionId, id => new ConversationSession
+        if (_sessions.TryGetValue(normalizedSessionId, out var existing))
+            return CloneSession(existing);
+
+        return new ConversationSession
         {
-            SessionId = id,
+            SessionId = normalizedSessionId,
             UpdatedAtUtc = DateTime.UtcNow
-        });
+        };
     }
 
     public ConversationIntent DetectIntent(string userDescription, bool hasExistingFlow)
@@ -296,13 +347,13 @@ public class ConversationalFlowService : IConversationalFlowService
 
     public ConversationContext PrepareContext(AiFlowGenerationRequest request)
     {
-        var session = GetOrCreateSession(request.SessionId);
-        ConversationIntent intent;
-        GenerateFlowMode resolvedMode;
-        string? existingFlowJson;
-        string sessionSummary;
+        ConversationIntent intent = ConversationIntent.New;
+        GenerateFlowMode resolvedMode = GenerateFlowMode.New;
+        string? existingFlowJson = null;
+        string sessionSummary = string.Empty;
+        var normalizedSessionId = NormalizeSessionId(request.SessionId);
 
-        lock (session)
+        var commit = CommitSessionStateMutation(normalizedSessionId, session =>
         {
             if (HasMeaningfulFlow(request.ExistingFlowJson))
             {
@@ -342,12 +393,16 @@ public class ConversationalFlowService : IConversationalFlowService
 
             existingFlowJson = HasMeaningfulFlow(session.CurrentFlowJson) ? session.CurrentFlowJson : null;
             sessionSummary = BuildPromptSessionSummary(session);
+        });
+
+        if (!commit.Success || commit.Session == null)
+        {
+            throw new IOException(commit.PersistenceStatus.PublicMessage);
         }
 
-        PersistSessions();
         return new ConversationContext
         {
-            SessionId = session.SessionId,
+            SessionId = commit.Session.SessionId,
             Intent = intent,
             Mode = resolvedMode,
             ExistingFlowJson = existingFlowJson,
@@ -479,10 +534,16 @@ public class ConversationalFlowService : IConversationalFlowService
         string? latestCanvasFlowJson = null,
         ConversationTurnPayload? payload = null)
     {
-        if (!_sessions.TryGetValue(sessionId, out var session))
-            return;
+        RecordAssistantResponseWithPersistence(sessionId, assistantMessage, latestFlowJson, latestCanvasFlowJson, payload);
+    }
 
-        lock (session)
+    public ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
+        string sessionId,
+        string assistantMessage,
+        string? latestFlowJson,
+        string? latestCanvasFlowJson = null,
+        ConversationTurnPayload? payload = null) =>
+        CommitSessionStateMutation(sessionId, session =>
         {
             if (!string.IsNullOrWhiteSpace(latestFlowJson))
                 session.CurrentFlowJson = latestFlowJson;
@@ -503,10 +564,7 @@ public class ConversationalFlowService : IConversationalFlowService
 
             TrimHistory(session);
             session.UpdatedAtUtc = DateTime.UtcNow;
-        }
-
-        PersistSessions();
-    }
+        });
 
     public IReadOnlyList<ConversationSessionSummary> ListSessions()
     {
@@ -530,23 +588,45 @@ public class ConversationalFlowService : IConversationalFlowService
 
     public bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson)
     {
+        return TryBackfillCanvasFlowJsonWithResult(sessionId, canvasFlowJson).Status == ConversationBackfillStatus.Applied;
+    }
+
+    public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(string sessionId, string canvasFlowJson)
+    {
         if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(canvasFlowJson))
-            return false;
+            return new ConversationBackfillResult { Status = ConversationBackfillStatus.NotFound };
 
         var normalizedSessionId = sessionId.Trim();
-        if (!_sessions.TryGetValue(normalizedSessionId, out var session))
-            return false;
-
-        lock (session)
+        lock (_persistLock)
         {
-            if (!string.IsNullOrWhiteSpace(session.CurrentCanvasFlowJson))
-                return false;
+            if (!_sessions.TryGetValue(normalizedSessionId, out var currentSession))
+                return new ConversationBackfillResult { Status = ConversationBackfillStatus.NotFound };
 
-            session.CurrentCanvasFlowJson = canvasFlowJson;
+            var current = CloneSession(currentSession);
+            if (!string.IsNullOrWhiteSpace(current.CurrentCanvasFlowJson))
+                return new ConversationBackfillResult { Status = ConversationBackfillStatus.AlreadyPresent };
+
+            var candidate = CloneSession(current);
+            candidate.CurrentCanvasFlowJson = canvasFlowJson;
+            candidate.UpdatedAtUtc = DateTime.UtcNow;
+            NormalizeSession(candidate);
+            var persistence = PersistSessionsSnapshotUnderLock(BuildPersistedSnapshotWithCandidate(candidate));
+            if (!persistence.PrimaryStoreSaved)
+            {
+                return new ConversationBackfillResult
+                {
+                    Status = ConversationBackfillStatus.PersistenceFailed,
+                    PersistenceStatus = ClonePersistenceStatus(persistence)
+                };
+            }
+
+            _sessions[normalizedSessionId] = candidate;
+            return new ConversationBackfillResult
+            {
+                Status = ConversationBackfillStatus.Applied,
+                PersistenceStatus = ClonePersistenceStatus(persistence)
+            };
         }
-
-        PersistSessions();
-        return true;
     }
 
     public ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update)
@@ -626,6 +706,40 @@ public class ConversationalFlowService : IConversationalFlowService
 
     public ConversationPersistenceStatus GetLastPersistenceStatus() =>
         ClonePersistenceStatus(_lastPersistenceStatus);
+
+    private ConversationSessionWriteResult CommitSessionStateMutation(
+        string sessionId,
+        Action<ConversationSession> mutator)
+    {
+        var normalizedSessionId = NormalizeSessionId(sessionId);
+        lock (_persistLock)
+        {
+            var current = GetCurrentSessionSnapshot(normalizedSessionId);
+            NormalizeSession(current);
+            var candidate = CloneSession(current);
+            mutator(candidate);
+            NormalizeSession(candidate);
+
+            var persistence = PersistSessionsSnapshotUnderLock(BuildPersistedSnapshotWithCandidate(candidate));
+            if (!persistence.PrimaryStoreSaved)
+            {
+                return new ConversationSessionWriteResult
+                {
+                    Success = false,
+                    Session = CloneSession(current),
+                    PersistenceStatus = ClonePersistenceStatus(persistence)
+                };
+            }
+
+            _sessions[normalizedSessionId] = candidate;
+            return new ConversationSessionWriteResult
+            {
+                Success = true,
+                Session = CloneSession(candidate),
+                PersistenceStatus = ClonePersistenceStatus(persistence)
+            };
+        }
+    }
 
     private SessionMutationCommitResult CommitSessionMutation(
         string sessionId,
@@ -874,15 +988,41 @@ public class ConversationalFlowService : IConversationalFlowService
 
     public bool DeleteSession(string sessionId)
     {
+        return DeleteSessionWithResult(sessionId).Status == ConversationSessionDeleteStatus.Deleted;
+    }
+
+    public ConversationSessionDeleteResult DeleteSessionWithResult(string sessionId)
+    {
         if (string.IsNullOrWhiteSpace(sessionId))
-            return false;
+            return new ConversationSessionDeleteResult { Status = ConversationSessionDeleteStatus.NotFound };
 
         var normalizedSessionId = sessionId.Trim();
-        if (!_sessions.TryRemove(normalizedSessionId, out _))
-            return false;
+        lock (_persistLock)
+        {
+            if (!_sessions.ContainsKey(normalizedSessionId))
+                return new ConversationSessionDeleteResult { Status = ConversationSessionDeleteStatus.NotFound };
 
-        PersistSessions();
-        return true;
+            var snapshot = _sessions.Values
+                .Where(session => !string.Equals(session.SessionId, normalizedSessionId, StringComparison.OrdinalIgnoreCase))
+                .Select(CloneSession)
+                .ToList();
+            var persistence = PersistSessionsSnapshotUnderLock(snapshot);
+            if (!persistence.PrimaryStoreSaved)
+            {
+                return new ConversationSessionDeleteResult
+                {
+                    Status = ConversationSessionDeleteStatus.PersistenceFailed,
+                    PersistenceStatus = ClonePersistenceStatus(persistence)
+                };
+            }
+
+            _sessions.TryRemove(normalizedSessionId, out _);
+            return new ConversationSessionDeleteResult
+            {
+                Status = ConversationSessionDeleteStatus.Deleted,
+                PersistenceStatus = ClonePersistenceStatus(persistence)
+            };
+        }
     }
 
     private static string BuildPromptContext(ConversationSession session, ConversationIntent intent)

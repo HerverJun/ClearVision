@@ -4,7 +4,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ConversationSessionSummary = ClearVision.Product.Infrastructure.AI.ConversationSessionSummary;
+using ConversationSessionDeleteStatus = ClearVision.Product.Infrastructure.AI.ConversationSessionDeleteStatus;
 using IConversationalFlowService = ClearVision.Product.Infrastructure.AI.IConversationalFlowService;
+using MicrosoftLogger = Microsoft.Extensions.Logging.ILogger<ClearVision.Product.Desktop.Handlers.AiSessionMessageHandler>;
 
 namespace ClearVision.Product.Desktop.Handlers;
 
@@ -12,12 +14,12 @@ internal sealed class AiSessionMessageHandler
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IWebMessageClient _client;
-    private readonly ILogger<AiSessionMessageHandler> _logger;
+    private readonly MicrosoftLogger _logger;
 
     public AiSessionMessageHandler(
         IServiceScopeFactory scopeFactory,
         IWebMessageClient client,
-        ILogger<AiSessionMessageHandler> logger)
+        MicrosoftLogger logger)
     {
         _scopeFactory = scopeFactory;
         _client = client;
@@ -54,9 +56,10 @@ internal sealed class AiSessionMessageHandler
 
     public Task HandleGetAsync(string messageJson)
     {
-        var request = ExtractSessionRequest(messageJson);
+        var request = AiSessionRequestEnvelope.Empty;
         try
         {
+            request = ExtractSessionRequest(messageJson);
             if (string.IsNullOrWhiteSpace(request.SessionId))
             {
                 _client.SendProgressMessage("GetAiSessionResult", new
@@ -117,13 +120,21 @@ internal sealed class AiSessionMessageHandler
 
             using var scope = _scopeFactory.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<IConversationalFlowService>();
-            var deleted = service.DeleteSession(sessionId);
+            var deleteResult = service.DeleteSessionWithResult(sessionId);
+            var deleted = deleteResult.Status == ConversationSessionDeleteStatus.Deleted;
+            var errorMessage = deleteResult.Status switch
+            {
+                ConversationSessionDeleteStatus.Deleted => null,
+                ConversationSessionDeleteStatus.PersistenceFailed => deleteResult.PersistenceStatus.PublicMessage,
+                _ => "Session not found."
+            };
 
             _client.SendProgressMessage("DeleteAiSessionResult", new
             {
                 success = deleted,
                 sessionId,
-                errorMessage = deleted ? null : "Session not found."
+                persistenceStatus = deleteResult.PersistenceStatus,
+                errorMessage
             });
         }
         catch (Exception ex)
@@ -187,5 +198,8 @@ internal sealed class AiSessionMessageHandler
     private sealed record AiSessionRequestEnvelope(
         string? SessionId,
         string? RequestId,
-        long NavigationEpoch);
+        long NavigationEpoch)
+    {
+        public static AiSessionRequestEnvelope Empty { get; } = new(null, null, 0);
+    }
 }

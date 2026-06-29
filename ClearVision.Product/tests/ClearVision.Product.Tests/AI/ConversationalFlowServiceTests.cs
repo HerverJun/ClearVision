@@ -110,6 +110,25 @@ public class ConversationalFlowServiceTests : IDisposable
     }
 
     [Fact]
+    public void DeleteSession_WhenPrimaryStoreFails_ShouldKeepMemoryAndDiskSession()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+
+        var context = service.PrepareContext(new AiFlowGenerationRequest(
+            "create flow for delete",
+            SessionId: "session-delete-primary-fail"));
+        service.RecordAssistantResponse(context.SessionId, "assistant delete", "{\"explanation\":\"delete\"}");
+
+        service.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+        var result = service.DeleteSessionWithResult("session-delete-primary-fail");
+
+        result.Status.Should().Be(ConversationSessionDeleteStatus.PersistenceFailed);
+        result.PersistenceStatus.PrimaryStoreSaved.Should().BeFalse();
+        service.GetSession("session-delete-primary-fail").Should().NotBeNull();
+        new ConversationalFlowService(_tempRoot).GetSession("session-delete-primary-fail").Should().NotBeNull();
+    }
+
+    [Fact]
     public void TryBackfillCanvasFlowJson_ShouldPersistCanvasSnapshotForLegacySession()
     {
         var service = new ConversationalFlowService(_tempRoot);
@@ -132,6 +151,70 @@ public class ConversationalFlowServiceTests : IDisposable
         var reloaded = reloadedService.GetSession(context.SessionId);
         reloaded.Should().NotBeNull();
         reloaded!.CurrentCanvasFlowJson.Should().Be(canvasJson);
+    }
+
+    [Fact]
+    public void TryBackfillCanvasFlowJson_WhenPrimaryStoreFails_ShouldKeepMemoryAndDiskUnchanged()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+
+        var context = service.PrepareContext(new AiFlowGenerationRequest(
+            "restore legacy session",
+            SessionId: "session-backfill-primary-fail"));
+        service.RecordAssistantResponse(
+            context.SessionId,
+            "assistant legacy",
+            "{\"Explanation\":\"legacy\",\"Operators\":[{\"TempId\":\"op_1\",\"OperatorType\":\"ImageAcquisition\"}],\"Connections\":[]}");
+
+        service.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+        var result = service.TryBackfillCanvasFlowJsonWithResult(
+            context.SessionId,
+            "{\"operators\":[{\"id\":\"op-1\",\"type\":\"ImageAcquisition\"}],\"connections\":[]}");
+
+        result.Status.Should().Be(ConversationBackfillStatus.PersistenceFailed);
+        result.PersistenceStatus.PrimaryStoreSaved.Should().BeFalse();
+        service.GetSession(context.SessionId)!.CurrentCanvasFlowJson.Should().BeNullOrWhiteSpace();
+        new ConversationalFlowService(_tempRoot)
+            .GetSession(context.SessionId)!
+            .CurrentCanvasFlowJson.Should().BeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void PrepareContext_WhenPrimaryStoreFails_ShouldNotPublishEmptySession()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        service.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+
+        var act = () => service.PrepareContext(new AiFlowGenerationRequest(
+            "create a flow",
+            SessionId: "session-prepare-primary-fail"));
+
+        act.Should().Throw<IOException>();
+        service.GetSession("session-prepare-primary-fail").Should().BeNull();
+        new ConversationalFlowService(_tempRoot).GetSession("session-prepare-primary-fail").Should().BeNull();
+    }
+
+    [Fact]
+    public void RecordAssistantResponse_WhenPrimaryStoreFails_ShouldKeepMemoryAndDiskHistoryUnchanged()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+
+        var context = service.PrepareContext(new AiFlowGenerationRequest(
+            "create a flow",
+            SessionId: "session-assistant-primary-fail"));
+
+        service.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+        var result = service.RecordAssistantResponseWithPersistence(
+            context.SessionId,
+            "assistant failed",
+            "{\"explanation\":\"failed\"}");
+
+        result.Success.Should().BeFalse();
+        result.PersistenceStatus.PrimaryStoreSaved.Should().BeFalse();
+        service.GetSession(context.SessionId)!.History.Should().ContainSingle(turn => turn.Role == "user");
+        new ConversationalFlowService(_tempRoot)
+            .GetSession(context.SessionId)!
+            .History.Should().ContainSingle(turn => turn.Role == "user");
     }
 
     [Fact]

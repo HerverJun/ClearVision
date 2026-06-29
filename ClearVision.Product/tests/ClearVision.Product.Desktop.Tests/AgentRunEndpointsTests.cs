@@ -966,6 +966,41 @@ public sealed class AgentRunEndpointsTests
             .Should().BeNull();
     }
 
+    [Fact(DisplayName = "POST AgentRun BuildFromPlan missing workspace revision returns controlled failed run")]
+    public async Task CreateRun_BuildFromPlanMissingWorkspaceRevision_ShouldNotStartBackgroundRun()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var initial = host.ConversationService.UpdateWorkspaceSnapshot(
+            "session-build-missing-revision",
+            new VisionAgentWorkspaceSnapshotUpdate
+            {
+                LifecycleState = "plan_ready",
+                RequirementMode = AiRequirementModes.Strict
+            });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "Build from persisted plan without revision",
+            SessionId = "session-build-missing-revision",
+            Mode = "new",
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest()
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("workspace_revision_required");
+        root.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64()
+            .Should().Be(initial.WorkspaceSnapshot!.Revision);
+        JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("workspace_revision_required");
+        host.Generation.LastCommand.Should().BeNull();
+        host.ConversationService.GetSession("session-build-missing-revision")!
+            .WorkspaceSnapshot!
+            .BuildRunId
+            .Should().BeNull();
+    }
+
     [Fact(DisplayName = "POST AgentRun BuildFromPlan backup persistence failure still starts background run")]
     public async Task CreateRun_BuildFromPlanBackupPersistenceFailure_ShouldStartBackgroundRunWithDegradedStatus()
     {

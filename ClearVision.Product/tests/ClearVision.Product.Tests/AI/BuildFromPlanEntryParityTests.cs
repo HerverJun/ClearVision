@@ -102,6 +102,34 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     }
 
     [Fact]
+    public async Task MissingWorkspaceRevision_ShouldFailThroughAgentRunWebMessageAndInternalEntries()
+    {
+        using var harness = CreateHarness();
+        var plan = BuildPlan();
+        harness.Conversation.UpdateWorkspaceSnapshot("session-missing-revision", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready",
+            PendingPlanSnapshot = plan
+        });
+        var request = BuildRequest(plan) with { SessionId = "session-missing-revision" };
+
+        var agentRun = await RunAgentRunEntryAsync(harness, request);
+        var webMessage = await RunWebMessageEntryAsync(harness, request);
+        var internalEntry = await RunInternalEntryAsync(harness, request);
+
+        foreach (var entry in new[] { agentRun, webMessage, internalEntry })
+        {
+            var projection = TerminalBusinessProjection(entry.Replay);
+            projection.CompletionStatus.Should().Be(AiFlowGenerationResult.CompletionStatusFailed);
+            projection.FailureCode.Should().Be("workspace_revision_required");
+            entry.Replay.Events.Should().Contain(evt =>
+                string.Equals(evt.EventType, AgentRunEventTypes.RunFailed, StringComparison.OrdinalIgnoreCase));
+        }
+
+        harness.Conversation.GetSession("session-missing-revision")!.History.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task LegacyContractWithoutHash_ShouldSucceedWithExplicitWarningThroughRunService()
     {
         using var harness = CreateHarness();
@@ -379,6 +407,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         var runService = new VisionAgentBuildRunService(
             application,
             stream,
+            conversation,
             projector,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildRunService>>());
 
@@ -840,12 +869,36 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             _inner.RecordAssistantResponse(sessionId, assistantMessage, latestFlowJson, latestCanvasFlowJson, payload);
         }
 
+        public ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
+            string sessionId,
+            string assistantMessage,
+            string? latestFlowJson,
+            string? latestCanvasFlowJson = null,
+            ConversationTurnPayload? payload = null)
+        {
+            if (_throw)
+            {
+                _throw = false;
+                throw new InvalidOperationException("public failure");
+            }
+
+            return _inner.RecordAssistantResponseWithPersistence(
+                sessionId,
+                assistantMessage,
+                latestFlowJson,
+                latestCanvasFlowJson,
+                payload);
+        }
+
         public IReadOnlyList<ConversationSessionSummary> ListSessions() => _inner.ListSessions();
 
         public ConversationSession? GetSession(string sessionId) => _inner.GetSession(sessionId);
 
         public bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson) =>
             _inner.TryBackfillCanvasFlowJson(sessionId, canvasFlowJson);
+
+        public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(string sessionId, string canvasFlowJson) =>
+            _inner.TryBackfillCanvasFlowJsonWithResult(sessionId, canvasFlowJson);
 
         public ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update) =>
             _inner.UpdateWorkspaceSnapshot(sessionId, update);
@@ -869,6 +922,9 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         public ConversationPersistenceStatus GetLastPersistenceStatus() => _inner.GetLastPersistenceStatus();
 
         public bool DeleteSession(string sessionId) => _inner.DeleteSession(sessionId);
+
+        public ConversationSessionDeleteResult DeleteSessionWithResult(string sessionId) =>
+            _inner.DeleteSessionWithResult(sessionId);
     }
 
     private sealed class PartialProjectionConversationService : IConversationalFlowService
@@ -897,12 +953,28 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             ConversationTurnPayload? payload = null) =>
             _inner.RecordAssistantResponse(sessionId, assistantMessage, latestFlowJson, latestCanvasFlowJson, payload);
 
+        public ConversationSessionWriteResult RecordAssistantResponseWithPersistence(
+            string sessionId,
+            string assistantMessage,
+            string? latestFlowJson,
+            string? latestCanvasFlowJson = null,
+            ConversationTurnPayload? payload = null) =>
+            _inner.RecordAssistantResponseWithPersistence(
+                sessionId,
+                assistantMessage,
+                latestFlowJson,
+                latestCanvasFlowJson,
+                payload);
+
         public IReadOnlyList<ConversationSessionSummary> ListSessions() => _inner.ListSessions();
 
         public ConversationSession? GetSession(string sessionId) => _inner.GetSession(sessionId);
 
         public bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson) =>
             _inner.TryBackfillCanvasFlowJson(sessionId, canvasFlowJson);
+
+        public ConversationBackfillResult TryBackfillCanvasFlowJsonWithResult(string sessionId, string canvasFlowJson) =>
+            _inner.TryBackfillCanvasFlowJsonWithResult(sessionId, canvasFlowJson);
 
         public ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update) =>
             _inner.UpdateWorkspaceSnapshot(sessionId, update);
@@ -953,6 +1025,9 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         public ConversationPersistenceStatus GetLastPersistenceStatus() => _inner.GetLastPersistenceStatus();
 
         public bool DeleteSession(string sessionId) => _inner.DeleteSession(sessionId);
+
+        public ConversationSessionDeleteResult DeleteSessionWithResult(string sessionId) =>
+            _inner.DeleteSessionWithResult(sessionId);
     }
 
     private sealed class FakeBuildExecution : IVisionAgentOrchestrator

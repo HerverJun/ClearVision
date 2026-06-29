@@ -179,6 +179,7 @@ public static class AgentRunEndpoints
         HttpContext context,
         IAgentRunEventStreamService streamService,
         IConversationalFlowService conversationService,
+        IVisionAgentBuildRunService buildRunService,
         IServiceScopeFactory scopeFactory,
         ILoggerFactory loggerFactory)
     {
@@ -250,6 +251,7 @@ public static class AgentRunEndpoints
         HttpContext context,
         IAgentRunEventStreamService streamService,
         IConversationalFlowService conversationService,
+        IVisionAgentBuildRunService buildRunService,
         IServiceScopeFactory scopeFactory,
         ILoggerFactory loggerFactory)
     {
@@ -275,21 +277,8 @@ public static class AgentRunEndpoints
         var persistenceStatus = conversationService.GetLastPersistenceStatus();
         if (request.BuildFromPlan != null)
         {
-            var associationResult = conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
-            {
-                ExpectedRevision = request.BuildFromPlan.WorkspaceExpectedRevision,
-                ClientMutationId = $"build-association:{createResult.RunId}",
-                LifecycleState = "building",
-                BuildRunId = createResult.RunId,
-                BuildRunStatus = AgentRunEventStatuses.Running,
-                PlanRunStatus = AgentRunEventStatuses.Completed,
-                PendingPlanSnapshot = request.BuildFromPlan.PlanSnapshot,
-                PlanQuestionSelections = request.BuildFromPlan.UserSelections,
-                ConfirmedPlanAnswers = request.BuildFromPlan.ConfirmedAnswers,
-                RequirementMode = request.RequirementMode,
-                PlanAcceptedRecommendedDefaults = request.BuildFromPlan.AcceptedRecommendedDefaults,
-                SubmittedBuildFingerprint = ComputeSubmittedBuildFingerprint(request)
-            });
+            var associationResult = buildRunService.PrepareBuildAssociation(
+                request.ToBuildCommand(createResult.RunId));
             workspaceSnapshot = associationResult.Snapshot;
             persistenceStatus = associationResult.PersistenceStatus;
             if (!associationResult.Success)
@@ -302,7 +291,7 @@ public static class AgentRunEndpoints
                     : StatusCodes.Status503ServiceUnavailable;
                 streamService.Fail(
                     createResult.RunId,
-                    "Build 创建失败：会话状态未能保存，后台构建未启动。",
+                    associationResult.PublicMessage,
                     "请检查本机存储权限或磁盘空间后重试 Build。",
                     new
                     {
@@ -315,7 +304,7 @@ public static class AgentRunEndpoints
                 return Task.FromResult<IResult>(Results.Json(new
                 {
                     errorCode = failureCode,
-                    publicMessage = "Build 创建失败：会话状态未能保存，后台构建未启动。",
+                    publicMessage = associationResult.PublicMessage,
                     runId = createResult.RunId,
                     sessionId,
                     brief = createResult.Brief,
@@ -330,6 +319,7 @@ public static class AgentRunEndpoints
             await RunGenerateFlowAsync(
                 createResult.RunId,
                 request,
+                request.BuildFromPlan != null,
                 scopeFactory,
                 loggerFactory.CreateLogger("AgentRunGenerateFlow"));
         });
@@ -617,6 +607,7 @@ public static class AgentRunEndpoints
     private static async Task RunGenerateFlowAsync(
         string runId,
         AgentRunCreateRequest request,
+        bool buildAssociationPrepared,
         IServiceScopeFactory scopeFactory,
         ILogger logger)
     {
@@ -625,7 +616,9 @@ public static class AgentRunEndpoints
 
         try
         {
-            await buildRunService.RunAsync(request.ToBuildCommand(runId), CancellationToken.None);
+            await buildRunService.RunAsync(
+                request.ToBuildCommand(runId) with { BuildAssociationPrepared = buildAssociationPrepared },
+                CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -1201,23 +1194,6 @@ public static class AgentRunEndpoints
         string.IsNullOrWhiteSpace(sessionId)
             ? Guid.NewGuid().ToString("N")
             : sessionId.Trim();
-
-    private static string ComputeSubmittedBuildFingerprint(AgentRunCreateRequest request)
-    {
-        var source = new
-        {
-            request.BuildFromPlan?.PlanId,
-            planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash,
-            request.RequirementMode,
-            request.BuildFromPlan?.AcceptedRecommendedDefaults,
-            request.BuildFromPlan?.AcceptedDefaults,
-            request.BuildFromPlan?.ConfirmedAnswers,
-            request.BuildFromPlan?.UserSelections
-        };
-        var json = JsonSerializer.Serialize(source, SseJsonOptions);
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(json));
-        return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
-    }
 
     private static async Task WriteAgentRunSseAsync(
         HttpResponse response,

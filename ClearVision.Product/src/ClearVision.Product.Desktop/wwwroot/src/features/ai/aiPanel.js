@@ -123,6 +123,11 @@ export class AiPanel {
         this.workspaceSnapshotRevision = 0;
         this.workspaceSnapshotDirty = false;
         this.workspaceSnapshotSaveQueue = Promise.resolve();
+        this.workspaceMutationGeneration = 0;
+        this.workspacePersistedGeneration = 0;
+        this.workspacePendingMutationCount = 0;
+        this.workspaceSaveErrorGeneration = 0;
+        this.workspaceBoundaryInProgress = false;
         this.workspaceBuildRunId = '';
         this.workspaceSubmittedBuildFingerprint = '';
         this.workspacePersistenceWarning = null;
@@ -256,6 +261,11 @@ export class AiPanel {
         this.workspaceSnapshotRevision = 0;
         this.workspaceSnapshotDirty = false;
         this.workspaceSnapshotSaveQueue = Promise.resolve();
+        this.workspaceMutationGeneration = 0;
+        this.workspacePersistedGeneration = 0;
+        this.workspacePendingMutationCount = 0;
+        this.workspaceSaveErrorGeneration = 0;
+        this.workspaceBoundaryInProgress = false;
         this.workspaceBuildRunId = '';
         this.workspaceSubmittedBuildFingerprint = '';
         this.workspacePersistenceWarning = null;

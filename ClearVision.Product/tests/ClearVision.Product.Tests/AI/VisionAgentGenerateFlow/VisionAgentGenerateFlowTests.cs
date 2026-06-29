@@ -882,6 +882,7 @@ public sealed class VisionAgentGenerateFlowTests
         var runService = new VisionAgentBuildRunService(
             applicationService,
             streamService,
+            conversationService,
             projector,
             Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildRunService>>());
         return new BuildRunHarness(runService, streamService);

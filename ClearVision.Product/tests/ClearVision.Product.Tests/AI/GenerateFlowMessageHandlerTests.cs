@@ -831,6 +831,9 @@ public class GenerateFlowMessageHandlerTests
 
         public BuildCommand? LastCommand { get; private set; }
 
+        public VisionAgentWorkspaceSnapshotMutationResult PrepareBuildAssociation(BuildCommand command) =>
+            new() { Success = true };
+
         public Task<VisionAgentBuildRunResult> RunAsync(
             BuildCommand command,
             CancellationToken cancellationToken = default)

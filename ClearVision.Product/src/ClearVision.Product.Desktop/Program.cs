@@ -14,6 +14,7 @@ using ClearVision.Product.Desktop.Middleware;
 using ClearVision.Product.Desktop.Station;
 using ClearVision.Product.Desktop.Triggers;
 using ClearVision.Product.Infrastructure.AI;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 using ClearVision.Product.Infrastructure.Logging;
 using ClearVision.Product.Infrastructure.Metrics;
 using ClearVision.Product.Infrastructure.Services;
@@ -42,8 +43,7 @@ static class Program
     private const int MaxWebPort = 5010;
     private static IHost? _host;
     private static int _webPort = 0;
-    private static Mutex? _singleInstanceMutex;
-    private static bool _singleInstanceMutexOwned;
+    private static IReadOnlyList<Mutex> _singleInstanceLeases = Array.Empty<Mutex>();
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool SetDllDirectory(string lpPathName);
@@ -95,7 +95,7 @@ static class Program
                     MessageBoxIcon.Error);
             };
 
-            if (!TryAcquireSingleInstanceMutex(out _singleInstanceMutex))
+            if (!TryAcquireSingleInstanceMutex(out _singleInstanceLeases))
             {
                 MessageBox.Show("ClearVision 已在运行", "ClearVision", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -145,57 +145,78 @@ static class Program
         string? dataPath = null,
         string? installPath = null)
     {
+        var defaultStorePath = string.IsNullOrWhiteSpace(dataPath)
+            ? ConversationalFlowService.ResolveStoragePath()
+            : dataPath.Trim();
+        return BuildStoreLeaseMutexName("conversation", defaultStorePath, userName);
+    }
+
+    internal static string BuildStoreLeaseMutexName(
+        string storeKind,
+        string storePath,
+        string? userName = null)
+    {
         var effectiveUser = string.IsNullOrWhiteSpace(userName)
             ? WindowsIdentity.GetCurrent().Name
             : userName.Trim();
-        var settingsPath = string.IsNullOrWhiteSpace(dataPath)
-            ? StationSettingsPaths.GetStudioCommunicationSettingsPath()
-            : dataPath.Trim();
-        var dataRoot = Path.GetFullPath(Path.GetDirectoryName(settingsPath) ?? settingsPath);
-        var installRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(installPath)
-            ? AppContext.BaseDirectory
-            : installPath.Trim());
-        var source = $"{effectiveUser}|{dataRoot}|{installRoot}".ToUpperInvariant();
+        var normalizedStorePath = Path.GetFullPath(storePath.Trim());
+        var source = $"{effectiveUser}|{normalizedStorePath}".ToUpperInvariant();
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))).ToLowerInvariant();
-        return $"Local\\ClearVision.Desktop.{hash}";
+        return $"Global\\ClearVision.Desktop.StoreLease.{hash}";
     }
 
-    private static bool TryAcquireSingleInstanceMutex(out Mutex mutex)
+    private static bool TryAcquireSingleInstanceMutex(out IReadOnlyList<Mutex> mutexes)
     {
-        mutex = new Mutex(initiallyOwned: true, BuildSingleInstanceMutexName(), out var createdNew);
-        _singleInstanceMutexOwned = createdNew;
-        if (createdNew)
+        var leaseNames = new[]
         {
-            return true;
+            BuildStoreLeaseMutexName("conversation", ConversationalFlowService.ResolveStoragePath()),
+            BuildStoreLeaseMutexName("agent-run", AgentRunEventStore.GetDefaultDirectory())
+        }
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item, StringComparer.Ordinal)
+            .ToList();
+
+        var acquired = new List<Mutex>();
+        foreach (var leaseName in leaseNames)
+        {
+            var mutex = new Mutex(initiallyOwned: true, leaseName, out var createdNew);
+            if (!createdNew)
+            {
+                mutex.Dispose();
+                ReleaseSingleInstanceLeases(acquired);
+                mutexes = Array.Empty<Mutex>();
+                return false;
+            }
+
+            acquired.Add(mutex);
         }
 
-        mutex.Dispose();
-        return false;
+        mutexes = acquired;
+        return true;
     }
 
     private static void ReleaseSingleInstanceMutex()
     {
-        if (_singleInstanceMutex == null)
-        {
-            return;
-        }
+        ReleaseSingleInstanceLeases(_singleInstanceLeases);
+        _singleInstanceLeases = Array.Empty<Mutex>();
+    }
 
-        try
+    private static void ReleaseSingleInstanceLeases(IEnumerable<Mutex> leases)
+    {
+        foreach (var lease in leases)
         {
-            if (_singleInstanceMutexOwned)
+            try
             {
-                _singleInstanceMutex.ReleaseMutex();
+                lease.ReleaseMutex();
             }
-        }
-        catch (ApplicationException)
-        {
-            // The mutex was not owned by this process anymore.
-        }
-        finally
-        {
-            _singleInstanceMutex.Dispose();
-            _singleInstanceMutex = null;
-            _singleInstanceMutexOwned = false;
+            catch (ApplicationException)
+            {
+                // The mutex was not owned by this process anymore.
+            }
+            finally
+            {
+                lease.Dispose();
+            }
         }
     }
 

@@ -1,6 +1,9 @@
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 
@@ -10,6 +13,8 @@ public sealed record VisionAgentBuildRunResult(
 
 public interface IVisionAgentBuildRunService
 {
+    VisionAgentWorkspaceSnapshotMutationResult PrepareBuildAssociation(BuildCommand command);
+
     Task<VisionAgentBuildRunResult> RunAsync(
         BuildCommand command,
         CancellationToken cancellationToken = default);
@@ -19,19 +24,66 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
 {
     private readonly IVisionAgentBuildApplicationService _applicationService;
     private readonly IAgentRunEventStreamService _streamService;
+    private readonly IConversationalFlowService _conversationService;
     private readonly IVisionAgentBuildTerminalProjector _terminalProjector;
     private readonly Microsoft.Extensions.Logging.ILogger<VisionAgentBuildRunService> _logger;
 
     public VisionAgentBuildRunService(
         IVisionAgentBuildApplicationService applicationService,
         IAgentRunEventStreamService streamService,
+        IConversationalFlowService conversationService,
         IVisionAgentBuildTerminalProjector terminalProjector,
         Microsoft.Extensions.Logging.ILogger<VisionAgentBuildRunService> logger)
     {
         _applicationService = applicationService;
         _streamService = streamService;
+        _conversationService = conversationService;
         _terminalProjector = terminalProjector;
         _logger = logger;
+    }
+
+    public VisionAgentWorkspaceSnapshotMutationResult PrepareBuildAssociation(BuildCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(command.Request);
+        var request = command.Request;
+        var build = request.BuildFromPlan;
+        var runId = FirstNonBlank(command.RunId, request.AgentRunId);
+        var sessionId = request.SessionId?.Trim() ?? string.Empty;
+        if (build == null || string.IsNullOrWhiteSpace(runId) || string.IsNullOrWhiteSpace(sessionId))
+        {
+            return new VisionAgentWorkspaceSnapshotMutationResult { Success = true };
+        }
+
+        var current = _conversationService.GetSession(sessionId);
+        if (current?.WorkspaceSnapshot != null && !build.WorkspaceExpectedRevision.HasValue)
+        {
+            return new VisionAgentWorkspaceSnapshotMutationResult
+            {
+                Success = false,
+                Conflict = true,
+                ErrorCode = "workspace_revision_required",
+                PublicMessage = "Plan 状态缺少版本号，请刷新确认后重新构建。",
+                Snapshot = current.WorkspaceSnapshot,
+                PersistenceStatus = _conversationService.GetLastPersistenceStatus()
+            };
+        }
+
+        return _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = build.WorkspaceExpectedRevision,
+            ClientMutationId = $"build-association:{runId}",
+            LifecycleState = "building",
+            BuildRunId = runId,
+            BuildRunStatus = AgentRunEventStatuses.Running,
+            PlanRunStatus = AgentRunEventStatuses.Completed,
+            PendingPlanSnapshot = build.PlanSnapshot,
+            PlanQuestionSelections = build.UserSelections,
+            ConfirmedPlanAnswers = build.ConfirmedAnswers,
+            RequirementMode = request.RequirementMode,
+            PlanAcceptedRecommendedDefaults = build.AcceptedRecommendedDefaults,
+            SubmittedBuildFingerprint = ComputeSubmittedBuildFingerprint(request)
+        });
     }
 
     public async Task<VisionAgentBuildRunResult> RunAsync(
@@ -56,6 +108,24 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             RunId = runId,
             PersistResult = false
         };
+        if (!runCommand.BuildAssociationPrepared)
+        {
+            var association = PrepareBuildAssociation(runCommand);
+            if (!association.Success)
+            {
+                var result = BuildAssociationFailureResult(request, association);
+                var terminal = TerminalOrReplay(
+                    _streamService.Fail(
+                        runId,
+                        result.ErrorMessage ?? "Build 创建失败，会话状态未保存。",
+                        result.FailureSummary?.RepairTarget ?? "请确认 Plan 状态后重新构建。",
+                        BuildFailurePayload(result, request)),
+                    runId);
+                return new VisionAgentBuildRunResult(
+                    BuildOutcome(runCommand, request, result, projected: false),
+                    terminal);
+            }
+        }
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             _streamService.GetCancellationToken(runId));
@@ -387,6 +457,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             PlanId = request.BuildFromPlan?.PlanSnapshot?.PlanId ?? request.BuildFromPlan?.PlanId ?? string.Empty,
             PlanHash = request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? request.BuildFromPlan?.PlanHash ?? string.Empty,
             ContractVersion = request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? string.Empty,
+            SessionId = request.SessionId,
             RequestedMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
             EffectiveMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
             ToolLoopEntered = false,
@@ -425,6 +496,68 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             TurnIntent = AiTurnIntents.NewFlow,
             RouterConfidence = AiRouterConfidence.High
         };
+    }
+
+    private static AiFlowGenerationResult BuildAssociationFailureResult(
+        AiFlowGenerationRequest request,
+        VisionAgentWorkspaceSnapshotMutationResult association)
+    {
+        var code = string.IsNullOrWhiteSpace(association.ErrorCode)
+            ? "session_persistence_failed"
+            : association.ErrorCode;
+        var message = code switch
+        {
+            "workspace_revision_required" => "Build 创建失败：Plan 状态缺少版本号。",
+            "workspace_revision_conflict" => "Build 创建失败：Plan 状态已变化。",
+            _ => "Build 创建失败：会话状态未能保存。"
+        };
+
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusFailed,
+            FailureType = AiFlowGenerationResult.FailureTypeSystemError,
+            ErrorMessage = message,
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "vision_agent_build_from_plan",
+                Code = code,
+                Message = message,
+                RepairTarget = code is "workspace_revision_required" or "workspace_revision_conflict"
+                    ? "请确认最新 Plan 状态后重新构建。"
+                    : "请检查本机会话存储权限或磁盘空间后重试 Build。"
+            },
+            PlanId = request.BuildFromPlan?.PlanSnapshot?.PlanId ?? request.BuildFromPlan?.PlanId ?? string.Empty,
+            PlanHash = request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? request.BuildFromPlan?.PlanHash ?? string.Empty,
+            ContractVersion = request.BuildFromPlan?.PlanSnapshot?.PlanContractVersion ?? string.Empty,
+            SessionId = request.SessionId,
+            RequestedMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+            EffectiveMode = AiAgentGenerateFlowModes.Normalize(request.AgentGenerateFlowMode),
+            ToolLoopEntered = false,
+            FallbackReason = string.Empty,
+            InteractionState = AiInteractionStates.Failed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High
+        };
+    }
+
+    private static string ComputeSubmittedBuildFingerprint(AiFlowGenerationRequest request) =>
+        ComputeJsonFingerprint(new
+        {
+            request.BuildFromPlan?.PlanId,
+            planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash,
+            request.RequirementMode,
+            request.BuildFromPlan?.AcceptedRecommendedDefaults,
+            request.BuildFromPlan?.AcceptedDefaults,
+            request.BuildFromPlan?.ConfirmedAnswers,
+            request.BuildFromPlan?.UserSelections
+        });
+
+    private static string ComputeJsonFingerprint(object value)
+    {
+        var json = JsonSerializer.Serialize(value);
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(json));
+        return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private static string ResolveResultPlanId(

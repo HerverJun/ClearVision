@@ -7,6 +7,7 @@ public sealed record BuildCommand
     public string? RequestId { get; init; }
     public string Transport { get; init; } = BuildCommandTransports.Internal;
     public bool PersistResult { get; init; } = true;
+    public bool BuildAssociationPrepared { get; init; }
 
     public static BuildCommand FromGenerationRequest(
         AiFlowGenerationRequest request,

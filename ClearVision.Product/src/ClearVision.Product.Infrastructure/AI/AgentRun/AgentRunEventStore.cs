@@ -126,7 +126,7 @@ public sealed class AgentRunEventStore
         return results;
     }
 
-    private static string GetDefaultDirectory()
+    public static string GetDefaultDirectory()
     {
         var configured = Environment.GetEnvironmentVariable("CV_AGENT_RUN_EVENT_STORE");
         if (!string.IsNullOrWhiteSpace(configured))
