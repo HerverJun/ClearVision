@@ -10,9 +10,10 @@ public interface IAgentRunEventStreamService
 {
     AgentRunCreateResult CreateRun(string description, object? payload = null, string? ownerHash = null);
     AgentRunEvent? Append(string? runId, AgentRunEventDraft draft);
-    AgentRunEvent? Complete(string? runId, string summary, object? payload = null);
-    AgentRunEvent? Fail(string? runId, string summary, string firstFixRecommendation, object? payload = null);
-    AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.", object? payload = null);
+    AgentRunTerminalReservationResult TryReserveTerminal(string? runId, string terminalStatus);
+    AgentRunEvent? Complete(string? runId, string summary, object? payload = null, AgentRunTerminalReservationResult? reservation = null);
+    AgentRunEvent? Fail(string? runId, string summary, string firstFixRecommendation, object? payload = null, AgentRunTerminalReservationResult? reservation = null);
+    AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.", object? payload = null, AgentRunTerminalReservationResult? reservation = null);
     AgentRunEventSubscription? Subscribe(string runId, long afterSequence);
     AgentRunReplayResult? Replay(string runId);
     AgentRunReplayResult? ReplayLatest(string? ownerHash = null);
@@ -21,6 +22,25 @@ public interface IAgentRunEventStreamService
     bool IsRunOwner(string runId, string? ownerHash);
     string? IssueStreamToken(string runId, string? ownerHash, TimeSpan? ttl = null);
     AgentRunStreamTokenValidationResult ValidateStreamToken(string runId, string? token, bool consume = true);
+}
+
+public enum AgentRunTerminalReservationOutcome
+{
+    Acquired,
+    AlreadyReservedBySameStatus,
+    AlreadyTerminal,
+    RejectedByOtherTerminalOwner,
+    RunNotFound,
+    InvalidTerminalStatus
+}
+
+public sealed record AgentRunTerminalReservationResult(
+    AgentRunTerminalReservationOutcome Outcome,
+    string TargetStatus,
+    string CurrentStatus,
+    string? ReservationId = null)
+{
+    public bool Acquired => Outcome == AgentRunTerminalReservationOutcome.Acquired;
 }
 
 public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
@@ -127,7 +147,87 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         return evt;
     }
 
-    public AgentRunEvent? Complete(string? runId, string summary, object? payload = null)
+    public AgentRunTerminalReservationResult TryReserveTerminal(string? runId, string terminalStatus)
+    {
+        var targetStatus = NormalizeTerminalStatus(terminalStatus);
+        if (string.IsNullOrWhiteSpace(targetStatus))
+        {
+            return new AgentRunTerminalReservationResult(
+                AgentRunTerminalReservationOutcome.InvalidTerminalStatus,
+                terminalStatus?.Trim() ?? string.Empty,
+                AgentRunTerminalIntents.None);
+        }
+
+        if (string.IsNullOrWhiteSpace(runId))
+        {
+            return new AgentRunTerminalReservationResult(
+                AgentRunTerminalReservationOutcome.RunNotFound,
+                targetStatus,
+                AgentRunTerminalIntents.None);
+        }
+
+        var state = GetOrRestoreState(runId.Trim());
+        if (state == null)
+        {
+            return new AgentRunTerminalReservationResult(
+                AgentRunTerminalReservationOutcome.RunNotFound,
+                targetStatus,
+                AgentRunTerminalIntents.None);
+        }
+
+        AgentRunTerminalReservationResult result;
+        var cancelToken = false;
+        lock (state.Gate)
+        {
+            if (state.IsTerminal)
+            {
+                result = new AgentRunTerminalReservationResult(
+                    AgentRunTerminalReservationOutcome.AlreadyTerminal,
+                    targetStatus,
+                    NormalizeTerminalStatus(state.Status) ?? state.Status);
+            }
+            else if (string.IsNullOrWhiteSpace(state.TerminalIntentStatus))
+            {
+                state.TerminalIntentStatus = targetStatus;
+                state.TerminalIntentState = ToPendingTerminalIntent(targetStatus);
+                state.TerminalReservationId = Guid.NewGuid().ToString("N");
+                cancelToken = string.Equals(targetStatus, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase);
+                result = new AgentRunTerminalReservationResult(
+                    AgentRunTerminalReservationOutcome.Acquired,
+                    targetStatus,
+                    state.TerminalIntentState,
+                    state.TerminalReservationId);
+            }
+            else if (string.Equals(state.TerminalIntentStatus, targetStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                cancelToken = string.Equals(targetStatus, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase);
+                result = new AgentRunTerminalReservationResult(
+                    AgentRunTerminalReservationOutcome.AlreadyReservedBySameStatus,
+                    targetStatus,
+                    state.TerminalIntentState);
+            }
+            else
+            {
+                result = new AgentRunTerminalReservationResult(
+                    AgentRunTerminalReservationOutcome.RejectedByOtherTerminalOwner,
+                    targetStatus,
+                    state.TerminalIntentState);
+            }
+        }
+
+        if (cancelToken)
+        {
+            TryCancelStateToken(state);
+        }
+
+        return result;
+    }
+
+    public AgentRunEvent? Complete(
+        string? runId,
+        string summary,
+        object? payload = null,
+        AgentRunTerminalReservationResult? reservation = null)
     {
         return AppendTerminal(runId, new AgentRunEventDraft
         {
@@ -137,10 +237,15 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             Summary = summary,
             Status = AgentRunEventStatuses.Completed,
             Payload = payload
-        });
+        }, reservation);
     }
 
-    public AgentRunEvent? Fail(string? runId, string summary, string firstFixRecommendation, object? payload = null)
+    public AgentRunEvent? Fail(
+        string? runId,
+        string summary,
+        string firstFixRecommendation,
+        object? payload = null,
+        AgentRunTerminalReservationResult? reservation = null)
     {
         return AppendTerminal(runId, new AgentRunEventDraft
         {
@@ -150,10 +255,14 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             Summary = summary,
             Status = AgentRunEventStatuses.Failed,
             Payload = BuildTerminalDiagnosticPayload(payload, firstFixRecommendation)
-        });
+        }, reservation);
     }
 
-    public AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.", object? payload = null)
+    public AgentRunEvent? Cancel(
+        string? runId,
+        string summary = "Vision Agent run cancelled by user.",
+        object? payload = null,
+        AgentRunTerminalReservationResult? reservation = null)
     {
         var terminal = AppendTerminal(runId, new AgentRunEventDraft
         {
@@ -165,7 +274,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             Payload = BuildTerminalDiagnosticPayload(
                 payload,
                 "Submit the request again when you are ready to continue.")
-        });
+        }, reservation);
 
         if (!string.IsNullOrWhiteSpace(runId))
         {
@@ -293,6 +402,11 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             return false;
         }
 
+        return TryCancelStateToken(state);
+    }
+
+    private static bool TryCancelStateToken(AgentRunState state)
+    {
         try
         {
             state.Cancellation.Cancel();
@@ -388,9 +502,18 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         return new AgentRunStreamTokenValidationResult(true, record.OwnerHash);
     }
 
-    private AgentRunEvent? AppendTerminal(string? runId, AgentRunEventDraft draft)
+    private AgentRunEvent? AppendTerminal(
+        string? runId,
+        AgentRunEventDraft draft,
+        AgentRunTerminalReservationResult? reservation = null)
     {
         if (string.IsNullOrWhiteSpace(runId))
+        {
+            return null;
+        }
+
+        var targetStatus = NormalizeTerminalStatus(draft.Status);
+        if (string.IsNullOrWhiteSpace(targetStatus))
         {
             return null;
         }
@@ -410,10 +533,17 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                 return null;
             }
 
+            if (!CanCommitTerminalLocked(state, targetStatus, reservation))
+            {
+                return null;
+            }
+
             evt = BuildSafeEvent(state.RunId, state.NextSequence(), draft);
             state.Events.Add(evt);
             UpdateSummaryFromEvent(state, evt);
             state.IsTerminal = true;
+            state.TerminalIntentStatus = targetStatus;
+            state.TerminalIntentState = targetStatus;
             _store.AppendEvent(evt);
             _store.AppendSummary(state.ToSummary());
             subscribers = state.Subscribers.ToList();
@@ -427,6 +557,31 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         }
 
         return evt;
+    }
+
+    private static bool CanCommitTerminalLocked(
+        AgentRunState state,
+        string targetStatus,
+        AgentRunTerminalReservationResult? reservation)
+    {
+        if (reservation != null)
+        {
+            return reservation.Outcome == AgentRunTerminalReservationOutcome.Acquired &&
+                   !string.IsNullOrWhiteSpace(reservation.ReservationId) &&
+                   string.Equals(reservation.TargetStatus, targetStatus, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(state.TerminalIntentStatus, targetStatus, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(state.TerminalReservationId, reservation.ReservationId, StringComparison.Ordinal);
+        }
+
+        if (!string.IsNullOrWhiteSpace(state.TerminalIntentStatus))
+        {
+            return false;
+        }
+
+        state.TerminalIntentStatus = targetStatus;
+        state.TerminalIntentState = ToPendingTerminalIntent(targetStatus);
+        state.TerminalReservationId = Guid.NewGuid().ToString("N");
+        return true;
     }
 
     private AgentRunEvent BuildSafeEvent(string runId, long sequence, AgentRunEventDraft draft)
@@ -537,6 +692,13 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             LastSequence = Math.Max(summary?.LastSequence ?? 0, events.Count == 0 ? 0 : events.Max(evt => evt.Sequence)),
             RedactionPass = summary?.RedactionPass ?? events.All(evt => evt.RedactionPass)
         };
+        if (restored.IsTerminal)
+        {
+            var restoredTerminalStatus = NormalizeTerminalStatus(restored.Status);
+            restored.TerminalIntentStatus = restoredTerminalStatus;
+            restored.TerminalIntentState = restoredTerminalStatus ?? AgentRunTerminalIntents.None;
+        }
+
         restored.Events.AddRange(events.OrderBy(evt => evt.Sequence));
         restored = _runs.GetOrAdd(runId, restored);
         if (!restored.IsTerminal)
@@ -562,6 +724,8 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                     restored.Events.Add(recoveryEvent);
                     UpdateSummaryFromEvent(restored, recoveryEvent);
                     restored.IsTerminal = true;
+                    restored.TerminalIntentStatus = AgentRunEventStatuses.Failed;
+                    restored.TerminalIntentState = AgentRunEventStatuses.Failed;
                     _store.AppendEvent(recoveryEvent);
                     _store.AppendSummary(restored.ToSummary());
                 }
@@ -616,6 +780,42 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         return string.Equals(status, AgentRunEventStatuses.Completed, StringComparison.OrdinalIgnoreCase) ||
                string.Equals(status, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase) ||
                string.Equals(status, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? NormalizeTerminalStatus(string? status)
+    {
+        if (string.Equals(status, AgentRunEventStatuses.Completed, StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunEventStatuses.Completed;
+        }
+
+        if (string.Equals(status, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunEventStatuses.Failed;
+        }
+
+        if (string.Equals(status, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "canceled", StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunEventStatuses.Cancelled;
+        }
+
+        return null;
+    }
+
+    private static string ToPendingTerminalIntent(string terminalStatus)
+    {
+        if (string.Equals(terminalStatus, AgentRunEventStatuses.Completed, StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunTerminalIntents.Completing;
+        }
+
+        if (string.Equals(terminalStatus, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunTerminalIntents.Failing;
+        }
+
+        return AgentRunTerminalIntents.Cancelling;
     }
 
     private static string NormalizeOwnerHash(string? ownerHash)
@@ -773,6 +973,9 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         public int StaleEventCount { get; set; }
         public bool RedactionPass { get; set; } = true;
         public bool IsTerminal { get; set; }
+        public string? TerminalIntentStatus { get; set; }
+        public string TerminalIntentState { get; set; } = AgentRunTerminalIntents.None;
+        public string? TerminalReservationId { get; set; }
         public CancellationTokenSource Cancellation { get; } = new();
         public List<AgentRunEvent> Events { get; } = new();
         public List<ChannelWriter<AgentRunEvent>> Subscribers { get; } = new();
@@ -809,6 +1012,14 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                 }
             };
         }
+    }
+
+    private static class AgentRunTerminalIntents
+    {
+        public const string None = "none";
+        public const string Completing = "completing";
+        public const string Failing = "failing";
+        public const string Cancelling = "cancelling";
     }
 
     private sealed record AgentRunStreamToken(

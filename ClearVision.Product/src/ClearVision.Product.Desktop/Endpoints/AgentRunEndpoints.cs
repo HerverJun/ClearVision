@@ -433,6 +433,12 @@ public static class AgentRunEndpoints
 
         if (ReplayHasMode(replayBeforeCancel, "plan"))
         {
+            var reservation = streamService.TryReserveTerminal(runId, AgentRunEventStatuses.Cancelled);
+            if (!reservation.Acquired)
+            {
+                return BuildCancelReservationResponse(runId, reservation, streamService.Replay(runId) ?? replayBeforeCancel);
+            }
+
             var cancelledEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCancelled, "plan", "规划已取消",
                 "用户已取消本次规划，事件流即将关闭。", AgentRunEventStatuses.Cancelled, new
                 {
@@ -471,7 +477,8 @@ public static class AgentRunEndpoints
                     "规划已取消。",
                     finalWorkspaceSnapshot,
                     finalPersistenceStatus,
-                    persistenceWarning));
+                    persistenceWarning),
+                reservation);
             var planReplay = streamService.Replay(runId);
             return Results.Ok(new
             {
@@ -481,7 +488,13 @@ public static class AgentRunEndpoints
             });
         }
 
-        var cancelled = streamService.Cancel(runId);
+        var nonPlanReservation = streamService.TryReserveTerminal(runId, AgentRunEventStatuses.Cancelled);
+        if (!nonPlanReservation.Acquired)
+        {
+            return BuildCancelReservationResponse(runId, nonPlanReservation, streamService.Replay(runId) ?? replayBeforeCancel);
+        }
+
+        var cancelled = streamService.Cancel(runId, reservation: nonPlanReservation);
         var replay = streamService.Replay(runId);
         return Results.Ok(new
         {
@@ -489,6 +502,94 @@ public static class AgentRunEndpoints
             cancelled = cancelled != null,
             summary = replay?.Summary
         });
+    }
+
+    private static IResult BuildCancelReservationResponse(
+        string runId,
+        AgentRunTerminalReservationResult reservation,
+        AgentRunReplayResult? replay)
+    {
+        var terminalStatus = NormalizeReservedTerminalStatus(reservation.CurrentStatus);
+        if (reservation.Outcome == AgentRunTerminalReservationOutcome.RunNotFound)
+        {
+            return Results.NotFound(new { error = "Agent run not found." });
+        }
+
+        if (reservation.Outcome == AgentRunTerminalReservationOutcome.AlreadyTerminal &&
+            string.Equals(terminalStatus, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Ok(new
+            {
+                runId,
+                cancelled = true,
+                cancellationStatus = AgentRunEventStatuses.Cancelled,
+                summary = replay?.Summary,
+                metadataOnly = true
+            });
+        }
+
+        if (reservation.Outcome == AgentRunTerminalReservationOutcome.AlreadyReservedBySameStatus &&
+            string.Equals(terminalStatus, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.Ok(new
+            {
+                runId,
+                cancelled = false,
+                cancellationStatus = reservation.CurrentStatus,
+                publicMessage = "Cancellation is already being committed.",
+                summary = replay?.Summary,
+                metadataOnly = true
+            });
+        }
+
+        return Results.Json(new
+        {
+            errorCode = "run_already_terminal",
+            runId,
+            terminalStatus,
+            currentStatus = reservation.CurrentStatus,
+            publicMessage = BuildCancelRejectedPublicMessage(terminalStatus),
+            summary = replay?.Summary,
+            metadataOnly = true
+        }, statusCode: StatusCodes.Status409Conflict);
+    }
+
+    private static string NormalizeReservedTerminalStatus(string status)
+    {
+        if (string.Equals(status, "completing", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, AgentRunEventStatuses.Completed, StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunEventStatuses.Completed;
+        }
+
+        if (string.Equals(status, "failing", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunEventStatuses.Failed;
+        }
+
+        if (string.Equals(status, "cancelling", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunEventStatuses.Cancelled;
+        }
+
+        return status;
+    }
+
+    private static string BuildCancelRejectedPublicMessage(string terminalStatus)
+    {
+        if (string.Equals(terminalStatus, AgentRunEventStatuses.Completed, StringComparison.OrdinalIgnoreCase))
+        {
+            return "\u672c\u6b21\u89c4\u5212\u5df2\u7ecf\u5b8c\u6210\uff0c\u65e0\u6cd5\u518d\u53d6\u6d88\u3002";
+        }
+
+        if (string.Equals(terminalStatus, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+        {
+            return "\u672c\u6b21\u89c4\u5212\u5df2\u7ecf\u5931\u8d25\uff0c\u65e0\u6cd5\u518d\u53d6\u6d88\u3002";
+        }
+
+        return "\u672c\u6b21\u89c4\u5212\u5df2\u8fdb\u5165\u7ec8\u6001\uff0c\u65e0\u6cd5\u518d\u53d6\u6d88\u3002";
     }
 
     private static IResult HandleCreateStreamToken(
@@ -612,7 +713,8 @@ public static class AgentRunEndpoints
 
             if (cancellationToken.IsCancellationRequested)
             {
-                if (IsRunTerminal(streamService, runId))
+                var cancelReservation = streamService.TryReserveTerminal(runId, AgentRunEventStatuses.Cancelled);
+                if (!cancelReservation.Acquired)
                 {
                     return;
                 }
@@ -654,7 +756,14 @@ public static class AgentRunEndpoints
                         "规划已取消。",
                         cancelWorkspaceSnapshot,
                         cancelPersistenceStatus,
-                        cancelPersistenceWarning));
+                        cancelPersistenceWarning),
+                    cancelReservation);
+                return;
+            }
+
+            var completeReservation = streamService.TryReserveTerminal(runId, AgentRunEventStatuses.Completed);
+            if (!completeReservation.Acquired)
+            {
                 return;
             }
 
@@ -698,11 +807,13 @@ public static class AgentRunEndpoints
                     runId,
                     finalWorkspaceSnapshot,
                     finalPersistenceStatus,
-                    persistenceWarning));
+                    persistenceWarning),
+                completeReservation);
         }
         catch (OperationCanceledException)
         {
-            if (IsRunTerminal(streamService, runId))
+            var cancelReservation = streamService.TryReserveTerminal(runId, AgentRunEventStatuses.Cancelled);
+            if (!cancelReservation.Acquired)
             {
                 return;
             }
@@ -744,11 +855,18 @@ public static class AgentRunEndpoints
                     "规划已取消。",
                     finalWorkspaceSnapshot,
                     finalPersistenceStatus,
-                    persistenceWarning));
+                    persistenceWarning),
+                cancelReservation);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "AgentRun PlanMode background task failed. RunId={RunId}", runId);
+            var failReservation = streamService.TryReserveTerminal(runId, AgentRunEventStatuses.Failed);
+            if (!failReservation.Acquired)
+            {
+                return;
+            }
+
             var failedEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanFailed, "plan",
                 "规划失败", "规划在完成前失败，请检查公开诊断后重试。", AgentRunEventStatuses.Failed, new
                 {
@@ -791,7 +909,8 @@ public static class AgentRunEndpoints
                     persistenceStatus = finalPersistenceStatus,
                     persistenceWarning,
                     metadataOnly = true
-                });
+                },
+                failReservation);
         }
     }
 

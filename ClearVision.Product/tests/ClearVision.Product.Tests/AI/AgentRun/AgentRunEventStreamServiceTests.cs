@@ -113,6 +113,46 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         _service.Replay(run.RunId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Cancelled);
     }
 
+    [Fact(DisplayName = "AgentRun terminal reservation grants only one terminal owner")]
+    public void TryReserveTerminal_ShouldRejectOtherTerminalOwners()
+    {
+        var run = _service.CreateRun("terminal reservation");
+        var token = _service.GetCancellationToken(run.RunId);
+
+        var cancelReservation = _service.TryReserveTerminal(run.RunId, AgentRunEventStatuses.Cancelled);
+        var completeReservation = _service.TryReserveTerminal(run.RunId, AgentRunEventStatuses.Completed);
+        var repeatedCancel = _service.TryReserveTerminal(run.RunId, AgentRunEventStatuses.Cancelled);
+
+        cancelReservation.Outcome.Should().Be(AgentRunTerminalReservationOutcome.Acquired);
+        cancelReservation.ReservationId.Should().NotBeNullOrWhiteSpace();
+        token.IsCancellationRequested.Should().BeTrue();
+        completeReservation.Outcome.Should().Be(AgentRunTerminalReservationOutcome.RejectedByOtherTerminalOwner);
+        completeReservation.CurrentStatus.Should().Be("cancelling");
+        repeatedCancel.Outcome.Should().Be(AgentRunTerminalReservationOutcome.AlreadyReservedBySameStatus);
+        repeatedCancel.ReservationId.Should().BeNull();
+
+        _service.Complete(run.RunId, "wrong owner").Should().BeNull();
+        var cancelled = _service.Cancel(run.RunId, reservation: cancelReservation);
+        cancelled.Should().NotBeNull();
+        cancelled!.EventType.Should().Be(AgentRunEventTypes.RunCancelled);
+        _service.Replay(run.RunId)!.Events.Should().ContainSingle(evt => evt.EventType == AgentRunEventTypes.RunCancelled);
+    }
+
+    [Fact(DisplayName = "AgentRun unreserved terminal append atomically reserves and completes")]
+    public void Complete_WithoutReservation_ShouldPreserveCompatibility()
+    {
+        var run = _service.CreateRun("compat terminal");
+
+        var completed = _service.Complete(run.RunId, "done");
+        var cancelReservation = _service.TryReserveTerminal(run.RunId, AgentRunEventStatuses.Cancelled);
+
+        completed.Should().NotBeNull();
+        completed!.EventType.Should().Be(AgentRunEventTypes.RunCompleted);
+        cancelReservation.Outcome.Should().Be(AgentRunTerminalReservationOutcome.AlreadyTerminal);
+        cancelReservation.CurrentStatus.Should().Be(AgentRunEventStatuses.Completed);
+        _service.Replay(run.RunId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Completed);
+    }
+
     [Fact(DisplayName = "AgentRun fail captures first fix recommendation in summary")]
     public void Fail_ShouldCaptureFirstFixRecommendation()
     {

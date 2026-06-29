@@ -837,6 +837,273 @@ public sealed class AgentRunEndpointsTests
         AssertCancelledPlanRunTerminalConsistency(host, runId, sessionId, expectPrimarySaved: false);
     }
 
+    [Fact(DisplayName = "Plan run cancel owns terminal while planner returns during cancel persistence")]
+    public async Task CreatePlanRunCancel_WhenPlannerReturnsDuringCancelPersistence_ShouldKeepCancelledTerminal()
+    {
+        var releasePlanner = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var plannerExited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, _) =>
+        {
+            try
+            {
+                await releasePlanner.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                return baseline with { PlanSource = "planner" };
+            }
+            finally
+            {
+                plannerExited.TrySetResult();
+            }
+        });
+        var sessionId = "session-plan-cancel-gated-return";
+        var runId = await host.CreatePlanRunAsync("cancel owns while planner returns", sessionId);
+        await host.WaitForEventAsync(runId, AgentRunEventTypes.PlanModelStarted);
+
+        var cancelPersistenceEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCancelPersistence = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gateNextWrite = 1;
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () =>
+        {
+            if (Interlocked.Exchange(ref gateNextWrite, 0) == 1)
+            {
+                cancelPersistenceEntered.TrySetResult();
+                releaseCancelPersistence.Task.GetAwaiter().GetResult();
+            }
+        };
+
+        var cancelTask = host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+        await cancelPersistenceEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            releasePlanner.SetResult();
+            await plannerExited.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            releaseCancelPersistence.TrySetResult();
+        }
+
+        using var cancel = await cancelTask.WaitAsync(TimeSpan.FromSeconds(5));
+        cancel.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = null;
+        await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
+
+        AssertCancelledPlanRunTerminalConsistency(host, runId, sessionId, expectPrimarySaved: true);
+        host.StreamService.Replay(runId)!.Events.Should().NotContain(evt => evt.Stage == "plan_ready");
+    }
+
+    [Fact(DisplayName = "Plan run completed terminal rejects late cancel without changing revision")]
+    public async Task CreatePlanRunCancel_AfterCompleted_ShouldReturnConflictWithoutChangingSession()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
+            Task.FromResult(baseline with { PlanSource = "planner", FallbackReason = string.Empty }));
+        var sessionId = "session-plan-completed-late-cancel";
+        var runId = await host.CreatePlanRunAsync("complete before late cancel", sessionId);
+        await host.WaitForTerminalAsync(runId);
+        await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
+
+        var beforeReplay = host.StreamService.Replay(runId)!;
+        var beforeRevision = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision;
+        using var cancel = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+        cancel.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var document = JsonDocument.Parse(await cancel.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("errorCode").GetString().Should().Be("run_already_terminal");
+        document.RootElement.GetProperty("terminalStatus").GetString().Should().Be(AgentRunEventStatuses.Completed);
+        await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
+
+        var afterReplay = host.StreamService.Replay(runId)!;
+        afterReplay.Events.Count.Should().Be(beforeReplay.Events.Count);
+        afterReplay.Events.Count(evt => evt.EventType == AgentRunEventTypes.RunCompleted).Should().Be(1);
+        afterReplay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunCancelled);
+        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
+        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.PlanRunStatus.Should().Be(AgentRunEventStatuses.Completed);
+    }
+
+    [Fact(DisplayName = "Plan run failed terminal rejects late cancel without plan_cancelled write")]
+    public async Task CreatePlanRunCancel_AfterFailed_ShouldReturnConflictWithoutWritingCancelledSession()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, _, _) =>
+            throw new InvalidOperationException("planner failed before cancel"));
+        var sessionId = "session-plan-failed-late-cancel";
+        var runId = await host.CreatePlanRunAsync("fail before late cancel", sessionId);
+        await host.WaitForTerminalAsync(runId);
+        await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
+
+        var beforeReplay = host.StreamService.Replay(runId)!;
+        var beforeRevision = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision;
+        var writesAfterFailure = 0;
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => Interlocked.Increment(ref writesAfterFailure);
+
+        using var cancel = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+        cancel.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var document = JsonDocument.Parse(await cancel.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("terminalStatus").GetString().Should().Be(AgentRunEventStatuses.Failed);
+        await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
+
+        writesAfterFailure.Should().Be(0);
+        var afterReplay = host.StreamService.Replay(runId)!;
+        afterReplay.Events.Count.Should().Be(beforeReplay.Events.Count);
+        afterReplay.Events.Count(evt => evt.EventType == AgentRunEventTypes.RunFailed).Should().Be(1);
+        afterReplay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.PlanCancelled);
+        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
+        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.PlanRunStatus.Should().Be(AgentRunEventStatuses.Failed);
+    }
+
+    [Fact(DisplayName = "Plan run repeated cancel is idempotent without events or revision change")]
+    public async Task CreatePlanRunCancel_AfterCancelled_ShouldReturnOkWithoutChangingSession()
+    {
+        var plannerExited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, ct) =>
+        {
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+                return baseline with { PlanSource = "planner" };
+            }
+            finally
+            {
+                plannerExited.TrySetResult();
+            }
+        });
+        var sessionId = "session-plan-repeat-cancel";
+        var runId = await host.CreatePlanRunAsync("repeat cancel plan", sessionId);
+        await host.WaitForEventAsync(runId, AgentRunEventTypes.PlanModelStarted);
+
+        using var firstCancel = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+        firstCancel.StatusCode.Should().Be(HttpStatusCode.OK);
+        await plannerExited.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
+        var beforeReplay = host.StreamService.Replay(runId)!;
+        var beforeRevision = host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision;
+        var writesAfterFirstCancel = 0;
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => Interlocked.Increment(ref writesAfterFirstCancel);
+
+        using var secondCancel = await host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+        secondCancel.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await secondCancel.Content.ReadAsStringAsync());
+        document.RootElement.GetProperty("cancellationStatus").GetString().Should().Be(AgentRunEventStatuses.Cancelled);
+        await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
+
+        writesAfterFirstCancel.Should().Be(0);
+        var afterReplay = host.StreamService.Replay(runId)!;
+        afterReplay.Events.Count.Should().Be(beforeReplay.Events.Count);
+        afterReplay.Events.Count(evt => evt.EventType == AgentRunEventTypes.RunCancelled).Should().Be(1);
+        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(beforeRevision);
+        host.ConversationService.GetSession(sessionId)!.WorkspaceSnapshot!.PlanRunStatus.Should().Be(AgentRunEventStatuses.Cancelled);
+    }
+
+    [Fact(DisplayName = "Plan run endpoint cancel and planner OperationCanceledException race to one cancelled terminal")]
+    public async Task CreatePlanRunCancel_WhenPlannerThrowsCancellationDuringCancelPersistence_ShouldCommitOnce()
+    {
+        var releasePlanner = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var plannerExited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, _, _) =>
+        {
+            try
+            {
+                await releasePlanner.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                throw new OperationCanceledException("planner cancellation raced endpoint cancel");
+            }
+            finally
+            {
+                plannerExited.TrySetResult();
+            }
+        });
+        var sessionId = "session-plan-cancel-oce-race";
+        var runId = await host.CreatePlanRunAsync("cancel races planner cancellation", sessionId);
+        await host.WaitForEventAsync(runId, AgentRunEventTypes.PlanModelStarted);
+
+        var cancelPersistenceEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCancelPersistence = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gateNextWrite = 1;
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () =>
+        {
+            if (Interlocked.Exchange(ref gateNextWrite, 0) == 1)
+            {
+                cancelPersistenceEntered.TrySetResult();
+                releaseCancelPersistence.Task.GetAwaiter().GetResult();
+            }
+        };
+
+        var cancelTask = host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+        await cancelPersistenceEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            releasePlanner.SetResult();
+            await plannerExited.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            releaseCancelPersistence.TrySetResult();
+        }
+
+        using var cancel = await cancelTask.WaitAsync(TimeSpan.FromSeconds(5));
+        cancel.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = null;
+        await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
+
+        AssertCancelledPlanRunTerminalConsistency(host, runId, sessionId, expectPrimarySaved: true);
+        host.StreamService.Replay(runId)!.Events.Count(evt => evt.EventType == AgentRunEventTypes.PlanCancelled).Should().Be(1);
+    }
+
+    [Fact(DisplayName = "Plan run cancel persistence failure remains cancelled while planner returns")]
+    public async Task CreatePlanRunCancel_WhenPersistenceFailsAndPlannerReturns_ShouldKeepWarningAndAvoidCompletedOverwrite()
+    {
+        var releasePlanner = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var plannerExited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, _) =>
+        {
+            try
+            {
+                await releasePlanner.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                return baseline with { PlanSource = "planner" };
+            }
+            finally
+            {
+                plannerExited.TrySetResult();
+            }
+        });
+        var sessionId = "session-plan-cancel-fail-gated-return";
+        var runId = await host.CreatePlanRunAsync("cancel persistence fails while planner returns", sessionId);
+        await host.WaitForEventAsync(runId, AgentRunEventTypes.PlanModelStarted);
+
+        var cancelPersistenceEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseCancelPersistence = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failNextWrite = 1;
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () =>
+        {
+            if (Interlocked.Exchange(ref failNextWrite, 0) == 1)
+            {
+                cancelPersistenceEntered.TrySetResult();
+                releaseCancelPersistence.Task.GetAwaiter().GetResult();
+                throw new IOException("cancel terminal primary failed");
+            }
+        };
+
+        var cancelTask = host.Client.PostAsync($"/api/ai/agent-runs/{runId}/cancel", content: null);
+        await cancelPersistenceEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            releasePlanner.SetResult();
+            await plannerExited.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            releaseCancelPersistence.TrySetResult();
+        }
+
+        using var cancel = await cancelTask.WaitAsync(TimeSpan.FromSeconds(5));
+        cancel.StatusCode.Should().Be(HttpStatusCode.OK);
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = null;
+        await WaitForPlanRunBackgroundSettleAsync(host, runId, sessionId);
+
+        AssertCancelledPlanRunTerminalConsistency(host, runId, sessionId, expectPrimarySaved: false);
+        var replay = host.StreamService.Replay(runId)!;
+        replay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+        replay.Events.Should().Contain(evt =>
+            evt.Stage == "workspace_persistence" &&
+            evt.Status == AgentRunEventStatuses.Warning);
+    }
+
     [Fact(DisplayName = "Plan run failure terminal payload carries final workspace and persistence status")]
     public async Task CreatePlanRunFailure_ShouldPublishFinalWorkspaceAndPersistenceStatus()
     {
