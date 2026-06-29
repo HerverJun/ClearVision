@@ -544,8 +544,7 @@ export const aiPanelAgentRunMixin = {
 
         const canonicalSessionId = String(createResult?.sessionId || createResult?.SessionId || '').trim();
         if (canonicalSessionId) {
-            this.sessionId = canonicalSessionId;
-            this._saveSessionId?.(canonicalSessionId);
+            this._adoptCanonicalSessionId?.(canonicalSessionId, { reason: 'agent_run_create' });
         }
         this._applyWorkspaceSnapshotSummary?.(createResult?.workspaceSnapshot || createResult?.WorkspaceSnapshot || null);
         this._handleWorkspacePersistenceStatus?.(createResult?.persistenceStatus || createResult?.PersistenceStatus || null);

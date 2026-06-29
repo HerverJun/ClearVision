@@ -589,11 +589,12 @@ public class ConversationalFlowService : IConversationalFlowService
             var committedAssistantTurnId = string.IsNullOrWhiteSpace(request.AssistantTurnId)
                 ? Guid.NewGuid().ToString("N")
                 : request.AssistantTurnId.Trim();
+            var terminalProjectionFingerprint = BuildTerminalProjectionFingerprint(request, committedAssistantTurnId);
             return CommitSessionMutation(
                 request.SessionId,
                 request.WorkspaceUpdate.ExpectedRevision,
-                $"build-terminal:{committedAssistantTurnId}",
-                BuildTerminalProjectionFingerprint(request, committedAssistantTurnId),
+                $"build-terminal:{committedAssistantTurnId}:{BuildMutationIdFingerprintSuffix(terminalProjectionFingerprint)}",
+                terminalProjectionFingerprint,
                 candidate =>
                 {
                     if (!string.IsNullOrWhiteSpace(request.LatestFlowJson))
@@ -853,6 +854,16 @@ public class ConversationalFlowService : IConversationalFlowService
             request.Payload,
             WorkspaceFingerprint = BuildWorkspaceMutationFingerprint(request.WorkspaceUpdate)
         });
+
+    private static string BuildMutationIdFingerprintSuffix(string fingerprint)
+    {
+        var normalized = string.IsNullOrWhiteSpace(fingerprint)
+            ? string.Empty
+            : fingerprint.Trim();
+        var separator = normalized.IndexOf(':', StringComparison.Ordinal);
+        var value = separator >= 0 ? normalized[(separator + 1)..] : normalized;
+        return value.Length <= 16 ? value : value[..16];
+    }
 
     private static string ComputeJsonFingerprint(object value)
     {

@@ -159,14 +159,16 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
                     SubmittedBuildFingerprint = FirstNonBlank(result.AnswerSetFingerprint, result.PlanHash, projection.Request.BuildFromPlan?.PlanHash)
                 }
             });
-            if (!projectionResult.PersistenceStatus.PrimaryStoreSaved)
+            if (!projectionResult.Success)
             {
                 _journal.MarkFailed(
                     runId,
                     session.SessionId,
                     terminal.Sequence,
                     terminal.EventType,
-                    new IOException(projectionResult.PublicMessage));
+                    new IOException(string.IsNullOrWhiteSpace(projectionResult.PublicMessage)
+                        ? projectionResult.ErrorCode
+                        : projectionResult.PublicMessage));
                 return false;
             }
 

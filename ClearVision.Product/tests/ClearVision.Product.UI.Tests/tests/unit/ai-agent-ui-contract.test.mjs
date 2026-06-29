@@ -5364,6 +5364,7 @@ test('BuildFromPlan prefers Plan templateSelection over raw snapshot and queued 
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   panel.nextTemplateSelection = { mode: 'template_fill', templateId: 'tmpl-next', scenarioKey: 'queued' };
+  panel.workspaceSnapshotRevision = 17;
   panel.planQuestionSelections = {};
   const plan = panel._normalizeBackendPlanResult(backendPlanResult({
     planId: 'plan_template_priority',
@@ -5379,6 +5380,7 @@ test('BuildFromPlan prefers Plan templateSelection over raw snapshot and queued 
   const buildFromPlan = panel._buildStructuredBuildFromPlanRequest(plan);
 
   assert.equal(buildFromPlan.planHash, 'sha256:priority');
+  assert.equal(buildFromPlan.workspaceExpectedRevision, 17);
   assert.deepEqual(buildFromPlan.templateSelection, {
     mode: 'template_adapt',
     templateId: 'tmpl-plan',
@@ -10293,6 +10295,7 @@ test('AI session history auto restores stored active session exactly once', asyn
   const panel = createPanel(AiPanel);
   panel.container = createContainer({ '#ai-history-list': createFakeElement() });
   panel.sessionId = 'session-active';
+  panel.initialAutoRestoreSessionId = 'session-active';
   const requested = [];
   panel._sendGetAiSession = sessionId => requested.push(sessionId);
 
@@ -10320,6 +10323,7 @@ test('AI session history clears invalid active session pointer', async () => {
   const panel = createPanel(AiPanel);
   panel.container = createContainer({ '#ai-history-list': createFakeElement() });
   panel.sessionId = 'missing-session';
+  panel.initialAutoRestoreSessionId = 'missing-session';
 
   panel._handleListAiSessionsResult({
     success: true,
@@ -10336,6 +10340,7 @@ test('AI session restore ignores late auto restore after user switches session',
   const panel = createPanel(AiPanel);
   panel.container = createContainer({ '#ai-history-list': createFakeElement() });
   panel.sessionId = 'current-session';
+  panel.initialAutoRestoreSessionId = 'old-session';
   panel.currentResult = { aiExplanation: 'current' };
   panel._sendGetAiSession = () => {};
   panel._handleListAiSessionsResult({

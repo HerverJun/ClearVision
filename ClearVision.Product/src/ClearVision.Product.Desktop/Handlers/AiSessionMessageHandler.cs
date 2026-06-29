@@ -54,14 +54,17 @@ internal sealed class AiSessionMessageHandler
 
     public Task HandleGetAsync(string messageJson)
     {
+        var request = ExtractSessionRequest(messageJson);
         try
         {
-            var sessionId = ExtractSessionId(messageJson);
-            if (string.IsNullOrWhiteSpace(sessionId))
+            if (string.IsNullOrWhiteSpace(request.SessionId))
             {
                 _client.SendProgressMessage("GetAiSessionResult", new
                 {
                     success = false,
+                    sessionId = request.SessionId,
+                    requestId = request.RequestId,
+                    navigationEpoch = request.NavigationEpoch,
                     errorMessage = "sessionId is required."
                 });
                 return Task.CompletedTask;
@@ -69,12 +72,14 @@ internal sealed class AiSessionMessageHandler
 
             using var scope = _scopeFactory.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<IConversationalFlowService>();
-            var session = service.GetSession(sessionId);
+            var session = service.GetSession(request.SessionId);
 
             _client.SendProgressMessage("GetAiSessionResult", new
             {
                 success = session != null,
-                sessionId,
+                sessionId = request.SessionId,
+                requestId = request.RequestId,
+                navigationEpoch = request.NavigationEpoch,
                 session,
                 errorMessage = session == null ? "Session not found." : null
             });
@@ -85,6 +90,9 @@ internal sealed class AiSessionMessageHandler
             _client.SendProgressMessage("GetAiSessionResult", new
             {
                 success = false,
+                sessionId = request.SessionId,
+                requestId = request.RequestId,
+                navigationEpoch = request.NavigationEpoch,
                 errorMessage = ex.Message
             });
         }
@@ -133,21 +141,51 @@ internal sealed class AiSessionMessageHandler
 
     private static string? ExtractSessionId(string messageJson)
     {
+        return ExtractSessionRequest(messageJson).SessionId;
+    }
+
+    private static AiSessionRequestEnvelope ExtractSessionRequest(string messageJson)
+    {
         using var doc = JsonDocument.Parse(messageJson);
-        if (doc.RootElement.TryGetProperty("payload", out var payload) &&
-            payload.ValueKind == JsonValueKind.Object &&
-            (payload.TryGetProperty("sessionId", out var payloadSessionId) ||
-             payload.TryGetProperty("SessionId", out payloadSessionId)))
+        var root = doc.RootElement;
+        var source = root;
+        if (root.TryGetProperty("payload", out var payload) &&
+            payload.ValueKind == JsonValueKind.Object)
         {
-            return payloadSessionId.GetString();
+            source = payload;
         }
 
-        if (doc.RootElement.TryGetProperty("sessionId", out var sessionId) ||
-            doc.RootElement.TryGetProperty("SessionId", out sessionId))
+        return new AiSessionRequestEnvelope(
+            ReadString(source, "sessionId", "SessionId"),
+            ReadString(source, "requestId", "RequestId"),
+            ReadLong(source, "navigationEpoch", "NavigationEpoch"));
+    }
+
+    private static string? ReadString(JsonElement element, string camelName, string pascalName)
+    {
+        if (element.TryGetProperty(camelName, out var camel) ||
+            element.TryGetProperty(pascalName, out camel))
         {
-            return sessionId.GetString();
+            return camel.GetString();
         }
 
         return null;
     }
+
+    private static long ReadLong(JsonElement element, string camelName, string pascalName)
+    {
+        if ((element.TryGetProperty(camelName, out var value) ||
+             element.TryGetProperty(pascalName, out value)) &&
+            value.TryGetInt64(out var number))
+        {
+            return number;
+        }
+
+        return 0;
+    }
+
+    private sealed record AiSessionRequestEnvelope(
+        string? SessionId,
+        string? RequestId,
+        long NavigationEpoch);
 }

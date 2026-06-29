@@ -277,6 +277,7 @@ public static class AgentRunEndpoints
         {
             var associationResult = conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
             {
+                ExpectedRevision = request.BuildFromPlan.WorkspaceExpectedRevision,
                 ClientMutationId = $"build-association:{createResult.RunId}",
                 LifecycleState = "building",
                 BuildRunId = createResult.RunId,
@@ -293,13 +294,19 @@ public static class AgentRunEndpoints
             persistenceStatus = associationResult.PersistenceStatus;
             if (!associationResult.Success)
             {
+                var failureCode = associationResult.Conflict
+                    ? associationResult.ErrorCode
+                    : "session_persistence_failed";
+                var statusCode = associationResult.Conflict
+                    ? StatusCodes.Status409Conflict
+                    : StatusCodes.Status503ServiceUnavailable;
                 streamService.Fail(
                     createResult.RunId,
                     "Build 创建失败：会话状态未能保存，后台构建未启动。",
                     "请检查本机存储权限或磁盘空间后重试 Build。",
                     new
                     {
-                        failureCode = "session_persistence_failed",
+                        failureCode,
                         persistenceStatus,
                         metadataOnly = true
                     });
@@ -307,7 +314,7 @@ public static class AgentRunEndpoints
                 var failedReplay = streamService.Replay(createResult.RunId);
                 return Task.FromResult<IResult>(Results.Json(new
                 {
-                    errorCode = "session_persistence_failed",
+                    errorCode = failureCode,
                     publicMessage = "Build 创建失败：会话状态未能保存，后台构建未启动。",
                     runId = createResult.RunId,
                     sessionId,
@@ -315,7 +322,7 @@ public static class AgentRunEndpoints
                     events = failedReplay?.Events ?? createResult.Events,
                     workspaceSnapshot,
                     persistenceStatus
-                }, statusCode: StatusCodes.Status503ServiceUnavailable));
+                }, statusCode: statusCode));
             }
         }
         _ = Task.Run(async () =>

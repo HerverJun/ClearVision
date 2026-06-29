@@ -1982,8 +1982,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const response = await httpClient.post('/ai/agent-plan', request);
         const sessionId = String(response?.sessionId || response?.SessionId || '').trim();
         if (sessionId) {
-            this.sessionId = sessionId;
-            this._saveSessionId?.(sessionId);
+            this._adoptCanonicalSessionId?.(sessionId, { reason: 'plan_response' });
         }
         this._applyWorkspaceSnapshotSummary?.(response?.workspaceSnapshot || response?.WorkspaceSnapshot || null);
         this._handleWorkspacePersistenceStatus?.(response?.persistenceStatus || response?.PersistenceStatus || null);
@@ -2043,8 +2042,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const runId = String(createResult?.runId || createResult?.RunId || '').trim();
         const sessionId = String(createResult?.sessionId || createResult?.SessionId || '').trim();
         if (sessionId) {
-            this.sessionId = sessionId;
-            this._saveSessionId?.(sessionId);
+            this._adoptCanonicalSessionId?.(sessionId, { reason: 'plan_run_response' });
         }
         this._applyWorkspaceSnapshotSummary?.(createResult?.workspaceSnapshot || createResult?.WorkspaceSnapshot || null);
         this._handleWorkspacePersistenceStatus?.(createResult?.persistenceStatus || createResult?.PersistenceStatus || null);
@@ -5362,6 +5360,7 @@ export const aiPanelAgentWorkspaceMixin = {
         return {
             planId: plan.planId || plan.id || '',
             planHash,
+            workspaceExpectedRevision: Number(this.workspaceSnapshotRevision || 0),
             planSnapshot: this._buildPlanSnapshotForBuild(plan),
             confirmedAnswers: this._buildConfirmedPlanAnswers(plan, { acceptedRecommended: acceptedRecommendedDefaults }),
             userSelections: this._buildPlanSelectionMap(plan, { acceptedRecommended: acceptedRecommendedDefaults }),

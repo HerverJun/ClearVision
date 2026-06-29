@@ -50,6 +50,7 @@ export class AiPanel {
         this.isHistoryPanelOpen = false;
         this.currentThinkingStep = null;
         this.sessionId = this._loadSessionId();
+        this.initialAutoRestoreSessionId = this.sessionId;
         this.sessionNavigationEpoch = 0;
         this.pendingSessionLoad = null;
         this.autoRestoreAttempted = false;
@@ -830,8 +831,7 @@ export class AiPanel {
         const isCancelled = this._isCancelledResult(payload);
         this.isCancellingGenerate = false;
         this._setGeneratingState(false);
-        this.sessionId = payload.sessionId || this.sessionId;
-        this._saveSessionId(this.sessionId);
+        this._adoptCanonicalSessionId?.(payload.sessionId || this.sessionId, { reason: 'generate_result' });
         const activeTurn = this.activeAssistantTurn
             || this._startAssistantTurn({ activate: false, statusText: '处理中', statusTone: 'streaming' });
         const isClarification = this._isClarificationResult(payload);

@@ -412,6 +412,7 @@ public sealed record VisionAgentBuildFromPlanRequest
 {
     public string PlanId { get; init; } = string.Empty;
     public string PlanHash { get; init; } = string.Empty;
+    public long? WorkspaceExpectedRevision { get; init; }
     public VisionAgentPlanModeResult? PlanSnapshot { get; init; }
     public List<VisionAgentPlanAnswer> ConfirmedAnswers { get; init; } = [];
     public Dictionary<string, string> UserSelections { get; init; } =

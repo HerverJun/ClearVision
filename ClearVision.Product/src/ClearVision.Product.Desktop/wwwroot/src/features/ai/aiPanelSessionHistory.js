@@ -134,14 +134,14 @@ export const aiPanelSessionHistoryMixin = {
         if (this.autoRestoreAttempted) return;
         this.autoRestoreAttempted = true;
 
-        const candidateSessionId = String(this._loadSessionId?.() || '').trim();
+        const candidateSessionId = String(this.initialAutoRestoreSessionId || '').trim();
         if (!candidateSessionId) return;
 
         const exists = sessions.some(item =>
             String(item?.sessionId || '').trim().toLowerCase() === candidateSessionId.toLowerCase());
         if (!exists) {
             if (String(this.sessionId || '').trim().toLowerCase() === candidateSessionId.toLowerCase()) {
-                this.sessionId = null;
+                this._adoptCanonicalSessionId?.(null, { reason: 'auto_restore_missing' });
             }
             this._saveSessionId?.(null);
             return;
@@ -173,20 +173,35 @@ export const aiPanelSessionHistoryMixin = {
         this.pendingSessionLoad = {
             sessionId: normalizedSessionId,
             source,
-            epoch: this.sessionNavigationEpoch || 0
+            epoch: this.sessionNavigationEpoch || 0,
+            requestId: this._createSessionLoadRequestId?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`
         };
-        this._sendGetAiSession(normalizedSessionId);
+        this._sendGetAiSession(normalizedSessionId, this.pendingSessionLoad);
     },
 
-    _sendGetAiSession(sessionId) {
+    _sendGetAiSession(sessionId, request = {}) {
         webMessageBridge.sendMessage('GetAiSession', {
-            payload: { sessionId }
+            payload: {
+                sessionId,
+                requestId: request.requestId || '',
+                navigationEpoch: Number(request.epoch || 0)
+            }
         });
     },
 
     _handleGetAiSessionResult(data) {
         const payload = data?.payload || data || {};
         const pendingLoad = this.pendingSessionLoad;
+        const responseSessionId = String(payload.sessionId ?? payload.SessionId ?? '').trim();
+        const responseRequestId = String(payload.requestId ?? payload.RequestId ?? '').trim();
+        const responseEpoch = Number(payload.navigationEpoch ?? payload.NavigationEpoch ?? -1);
+        const isMatchingLoad = Boolean(pendingLoad) &&
+            responseEpoch === Number(pendingLoad.epoch || 0) &&
+            responseRequestId === String(pendingLoad.requestId || '') &&
+            responseSessionId.toLowerCase() === String(pendingLoad.sessionId || '').trim().toLowerCase();
+        if (!isMatchingLoad) {
+            return;
+        }
         if (!payload.success) {
             if (pendingLoad?.source === 'auto_restore') {
                 this.pendingSessionLoad = null;
@@ -217,15 +232,12 @@ export const aiPanelSessionHistoryMixin = {
             return;
         }
 
-        if (!pendingLoad ||
-            pendingLoad.epoch !== (this.sessionNavigationEpoch || 0) ||
-            String(pendingLoad.sessionId || '').trim().toLowerCase() !== sessionId.toLowerCase()) {
+        if (responseSessionId.toLowerCase() !== sessionId.toLowerCase()) {
             return;
         }
         this.pendingSessionLoad = null;
 
-        this.sessionId = sessionId;
-        this._saveSessionId(this.sessionId);
+        this._adoptCanonicalSessionId?.(sessionId, { reason: 'session_restore' });
         const workspaceSnapshot = this._normalizeSessionWorkspaceSnapshot(session.workspaceSnapshot ?? session.WorkspaceSnapshot);
         this.nextHintDraft = '';
         this.nextTemplateSelection = null;
@@ -620,6 +632,29 @@ export const aiPanelSessionHistoryMixin = {
         } catch {
             // ignore localStorage failures
         }
+    },
+
+    _createSessionLoadRequestId() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    },
+
+    _adoptCanonicalSessionId(sessionId, { reason = '' } = {}) {
+        const normalized = String(sessionId || '').trim();
+        const current = String(this.sessionId || '').trim();
+        if (normalized.toLowerCase() === current.toLowerCase()) {
+            this.sessionId = normalized || null;
+            this._saveSessionId?.(this.sessionId);
+            return false;
+        }
+
+        this.sessionNavigationEpoch = (Number(this.sessionNavigationEpoch) || 0) + 1;
+        this.pendingSessionLoad = null;
+        this.sessionId = normalized || null;
+        this._saveSessionId?.(this.sessionId);
+        return true;
     }
 
     // ── 工作台状态机 ──────────────────────────────────────────

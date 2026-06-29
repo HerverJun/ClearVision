@@ -928,6 +928,44 @@ public sealed class AgentRunEndpointsTests
         host.ConversationService.GetSession("session-build-primary-fail").Should().BeNull();
     }
 
+    [Fact(DisplayName = "POST AgentRun BuildFromPlan stale workspace revision returns controlled failed run")]
+    public async Task CreateRun_BuildFromPlanStaleWorkspaceRevision_ShouldNotStartBackgroundRun()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var initial = host.ConversationService.UpdateWorkspaceSnapshot(
+            "session-build-stale-revision",
+            new VisionAgentWorkspaceSnapshotUpdate
+            {
+                LifecycleState = "plan_ready",
+                RequirementMode = AiRequirementModes.Strict
+            });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "Build from stale persisted plan",
+            SessionId = "session-build-stale-revision",
+            Mode = "new",
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest() with
+            {
+                WorkspaceExpectedRevision = initial.WorkspaceSnapshot!.Revision - 1
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("workspace_revision_conflict");
+        root.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64()
+            .Should().Be(initial.WorkspaceSnapshot.Revision);
+        JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("workspace_revision_conflict");
+        host.Generation.LastCommand.Should().BeNull();
+        host.ConversationService.GetSession("session-build-stale-revision")!
+            .WorkspaceSnapshot!
+            .BuildRunId
+            .Should().BeNull();
+    }
+
     [Fact(DisplayName = "POST AgentRun BuildFromPlan backup persistence failure still starts background run")]
     public async Task CreateRun_BuildFromPlanBackupPersistenceFailure_ShouldStartBackgroundRunWithDegradedStatus()
     {
