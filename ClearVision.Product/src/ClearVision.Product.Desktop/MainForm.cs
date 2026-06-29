@@ -3,6 +3,7 @@
 // 作者：蘅芜君
 
 using System.Windows.Forms;
+using System.Text.Json;
 using ClearVision.Product.Desktop.Triggers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.WebView2.WinForms;
@@ -18,6 +19,9 @@ public partial class MainForm : Form
     private readonly WebView2Host _webView2Host;
     private readonly Handlers.WebMessageHandler? _messageHandler;
     private readonly EnterPhotoelectricTriggerInputService? _triggerInputService;
+    private bool _allowClose;
+    private bool _closingInProgress;
+    private bool _disposedWebViewHost;
 
     public MainForm()
     {
@@ -141,18 +145,114 @@ public partial class MainForm : Form
 
     private async void MainForm_FormClosing(object? sender, FormClosingEventArgs e)
     {
+        if (_allowClose)
+        {
+            await DisposeWebViewHostAsync();
+            return;
+        }
+
+        if (_closingInProgress)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        e.Cancel = true;
+        _closingInProgress = true;
+
         try
         {
-            try
+            var timeout = e.CloseReason == CloseReason.WindowsShutDown
+                ? TimeSpan.FromSeconds(2)
+                : TimeSpan.FromSeconds(5);
+            var flushed = await FlushWorkspaceBeforeCloseAsync(timeout);
+            if (!flushed && e.CloseReason != CloseReason.WindowsShutDown)
             {
-                await _webView2Host.ExecuteScriptAsync(
-                    "(async()=>{try{return await (window.__clearVisionFlushAiPanelWorkspace?.('host_close') ?? true);}catch{return false;}})()");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[MainForm] AI workspace flush before close failed: {ex}");
+                var choice = MessageBox.Show(
+                    "Plan 修改尚未保存，仍要退出吗？",
+                    "ClearVision",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+                if (choice != DialogResult.Yes)
+                {
+                    _closingInProgress = false;
+                    return;
+                }
             }
 
+            _allowClose = true;
+            BeginInvoke(new Action(Close));
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainForm] Shutdown coordination failed: {ex}");
+            var choice = MessageBox.Show(
+                "Plan 修改尚未保存，仍要退出吗？",
+                "ClearVision",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2);
+            if (choice == DialogResult.Yes)
+            {
+                _allowClose = true;
+                BeginInvoke(new Action(Close));
+                return;
+            }
+
+            _closingInProgress = false;
+        }
+    }
+
+    private async Task<bool> FlushWorkspaceBeforeCloseAsync(TimeSpan timeout)
+    {
+        try
+        {
+            var scriptTask = _webView2Host.ExecuteScriptAsync(
+                "(async()=>{try{return await (window.__clearVisionFlushAiPanelWorkspace?.('host_close') ?? true);}catch{return false;}})()");
+            var completed = await Task.WhenAny(scriptTask, Task.Delay(timeout));
+            if (completed != scriptTask)
+            {
+                return false;
+            }
+
+            var rawResult = await scriptTask;
+            return ParseBooleanScriptResult(rawResult);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainForm] AI workspace flush before close failed: {ex}");
+            return false;
+        }
+    }
+
+    internal static bool ParseBooleanScriptResult(string? rawResult)
+    {
+        if (string.IsNullOrWhiteSpace(rawResult))
+        {
+            return false;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<bool>(rawResult);
+        }
+        catch (JsonException)
+        {
+            return string.Equals(rawResult.Trim(), "true", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private async Task DisposeWebViewHostAsync()
+    {
+        if (_disposedWebViewHost)
+        {
+            return;
+        }
+
+        _disposedWebViewHost = true;
+        try
+        {
             _messageHandler?.Dispose();
             await _webView2Host.DisposeAsync();
         }

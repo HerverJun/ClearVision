@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Security.Principal;
+using System.Text;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Desktop.Configuration;
 using ClearVision.Product.Desktop.Data;
@@ -39,6 +42,8 @@ static class Program
     private const int MaxWebPort = 5010;
     private static IHost? _host;
     private static int _webPort = 0;
+    private static Mutex? _singleInstanceMutex;
+    private static bool _singleInstanceMutexOwned;
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool SetDllDirectory(string lpPathName);
@@ -90,6 +95,12 @@ static class Program
                     MessageBoxIcon.Error);
             };
 
+            if (!TryAcquireSingleInstanceMutex(out _singleInstanceMutex))
+            {
+                MessageBox.Show("ClearVision 已在运行", "ClearVision", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
             StartWebServer();
 
             System.Windows.Forms.Application.EnableVisualStyles();
@@ -110,6 +121,81 @@ static class Program
         catch (Exception ex)
         {
             MessageBox.Show($"Application Error: {ex}");
+        }
+        finally
+        {
+            if (_host != null)
+            {
+                try
+                {
+                    StopWebServer().GetAwaiter().GetResult();
+                }
+                catch (Exception stopEx)
+                {
+                    Debug.WriteLine($"Stop web server failed: {stopEx}");
+                }
+            }
+
+            ReleaseSingleInstanceMutex();
+        }
+    }
+
+    internal static string BuildSingleInstanceMutexName(
+        string? userName = null,
+        string? dataPath = null,
+        string? installPath = null)
+    {
+        var effectiveUser = string.IsNullOrWhiteSpace(userName)
+            ? WindowsIdentity.GetCurrent().Name
+            : userName.Trim();
+        var settingsPath = string.IsNullOrWhiteSpace(dataPath)
+            ? StationSettingsPaths.GetStudioCommunicationSettingsPath()
+            : dataPath.Trim();
+        var dataRoot = Path.GetFullPath(Path.GetDirectoryName(settingsPath) ?? settingsPath);
+        var installRoot = Path.GetFullPath(string.IsNullOrWhiteSpace(installPath)
+            ? AppContext.BaseDirectory
+            : installPath.Trim());
+        var source = $"{effectiveUser}|{dataRoot}|{installRoot}".ToUpperInvariant();
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))).ToLowerInvariant();
+        return $"Local\\ClearVision.Desktop.{hash}";
+    }
+
+    private static bool TryAcquireSingleInstanceMutex(out Mutex mutex)
+    {
+        mutex = new Mutex(initiallyOwned: true, BuildSingleInstanceMutexName(), out var createdNew);
+        _singleInstanceMutexOwned = createdNew;
+        if (createdNew)
+        {
+            return true;
+        }
+
+        mutex.Dispose();
+        return false;
+    }
+
+    private static void ReleaseSingleInstanceMutex()
+    {
+        if (_singleInstanceMutex == null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (_singleInstanceMutexOwned)
+            {
+                _singleInstanceMutex.ReleaseMutex();
+            }
+        }
+        catch (ApplicationException)
+        {
+            // The mutex was not owned by this process anymore.
+        }
+        finally
+        {
+            _singleInstanceMutex.Dispose();
+            _singleInstanceMutex = null;
+            _singleInstanceMutexOwned = false;
         }
     }
 
@@ -316,6 +402,7 @@ static class Program
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
             await _host.StopAsync(cts.Token);
             _host.Dispose();
+            _host = null;
         }
     }
 

@@ -261,18 +261,23 @@ public static class AgentRunEndpoints
             }));
         }
 
-        var session = conversationService.GetOrCreateSession(request.SessionId);
-        request = request with { SessionId = session.SessionId };
+        var sessionId = request.BuildFromPlan == null
+            ? conversationService.GetOrCreateSession(request.SessionId).SessionId
+            : NormalizeAgentRunSessionId(request.SessionId);
+        request = request with { SessionId = sessionId };
 
         var ownerHash = ResolveCurrentOwnerHash(context);
         var createResult = streamService.CreateRun(
             request.Description,
             BuildCreatePayload(request),
             ownerHash);
+        VisionAgentWorkspaceSnapshot? workspaceSnapshot = null;
+        var persistenceStatus = conversationService.GetLastPersistenceStatus();
         if (request.BuildFromPlan != null)
         {
-            conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+            var associationResult = conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
             {
+                ClientMutationId = $"build-association:{createResult.RunId}",
                 LifecycleState = "building",
                 BuildRunId = createResult.RunId,
                 BuildRunStatus = AgentRunEventStatuses.Running,
@@ -284,6 +289,34 @@ public static class AgentRunEndpoints
                 PlanAcceptedRecommendedDefaults = request.BuildFromPlan.AcceptedRecommendedDefaults,
                 SubmittedBuildFingerprint = ComputeSubmittedBuildFingerprint(request)
             });
+            workspaceSnapshot = associationResult.Snapshot;
+            persistenceStatus = associationResult.PersistenceStatus;
+            if (!associationResult.Success)
+            {
+                streamService.Fail(
+                    createResult.RunId,
+                    "Build 创建失败：会话状态未能保存，后台构建未启动。",
+                    "请检查本机存储权限或磁盘空间后重试 Build。",
+                    new
+                    {
+                        failureCode = "session_persistence_failed",
+                        persistenceStatus,
+                        metadataOnly = true
+                    });
+
+                var failedReplay = streamService.Replay(createResult.RunId);
+                return Task.FromResult<IResult>(Results.Json(new
+                {
+                    errorCode = "session_persistence_failed",
+                    publicMessage = "Build 创建失败：会话状态未能保存，后台构建未启动。",
+                    runId = createResult.RunId,
+                    sessionId,
+                    brief = createResult.Brief,
+                    events = failedReplay?.Events ?? createResult.Events,
+                    workspaceSnapshot,
+                    persistenceStatus
+                }, statusCode: StatusCodes.Status503ServiceUnavailable));
+            }
         }
         _ = Task.Run(async () =>
         {
@@ -297,9 +330,11 @@ public static class AgentRunEndpoints
         return Task.FromResult<IResult>(Results.Ok(new
         {
             runId = createResult.RunId,
-            sessionId = session.SessionId,
+            sessionId,
             brief = createResult.Brief,
-            events = createResult.Events
+            events = streamService.Replay(createResult.RunId)?.Events ?? createResult.Events,
+            workspaceSnapshot,
+            persistenceStatus
         }));
     }
 
@@ -1154,6 +1189,11 @@ public static class AgentRunEndpoints
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"agent-run-owner:{userId.Trim()}"));
         return "usr_" + Convert.ToHexString(bytes).ToLowerInvariant();
     }
+
+    private static string NormalizeAgentRunSessionId(string? sessionId) =>
+        string.IsNullOrWhiteSpace(sessionId)
+            ? Guid.NewGuid().ToString("N")
+            : sessionId.Trim();
 
     private static string ComputeSubmittedBuildFingerprint(AgentRunCreateRequest request)
     {

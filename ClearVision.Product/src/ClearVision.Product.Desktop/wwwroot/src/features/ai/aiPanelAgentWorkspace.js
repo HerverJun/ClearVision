@@ -1,5 +1,4 @@
 import httpClient from '../../core/messaging/httpClient.js';
-import webMessageBridge from '../../core/messaging/webMessageBridge.js';
 import { AiWorkbenchStates } from './aiPanelWorkbench.js';
 
 export const AgentWorkspaceModes = Object.freeze({
@@ -563,28 +562,54 @@ export const aiPanelAgentWorkspaceMixin = {
         this.workspaceSnapshotDirty = true;
         const mutationId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         const delta = this._buildWorkspaceSnapshotDelta();
+        const planIdentity = this._getPlanIdentity?.(this.pendingVisionPlan) || '';
         const run = async () => {
+            let expectedRevision = Number(this.workspaceSnapshotRevision || 0);
+            let rebased = false;
             try {
-                const expectedRevision = Number(this.workspaceSnapshotRevision || 0);
-                const result = await httpClient.post(`/ai/sessions/${encodeURIComponent(this.sessionId)}/workspace-snapshot`, {
-                    expectedRevision,
-                    clientMutationId: mutationId,
-                    ...delta
-                });
-                this._applyWorkspaceSnapshotSummary?.(result?.snapshot || result?.Snapshot || null);
-                this._handleWorkspacePersistenceStatus?.(result?.persistenceStatus || result?.PersistenceStatus || null);
-                this.workspaceSnapshotDirty = false;
-                return result;
-            } catch (error) {
-                const message = String(error?.message || '').toLowerCase();
-                if (message.includes('workspace_revision_conflict') || message.includes('409')) {
-                    this._setResultStatusNote?.('工作台状态已在其他操作中更新，正在恢复最新快照。', 'warning');
-                    if (this.sessionId) {
-                        webMessageBridge.sendMessage('GetAiSession', {
-                            payload: { sessionId: this.sessionId }
+                while (true) {
+                    try {
+                        const result = await httpClient.post(`/ai/sessions/${encodeURIComponent(this.sessionId)}/workspace-snapshot`, {
+                            expectedRevision,
+                            clientMutationId: mutationId,
+                            ...delta
                         });
+                        this._applyWorkspaceSnapshotSummary?.(result?.snapshot || result?.Snapshot || null);
+                        this._handleWorkspacePersistenceStatus?.(result?.persistenceStatus || result?.PersistenceStatus || null);
+                        this.workspaceSnapshotDirty = false;
+                        return result;
+                    } catch (error) {
+                        const payload = error?.payload || {};
+                        const errorCode = String(payload?.errorCode ?? payload?.ErrorCode ?? '').trim();
+                        const isConflict = error?.status === 409 ||
+                            error?.statusCode === 409 ||
+                            errorCode === 'workspace_revision_conflict';
+                        if (!isConflict) {
+                            throw error;
+                        }
+
+                        this._applyWorkspaceSnapshotSummary?.(payload?.snapshot || payload?.Snapshot || null);
+                        this._handleWorkspacePersistenceStatus?.(payload?.persistenceStatus || payload?.PersistenceStatus || null);
+                        const currentPlanIdentity = this._getPlanIdentity?.(this.pendingVisionPlan) || '';
+                        const samePlan = Boolean(planIdentity && currentPlanIdentity && planIdentity === currentPlanIdentity);
+                        if (!rebased && samePlan && !this._isPlanSnapshotReadOnly()) {
+                            rebased = true;
+                            expectedRevision = Number(this.workspaceSnapshotRevision || 0);
+                            continue;
+                        }
+
+                        this.workspaceSnapshotDirty = true;
+                        this._setResultStatusNote?.('工作台状态已更新，当前未保存修改已保留，请确认后重试。', 'warning');
+                        throw error;
                     }
-                } else {
+                }
+            } catch (error) {
+                const payload = error?.payload || {};
+                const errorCode = String(payload?.errorCode ?? payload?.ErrorCode ?? '').trim();
+                const isConflict = error?.status === 409 ||
+                    error?.statusCode === 409 ||
+                    errorCode === 'workspace_revision_conflict';
+                if (!isConflict) {
                     this._setResultStatusNote?.('Plan 修改尚未成功保存，切换前请重试。', 'warning');
                 }
                 throw error;
@@ -2067,10 +2092,12 @@ export const aiPanelAgentWorkspaceMixin = {
         }
         const buildRunId = String(snapshot.buildRunId ?? snapshot.BuildRunId ?? '').trim();
         const submittedBuildFingerprint = String(snapshot.submittedBuildFingerprint ?? snapshot.SubmittedBuildFingerprint ?? '').trim();
-        if (buildRunId) {
+        if (Object.prototype.hasOwnProperty.call(snapshot, 'buildRunId') ||
+            Object.prototype.hasOwnProperty.call(snapshot, 'BuildRunId')) {
             this.workspaceBuildRunId = buildRunId;
         }
-        if (submittedBuildFingerprint) {
+        if (Object.prototype.hasOwnProperty.call(snapshot, 'submittedBuildFingerprint') ||
+            Object.prototype.hasOwnProperty.call(snapshot, 'SubmittedBuildFingerprint')) {
             this.workspaceSubmittedBuildFingerprint = submittedBuildFingerprint;
         }
     },
@@ -2081,10 +2108,33 @@ export const aiPanelAgentWorkspaceMixin = {
         const backupSaved = status.recoveryBackupSaved ?? status.RecoveryBackupSaved;
         const message = String(status.publicMessage ?? status.PublicMessage ?? '').trim();
         if (primarySaved === false) {
-            this._setResultStatusNote?.(message || '结果已生成，但本次会话尚未成功保存。', 'warning');
+            this.workspacePersistenceWarning = {
+                level: 'warning',
+                message: message || '结果已生成，但本次会话尚未成功保存。'
+            };
+            this._workspacePersistenceStatusNoteActive = true;
+            this._workspacePersistenceStatusNoteText = this.workspacePersistenceWarning.message;
+            this._setResultStatusNote?.(this.workspacePersistenceWarning.message, 'warning');
             return;
         }
+        if (primarySaved === true) {
+            this.workspacePersistenceWarning = null;
+            if (this._workspacePersistenceStatusNoteActive) {
+                const note = this.container?.querySelector?.('#ai-result-status-note');
+                if (!note || String(note.textContent || '').trim() === String(this._workspacePersistenceStatusNoteText || '').trim()) {
+                    this._setResultStatusNote?.('', '');
+                }
+                this._workspacePersistenceStatusNoteActive = false;
+                this._workspacePersistenceStatusNoteText = '';
+            }
+        }
         if (backupSaved === false && message) {
+            this.workspacePersistenceWarning = {
+                level: 'info',
+                message
+            };
+            this._workspacePersistenceStatusNoteActive = true;
+            this._workspacePersistenceStatusNoteText = message;
             this._setResultStatusNote?.(message, 'info');
         }
     },
@@ -5279,12 +5329,6 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         const buildFromPlan = this._buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended: false });
-        this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
-        this._setWorkspaceViewMode?.(AgentWorkspaceModes.BUILD, { render: false });
-        this._renderAgentWorkspaceOverview();
-        this._renderPlanWorkspace(plan);
-        this._renderBuildWorkspaceFromAgentRun();
-        this._setResultStatusNote('构建模式已启动，进度来自后端 AgentRun 公开事件。', 'info');
 
         return this._dispatchGenerateRequest({
             description: plan.buildPrompt || plan.originalDescription,

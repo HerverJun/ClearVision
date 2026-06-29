@@ -50,6 +50,10 @@ export class AiPanel {
         this.isHistoryPanelOpen = false;
         this.currentThinkingStep = null;
         this.sessionId = this._loadSessionId();
+        this.sessionNavigationEpoch = 0;
+        this.pendingSessionLoad = null;
+        this.autoRestoreAttempted = false;
+        this.autoRestoreNoticeShown = false;
         this.currentResult = null;
         this.lastUserPrompt = '';
         this.nextHintDraft = '';
@@ -120,6 +124,9 @@ export class AiPanel {
         this.workspaceSnapshotSaveQueue = Promise.resolve();
         this.workspaceBuildRunId = '';
         this.workspaceSubmittedBuildFingerprint = '';
+        this.workspacePersistenceWarning = null;
+        this._workspacePersistenceStatusNoteActive = false;
+        this._workspacePersistenceStatusNoteText = '';
         this.pendingVisionPlan = null;
         this.pendingClarificationPayload = null;
         this.planQuestionSelections = {};
@@ -212,6 +219,8 @@ export class AiPanel {
             return;
         }
 
+        this.sessionNavigationEpoch += 1;
+        this.pendingSessionLoad = null;
         this.sessionId = null;
         this._saveSessionId(null);
         this.currentResult = null;
@@ -248,6 +257,9 @@ export class AiPanel {
         this.workspaceSnapshotSaveQueue = Promise.resolve();
         this.workspaceBuildRunId = '';
         this.workspaceSubmittedBuildFingerprint = '';
+        this.workspacePersistenceWarning = null;
+        this._workspacePersistenceStatusNoteActive = false;
+        this._workspacePersistenceStatusNoteText = '';
         this._preApplySnapshot = null;
         this._lastAttachmentReport = null;
         this._lastModelSupportsVision = null;

@@ -155,8 +155,17 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
 
         replay.Should().NotBeNull();
         replay!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
-        replay.Events.Last().EventType.Should().Be(AgentRunEventTypes.RunFailed);
-        JsonSerializer.Serialize(replay.Events.Last().Payload).Should().Contain("host_instance_restarted");
+        replay.Events.Should().ContainSingle(evt => evt.EventType == AgentRunEventTypes.RunFailed);
+        var terminal = replay.Events.Last();
+        terminal.EventType.Should().Be(AgentRunEventTypes.RunFailed);
+        terminal.Title.Should().Contain("主机重启");
+        terminal.Summary.Should().Contain("失败状态");
+        terminal.MetadataOnly.Should().BeTrue();
+        var payloadJson = JsonSerializer.Serialize(terminal.Payload);
+        payloadJson.Should().Contain("host_instance_restarted");
+        payloadJson.Should().Contain("metadataOnly");
+        payloadJson.Should().NotContain("hostInstanceId");
+        reloaded.Replay(run.RunId)!.Events.Should().ContainSingle(evt => evt.EventType == AgentRunEventTypes.RunFailed);
         appended.Should().BeNull();
     }
 

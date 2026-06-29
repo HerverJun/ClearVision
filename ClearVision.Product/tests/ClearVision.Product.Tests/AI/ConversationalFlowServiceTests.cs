@@ -403,6 +403,170 @@ public class ConversationalFlowServiceTests : IDisposable
     }
 
     [Fact]
+    public void TryUpdateWorkspaceSnapshot_WhenPrimaryStoreFails_ShouldNotAdvanceMemoryOrDiskRevision()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        var initial = service.UpdateWorkspaceSnapshot("primary-fail-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready",
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["q1"] = "camera"
+            }
+        });
+
+        service.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+        var failed = service.TryUpdateWorkspaceSnapshot("primary-fail-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = initial.WorkspaceSnapshot!.Revision,
+            ClientMutationId = "primary-fail-mutation",
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["q1"] = "file"
+            }
+        });
+
+        failed.Success.Should().BeFalse();
+        failed.PersistenceStatus.PrimaryStoreSaved.Should().BeFalse();
+        var inMemory = service.GetSession("primary-fail-session")!.WorkspaceSnapshot!;
+        inMemory.Revision.Should().Be(initial.WorkspaceSnapshot.Revision);
+        inMemory.PlanQuestionSelections["q1"].Should().Be("camera");
+
+        var reloaded = new ConversationalFlowService(_tempRoot)
+            .GetSession("primary-fail-session")!
+            .WorkspaceSnapshot!;
+        reloaded.Revision.Should().Be(initial.WorkspaceSnapshot.Revision);
+        reloaded.PlanQuestionSelections["q1"].Should().Be("camera");
+    }
+
+    [Fact]
+    public void TryUpdateWorkspaceSnapshot_WithSameMutationIdAndPayload_ShouldReplayWithoutDuplicateRevision()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+
+        var first = service.TryUpdateWorkspaceSnapshot("idempotent-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = 0,
+            ClientMutationId = "mutation-same",
+            RequirementMode = AiRequirementModes.Draft,
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["q1"] = "file"
+            }
+        });
+        var replay = service.TryUpdateWorkspaceSnapshot("idempotent-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = 0,
+            ClientMutationId = "mutation-same",
+            RequirementMode = AiRequirementModes.Draft,
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["q1"] = "file"
+            }
+        });
+
+        first.Success.Should().BeTrue();
+        replay.Success.Should().BeTrue();
+        replay.Revision.Should().Be(first.Revision);
+        service.GetSession("idempotent-session")!.WorkspaceSnapshot!.Revision.Should().Be(1);
+    }
+
+    [Fact]
+    public void TryUpdateWorkspaceSnapshot_WithSameMutationIdAndDifferentPayload_ShouldRejectConflict()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        service.TryUpdateWorkspaceSnapshot("mutation-conflict-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = 0,
+            ClientMutationId = "mutation-conflict",
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["q1"] = "camera"
+            }
+        }).Success.Should().BeTrue();
+
+        var conflict = service.TryUpdateWorkspaceSnapshot("mutation-conflict-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = 1,
+            ClientMutationId = "mutation-conflict",
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["q1"] = "file"
+            }
+        });
+
+        conflict.Success.Should().BeFalse();
+        conflict.Conflict.Should().BeTrue();
+        conflict.ErrorCode.Should().Be("workspace_mutation_id_conflict");
+        service.GetSession("mutation-conflict-session")!.WorkspaceSnapshot!.PlanQuestionSelections["q1"]
+            .Should().Be("camera");
+    }
+
+    [Fact]
+    public async Task TryUpdateWorkspaceSnapshot_ForTwoSessionsCommittedConcurrently_ShouldNotOverwriteEitherSession()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+
+        await Task.WhenAll(
+            Task.Run(() => service.TryUpdateWorkspaceSnapshot("concurrent-a", new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ExpectedRevision = 0,
+                ClientMutationId = "mutation-a",
+                PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["qa"] = "camera"
+                }
+            }).Success.Should().BeTrue()),
+            Task.Run(() => service.TryUpdateWorkspaceSnapshot("concurrent-b", new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ExpectedRevision = 0,
+                ClientMutationId = "mutation-b",
+                PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["qb"] = "file"
+                }
+            }).Success.Should().BeTrue()));
+
+        var reloaded = new ConversationalFlowService(_tempRoot);
+        reloaded.GetSession("concurrent-a")!.WorkspaceSnapshot!.PlanQuestionSelections["qa"].Should().Be("camera");
+        reloaded.GetSession("concurrent-b")!.WorkspaceSnapshot!.PlanQuestionSelections["qb"].Should().Be("file");
+    }
+
+    [Fact]
+    public void ProjectBuildTerminal_WhenFirstPersistenceFails_ShouldRetryWithOneAssistantTurn()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        var request = new VisionAgentTerminalProjectionRequest
+        {
+            SessionId = "terminal-retry-session",
+            AssistantTurnId = "build:run-1:terminal:3:assistant",
+            AssistantMessage = "Build 已失败。",
+            WorkspaceUpdate = new VisionAgentWorkspaceSnapshotUpdate
+            {
+                LifecycleState = "build_failed",
+                BuildRunId = "run-1",
+                BuildRunStatus = "failed",
+                BuildTerminalSequence = 3
+            }
+        };
+
+        service.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+        service.ProjectBuildTerminal(request).Success.Should().BeFalse();
+        service.GetSession("terminal-retry-session").Should().BeNull();
+
+        service.PrimaryStoreWriteFaultInjector = null;
+        var success = service.ProjectBuildTerminal(request);
+        var replay = service.ProjectBuildTerminal(request);
+
+        success.Success.Should().BeTrue();
+        replay.Success.Should().BeTrue();
+        replay.Revision.Should().Be(success.Revision);
+        var session = service.GetSession("terminal-retry-session")!;
+        session.History.Should().ContainSingle(turn => turn.TurnId == request.AssistantTurnId);
+        session.WorkspaceSnapshot!.Revision.Should().Be(1);
+    }
+
+    [Fact]
     public void LoadSessionsFromStore_WhenMainFileIsCorrupt_ShouldRecoverLastGood()
     {
         var service = new ConversationalFlowService(_tempRoot);

@@ -13,6 +13,19 @@ import {
 } from './apiConfig.js';
 import { getStoredToken } from '../../features/auth/authStorage.js';
 
+class HttpError extends Error {
+    constructor(message, { status = 0, statusText = '', payload = null, rawBody = '', response = null } = {}) {
+        super(message || `HTTP ${status}`);
+        this.name = 'HttpError';
+        this.status = status;
+        this.statusCode = status;
+        this.statusText = statusText;
+        this.payload = payload;
+        this.rawBody = rawBody;
+        this.response = response;
+    }
+}
+
 class HttpClient {
     constructor(baseUrl = null) {
         this._baseUrl = baseUrl;
@@ -461,8 +474,7 @@ class HttpClient {
      */
     async handleBlobResponse(response) {
         if (!response.ok) {
-            const error = await this.extractErrorMessage(response);
-            throw new Error(error);
+            throw await this.buildHttpError(response);
         }
 
         return {
@@ -476,8 +488,7 @@ class HttpClient {
      */
     async handleResponse(response) {
         if (!response.ok) {
-            const error = await this.extractErrorMessage(response);
-            throw new Error(error);
+            throw await this.buildHttpError(response);
         }
 
         const contentType = response.headers.get('content-type');
@@ -486,6 +497,43 @@ class HttpClient {
         }
 
         return await response.text();
+    }
+
+    async buildHttpError(response) {
+        const rawBody = (await response.text()).trim();
+        let payload = null;
+        let message = rawBody || `HTTP ${response.status}`;
+        const contentType = response.headers.get('content-type') || '';
+        if (rawBody && contentType.includes('application/json')) {
+            try {
+                payload = JSON.parse(rawBody);
+                if (typeof payload === 'string' && payload.trim()) {
+                    message = payload.trim();
+                } else if (payload && typeof payload === 'object') {
+                    const candidate = payload.error
+                        || payload.Error
+                        || payload.message
+                        || payload.Message
+                        || payload.publicMessage
+                        || payload.PublicMessage
+                        || payload.errorCode
+                        || payload.ErrorCode;
+                    if (typeof candidate === 'string' && candidate.trim()) {
+                        message = candidate.trim();
+                    }
+                }
+            } catch (error) {
+                console.warn('[HttpClient] Failed to parse JSON error payload:', error);
+            }
+        }
+
+        return new HttpError(message, {
+            status: response.status,
+            statusText: response.statusText,
+            payload,
+            rawBody,
+            response
+        });
     }
 
     async extractErrorMessage(response) {
@@ -524,4 +572,4 @@ class HttpClient {
 const httpClient = new HttpClient();
 
 export default httpClient;
-export { HttpClient };
+export { HttpClient, HttpError };

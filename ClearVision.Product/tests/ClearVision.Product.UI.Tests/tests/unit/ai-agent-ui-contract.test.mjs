@@ -301,6 +301,11 @@ function createPanel(AiPanel, overrides = {}) {
   panel.canvasManualEditRecords = [];
   panel.canvasManualEditSignature = '';
   panel.sessionId = 'agent-ui-contract';
+  panel.sessionStorageKey = 'cv_ai_session_id';
+  panel.sessionNavigationEpoch = 0;
+  panel.pendingSessionLoad = null;
+  panel.autoRestoreAttempted = false;
+  panel.autoRestoreNoticeShown = false;
   panel.currentResult = overrides.currentResult || null;
   panel.isGenerating = false;
   panel.flowCanvas = null;
@@ -311,6 +316,15 @@ function createPanel(AiPanel, overrides = {}) {
   panel.nextHintDraft = '';
   panel.nextTemplateSelection = null;
   panel.agentWorkspaceMode = 'plan';
+  panel.workspaceViewMode = 'plan';
+  panel.workspaceSnapshotRevision = 0;
+  panel.workspaceSnapshotDirty = false;
+  panel.workspaceSnapshotSaveQueue = Promise.resolve();
+  panel.workspaceBuildRunId = '';
+  panel.workspaceSubmittedBuildFingerprint = '';
+  panel.workspacePersistenceWarning = null;
+  panel._workspacePersistenceStatusNoteActive = false;
+  panel._workspacePersistenceStatusNoteText = '';
   panel.pendingVisionPlan = null;
   panel.planQuestionSelections = {};
   panel.planQuestionAnswers = {};
@@ -3090,7 +3104,7 @@ test('Start Build from Plan enters Build request with skipPlan', async () => {
   const started = await panel._startBuildFromCurrentPlan();
 
   assert.equal(started, true);
-  assert.equal(panel.agentWorkspaceMode, 'build');
+  assert.equal(panel.agentWorkspaceMode, 'plan');
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.skipPlanSource, 'confirmed_plan');
   assert.equal(captured.explicitMode, 'new');
@@ -3275,7 +3289,7 @@ test('Draft Plan can start Build with legal Planner route without accepting stra
   const started = await panel._startBuildFromCurrentPlan();
 
   assert.equal(started, true);
-  assert.equal(panel.agentWorkspaceMode, 'build');
+  assert.equal(panel.agentWorkspaceMode, 'plan');
   assert.equal(captured.skipPlan, true);
   assert.equal(captured.buildFromPlan.acceptedRecommendedDefaults, false);
   assert.deepEqual(captured.buildFromPlan.userSelections, {});
@@ -10237,4 +10251,275 @@ test('source guard: Agent UI has no RuntimePreview hardware network or process t
 
   assert.doesNotMatch(guardedSource, /capture_test_frame|replay_flow_with_frame|runtime_package_precheck/i);
   assert.doesNotMatch(guardedSource, /AcquireSingleFrameAsync|EnumerateCamerasAsync|GetOrCreateByBindingAsync|fetch\(|XMLHttpRequest|child_process|process\.|powershell|cmd\.exe|execute_command/i);
+});
+
+function jsonResponse(payload, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 409 ? 'Conflict' : (status === 503 ? 'Service Unavailable' : 'OK'),
+    headers: {
+      get(name) {
+        return String(name || '').toLowerCase() === 'content-type'
+          ? 'application/json'
+          : '';
+      }
+    },
+    async json() {
+      return payload;
+    },
+    async text() {
+      return JSON.stringify(payload);
+    }
+  };
+}
+
+function testPlan({ planId = 'plan-a', planHash = 'sha256:plan-a' } = {}) {
+  return {
+    planId,
+    id: planId,
+    planHash,
+    goal: '检测表面缺陷',
+    buildPrompt: '从计划构建检测流程',
+    originalDescription: '检测表面缺陷',
+    rawPlanSnapshot: { planId, planHash, canBuild: true },
+    questions: []
+  };
+}
+
+test('AI session history auto restores stored active session exactly once', async () => {
+  const { AiPanel } = await loadAiPanel();
+  global.localStorage.setItem('cv_ai_session_id', 'session-active');
+  const panel = createPanel(AiPanel);
+  panel.container = createContainer({ '#ai-history-list': createFakeElement() });
+  panel.sessionId = 'session-active';
+  const requested = [];
+  panel._sendGetAiSession = sessionId => requested.push(sessionId);
+
+  panel._handleListAiSessionsResult({
+    success: true,
+    sessions: [
+      { sessionId: 'session-active', lastMessage: '上次会话', updatedAtUtc: '2026-01-01T00:00:00Z', turnCount: 1 }
+    ]
+  });
+  panel._handleListAiSessionsResult({
+    success: true,
+    sessions: [
+      { sessionId: 'session-active', lastMessage: '上次会话', updatedAtUtc: '2026-01-01T00:00:00Z', turnCount: 1 }
+    ]
+  });
+
+  assert.deepEqual(requested, ['session-active']);
+  assert.equal(panel.pendingSessionLoad.sessionId, 'session-active');
+  assert.equal(panel.pendingSessionLoad.source, 'auto_restore');
+});
+
+test('AI session history clears invalid active session pointer', async () => {
+  const { AiPanel } = await loadAiPanel();
+  global.localStorage.setItem('cv_ai_session_id', 'missing-session');
+  const panel = createPanel(AiPanel);
+  panel.container = createContainer({ '#ai-history-list': createFakeElement() });
+  panel.sessionId = 'missing-session';
+
+  panel._handleListAiSessionsResult({
+    success: true,
+    sessions: [{ sessionId: 'other-session', lastMessage: '其他', updatedAtUtc: '2026-01-01T00:00:00Z', turnCount: 1 }]
+  });
+
+  assert.equal(global.localStorage.getItem('cv_ai_session_id'), null);
+  assert.equal(panel.sessionId, null);
+});
+
+test('AI session restore ignores late auto restore after user switches session', async () => {
+  const { AiPanel } = await loadAiPanel();
+  global.localStorage.setItem('cv_ai_session_id', 'old-session');
+  const panel = createPanel(AiPanel);
+  panel.container = createContainer({ '#ai-history-list': createFakeElement() });
+  panel.sessionId = 'current-session';
+  panel.currentResult = { aiExplanation: 'current' };
+  panel._sendGetAiSession = () => {};
+  panel._handleListAiSessionsResult({
+    success: true,
+    sessions: [{ sessionId: 'old-session', lastMessage: '旧', updatedAtUtc: '2026-01-01T00:00:00Z', turnCount: 1 }]
+  });
+
+  panel.sessionNavigationEpoch += 1;
+  panel.pendingSessionLoad = { sessionId: 'new-session', source: 'history_switch', epoch: panel.sessionNavigationEpoch };
+  panel._handleGetAiSessionResult({
+    success: true,
+    session: { sessionId: 'old-session', history: [], workspaceSnapshot: { revision: 3, lifecycleState: 'plan_ready' } }
+  });
+
+  assert.equal(panel.sessionId, 'current-session');
+  assert.deepEqual(panel.currentResult, { aiExplanation: 'current' });
+});
+
+test('AI session restore resets workspace fields and clears stale build readonly state', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel.workspaceSnapshotRevision = 12;
+  panel.workspaceBuildRunId = 'ar_old';
+  panel.workspaceSubmittedBuildFingerprint = 'sha256:old';
+  panel.activeAgentRunId = 'ar_old';
+  panel.pendingVisionPlan = testPlan({ planId: 'old-plan', planHash: 'sha256:old' });
+
+  panel._restoreWorkspaceSnapshotFromSession({
+    revision: 5,
+    lifecycleState: 'plan_ready',
+    pendingPlanSnapshot: { planId: 'plan-a', planHash: 'sha256:plan-a', goal: '检测表面缺陷', canBuild: true },
+    planQuestionSelections: {},
+    confirmedPlanAnswers: [],
+    requirementMode: 'strict',
+    planAcceptedRecommendedDefaults: false,
+    planRunId: '',
+    buildRunId: '',
+    submittedBuildFingerprint: ''
+  }, 'session-a');
+
+  assert.equal(panel.workspaceSnapshotRevision, 5);
+  assert.equal(panel.workspaceBuildRunId, '');
+  assert.equal(panel.workspaceSubmittedBuildFingerprint, '');
+  assert.equal(panel.activeAgentRunId, null);
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+});
+
+test('AI workspace conflict rebases same plan once without fetching full session', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel.pendingVisionPlan = testPlan();
+  panel.sessionId = 'session-conflict';
+  panel.workspaceSnapshotRevision = 4;
+  panel.workspaceSnapshotDirty = true;
+  panel.planQuestionSelections = { image_source: 'camera' };
+  panel._sendGetAiSession = () => {
+    throw new Error('should not fetch full session');
+  };
+
+  const calls = [];
+  const originalFetch = global.fetch;
+  global.fetch = async (url, options = {}) => {
+    const body = JSON.parse(options.body);
+    calls.push(body);
+    if (calls.length === 1) {
+      return jsonResponse({
+        errorCode: 'workspace_revision_conflict',
+        snapshot: {
+          revision: 8,
+          lifecycleState: 'plan_ready',
+          buildRunId: '',
+          submittedBuildFingerprint: ''
+        },
+        persistenceStatus: { primaryStoreSaved: true, recoveryBackupSaved: true }
+      }, 409);
+    }
+    return jsonResponse({
+      success: true,
+      snapshot: {
+        revision: 9,
+        lifecycleState: 'plan_ready',
+        buildRunId: '',
+        submittedBuildFingerprint: ''
+      },
+      persistenceStatus: { primaryStoreSaved: true, recoveryBackupSaved: true }
+    });
+  };
+
+  try {
+    await panel._queueWorkspaceSnapshotFlush('test-conflict');
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].expectedRevision, 4);
+  assert.equal(calls[1].expectedRevision, 8);
+  assert.equal(calls[0].clientMutationId, calls[1].clientMutationId);
+  assert.equal(panel.workspaceSnapshotRevision, 9);
+  assert.equal(panel.workspaceSnapshotDirty, false);
+});
+
+test('AI AgentRun Build success applies canonical session and snapshot before SSE', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel.pendingVisionPlan = testPlan();
+  const started = [];
+  panel._startAgentRunEventSource = (runId, options) => started.push({ runId, options });
+  panel._handleAgentRunEvent = evt => {
+    panel.activeAgentRunEvents.push(evt);
+  };
+  const originalFetch = global.fetch;
+  global.fetch = async () => jsonResponse({
+    runId: 'ar_build',
+    sessionId: 'session-canonical',
+    brief: 'brief',
+    events: [{ runId: 'ar_build', sequence: 1, eventType: 'run.started', stage: 'run', status: 'running' }],
+    workspaceSnapshot: {
+      revision: 6,
+      lifecycleState: 'building',
+      buildRunId: 'ar_build',
+      submittedBuildFingerprint: 'sha256:submitted'
+    },
+    persistenceStatus: { primaryStoreSaved: true, recoveryBackupSaved: true }
+  });
+
+  try {
+    await panel._dispatchAgentRunGenerateRequest({
+      description: 'build',
+      sessionId: 'session-old',
+      buildFromPlan: { planId: 'plan-a' }
+    }, { clearInput: false });
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  assert.equal(panel.sessionId, 'session-canonical');
+  assert.equal(global.localStorage.getItem('cv_ai_session_id'), 'session-canonical');
+  assert.equal(panel.workspaceSnapshotRevision, 6);
+  assert.equal(panel.workspaceBuildRunId, 'ar_build');
+  assert.equal(panel.workspaceSubmittedBuildFingerprint, 'sha256:submitted');
+  assert.equal(panel.agentWorkspaceMode, 'build');
+  assert.deepEqual(started.map(item => item.runId), ['ar_build']);
+});
+
+test('AI Build 503 keeps Plan mode and does not start SSE', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  panel.useVisionAgentGenerateFlow = true;
+  panel.pendingVisionPlan = testPlan();
+  panel.agentWorkspaceMode = 'plan';
+  panel._startAgentRunEventSource = () => {
+    throw new Error('SSE should not start');
+  };
+  panel._startAssistantTurn = () => {};
+  panel._createGenerateRequestId = () => 'request-build-503';
+  panel.container = createContainer({ '#ai-input': { value: '', style: {} } });
+  const originalFetch = global.fetch;
+  global.fetch = async () => jsonResponse({
+    errorCode: 'session_persistence_failed',
+    publicMessage: 'Build 创建失败：会话状态未能保存，后台构建未启动。',
+    runId: 'ar_failed',
+    events: [{ runId: 'ar_failed', sequence: 3, eventType: 'run.failed' }],
+    persistenceStatus: { primaryStoreSaved: false, recoveryBackupSaved: true }
+  }, 503);
+
+  try {
+    const dispatched = panel._dispatchGenerateRequest({
+      description: 'build',
+      buildFromPlan: { planId: 'plan-a' },
+      skipPlan: true,
+      clearInput: false
+    });
+    assert.equal(dispatched, true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  assert.equal(panel.agentWorkspaceMode, 'plan');
+  assert.equal(panel.activeAgentRunId, null);
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
 });

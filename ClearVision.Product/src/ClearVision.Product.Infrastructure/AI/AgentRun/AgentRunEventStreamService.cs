@@ -551,14 +551,14 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                     {
                         EventType = AgentRunEventTypes.RunFailed,
                         Stage = "run",
-                        Title = "Run failed after host restart",
-                        Summary = "The previous host process ended before this AgentRun reached a terminal event. Submit the request again to continue.",
+                        Title = "主机重启后已终止",
+                        Summary = "上一次主机进程在该 AgentRun 到达终态前结束，本次已将它恢复为失败状态。",
                         Status = AgentRunEventStatuses.Failed,
                         Payload = new
                         {
-                            hostInstanceId = HostInstanceId,
-                            recoveryReason = "host_instance_restarted",
-                            firstFixRecommendation = "Submit the request again so a live host can execute it from the beginning."
+                            failureCode = "host_instance_restarted",
+                            metadataOnly = true,
+                            firstFixRecommendation = "请重新提交请求，由当前正在运行的主机从头执行。"
                         }
                     });
                     restored.Events.Add(recoveryEvent);

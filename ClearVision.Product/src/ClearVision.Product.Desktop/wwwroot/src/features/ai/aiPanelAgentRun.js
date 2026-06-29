@@ -542,6 +542,22 @@ export const aiPanelAgentRunMixin = {
             throw new Error('AgentRun 创建接口没有返回 runId。');
         }
 
+        const canonicalSessionId = String(createResult?.sessionId || createResult?.SessionId || '').trim();
+        if (canonicalSessionId) {
+            this.sessionId = canonicalSessionId;
+            this._saveSessionId?.(canonicalSessionId);
+        }
+        this._applyWorkspaceSnapshotSummary?.(createResult?.workspaceSnapshot || createResult?.WorkspaceSnapshot || null);
+        this._handleWorkspacePersistenceStatus?.(createResult?.persistenceStatus || createResult?.PersistenceStatus || null);
+        if (payload?.buildFromPlan || payload?.BuildFromPlan) {
+            this.agentWorkspaceMode = 'build';
+            this._setWorkspaceViewMode?.('build', { render: false });
+            this._renderAgentWorkspaceOverview?.();
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+            this._renderBuildWorkspaceFromAgentRun?.();
+            this._setResultStatusNote?.('构建模式已启动，进度来自后端 AgentRun 公开事件。', 'info');
+        }
+
         this.activeAgentRunId = runId;
         this.activeAgentRunEvents = [];
         this.activeAgentRunEventKeys = new Set();

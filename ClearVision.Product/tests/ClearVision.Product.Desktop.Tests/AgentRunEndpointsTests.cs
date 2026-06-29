@@ -84,6 +84,7 @@ public sealed class AgentRunEndpointsTests
 
         await host.Generation.WaitForCallAsync();
         await host.WaitForTerminalAsync(runId);
+        await host.WaitForSessionHistoryCountAsync(sessionId, 1);
 
         host.Generation.LastCommand!.PersistResult.Should().BeFalse();
         var replay = host.StreamService.Replay(runId)!;
@@ -856,6 +857,7 @@ public sealed class AgentRunEndpointsTests
         host.Generation.LastCommand!.Transport.Should().Be(BuildCommandTransports.AgentRun);
         host.Generation.LastCommand.RunId.Should().Be(runId);
         host.Generation.LastCommand.PersistResult.Should().BeFalse();
+        await host.WaitForSessionHistoryCountAsync("session-plan-build", 1);
 
         var replay = host.StreamService.Replay(runId)!;
         replay.Events.Select(evt => evt.Stage).Should().ContainInOrder([
@@ -895,6 +897,62 @@ public sealed class AgentRunEndpointsTests
         completedJson.Should().NotContain("systemPrompt");
         completedJson.Should().NotContain("rawPrompt");
         completedJson.Should().NotContain("C:\\");
+    }
+
+    [Fact(DisplayName = "POST AgentRun BuildFromPlan primary persistence failure returns controlled failed run")]
+    public async Task CreateRun_BuildFromPlanPrimaryPersistenceFailure_ShouldNotStartBackgroundRun()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "Build from persisted plan",
+            SessionId = "session-build-primary-fail",
+            Mode = "new",
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest()
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("session_persistence_failed");
+        var runId = root.GetProperty("runId").GetString()!;
+        root.GetProperty("events").EnumerateArray()
+            .Should()
+            .Contain(evt => evt.GetProperty("eventType").GetString() == AgentRunEventTypes.RunFailed);
+        JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("session_persistence_failed");
+        host.Generation.LastCommand.Should().BeNull();
+        host.StreamService.Replay(runId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
+        host.ConversationService.GetSession("session-build-primary-fail").Should().BeNull();
+    }
+
+    [Fact(DisplayName = "POST AgentRun BuildFromPlan backup persistence failure still starts background run")]
+    public async Task CreateRun_BuildFromPlanBackupPersistenceFailure_ShouldStartBackgroundRunWithDegradedStatus()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        host.ConcreteConversationService.RecoveryBackupWriteFaultInjector = () => throw new IOException("backup failed");
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "Build from persisted plan",
+            SessionId = "session-build-backup-fail",
+            Mode = "new",
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest()
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeTrue();
+        root.GetProperty("persistenceStatus").GetProperty("recoveryBackupSaved").GetBoolean().Should().BeFalse();
+        var runId = root.GetProperty("runId").GetString()!;
+        root.GetProperty("workspaceSnapshot").GetProperty("buildRunId").GetString().Should().Be(runId);
+        await host.Generation.WaitForCallAsync();
+        host.Generation.LastCommand.Should().NotBeNull();
+        host.Generation.LastCommand!.RunId.Should().Be(runId);
     }
 
     [Fact(DisplayName = "POST AgentRun BuildFromPlan failure replays canonical BuildReadiness payload")]
@@ -1451,6 +1509,40 @@ public sealed class AgentRunEndpointsTests
         };
     }
 
+    private static VisionAgentBuildFromPlanRequest BuildableAgentRunBuildFromPlanRequest()
+    {
+        return new VisionAgentBuildFromPlanRequest
+        {
+            PlanId = "plan_buildable",
+            PlanHash = "sha256:plan-buildable",
+            PlanSnapshot = new VisionAgentPlanModeResult
+            {
+                PlanId = "plan_buildable",
+                PlanHash = "sha256:plan-buildable",
+                Goal = "Build from a persisted plan",
+                CanBuild = true,
+                MetadataOnly = true
+            },
+            UserSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["image_source"] = "camera"
+            },
+            ConfirmedAnswers =
+            [
+                new VisionAgentPlanAnswer
+                {
+                    QuestionId = "image_source",
+                    Field = "image_source",
+                    Value = "camera",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                }
+            ],
+            BuildIntent = "new",
+            OriginalUserPrompt = "Build from a persisted plan",
+            MetadataOnly = true
+        };
+    }
+
     private static List<VisionAgentPlanAnswer> ConfirmedAgentRunBuildFromPlanAnswers()
     {
         return
@@ -1490,6 +1582,7 @@ public sealed class AgentRunEndpointsTests
             Generation = generation;
             StreamService = streamService;
             ConversationService = conversationService;
+            ConcreteConversationService = (ConversationalFlowService)conversationService;
             TerminalProjector = terminalProjector;
             Client = app.GetTestClient();
         }
@@ -1503,6 +1596,8 @@ public sealed class AgentRunEndpointsTests
         public IAgentRunEventStreamService StreamService { get; }
 
         public IConversationalFlowService ConversationService { get; }
+
+        public ConversationalFlowService ConcreteConversationService { get; }
 
         public IVisionAgentBuildTerminalProjector TerminalProjector { get; }
 
@@ -1648,6 +1743,23 @@ public sealed class AgentRunEndpointsTests
             }
 
             throw new TimeoutException("AgentRun terminal event was not emitted.");
+        }
+
+        public async Task WaitForSessionHistoryCountAsync(string sessionId, int expectedCount)
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            while (!cts.IsCancellationRequested)
+            {
+                var session = ConversationService.GetSession(sessionId);
+                if (session?.History.Count >= expectedCount)
+                {
+                    return;
+                }
+
+                await Task.Delay(20, cts.Token);
+            }
+
+            throw new TimeoutException($"Conversation session '{sessionId}' did not reach {expectedCount} history entries.");
         }
 
         public async Task WaitForEventAsync(string runId, string eventType)

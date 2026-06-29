@@ -75,11 +75,13 @@ export const aiPanelGenerateRequestMixin = {
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this._setGeneratingState(true);
         this._setWorkbenchState(AiWorkbenchStates.GENERATING);
-        this.agentWorkspaceMode = 'build';
-        this._setWorkspaceViewMode?.('build', { render: false });
-        this._renderAgentWorkspaceOverview?.();
-        this._renderPlanWorkspace?.(this.pendingVisionPlan);
-        this._renderBuildWorkspaceFromAgentRun?.();
+        if (!buildFromPlan) {
+            this.agentWorkspaceMode = 'build';
+            this._setWorkspaceViewMode?.('build', { render: false });
+            this._renderAgentWorkspaceOverview?.();
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+            this._renderBuildWorkspaceFromAgentRun?.();
+        }
         this.activeGenerateRequestId = requestId;
         this.activeGenerateSessionId = this.sessionId;
         this.isCancellingGenerate = false;
@@ -138,6 +140,14 @@ export const aiPanelGenerateRequestMixin = {
             this._dispatchAgentRunGenerateRequest(agentRunPayload, { clearInput, input })
                 .catch(err => {
                     this._handleError(err?.message || String(err || 'AgentRun 创建失败'));
+                    if (buildFromPlan) {
+                        this.agentWorkspaceMode = 'plan';
+                        this._setWorkspaceViewMode?.('plan', { render: false });
+                        this._renderAgentWorkspaceOverview?.();
+                        this._renderPlanWorkspace?.(this.pendingVisionPlan);
+                        this._renderBuildWorkspaceFromAgentRun?.();
+                        this._setResultStatusNote?.('Build 创建失败，已返回 Plan 视图，当前 Plan 仍可编辑。', 'warning');
+                    }
                 });
             return true;
         }

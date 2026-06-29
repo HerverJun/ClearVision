@@ -127,6 +127,27 @@ export const aiPanelSessionHistoryMixin = {
             .filter(Boolean)
             .sort((a, b) => new Date(b.updatedAtUtc).getTime() - new Date(a.updatedAtUtc).getTime());
         this._filterHistory(this.historyKeyword);
+        this._maybeAutoRestoreActiveSession(this.history);
+    },
+
+    _maybeAutoRestoreActiveSession(sessions = []) {
+        if (this.autoRestoreAttempted) return;
+        this.autoRestoreAttempted = true;
+
+        const candidateSessionId = String(this._loadSessionId?.() || '').trim();
+        if (!candidateSessionId) return;
+
+        const exists = sessions.some(item =>
+            String(item?.sessionId || '').trim().toLowerCase() === candidateSessionId.toLowerCase());
+        if (!exists) {
+            if (String(this.sessionId || '').trim().toLowerCase() === candidateSessionId.toLowerCase()) {
+                this.sessionId = null;
+            }
+            this._saveSessionId?.(null);
+            return;
+        }
+
+        this._requestSessionLoad(candidateSessionId, 'auto_restore');
     },
 
     async _switchToSession(sessionId) {
@@ -142,6 +163,22 @@ export const aiPanelSessionHistoryMixin = {
             return;
         }
 
+        this.sessionNavigationEpoch += 1;
+        this._requestSessionLoad(sessionId, 'history_switch');
+    },
+
+    _requestSessionLoad(sessionId, source = 'manual') {
+        const normalizedSessionId = String(sessionId || '').trim();
+        if (!normalizedSessionId) return;
+        this.pendingSessionLoad = {
+            sessionId: normalizedSessionId,
+            source,
+            epoch: this.sessionNavigationEpoch || 0
+        };
+        this._sendGetAiSession(normalizedSessionId);
+    },
+
+    _sendGetAiSession(sessionId) {
         webMessageBridge.sendMessage('GetAiSession', {
             payload: { sessionId }
         });
@@ -149,22 +186,43 @@ export const aiPanelSessionHistoryMixin = {
 
     _handleGetAiSessionResult(data) {
         const payload = data?.payload || data || {};
+        const pendingLoad = this.pendingSessionLoad;
         if (!payload.success) {
+            if (pendingLoad?.source === 'auto_restore') {
+                this.pendingSessionLoad = null;
+                this._saveSessionId?.(null);
+                if (!this.autoRestoreNoticeShown) {
+                    this.autoRestoreNoticeShown = true;
+                    this._addMessage('system', `自动恢复上次会话失败：${payload.errorMessage || '未知错误'}。已进入新会话。`);
+                }
+                return;
+            }
+
+            this.pendingSessionLoad = null;
             this._addMessage('system', `会话恢复失败: ${payload.errorMessage || '未知错误'}`);
             return;
         }
 
         const session = payload.session;
         if (!session) {
+            this.pendingSessionLoad = null;
             this._addMessage('system', '会话恢复失败: 会话数据为空');
             return;
         }
 
         const sessionId = String(session.sessionId ?? session.SessionId ?? '').trim();
         if (!sessionId) {
+            this.pendingSessionLoad = null;
             this._addMessage('system', '会话恢复失败: 会话 ID 无效');
             return;
         }
+
+        if (!pendingLoad ||
+            pendingLoad.epoch !== (this.sessionNavigationEpoch || 0) ||
+            String(pendingLoad.sessionId || '').trim().toLowerCase() !== sessionId.toLowerCase()) {
+            return;
+        }
+        this.pendingSessionLoad = null;
 
         this.sessionId = sessionId;
         this._saveSessionId(this.sessionId);
@@ -326,13 +384,16 @@ export const aiPanelSessionHistoryMixin = {
             planAcceptedRecommendedDefaults: read('planAcceptedRecommendedDefaults') === true,
             planRunId: String(read('planRunId') || '').trim(),
             planRunStatus: String(read('planRunStatus') || '').trim().toLowerCase(),
+            planTerminalSequence: Number(read('planTerminalSequence')) || null,
             buildRunId: String(read('buildRunId') || '').trim(),
             buildRunStatus: String(read('buildRunStatus') || '').trim().toLowerCase(),
+            buildTerminalSequence: Number(read('buildTerminalSequence')) || null,
             submittedBuildFingerprint: String(read('submittedBuildFingerprint') || '').trim()
         };
     },
 
     _restoreWorkspaceSnapshotFromSession(snapshot, sessionId) {
+        this._resetWorkspaceStateForSessionRestore();
         if (!snapshot) {
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
             this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
@@ -343,6 +404,7 @@ export const aiPanelSessionHistoryMixin = {
             return false;
         }
 
+        this._applyWorkspaceSnapshotSummary?.(snapshot);
         const planSnapshot = snapshot.pendingPlanSnapshot;
         if (planSnapshot && typeof this._normalizeBackendPlanResult === 'function') {
             const fallback = planSnapshot.originalUserPrompt || planSnapshot.OriginalUserPrompt || this.lastUserPrompt || '';
@@ -383,6 +445,36 @@ export const aiPanelSessionHistoryMixin = {
 
         this._restoreWorkspaceRunReplays(snapshot, sessionId);
         return true;
+    },
+
+    _resetWorkspaceStateForSessionRestore() {
+        this.pendingVisionPlan = null;
+        this.pendingClarificationPayload = null;
+        this.planQuestionSelections = {};
+        this.planQuestionAnswers = {};
+        this.planAnswerRevision = 0;
+        this.planAcceptedRecommendedDefaults = false;
+        this.currentPlanIdentity = '';
+        this.effectiveReadiness = null;
+        this.previewState = 'idle';
+        this.activePlanReadinessPreviewController?.abort?.();
+        this.activePlanReadinessPreviewController = null;
+        this.activePlanReadinessPreviewRequest = null;
+        this.lastPlanReadinessPreviewError = '';
+        this.workspaceSnapshotRevision = 0;
+        this.workspaceSnapshotDirty = false;
+        this.workspaceSnapshotSaveQueue = Promise.resolve();
+        this.workspaceBuildRunId = '';
+        this.workspaceSubmittedBuildFingerprint = '';
+        this.activePlanRunId = null;
+        this.activePlanRunRequestId = null;
+        this.activePlanRunEvents = [];
+        this.activePlanRunEventKeys = new Set();
+        this.activePlanRunCompletion = null;
+        this._resetAgentRunState?.();
+        this.workspacePersistenceWarning = null;
+        this._workspacePersistenceStatusNoteActive = false;
+        this._workspacePersistenceStatusNoteText = '';
     },
 
     async _restoreWorkspaceRunReplays(snapshot, sessionId) {
@@ -483,6 +575,10 @@ export const aiPanelSessionHistoryMixin = {
 
     _deleteSession(sessionId) {
         if (!sessionId) return;
+        if (String(this.pendingSessionLoad?.sessionId || '').trim().toLowerCase() === String(sessionId).trim().toLowerCase()) {
+            this.sessionNavigationEpoch += 1;
+            this.pendingSessionLoad = null;
+        }
         webMessageBridge.sendMessage('DeleteAiSession', {
             payload: { sessionId }
         });

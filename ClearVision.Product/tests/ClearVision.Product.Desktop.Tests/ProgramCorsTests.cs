@@ -30,6 +30,41 @@ public class ProgramCorsTests
     }
 
     [Fact]
+    public void BuildSingleInstanceMutexName_ShouldBeStableForSameUserDataAndInstall()
+    {
+        var first = Program.BuildSingleInstanceMutexName(
+            "DOMAIN\\operator",
+            @"C:\Data\ClearVision\settings.json",
+            @"C:\Program Files\ClearVision");
+        var second = Program.BuildSingleInstanceMutexName(
+            "DOMAIN\\operator",
+            @"C:\Data\ClearVision\settings.json",
+            @"C:\Program Files\ClearVision");
+
+        second.Should().Be(first);
+        first.Should().StartWith("Local\\ClearVision.Desktop.");
+        first.Should().NotContain("DOMAIN");
+        first.Should().NotContain("Data");
+        first.Should().NotContain("Program Files");
+    }
+
+    [Fact]
+    public void BuildSingleInstanceMutexName_ShouldBeIsolatedByUserDataAndInstall()
+    {
+        var baseline = Program.BuildSingleInstanceMutexName(
+            "DOMAIN\\operator-a",
+            @"C:\Data\A\settings.json",
+            @"C:\Install\A");
+
+        Program.BuildSingleInstanceMutexName("DOMAIN\\operator-b", @"C:\Data\A\settings.json", @"C:\Install\A")
+            .Should().NotBe(baseline);
+        Program.BuildSingleInstanceMutexName("DOMAIN\\operator-a", @"C:\Data\B\settings.json", @"C:\Install\A")
+            .Should().NotBe(baseline);
+        Program.BuildSingleInstanceMutexName("DOMAIN\\operator-a", @"C:\Data\A\settings.json", @"C:\Install\B")
+            .Should().NotBe(baseline);
+    }
+
+    [Fact]
     public async Task CorsPreflight_ShouldAllowAuthAndSseHeaders_ForKnownLocalOrigins()
     {
         await using var host = await CorsTestHost.CreateAsync();
