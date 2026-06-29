@@ -10727,6 +10727,23 @@ test('AI Build 503 keeps Plan mode and does not start SSE', async () => {
   assert.equal(panel.lastResultStatusNote.tone, 'warning');
 });
 
+test('AI result persistence warning exposes Chinese status note', async () => {
+  installDom();
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel);
+  const warning = panel._getPersistenceWarning({
+    persistenceWarning: {
+      code: 'primary_store_save_failed',
+      message: '结果已生成，但本次会话尚未成功保存。'
+    }
+  });
+
+  assert.equal(warning.code, 'primary_store_save_failed');
+  panel._setResultStatusNote(warning.message, 'warning');
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+  assert.match(panel.lastResultStatusNote.text, /尚未成功保存/);
+});
+
 test('AI Build 409 applies latest workspace revision and stays in Plan without SSE', async () => {
   installDom();
   const { AiPanel } = await loadAiPanel();

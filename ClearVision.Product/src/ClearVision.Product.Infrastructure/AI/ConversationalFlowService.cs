@@ -122,6 +122,7 @@ public sealed class VisionAgentWorkspaceSnapshotUpdate
     public string? SubmittedBuildFingerprint { get; set; }
     public string? UserTurnId { get; set; }
     public string? UserMessage { get; set; }
+    public bool RequireExpectedRevisionWhenWorkspaceExists { get; set; }
 }
 
 public sealed class ConversationPersistenceStatus
@@ -638,7 +639,8 @@ public class ConversationalFlowService : IConversationalFlowService
             update.ExpectedRevision,
             update.ClientMutationId,
             BuildWorkspaceMutationFingerprint(update),
-            candidate => ApplyWorkspaceUpdateLocked(candidate, update));
+            candidate => ApplyWorkspaceUpdateLocked(candidate, update),
+            update.RequireExpectedRevisionWhenWorkspaceExists);
 
         return result.Session ?? new ConversationSession
         {
@@ -658,7 +660,8 @@ public class ConversationalFlowService : IConversationalFlowService
             update.ExpectedRevision,
             update.ClientMutationId,
             BuildWorkspaceMutationFingerprint(update),
-            candidate => ApplyWorkspaceUpdateLocked(candidate, update))
+            candidate => ApplyWorkspaceUpdateLocked(candidate, update),
+            update.RequireExpectedRevisionWhenWorkspaceExists)
             .ToWorkspaceMutationResult();
     }
 
@@ -746,7 +749,8 @@ public class ConversationalFlowService : IConversationalFlowService
         long? expectedRevision,
         string? clientMutationId,
         string payloadFingerprint,
-        Action<ConversationSession> mutator)
+        Action<ConversationSession> mutator,
+        bool requireExpectedRevisionWhenWorkspaceExists = false)
     {
         var normalizedSessionId = NormalizeSessionId(sessionId);
         var normalizedMutationId = clientMutationId?.Trim() ?? string.Empty;
@@ -783,6 +787,17 @@ public class ConversationalFlowService : IConversationalFlowService
             }
 
             var currentRevision = current.WorkspaceSnapshot?.Revision ?? 0;
+            if (requireExpectedRevisionWhenWorkspaceExists &&
+                current.WorkspaceSnapshot != null &&
+                !expectedRevision.HasValue)
+            {
+                return SessionMutationCommitResult.Conflicted(
+                    "workspace_revision_required",
+                    "Plan 状态缺少版本号，请刷新确认后重新构建。",
+                    current.WorkspaceSnapshot,
+                    _lastPersistenceStatus);
+            }
+
             if (expectedRevision.HasValue && expectedRevision.Value != currentRevision)
             {
                 return SessionMutationCommitResult.Conflicted(

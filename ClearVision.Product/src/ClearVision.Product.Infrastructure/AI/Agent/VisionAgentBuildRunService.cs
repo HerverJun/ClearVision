@@ -55,23 +55,10 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             return new VisionAgentWorkspaceSnapshotMutationResult { Success = true };
         }
 
-        var current = _conversationService.GetSession(sessionId);
-        if (current?.WorkspaceSnapshot != null && !build.WorkspaceExpectedRevision.HasValue)
-        {
-            return new VisionAgentWorkspaceSnapshotMutationResult
-            {
-                Success = false,
-                Conflict = true,
-                ErrorCode = "workspace_revision_required",
-                PublicMessage = "Plan 状态缺少版本号，请刷新确认后重新构建。",
-                Snapshot = current.WorkspaceSnapshot,
-                PersistenceStatus = _conversationService.GetLastPersistenceStatus()
-            };
-        }
-
         return _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             ExpectedRevision = build.WorkspaceExpectedRevision,
+            RequireExpectedRevisionWhenWorkspaceExists = true,
             ClientMutationId = $"build-association:{runId}",
             LifecycleState = "building",
             BuildRunId = runId,
@@ -314,6 +301,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             releaseReview = result.BuildResult?.ReleaseReview,
             firstFixRecommendation = result.BuildResult?.FirstFixRecommendation,
             stageTimeline = result.StageTimeline,
+            persistenceWarning = result.PersistenceWarning,
             turnIntent = result.TurnIntent,
             interactionState = result.InteractionState,
             routerConfidence = result.RouterConfidence,
@@ -359,6 +347,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             nonBlockingMissingFields = result.NonBlockingMissingFields,
             requirementMaturity = result.RequirementMaturity,
             decisionTrace = result.DecisionTrace,
+            persistenceWarning = result.PersistenceWarning,
             metadataOnly = true
         };
     }

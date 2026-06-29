@@ -199,7 +199,7 @@ public static class AgentRunEndpoints
             request.Description,
             BuildPlanCreatePayload(request),
             ownerHash);
-        var workspaceSnapshot = conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var initialPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
             LifecycleState = "planning",
             PlanRunId = createResult.RunId,
@@ -208,7 +208,40 @@ public static class AgentRunEndpoints
             ConfirmedPlanAnswers = request.ConfirmedPlanAnswers,
             UserTurnId = $"plan:{createResult.RunId}:user",
             UserMessage = request.Description
-        }).WorkspaceSnapshot;
+        });
+        var workspaceSnapshot = initialPersistence.Snapshot;
+        if (!initialPersistence.Success)
+        {
+            var failureCode = initialPersistence.Conflict
+                ? initialPersistence.ErrorCode
+                : "session_persistence_failed";
+            var publicMessage = "Plan Run 创建失败：会话状态未能保存，模型规划未启动。";
+            streamService.Fail(
+                createResult.RunId,
+                publicMessage,
+                "请检查本机会话存储权限或磁盘空间后重试规划。",
+                new
+                {
+                    failureCode,
+                    persistenceStatus = initialPersistence.PersistenceStatus,
+                    metadataOnly = true
+                });
+
+            var failedReplay = streamService.Replay(createResult.RunId);
+            return Task.FromResult<IResult>(Results.Json(new
+            {
+                errorCode = failureCode,
+                publicMessage,
+                runId = createResult.RunId,
+                sessionId = session.SessionId,
+                brief = createResult.Brief,
+                events = failedReplay?.Events ?? createResult.Events,
+                workspaceSnapshot,
+                persistenceStatus = initialPersistence.PersistenceStatus
+            }, statusCode: initialPersistence.Conflict
+                ? StatusCodes.Status409Conflict
+                : StatusCodes.Status503ServiceUnavailable));
+        }
 
         AppendPlanEvent(streamService, createResult.RunId, AgentRunEventTypes.PlanCreated, "plan", "规划已创建",
             "已创建 Plan Run，公开进度将通过事件流更新。", AgentRunEventStatuses.Completed, new
@@ -242,7 +275,7 @@ public static class AgentRunEndpoints
             brief = createResult.Brief,
             events = replay?.Events ?? createResult.Events,
             workspaceSnapshot,
-            persistenceStatus = conversationService.GetLastPersistenceStatus()
+            persistenceStatus = initialPersistence.PersistenceStatus
         }));
     }
 
@@ -531,9 +564,10 @@ public static class AgentRunEndpoints
             var completedPayload = BuildPlanCompletedPayload(result, request.SessionId, runId);
             var completedEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCompleted, "plan_ready",
                 "规划已就绪", BuildPlanCompletionSummary(result), AgentRunEventStatuses.Completed, completedPayload);
+            object? persistenceWarning = null;
             if (!string.IsNullOrWhiteSpace(request.SessionId))
             {
-                conversationService.UpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
                 {
                     LifecycleState = result.CanBuild ? "plan_ready" : "plan_blocked",
                     PendingPlanSnapshot = BuildReplaySafePlanResult(result),
@@ -545,9 +579,17 @@ public static class AgentRunEndpoints
                         ? result.ConfirmedPlanAnswers
                         : request.ConfirmedPlanAnswers
                 });
+                if (!terminalPersistence.Success)
+                {
+                    persistenceWarning = BuildPlanPersistenceWarning(terminalPersistence);
+                    AppendPlanPersistenceWarning(streamService, runId, terminalPersistence);
+                }
             }
 
-            streamService.Complete(runId, BuildPlanCompletionSummary(result), completedPayload);
+            streamService.Complete(
+                runId,
+                BuildPlanCompletionSummary(result),
+                BuildPlanCompletedPayload(result, request.SessionId, runId, persistenceWarning));
         }
         catch (OperationCanceledException)
         {
@@ -556,10 +598,10 @@ public static class AgentRunEndpoints
                 {
                     sessionId = request.SessionId,
                     metadataOnly = true
-                });
+            });
             if (!string.IsNullOrWhiteSpace(request.SessionId))
             {
-                conversationService.UpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
                 {
                     LifecycleState = "plan_cancelled",
                     PlanRunId = runId,
@@ -567,6 +609,10 @@ public static class AgentRunEndpoints
                     PlanTerminalSequence = cancelledEvent?.Sequence,
                     RequirementMode = request.RequirementMode
                 });
+                if (!terminalPersistence.Success)
+                {
+                    AppendPlanPersistenceWarning(streamService, runId, terminalPersistence);
+                }
             }
             streamService.Cancel(runId, "规划已取消。");
         }
@@ -579,10 +625,11 @@ public static class AgentRunEndpoints
                     sessionId = request.SessionId,
                     error = ex.Message,
                     metadataOnly = true
-                });
+            });
+            object? persistenceWarning = null;
             if (!string.IsNullOrWhiteSpace(request.SessionId))
             {
-                conversationService.UpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
                 {
                     LifecycleState = "plan_failed",
                     PlanRunId = runId,
@@ -590,6 +637,11 @@ public static class AgentRunEndpoints
                     PlanTerminalSequence = failedEvent?.Sequence,
                     RequirementMode = request.RequirementMode
                 });
+                if (!terminalPersistence.Success)
+                {
+                    persistenceWarning = BuildPlanPersistenceWarning(terminalPersistence);
+                    AppendPlanPersistenceWarning(streamService, runId, terminalPersistence);
+                }
             }
             streamService.Fail(
                 runId,
@@ -599,6 +651,7 @@ public static class AgentRunEndpoints
                 {
                     mode = "plan",
                     error = ex.Message,
+                    persistenceWarning,
                     metadataOnly = true
                 });
         }
@@ -685,7 +738,8 @@ public static class AgentRunEndpoints
     private static object BuildPlanCompletedPayload(
         VisionAgentPlanModeResult result,
         string? sessionId,
-        string runId)
+        string runId,
+        object? persistenceWarning = null)
     {
         var replaySafePlan = BuildReplaySafePlanResult(result);
         return new
@@ -707,6 +761,7 @@ public static class AgentRunEndpoints
             canBuild = replaySafePlan.CanBuild,
             questionCount = replaySafePlan.ClarificationQuestions.Count,
             publicEventCount = replaySafePlan.PublicEvents.Count,
+            persistenceWarning,
             metadataOnly = true
         };
     }
@@ -1105,6 +1160,41 @@ public static class AgentRunEndpoints
             Status = status,
             Payload = payload
         });
+    }
+
+    private static AgentRunEvent? AppendPlanPersistenceWarning(
+        IAgentRunEventStreamService streamService,
+        string runId,
+        VisionAgentWorkspaceSnapshotMutationResult persistence)
+    {
+        return AppendPlanEvent(
+            streamService,
+            runId,
+            AgentRunEventTypes.StageCompleted,
+            "workspace_persistence",
+            "Plan 状态未保存",
+            "规划结果已生成，但本次 Plan 工作台状态未能保存；请检查本机会话存储后重试。",
+            AgentRunEventStatuses.Warning,
+            new
+            {
+                persistenceWarning = BuildPlanPersistenceWarning(persistence),
+                persistenceStatus = persistence.PersistenceStatus,
+                metadataOnly = true
+            });
+    }
+
+    private static object BuildPlanPersistenceWarning(VisionAgentWorkspaceSnapshotMutationResult persistence)
+    {
+        return new
+        {
+            code = string.IsNullOrWhiteSpace(persistence.ErrorCode)
+                ? "session_persistence_failed"
+                : persistence.ErrorCode,
+            message = string.IsNullOrWhiteSpace(persistence.PublicMessage)
+                ? "规划结果已生成，但本次 Plan 工作台状态未能保存。"
+                : persistence.PublicMessage,
+            persistenceStatus = persistence.PersistenceStatus
+        };
     }
 
     private static string BuildPlanCompletionSummary(VisionAgentPlanModeResult result)

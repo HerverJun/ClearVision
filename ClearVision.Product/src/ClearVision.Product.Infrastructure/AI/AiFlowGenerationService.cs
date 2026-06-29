@@ -661,7 +661,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         ClarificationRequired = requirementBrief.ClarificationRequired
                     };
 
-                    _conversationalFlowService.RecordAssistantResponse(
+                    var persistenceWarning = RecordAssistantResponseWithPersistenceWarning(
                         conversationContext.SessionId,
                         assistantReply,
                         JsonSerializer.Serialize(generatedFlow, _jsonOptions),
@@ -694,7 +694,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                         InteractionState = ResolveCompletedInteractionState(turnRoute, pendingParameters),
                         RouterConfidence = turnRoute.Confidence,
                         BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-                        NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+                        NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
+                        PersistenceWarning = persistenceWarning
                     };
                 }
 
@@ -992,7 +993,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
 
         return runResult.Outcome.Result;
     }
-    private void PersistAgentGenerateFlowResult(
+    private AiPersistenceWarning? PersistAgentGenerateFlowResult(
         AiFlowGenerationRequest request,
         AiFlowGenerationResult result,
         IReadOnlyList<string> progressMessages)
@@ -1034,7 +1035,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 }
         };
 
-        _conversationalFlowService.RecordAssistantResponse(
+        return RecordAssistantResponseWithPersistenceWarning(
             session.SessionId,
             assistantMessage,
             flowJson,
@@ -1049,14 +1050,69 @@ public class AiFlowGenerationService : IAiFlowGenerationService
     {
         try
         {
-            PersistAgentGenerateFlowResult(request, result, progressMessages);
+            var persistenceWarning = PersistAgentGenerateFlowResult(request, result, progressMessages);
+            result.PersistenceWarning ??= persistenceWarning;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(
                 ex,
                 "Vision Agent GenerateFlow result persistence failed; returning agent result without legacy fallback.");
+            result.PersistenceWarning ??= new AiPersistenceWarning
+            {
+                Code = "session_persistence_failed",
+                Message = "结果已生成，但本次会话尚未成功保存。"
+            };
         }
+    }
+
+    private AiPersistenceWarning? RecordAssistantResponseWithPersistenceWarning(
+        string sessionId,
+        string assistantMessage,
+        string? latestFlowJson,
+        string? latestCanvasFlowJson = null,
+        ConversationTurnPayload? payload = null)
+    {
+        var writeResult = _conversationalFlowService.RecordAssistantResponseWithPersistence(
+            sessionId,
+            assistantMessage,
+            latestFlowJson,
+            latestCanvasFlowJson,
+            payload);
+        if (writeResult?.Success == true)
+        {
+            return null;
+        }
+
+        var status = writeResult?.PersistenceStatus ?? new ConversationPersistenceStatus
+        {
+            PrimaryStoreSaved = false,
+            RecoveryBackupSaved = false,
+            ErrorCode = "session_persistence_failed",
+            PublicMessage = "结果已生成，但本次会话尚未成功保存。"
+        };
+        _logger.LogWarning(
+            "Vision Agent assistant response persistence failed. SessionId={SessionId}, ErrorCode={ErrorCode}, PrimaryStoreSaved={PrimaryStoreSaved}, RecoveryBackupSaved={RecoveryBackupSaved}",
+            sessionId,
+            status.ErrorCode,
+            status.PrimaryStoreSaved,
+            status.RecoveryBackupSaved);
+
+        return BuildPersistenceWarning(status);
+    }
+
+    private static AiPersistenceWarning BuildPersistenceWarning(ConversationPersistenceStatus status)
+    {
+        return new AiPersistenceWarning
+        {
+            Code = string.IsNullOrWhiteSpace(status.ErrorCode)
+                ? "session_persistence_failed"
+                : status.ErrorCode,
+            Message = string.IsNullOrWhiteSpace(status.PublicMessage)
+                ? "结果已生成，但本次会话尚未成功保存。"
+                : status.PublicMessage,
+            PersistenceStatus = status
+        };
     }
 
     private static GenerateFlowMode ResolveEffectiveMode(
@@ -1138,7 +1194,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             ClarificationRequired = false
         };
 
-        _conversationalFlowService.RecordAssistantResponse(
+        var persistenceWarning = RecordAssistantResponseWithPersistenceWarning(
             sessionId,
             reply,
             null,
@@ -1153,7 +1209,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             TurnIntent = turnRoute.TurnIntent,
             InteractionState = turnRoute.InteractionState,
             RouterConfidence = turnRoute.Confidence,
-            StageTimeline = stageTimeline.ToList()
+            StageTimeline = stageTimeline.ToList(),
+            PersistenceWarning = persistenceWarning
         };
     }
 
@@ -3360,7 +3417,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             RequirementBrief = requirementBrief
         };
 
-        _conversationalFlowService.RecordAssistantResponse(
+        var persistenceWarning = RecordAssistantResponseWithPersistenceWarning(
             sessionId,
             summary,
             null,
@@ -3389,7 +3446,8 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             InteractionState = AiInteractionStates.Clarifying,
             RouterConfidence = turnRoute.Confidence,
             BlockingClarificationFields = requirementBrief.BlockingClarificationFields.ToList(),
-            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList()
+            NonBlockingMissingFields = requirementBrief.NonBlockingMissingFields.ToList(),
+            PersistenceWarning = persistenceWarning
         };
     }
 
@@ -3842,7 +3900,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
             summary.AppendLine(TrimRetryOutput(lastRawResponse));
         }
 
-        _conversationalFlowService.RecordAssistantResponse(
+        RecordAssistantResponseWithPersistenceWarning(
             sessionId,
             summary.ToString().Trim(),
             null,

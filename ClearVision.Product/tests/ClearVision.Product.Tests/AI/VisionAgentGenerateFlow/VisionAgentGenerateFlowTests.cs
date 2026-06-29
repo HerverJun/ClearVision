@@ -62,6 +62,52 @@ public sealed class VisionAgentGenerateFlowTests
         result.ToolTrace.Should().NotBeEmpty();
     }
 
+    [Fact(DisplayName = "Agent GenerateFlow assistant persistence failure should keep result and surface warning")]
+    public async Task AgentGenerateFlow_AssistantPersistenceFailure_ShouldKeepResultAndSurfaceWarning()
+    {
+        var conversationService = Substitute.For<IConversationalFlowService>();
+        ConfigureConversationService(conversationService);
+        conversationService.RecordAssistantResponseWithPersistence(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<ConversationTurnPayload?>())
+            .Returns(new ConversationSessionWriteResult
+            {
+                Success = false,
+                PersistenceStatus = new ConversationPersistenceStatus
+                {
+                    PrimaryStoreSaved = false,
+                    RecoveryBackupSaved = true,
+                    ErrorCode = "primary_store_save_failed",
+                    PublicMessage = "结果已生成，但本次会话尚未成功保存。"
+                }
+            });
+        var agent = new FakeAgentGenerateFlowService(_ => Task.FromResult(new AiFlowGenerationResult
+        {
+            Success = true,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+            Flow = new OperatorFlowDto(),
+            AiExplanation = "Generated draft."
+        }));
+        var service = CreateAiFlowGenerationService(
+            agent,
+            new AgentGenerateFlowOptions { Enabled = true },
+            conversationService: conversationService);
+
+        var result = await service.GenerateFlowAsync(new AiFlowGenerationRequest("wire sequence")
+        {
+            UseVisionAgentGenerateFlow = true
+        });
+
+        result.Success.Should().BeTrue();
+        result.Flow.Should().NotBeNull();
+        result.PersistenceWarning.Should().NotBeNull();
+        result.PersistenceWarning!.Code.Should().Be("primary_store_save_failed");
+        result.PersistenceWarning.Message.Should().Contain("尚未成功保存");
+    }
+
     [Fact(DisplayName = "BuildFromPlan GenerateFlow should use dedicated Build pipeline even when use flag is false")]
     public async Task BuildFromPlanGenerateFlow_ShouldUseDedicatedBuildPipeline_WhenUseFlagIsFalse()
     {
@@ -792,24 +838,14 @@ public sealed class VisionAgentGenerateFlowTests
         IVisionAgentGenerateFlowService agentGenerateFlowService,
         AgentGenerateFlowOptions agentOptions,
         IRequirementBriefExtractor? requirementBriefExtractor = null,
-        IServiceProvider? serviceProvider = null)
+        IServiceProvider? serviceProvider = null,
+        IConversationalFlowService? conversationService = null)
     {
-        var conversationService = Substitute.For<IConversationalFlowService>();
-        conversationService.PrepareContext(Arg.Any<AiFlowGenerationRequest>())
-            .Returns(new ConversationContext
-            {
-                SessionId = "session",
-                Intent = ConversationIntent.New,
-                Mode = GenerateFlowMode.Auto
-            });
-        conversationService.GetSession("session").Returns(new ConversationSession { SessionId = "session" });
-        conversationService.GetOrCreateSession(Arg.Any<string?>())
-            .Returns(call => new ConversationSession
-            {
-                SessionId = string.IsNullOrWhiteSpace(call.Arg<string?>())
-                    ? "session"
-                    : call.Arg<string?>()!.Trim()
-            });
+        if (conversationService == null)
+        {
+            conversationService = Substitute.For<IConversationalFlowService>();
+            ConfigureConversationService(conversationService);
+        }
         var turnRouter = Substitute.For<IAiTurnRouter>();
         turnRouter.Route(Arg.Any<AiTurnRouteRequest>())
             .Returns(new AiTurnRoute(
@@ -852,6 +888,37 @@ public sealed class VisionAgentGenerateFlowTests
             agentGenerateFlowService,
             buildRunHarness?.RunService,
             buildRunHarness?.StreamService);
+    }
+
+    private static void ConfigureConversationService(IConversationalFlowService conversationService)
+    {
+        conversationService.PrepareContext(Arg.Any<AiFlowGenerationRequest>())
+            .Returns(new ConversationContext
+            {
+                SessionId = "session",
+                Intent = ConversationIntent.New,
+                Mode = GenerateFlowMode.Auto
+            });
+        conversationService.GetSession("session").Returns(new ConversationSession { SessionId = "session" });
+        conversationService.GetOrCreateSession(Arg.Any<string?>())
+            .Returns(call => new ConversationSession
+            {
+                SessionId = string.IsNullOrWhiteSpace(call.Arg<string?>())
+                    ? "session"
+                    : call.Arg<string?>()!.Trim()
+            });
+        conversationService.RecordAssistantResponseWithPersistence(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<ConversationTurnPayload?>())
+            .Returns(new ConversationSessionWriteResult
+            {
+                Success = true,
+                Session = new ConversationSession { SessionId = "session" },
+                PersistenceStatus = new ConversationPersistenceStatus()
+            });
     }
 
     private static BuildRunHarness? BuildRunServiceFor(

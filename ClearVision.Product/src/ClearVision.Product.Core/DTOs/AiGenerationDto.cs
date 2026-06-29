@@ -290,6 +290,14 @@ public class AiFlowGenerationResult
     public List<string> NonBlockingMissingFields { get; set; } = new();
     public AiRequirementMaturityResult? RequirementMaturity { get; set; }
     public AiDecisionTrace? DecisionTrace { get; set; }
+    public AiPersistenceWarning? PersistenceWarning { get; set; }
+}
+
+public class AiPersistenceWarning
+{
+    public string Code { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public object? PersistenceStatus { get; set; }
 }
 
 public static class AiTurnIntents

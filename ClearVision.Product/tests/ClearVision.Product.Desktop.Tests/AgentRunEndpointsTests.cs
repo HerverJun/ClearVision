@@ -467,6 +467,78 @@ public sealed class AgentRunEndpointsTests
         session.WorkspaceSnapshot.PendingPlanSnapshot!.MetadataOnly.Should().BeTrue();
     }
 
+    [Fact(DisplayName = "POST PlanRun primary persistence failure returns 503 before planner executes")]
+    public async Task CreatePlanRun_PrimaryPersistenceFailure_ShouldFailRunAndNotExecutePlanner()
+    {
+        var plannerCalled = false;
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, baseline, _) =>
+        {
+            plannerCalled = true;
+            return Task.FromResult(baseline);
+        });
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "detect scratches on metal",
+            OriginalUserPrompt = "detect scratches on metal",
+            SessionId = "session-plan-primary-fail"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("session_persistence_failed");
+        root.GetProperty("publicMessage").GetString().Should().Contain("模型规划未启动");
+        var runId = root.GetProperty("runId").GetString()!;
+        root.GetProperty("events").EnumerateArray()
+            .Should()
+            .Contain(evt => evt.GetProperty("eventType").GetString() == AgentRunEventTypes.RunFailed);
+        JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("session_persistence_failed");
+        plannerCalled.Should().BeFalse();
+        host.StreamService.Replay(runId)!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
+        host.ConversationService.GetSession("session-plan-primary-fail").Should().BeNull();
+    }
+
+    [Fact(DisplayName = "PlanRun terminal persistence failure emits explicit warning")]
+    public async Task CreatePlanRun_TerminalPersistenceFailure_ShouldEmitWarning()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: async (_, baseline, ct) =>
+        {
+            await gate.Task.WaitAsync(ct);
+            return baseline with { PlanSource = "planner", FallbackReason = string.Empty };
+        });
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "detect scratches on metal",
+            OriginalUserPrompt = "detect scratches on metal",
+            SessionId = "session-plan-terminal-fail"
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = createDoc.RootElement.GetProperty("runId").GetString()!;
+
+        await host.WaitForEventAsync(runId, AgentRunEventTypes.PlanModelStarted);
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () => throw new IOException("terminal primary failed");
+        gate.SetResult();
+        await host.WaitForTerminalAsync(runId);
+
+        var replay = host.StreamService.Replay(runId)!;
+        replay.Events.Should().Contain(evt =>
+            evt.Stage == "workspace_persistence" &&
+            evt.Status == AgentRunEventStatuses.Warning);
+        var completed = replay.Events.Last(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+        var completedJson = JsonSerializer.Serialize(completed, AgentRunEventJson.Options);
+        completedJson.Should().Contain("\"persistenceWarning\"");
+        completedJson.Should().Contain("primary_store_save_failed");
+        host.ConversationService.GetSession("session-plan-terminal-fail")!
+            .WorkspaceSnapshot!
+            .PlanRunStatus
+            .Should().Be(AgentRunEventStatuses.Running);
+    }
+
     [Fact(DisplayName = "Plan run timeout emits timeout and fallback before completed PlanResult")]
     public async Task CreatePlanRun_ShouldEmitTimeoutFallbackBeforeCompleted()
     {
@@ -996,6 +1068,60 @@ public sealed class AgentRunEndpointsTests
         JsonSerializer.Serialize(root.GetProperty("events")).Should().Contain("workspace_revision_required");
         host.Generation.LastCommand.Should().BeNull();
         host.ConversationService.GetSession("session-build-missing-revision")!
+            .WorkspaceSnapshot!
+            .BuildRunId
+            .Should().BeNull();
+    }
+
+    [Fact(DisplayName = "POST AgentRun BuildFromPlan missing revision is blocked when workspace is created concurrently")]
+    public async Task CreateRun_BuildFromPlanConcurrentWorkspaceCreationWithoutRevision_ShouldNotStartBackgroundRun()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+        var sessionId = "session-build-concurrent-missing-revision";
+        var updateEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseUpdate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstWrite = 1;
+        host.ConcreteConversationService.PrimaryStoreWriteFaultInjector = () =>
+        {
+            if (Interlocked.Exchange(ref firstWrite, 0) != 1)
+            {
+                return;
+            }
+
+            updateEntered.SetResult();
+            releaseUpdate.Task.GetAwaiter().GetResult();
+        };
+
+        var workspaceTask = Task.Run(() => host.ConversationService.TryUpdateWorkspaceSnapshot(
+            sessionId,
+            new VisionAgentWorkspaceSnapshotUpdate
+            {
+                LifecycleState = "plan_ready",
+                RequirementMode = AiRequirementModes.Strict
+            }));
+        await updateEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var buildTask = host.Client.PostAsJsonAsync("/api/ai/agent-runs", new AgentRunCreateRequest
+        {
+            Description = "Build from concurrently persisted plan without revision",
+            SessionId = sessionId,
+            Mode = "new",
+            UseVisionAgentGenerateFlow = true,
+            BuildFromPlan = BuildableAgentRunBuildFromPlanRequest()
+        });
+        releaseUpdate.SetResult();
+        var initial = await workspaceTask.WaitAsync(TimeSpan.FromSeconds(5));
+        using var response = await buildTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        initial.Success.Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        root.GetProperty("errorCode").GetString().Should().Be("workspace_revision_required");
+        root.GetProperty("workspaceSnapshot").GetProperty("revision").GetInt64()
+            .Should().Be(initial.Revision);
+        host.Generation.LastCommand.Should().BeNull();
+        host.ConversationService.GetSession(sessionId)!
             .WorkspaceSnapshot!
             .BuildRunId
             .Should().BeNull();

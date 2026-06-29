@@ -946,6 +946,10 @@ export class AiPanel {
                 } else {
                     this._setResultStatusNote('', '');
                 }
+                const persistenceWarning = this._getPersistenceWarning?.(payload);
+                if (persistenceWarning) {
+                    this._setResultStatusNote(persistenceWarning.message || '结果已生成，但本次会话尚未成功保存。', 'warning');
+                }
 
                 if (this.sessionId) {
                     this._addToHistory({
@@ -982,6 +986,10 @@ export class AiPanel {
                 this._setResultStatusNote('本轮修改失败，右侧仍显示上一版可应用方案。', 'warning');
             } else {
                 this._setResultStatusNote('', '');
+            }
+            const persistenceWarning = this._getPersistenceWarning?.(payload);
+            if (persistenceWarning) {
+                this._setResultStatusNote(persistenceWarning.message || '结果已生成，但本次会话尚未成功保存。', 'warning');
             }
 
             this.activeAssistantTurn = null;
@@ -1029,7 +1037,12 @@ export class AiPanel {
         }
         const turnIntent = this._getTurnIntent(payload);
         this._setAssistantTurnStatus(activeTurn, turnIntent === 'modify_flow' ? '微调完成' : '生成成功', 'success');
-        this._setResultStatusNote(turnIntent === 'modify_flow' ? '已基于当前工程完成微调。' : '', turnIntent === 'modify_flow' ? 'info' : '');
+        const persistenceWarning = this._getPersistenceWarning?.(payload);
+        if (persistenceWarning) {
+            this._setResultStatusNote(persistenceWarning.message || '结果已生成，但本次会话尚未成功保存。', 'warning');
+        } else {
+            this._setResultStatusNote(turnIntent === 'modify_flow' ? '已基于当前工程完成微调。' : '', turnIntent === 'modify_flow' ? 'info' : '');
+        }
         this._displayResult(payload, {
             appendChatMessage: false,
             assistantTurn: activeTurn
@@ -2172,6 +2185,15 @@ export class AiPanel {
     _clearActiveRequestState() {
         this.activeGenerateRequestId = null;
         this.activeGenerateSessionId = null;
+    }
+
+    _getPersistenceWarning(payload = null) {
+        const warning = payload?.persistenceWarning || payload?.PersistenceWarning || null;
+        if (!warning || typeof warning !== 'object') return null;
+        return {
+            code: String(warning.code || warning.Code || 'session_persistence_failed'),
+            message: String(warning.message || warning.Message || '结果已生成，但本次会话尚未成功保存。')
+        };
     }
     
     _clearResultPane() {

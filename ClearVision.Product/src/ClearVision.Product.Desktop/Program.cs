@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Security.Principal;
 using System.Text;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Desktop.Configuration;
@@ -156,22 +155,29 @@ static class Program
         string storePath,
         string? userName = null)
     {
-        var effectiveUser = string.IsNullOrWhiteSpace(userName)
-            ? WindowsIdentity.GetCurrent().Name
-            : userName.Trim();
         var normalizedStorePath = Path.GetFullPath(storePath.Trim());
-        var source = $"{effectiveUser}|{normalizedStorePath}".ToUpperInvariant();
+        var source = normalizedStorePath.ToUpperInvariant();
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source))).ToLowerInvariant();
         return $"Global\\ClearVision.Desktop.StoreLease.{hash}";
     }
 
     private static bool TryAcquireSingleInstanceMutex(out IReadOnlyList<Mutex> mutexes)
     {
-        var leaseNames = new[]
-        {
-            BuildStoreLeaseMutexName("conversation", ConversationalFlowService.ResolveStoragePath()),
-            BuildStoreLeaseMutexName("agent-run", AgentRunEventStore.GetDefaultDirectory())
-        }
+        return TryAcquireStoreLeaseMutexes(
+            [
+                ConversationalFlowService.ResolveStoragePath(),
+                AgentRunEventStore.GetDefaultDirectory()
+            ],
+            out mutexes);
+    }
+
+    internal static bool TryAcquireStoreLeaseMutexes(
+        IEnumerable<string> storePaths,
+        out IReadOnlyList<Mutex> mutexes)
+    {
+        var leaseNames = storePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => BuildStoreLeaseMutexName("store", path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(item => item, StringComparer.Ordinal)
             .ToList();
@@ -193,6 +199,11 @@ static class Program
 
         mutexes = acquired;
         return true;
+    }
+
+    internal static void ReleaseStoreLeaseMutexes(IEnumerable<Mutex> leases)
+    {
+        ReleaseSingleInstanceLeases(leases);
     }
 
     private static void ReleaseSingleInstanceMutex()
