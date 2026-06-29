@@ -612,6 +612,11 @@ public static class AgentRunEndpoints
 
             if (cancellationToken.IsCancellationRequested)
             {
+                if (IsRunTerminal(streamService, runId))
+                {
+                    return;
+                }
+
                 var cancelledEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCancelled, "plan",
                     "规划已取消", "规划已取消，未发布完成结果。", AgentRunEventStatuses.Cancelled, new
                     {
@@ -697,6 +702,11 @@ public static class AgentRunEndpoints
         }
         catch (OperationCanceledException)
         {
+            if (IsRunTerminal(streamService, runId))
+            {
+                return;
+            }
+
             var cancelledEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCancelled, "plan",
                 "规划已取消", "规划已取消，未发布完成结果。", AgentRunEventStatuses.Cancelled, new
                 {
@@ -1401,6 +1411,14 @@ public static class AgentRunEndpoints
         }
 
         return false;
+    }
+
+    private static bool IsRunTerminal(IAgentRunEventStreamService streamService, string runId)
+    {
+        var status = streamService.Replay(runId)?.Summary.Status;
+        return string.Equals(status, AgentRunEventStatuses.Completed, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(status, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(status, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? TryResolvePlanRunSessionId(AgentRunReplayResult replay) =>

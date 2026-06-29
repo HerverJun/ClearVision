@@ -155,12 +155,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
     public AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.", object? payload = null)
     {
-        if (!string.IsNullOrWhiteSpace(runId))
-        {
-            TryCancelToken(runId);
-        }
-
-        return AppendTerminal(runId, new AgentRunEventDraft
+        var terminal = AppendTerminal(runId, new AgentRunEventDraft
         {
             EventType = AgentRunEventTypes.RunCancelled,
             Stage = "run",
@@ -171,6 +166,13 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                 payload,
                 "Submit the request again when you are ready to continue.")
         });
+
+        if (!string.IsNullOrWhiteSpace(runId))
+        {
+            TryCancelToken(runId);
+        }
+
+        return terminal;
     }
 
     public AgentRunEventSubscription? Subscribe(string runId, long afterSequence)
