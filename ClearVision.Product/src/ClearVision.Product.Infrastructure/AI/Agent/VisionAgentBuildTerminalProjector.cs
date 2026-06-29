@@ -144,6 +144,27 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
                 flowJson,
                 flowJson,
                 payload);
+            _conversationalFlowService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+            {
+                LifecycleState = result.Success
+                    ? "build_completed"
+                    : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
+                        ? "build_cancelled"
+                        : "build_failed"),
+                PendingPlanSnapshot = projection.Request.BuildFromPlan?.PlanSnapshot,
+                PlanQuestionSelections = projection.Request.BuildFromPlan?.UserSelections,
+                ConfirmedPlanAnswers = projection.Request.BuildFromPlan?.ConfirmedAnswers,
+                RequirementMode = projection.Request.RequirementMode,
+                PlanAcceptedRecommendedDefaults = projection.Request.BuildFromPlan?.AcceptedRecommendedDefaults,
+                BuildRunId = runId,
+                BuildRunStatus = result.Success
+                    ? AgentRunEventStatuses.Completed
+                    : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
+                        ? AgentRunEventStatuses.Cancelled
+                        : AgentRunEventStatuses.Failed),
+                BuildTerminalSequence = terminal.Sequence,
+                SubmittedBuildFingerprint = FirstNonBlank(result.AnswerSetFingerprint, result.PlanHash, projection.Request.BuildFromPlan?.PlanHash)
+            });
             _journal.MarkProjected(
                 runId,
                 session.SessionId,

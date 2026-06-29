@@ -5353,28 +5353,45 @@ body:has(#ai-view:not(.hidden)) .cv-toast-info {
 .ai-agent-stage-strip {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
 }
 
-.ai-agent-stage-strip span {
+.ai-agent-stage-strip button {
     border: 1px solid var(--ai-border);
-    border-radius: 999px;
+    border-radius: 8px;
     background: var(--ai-surface-pane);
     color: var(--ai-text-muted);
     font-size: 11px;
     font-weight: 700;
     text-align: center;
     padding: 5px 8px;
+    cursor: pointer;
+    min-width: 0;
 }
 
-.ai-agent-stage-strip span.is-active {
+.ai-agent-stage-strip button small {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 600;
+    color: inherit;
+    opacity: 0.82;
+}
+
+.ai-agent-stage-strip button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.ai-agent-stage-strip button.is-selected {
     color: #ffffff;
     border-color: var(--ai-accent-strong);
     background: var(--ai-accent-strong);
 }
 
-.ai-agent-stage-strip span.is-completed {
+.ai-agent-stage-strip button.is-active:not(.is-selected),
+.ai-agent-stage-strip button.is-completed:not(.is-selected) {
     color: var(--ai-accent-strong);
     border-color: rgba(184, 154, 117, 0.35);
 }

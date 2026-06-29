@@ -464,10 +464,65 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+        this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { persist: false, render: false });
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun();
         this._updatePlanBuildActionState();
+    },
+
+    _loadWorkspaceViewMode() {
+        try {
+            return this._normalizeWorkspaceViewMode(localStorage.getItem(this.workspaceViewStorageKey));
+        } catch {
+            return AgentWorkspaceModes.PLAN;
+        }
+    },
+
+    _saveWorkspaceViewMode(mode) {
+        try {
+            localStorage.setItem(this.workspaceViewStorageKey, this._normalizeWorkspaceViewMode(mode));
+        } catch {
+            // ignore localStorage failures
+        }
+    },
+
+    _normalizeWorkspaceViewMode(mode) {
+        const normalized = String(mode || '').trim().toLowerCase();
+        return normalized === AgentWorkspaceModes.BUILD ? AgentWorkspaceModes.BUILD : AgentWorkspaceModes.PLAN;
+    },
+
+    _canViewPlanWorkspace() {
+        return Boolean(this.pendingVisionPlan || this.activePlanRunId || this.activePlanRunEvents?.length);
+    },
+
+    _canViewBuildWorkspace() {
+        return Boolean(this.activeAgentRunId || this.activeAgentRunEvents?.length || this.currentResult?.buildResult || this.currentResult?.BuildResult);
+    },
+
+    _getWorkspaceViewMode() {
+        const requested = this._normalizeWorkspaceViewMode(this.workspaceViewMode);
+        if (requested === AgentWorkspaceModes.BUILD && !this._canViewBuildWorkspace()) {
+            return AgentWorkspaceModes.PLAN;
+        }
+        return requested;
+    },
+
+    _setWorkspaceViewMode(mode, { persist = true, render = true } = {}) {
+        const requested = this._normalizeWorkspaceViewMode(mode);
+        this.workspaceViewMode = requested === AgentWorkspaceModes.BUILD && !this._canViewBuildWorkspace()
+            ? AgentWorkspaceModes.PLAN
+            : requested;
+
+        if (persist) {
+            this._saveWorkspaceViewMode(this.workspaceViewMode);
+        }
+
+        if (render) {
+            this._renderAgentWorkspaceOverview();
+            this._renderPlanWorkspace(this.pendingVisionPlan);
+            this._renderBuildWorkspaceFromAgentRun();
+        }
     },
 
     _clearPlanQuestionAnswers() {
@@ -937,6 +992,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this.activeIntentRouterRequestId = routerRequestId;
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+        this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
         this.pendingClarificationPayload = null;
         this.activePlanRequestId = null;
         this.activePlanRunId = null;
@@ -1196,6 +1252,7 @@ export const aiPanelAgentWorkspaceMixin = {
                 this.pendingClarificationPayload = null;
                 this._refreshPlanEffectiveBuildReadiness?.(this.pendingVisionPlan);
                 this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+                this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
                 this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
                 this._setResultStatusNote(route.publicReason || 'Plan answers are still required before build.', 'warning');
                 this._setGeneratingState?.(false);
@@ -1602,6 +1659,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
         this.lastUserPrompt = String(userMessage || normalizedDescription).trim();
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+        this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
         this.pendingClarificationPayload = null;
         if (clearPendingPlan) {
             this.pendingVisionPlan = null;
@@ -4258,6 +4316,7 @@ export const aiPanelAgentWorkspaceMixin = {
         }
         const mode = this._formatWorkspaceModeLabel();
         const phase = this._getAgentWorkspacePhase();
+        const viewMode = this._getWorkspaceViewMode();
         const activeEvents = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
         const planEvents = Array.isArray(plan?.publicEvents) ? plan.publicEvents : [];
         const planRunEvents = Array.isArray(this.activePlanRunEvents) ? this.activePlanRunEvents : [];
@@ -4265,7 +4324,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const terminal = activeEvents.find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(evt.eventType));
         const lastEvent = activeEvents[activeEvents.length - 1];
         const blockerCount = this._countBuildBlockers(activeEvents);
-        const showBuildExecutionPath = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD || activeEvents.length > 0;
+        const showBuildExecutionPath = phase === AgentWorkspaceModes.BUILD || activeEvents.length > 0;
         const executionPath = showBuildExecutionPath
             ? this._getBuildExecutionPath(activeEvents)
             : { modeLabel: '', enteredLabel: '', reasonLabel: '' };
@@ -4273,13 +4332,13 @@ export const aiPanelAgentWorkspaceMixin = {
         const confidence = this._formatWorkspaceValue(plan?.confidence || (activeEvents.length || planRunEvents.length ? '事件驱动' : '未设置'));
         const nextAction = terminal
             ? (terminal.eventType === 'run.completed' ? '复核流程草稿，可应用到画布继续编辑。' : '查看首要修复建议后重试构建。')
-            : this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
+            : phase === AgentWorkspaceModes.BUILD
                 ? (lastEvent?.summary || '等待下一条后端公开事件。')
                 : (plan?.nextAction || planProgress.currentLabel || '规划模式只提出高价值工程问题。');
-        const executable = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
+        const executable = phase === AgentWorkspaceModes.BUILD
             ? activeEvents.length > 0
             : Boolean(plan?.executable);
-        const canPlan = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD
+        const canPlan = phase === AgentWorkspaceModes.BUILD
             ? true
             : Boolean(plan?.canPlan || plan?.requirementMaturity?.canPlan);
         const source = this._formatWorkspaceValue(plan?.planSource || (activeEvents.length ? '构建事件' : (planRunEvents.length ? '事件驱动' : '未设置')));
@@ -4302,15 +4361,52 @@ export const aiPanelAgentWorkspaceMixin = {
                     <span><small>事件数</small><b>${this._escapeHtml(String(activeEvents.length || planRunEvents.length || planEvents.length))}</b></span>
                 </div>
                 ${executionPath.reasonLabel ? `<div class="ai-build-note"><strong>路径原因</strong>${this._escapeHtml(executionPath.reasonLabel)}</div>` : ''}
-                <div class="ai-agent-stage-strip" aria-label="Vision Agent 阶段">
-                    ${['plan', 'build', 'applied'].map(key => `
-                        <span class="${key === phase ? 'is-active' : ''} ${this._isWorkspacePhaseCompleted(key, phase) ? 'is-completed' : ''}">
-                            ${key === 'plan' ? 'Plan 规划' : key === 'build' ? 'Build 审计' : 'Applied 复核'}
-                        </span>
-                    `).join('')}
+                <div class="ai-agent-stage-strip" role="tablist" aria-label="Vision Agent 工作台视图">
+                    ${[AgentWorkspaceModes.PLAN, AgentWorkspaceModes.BUILD].map(key => {
+                        const disabled = key === AgentWorkspaceModes.PLAN
+                            ? !this._canViewPlanWorkspace()
+                            : !this._canViewBuildWorkspace();
+                        const statusLabel = key === AgentWorkspaceModes.BUILD
+                            ? this._getBuildViewStatusLabel(activeEvents)
+                            : this._getPlanViewStatusLabel(planRunEvents);
+                        return `
+                            <button type="button"
+                                role="tab"
+                                data-workspace-view-mode="${key}"
+                                aria-selected="${key === viewMode ? 'true' : 'false'}"
+                                ${disabled ? 'disabled aria-disabled="true"' : ''}
+                                class="${key === phase ? 'is-active' : ''} ${key === viewMode ? 'is-selected' : ''} ${this._isWorkspacePhaseCompleted(key, phase) ? 'is-completed' : ''}">
+                                <span>${key === AgentWorkspaceModes.PLAN ? 'Plan 规划' : 'Build 审计'}</span>
+                                <small>${this._escapeHtml(statusLabel)}</small>
+                            </button>
+                        `;
+                    }).join('')}
                 </div>
             </section>
         `;
+        el.querySelectorAll('[data-workspace-view-mode]').forEach(button => {
+            button.addEventListener('click', () => {
+                this._setWorkspaceViewMode(button.getAttribute('data-workspace-view-mode'));
+            });
+        });
+    },
+
+    _getPlanViewStatusLabel(events = []) {
+        if (this.activePlanRunCompletion) return '运行中';
+        if ((Array.isArray(events) ? events : []).some(evt => String(evt?.eventType || '').includes('failed'))) return '失败';
+        if ((Array.isArray(events) ? events : []).length || this.pendingVisionPlan) return '可查看';
+        return '暂无';
+    },
+
+    _getBuildViewStatusLabel(events = []) {
+        const terminal = [...(Array.isArray(events) ? events : [])].reverse()
+            .find(evt => ['run.completed', 'run.failed', 'run.cancelled'].includes(String(evt?.eventType || '')));
+        if (terminal?.eventType === 'run.completed') return '已完成';
+        if (terminal?.eventType === 'run.failed') return '失败';
+        if (terminal?.eventType === 'run.cancelled') return '已取消';
+        if (this.activeAgentRunId || (Array.isArray(events) && events.length)) return '运行中';
+        if (this.currentResult?.buildResult || this.currentResult?.BuildResult) return '可查看';
+        return '暂无';
     },
 
     _getBuildExecutionPath(events = []) {
@@ -4391,7 +4487,11 @@ export const aiPanelAgentWorkspaceMixin = {
     _formatWorkspaceModeLabel() {
         if (this.workbenchState === AiWorkbenchStates.APPLIED) return '已应用';
         if (this.workbenchState === AiWorkbenchStates.READY_TO_APPLY) return '可应用';
-        return this.agentWorkspaceMode === AgentWorkspaceModes.BUILD ? '构建模式' : '规划模式';
+        const phase = this._getAgentWorkspacePhase();
+        const view = this._getWorkspaceViewMode();
+        const phaseLabel = phase === AgentWorkspaceModes.BUILD ? '构建运行' : '规划阶段';
+        const viewLabel = view === AgentWorkspaceModes.BUILD ? '查看 Build' : '查看 Plan';
+        return `${phaseLabel} / ${viewLabel}`;
     },
 
     _formatWorkspaceValue(value) {
@@ -4497,7 +4597,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const el = this.container?.querySelector('#ai-plan-workspace');
         if (!el) return;
 
-        el.hidden = this.agentWorkspaceMode === AgentWorkspaceModes.BUILD;
+        el.hidden = this._getWorkspaceViewMode() !== AgentWorkspaceModes.PLAN;
         if (!plan) {
             const progress = this._getPlanRunProgressState?.();
             const liveStatus = progress?.eventCount > 0
@@ -4963,6 +5063,7 @@ export const aiPanelAgentWorkspaceMixin = {
 
         if (!this.pendingVisionPlan) {
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
             this._addMessage?.('system', '请先完成规划，再开始构建。');
             this._setResultStatusNote?.('请先完成规划，再开始构建。', 'warning');
             this._renderAgentWorkspaceOverview();
@@ -4976,6 +5077,7 @@ export const aiPanelAgentWorkspaceMixin = {
         if (acceptedRecommended) {
             const changed = this._acceptRecommendedPlanAnswers(plan);
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
             this._setResultStatusNote?.(
                 changed ? '已接受推荐方案，正在校验构建条件…' : '正在校验构建条件…',
                 'info'
@@ -4992,6 +5094,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const actionState = this._getPlanBuildActionState(plan);
         if (actionState.canStart !== true) {
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
             const readinessReason = actionState.statusText || this._getPlanBuildBlockedReason(plan);
             if (!this._getCurrentCanonicalPreview?.(plan) &&
                 plan.previewState !== 'validating' &&
@@ -5010,6 +5113,7 @@ export const aiPanelAgentWorkspaceMixin = {
         this.activePlanRequestId = null;
         const buildFromPlan = this._buildStructuredBuildFromPlanRequest(plan, { acceptedRecommended: false });
         this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
+        this._setWorkspaceViewMode?.(AgentWorkspaceModes.BUILD, { render: false });
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(plan);
         this._renderBuildWorkspaceFromAgentRun();
@@ -5193,7 +5297,7 @@ export const aiPanelAgentWorkspaceMixin = {
         const finalDraft = this.container?.querySelector('#ai-build-final-draft');
         if (!el) return;
 
-        el.hidden = this.agentWorkspaceMode !== AgentWorkspaceModes.BUILD;
+        el.hidden = this._getWorkspaceViewMode() !== AgentWorkspaceModes.BUILD;
         const events = Array.isArray(this.activeAgentRunEvents) ? this.activeAgentRunEvents : [];
         if (!events.length) {
             if (timeline) {

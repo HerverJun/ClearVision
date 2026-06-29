@@ -305,6 +305,83 @@ public class ConversationalFlowServiceTests : IDisposable
         assistantTurn.Payload.RequirementBrief!.ScenarioName.Should().Be("缺陷检测");
     }
 
+    [Fact]
+    public void UpdateWorkspaceSnapshot_ShouldPersistPlanAndRunIdsAcrossRestart()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+
+        var session = service.UpdateWorkspaceSnapshot("workspace-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready",
+            PlanRunId = "plan-run-1",
+            PlanRunStatus = "completed",
+            RequirementMode = AiRequirementModes.Draft,
+            PlanQuestionSelections = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["defect_definition"] = "defer"
+            },
+            ConfirmedPlanAnswers =
+            [
+                new VisionAgentPlanAnswer
+                {
+                    QuestionId = "image_source",
+                    Field = "image_source",
+                    Value = "camera",
+                    Origin = VisionAgentPlanAnswerOrigins.ExplicitUserSelection
+                }
+            ],
+            PendingPlanSnapshot = new VisionAgentPlanModeResult
+            {
+                PlanId = "plan-1",
+                PlanHash = "sha256:plan",
+                Goal = "Detect scratches",
+                CanBuild = true
+            },
+            UserTurnId = "plan:plan-run-1:user",
+            UserMessage = "Detect scratches"
+        });
+
+        session.WorkspaceSnapshot.Should().NotBeNull();
+        session.WorkspaceSnapshot!.Revision.Should().Be(1);
+
+        var reloaded = new ConversationalFlowService(_tempRoot).GetSession("workspace-session");
+
+        reloaded.Should().NotBeNull();
+        reloaded!.History.Should().ContainSingle(turn => turn.TurnId == "plan:plan-run-1:user");
+        reloaded.WorkspaceSnapshot.Should().NotBeNull();
+        reloaded.WorkspaceSnapshot!.PlanRunId.Should().Be("plan-run-1");
+        reloaded.WorkspaceSnapshot.RequirementMode.Should().Be(AiRequirementModes.Draft);
+        reloaded.WorkspaceSnapshot.PlanQuestionSelections.Should().ContainKey("defect_definition");
+        reloaded.WorkspaceSnapshot.PlanQuestionSelections["defect_definition"].Should().Be("defer");
+        reloaded.WorkspaceSnapshot.ConfirmedPlanAnswers.Should().ContainSingle(answer => answer.Field == "image_source");
+        reloaded.WorkspaceSnapshot.PendingPlanSnapshot!.PlanId.Should().Be("plan-1");
+    }
+
+    [Fact]
+    public void LoadSessionsFromStore_WhenMainFileIsCorrupt_ShouldRecoverLastGood()
+    {
+        var service = new ConversationalFlowService(_tempRoot);
+        service.UpdateWorkspaceSnapshot("recover-session", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "plan_ready",
+            PlanRunId = "plan-recover",
+            UserTurnId = "plan:plan-recover:user",
+            UserMessage = "recover me"
+        });
+
+        var storePath = Path.Combine(_tempRoot, "conversation_sessions.json");
+        File.WriteAllText(storePath, "{ this is not json");
+
+        var reloaded = new ConversationalFlowService(_tempRoot);
+        var session = reloaded.GetSession("recover-session");
+
+        session.Should().NotBeNull();
+        session!.WorkspaceSnapshot!.PlanRunId.Should().Be("plan-recover");
+        Directory.EnumerateFiles(_tempRoot, "conversation_sessions.json.corrupt-*")
+            .Should()
+            .ContainSingle();
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempRoot))

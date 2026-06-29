@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI;
 using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 using Microsoft.AspNetCore.Builder;
@@ -113,6 +114,7 @@ public static class AgentRunEndpoints
         VisionAgentPlanModeRequest request,
         HttpContext context,
         IAgentRunEventStreamService streamService,
+        IConversationalFlowService conversationService,
         IServiceScopeFactory scopeFactory,
         ILoggerFactory loggerFactory)
     {
@@ -124,21 +126,36 @@ public static class AgentRunEndpoints
             }));
         }
 
+        var session = conversationService.GetOrCreateSession(request.SessionId);
+        request = request with { SessionId = session.SessionId };
+
         var ownerHash = ResolveCurrentOwnerHash(context);
         var createResult = streamService.CreateRun(
             request.Description,
             BuildPlanCreatePayload(request),
             ownerHash);
+        conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            LifecycleState = "planning",
+            PlanRunId = createResult.RunId,
+            PlanRunStatus = AgentRunEventStatuses.Running,
+            RequirementMode = request.RequirementMode,
+            ConfirmedPlanAnswers = request.ConfirmedPlanAnswers,
+            UserTurnId = $"plan:{createResult.RunId}:user",
+            UserMessage = request.Description
+        });
 
         AppendPlanEvent(streamService, createResult.RunId, AgentRunEventTypes.PlanCreated, "plan", "规划已创建",
             "已创建 Plan Run，公开进度将通过事件流更新。", AgentRunEventStatuses.Completed, new
             {
+                sessionId = session.SessionId,
                 mode = "plan",
                 metadataOnly = true
             });
         AppendPlanEvent(streamService, createResult.RunId, AgentRunEventTypes.PlanStarted, "plan", "规划已启动",
             "正在进入规划阶段。", AgentRunEventStatuses.Running, new
             {
+                sessionId = session.SessionId,
                 mode = "plan",
                 metadataOnly = true
             });
@@ -156,6 +173,7 @@ public static class AgentRunEndpoints
         return Task.FromResult<IResult>(Results.Ok(new
         {
             runId = createResult.RunId,
+            sessionId = session.SessionId,
             brief = createResult.Brief,
             events = replay?.Events ?? createResult.Events
         }));
@@ -165,6 +183,7 @@ public static class AgentRunEndpoints
         AgentRunCreateRequest request,
         HttpContext context,
         IAgentRunEventStreamService streamService,
+        IConversationalFlowService conversationService,
         IServiceScopeFactory scopeFactory,
         ILoggerFactory loggerFactory)
     {
@@ -176,11 +195,30 @@ public static class AgentRunEndpoints
             }));
         }
 
+        var session = conversationService.GetOrCreateSession(request.SessionId);
+        request = request with { SessionId = session.SessionId };
+
         var ownerHash = ResolveCurrentOwnerHash(context);
         var createResult = streamService.CreateRun(
             request.Description,
             BuildCreatePayload(request),
             ownerHash);
+        if (request.BuildFromPlan != null)
+        {
+            conversationService.UpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+            {
+                LifecycleState = "building",
+                BuildRunId = createResult.RunId,
+                BuildRunStatus = AgentRunEventStatuses.Running,
+                PlanRunStatus = AgentRunEventStatuses.Completed,
+                PendingPlanSnapshot = request.BuildFromPlan.PlanSnapshot,
+                PlanQuestionSelections = request.BuildFromPlan.UserSelections,
+                ConfirmedPlanAnswers = request.BuildFromPlan.ConfirmedAnswers,
+                RequirementMode = request.RequirementMode,
+                PlanAcceptedRecommendedDefaults = request.BuildFromPlan.AcceptedRecommendedDefaults,
+                SubmittedBuildFingerprint = ComputeSubmittedBuildFingerprint(request)
+            });
+        }
         _ = Task.Run(async () =>
         {
             await RunGenerateFlowAsync(
@@ -193,6 +231,7 @@ public static class AgentRunEndpoints
         return Task.FromResult<IResult>(Results.Ok(new
         {
             runId = createResult.RunId,
+            sessionId = session.SessionId,
             brief = createResult.Brief,
             events = createResult.Events
         }));
@@ -350,6 +389,7 @@ public static class AgentRunEndpoints
         using var scope = scopeFactory.CreateScope();
         var streamService = scope.ServiceProvider.GetRequiredService<IAgentRunEventStreamService>();
         var orchestrator = scope.ServiceProvider.GetRequiredService<IVisionAgentOrchestrator>();
+        var conversationService = scope.ServiceProvider.GetRequiredService<IConversationalFlowService>();
         var cancellationToken = streamService.GetCancellationToken(runId);
         var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -390,30 +430,69 @@ public static class AgentRunEndpoints
 
             EmitPlanResultEvents(streamService, runId, result, emitted);
 
-            var completedPayload = BuildPlanCompletedPayload(result);
-            AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCompleted, "plan_ready",
+            var completedPayload = BuildPlanCompletedPayload(result, request.SessionId, runId);
+            var completedEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCompleted, "plan_ready",
                 "规划已就绪", BuildPlanCompletionSummary(result), AgentRunEventStatuses.Completed, completedPayload);
+            if (!string.IsNullOrWhiteSpace(request.SessionId))
+            {
+                conversationService.UpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                {
+                    LifecycleState = result.CanBuild ? "plan_ready" : "plan_blocked",
+                    PendingPlanSnapshot = BuildReplaySafePlanResult(result),
+                    PlanRunId = runId,
+                    PlanRunStatus = AgentRunEventStatuses.Completed,
+                    PlanTerminalSequence = completedEvent?.Sequence,
+                    RequirementMode = request.RequirementMode,
+                    ConfirmedPlanAnswers = result.ConfirmedPlanAnswers.Count > 0
+                        ? result.ConfirmedPlanAnswers
+                        : request.ConfirmedPlanAnswers
+                });
+            }
 
             streamService.Complete(runId, BuildPlanCompletionSummary(result), completedPayload);
         }
         catch (OperationCanceledException)
         {
-            EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.PlanCancelled, "plan",
+            var cancelledEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCancelled, "plan",
                 "规划已取消", "规划已取消，未发布完成结果。", AgentRunEventStatuses.Cancelled, new
                 {
+                    sessionId = request.SessionId,
                     metadataOnly = true
                 });
+            if (!string.IsNullOrWhiteSpace(request.SessionId))
+            {
+                conversationService.UpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                {
+                    LifecycleState = "plan_cancelled",
+                    PlanRunId = runId,
+                    PlanRunStatus = AgentRunEventStatuses.Cancelled,
+                    PlanTerminalSequence = cancelledEvent?.Sequence,
+                    RequirementMode = request.RequirementMode
+                });
+            }
             streamService.Cancel(runId, "规划已取消。");
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "AgentRun PlanMode background task failed. RunId={RunId}", runId);
-            EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.PlanFailed, "plan",
+            var failedEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanFailed, "plan",
                 "规划失败", "规划在完成前失败，请检查公开诊断后重试。", AgentRunEventStatuses.Failed, new
                 {
+                    sessionId = request.SessionId,
                     error = ex.Message,
                     metadataOnly = true
                 });
+            if (!string.IsNullOrWhiteSpace(request.SessionId))
+            {
+                conversationService.UpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                {
+                    LifecycleState = "plan_failed",
+                    PlanRunId = runId,
+                    PlanRunStatus = AgentRunEventStatuses.Failed,
+                    PlanTerminalSequence = failedEvent?.Sequence,
+                    RequirementMode = request.RequirementMode
+                });
+            }
             streamService.Fail(
                 runId,
                 "规划在完成前失败。",
@@ -468,6 +547,7 @@ public static class AgentRunEndpoints
         return new
         {
             mode = "plan",
+            sessionId = request.SessionId,
             hasCurrentFlowSnapshot = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
             hasCurrentResultSnapshot = !string.IsNullOrWhiteSpace(request.CurrentResultSnapshot),
             attachmentCount = request.AttachmentSummary.Count,
@@ -483,6 +563,7 @@ public static class AgentRunEndpoints
         return new
         {
             hasCurrentFlow = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),
+            sessionId = request.SessionId,
             hasCurrentResult = !string.IsNullOrWhiteSpace(request.CurrentResultSnapshot),
             attachmentCount = request.AttachmentSummary.Count,
             templateSelectionMode = request.TemplateSelection?.Mode ?? string.Empty,
@@ -500,13 +581,18 @@ public static class AgentRunEndpoints
         };
     }
 
-    private static object BuildPlanCompletedPayload(VisionAgentPlanModeResult result)
+    private static object BuildPlanCompletedPayload(
+        VisionAgentPlanModeResult result,
+        string? sessionId,
+        string runId)
     {
         var replaySafePlan = BuildReplaySafePlanResult(result);
         return new
         {
             status = "plan_completed",
             generationMode = "plan",
+            sessionId,
+            planRunId = runId,
             planSource = replaySafePlan.PlanSource,
             fallbackReason = replaySafePlan.FallbackReason,
             plannerFailureStage = replaySafePlan.PlannerFailureStage,
@@ -1001,6 +1087,23 @@ public static class AgentRunEndpoints
 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"agent-run-owner:{userId.Trim()}"));
         return "usr_" + Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    private static string ComputeSubmittedBuildFingerprint(AgentRunCreateRequest request)
+    {
+        var source = new
+        {
+            request.BuildFromPlan?.PlanId,
+            planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash,
+            request.RequirementMode,
+            request.BuildFromPlan?.AcceptedRecommendedDefaults,
+            request.BuildFromPlan?.AcceptedDefaults,
+            request.BuildFromPlan?.ConfirmedAnswers,
+            request.BuildFromPlan?.UserSelections
+        };
+        var json = JsonSerializer.Serialize(source, SseJsonOptions);
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(json));
+        return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private static async Task WriteAgentRunSseAsync(

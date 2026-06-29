@@ -414,6 +414,44 @@ public sealed class AgentRunEndpointsTests
         planSemantic.GetProperty("imageSource").GetString().Should().Be("camera");
     }
 
+    [Fact(DisplayName = "POST PlanRun creates canonical ConversationSession workspace snapshot")]
+    public async Task CreatePlanRun_ShouldCreateConversationSessionWorkspaceSnapshot()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync();
+
+        using var response = await host.Client.PostAsJsonAsync("/api/ai/agent-plan-runs", new VisionAgentPlanModeRequest
+        {
+            Description = "detect scratches on metal",
+            OriginalUserPrompt = "detect scratches on metal",
+            RequirementMode = AiRequirementModes.Draft
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var createDoc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var runId = createDoc.RootElement.GetProperty("runId").GetString();
+        var sessionId = createDoc.RootElement.GetProperty("sessionId").GetString();
+        runId.Should().NotBeNullOrWhiteSpace();
+        sessionId.Should().NotBeNullOrWhiteSpace();
+
+        await host.WaitForTerminalAsync(runId!);
+
+        host.ConversationService.ListSessions()
+            .Should()
+            .Contain(summary => summary.SessionId == sessionId);
+        var session = host.ConversationService.GetSession(sessionId!);
+        session.Should().NotBeNull();
+        session!.History.Should().ContainSingle(turn =>
+            turn.Role == "user" &&
+            turn.TurnId == $"plan:{runId}:user" &&
+            turn.Message == "detect scratches on metal");
+        session.WorkspaceSnapshot.Should().NotBeNull();
+        session.WorkspaceSnapshot!.PlanRunId.Should().Be(runId);
+        session.WorkspaceSnapshot.PlanRunStatus.Should().Be(AgentRunEventStatuses.Completed);
+        session.WorkspaceSnapshot.RequirementMode.Should().Be(AiRequirementModes.Draft);
+        session.WorkspaceSnapshot.PendingPlanSnapshot.Should().NotBeNull();
+        session.WorkspaceSnapshot.PendingPlanSnapshot!.MetadataOnly.Should().BeTrue();
+    }
+
     [Fact(DisplayName = "Plan run timeout emits timeout and fallback before completed PlanResult")]
     public async Task CreatePlanRun_ShouldEmitTimeoutFallbackBeforeCompleted()
     {

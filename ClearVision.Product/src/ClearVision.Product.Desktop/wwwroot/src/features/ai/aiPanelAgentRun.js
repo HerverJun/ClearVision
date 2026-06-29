@@ -998,6 +998,7 @@ export const aiPanelAgentRunMixin = {
             if (isClarificationTerminal) {
                 this.pendingClarificationPayload = null;
                 this.agentWorkspaceMode = 'plan';
+                this._setWorkspaceViewMode?.('plan', { render: false });
                 this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
                 this._renderAgentWorkspaceOverview?.();
                 this._renderPlanWorkspace?.(this.pendingVisionPlan);
@@ -1261,6 +1262,41 @@ export const aiPanelAgentRunMixin = {
             `已回放最近一次 AgentRun：${runId}`,
             'info'
         );
+        return true;
+    },
+
+    async _replayAgentRunPublicEventsById(runId, { kind = '', statusText = '回放 AgentRun' } = {}) {
+        const normalizedRunId = String(runId || '').trim();
+        if (!normalizedRunId) return false;
+
+        const replay = await httpClient.get(`/ai/agent-runs/${encodeURIComponent(normalizedRunId)}`);
+        const events = (Array.isArray(replay?.events) ? replay.events : replay?.Events) || [];
+        const normalizedEvents = events
+            .map(evt => this._normalizeAgentRunEvent(evt))
+            .filter(Boolean)
+            .sort((a, b) => a.sequence - b.sequence);
+        if (!normalizedEvents.length) return false;
+
+        const hasPlanEvents = kind === 'plan' ||
+            normalizedEvents.some(evt => String(evt.eventType || '').startsWith('plan.'));
+        const replayRequestId = `agent-run-replay-${normalizedRunId}`;
+        if (hasPlanEvents) {
+            this.activePlanRunId = normalizedRunId;
+            this.activePlanRequestId = replayRequestId;
+            this.activePlanRunRequestId = replayRequestId;
+            this.activePlanRunEvents = [];
+            this.activePlanRunEventKeys = new Set();
+        } else {
+            this.activeAgentRunId = normalizedRunId;
+            this.activeAgentRunEvents = [];
+            this.activeAgentRunEventKeys = new Set();
+        }
+
+        this._setResultStatusNote?.(`${statusText}：${normalizedRunId}`, 'info');
+        normalizedEvents.forEach(evt => this._handleAgentRunEvent(evt));
+        this._renderAgentWorkspaceOverview?.();
+        this._renderPlanWorkspace?.(this.pendingVisionPlan);
+        this._renderBuildWorkspaceFromAgentRun?.();
         return true;
     },
 

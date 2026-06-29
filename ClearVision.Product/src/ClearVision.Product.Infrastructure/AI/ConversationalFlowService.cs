@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
+using Microsoft.Extensions.Logging;
 
 namespace ClearVision.Product.Infrastructure.AI;
 
@@ -19,6 +20,7 @@ public enum ConversationIntent
 
 public sealed class ConversationTurn
 {
+    public string TurnId { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public DateTime TimestampUtc { get; set; } = DateTime.UtcNow;
@@ -63,8 +65,51 @@ public sealed class ConversationSession
     public string SessionId { get; set; } = string.Empty;
     public string? CurrentFlowJson { get; set; }
     public string? CurrentCanvasFlowJson { get; set; }
+    public VisionAgentWorkspaceSnapshot? WorkspaceSnapshot { get; set; }
     public List<ConversationTurn> History { get; set; } = new();
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class VisionAgentWorkspaceSnapshot
+{
+    public int SchemaVersion { get; set; } = 1;
+    public long Revision { get; set; }
+    public string? ProjectId { get; set; }
+    public string LifecycleState { get; set; } = "idle";
+    public VisionAgentPlanModeResult? PendingPlanSnapshot { get; set; }
+    public Dictionary<string, string> PlanQuestionSelections { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+    public List<VisionAgentPlanAnswer> ConfirmedPlanAnswers { get; set; } = new();
+    public string RequirementMode { get; set; } = AiRequirementModes.Strict;
+    public bool PlanAcceptedRecommendedDefaults { get; set; }
+    public string? PlanRunId { get; set; }
+    public string? PlanRunStatus { get; set; }
+    public long? PlanTerminalSequence { get; set; }
+    public string? BuildRunId { get; set; }
+    public string? BuildRunStatus { get; set; }
+    public long? BuildTerminalSequence { get; set; }
+    public string? SubmittedBuildFingerprint { get; set; }
+    public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class VisionAgentWorkspaceSnapshotUpdate
+{
+    public string? ProjectId { get; set; }
+    public string? LifecycleState { get; set; }
+    public VisionAgentPlanModeResult? PendingPlanSnapshot { get; set; }
+    public Dictionary<string, string>? PlanQuestionSelections { get; set; }
+    public List<VisionAgentPlanAnswer>? ConfirmedPlanAnswers { get; set; }
+    public string? RequirementMode { get; set; }
+    public bool? PlanAcceptedRecommendedDefaults { get; set; }
+    public string? PlanRunId { get; set; }
+    public string? PlanRunStatus { get; set; }
+    public long? PlanTerminalSequence { get; set; }
+    public string? BuildRunId { get; set; }
+    public string? BuildRunStatus { get; set; }
+    public long? BuildTerminalSequence { get; set; }
+    public string? SubmittedBuildFingerprint { get; set; }
+    public string? UserTurnId { get; set; }
+    public string? UserMessage { get; set; }
 }
 
 public sealed class ConversationSessionSummary
@@ -99,6 +144,7 @@ public interface IConversationalFlowService
     IReadOnlyList<ConversationSessionSummary> ListSessions();
     ConversationSession? GetSession(string sessionId);
     bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson);
+    ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update);
     bool DeleteSession(string sessionId);
 }
 
@@ -145,15 +191,21 @@ public class ConversationalFlowService : IConversationalFlowService
 
     private readonly object _persistLock = new();
     private readonly string _storagePath;
+    private readonly string _lastGoodStoragePath;
+    private readonly Microsoft.Extensions.Logging.ILogger<ConversationalFlowService>? _logger;
 
-    public ConversationalFlowService(string? storageRootPath = null)
+    public ConversationalFlowService(
+        string? storageRootPath = null,
+        Microsoft.Extensions.Logging.ILogger<ConversationalFlowService>? logger = null)
     {
+        _logger = logger;
         var rootPath = string.IsNullOrWhiteSpace(storageRootPath)
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClearVision")
             : storageRootPath;
 
         Directory.CreateDirectory(rootPath);
         _storagePath = Path.Combine(rootPath, "conversation_sessions.json");
+        _lastGoodStoragePath = _storagePath + ".last-good";
         LoadSessionsFromStore();
     }
 
@@ -216,6 +268,7 @@ public class ConversationalFlowService : IConversationalFlowService
 
             session.History.Add(new ConversationTurn
             {
+                TurnId = Guid.NewGuid().ToString("N"),
                 Role = "user",
                 Message = request.Description,
                 TimestampUtc = DateTime.UtcNow
@@ -389,6 +442,7 @@ public class ConversationalFlowService : IConversationalFlowService
 
             session.History.Add(new ConversationTurn
             {
+                TurnId = Guid.NewGuid().ToString("N"),
                 Role = "assistant",
                 Message = assistantMessage,
                 TimestampUtc = DateTime.UtcNow,
@@ -441,6 +495,40 @@ public class ConversationalFlowService : IConversationalFlowService
 
         PersistSessions();
         return true;
+    }
+
+    public ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+
+        var session = GetOrCreateSession(sessionId);
+        lock (session)
+        {
+            var snapshot = session.WorkspaceSnapshot ?? new VisionAgentWorkspaceSnapshot();
+            ApplyWorkspaceUpdate(snapshot, update);
+            session.WorkspaceSnapshot = snapshot;
+
+            var userMessage = update.UserMessage?.Trim();
+            var userTurnId = update.UserTurnId?.Trim();
+            if (!string.IsNullOrWhiteSpace(userMessage) &&
+                !string.IsNullOrWhiteSpace(userTurnId) &&
+                !session.History.Any(turn => string.Equals(turn.TurnId, userTurnId, StringComparison.OrdinalIgnoreCase)))
+            {
+                session.History.Add(new ConversationTurn
+                {
+                    TurnId = userTurnId,
+                    Role = "user",
+                    Message = userMessage,
+                    TimestampUtc = DateTime.UtcNow
+                });
+                TrimHistory(session);
+            }
+
+            session.UpdatedAtUtc = snapshot.UpdatedAtUtc;
+        }
+
+        PersistSessions();
+        return CloneSession(session);
     }
 
     public bool DeleteSession(string sessionId)
@@ -543,28 +631,14 @@ public class ConversationalFlowService : IConversationalFlowService
         try
         {
             var json = File.ReadAllText(_storagePath);
-            var store = JsonSerializer.Deserialize<ConversationStore>(json, _jsonOptions);
-            if (store?.Sessions == null || store.Sessions.Count == 0)
-                return;
-
-            var cutoff = DateTime.UtcNow - SessionRetention;
-            foreach (var session in store.Sessions)
-            {
-                if (session == null || string.IsNullOrWhiteSpace(session.SessionId))
-                    continue;
-
-                NormalizeSession(session);
-                if (session.UpdatedAtUtc < cutoff)
-                    continue;
-
-                _sessions[session.SessionId.Trim()] = session;
-            }
-
-            PruneInMemorySessions();
+            LoadSessionsFromJson(json);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
-            // Ignore corrupted persistence file and start with empty in-memory sessions.
+            if (_logger != null)
+                LoggerExtensions.LogWarning(_logger, ex, "Failed to load conversation session store. Path={StoragePath}", _storagePath);
+            QuarantineCorruptStore(ex);
+            TryLoadLastGoodStore();
         }
     }
 
@@ -587,13 +661,118 @@ public class ConversationalFlowService : IConversationalFlowService
                     Sessions = snapshot
                 }, _jsonOptions);
 
-                File.WriteAllText(_storagePath, json);
+                var directory = Path.GetDirectoryName(_storagePath) ?? AppContext.BaseDirectory;
+                Directory.CreateDirectory(directory);
+                var tempPath = Path.Combine(directory, $"{Path.GetFileName(_storagePath)}.{Guid.NewGuid():N}.tmp");
+                WriteAllTextDurably(tempPath, json);
+
+                if (File.Exists(_storagePath))
+                {
+                    var replaceBackupPath = tempPath + ".backup";
+                    if (File.Exists(replaceBackupPath))
+                        File.Delete(replaceBackupPath);
+                    File.Replace(tempPath, _storagePath, replaceBackupPath, ignoreMetadataErrors: true);
+                    File.Copy(_storagePath, _lastGoodStoragePath, overwrite: true);
+                    if (File.Exists(replaceBackupPath))
+                        File.Delete(replaceBackupPath);
+                }
+                else
+                {
+                    File.Move(tempPath, _storagePath);
+                    File.Copy(_storagePath, _lastGoodStoragePath, overwrite: true);
+                }
             }
-            catch
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
             {
-                // Swallow persistence failure to avoid interrupting request flow.
+                if (_logger != null)
+                    LoggerExtensions.LogError(_logger, ex, "Failed to persist conversation session store. Path={StoragePath}", _storagePath);
             }
         }
+    }
+
+    private void LoadSessionsFromJson(string json)
+    {
+        var store = JsonSerializer.Deserialize<ConversationStore>(json, _jsonOptions);
+        if (store?.Sessions == null || store.Sessions.Count == 0)
+            return;
+
+        var cutoff = DateTime.UtcNow - SessionRetention;
+        foreach (var session in store.Sessions)
+        {
+            if (session == null || string.IsNullOrWhiteSpace(session.SessionId))
+                continue;
+
+            NormalizeSession(session);
+            if (session.UpdatedAtUtc < cutoff)
+                continue;
+
+            _sessions[session.SessionId.Trim()] = session;
+        }
+
+        PruneInMemorySessions();
+    }
+
+    private void TryLoadLastGoodStore()
+    {
+        if (!File.Exists(_lastGoodStoragePath))
+            return;
+
+        try
+        {
+            LoadSessionsFromJson(File.ReadAllText(_lastGoodStoragePath));
+            if (_logger != null)
+            {
+                LoggerExtensions.LogInformation(
+                    _logger,
+                    "Recovered conversation sessions from last-good store. Path={LastGoodPath}",
+                    _lastGoodStoragePath);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            if (_logger != null)
+                LoggerExtensions.LogError(_logger, ex, "Failed to recover conversation sessions from last-good store. Path={LastGoodPath}", _lastGoodStoragePath);
+        }
+    }
+
+    private void QuarantineCorruptStore(Exception ex)
+    {
+        try
+        {
+            if (!File.Exists(_storagePath))
+                return;
+
+            var corruptPath = $"{_storagePath}.corrupt-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
+            File.Move(_storagePath, corruptPath);
+            if (_logger != null)
+            {
+                LoggerExtensions.LogWarning(
+                    _logger,
+                    ex,
+                    "Quarantined corrupt conversation session store. Path={StoragePath}, CorruptPath={CorruptPath}",
+                    _storagePath,
+                    corruptPath);
+            }
+        }
+        catch (Exception quarantineEx) when (quarantineEx is IOException or UnauthorizedAccessException)
+        {
+            if (_logger != null)
+                LoggerExtensions.LogError(_logger, quarantineEx, "Failed to quarantine corrupt conversation session store. Path={StoragePath}", _storagePath);
+        }
+    }
+
+    private static void WriteAllTextDurably(string path, string contents)
+    {
+        var bytes = Encoding.UTF8.GetBytes(contents);
+        using var stream = new FileStream(
+            path,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            bufferSize: 64 * 1024,
+            FileOptions.WriteThrough);
+        stream.Write(bytes, 0, bytes.Length);
+        stream.Flush(flushToDisk: true);
     }
 
     private static ConversationSession CloneSession(ConversationSession session)
@@ -605,10 +784,12 @@ public class ConversationalFlowService : IConversationalFlowService
                 SessionId = session.SessionId,
                 CurrentFlowJson = session.CurrentFlowJson,
                 CurrentCanvasFlowJson = session.CurrentCanvasFlowJson,
+                WorkspaceSnapshot = CloneWorkspaceSnapshot(session.WorkspaceSnapshot),
                 UpdatedAtUtc = session.UpdatedAtUtc,
                 History = session.History
                     .Select(turn => new ConversationTurn
                     {
+                        TurnId = turn.TurnId,
                         Role = turn.Role,
                         Message = turn.Message,
                         TimestampUtc = turn.TimestampUtc,
@@ -617,6 +798,97 @@ public class ConversationalFlowService : IConversationalFlowService
                     .ToList()
             };
         }
+    }
+
+    private static void ApplyWorkspaceUpdate(
+        VisionAgentWorkspaceSnapshot snapshot,
+        VisionAgentWorkspaceSnapshotUpdate update)
+    {
+        snapshot.SchemaVersion = Math.Max(1, snapshot.SchemaVersion);
+        snapshot.Revision++;
+        snapshot.UpdatedAtUtc = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(update.ProjectId))
+            snapshot.ProjectId = update.ProjectId.Trim();
+        if (!string.IsNullOrWhiteSpace(update.LifecycleState))
+            snapshot.LifecycleState = update.LifecycleState.Trim();
+        if (update.PendingPlanSnapshot != null)
+            snapshot.PendingPlanSnapshot = ClonePlanSnapshot(update.PendingPlanSnapshot);
+        if (update.PlanQuestionSelections != null)
+        {
+            snapshot.PlanQuestionSelections = update.PlanQuestionSelections
+                .Where(pair => !string.IsNullOrWhiteSpace(pair.Key))
+                .ToDictionary(
+                    pair => pair.Key.Trim(),
+                    pair => pair.Value?.Trim() ?? string.Empty,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+        if (update.ConfirmedPlanAnswers != null)
+            snapshot.ConfirmedPlanAnswers = ClonePlanAnswers(update.ConfirmedPlanAnswers);
+        if (!string.IsNullOrWhiteSpace(update.RequirementMode))
+            snapshot.RequirementMode = update.RequirementMode.Trim();
+        if (update.PlanAcceptedRecommendedDefaults.HasValue)
+            snapshot.PlanAcceptedRecommendedDefaults = update.PlanAcceptedRecommendedDefaults.Value;
+        if (!string.IsNullOrWhiteSpace(update.PlanRunId))
+            snapshot.PlanRunId = update.PlanRunId.Trim();
+        if (!string.IsNullOrWhiteSpace(update.PlanRunStatus))
+            snapshot.PlanRunStatus = update.PlanRunStatus.Trim();
+        if (update.PlanTerminalSequence.HasValue)
+            snapshot.PlanTerminalSequence = update.PlanTerminalSequence;
+        if (!string.IsNullOrWhiteSpace(update.BuildRunId))
+            snapshot.BuildRunId = update.BuildRunId.Trim();
+        if (!string.IsNullOrWhiteSpace(update.BuildRunStatus))
+            snapshot.BuildRunStatus = update.BuildRunStatus.Trim();
+        if (update.BuildTerminalSequence.HasValue)
+            snapshot.BuildTerminalSequence = update.BuildTerminalSequence;
+        if (!string.IsNullOrWhiteSpace(update.SubmittedBuildFingerprint))
+            snapshot.SubmittedBuildFingerprint = update.SubmittedBuildFingerprint.Trim();
+    }
+
+    private static VisionAgentWorkspaceSnapshot? CloneWorkspaceSnapshot(VisionAgentWorkspaceSnapshot? snapshot)
+    {
+        if (snapshot == null)
+            return null;
+
+        return new VisionAgentWorkspaceSnapshot
+        {
+            SchemaVersion = snapshot.SchemaVersion,
+            Revision = snapshot.Revision,
+            ProjectId = snapshot.ProjectId,
+            LifecycleState = snapshot.LifecycleState,
+            PendingPlanSnapshot = ClonePlanSnapshot(snapshot.PendingPlanSnapshot),
+            PlanQuestionSelections = snapshot.PlanQuestionSelections
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase),
+            ConfirmedPlanAnswers = ClonePlanAnswers(snapshot.ConfirmedPlanAnswers),
+            RequirementMode = snapshot.RequirementMode,
+            PlanAcceptedRecommendedDefaults = snapshot.PlanAcceptedRecommendedDefaults,
+            PlanRunId = snapshot.PlanRunId,
+            PlanRunStatus = snapshot.PlanRunStatus,
+            PlanTerminalSequence = snapshot.PlanTerminalSequence,
+            BuildRunId = snapshot.BuildRunId,
+            BuildRunStatus = snapshot.BuildRunStatus,
+            BuildTerminalSequence = snapshot.BuildTerminalSequence,
+            SubmittedBuildFingerprint = snapshot.SubmittedBuildFingerprint,
+            UpdatedAtUtc = snapshot.UpdatedAtUtc
+        };
+    }
+
+    private static VisionAgentPlanModeResult? ClonePlanSnapshot(VisionAgentPlanModeResult? plan)
+    {
+        if (plan == null)
+            return null;
+
+        var json = JsonSerializer.Serialize(plan, _jsonOptions);
+        return JsonSerializer.Deserialize<VisionAgentPlanModeResult>(json, _jsonOptions);
+    }
+
+    private static List<VisionAgentPlanAnswer> ClonePlanAnswers(IEnumerable<VisionAgentPlanAnswer>? answers)
+    {
+        if (answers == null)
+            return [];
+
+        var json = JsonSerializer.Serialize(answers, _jsonOptions);
+        return JsonSerializer.Deserialize<List<VisionAgentPlanAnswer>>(json, _jsonOptions) ?? [];
     }
 
     private static ConversationTurnPayload? CloneTurnPayload(ConversationTurnPayload? payload)
@@ -767,12 +1039,15 @@ public class ConversationalFlowService : IConversationalFlowService
             .TakeLast(MaxHistory)
             .Select(turn => new ConversationTurn
             {
+                TurnId = string.IsNullOrWhiteSpace(turn.TurnId) ? Guid.NewGuid().ToString("N") : turn.TurnId.Trim(),
                 Role = turn.Role,
                 Message = turn.Message ?? string.Empty,
                 TimestampUtc = turn.TimestampUtc == default ? DateTime.UtcNow : turn.TimestampUtc,
                 Payload = CloneTurnPayload(turn.Payload)
             })
             .ToList();
+
+        session.WorkspaceSnapshot = CloneWorkspaceSnapshot(session.WorkspaceSnapshot);
 
         if (string.IsNullOrWhiteSpace(session.CurrentCanvasFlowJson) &&
             IsCanvasFlowJson(session.CurrentFlowJson))

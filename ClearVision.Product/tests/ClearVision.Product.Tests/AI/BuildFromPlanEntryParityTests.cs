@@ -855,6 +855,9 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         public bool TryBackfillCanvasFlowJson(string sessionId, string canvasFlowJson) =>
             _inner.TryBackfillCanvasFlowJson(sessionId, canvasFlowJson);
 
+        public ConversationSession UpdateWorkspaceSnapshot(string sessionId, VisionAgentWorkspaceSnapshotUpdate update) =>
+            _inner.UpdateWorkspaceSnapshot(sessionId, update);
+
         public bool DeleteSession(string sessionId) => _inner.DeleteSession(sessionId);
     }
 

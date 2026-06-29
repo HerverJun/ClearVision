@@ -40,6 +40,7 @@ export class AiPanel {
         this.options = options || {};
         this.container = document.getElementById(containerId);
         this.sessionStorageKey = 'cv_ai_session_id';
+        this.workspaceViewStorageKey = 'cv_ai_workspace_view_mode';
         
         // 状态
         this.isGenerating = false;
@@ -113,6 +114,7 @@ export class AiPanel {
         this.runtimePreviewConsent = false;
         this.directBuildDebugNextRequest = false;
         this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+        this.workspaceViewMode = this._loadWorkspaceViewMode?.() || AgentWorkspaceModes.PLAN;
         this.pendingVisionPlan = null;
         this.pendingClarificationPayload = null;
         this.planQuestionSelections = {};
@@ -858,10 +860,12 @@ export class AiPanel {
                 this._resetClarificationSelectionDraft();
             }
             this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
             this._setWorkbenchState(AiWorkbenchStates.CLARIFYING);
         } else {
             this.pendingClarificationPayload = null;
             this.agentWorkspaceMode = AgentWorkspaceModes.BUILD;
+            this._setWorkspaceViewMode?.(AgentWorkspaceModes.BUILD, { render: false });
         }
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);

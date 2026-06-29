@@ -76,6 +76,7 @@ export const aiPanelGenerateRequestMixin = {
         this._setGeneratingState(true);
         this._setWorkbenchState(AiWorkbenchStates.GENERATING);
         this.agentWorkspaceMode = 'build';
+        this._setWorkspaceViewMode?.('build', { render: false });
         this._renderAgentWorkspaceOverview?.();
         this._renderPlanWorkspace?.(this.pendingVisionPlan);
         this._renderBuildWorkspaceFromAgentRun?.();

@@ -1,4 +1,5 @@
 import webMessageBridge from '../../core/messaging/webMessageBridge.js';
+import { AgentWorkspaceModes } from './aiPanelAgentWorkspace.js';
 export const aiPanelSessionHistoryMixin = {
     _toggleHistoryPanel() {
         const panel = this.container.querySelector('#ai-history-panel');
@@ -161,6 +162,7 @@ export const aiPanelSessionHistoryMixin = {
 
         this.sessionId = sessionId;
         this._saveSessionId(this.sessionId);
+        const workspaceSnapshot = this._normalizeSessionWorkspaceSnapshot(session.workspaceSnapshot ?? session.WorkspaceSnapshot);
         this.nextHintDraft = '';
         this.nextTemplateSelection = null;
         this._resetPendingDraftState();
@@ -289,6 +291,7 @@ export const aiPanelSessionHistoryMixin = {
             this._resetCurrentResultSyncState();
         }
         this._displayResult(restoredResult, { appendChatMessage: false });
+        this._restoreWorkspaceSnapshotFromSession(workspaceSnapshot, sessionId);
 
         const updatedAtUtc = session.updatedAtUtc ?? session.UpdatedAtUtc ?? new Date().toISOString();
         const latestMessage = normalizedHistory.length > 0
@@ -300,6 +303,103 @@ export const aiPanelSessionHistoryMixin = {
             updatedAtUtc,
             turnCount: normalizedHistory.length
         });
+    },
+
+    _normalizeSessionWorkspaceSnapshot(raw) {
+        if (!raw || typeof raw !== 'object') return null;
+        const snapshot = raw;
+        const read = (camel, pascal = '') => snapshot?.[camel] ?? snapshot?.[pascal || `${camel[0].toUpperCase()}${camel.slice(1)}`];
+        return {
+            schemaVersion: Number(read('schemaVersion')) || 0,
+            revision: Number(read('revision')) || 0,
+            lifecycleState: String(read('lifecycleState') || 'idle').trim(),
+            pendingPlanSnapshot: read('pendingPlanSnapshot'),
+            planQuestionSelections: read('planQuestionSelections') || {},
+            confirmedPlanAnswers: Array.isArray(read('confirmedPlanAnswers')) ? read('confirmedPlanAnswers') : [],
+            requirementMode: String(read('requirementMode') || 'strict').trim().toLowerCase(),
+            planAcceptedRecommendedDefaults: read('planAcceptedRecommendedDefaults') === true,
+            planRunId: String(read('planRunId') || '').trim(),
+            planRunStatus: String(read('planRunStatus') || '').trim().toLowerCase(),
+            buildRunId: String(read('buildRunId') || '').trim(),
+            buildRunStatus: String(read('buildRunStatus') || '').trim().toLowerCase(),
+            submittedBuildFingerprint: String(read('submittedBuildFingerprint') || '').trim()
+        };
+    },
+
+    _restoreWorkspaceSnapshotFromSession(snapshot, sessionId) {
+        if (!snapshot) {
+            this.agentWorkspaceMode = AgentWorkspaceModes.PLAN;
+            this._setWorkspaceViewMode?.(AgentWorkspaceModes.PLAN, { render: false });
+            this._addMessage('system', '该历史版本不包含完整工作台状态，已仅恢复对话和可用结果。');
+            this._renderAgentWorkspaceOverview?.();
+            this._renderPlanWorkspace?.(this.pendingVisionPlan);
+            this._renderBuildWorkspaceFromAgentRun?.();
+            return false;
+        }
+
+        const planSnapshot = snapshot.pendingPlanSnapshot;
+        if (planSnapshot && typeof this._normalizeBackendPlanResult === 'function') {
+            const fallback = planSnapshot.originalUserPrompt || planSnapshot.OriginalUserPrompt || this.lastUserPrompt || '';
+            this.pendingVisionPlan = this._normalizeBackendPlanResult(planSnapshot, fallback);
+            this.pendingVisionPlan.requirementMode = snapshot.requirementMode || this.pendingVisionPlan.requirementMode || 'strict';
+        }
+
+        this.planQuestionSelections = { ...(snapshot.planQuestionSelections || {}) };
+        this.planQuestionAnswers = {};
+        snapshot.confirmedPlanAnswers.forEach(answer => {
+            const normalized = this._normalizePlanAnswer?.(answer) || answer;
+            const key = normalized?.questionId || normalized?.field || normalized?.Field || normalized?.QuestionId || '';
+            if (key) {
+                this.planQuestionAnswers[key] = normalized;
+            }
+        });
+        this.requirementMode = snapshot.requirementMode === 'draft' ? 'draft' : 'strict';
+        this.planAcceptedRecommendedDefaults = snapshot.planAcceptedRecommendedDefaults === true;
+        this.activePlanRunId = snapshot.planRunId || null;
+        this.activePlanRunRequestId = snapshot.planRunId ? `session-restore-plan-${snapshot.planRunId}` : null;
+        this.activePlanRunEvents = [];
+        this.activePlanRunEventKeys = new Set();
+        this.activePlanRunCompletion = null;
+        this.activeAgentRunId = snapshot.buildRunId || null;
+        this.activeAgentRunEvents = [];
+        this.activeAgentRunEventKeys = new Set();
+
+        const lifecycle = snapshot.lifecycleState.toLowerCase();
+        this.agentWorkspaceMode = lifecycle.includes('build') || snapshot.buildRunId
+            ? AgentWorkspaceModes.BUILD
+            : AgentWorkspaceModes.PLAN;
+        this._setWorkspaceViewMode(snapshot.buildRunId ? AgentWorkspaceModes.BUILD : AgentWorkspaceModes.PLAN, { render: false });
+
+        this._renderAgentWorkspaceOverview?.();
+        this._renderPlanWorkspace?.(this.pendingVisionPlan);
+        this._renderBuildWorkspaceFromAgentRun?.();
+        this._updatePlanBuildActionState?.();
+
+        this._restoreWorkspaceRunReplays(snapshot, sessionId);
+        return true;
+    },
+
+    async _restoreWorkspaceRunReplays(snapshot, sessionId) {
+        try {
+            if (snapshot?.planRunId) {
+                await this._replayAgentRunPublicEventsById?.(snapshot.planRunId, {
+                    kind: 'plan',
+                    statusText: '回放历史 Plan 事件'
+                });
+            }
+            if (snapshot?.buildRunId) {
+                await this._replayAgentRunPublicEventsById?.(snapshot.buildRunId, {
+                    kind: 'build',
+                    statusText: '回放历史 Build 事件'
+                });
+            }
+        } catch (error) {
+            console.warn('[AiPanel] 恢复工作台 Run 回放失败。', {
+                sessionId,
+                error: error?.message || String(error)
+            });
+            this._addMessage?.('system', '历史工作台已从会话快照恢复，但部分事件回放失败。');
+        }
     },
 
     _parseFlowJson(raw) {
