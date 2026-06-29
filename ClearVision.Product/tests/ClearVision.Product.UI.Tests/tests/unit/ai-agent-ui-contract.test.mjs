@@ -800,30 +800,48 @@ function planRunCompletedEvent({
   runId,
   sequence,
   planResult,
+  eventType = 'run.completed',
   revision = 9,
   persistenceStatus = { primaryStoreSaved: true, recoveryBackupSaved: true },
-  persistenceWarning = null
+  persistenceWarning = null,
+  publicMessage = '',
+  diagnostic = null
 } = {}) {
+  const status = eventType === 'run.failed'
+    ? 'failed'
+    : eventType === 'run.cancelled'
+      ? 'cancelled'
+      : 'completed';
+  const defaultSummary = eventType === 'run.failed'
+    ? '规划在完成前失败。'
+    : eventType === 'run.cancelled'
+      ? '规划已取消。'
+      : 'Plan run completed.';
+  const payload = {
+    ...(planResult ? { planResult } : {}),
+    workspaceSnapshot: {
+      revision,
+      lifecycleState: status === 'completed' ? 'plan_ready' : `plan_${status}`,
+      planRunId: runId,
+      planRunStatus: status
+    },
+    persistenceStatus,
+    persistenceWarning,
+    publicMessage: publicMessage || defaultSummary,
+    metadataOnly: true
+  };
+  if (diagnostic && typeof diagnostic === 'object') {
+    payload.diagnostic = diagnostic;
+  }
   return {
     runId,
     sequence,
-    eventType: 'run.completed',
+    eventType,
     stage: 'run',
-    title: 'Run completed',
-    summary: 'Plan run completed.',
-    status: 'completed',
-    payload: {
-      planResult,
-      workspaceSnapshot: {
-        revision,
-        lifecycleState: 'plan_ready',
-        planRunId: runId,
-        planRunStatus: 'completed'
-      },
-      persistenceStatus,
-      persistenceWarning,
-      metadataOnly: true
-    },
+    title: eventType === 'run.failed' ? 'Run failed' : eventType === 'run.cancelled' ? 'Run cancelled' : 'Run completed',
+    summary: publicMessage || defaultSummary,
+    status,
+    payload,
     metadataOnly: true,
     redactionPass: true
   };
@@ -3133,6 +3151,67 @@ test('Plan Mode falls back to ordinary POST only when PlanRun event mode is unav
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+test('ordinary Plan terminal persistence warning stays visible after plan confirmation prompt', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  panel.container = createContainer({
+    '#ai-input': createFakeElement(),
+    '#ai-chat-container': createFakeElement(),
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel._shouldUsePlanRunEventStream = () => false;
+  panel._requestPlanReadinessPreview = () => null;
+  const warningMessage = '规划结果已生成，但本次 Plan 工作台状态未能保存。';
+  installFetchStream([
+    {
+      json: {
+        sessionId: 'session-ordinary-warning',
+        planResult: backendPlanResult({
+          planId: 'plan_ordinary_warning',
+          goal: 'ordinary warning plan',
+          canPlan: true,
+          canBuild: false
+        }),
+        workspaceSnapshot: {
+          revision: 44,
+          lifecycleState: 'plan_ready',
+          planRunStatus: 'completed'
+        },
+        persistenceStatus: {
+          primaryStoreSaved: false,
+          recoveryBackupSaved: true,
+          errorCode: 'primary_store_save_failed',
+          publicMessage: warningMessage
+        },
+        persistenceWarning: {
+          code: 'primary_store_save_failed',
+          message: warningMessage
+        },
+        metadataOnly: true
+      }
+    }
+  ]);
+
+  panel._enterPlanModeFromPrompt({
+    description: 'ordinary warning plan',
+    userMessage: 'ordinary warning plan',
+    clearInput: false
+  });
+  await waitFor(() => panel.pendingVisionPlan?.planId === 'plan_ordinary_warning', 'ordinary warning plan');
+
+  assert.equal(panel.workspaceSnapshotRevision, 44);
+  assert.equal(panel.pendingVisionPlan.rawPlanSnapshot.workspaceSnapshot.revision, 44);
+  assert.equal(panel.pendingVisionPlan.rawPlanSnapshot.persistenceStatus.primaryStoreSaved, false);
+  assert.equal(panel.pendingVisionPlan.rawPlanSnapshot.persistenceWarning.message, warningMessage);
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+  assert.match(panel.lastResultStatusNote.text, /Plan 工作台状态未能保存/);
+  assert.doesNotMatch(panel.lastResultStatusNote.text, /规划模式等待确认/);
+  assert.match(panel.workspacePersistenceWarning.message, /Plan 工作台状态未能保存/);
 });
 
 test('PlanRun create 503 keeps Plan input and does not fall back to ordinary Plan', async () => {
@@ -5469,7 +5548,7 @@ test('Plan Mode ignores stale Plan run events when a newer run is active', async
   assert.equal(panel.activePlanRunEvents.length, 0);
 });
 
-test('PlanRun plan.completed records timeline but does not close or resolve stream', async () => {
+test('PlanRun plan.completed/cancelled/failed record timeline but do not close or settle stream', async () => {
   const { AiPanel } = await loadAiPanel();
   const panel = createPanel(AiPanel, { developer: false, enabled: true });
   attachAgentRunTurn(panel);
@@ -5512,13 +5591,27 @@ test('PlanRun plan.completed records timeline but does not close or resolve stre
     metadataOnly: true,
     redactionPass: true
   });
+  ['plan.cancelled', 'plan.failed'].forEach((eventType, index) => {
+    panel._handlePlanRunEvent({
+      runId: 'ar_plan_open',
+      sequence: 8 + index,
+      eventType,
+      stage: 'plan_ready',
+      title: eventType,
+      summary: `${eventType} only updates the timeline`,
+      status: eventType === 'plan.cancelled' ? 'cancelled' : 'failed',
+      payload: { planResult, metadataOnly: true },
+      metadataOnly: true,
+      redactionPass: true
+    });
+  });
   await flushAsync();
 
   assert.equal(closed, false);
   assert.equal(resolved, false);
   assert.equal(rejected, false);
   assert.equal(panel.activePlanRunCompletion?.runId, 'ar_plan_open');
-  assert.equal(panel.activePlanRunEvents.length, 1);
+  assert.equal(panel.activePlanRunEvents.length, 3);
 });
 
 test('PlanRun run.completed applies final revision before resolving Plan', async () => {
@@ -5566,7 +5659,140 @@ test('PlanRun run.completed applies final revision before resolving Plan', async
   assert.equal(panel.workspaceSnapshotRevision, 42);
   assert.equal(revisionAtResolve, 42);
   assert.equal(resolvedPlan.planId, 'plan_final_revision');
+  assert.equal(resolvedPlan.workspaceSnapshot.revision, 42);
+  assert.equal(resolvedPlan.persistenceStatus.primaryStoreSaved, true);
   assert.equal(panel.activePlanRunCompletion, null);
+});
+
+test('PlanRun run.cancelled applies final persistence before rejecting Plan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  attachAgentRunTurn(panel);
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.workspaceSnapshotRevision = 3;
+  panel.activePlanRequestId = 'plan-request-cancel-final';
+  panel.activePlanRunId = 'ar_plan_cancel_final';
+  panel.activePlanRunRequestId = 'plan-request-cancel-final';
+  let rejectedError = null;
+  panel.activePlanRunCompletion = {
+    runId: 'ar_plan_cancel_final',
+    resolve() {},
+    reject(error) {
+      rejectedError = error;
+    }
+  };
+  let closed = false;
+  panel._closeAgentRunEventSource = () => {
+    closed = true;
+  };
+  const warningMessage = '规划已取消，但本次 Plan 工作台状态未能保存。';
+
+  panel._handlePlanRunEvent(planRunCompletedEvent({
+    eventType: 'run.cancelled',
+    runId: 'ar_plan_cancel_final',
+    sequence: 9,
+    revision: 51,
+    publicMessage: '规划已取消。',
+    persistenceStatus: {
+      primaryStoreSaved: false,
+      recoveryBackupSaved: true,
+      errorCode: 'primary_store_save_failed',
+      publicMessage: warningMessage
+    },
+    persistenceWarning: {
+      code: 'primary_store_save_failed',
+      message: warningMessage
+    }
+  }));
+
+  assert.equal(closed, true);
+  assert.equal(panel.workspaceSnapshotRevision, 51);
+  assert.equal(panel.activePlanRunCompletion, null);
+  assert.match(rejectedError?.message || '', /规划已取消/);
+  assert.match(rejectedError?.message || '', /Plan 工作台状态未能保存/);
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+  assert.match(panel.lastResultStatusNote.text, /Plan 工作台状态未能保存/);
+  assert.match(panel.workspacePersistenceWarning.message, /Plan 工作台状态未能保存/);
+});
+
+test('PlanRun run.failed applies final persistence before rejecting Plan', async () => {
+  const { AiPanel } = await loadAiPanel();
+  const panel = createPanel(AiPanel, { developer: false, enabled: true });
+  attachAgentRunTurn(panel);
+  panel.container = createContainer({
+    '#ai-agent-workspace-overview': createFakeElement(),
+    '#ai-plan-workspace': createFakeElement(),
+    '#ai-build-workspace': createFakeElement(),
+    '#ai-result-status-note': createFakeElement()
+  });
+  panel.workspaceSnapshotRevision = 3;
+  panel.activePlanRequestId = 'plan-request-fail-final';
+  panel.activePlanRunId = 'ar_plan_fail_final';
+  panel.activePlanRunRequestId = 'plan-request-fail-final';
+  let rejectedError = null;
+  panel.activePlanRunCompletion = {
+    runId: 'ar_plan_fail_final',
+    resolve() {},
+    reject(error) {
+      rejectedError = error;
+    }
+  };
+  let closed = false;
+  panel._closeAgentRunEventSource = () => {
+    closed = true;
+  };
+  const warningMessage = '规划失败，但本次 Plan 工作台状态未能保存。';
+
+  panel._handlePlanRunEvent(planRunCompletedEvent({
+    eventType: 'run.failed',
+    runId: 'ar_plan_fail_final',
+    sequence: 10,
+    revision: 52,
+    publicMessage: '规划在完成前失败。',
+    persistenceStatus: {
+      primaryStoreSaved: false,
+      recoveryBackupSaved: true,
+      errorCode: 'primary_store_save_failed',
+      publicMessage: warningMessage
+    },
+    persistenceWarning: {
+      code: 'primary_store_save_failed',
+      message: warningMessage
+    },
+    diagnostic: {
+      publicMessage: '规划在完成前失败。',
+      workspaceSnapshot: {
+        revision: 52,
+        lifecycleState: 'plan_failed',
+        planRunId: 'ar_plan_fail_final',
+        planRunStatus: 'failed'
+      },
+      persistenceStatus: {
+        primaryStoreSaved: false,
+        recoveryBackupSaved: true,
+        errorCode: 'primary_store_save_failed',
+        publicMessage: warningMessage
+      },
+      persistenceWarning: {
+        code: 'primary_store_save_failed',
+        message: warningMessage
+      }
+    }
+  }));
+
+  assert.equal(closed, true);
+  assert.equal(panel.workspaceSnapshotRevision, 52);
+  assert.equal(panel.activePlanRunCompletion, null);
+  assert.match(rejectedError?.message || '', /规划在完成前失败/);
+  assert.match(rejectedError?.message || '', /Plan 工作台状态未能保存/);
+  assert.equal(panel.lastResultStatusNote.tone, 'warning');
+  assert.match(panel.lastResultStatusNote.text, /Plan 工作台状态未能保存/);
+  assert.match(panel.workspacePersistenceWarning.message, /Plan 工作台状态未能保存/);
 });
 
 test('PlanRun first Build after completion uses final workspace revision and starts Build', async () => {

@@ -127,6 +127,46 @@ public class ProgramCorsTests
     }
 
     [Fact]
+    public void TryAcquireStoreLeaseMutexes_ShouldBlockSecondInstanceWithSameStorePaths()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "clearvision-store-lease-same-test-" + Guid.NewGuid().ToString("N"));
+        var conversation = Path.Combine(root, "conversation.json");
+        var agentRun = Path.Combine(root, "agent-runs");
+
+        Program.TryAcquireStoreLeaseMutexes([conversation, agentRun], out var first).Should().BeTrue();
+        try
+        {
+            Program.TryAcquireStoreLeaseMutexes([conversation, agentRun], out var second).Should().BeFalse();
+            second.Should().BeEmpty();
+        }
+        finally
+        {
+            Program.ReleaseStoreLeaseMutexes(first);
+        }
+    }
+
+    [Fact]
+    public void TryAcquireStoreLeaseMutexes_ShouldAllowSecondInstanceWhenBothStorePathsDiffer()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "clearvision-store-lease-different-test-" + Guid.NewGuid().ToString("N"));
+        var conversationA = Path.Combine(root, "conversation-a.json");
+        var agentRunA = Path.Combine(root, "agent-run-a");
+        var conversationB = Path.Combine(root, "conversation-b.json");
+        var agentRunB = Path.Combine(root, "agent-run-b");
+
+        Program.TryAcquireStoreLeaseMutexes([conversationA, agentRunA], out var first).Should().BeTrue();
+        try
+        {
+            Program.TryAcquireStoreLeaseMutexes([conversationB, agentRunB], out var second).Should().BeTrue();
+            Program.ReleaseStoreLeaseMutexes(second);
+        }
+        finally
+        {
+            Program.ReleaseStoreLeaseMutexes(first);
+        }
+    }
+
+    [Fact]
     public async Task CorsPreflight_ShouldAllowAuthAndSseHeaders_ForKnownLocalOrigins()
     {
         await using var host = await CorsTestHost.CreateAsync();

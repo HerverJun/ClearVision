@@ -702,6 +702,38 @@ public sealed class AgentRunEndpointsTests
         replay.Events.Should().Contain(evt => evt.EventType == AgentRunEventTypes.RunCancelled);
         replay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.PlanCompleted);
         replay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+        var runCancelled = replay.Events.Last(evt => evt.EventType == AgentRunEventTypes.RunCancelled);
+        using var payloadDoc = JsonDocument.Parse(JsonSerializer.Serialize(runCancelled.Payload, AgentRunEventJson.Options));
+        var payload = payloadDoc.RootElement;
+        payload.GetProperty("workspaceSnapshot").GetProperty("planRunStatus").GetString()
+            .Should()
+            .Be(AgentRunEventStatuses.Cancelled);
+        payload.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeTrue();
+        payload.GetProperty("publicMessage").GetString().Should().Contain("规划已取消");
+    }
+
+    [Fact(DisplayName = "Plan run failure terminal payload carries final workspace and persistence status")]
+    public async Task CreatePlanRunFailure_ShouldPublishFinalWorkspaceAndPersistenceStatus()
+    {
+        await using var host = await AgentRunEndpointTestHost.CreateAsync(planHandler: (_, _, _) =>
+            throw new InvalidOperationException("planner exploded"));
+
+        var runId = await host.CreatePlanRunAsync("failing plan");
+        await host.WaitForTerminalAsync(runId);
+
+        var replay = host.StreamService.Replay(runId)!;
+        replay.Events.Should().Contain(evt => evt.EventType == AgentRunEventTypes.PlanFailed);
+        var runFailed = replay.Events.Last(evt => evt.EventType == AgentRunEventTypes.RunFailed);
+        using var payloadDoc = JsonDocument.Parse(JsonSerializer.Serialize(runFailed.Payload, AgentRunEventJson.Options));
+        var payload = payloadDoc.RootElement;
+        payload.GetProperty("workspaceSnapshot").GetProperty("planRunStatus").GetString()
+            .Should()
+            .Be(AgentRunEventStatuses.Failed);
+        payload.GetProperty("persistenceStatus").GetProperty("primaryStoreSaved").GetBoolean().Should().BeTrue();
+        payload.GetProperty("publicMessage").GetString().Should().Contain("规划在完成前失败");
+        payload.GetProperty("diagnostic").GetProperty("workspaceSnapshot").GetProperty("planRunStatus").GetString()
+            .Should()
+            .Be(AgentRunEventStatuses.Failed);
     }
 
     [Fact(DisplayName = "Plan run replay carries redacted PlanResult without private reasoning or raw prompts")]

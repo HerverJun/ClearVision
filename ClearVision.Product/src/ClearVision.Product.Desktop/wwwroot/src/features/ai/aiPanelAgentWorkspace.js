@@ -2060,7 +2060,24 @@ export const aiPanelAgentWorkspaceMixin = {
         }
         this._applyWorkspaceSnapshotSummary?.(response?.workspaceSnapshot || response?.WorkspaceSnapshot || null);
         this._handleWorkspacePersistenceStatus?.(response?.persistenceStatus || response?.PersistenceStatus || null);
-        return response?.planResult || response?.PlanResult || response?.planModeResult || response?.PlanModeResult || response;
+        const result = response?.planResult || response?.PlanResult || response?.planModeResult || response?.PlanModeResult || response;
+        return this._mergePlanResponsePersistenceEnvelope(result, response);
+    },
+
+    _mergePlanResponsePersistenceEnvelope(result, response) {
+        if (!result || typeof result !== 'object' || !response || typeof response !== 'object' || result === response) {
+            return result;
+        }
+
+        const workspaceSnapshot = response.workspaceSnapshot || response.WorkspaceSnapshot || null;
+        const persistenceStatus = response.persistenceStatus || response.PersistenceStatus || null;
+        const persistenceWarning = response.persistenceWarning || response.PersistenceWarning || null;
+        return {
+            ...result,
+            ...(workspaceSnapshot ? { workspaceSnapshot, WorkspaceSnapshot: workspaceSnapshot } : {}),
+            ...(persistenceStatus ? { persistenceStatus, PersistenceStatus: persistenceStatus } : {}),
+            ...(persistenceWarning ? { persistenceWarning, PersistenceWarning: persistenceWarning } : {})
+        };
     },
 
     _shouldUsePlanRunEventStream() {
@@ -2235,7 +2252,9 @@ export const aiPanelAgentWorkspaceMixin = {
         this._renderAgentWorkspaceOverview();
         this._renderPlanWorkspace(this.pendingVisionPlan);
 
-        if (evt.eventType === 'plan.completed') {
+        if (evt.eventType === 'plan.completed' ||
+            evt.eventType === 'plan.cancelled' ||
+            evt.eventType === 'plan.failed') {
             return;
         }
 
@@ -2244,13 +2263,17 @@ export const aiPanelAgentWorkspaceMixin = {
             return;
         }
 
-        if (evt.eventType === 'plan.cancelled' || evt.eventType === 'run.cancelled') {
-            this._rejectActivePlanRun(new Error('规划已取消。'), { cancelled: true });
+        if (evt.eventType === 'run.cancelled') {
+            const terminal = this._applyPlanRunTerminalPayload(evt);
+            this._rejectActivePlanRun(
+                new Error(this._buildPlanRunTerminalMessage(evt, terminal, '规划已取消。')),
+                { cancelled: true });
             return;
         }
 
-        if (evt.eventType === 'plan.failed' || evt.eventType === 'run.failed') {
-            this._rejectActivePlanRun(new Error(evt.summary || '规划失败。'));
+        if (evt.eventType === 'run.failed') {
+            const terminal = this._applyPlanRunTerminalPayload(evt);
+            this._rejectActivePlanRun(new Error(this._buildPlanRunTerminalMessage(evt, terminal, '规划失败。')));
         }
     },
 
@@ -2273,20 +2296,76 @@ export const aiPanelAgentWorkspaceMixin = {
         }
 
         if (evt.eventType === 'run.completed') {
-            this._applyWorkspaceSnapshotSummary?.(payload.workspaceSnapshot || payload.WorkspaceSnapshot || null);
-            this._handleWorkspacePersistenceStatus?.(payload.persistenceStatus || payload.PersistenceStatus || null);
-            const persistenceWarning = payload.persistenceWarning || payload.PersistenceWarning || null;
-            if (persistenceWarning) {
-                result.persistenceWarning = persistenceWarning;
-                result.PersistenceWarning = persistenceWarning;
-                const warning = this._getPersistenceWarning?.({ persistenceWarning }) || {};
-                this._setResultStatusNote?.(warning.message || '规划结果已生成，但本次 Plan 工作台状态未能保存。', 'warning');
-            }
+            this._applyPlanRunTerminalPayload(evt, result);
         }
 
         this._closeAgentRunEventSource?.();
         this.activePlanRunCompletion = null;
         completion.resolve(result);
+    },
+
+    _getPlanRunTerminalPayload(evt) {
+        const payload = this._asObject?.(evt?.payload) || evt?.payload || {};
+        const diagnostic = this._asObject?.(payload.diagnostic || payload.Diagnostic) || payload.diagnostic || payload.Diagnostic || {};
+        return {
+            ...(diagnostic && typeof diagnostic === 'object' ? diagnostic : {}),
+            ...(payload && typeof payload === 'object' ? payload : {})
+        };
+    },
+
+    _applyPlanRunTerminalPayload(evt, result = null) {
+        const payload = this._getPlanRunTerminalPayload(evt);
+        const workspaceSnapshot = payload.workspaceSnapshot || payload.WorkspaceSnapshot || null;
+        const persistenceStatus = payload.persistenceStatus || payload.PersistenceStatus || null;
+        const persistenceWarning = payload.persistenceWarning || payload.PersistenceWarning || null;
+        this._applyWorkspaceSnapshotSummary?.(workspaceSnapshot);
+        this._handleWorkspacePersistenceStatus?.(persistenceStatus);
+        if (result && typeof result === 'object') {
+            if (workspaceSnapshot) {
+                result.workspaceSnapshot = workspaceSnapshot;
+                result.WorkspaceSnapshot = workspaceSnapshot;
+            }
+            if (persistenceStatus) {
+                result.persistenceStatus = persistenceStatus;
+                result.PersistenceStatus = persistenceStatus;
+            }
+        }
+        let warning = null;
+        if (persistenceWarning) {
+            if (result && typeof result === 'object') {
+                result.persistenceWarning = persistenceWarning;
+                result.PersistenceWarning = persistenceWarning;
+            }
+            warning = this._getPersistenceWarning?.({ persistenceWarning }) || null;
+            this._setResultStatusNote?.(
+                warning?.message || '规划结果已生成，但本次 Plan 工作台状态未能保存。',
+                'warning');
+        }
+
+        return {
+            payload,
+            workspaceSnapshot,
+            persistenceStatus,
+            persistenceWarning,
+            warning
+        };
+    },
+
+    _buildPlanRunTerminalMessage(evt, terminal, fallback) {
+        const payload = terminal?.payload || this._getPlanRunTerminalPayload(evt);
+        const message = String(
+            payload.publicMessage ||
+            payload.PublicMessage ||
+            payload.message ||
+            payload.Message ||
+            evt?.summary ||
+            fallback ||
+            ''
+        ).trim() || fallback;
+        const warningMessage = String(terminal?.warning?.message || '').trim();
+        return warningMessage && !message.includes(warningMessage)
+            ? `${message} ${warningMessage}`
+            : message;
     },
 
     _rejectActivePlanRun(error, { cancelled = false } = {}) {

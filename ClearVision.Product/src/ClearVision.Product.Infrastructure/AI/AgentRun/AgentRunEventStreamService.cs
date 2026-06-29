@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Channels;
 
 namespace ClearVision.Product.Infrastructure.AI.AgentRun;
@@ -11,7 +12,7 @@ public interface IAgentRunEventStreamService
     AgentRunEvent? Append(string? runId, AgentRunEventDraft draft);
     AgentRunEvent? Complete(string? runId, string summary, object? payload = null);
     AgentRunEvent? Fail(string? runId, string summary, string firstFixRecommendation, object? payload = null);
-    AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.");
+    AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.", object? payload = null);
     AgentRunEventSubscription? Subscribe(string runId, long afterSequence);
     AgentRunReplayResult? Replay(string runId);
     AgentRunReplayResult? ReplayLatest(string? ownerHash = null);
@@ -148,15 +149,11 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             Title = "Run failed",
             Summary = summary,
             Status = AgentRunEventStatuses.Failed,
-            Payload = new
-            {
-                diagnostic = payload,
-                firstFixRecommendation
-            }
+            Payload = BuildTerminalDiagnosticPayload(payload, firstFixRecommendation)
         });
     }
 
-    public AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.")
+    public AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.", object? payload = null)
     {
         if (!string.IsNullOrWhiteSpace(runId))
         {
@@ -170,10 +167,9 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             Title = "Run cancelled",
             Summary = summary,
             Status = AgentRunEventStatuses.Cancelled,
-            Payload = new
-            {
-                firstFixRecommendation = "Submit the request again when you are ready to continue."
-            }
+            Payload = BuildTerminalDiagnosticPayload(
+                payload,
+                "Submit the request again when you are ready to continue.")
         });
     }
 
@@ -676,6 +672,42 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         {
             return string.Empty;
         }
+    }
+
+    private static object BuildTerminalDiagnosticPayload(object? payload, string firstFixRecommendation)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["firstFixRecommendation"] = firstFixRecommendation
+        };
+
+        if (payload == null)
+        {
+            return result;
+        }
+
+        result["diagnostic"] = payload;
+        try
+        {
+            if (JsonSerializer.SerializeToNode(payload, AgentRunEventJson.Options) is JsonObject node)
+            {
+                foreach (var property in node)
+                {
+                    if (result.ContainsKey(property.Key))
+                    {
+                        continue;
+                    }
+
+                    result[property.Key] = property.Value?.Deserialize<object>(AgentRunEventJson.Options);
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Keep the compatibility diagnostic payload even if it cannot be flattened.
+        }
+
+        return result;
     }
 
     private static string? TryFindString(JsonElement element, string propertyName)

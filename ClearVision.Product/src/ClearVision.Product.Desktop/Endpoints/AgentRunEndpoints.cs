@@ -417,7 +417,8 @@ public static class AgentRunEndpoints
     private static IResult HandleCancelRun(
         string runId,
         HttpContext context,
-        IAgentRunEventStreamService streamService)
+        IAgentRunEventStreamService streamService,
+        IConversationalFlowService conversationService)
     {
         var replayBeforeCancel = streamService.Replay(runId);
         if (replayBeforeCancel == null)
@@ -432,11 +433,52 @@ public static class AgentRunEndpoints
 
         if (ReplayHasMode(replayBeforeCancel, "plan"))
         {
-            AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCancelled, "plan", "规划已取消",
+            var cancelledEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCancelled, "plan", "规划已取消",
                 "用户已取消本次规划，事件流即将关闭。", AgentRunEventStatuses.Cancelled, new
                 {
                     metadataOnly = true
                 });
+            var sessionId = TryResolvePlanRunSessionId(replayBeforeCancel);
+            object? persistenceWarning = null;
+            VisionAgentWorkspaceSnapshot? finalWorkspaceSnapshot = null;
+            ConversationPersistenceStatus? finalPersistenceStatus = null;
+            if (!string.IsNullOrWhiteSpace(sessionId))
+            {
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+                {
+                    LifecycleState = "plan_cancelled",
+                    PlanRunId = runId,
+                    PlanRunStatus = AgentRunEventStatuses.Cancelled,
+                    PlanTerminalSequence = cancelledEvent?.Sequence,
+                    RequirementMode = TryResolvePlanRequirementMode(replayBeforeCancel)
+                });
+                finalWorkspaceSnapshot = terminalPersistence.Snapshot;
+                finalPersistenceStatus = terminalPersistence.PersistenceStatus;
+                if (!terminalPersistence.Success)
+                {
+                    persistenceWarning = BuildPlanPersistenceWarning(terminalPersistence);
+                    AppendPlanPersistenceWarning(streamService, runId, terminalPersistence);
+                }
+            }
+
+            var planCancelled = streamService.Cancel(
+                runId,
+                "规划已取消。",
+                BuildPlanTerminalPayload(
+                    "plan_cancelled",
+                    sessionId,
+                    runId,
+                    "规划已取消。",
+                    finalWorkspaceSnapshot,
+                    finalPersistenceStatus,
+                    persistenceWarning));
+            var planReplay = streamService.Replay(runId);
+            return Results.Ok(new
+            {
+                runId,
+                cancelled = planCancelled != null,
+                summary = planReplay?.Summary
+            });
         }
 
         var cancelled = streamService.Cancel(runId);
@@ -570,12 +612,44 @@ public static class AgentRunEndpoints
 
             if (cancellationToken.IsCancellationRequested)
             {
-                EmitPlanStage(streamService, runId, emitted, AgentRunEventTypes.PlanCancelled, "plan",
+                var cancelledEvent = AppendPlanEvent(streamService, runId, AgentRunEventTypes.PlanCancelled, "plan",
                     "规划已取消", "规划已取消，未发布完成结果。", AgentRunEventStatuses.Cancelled, new
                     {
                         metadataOnly = true
                     });
-                streamService.Cancel(runId, "规划已取消。");
+                object? cancelPersistenceWarning = null;
+                VisionAgentWorkspaceSnapshot? cancelWorkspaceSnapshot = null;
+                ConversationPersistenceStatus? cancelPersistenceStatus = null;
+                if (!string.IsNullOrWhiteSpace(request.SessionId))
+                {
+                    var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                    {
+                        LifecycleState = "plan_cancelled",
+                        PlanRunId = runId,
+                        PlanRunStatus = AgentRunEventStatuses.Cancelled,
+                        PlanTerminalSequence = cancelledEvent?.Sequence,
+                        RequirementMode = request.RequirementMode
+                    });
+                    cancelWorkspaceSnapshot = terminalPersistence.Snapshot;
+                    cancelPersistenceStatus = terminalPersistence.PersistenceStatus;
+                    if (!terminalPersistence.Success)
+                    {
+                        cancelPersistenceWarning = BuildPlanPersistenceWarning(terminalPersistence);
+                        AppendPlanPersistenceWarning(streamService, runId, terminalPersistence);
+                    }
+                }
+
+                streamService.Cancel(
+                    runId,
+                    "规划已取消。",
+                    BuildPlanTerminalPayload(
+                        "plan_cancelled",
+                        request.SessionId,
+                        runId,
+                        "规划已取消。",
+                        cancelWorkspaceSnapshot,
+                        cancelPersistenceStatus,
+                        cancelPersistenceWarning));
                 return;
             }
 
@@ -629,6 +703,9 @@ public static class AgentRunEndpoints
                     sessionId = request.SessionId,
                     metadataOnly = true
             });
+            object? persistenceWarning = null;
+            VisionAgentWorkspaceSnapshot? finalWorkspaceSnapshot = null;
+            ConversationPersistenceStatus? finalPersistenceStatus = null;
             if (!string.IsNullOrWhiteSpace(request.SessionId))
             {
                 var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
@@ -639,12 +716,25 @@ public static class AgentRunEndpoints
                     PlanTerminalSequence = cancelledEvent?.Sequence,
                     RequirementMode = request.RequirementMode
                 });
+                finalWorkspaceSnapshot = terminalPersistence.Snapshot;
+                finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
                 {
+                    persistenceWarning = BuildPlanPersistenceWarning(terminalPersistence);
                     AppendPlanPersistenceWarning(streamService, runId, terminalPersistence);
                 }
             }
-            streamService.Cancel(runId, "规划已取消。");
+            streamService.Cancel(
+                runId,
+                "规划已取消。",
+                BuildPlanTerminalPayload(
+                    "plan_cancelled",
+                    request.SessionId,
+                    runId,
+                    "规划已取消。",
+                    finalWorkspaceSnapshot,
+                    finalPersistenceStatus,
+                    persistenceWarning));
         }
         catch (Exception ex)
         {
@@ -657,6 +747,8 @@ public static class AgentRunEndpoints
                     metadataOnly = true
             });
             object? persistenceWarning = null;
+            VisionAgentWorkspaceSnapshot? finalWorkspaceSnapshot = null;
+            ConversationPersistenceStatus? finalPersistenceStatus = null;
             if (!string.IsNullOrWhiteSpace(request.SessionId))
             {
                 var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
@@ -667,6 +759,8 @@ public static class AgentRunEndpoints
                     PlanTerminalSequence = failedEvent?.Sequence,
                     RequirementMode = request.RequirementMode
                 });
+                finalWorkspaceSnapshot = terminalPersistence.Snapshot;
+                finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
                 {
                     persistenceWarning = BuildPlanPersistenceWarning(terminalPersistence);
@@ -679,8 +773,12 @@ public static class AgentRunEndpoints
                 "请检查公开诊断并重试规划。",
                 new
                 {
+                    status = "plan_failed",
                     mode = "plan",
+                    publicMessage = "规划在完成前失败。",
                     error = ex.Message,
+                    workspaceSnapshot = finalWorkspaceSnapshot,
+                    persistenceStatus = finalPersistenceStatus,
                     persistenceWarning,
                     metadataOnly = true
                 });
@@ -793,6 +891,29 @@ public static class AgentRunEndpoints
             canBuild = replaySafePlan.CanBuild,
             questionCount = replaySafePlan.ClarificationQuestions.Count,
             publicEventCount = replaySafePlan.PublicEvents.Count,
+            workspaceSnapshot,
+            persistenceStatus,
+            persistenceWarning,
+            metadataOnly = true
+        };
+    }
+
+    private static object BuildPlanTerminalPayload(
+        string status,
+        string? sessionId,
+        string runId,
+        string publicMessage,
+        VisionAgentWorkspaceSnapshot? workspaceSnapshot,
+        ConversationPersistenceStatus? persistenceStatus,
+        object? persistenceWarning)
+    {
+        return new
+        {
+            status,
+            generationMode = "plan",
+            sessionId,
+            planRunId = runId,
+            publicMessage,
             workspaceSnapshot,
             persistenceStatus,
             persistenceWarning,
@@ -1280,6 +1401,39 @@ public static class AgentRunEndpoints
         }
 
         return false;
+    }
+
+    private static string? TryResolvePlanRunSessionId(AgentRunReplayResult replay) =>
+        TryResolvePlanRunString(replay, "sessionId");
+
+    private static string? TryResolvePlanRequirementMode(AgentRunReplayResult replay) =>
+        TryResolvePlanRunString(replay, "requirementMode");
+
+    private static string? TryResolvePlanRunString(AgentRunReplayResult replay, string propertyName)
+    {
+        foreach (var evt in replay.Events)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(JsonSerializer.Serialize(evt.Payload, SseJsonOptions));
+                if (document.RootElement.ValueKind == JsonValueKind.Object &&
+                    document.RootElement.TryGetProperty(propertyName, out var element) &&
+                    element.ValueKind == JsonValueKind.String)
+                {
+                    var value = element.GetString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        return value.Trim();
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                // Ignore non-object payloads when recovering PlanRun context from replay.
+            }
+        }
+
+        return null;
     }
 
     private static long ParseLastEventId(HttpRequest request)
