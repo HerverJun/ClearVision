@@ -37,15 +37,18 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
     private readonly IConversationalFlowService _conversationalFlowService;
     private readonly IVisionAgentBuildProjectionJournal _journal;
     private readonly Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector> _logger;
+    private readonly VisionAgentBuildProjectionDispositionResolver _dispositionResolver;
 
     public VisionAgentBuildTerminalProjector(
         IConversationalFlowService conversationalFlowService,
         IVisionAgentBuildProjectionJournal journal,
-        Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector> logger)
+        Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector> logger,
+        VisionAgentBuildProjectionDispositionResolver? dispositionResolver = null)
     {
         _conversationalFlowService = conversationalFlowService;
         _journal = journal;
         _logger = logger;
+        _dispositionResolver = dispositionResolver ?? new VisionAgentBuildProjectionDispositionResolver();
     }
 
     public bool Project(VisionAgentBuildTerminalProjection projection)
@@ -85,7 +88,12 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         var result = projection.Result;
         var terminal = projection.TerminalEvent;
         var basis = BuildProjectionBasis(terminalSource, result, projection.Request);
-        if (projection.Recovered && !HasCompleteTerminalProjectionBasis(terminalSource))
+        var existingCheckpoint = projection.Recovered
+            ? _journal.TryGetLatest(runId, terminal.Sequence, terminal.EventType)
+            : null;
+        if (projection.Recovered &&
+            existingCheckpoint == null &&
+            !VisionAgentBuildProjectionDispositionResolver.HasCompleteProjectionBasis(terminalSource))
         {
             MarkRecoveryConflict(
                 session.SessionId,
@@ -250,6 +258,13 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
                 return false;
             }
 
+            if (projection.Recovered && !projectionResult.PersistenceStatus.PrimaryStoreSaved)
+            {
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(projectionResult.PublicMessage)
+                    ? "Vision Agent Build recovery could not persist conversation state."
+                    : projectionResult.PublicMessage);
+            }
+
             _journal.MarkProjected(
                 runId,
                 session.SessionId,
@@ -292,6 +307,12 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             .OrderBy(evt => evt.Sequence)
             .LastOrDefault(IsTerminalEvent);
         if (terminal == null)
+        {
+            return false;
+        }
+
+        if (_dispositionResolver.Resolve(replay, _journal, _conversationalFlowService) !=
+            VisionAgentBuildProjectionDisposition.Project)
         {
             return false;
         }
@@ -350,16 +371,6 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             buildIdentity);
     }
 
-    private static bool HasCompleteTerminalProjectionBasis(JsonElement? terminalSource)
-    {
-        return TryReadLong(terminalSource, "associationWorkspaceRevision").HasValue &&
-               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "submittedBuildFingerprint")) &&
-               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "planId")) &&
-               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "planHash")) &&
-               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "answerSetFingerprint")) &&
-               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "buildIdentity"));
-    }
-
     private static bool HasMatchingWorkspaceReceipt(
         ConversationSession session,
         string mutationId,
@@ -379,18 +390,62 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         string conflictCode,
         VisionAgentWorkspaceSnapshot? workspace)
     {
-        if (string.IsNullOrWhiteSpace(sessionId) || workspace == null)
+        if (string.IsNullOrWhiteSpace(sessionId))
         {
             return;
         }
 
-        _conversationalFlowService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var latest = _conversationalFlowService.GetSession(sessionId);
+        if (latest?.WorkspaceSnapshot == null)
         {
-            ExpectedRevision = workspace.Revision,
-            ClientMutationId = $"recovery-conflict:{runId}",
-            LifecycleState = "recovery_conflict"
-        });
+            return;
+        }
 
+        if (HasAppliedRecoveryConflict(latest, runId, terminalStatus))
+        {
+            return;
+        }
+
+        var update = new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = latest.WorkspaceSnapshot.Revision,
+            ClientMutationId = $"recovery-conflict:{runId}",
+            LifecycleState = "recovery_conflict",
+            BuildRunId = runId,
+            BuildRunStatus = terminalStatus
+        };
+        var result = _conversationalFlowService.TryUpdateWorkspaceSnapshot(sessionId, update);
+        if (result.Success && result.PersistenceStatus.PrimaryStoreSaved)
+        {
+            LogRecoveryConflict(runId, sessionId, terminalStatus, conflictCode);
+            return;
+        }
+
+        if (!result.PersistenceStatus.PrimaryStoreSaved)
+        {
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.PublicMessage)
+                ? $"Vision Agent Build recovery conflict could not be persisted. ErrorCode={result.ErrorCode}"
+                : result.PublicMessage);
+        }
+
+        var reread = _conversationalFlowService.GetSession(sessionId);
+        if (HasAppliedRecoveryConflict(reread, runId, terminalStatus))
+        {
+            LogRecoveryConflict(runId, sessionId, terminalStatus, conflictCode);
+            return;
+        }
+
+        throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.ErrorCode)
+            ? "Vision Agent Build recovery conflict write failed with an unexplained workspace mutation conflict."
+            : $"Vision Agent Build recovery conflict write failed. ErrorCode={result.ErrorCode}");
+    }
+
+    private void LogRecoveryConflict(
+        string runId,
+        string sessionId,
+        string terminalStatus,
+        string conflictCode)
+    {
         Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
             _logger,
             "Vision Agent Build recovery conflict. RunId={RunId}, SessionId={SessionId}, TerminalStatus={TerminalStatus}, ConflictCode={ConflictCode}",
@@ -398,6 +453,24 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             sessionId,
             terminalStatus,
             conflictCode);
+    }
+
+    private static bool HasAppliedRecoveryConflict(
+        ConversationSession? session,
+        string runId,
+        string terminalStatus)
+    {
+        if (session?.WorkspaceSnapshot == null)
+        {
+            return false;
+        }
+
+        var workspace = session.WorkspaceSnapshot;
+        return string.Equals(workspace.LifecycleState, "recovery_conflict", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(workspace.BuildRunId, runId, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(workspace.BuildRunStatus, terminalStatus, StringComparison.OrdinalIgnoreCase) &&
+               session.MutationReceipts.Any(receipt =>
+                   string.Equals(receipt.MutationId, $"recovery-conflict:{runId}", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string BuildBuildIdentity(

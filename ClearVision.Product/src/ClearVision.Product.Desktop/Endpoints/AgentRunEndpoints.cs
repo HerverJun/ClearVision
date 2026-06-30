@@ -349,6 +349,21 @@ public static class AgentRunEndpoints
                     "请检查本机存储权限或磁盘空间后重试 Build。",
                     new
                     {
+                        runKind = VisionAgentRunKindResolver.Build,
+                        projectionDisposition = VisionAgentBuildProjectionDispositionResolver.Skip,
+                        associationCommitted = false,
+                        associationWorkspaceRevision = (long?)null,
+                        submittedBuildFingerprint = ComputeSubmittedBuildFingerprint(request),
+                        planId = request.BuildFromPlan?.PlanId ?? request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
+                        planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
+                        answerSetFingerprint = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
+                        buildIdentity = BuildBuildIdentity(
+                            request.BuildFromPlan?.PlanId ?? request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
+                            request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
+                            request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,
+                            ComputeSubmittedBuildFingerprint(request)),
+                        status = AiFlowGenerationResult.CompletionStatusFailed,
+                        sessionId,
                         failureCode,
                         persistenceStatus,
                         metadataOnly = true
@@ -1010,6 +1025,47 @@ public static class AgentRunEndpoints
                                      !string.IsNullOrWhiteSpace(request.ExistingFlowJson),
             metadataOnly = true
         };
+    }
+
+    private static string ComputeSubmittedBuildFingerprint(AgentRunCreateRequest request)
+    {
+        var json = JsonSerializer.Serialize(new
+        {
+            request.BuildFromPlan?.PlanId,
+            planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash,
+            request.RequirementMode,
+            request.BuildFromPlan?.AcceptedRecommendedDefaults,
+            request.BuildFromPlan?.AcceptedDefaults,
+            request.BuildFromPlan?.ConfirmedAnswers,
+            request.BuildFromPlan?.UserSelections
+        });
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(json));
+        return "sha256:" + Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static string BuildBuildIdentity(
+        string planId,
+        string planHash,
+        string answerSetFingerprint,
+        string submittedBuildFingerprint)
+    {
+        return string.Join(
+            ":",
+            new[] { planId, planHash, answerSetFingerprint, submittedBuildFingerprint }
+                .Select(SanitizeBuildIdentityToken)
+                .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string SanitizeBuildIdentityToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            string.Empty,
+            value.Trim().Where(ch => char.IsLetterOrDigit(ch) || ch is ':' or '_' or '-' or '.'));
     }
 
     private static object BuildPlanCreatePayload(VisionAgentPlanModeRequest request)

@@ -43,22 +43,7 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
         foreach (var runId in runIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                ReconcileRun(runId);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
-                    _logger,
-                    ex,
-                    "Vision Agent startup recovery skipped a bad run record. RunId={RunId}",
-                    runId);
-            }
+            ReconcileRun(runId);
         }
 
         return Task.CompletedTask;
@@ -126,7 +111,8 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             return;
         }
 
-        _streamService.FailHostInterrupted(runId);
+        var interruptedTerminal = _streamService.FailHostInterrupted(runId);
+        EnsureRunTerminalCommitted(runId, AgentRunEventStatuses.Failed, interruptedTerminal);
         MarkHostInterruptedWorkspace(sessionId, runId, runType, workspace);
     }
 
@@ -167,9 +153,11 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
         var projected = _conversationService.TryUpdateWorkspaceSnapshot(intent.SessionId, update);
         if (!projected.Success)
         {
+            ThrowIfPrimaryStoreFailed(projected, "plan terminal intent recovery", replay.Summary.RunId, intent.SessionId);
             return false;
         }
 
+        ThrowIfPrimaryStoreFailed(projected, "plan terminal intent recovery", replay.Summary.RunId, intent.SessionId);
         CommitRunTerminalFromIntent(replay.Summary.RunId, intent);
         return true;
     }
@@ -246,7 +234,26 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             return;
         }
 
-        _conversationService.TryUpdateWorkspaceSnapshot(sessionId, update);
+        var projected = _conversationService.TryUpdateWorkspaceSnapshot(sessionId, update);
+        if (projected.Success)
+        {
+            ThrowIfPrimaryStoreFailed(projected, "plan terminal recovery", terminal.RunId, sessionId);
+            return;
+        }
+
+        ThrowIfPrimaryStoreFailed(projected, "plan terminal recovery", terminal.RunId, sessionId);
+        if (projected.Conflict)
+        {
+            MarkRecoveryConflict(sessionId, terminal.RunId, "plan", terminalStatus, workspace);
+            return;
+        }
+
+        throw BuildRecoveryPersistenceException(
+            "plan terminal recovery",
+            terminal.RunId,
+            sessionId,
+            projected.ErrorCode,
+            projected.PublicMessage);
     }
 
     private VisionAgentWorkspaceSnapshotUpdate? BuildPlanWorkspaceUpdate(
@@ -322,23 +329,27 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
 
     private void CommitRunTerminal(string runId, string status, object payload)
     {
+        AgentRunEvent? terminal;
         if (string.Equals(status, AgentRunEventStatuses.Completed, StringComparison.OrdinalIgnoreCase))
         {
-            _streamService.Complete(runId, "Plan terminal state recovered during startup.", payload);
+            terminal = _streamService.Complete(runId, "Plan terminal state recovered during startup.", payload);
+            EnsureRunTerminalCommitted(runId, status, terminal);
             return;
         }
 
         if (string.Equals(status, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
         {
-            _streamService.Cancel(runId, "Plan was cancelled before startup recovery.", payload);
+            terminal = _streamService.Cancel(runId, "Plan was cancelled before startup recovery.", payload);
+            EnsureRunTerminalCommitted(runId, status, terminal);
             return;
         }
 
-        _streamService.Fail(
+        terminal = _streamService.Fail(
             runId,
             "Plan recovered as failed during startup.",
             "Create a new plan before continuing the build.",
             payload);
+        EnsureRunTerminalCommitted(runId, AgentRunEventStatuses.Failed, terminal);
     }
 
     private void MarkRecoveryConflict(
@@ -353,16 +364,50 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             return;
         }
 
-        _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        var latest = _conversationService.GetSession(sessionId);
+        if (latest?.WorkspaceSnapshot == null)
         {
-            ExpectedRevision = workspace?.Revision,
+            return;
+        }
+
+        if (HasAppliedRecoveryConflict(latest, runId, runType, status))
+        {
+            LogRecoveryConflict(runId, sessionId, runType, status, "already_applied");
+            return;
+        }
+
+        var update = new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = latest.WorkspaceSnapshot.Revision,
             ClientMutationId = $"recovery-conflict:{runId}",
             LifecycleState = "recovery_conflict",
             PlanRunId = string.Equals(runType, "plan", StringComparison.OrdinalIgnoreCase) ? runId : null,
             PlanRunStatus = string.Equals(runType, "plan", StringComparison.OrdinalIgnoreCase) ? status : null,
             BuildRunId = string.Equals(runType, "build", StringComparison.OrdinalIgnoreCase) ? runId : null,
             BuildRunStatus = string.Equals(runType, "build", StringComparison.OrdinalIgnoreCase) ? status : null
-        });
+        };
+        var result = _conversationService.TryUpdateWorkspaceSnapshot(sessionId, update);
+        if (result.Success)
+        {
+            ThrowIfPrimaryStoreFailed(result, "recovery conflict", runId, sessionId);
+            LogRecoveryConflict(runId, sessionId, runType, status, "workspace_conflict");
+            return;
+        }
+
+        ThrowIfPrimaryStoreFailed(result, "recovery conflict", runId, sessionId);
+        var reread = _conversationService.GetSession(sessionId);
+        if (HasAppliedRecoveryConflict(reread, runId, runType, status))
+        {
+            LogRecoveryConflict(runId, sessionId, runType, status, "already_applied");
+            return;
+        }
+
+        throw BuildRecoveryPersistenceException(
+            "recovery conflict",
+            runId,
+            sessionId,
+            result.ErrorCode,
+            result.PublicMessage);
     }
 
     private void MarkHostInterruptedWorkspace(
@@ -380,29 +425,188 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             string.Equals(workspace.PlanRunId, runId, StringComparison.OrdinalIgnoreCase) &&
             !IsTerminalStatus(workspace.PlanRunStatus))
         {
-            _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+            var latest = _conversationService.GetSession(sessionId);
+            var latestWorkspace = latest?.WorkspaceSnapshot;
+            if (latestWorkspace == null ||
+                !string.Equals(latestWorkspace.PlanRunId, runId, StringComparison.OrdinalIgnoreCase) ||
+                IsTerminalStatus(latestWorkspace.PlanRunStatus))
             {
-                ExpectedRevision = workspace.Revision,
+                return;
+            }
+
+            var result = _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ExpectedRevision = latestWorkspace.Revision,
                 ClientMutationId = $"plan-host-interrupted:{runId}",
                 LifecycleState = "plan_failed",
                 PlanRunId = runId,
                 PlanRunStatus = AgentRunEventStatuses.Failed
             });
+            EnsureHostInterruptedMutation(result, sessionId, runId, "plan");
         }
 
         if (string.Equals(runType, "build", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(workspace.BuildRunId, runId, StringComparison.OrdinalIgnoreCase) &&
             !IsTerminalStatus(workspace.BuildRunStatus))
         {
-            _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+            var latest = _conversationService.GetSession(sessionId);
+            var latestWorkspace = latest?.WorkspaceSnapshot;
+            if (latestWorkspace == null ||
+                !string.Equals(latestWorkspace.BuildRunId, runId, StringComparison.OrdinalIgnoreCase) ||
+                IsTerminalStatus(latestWorkspace.BuildRunStatus))
             {
-                ExpectedRevision = workspace.Revision,
+                return;
+            }
+
+            var result = _conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+            {
+                ExpectedRevision = latestWorkspace.Revision,
                 ClientMutationId = $"build-host-interrupted:{runId}",
                 LifecycleState = "build_failed",
                 BuildRunId = runId,
                 BuildRunStatus = AgentRunEventStatuses.Failed
             });
+            EnsureHostInterruptedMutation(result, sessionId, runId, "build");
         }
+    }
+
+    private void EnsureHostInterruptedMutation(
+        VisionAgentWorkspaceSnapshotMutationResult result,
+        string sessionId,
+        string runId,
+        string runType)
+    {
+        if (result.Success)
+        {
+            ThrowIfPrimaryStoreFailed(result, $"{runType} host interrupted recovery", runId, sessionId);
+            return;
+        }
+
+        ThrowIfPrimaryStoreFailed(result, $"{runType} host interrupted recovery", runId, sessionId);
+        var latest = _conversationService.GetSession(sessionId)?.WorkspaceSnapshot;
+        if (string.Equals(runType, "plan", StringComparison.OrdinalIgnoreCase) &&
+            latest != null &&
+            string.Equals(latest.PlanRunId, runId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(latest.PlanRunStatus, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (string.Equals(runType, "build", StringComparison.OrdinalIgnoreCase) &&
+            latest != null &&
+            string.Equals(latest.BuildRunId, runId, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(latest.BuildRunStatus, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        throw BuildRecoveryPersistenceException(
+            $"{runType} host interrupted recovery",
+            runId,
+            sessionId,
+            result.ErrorCode,
+            result.PublicMessage);
+    }
+
+    private void EnsureRunTerminalCommitted(string runId, string status, AgentRunEvent? terminal)
+    {
+        if (terminal != null)
+        {
+            return;
+        }
+
+        var replay = _streamService.ReplayRaw(runId);
+        if (replay?.Events.Any(evt =>
+                IsRunTerminalEvent(evt) &&
+                string.Equals(NormalizeTerminalStatus(evt.Status), NormalizeTerminalStatus(status), StringComparison.OrdinalIgnoreCase)) == true)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Vision Agent startup recovery could not append terminal event. RunId={runId}, Status={status}");
+    }
+
+    private static void ThrowIfPrimaryStoreFailed(
+        VisionAgentWorkspaceSnapshotMutationResult result,
+        string operation,
+        string runId,
+        string sessionId)
+    {
+        if (result.PersistenceStatus.PrimaryStoreSaved)
+        {
+            return;
+        }
+
+        throw BuildRecoveryPersistenceException(
+            operation,
+            runId,
+            sessionId,
+            result.ErrorCode,
+            result.PublicMessage);
+    }
+
+    private static InvalidOperationException BuildRecoveryPersistenceException(
+        string operation,
+        string runId,
+        string sessionId,
+        string errorCode,
+        string publicMessage)
+    {
+        var code = string.IsNullOrWhiteSpace(errorCode)
+            ? "unknown"
+            : errorCode.Trim();
+        var message = string.IsNullOrWhiteSpace(publicMessage)
+            ? $"Vision Agent startup recovery failed to persist {operation}. RunId={runId}, SessionId={sessionId}, ErrorCode={code}"
+            : publicMessage;
+        return new InvalidOperationException(message);
+    }
+
+    private void LogRecoveryConflict(
+        string runId,
+        string sessionId,
+        string runType,
+        string status,
+        string conflictCode)
+    {
+        Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
+            _logger,
+            "Vision Agent startup recovery conflict. RunId={RunId}, SessionId={SessionId}, RunType={RunType}, Status={Status}, ConflictCode={ConflictCode}",
+            runId,
+            sessionId,
+            runType,
+            status,
+            conflictCode);
+    }
+
+    private static bool HasAppliedRecoveryConflict(
+        ConversationSession? session,
+        string runId,
+        string runType,
+        string status)
+    {
+        if (session?.WorkspaceSnapshot == null)
+        {
+            return false;
+        }
+
+        var workspace = session.WorkspaceSnapshot;
+        var receiptApplied = session.MutationReceipts.Any(receipt =>
+            string.Equals(receipt.MutationId, $"recovery-conflict:{runId}", StringComparison.OrdinalIgnoreCase));
+        if (!receiptApplied ||
+            !string.Equals(workspace.LifecycleState, "recovery_conflict", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (string.Equals(runType, "plan", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(workspace.PlanRunId, runId, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(workspace.PlanRunStatus, status, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(workspace.BuildRunId, runId, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(workspace.BuildRunStatus, status, StringComparison.OrdinalIgnoreCase);
     }
 
     private bool HasWorkspaceConflict(

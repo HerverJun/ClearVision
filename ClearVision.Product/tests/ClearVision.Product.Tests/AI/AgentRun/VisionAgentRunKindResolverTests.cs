@@ -102,6 +102,42 @@ public sealed class VisionAgentRunKindResolverTests : IDisposable
             .Be(VisionAgentRunKind.Unknown);
     }
 
+    [Fact]
+    public void Resolve_ShouldTreatLegacyRunStartedPlanModeAsPlan()
+    {
+        var service = CreateService();
+        var run = service.CreateRun("legacy plan mode", new
+        {
+            mode = "plan",
+            sessionId = "session-plan",
+            metadataOnly = true
+        });
+
+        VisionAgentRunKindResolver.Resolve(service.ReplayRaw(run.RunId)!)
+            .Should()
+            .Be(VisionAgentRunKind.Plan);
+    }
+
+    [Theory]
+    [InlineData("new")]
+    [InlineData("modify")]
+    [InlineData("auto")]
+    public void Resolve_ShouldNotInferBuildFromLegacyNonPlanModes(string mode)
+    {
+        var service = CreateService();
+        var run = service.CreateRun("legacy non-build mode", new
+        {
+            mode,
+            planId = "plan-a",
+            planHash = "sha256:plan",
+            metadataOnly = true
+        });
+
+        VisionAgentRunKindResolver.Resolve(service.ReplayRaw(run.RunId)!)
+            .Should()
+            .Be(VisionAgentRunKind.Unknown);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempRoot))

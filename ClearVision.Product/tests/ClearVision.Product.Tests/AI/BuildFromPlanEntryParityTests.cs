@@ -238,20 +238,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         }).Should().NotBeNull();
         harness.Conversation.GetSession("session-startup")!.History.Should().BeEmpty();
 
-        var services = new ServiceCollection();
-        services.AddSingleton<IVisionAgentBuildTerminalProjector>(
-            new VisionAgentBuildTerminalProjector(
-                harness.Conversation,
-                harness.Journal,
-                Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>()));
-        await using var provider = services.BuildServiceProvider();
-        var reconciler = new VisionAgentBuildProjectionReconciliationService(
-            harness.Store,
-            new AgentRunEventStreamService(harness.Store, harness.Redactor),
-            provider.GetRequiredService<IServiceScopeFactory>(),
-            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildProjectionReconciliationService>>());
-
-        await reconciler.ReconcileAsync(CancellationToken.None);
+        await RunFullRecoveryAsync(harness);
         harness.Conversation.GetSession("session-startup")!.History.Should().HaveCount(1);
         var checkpoint = harness.Journal.LoadCheckpoints().Single(item => item.RunId == run.RunId);
         checkpoint.Status.Should().Be(VisionAgentBuildProjectionStatuses.Projected);
@@ -259,7 +246,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         checkpoint.PayloadFingerprint.Should().StartWith("sha256:");
         checkpoint.Identity.Should().NotBeNullOrWhiteSpace();
         checkpoint.ExpectedWorkspaceRevision.Should().Be(associationRevision);
-        await reconciler.ReconcileAsync(CancellationToken.None);
+        await RunFullRecoveryAsync(harness);
 
         harness.Conversation.GetSession("session-startup")!.History.Should().HaveCount(1);
         harness.Journal.LoadCheckpoints()
@@ -333,6 +320,8 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         harness.Stream.Complete(run.RunId, "done", new
         {
             runKind = VisionAgentRunKindResolver.Build,
+            projectionDisposition = VisionAgentBuildProjectionDispositionResolver.Project,
+            associationCommitted = true,
             status = result.CompletionStatus,
             sessionId = request.SessionId,
             flow = result.Flow,
@@ -341,8 +330,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             metadataOnly = true
         }).Should().NotBeNull();
 
-        var reconciler = CreateBuildReconciler(harness);
-        await reconciler.ReconcileAsync(CancellationToken.None);
+        await RunFullRecoveryAsync(harness);
         var session = harness.Conversation.GetSession("session-missing-basis")!;
         var revision = session.WorkspaceSnapshot!.Revision;
 
@@ -350,10 +338,259 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         session.WorkspaceSnapshot.LifecycleState.Should().Be("recovery_conflict");
         harness.Journal.LoadCheckpoints().Should().BeEmpty();
 
-        await reconciler.ReconcileAsync(CancellationToken.None);
+        await RunFullRecoveryAsync(harness);
 
         harness.Conversation.GetSession("session-missing-basis")!.WorkspaceSnapshot!.Revision.Should().Be(revision);
         harness.Conversation.GetSession("session-missing-basis")!.History.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task StartupReconciliation_AssociationFailure_ShouldSkipWithoutCheckpointHistoryOrConflict()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("association failure", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId = "session-association-failure",
+            metadataOnly = true
+        });
+        var request = BuildRequest(BuildPlan()) with
+        {
+            AgentRunId = run.RunId,
+            SessionId = "session-association-failure",
+            BuildFromPlan = BuildRequest(BuildPlan()).BuildFromPlan! with
+            {
+                WorkspaceExpectedRevision = 99
+            }
+        };
+
+        var result = await harness.RunService.RunAsync(
+            BuildCommand.FromGenerationRequest(
+                request,
+                run.RunId,
+                $"req-{run.RunId}",
+                BuildCommandTransports.AgentRun,
+                persistResult: false),
+            CancellationToken.None);
+
+        result.TerminalEvent.Should().NotBeNull();
+        await RunFullRecoveryAsync(harness);
+
+        harness.Journal.LoadCheckpoints().Should().BeEmpty();
+        var session = harness.Conversation.GetSession("session-association-failure");
+        session?.History.Should().BeNullOrEmpty();
+        session?.WorkspaceSnapshot?.LifecycleState.Should().NotBe("recovery_conflict");
+    }
+
+    [Fact]
+    public async Task StartupReconciliation_BuildHostInterrupted_ShouldRemainBuildFailedAfterBuildRecovery()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("interrupted build", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId = "session-build-interrupted",
+            metadataOnly = true
+        });
+        harness.Conversation.TryUpdateWorkspaceSnapshot("session-build-interrupted", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ClientMutationId = $"build-start:{run.RunId}",
+            LifecycleState = "building",
+            BuildRunId = run.RunId,
+            BuildRunStatus = AgentRunEventStatuses.Running
+        }).Success.Should().BeTrue();
+
+        await RunFullRecoveryAsync(harness);
+        var session = harness.Conversation.GetSession("session-build-interrupted")!;
+        var revision = session.WorkspaceSnapshot!.Revision;
+        session.WorkspaceSnapshot.LifecycleState.Should().Be("build_failed");
+        session.WorkspaceSnapshot.BuildRunStatus.Should().Be(AgentRunEventStatuses.Failed);
+        session.History.Should().BeEmpty();
+        harness.Journal.LoadCheckpoints().Should().BeEmpty();
+
+        await CreateBuildReconciler(harness).ReconcileAsync(CancellationToken.None);
+
+        harness.Conversation.GetSession("session-build-interrupted")!.WorkspaceSnapshot!.Revision.Should().Be(revision);
+        harness.Conversation.GetSession("session-build-interrupted")!.WorkspaceSnapshot!.LifecycleState.Should().Be("build_failed");
+        harness.Journal.LoadCheckpoints().Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(AgentRunEventStatuses.Failed)]
+    [InlineData(AgentRunEventStatuses.Cancelled)]
+    public async Task StartupReconciliation_AssociatedFailedOrCancelledBuild_ShouldProjectOnlyOnce(string terminalStatus)
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("associated terminal", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId = $"session-associated-{terminalStatus}",
+            metadataOnly = true
+        });
+        var request = BuildRequest(BuildPlan()) with
+        {
+            AgentRunId = run.RunId,
+            SessionId = $"session-associated-{terminalStatus}"
+        };
+        var association = PrepareAssociatedBuild(harness, request, run.RunId);
+        var result = FailureResult(request, terminalStatus);
+        var payload = BuildProjectedTerminalPayload(request, result, association);
+        if (string.Equals(terminalStatus, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+        {
+            harness.Stream.Cancel(run.RunId, "cancelled", payload).Should().NotBeNull();
+        }
+        else
+        {
+            harness.Stream.Fail(run.RunId, "failed", "retry", payload).Should().NotBeNull();
+        }
+
+        await RunFullRecoveryAsync(harness);
+        await RunFullRecoveryAsync(harness);
+
+        var session = harness.Conversation.GetSession(request.SessionId!)!;
+        session.History.Should().HaveCount(1);
+        session.WorkspaceSnapshot!.BuildRunStatus.Should().Be(terminalStatus);
+        harness.Journal.LoadCheckpoints().Single(item => item.RunId == run.RunId)
+            .Status.Should().Be(VisionAgentBuildProjectionStatuses.Projected);
+    }
+
+    [Fact]
+    public async Task StartupReconciliation_LegacyPlanMode_ShouldRecoverAsInterruptedPlanAndSkipBuildProjector()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("legacy plan mode", new
+        {
+            mode = "plan",
+            sessionId = "session-legacy-plan-mode",
+            metadataOnly = true
+        });
+        harness.Conversation.TryUpdateWorkspaceSnapshot("session-legacy-plan-mode", new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ClientMutationId = $"plan-start:{run.RunId}",
+            LifecycleState = "planning",
+            PlanRunId = run.RunId,
+            PlanRunStatus = AgentRunEventStatuses.Running
+        }).Success.Should().BeTrue();
+
+        await RunFullRecoveryAsync(harness);
+
+        var session = harness.Conversation.GetSession("session-legacy-plan-mode")!;
+        session.WorkspaceSnapshot!.LifecycleState.Should().Be("plan_failed");
+        session.WorkspaceSnapshot.PlanRunStatus.Should().Be(AgentRunEventStatuses.Failed);
+        session.WorkspaceSnapshot.BuildRunId.Should().BeNull();
+        harness.Journal.LoadCheckpoints().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task StartupReconciliation_FirstBusinessConflict_ShouldContinueWithLaterBuildRun()
+    {
+        using var harness = CreateHarness();
+        var conflictRun = harness.Stream.CreateRun("first conflict", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId = "session-first-conflict",
+            metadataOnly = true
+        });
+        var conflictRequest = BuildRequest(BuildPlan()) with
+        {
+            AgentRunId = conflictRun.RunId,
+            SessionId = "session-first-conflict"
+        };
+        PrepareAssociatedBuild(harness, conflictRequest, conflictRun.RunId);
+        harness.Stream.Complete(conflictRun.RunId, "done", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            projectionDisposition = VisionAgentBuildProjectionDispositionResolver.Project,
+            associationCommitted = true,
+            status = AiFlowGenerationResult.CompletionStatusCompleted,
+            sessionId = conflictRequest.SessionId,
+            metadataOnly = true
+        }).Should().NotBeNull();
+
+        var goodRun = harness.Stream.CreateRun("later good", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId = "session-later-good",
+            metadataOnly = true
+        });
+        var goodRequest = BuildRequest(BuildPlan()) with
+        {
+            AgentRunId = goodRun.RunId,
+            SessionId = "session-later-good"
+        };
+        var association = PrepareAssociatedBuild(harness, goodRequest, goodRun.RunId);
+        var goodResult = SuccessResult(goodRequest);
+        harness.Stream.Complete(goodRun.RunId, "done", BuildProjectedTerminalPayload(goodRequest, goodResult, association))
+            .Should().NotBeNull();
+
+        await RunFullRecoveryAsync(harness);
+
+        harness.Conversation.GetSession("session-first-conflict")!.WorkspaceSnapshot!.LifecycleState
+            .Should().Be("recovery_conflict");
+        harness.Conversation.GetSession("session-later-good")!.History.Should().HaveCount(1);
+        harness.Journal.LoadCheckpoints().Should().ContainSingle(item => item.RunId == goodRun.RunId);
+    }
+
+    [Fact]
+    public async Task StartupReconciliation_RepeatedFullRecovery_ShouldNotIncreaseEventsRevisionHistoryOrCheckpoints()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("full idempotence", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId = "session-full-idempotence",
+            metadataOnly = true
+        });
+        var request = BuildRequest(BuildPlan()) with
+        {
+            AgentRunId = run.RunId,
+            SessionId = "session-full-idempotence"
+        };
+        var association = PrepareAssociatedBuild(harness, request, run.RunId);
+        var result = SuccessResult(request);
+        harness.Stream.Complete(run.RunId, "done", BuildProjectedTerminalPayload(request, result, association))
+            .Should().NotBeNull();
+
+        await RunFullRecoveryAsync(harness);
+        var replay = harness.Stream.ReplayRaw(run.RunId)!;
+        var session = harness.Conversation.GetSession("session-full-idempotence")!;
+        var eventCount = replay.Events.Count;
+        var revision = session.WorkspaceSnapshot!.Revision;
+        var historyCount = session.History.Count;
+        var checkpointCount = harness.Journal.LoadCheckpoints().Count;
+
+        await RunFullRecoveryAsync(harness);
+
+        harness.Stream.ReplayRaw(run.RunId)!.Events.Should().HaveCount(eventCount);
+        harness.Conversation.GetSession("session-full-idempotence")!.WorkspaceSnapshot!.Revision.Should().Be(revision);
+        harness.Conversation.GetSession("session-full-idempotence")!.History.Should().HaveCount(historyCount);
+        harness.Journal.LoadCheckpoints().Should().HaveCount(checkpointCount);
+    }
+
+    [Fact]
+    public async Task StartupReconciliation_PrimaryStorePersistenceFailure_ShouldThrow()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("primary store failure", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId = "session-primary-store-fail",
+            metadataOnly = true
+        });
+        var request = BuildRequest(BuildPlan()) with
+        {
+            AgentRunId = run.RunId,
+            SessionId = "session-primary-store-fail"
+        };
+        var association = PrepareAssociatedBuild(harness, request, run.RunId);
+        var result = SuccessResult(request);
+        harness.Stream.Complete(run.RunId, "done", BuildProjectedTerminalPayload(request, result, association))
+            .Should().NotBeNull();
+        harness.Conversation.PrimaryStoreWriteFaultInjector = () => throw new IOException("primary failed");
+
+        var act = () => RunFullRecoveryAsync(harness);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
@@ -663,8 +900,156 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         return new VisionAgentBuildProjectionReconciliationService(
             harness.Store,
             new AgentRunEventStreamService(harness.Store, harness.Redactor),
+            harness.Journal,
+            harness.Conversation,
             provider.GetRequiredService<IServiceScopeFactory>(),
+            new VisionAgentBuildProjectionDispositionResolver(),
             Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildProjectionReconciliationService>>());
+    }
+
+    private static async Task RunFullRecoveryAsync(BuildHarness harness)
+    {
+        var runRecovery = new VisionAgentRunRecoveryReconciliationService(
+            harness.Store,
+            new AgentRunEventStreamService(harness.Store, harness.Redactor),
+            harness.Conversation,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentRunRecoveryReconciliationService>>());
+        await runRecovery.ReconcileAsync(CancellationToken.None);
+        await CreateBuildReconciler(harness).ReconcileAsync(CancellationToken.None);
+    }
+
+    private static VisionAgentWorkspaceSnapshotMutationResult PrepareAssociatedBuild(
+        BuildHarness harness,
+        AiFlowGenerationRequest request,
+        string runId)
+    {
+        var association = harness.RunService.PrepareBuildAssociation(
+            BuildCommand.FromGenerationRequest(
+                request,
+                runId,
+                $"req-{runId}",
+                BuildCommandTransports.AgentRun,
+                persistResult: false));
+        association.Success.Should().BeTrue();
+        association.Snapshot.Should().NotBeNull();
+        return association;
+    }
+
+    private static object BuildProjectedTerminalPayload(
+        AiFlowGenerationRequest request,
+        AiFlowGenerationResult result,
+        VisionAgentWorkspaceSnapshotMutationResult association)
+    {
+        var build = request.BuildFromPlan!;
+        var answerSetFingerprint = FirstNonBlank(
+            result.AnswerSetFingerprint,
+            result.BuildResult?.AnswerSetFingerprint,
+            build.PlanHash,
+            build.PlanSnapshot?.PlanHash);
+        var submittedFingerprint = FirstNonBlank(
+            association.Snapshot?.SubmittedBuildFingerprint,
+            answerSetFingerprint,
+            build.PlanHash,
+            build.PlanSnapshot?.PlanHash);
+        return new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            projectionDisposition = VisionAgentBuildProjectionDispositionResolver.Project,
+            associationCommitted = true,
+            associationWorkspaceRevision = association.Revision,
+            submittedBuildFingerprint = submittedFingerprint,
+            planId = build.PlanId,
+            planHash = build.PlanHash,
+            answerSetFingerprint,
+            buildIdentity = BuildBuildIdentity(build.PlanId, build.PlanHash, answerSetFingerprint, submittedFingerprint),
+            status = result.CompletionStatus,
+            sessionId = request.SessionId,
+            failureType = result.FailureType,
+            failureCode = result.FailureSummary?.Code ?? string.Empty,
+            failureSummary = result.FailureSummary,
+            flow = result.Flow,
+            buildResult = result.BuildResult,
+            buildReadiness = result.BuildReadiness,
+            planSnapshot = build.PlanSnapshot,
+            buildFromPlan = new
+            {
+                planId = build.PlanId,
+                planHash = build.PlanHash,
+                planSnapshot = build.PlanSnapshot,
+                metadataOnly = true
+            },
+            metadataOnly = true
+        };
+    }
+
+    private static AiFlowGenerationResult FailureResult(AiFlowGenerationRequest request, string terminalStatus)
+    {
+        var cancelled = string.Equals(terminalStatus, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase);
+        return new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = cancelled
+                ? AiFlowGenerationResult.CompletionStatusCancelled
+                : AiFlowGenerationResult.CompletionStatusFailed,
+            FailureType = cancelled
+                ? AiFlowGenerationResult.FailureTypeUserCancelled
+                : AiFlowGenerationResult.FailureTypeSystemError,
+            ErrorMessage = cancelled ? "cancelled" : "failed",
+            FailureSummary = new AiFailureSummary
+            {
+                Category = "test",
+                Code = cancelled ? "test_cancelled" : "test_failed",
+                Message = cancelled ? "cancelled" : "failed",
+                RepairTarget = "retry"
+            },
+            BuildResult = new VisionAgentBuildResult
+            {
+                BuildId = "build-fake",
+                PlanId = request.BuildFromPlan!.PlanId,
+                PlanHash = request.BuildFromPlan.PlanHash,
+                ContractVersion = request.BuildFromPlan.PlanSnapshot?.PlanContractVersion ?? string.Empty,
+                AnswerSetFingerprint = "manual",
+                MetadataOnly = true
+            },
+            BuildReadiness = request.BuildFromPlan.PlanSnapshot?.BuildReadiness,
+            PlanId = request.BuildFromPlan.PlanId,
+            PlanHash = request.BuildFromPlan.PlanHash,
+            AnswerSetFingerprint = "manual",
+            SessionId = request.SessionId,
+            InteractionState = cancelled ? AiInteractionStates.Idle : AiInteractionStates.Failed,
+            TurnIntent = AiTurnIntents.NewFlow,
+            RouterConfidence = AiRouterConfidence.High
+        };
+    }
+
+    private static string BuildBuildIdentity(
+        string planId,
+        string planHash,
+        string answerSetFingerprint,
+        string submittedBuildFingerprint)
+    {
+        return string.Join(
+            ":",
+            new[] { planId, planHash, answerSetFingerprint, submittedBuildFingerprint }
+                .Select(SanitizeIdentityToken)
+                .Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string SanitizeIdentityToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            string.Empty,
+            value.Trim().Where(ch => char.IsLetterOrDigit(ch) || ch is ':' or '_' or '-' or '.'));
+    }
+
+    private static string FirstNonBlank(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
     }
 
     private static async Task<EntryResult> RunAgentRunEntryAsync(

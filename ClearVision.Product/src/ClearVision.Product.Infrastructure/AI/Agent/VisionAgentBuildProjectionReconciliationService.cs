@@ -8,17 +8,26 @@ public sealed class VisionAgentBuildProjectionReconciliationService : IHostedSer
 {
     private readonly AgentRunEventStore _eventStore;
     private readonly IAgentRunEventStreamService _streamService;
+    private readonly IVisionAgentBuildProjectionJournal _journal;
+    private readonly IConversationalFlowService _conversationService;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly VisionAgentBuildProjectionDispositionResolver _dispositionResolver;
 
     public VisionAgentBuildProjectionReconciliationService(
         AgentRunEventStore eventStore,
         IAgentRunEventStreamService streamService,
+        IVisionAgentBuildProjectionJournal journal,
+        IConversationalFlowService conversationService,
         IServiceScopeFactory scopeFactory,
+        VisionAgentBuildProjectionDispositionResolver dispositionResolver,
         Microsoft.Extensions.Logging.ILogger<VisionAgentBuildProjectionReconciliationService> logger)
     {
         _eventStore = eventStore;
         _streamService = streamService;
+        _journal = journal;
+        _conversationService = conversationService;
         _scopeFactory = scopeFactory;
+        _dispositionResolver = dispositionResolver;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -52,6 +61,12 @@ public sealed class VisionAgentBuildProjectionReconciliationService : IHostedSer
             var replay = _streamService.ReplayRaw(runId);
             if (replay == null ||
                 VisionAgentRunKindResolver.Resolve(replay) != VisionAgentRunKind.Build)
+            {
+                continue;
+            }
+
+            if (_dispositionResolver.Resolve(replay, _journal, _conversationService) !=
+                VisionAgentBuildProjectionDisposition.Project)
             {
                 continue;
             }

@@ -285,6 +285,8 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         return new
         {
             runKind = VisionAgentRunKindResolver.Build,
+            projectionDisposition = terminalBasis.ProjectionDisposition,
+            associationCommitted = terminalBasis.AssociationCommitted,
             associationWorkspaceRevision = terminalBasis.AssociationWorkspaceRevision,
             submittedBuildFingerprint = terminalBasis.SubmittedBuildFingerprint,
             planId = terminalBasis.PlanId,
@@ -354,6 +356,8 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         return new
         {
             runKind = VisionAgentRunKindResolver.Build,
+            projectionDisposition = terminalBasis.ProjectionDisposition,
+            associationCommitted = terminalBasis.AssociationCommitted,
             associationWorkspaceRevision = terminalBasis.AssociationWorkspaceRevision,
             submittedBuildFingerprint = terminalBasis.SubmittedBuildFingerprint,
             planId = terminalBasis.PlanId,
@@ -454,7 +458,8 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
 
         return new BuildAssociationProjectionBasis(
             workspace.Revision,
-            FirstNonBlank(workspace.SubmittedBuildFingerprint, ComputeSubmittedBuildFingerprint(request)));
+            FirstNonBlank(workspace.SubmittedBuildFingerprint, ComputeSubmittedBuildFingerprint(request)),
+            AssociationCommitted: true);
     }
 
     private static BuildTerminalProjectionBasis BuildTerminalBasis(
@@ -471,6 +476,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             request.BuildFromPlan?.PlanSnapshot?.PlanHash);
         var submittedBuildFingerprint = FirstNonBlank(
             projectionBasis.SubmittedBuildFingerprint,
+            ComputeSubmittedBuildFingerprint(request),
             answerSetFingerprint,
             planHash);
         var buildIdentity = BuildBuildIdentity(
@@ -480,6 +486,10 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             submittedBuildFingerprint);
 
         return new BuildTerminalProjectionBasis(
+            projectionBasis.AssociationCommitted
+                ? VisionAgentBuildProjectionDispositionResolver.Project
+                : VisionAgentBuildProjectionDispositionResolver.Skip,
+            projectionBasis.AssociationCommitted,
             projectionBasis.AssociationWorkspaceRevision,
             submittedBuildFingerprint,
             planId,
@@ -692,9 +702,10 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
 
     private sealed record BuildAssociationProjectionBasis(
         long? AssociationWorkspaceRevision,
-        string SubmittedBuildFingerprint)
+        string SubmittedBuildFingerprint,
+        bool AssociationCommitted)
     {
-        public static BuildAssociationProjectionBasis Empty { get; } = new(null, string.Empty);
+        public static BuildAssociationProjectionBasis Empty { get; } = new(null, string.Empty, false);
 
         public static BuildAssociationProjectionBasis FromAssociation(
             VisionAgentWorkspaceSnapshotMutationResult association,
@@ -702,11 +713,14 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         {
             return new BuildAssociationProjectionBasis(
                 association.Snapshot?.Revision,
-                FirstNonBlank(association.Snapshot?.SubmittedBuildFingerprint, submittedBuildFingerprint));
+                FirstNonBlank(association.Snapshot?.SubmittedBuildFingerprint, submittedBuildFingerprint),
+                AssociationCommitted: true);
         }
     }
 
     private sealed record BuildTerminalProjectionBasis(
+        string ProjectionDisposition,
+        bool AssociationCommitted,
         long? AssociationWorkspaceRevision,
         string SubmittedBuildFingerprint,
         string PlanId,

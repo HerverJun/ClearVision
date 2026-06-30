@@ -105,6 +105,7 @@ public static class AiGenerationServiceExtensions
         services.AddScoped<BuildResultAssembler>();
         services.AddScoped<IVisionAgentBuildOrchestrator, VisionAgentBuildOrchestrator>();
         services.AddScoped<IVisionAgentBuildApplicationService, VisionAgentBuildApplicationService>();
+        services.AddSingleton<VisionAgentBuildProjectionDispositionResolver>();
         services.AddSingleton<IVisionAgentBuildProjectionJournal, VisionAgentBuildProjectionJournal>();
         services.AddScoped<IVisionAgentBuildTerminalProjector, VisionAgentBuildTerminalProjector>();
         services.AddScoped<IVisionAgentBuildRunService, VisionAgentBuildRunService>();

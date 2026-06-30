@@ -40,9 +40,17 @@ public static class VisionAgentRunKindResolver
             return VisionAgentRunKind.Plan;
         }
 
-        return HasBuildFromPlanEvidence(replay)
-            ? VisionAgentRunKind.Build
-            : VisionAgentRunKind.Unknown;
+        if (HasBuildFromPlanEvidence(replay))
+        {
+            return VisionAgentRunKind.Build;
+        }
+
+        if (HasLegacyPlanMode(replay))
+        {
+            return VisionAgentRunKind.Plan;
+        }
+
+        return VisionAgentRunKind.Unknown;
     }
 
     public static string ToWireValue(VisionAgentRunKind kind)
@@ -92,6 +100,15 @@ public static class VisionAgentRunKindResolver
             HasProperty(evt.Payload, "buildInputSummary") ||
             HasProperty(evt.Payload, "buildReadiness") ||
             HasProperty(evt.Payload, "buildResult"));
+    }
+
+    private static bool HasLegacyPlanMode(AgentRunReplayResult replay)
+    {
+        return replay.Events
+            .Where(evt => string.Equals(evt.EventType, AgentRunEventTypes.RunStarted, StringComparison.OrdinalIgnoreCase))
+            .Any(evt =>
+                string.Equals(TryReadString(evt.Payload, "mode"), Plan, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(TryReadString(evt.Payload, "generationMode"), Plan, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool HasProperty(object? payload, string propertyName)
