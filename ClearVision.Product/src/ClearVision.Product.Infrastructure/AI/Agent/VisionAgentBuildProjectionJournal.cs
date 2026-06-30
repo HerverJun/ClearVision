@@ -31,9 +31,14 @@ public sealed record VisionAgentBuildProjectionCheckpoint
     public string SessionId { get; init; } = string.Empty;
     public long TerminalSequence { get; init; }
     public string TerminalType { get; init; } = string.Empty;
+    public string TerminalMutationId { get; init; } = string.Empty;
+    public string PayloadFingerprint { get; init; } = string.Empty;
+    public long? ExpectedWorkspaceRevision { get; init; }
+    public string Identity { get; init; } = string.Empty;
     public string Status { get; init; } = VisionAgentBuildProjectionStatuses.Pending;
     public int Attempts { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
+    public string HostInstanceId { get; init; } = string.Empty;
     public string PublicErrorCode { get; init; } = string.Empty;
     public string PublicErrorMessage { get; init; } = string.Empty;
     public bool MetadataOnly { get; init; } = true;
@@ -54,7 +59,12 @@ public interface IVisionAgentBuildProjectionJournal
         string runId,
         string sessionId,
         long terminalSequence,
-        string terminalType);
+        string terminalType,
+        string terminalMutationId = "",
+        string payloadFingerprint = "",
+        long? expectedWorkspaceRevision = null,
+        string identity = "",
+        string hostInstanceId = "");
 
     void MarkProjected(
         string runId,
@@ -117,7 +127,12 @@ public sealed class VisionAgentBuildProjectionJournal : IVisionAgentBuildProject
         string runId,
         string sessionId,
         long terminalSequence,
-        string terminalType)
+        string terminalType,
+        string terminalMutationId = "",
+        string payloadFingerprint = "",
+        long? expectedWorkspaceRevision = null,
+        string identity = "",
+        string hostInstanceId = "")
     {
         var terminalKey = TerminalKey(runId, terminalSequence, terminalType);
         var projectionKey = ProjectionKey(runId, sessionId, terminalSequence, terminalType);
@@ -152,9 +167,14 @@ public sealed class VisionAgentBuildProjectionJournal : IVisionAgentBuildProject
                 SessionId = sessionId,
                 TerminalSequence = terminalSequence,
                 TerminalType = terminalType,
+                TerminalMutationId = terminalMutationId?.Trim() ?? string.Empty,
+                PayloadFingerprint = payloadFingerprint?.Trim() ?? string.Empty,
+                ExpectedWorkspaceRevision = expectedWorkspaceRevision,
+                Identity = identity?.Trim() ?? string.Empty,
                 Status = VisionAgentBuildProjectionStatuses.Pending,
                 Attempts = (latest?.Attempts ?? 0) + 1,
-                UpdatedAt = DateTimeOffset.UtcNow
+                UpdatedAt = DateTimeOffset.UtcNow,
+                HostInstanceId = hostInstanceId?.Trim() ?? string.Empty
             };
 
             AppendUnsafe(checkpoint);
@@ -250,9 +270,14 @@ public sealed class VisionAgentBuildProjectionJournal : IVisionAgentBuildProject
                 SessionId = sessionId,
                 TerminalSequence = terminalSequence,
                 TerminalType = terminalType,
+                TerminalMutationId = latest?.TerminalMutationId ?? string.Empty,
+                PayloadFingerprint = latest?.PayloadFingerprint ?? string.Empty,
+                ExpectedWorkspaceRevision = latest?.ExpectedWorkspaceRevision,
+                Identity = latest?.Identity ?? string.Empty,
                 Status = status,
                 Attempts = latest?.Attempts ?? 1,
                 UpdatedAt = DateTimeOffset.UtcNow,
+                HostInstanceId = latest?.HostInstanceId ?? string.Empty,
                 PublicErrorCode = _redactor.RedactText(publicErrorCode),
                 PublicErrorMessage = _redactor.RedactText(publicErrorMessage)
             };

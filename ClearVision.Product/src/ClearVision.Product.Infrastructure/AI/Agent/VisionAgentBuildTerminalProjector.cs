@@ -71,11 +71,100 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             projection.TerminalEvent.Sequence,
             projection.TerminalEvent.EventType,
             proposedSessionId);
+        var session = _conversationalFlowService.GetOrCreateSession(sessionId);
+        projection.Result.SessionId = session.SessionId;
+        var result = projection.Result;
+        var terminal = projection.TerminalEvent;
+        var assistantMessage = FirstNonBlank(
+            terminal.Summary,
+            result.Success ? result.AiExplanation : result.ErrorMessage,
+            result.FailureSummary?.Message,
+            result.Success
+                ? "Vision Agent BuildFromPlan completed."
+                : "Vision Agent BuildFromPlan failed.");
+        var flowJson = result.Flow == null ? null : JsonSerializer.Serialize(result.Flow, JsonOptions);
+        var payload = new ConversationTurnPayload
+        {
+            Kind = result.Success ? "assistant_agent_result" : "assistant_agent_failure",
+            Status = result.CompletionStatus,
+            InteractionState = result.InteractionState,
+            TurnIntent = result.TurnIntent,
+            RouterConfidence = result.RouterConfidence,
+            Reply = result.Success ? assistantMessage : null,
+            Progress =
+            [
+                projection.Transport,
+                $"agent_run:{runId}",
+                $"terminal:{terminal.Sequence}"
+            ],
+            ClarificationRequired = result.ClarificationRequired,
+            RequirementBrief = result.RequirementBrief,
+            BuildResult = result.BuildResult,
+            WorkflowDiff = result.BuildResult?.WorkflowDiff,
+            ApplyGate = result.BuildResult?.ApplyGate,
+            ToolEvidenceTimeline = result.BuildResult?.ToolEvidenceTimeline,
+            FirstFixRecommendation = result.BuildResult?.FirstFixRecommendation ??
+                                     result.FailureSummary?.RepairTarget,
+            BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
+            NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
+            Failure = result.Success || result.FailureSummary == null
+                ? null
+                : new ConversationTurnFailurePayload
+                {
+                    Summary = assistantMessage,
+                    FailureSummary = result.FailureSummary,
+                    Diagnostics = result.LastAttemptDiagnostics.ToList()
+                }
+        };
+        var assistantTurnId = $"build:{runId}:terminal:{terminal.Sequence}:assistant";
+        var workspaceUpdate = new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = session.WorkspaceSnapshot?.Revision,
+            LifecycleState = result.Success
+                ? "build_completed"
+                : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
+                    ? "build_cancelled"
+                    : "build_failed"),
+            PendingPlanSnapshot = projection.Request.BuildFromPlan?.PlanSnapshot,
+            PlanQuestionSelections = projection.Request.BuildFromPlan?.UserSelections,
+            ConfirmedPlanAnswers = projection.Request.BuildFromPlan?.ConfirmedAnswers,
+            RequirementMode = projection.Request.RequirementMode,
+            PlanAcceptedRecommendedDefaults = projection.Request.BuildFromPlan?.AcceptedRecommendedDefaults,
+            BuildRunId = runId,
+            BuildRunStatus = result.Success
+                ? AgentRunEventStatuses.Completed
+                : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
+                    ? AgentRunEventStatuses.Cancelled
+                    : AgentRunEventStatuses.Failed),
+            BuildTerminalSequence = terminal.Sequence,
+            SubmittedBuildFingerprint = FirstNonBlank(result.AnswerSetFingerprint, result.PlanHash, projection.Request.BuildFromPlan?.PlanHash)
+        };
+        var projectionRequest = new VisionAgentTerminalProjectionRequest
+        {
+            SessionId = session.SessionId,
+            AssistantTurnId = assistantTurnId,
+            AssistantMessage = assistantMessage,
+            LatestFlowJson = flowJson,
+            LatestCanvasFlowJson = flowJson,
+            Payload = payload,
+            WorkspaceUpdate = workspaceUpdate
+        };
+        var projectionFingerprint = ConversationalFlowService.ComputeTerminalProjectionFingerprint(
+            projectionRequest,
+            assistantTurnId);
+        var projectionMutationId = ConversationalFlowService.BuildTerminalProjectionMutationId(
+            assistantTurnId,
+            projectionFingerprint);
         var begin = _journal.Begin(
             runId,
             sessionId,
             projection.TerminalEvent.Sequence,
-            projection.TerminalEvent.EventType);
+            projection.TerminalEvent.EventType,
+            projectionMutationId,
+            projectionFingerprint,
+            workspaceUpdate.ExpectedRevision,
+            FirstNonBlank(result.AnswerSetFingerprint, result.PlanHash, projection.Request.BuildFromPlan?.PlanHash),
+            string.Empty);
         if (begin.Status != VisionAgentBuildProjectionBeginStatus.Started)
         {
             return false;
@@ -83,82 +172,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
 
         try
         {
-            var session = _conversationalFlowService.GetOrCreateSession(sessionId);
-
-            projection.Result.SessionId = session.SessionId;
-            var result = projection.Result;
-            var terminal = projection.TerminalEvent;
-            var assistantMessage = FirstNonBlank(
-                terminal.Summary,
-                result.Success ? result.AiExplanation : result.ErrorMessage,
-                result.FailureSummary?.Message,
-                result.Success
-                    ? "Vision Agent BuildFromPlan completed."
-                    : "Vision Agent BuildFromPlan failed.");
-            var flowJson = result.Flow == null ? null : JsonSerializer.Serialize(result.Flow, JsonOptions);
-            var payload = new ConversationTurnPayload
-            {
-                Kind = result.Success ? "assistant_agent_result" : "assistant_agent_failure",
-                Status = result.CompletionStatus,
-                InteractionState = result.InteractionState,
-                TurnIntent = result.TurnIntent,
-                RouterConfidence = result.RouterConfidence,
-                Reply = result.Success ? assistantMessage : null,
-                Progress =
-                [
-                    projection.Transport,
-                    $"agent_run:{runId}",
-                    $"terminal:{terminal.Sequence}"
-                ],
-                ClarificationRequired = result.ClarificationRequired,
-                RequirementBrief = result.RequirementBrief,
-                BuildResult = result.BuildResult,
-                WorkflowDiff = result.BuildResult?.WorkflowDiff,
-                ApplyGate = result.BuildResult?.ApplyGate,
-                ToolEvidenceTimeline = result.BuildResult?.ToolEvidenceTimeline,
-                FirstFixRecommendation = result.BuildResult?.FirstFixRecommendation ??
-                                         result.FailureSummary?.RepairTarget,
-                BlockingClarificationFields = result.BlockingClarificationFields.ToList(),
-                NonBlockingMissingFields = result.NonBlockingMissingFields.ToList(),
-                Failure = result.Success || result.FailureSummary == null
-                    ? null
-                    : new ConversationTurnFailurePayload
-                    {
-                        Summary = assistantMessage,
-                        FailureSummary = result.FailureSummary,
-                        Diagnostics = result.LastAttemptDiagnostics.ToList()
-                    }
-            };
-            var projectionResult = _conversationalFlowService.ProjectBuildTerminal(new VisionAgentTerminalProjectionRequest
-            {
-                SessionId = session.SessionId,
-                AssistantTurnId = $"build:{runId}:terminal:{terminal.Sequence}:assistant",
-                AssistantMessage = assistantMessage,
-                LatestFlowJson = flowJson,
-                LatestCanvasFlowJson = flowJson,
-                Payload = payload,
-                WorkspaceUpdate = new VisionAgentWorkspaceSnapshotUpdate
-                {
-                    LifecycleState = result.Success
-                        ? "build_completed"
-                        : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
-                            ? "build_cancelled"
-                            : "build_failed"),
-                    PendingPlanSnapshot = projection.Request.BuildFromPlan?.PlanSnapshot,
-                    PlanQuestionSelections = projection.Request.BuildFromPlan?.UserSelections,
-                    ConfirmedPlanAnswers = projection.Request.BuildFromPlan?.ConfirmedAnswers,
-                    RequirementMode = projection.Request.RequirementMode,
-                    PlanAcceptedRecommendedDefaults = projection.Request.BuildFromPlan?.AcceptedRecommendedDefaults,
-                    BuildRunId = runId,
-                    BuildRunStatus = result.Success
-                        ? AgentRunEventStatuses.Completed
-                        : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
-                            ? AgentRunEventStatuses.Cancelled
-                            : AgentRunEventStatuses.Failed),
-                    BuildTerminalSequence = terminal.Sequence,
-                    SubmittedBuildFingerprint = FirstNonBlank(result.AnswerSetFingerprint, result.PlanHash, projection.Request.BuildFromPlan?.PlanHash)
-                }
-            });
+            var projectionResult = _conversationalFlowService.ProjectBuildTerminal(projectionRequest);
             if (!projectionResult.Success)
             {
                 _journal.MarkFailed(

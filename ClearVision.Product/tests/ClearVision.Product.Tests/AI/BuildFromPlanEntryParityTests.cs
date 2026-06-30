@@ -231,10 +231,11 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
 
         await reconciler.ReconcileAsync(CancellationToken.None);
         harness.Conversation.GetSession("session-startup")!.History.Should().HaveCount(1);
-        harness.Journal.LoadCheckpoints()
-            .Single(item => item.RunId == run.RunId)
-            .Status.Should()
-            .Be(VisionAgentBuildProjectionStatuses.Projected);
+        var checkpoint = harness.Journal.LoadCheckpoints().Single(item => item.RunId == run.RunId);
+        checkpoint.Status.Should().Be(VisionAgentBuildProjectionStatuses.Projected);
+        checkpoint.TerminalMutationId.Should().StartWith("build-terminal:build:");
+        checkpoint.PayloadFingerprint.Should().StartWith("sha256:");
+        checkpoint.Identity.Should().NotBeNullOrWhiteSpace();
         await reconciler.ReconcileAsync(CancellationToken.None);
 
         harness.Conversation.GetSession("session-startup")!.History.Should().HaveCount(1);
@@ -242,6 +243,101 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             .Single(item => item.RunId == run.RunId)
             .Status.Should()
             .Be(VisionAgentBuildProjectionStatuses.Projected);
+    }
+
+    [Fact]
+    public async Task StartupRecovery_ShouldCompletePreparedPlanTerminalIntentOnce()
+    {
+        using var harness = CreateHarness();
+        var sessionId = "session-plan-recovery";
+        var plan = BuildPlan();
+        var run = harness.Stream.CreateRun("plan startup recovery", new
+        {
+            sessionId,
+            generationMode = "plan",
+            metadataOnly = true
+        });
+        var initial = harness.Conversation.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ClientMutationId = $"plan-start:{run.RunId}",
+            LifecycleState = "planning",
+            PlanRunId = run.RunId,
+            PlanRunStatus = AgentRunEventStatuses.Running,
+            RequirementMode = AiRequirementModes.Strict
+        });
+        var planCompleted = harness.Stream.Append(run.RunId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.PlanCompleted,
+            Stage = "plan_ready",
+            Title = "Plan ready",
+            Summary = "Plan completed and ready to build.",
+            Status = AgentRunEventStatuses.Completed,
+            Payload = new
+            {
+                status = "plan_completed",
+                generationMode = "plan",
+                sessionId,
+                planRunId = run.RunId,
+                planResult = plan,
+                planModeResult = plan,
+                metadataOnly = true
+            }
+        })!;
+        var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = initial.Revision,
+            ClientMutationId = $"plan-terminal:{run.RunId}:completed",
+            LifecycleState = "plan_ready",
+            PendingPlanSnapshot = plan,
+            PlanRunId = run.RunId,
+            PlanRunStatus = AgentRunEventStatuses.Completed,
+            PlanTerminalSequence = planCompleted.Sequence,
+            RequirementMode = AiRequirementModes.Strict,
+            ConfirmedPlanAnswers = plan.ConfirmedPlanAnswers
+        };
+        var reservation = harness.Stream.TryReserveTerminal(run.RunId, AgentRunEventStatuses.Completed);
+        reservation.Acquired.Should().BeTrue();
+        harness.Stream.PrepareTerminalIntent(
+            run.RunId,
+            new AgentRunTerminalIntentDraft
+            {
+                SessionId = sessionId,
+                RunType = "plan",
+                TargetStatus = AgentRunEventStatuses.Completed,
+                TerminalMutationId = terminalUpdate.ClientMutationId!,
+                PayloadFingerprint = ConversationalFlowService.ComputeWorkspaceMutationFingerprint(terminalUpdate),
+                ExpectedWorkspaceRevision = terminalUpdate.ExpectedRevision,
+                Identity = $"{plan.PlanId}:{plan.PlanHash}",
+                Phase = "TerminalPrepared"
+            },
+            reservation).Should().NotBeNull();
+
+        var restartedStream = new AgentRunEventStreamService(harness.Store, harness.Redactor);
+        var recovery = new VisionAgentRunRecoveryReconciliationService(
+            harness.Store,
+            restartedStream,
+            harness.Conversation,
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentRunRecoveryReconciliationService>>());
+
+        await recovery.ReconcileAsync(CancellationToken.None);
+        var replay = restartedStream.ReplayRaw(run.RunId)!;
+        var session = harness.Conversation.GetSession(sessionId)!;
+        var revision = session.WorkspaceSnapshot!.Revision;
+        var eventCount = replay.Events.Count;
+        var receiptCount = session.MutationReceipts.Count;
+
+        replay.Events.Should().ContainSingle(evt => evt.EventType == AgentRunEventTypes.RunCompleted);
+        session.WorkspaceSnapshot.PlanRunStatus.Should().Be(AgentRunEventStatuses.Completed);
+        session.WorkspaceSnapshot.PlanTerminalSequence.Should().Be(planCompleted.Sequence);
+        session.MutationReceipts.Should().Contain(receipt =>
+            receipt.MutationId == terminalUpdate.ClientMutationId &&
+            receipt.PayloadFingerprint == ConversationalFlowService.ComputeWorkspaceMutationFingerprint(terminalUpdate));
+
+        await recovery.ReconcileAsync(CancellationToken.None);
+
+        restartedStream.ReplayRaw(run.RunId)!.Events.Should().HaveCount(eventCount);
+        harness.Conversation.GetSession(sessionId)!.WorkspaceSnapshot!.Revision.Should().Be(revision);
+        harness.Conversation.GetSession(sessionId)!.MutationReceipts.Should().HaveCount(receiptCount);
     }
 
     [Fact]

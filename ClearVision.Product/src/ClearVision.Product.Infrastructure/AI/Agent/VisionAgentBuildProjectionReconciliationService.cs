@@ -25,8 +25,7 @@ public sealed class VisionAgentBuildProjectionReconciliationService : IHostedSer
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _ = Task.Run(() => ReconcileAsync(cancellationToken), CancellationToken.None);
-        return Task.CompletedTask;
+        return ReconcileAsync(cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -54,7 +53,7 @@ public sealed class VisionAgentBuildProjectionReconciliationService : IHostedSer
             foreach (var runId in terminalRunIds)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var replay = _streamService.Replay(runId);
+                var replay = _streamService.ReplayRaw(runId);
                 if (replay == null)
                 {
                     continue;

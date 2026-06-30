@@ -221,6 +221,7 @@ public static class AgentRunEndpoints
             ownerHash);
         var initialPersistence = conversationService.TryUpdateWorkspaceSnapshot(session.SessionId, new VisionAgentWorkspaceSnapshotUpdate
         {
+            ClientMutationId = $"plan-start:{createResult.RunId}",
             LifecycleState = "planning",
             PlanRunId = createResult.RunId,
             PlanRunStatus = AgentRunEventStatuses.Running,
@@ -450,14 +451,25 @@ public static class AgentRunEndpoints
             ConversationPersistenceStatus? finalPersistenceStatus = null;
             if (!string.IsNullOrWhiteSpace(sessionId))
             {
-                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+                var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                 {
+                    ExpectedRevision = conversationService.GetSession(sessionId)?.WorkspaceSnapshot?.Revision,
+                    ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Cancelled),
                     LifecycleState = "plan_cancelled",
                     PlanRunId = runId,
                     PlanRunStatus = AgentRunEventStatuses.Cancelled,
                     PlanTerminalSequence = cancelledEvent?.Sequence,
                     RequirementMode = TryResolvePlanRequirementMode(replayBeforeCancel)
-                });
+                };
+                PreparePlanTerminalIntent(
+                    streamService,
+                    runId,
+                    sessionId,
+                    AgentRunEventStatuses.Cancelled,
+                    terminalUpdate,
+                    "plan_cancelled",
+                    reservation);
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(sessionId, terminalUpdate);
                 finalWorkspaceSnapshot = terminalPersistence.Snapshot;
                 finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
@@ -729,14 +741,25 @@ public static class AgentRunEndpoints
                 ConversationPersistenceStatus? cancelPersistenceStatus = null;
                 if (!string.IsNullOrWhiteSpace(request.SessionId))
                 {
-                    var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                    var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                     {
+                        ExpectedRevision = ResolveWorkspaceRevision(conversationService, request.SessionId),
+                        ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Cancelled),
                         LifecycleState = "plan_cancelled",
                         PlanRunId = runId,
                         PlanRunStatus = AgentRunEventStatuses.Cancelled,
                         PlanTerminalSequence = cancelledEvent?.Sequence,
                         RequirementMode = request.RequirementMode
-                    });
+                    };
+                    PreparePlanTerminalIntent(
+                        streamService,
+                        runId,
+                        request.SessionId,
+                        AgentRunEventStatuses.Cancelled,
+                        terminalUpdate,
+                        "plan_cancelled",
+                        cancelReservation);
+                    var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, terminalUpdate);
                     cancelWorkspaceSnapshot = terminalPersistence.Snapshot;
                     cancelPersistenceStatus = terminalPersistence.PersistenceStatus;
                     if (!terminalPersistence.Success)
@@ -777,8 +800,10 @@ public static class AgentRunEndpoints
             ConversationPersistenceStatus? finalPersistenceStatus = null;
             if (!string.IsNullOrWhiteSpace(request.SessionId))
             {
-                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                 {
+                    ExpectedRevision = ResolveWorkspaceRevision(conversationService, request.SessionId),
+                    ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Completed),
                     LifecycleState = result.CanBuild ? "plan_ready" : "plan_blocked",
                     PendingPlanSnapshot = BuildReplaySafePlanResult(result),
                     PlanRunId = runId,
@@ -788,7 +813,16 @@ public static class AgentRunEndpoints
                     ConfirmedPlanAnswers = result.ConfirmedPlanAnswers.Count > 0
                         ? result.ConfirmedPlanAnswers
                         : request.ConfirmedPlanAnswers
-                });
+                };
+                PreparePlanTerminalIntent(
+                    streamService,
+                    runId,
+                    request.SessionId,
+                    AgentRunEventStatuses.Completed,
+                    terminalUpdate,
+                    BuildPlanTerminalIdentity(result),
+                    completeReservation);
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, terminalUpdate);
                 finalWorkspaceSnapshot = terminalPersistence.Snapshot;
                 finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
@@ -829,14 +863,25 @@ public static class AgentRunEndpoints
             ConversationPersistenceStatus? finalPersistenceStatus = null;
             if (!string.IsNullOrWhiteSpace(request.SessionId))
             {
-                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                 {
+                    ExpectedRevision = ResolveWorkspaceRevision(conversationService, request.SessionId),
+                    ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Cancelled),
                     LifecycleState = "plan_cancelled",
                     PlanRunId = runId,
                     PlanRunStatus = AgentRunEventStatuses.Cancelled,
                     PlanTerminalSequence = cancelledEvent?.Sequence,
                     RequirementMode = request.RequirementMode
-                });
+                };
+                PreparePlanTerminalIntent(
+                    streamService,
+                    runId,
+                    request.SessionId,
+                    AgentRunEventStatuses.Cancelled,
+                    terminalUpdate,
+                    "plan_cancelled",
+                    cancelReservation);
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, terminalUpdate);
                 finalWorkspaceSnapshot = terminalPersistence.Snapshot;
                 finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
@@ -879,14 +924,25 @@ public static class AgentRunEndpoints
             ConversationPersistenceStatus? finalPersistenceStatus = null;
             if (!string.IsNullOrWhiteSpace(request.SessionId))
             {
-                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, new VisionAgentWorkspaceSnapshotUpdate
+                var terminalUpdate = new VisionAgentWorkspaceSnapshotUpdate
                 {
+                    ExpectedRevision = ResolveWorkspaceRevision(conversationService, request.SessionId),
+                    ClientMutationId = BuildPlanTerminalMutationId(runId, AgentRunEventStatuses.Failed),
                     LifecycleState = "plan_failed",
                     PlanRunId = runId,
                     PlanRunStatus = AgentRunEventStatuses.Failed,
                     PlanTerminalSequence = failedEvent?.Sequence,
                     RequirementMode = request.RequirementMode
-                });
+                };
+                PreparePlanTerminalIntent(
+                    streamService,
+                    runId,
+                    request.SessionId,
+                    AgentRunEventStatuses.Failed,
+                    terminalUpdate,
+                    "plan_failed",
+                    failReservation);
+                var terminalPersistence = conversationService.TryUpdateWorkspaceSnapshot(request.SessionId, terminalUpdate);
                 finalWorkspaceSnapshot = terminalPersistence.Snapshot;
                 finalPersistenceStatus = terminalPersistence.PersistenceStatus;
                 if (!terminalPersistence.Success)
@@ -1479,6 +1535,65 @@ public static class AgentRunEndpoints
                 : persistence.PublicMessage,
             persistenceStatus = persistence.PersistenceStatus
         };
+    }
+
+    private static string BuildPlanTerminalMutationId(string runId, string status)
+    {
+        var normalizedStatus = string.Equals(status, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase)
+            ? AgentRunEventStatuses.Cancelled
+            : string.Equals(status, AgentRunEventStatuses.Failed, StringComparison.OrdinalIgnoreCase)
+                ? AgentRunEventStatuses.Failed
+                : AgentRunEventStatuses.Completed;
+        return $"plan-terminal:{runId}:{normalizedStatus}";
+    }
+
+    private static long? ResolveWorkspaceRevision(
+        IConversationalFlowService conversationService,
+        string? sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return null;
+        }
+
+        return conversationService.GetSession(sessionId)?.WorkspaceSnapshot?.Revision;
+    }
+
+    private static AgentRunTerminalIntentRecord? PreparePlanTerminalIntent(
+        IAgentRunEventStreamService streamService,
+        string runId,
+        string sessionId,
+        string targetStatus,
+        VisionAgentWorkspaceSnapshotUpdate terminalUpdate,
+        string identity,
+        AgentRunTerminalReservationResult reservation)
+    {
+        return streamService.PrepareTerminalIntent(
+            runId,
+            new AgentRunTerminalIntentDraft
+            {
+                SessionId = sessionId,
+                RunType = "plan",
+                TargetStatus = targetStatus,
+                TerminalMutationId = terminalUpdate.ClientMutationId ?? BuildPlanTerminalMutationId(runId, targetStatus),
+                PayloadFingerprint = ConversationalFlowService.ComputeWorkspaceMutationFingerprint(terminalUpdate),
+                ExpectedWorkspaceRevision = terminalUpdate.ExpectedRevision,
+                Identity = identity,
+                Phase = "TerminalPrepared"
+            },
+            reservation);
+    }
+
+    private static string BuildPlanTerminalIdentity(VisionAgentPlanModeResult result)
+    {
+        return string.Join(
+            ":",
+            new[]
+            {
+                SanitizePlanToken(result.PlanId),
+                SanitizePlanToken(result.PlanHash),
+                result.CanBuild ? "can_build" : "blocked"
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
     }
 
     private static string BuildPlanCompletionSummary(VisionAgentPlanModeResult result)

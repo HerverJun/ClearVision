@@ -106,9 +106,38 @@ public sealed record AgentRunSummary
     public int DroppedEventCount { get; init; }
     public int StaleEventCount { get; init; }
     public string OwnerHash { get; init; } = string.Empty;
+    public AgentRunTerminalIntentRecord? TerminalIntent { get; init; }
     public bool MetadataOnly { get; init; } = true;
     public bool RedactionPass { get; init; } = true;
     public object? Payload { get; init; }
+}
+
+public sealed record AgentRunTerminalIntentRecord
+{
+    public string RunId { get; init; } = string.Empty;
+    public string SessionId { get; init; } = string.Empty;
+    public string RunType { get; init; } = string.Empty;
+    public string TargetStatus { get; init; } = string.Empty;
+    public string TerminalMutationId { get; init; } = string.Empty;
+    public string PayloadFingerprint { get; init; } = string.Empty;
+    public long? ExpectedWorkspaceRevision { get; init; }
+    public string Identity { get; init; } = string.Empty;
+    public string Phase { get; init; } = string.Empty;
+    public DateTimeOffset CreatedAt { get; init; }
+    public string HostInstanceId { get; init; } = string.Empty;
+    public bool MetadataOnly { get; init; } = true;
+}
+
+public sealed record AgentRunTerminalIntentDraft
+{
+    public string SessionId { get; init; } = string.Empty;
+    public string RunType { get; init; } = string.Empty;
+    public string TargetStatus { get; init; } = string.Empty;
+    public string TerminalMutationId { get; init; } = string.Empty;
+    public string PayloadFingerprint { get; init; } = string.Empty;
+    public long? ExpectedWorkspaceRevision { get; init; }
+    public string Identity { get; init; } = string.Empty;
+    public string Phase { get; init; } = "TerminalPrepared";
 }
 
 public sealed record AgentRunCreateResult(

@@ -138,6 +138,44 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         _service.Replay(run.RunId)!.Events.Should().ContainSingle(evt => evt.EventType == AgentRunEventTypes.RunCancelled);
     }
 
+    [Fact(DisplayName = "AgentRun prepared terminal intent rejects conflicting mutation metadata")]
+    public void PrepareTerminalIntent_ShouldRejectConflictingMutationMetadata()
+    {
+        var run = _service.CreateRun("terminal intent");
+        var reservation = _service.TryReserveTerminal(run.RunId, AgentRunEventStatuses.Completed);
+
+        var prepared = _service.PrepareTerminalIntent(
+            run.RunId,
+            new AgentRunTerminalIntentDraft
+            {
+                SessionId = "session-intent",
+                RunType = "plan",
+                TargetStatus = AgentRunEventStatuses.Completed,
+                TerminalMutationId = "plan-terminal:run:completed",
+                PayloadFingerprint = "sha256:first",
+                Identity = "plan:first"
+            },
+            reservation);
+        var conflicting = _service.PrepareTerminalIntent(
+            run.RunId,
+            new AgentRunTerminalIntentDraft
+            {
+                SessionId = "session-intent",
+                RunType = "plan",
+                TargetStatus = AgentRunEventStatuses.Completed,
+                TerminalMutationId = "plan-terminal:run:completed",
+                PayloadFingerprint = "sha256:second",
+                Identity = "plan:second"
+            },
+            reservation);
+        var replay = _service.Replay(run.RunId)!;
+
+        prepared.Should().NotBeNull();
+        conflicting.Should().BeNull();
+        replay.Summary.TerminalIntent.Should().NotBeNull();
+        replay.Summary.TerminalIntent!.PayloadFingerprint.Should().Be("sha256:first");
+    }
+
     [Fact(DisplayName = "AgentRun unreserved terminal append atomically reserves and completes")]
     public void Complete_WithoutReservation_ShouldPreserveCompatibility()
     {
@@ -183,29 +221,42 @@ public sealed class AgentRunEventStreamServiceTests : IDisposable
         reloaded.IsRunOwner(run.RunId, "usr_other").Should().BeFalse();
     }
 
-    [Fact(DisplayName = "AgentRun restart recovery fails non-terminal runs closed")]
-    public void Replay_ShouldFailClosedForNonTerminalRunAfterRestart()
+    [Fact(DisplayName = "AgentRun replay after restart does not synthesize terminal failure")]
+    public void Replay_ShouldRestoreNonTerminalRunWithoutFailureSideEffect()
     {
         var run = _service.CreateRun("restart recovery", ownerHash: "usr_owner_restart");
         _service.Append(run.RunId, Draft(AgentRunEventTypes.StageStarted, "planner"));
 
         var reloaded = new AgentRunEventStreamService(new AgentRunEventStore(_directory, _redactor), _redactor);
         var replay = reloaded.Replay(run.RunId);
-        var appended = reloaded.Append(run.RunId, Draft(AgentRunEventTypes.StageCompleted, "planner"));
 
         replay.Should().NotBeNull();
-        replay!.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
-        replay.Events.Should().ContainSingle(evt => evt.EventType == AgentRunEventTypes.RunFailed);
-        var terminal = replay.Events.Last();
-        terminal.EventType.Should().Be(AgentRunEventTypes.RunFailed);
-        terminal.Title.Should().Contain("主机重启");
+        replay!.Summary.Status.Should().Be(AgentRunEventStatuses.Running);
+        replay.Events.Should().NotContain(evt => evt.EventType == AgentRunEventTypes.RunFailed);
+        reloaded.Replay(run.RunId)!.Events.Should().HaveCount(replay.Events.Count);
+    }
+
+    [Fact(DisplayName = "AgentRun explicit host-interrupted recovery fails non-terminal runs closed")]
+    public void FailHostInterrupted_ShouldFailClosedForNonTerminalRunAfterRestart()
+    {
+        var run = _service.CreateRun("restart recovery", ownerHash: "usr_owner_restart");
+        _service.Append(run.RunId, Draft(AgentRunEventTypes.StageStarted, "planner"));
+
+        var reloaded = new AgentRunEventStreamService(new AgentRunEventStore(_directory, _redactor), _redactor);
+        var terminal = reloaded.FailHostInterrupted(run.RunId);
+        var appended = reloaded.Append(run.RunId, Draft(AgentRunEventTypes.StageCompleted, "planner"));
+        var replay = reloaded.Replay(run.RunId)!;
+
+        terminal.Should().NotBeNull();
+        terminal!.EventType.Should().Be(AgentRunEventTypes.RunFailed);
         terminal.Summary.Should().Contain("失败状态");
         terminal.MetadataOnly.Should().BeTrue();
         var payloadJson = JsonSerializer.Serialize(terminal.Payload);
-        payloadJson.Should().Contain("host_instance_restarted");
+        payloadJson.Should().Contain("host_instance_interrupted");
         payloadJson.Should().Contain("metadataOnly");
         payloadJson.Should().NotContain("hostInstanceId");
-        reloaded.Replay(run.RunId)!.Events.Should().ContainSingle(evt => evt.EventType == AgentRunEventTypes.RunFailed);
+        replay.Summary.Status.Should().Be(AgentRunEventStatuses.Failed);
+        replay.Events.Should().ContainSingle(evt => evt.EventType == AgentRunEventTypes.RunFailed);
         appended.Should().BeNull();
     }
 

@@ -11,10 +11,16 @@ public interface IAgentRunEventStreamService
     AgentRunCreateResult CreateRun(string description, object? payload = null, string? ownerHash = null);
     AgentRunEvent? Append(string? runId, AgentRunEventDraft draft);
     AgentRunTerminalReservationResult TryReserveTerminal(string? runId, string terminalStatus);
+    AgentRunTerminalIntentRecord? PrepareTerminalIntent(
+        string? runId,
+        AgentRunTerminalIntentDraft intent,
+        AgentRunTerminalReservationResult? reservation = null);
     AgentRunEvent? Complete(string? runId, string summary, object? payload = null, AgentRunTerminalReservationResult? reservation = null);
     AgentRunEvent? Fail(string? runId, string summary, string firstFixRecommendation, object? payload = null, AgentRunTerminalReservationResult? reservation = null);
+    AgentRunEvent? FailHostInterrupted(string? runId);
     AgentRunEvent? Cancel(string? runId, string summary = "Vision Agent run cancelled by user.", object? payload = null, AgentRunTerminalReservationResult? reservation = null);
     AgentRunEventSubscription? Subscribe(string runId, long afterSequence);
+    AgentRunReplayResult? ReplayRaw(string runId);
     AgentRunReplayResult? Replay(string runId);
     AgentRunReplayResult? ReplayLatest(string? ownerHash = null);
     CancellationToken GetCancellationToken(string? runId);
@@ -223,6 +229,90 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         return result;
     }
 
+    public AgentRunTerminalIntentRecord? PrepareTerminalIntent(
+        string? runId,
+        AgentRunTerminalIntentDraft intent,
+        AgentRunTerminalReservationResult? reservation = null)
+    {
+        if (string.IsNullOrWhiteSpace(runId) || intent == null)
+        {
+            return null;
+        }
+
+        var targetStatus = NormalizeTerminalStatus(intent.TargetStatus);
+        if (string.IsNullOrWhiteSpace(targetStatus))
+        {
+            return null;
+        }
+
+        var state = GetOrRestoreState(runId.Trim());
+        if (state == null)
+        {
+            return null;
+        }
+
+        lock (state.Gate)
+        {
+            if (state.IsTerminal)
+            {
+                return state.TerminalIntent;
+            }
+
+            if (reservation != null)
+            {
+                if (reservation.Outcome != AgentRunTerminalReservationOutcome.Acquired ||
+                    string.IsNullOrWhiteSpace(reservation.ReservationId) ||
+                    !string.Equals(reservation.TargetStatus, targetStatus, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(state.TerminalIntentStatus, targetStatus, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(state.TerminalReservationId, reservation.ReservationId, StringComparison.Ordinal))
+                {
+                    return null;
+                }
+            }
+            else if (string.IsNullOrWhiteSpace(state.TerminalIntentStatus))
+            {
+                state.TerminalIntentStatus = targetStatus;
+                state.TerminalIntentState = ToPendingTerminalIntent(targetStatus);
+                state.TerminalReservationId = Guid.NewGuid().ToString("N");
+            }
+            else if (!string.Equals(state.TerminalIntentStatus, targetStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var existing = state.TerminalIntent;
+            if (existing != null)
+            {
+                return string.Equals(existing.TargetStatus, targetStatus, StringComparison.OrdinalIgnoreCase) &&
+                       string.Equals(existing.TerminalMutationId, intent.TerminalMutationId?.Trim() ?? string.Empty, StringComparison.OrdinalIgnoreCase) &&
+                       string.Equals(existing.PayloadFingerprint, intent.PayloadFingerprint?.Trim() ?? string.Empty, StringComparison.Ordinal)
+                    ? existing
+                    : null;
+            }
+
+            var record = new AgentRunTerminalIntentRecord
+            {
+                RunId = state.RunId,
+                SessionId = intent.SessionId?.Trim() ?? string.Empty,
+                RunType = intent.RunType?.Trim() ?? string.Empty,
+                TargetStatus = targetStatus,
+                TerminalMutationId = intent.TerminalMutationId?.Trim() ?? string.Empty,
+                PayloadFingerprint = intent.PayloadFingerprint?.Trim() ?? string.Empty,
+                ExpectedWorkspaceRevision = intent.ExpectedWorkspaceRevision,
+                Identity = intent.Identity?.Trim() ?? string.Empty,
+                Phase = string.IsNullOrWhiteSpace(intent.Phase) ? "TerminalPrepared" : intent.Phase.Trim(),
+                CreatedAt = UtcNowProvider(),
+                HostInstanceId = HostInstanceId,
+                MetadataOnly = true
+            };
+
+            state.TerminalIntent = record;
+            state.UpdatedAt = UtcNowProvider();
+            _store.AppendSummary(state.ToSummary());
+            return record;
+        }
+    }
+
     public AgentRunEvent? Complete(
         string? runId,
         string summary,
@@ -256,6 +346,19 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             Status = AgentRunEventStatuses.Failed,
             Payload = BuildTerminalDiagnosticPayload(payload, firstFixRecommendation)
         }, reservation);
+    }
+
+    public AgentRunEvent? FailHostInterrupted(string? runId)
+    {
+        return Fail(
+            runId,
+            "上一次主机进程在该 AgentRun 到达终态前结束，本次已将它恢复为失败状态。",
+            "请重新提交请求，由当前正在运行的主机从头执行。",
+            new
+            {
+                failureCode = "host_instance_interrupted",
+                metadataOnly = true
+            });
     }
 
     public AgentRunEvent? Cancel(
@@ -336,7 +439,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             });
     }
 
-    public AgentRunReplayResult? Replay(string runId)
+    public AgentRunReplayResult? ReplayRaw(string runId)
     {
         if (string.IsNullOrWhiteSpace(runId))
         {
@@ -354,6 +457,11 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             var events = state.Events.OrderBy(evt => evt.Sequence).ToList();
             return BuildReplayResult(state, events);
         }
+    }
+
+    public AgentRunReplayResult? Replay(string runId)
+    {
+        return ReplayRaw(runId);
     }
 
     public AgentRunReplayResult? ReplayLatest(string? ownerHash = null)
@@ -544,6 +652,13 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             state.IsTerminal = true;
             state.TerminalIntentStatus = targetStatus;
             state.TerminalIntentState = targetStatus;
+            if (state.TerminalIntent != null)
+            {
+                state.TerminalIntent = state.TerminalIntent with
+                {
+                    Phase = "TerminalCommitted"
+                };
+            }
             _store.AppendEvent(evt);
             _store.AppendSummary(state.ToSummary());
             subscribers = state.Subscribers.ToList();
@@ -575,7 +690,8 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
 
         if (!string.IsNullOrWhiteSpace(state.TerminalIntentStatus))
         {
-            return false;
+            return state.TerminalIntent != null &&
+                   string.Equals(state.TerminalIntentStatus, targetStatus, StringComparison.OrdinalIgnoreCase);
         }
 
         state.TerminalIntentStatus = targetStatus;
@@ -692,46 +808,31 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
             LastSequence = Math.Max(summary?.LastSequence ?? 0, events.Count == 0 ? 0 : events.Max(evt => evt.Sequence)),
             RedactionPass = summary?.RedactionPass ?? events.All(evt => evt.RedactionPass)
         };
+        if (summary?.TerminalIntent != null)
+        {
+            restored.TerminalIntent = summary.TerminalIntent;
+            restored.TerminalIntentStatus = NormalizeTerminalStatus(summary.TerminalIntent.TargetStatus);
+            restored.TerminalIntentState = restored.TerminalIntentStatus == null
+                ? AgentRunTerminalIntents.None
+                : ToPendingTerminalIntent(restored.TerminalIntentStatus);
+        }
+
         if (restored.IsTerminal)
         {
             var restoredTerminalStatus = NormalizeTerminalStatus(restored.Status);
             restored.TerminalIntentStatus = restoredTerminalStatus;
             restored.TerminalIntentState = restoredTerminalStatus ?? AgentRunTerminalIntents.None;
+            if (restored.TerminalIntent != null)
+            {
+                restored.TerminalIntent = restored.TerminalIntent with
+                {
+                    Phase = "TerminalCommitted"
+                };
+            }
         }
 
         restored.Events.AddRange(events.OrderBy(evt => evt.Sequence));
         restored = _runs.GetOrAdd(runId, restored);
-        if (!restored.IsTerminal)
-        {
-            lock (restored.Gate)
-            {
-                if (!restored.IsTerminal)
-                {
-                    var recoveryEvent = BuildSafeEvent(restored.RunId, restored.NextSequence(), new AgentRunEventDraft
-                    {
-                        EventType = AgentRunEventTypes.RunFailed,
-                        Stage = "run",
-                        Title = "主机重启后已终止",
-                        Summary = "上一次主机进程在该 AgentRun 到达终态前结束，本次已将它恢复为失败状态。",
-                        Status = AgentRunEventStatuses.Failed,
-                        Payload = new
-                        {
-                            failureCode = "host_instance_restarted",
-                            metadataOnly = true,
-                            firstFixRecommendation = "请重新提交请求，由当前正在运行的主机从头执行。"
-                        }
-                    });
-                    restored.Events.Add(recoveryEvent);
-                    UpdateSummaryFromEvent(restored, recoveryEvent);
-                    restored.IsTerminal = true;
-                    restored.TerminalIntentStatus = AgentRunEventStatuses.Failed;
-                    restored.TerminalIntentState = AgentRunEventStatuses.Failed;
-                    _store.AppendEvent(recoveryEvent);
-                    _store.AppendSummary(restored.ToSummary());
-                }
-            }
-        }
-
         return restored;
     }
 
@@ -976,6 +1077,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
         public string? TerminalIntentStatus { get; set; }
         public string TerminalIntentState { get; set; } = AgentRunTerminalIntents.None;
         public string? TerminalReservationId { get; set; }
+        public AgentRunTerminalIntentRecord? TerminalIntent { get; set; }
         public CancellationTokenSource Cancellation { get; } = new();
         public List<AgentRunEvent> Events { get; } = new();
         public List<ChannelWriter<AgentRunEvent>> Subscribers { get; } = new();
@@ -1003,6 +1105,7 @@ public sealed class AgentRunEventStreamService : IAgentRunEventStreamService
                 DroppedEventCount = DroppedEventCount,
                 StaleEventCount = StaleEventCount,
                 OwnerHash = OwnerHash,
+                TerminalIntent = TerminalIntent,
                 MetadataOnly = true,
                 RedactionPass = RedactionPass,
                 Payload = new

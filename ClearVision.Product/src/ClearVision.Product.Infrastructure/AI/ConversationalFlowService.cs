@@ -638,7 +638,7 @@ public class ConversationalFlowService : IConversationalFlowService
             sessionId,
             update.ExpectedRevision,
             update.ClientMutationId,
-            BuildWorkspaceMutationFingerprint(update),
+            ComputeWorkspaceMutationFingerprint(update),
             candidate => ApplyWorkspaceUpdateLocked(candidate, update),
             update.RequireExpectedRevisionWhenWorkspaceExists);
 
@@ -659,7 +659,7 @@ public class ConversationalFlowService : IConversationalFlowService
             sessionId,
             update.ExpectedRevision,
             update.ClientMutationId,
-            BuildWorkspaceMutationFingerprint(update),
+            ComputeWorkspaceMutationFingerprint(update),
             candidate => ApplyWorkspaceUpdateLocked(candidate, update),
             update.RequireExpectedRevisionWhenWorkspaceExists)
             .ToWorkspaceMutationResult();
@@ -672,11 +672,11 @@ public class ConversationalFlowService : IConversationalFlowService
             var committedAssistantTurnId = string.IsNullOrWhiteSpace(request.AssistantTurnId)
                 ? Guid.NewGuid().ToString("N")
                 : request.AssistantTurnId.Trim();
-            var terminalProjectionFingerprint = BuildTerminalProjectionFingerprint(request, committedAssistantTurnId);
+            var terminalProjectionFingerprint = ComputeTerminalProjectionFingerprint(request, committedAssistantTurnId);
             return CommitSessionMutation(
                 request.SessionId,
                 request.WorkspaceUpdate.ExpectedRevision,
-                $"build-terminal:{committedAssistantTurnId}:{BuildMutationIdFingerprintSuffix(terminalProjectionFingerprint)}",
+                BuildTerminalProjectionMutationId(committedAssistantTurnId, terminalProjectionFingerprint),
                 terminalProjectionFingerprint,
                 candidate =>
                 {
@@ -946,7 +946,7 @@ public class ConversationalFlowService : IConversationalFlowService
             .ToList();
     }
 
-    private static string BuildWorkspaceMutationFingerprint(VisionAgentWorkspaceSnapshotUpdate update) =>
+    public static string ComputeWorkspaceMutationFingerprint(VisionAgentWorkspaceSnapshotUpdate update) =>
         ComputeJsonFingerprint(new
         {
             update.ProjectId,
@@ -971,7 +971,7 @@ public class ConversationalFlowService : IConversationalFlowService
             update.UserMessage
         });
 
-    private static string BuildTerminalProjectionFingerprint(
+    public static string ComputeTerminalProjectionFingerprint(
         VisionAgentTerminalProjectionRequest request,
         string assistantTurnId) =>
         ComputeJsonFingerprint(new
@@ -981,8 +981,11 @@ public class ConversationalFlowService : IConversationalFlowService
             request.LatestFlowJson,
             request.LatestCanvasFlowJson,
             request.Payload,
-            WorkspaceFingerprint = BuildWorkspaceMutationFingerprint(request.WorkspaceUpdate)
+            WorkspaceFingerprint = ComputeWorkspaceMutationFingerprint(request.WorkspaceUpdate)
         });
+
+    public static string BuildTerminalProjectionMutationId(string assistantTurnId, string fingerprint) =>
+        $"build-terminal:{assistantTurnId}:{BuildMutationIdFingerprintSuffix(fingerprint)}";
 
     private static string BuildMutationIdFingerprintSuffix(string fingerprint)
     {
