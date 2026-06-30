@@ -90,7 +90,7 @@ public class DistanceTransformOperatorTests
         var result = await _operator.ExecuteAsync(op, inputs);
         result.IsSuccess.Should().BeTrue();
 
-        var maxDistance = result.OutputData["MaxDistance"];
+        var maxDistance = result.OutputData!["MaxDistance"];
         maxDistance.Should().NotBeNull();
     }
 

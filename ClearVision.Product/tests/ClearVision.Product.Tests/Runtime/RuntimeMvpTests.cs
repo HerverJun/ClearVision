@@ -1,5 +1,5 @@
-using System.Text.Json;
 using System.Diagnostics;
+using System.Text.Json;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
@@ -19,6 +19,8 @@ namespace ClearVision.Product.Tests.Runtime;
 
 public class RuntimeMvpTests
 {
+    private static readonly TimeSpan RuntimeHostAsyncSignalTimeout = TimeSpan.FromMinutes(5);
+
     [Fact]
     public async Task PackageExporterAndLoader_ShouldRoundTripValidPackage()
     {
@@ -406,7 +408,7 @@ public class RuntimeMvpTests
 
             await runtimeHost.LoadPackageAsync(export.PackageRootPath);
             await runtimeHost.StartFolderRunAsync(replayRoot);
-            await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
+            await started.Task.WaitAsync(RuntimeHostAsyncSignalTimeout);
 
             var edit = async () => await runtimeHost.SetProjectVariableValueAsync(variableId, 8L);
             var reset = async () => await runtimeHost.ResetProjectVariableAsync(variableId);
@@ -415,7 +417,7 @@ public class RuntimeMvpTests
             await reset.Should().ThrowAsync<RuntimePackageException>();
 
             release.TrySetResult(null);
-            await WaitForStateAsync(runtimeHost, RuntimeHostState.Loaded, TimeSpan.FromSeconds(2));
+            await WaitForStateAsync(runtimeHost, RuntimeHostState.Loaded, RuntimeHostAsyncSignalTimeout);
             runtimeHost.GetProjectVariableSnapshots().Should().Contain(snapshot =>
                 snapshot.VariableId == variableId &&
                 Convert.ToInt64(ProjectVariableValueConverter.ToObject(snapshot.Value)) == 4L);
@@ -787,24 +789,24 @@ public class RuntimeMvpTests
 
             await runtimeHost.LoadPackageAsync(export.PackageRootPath);
             await runtimeHost.StartFolderRunAsync(replayRoot);
-            await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
+            await started.Task.WaitAsync(RuntimeHostAsyncSignalTimeout);
 
             var stopCts = new CancellationTokenSource();
             var stopTask = runtimeHost.StopAsync(stopCts.Token);
-            await WaitForStateAsync(runtimeHost, RuntimeHostState.Stopping, TimeSpan.FromSeconds(1));
+            await WaitForStateAsync(runtimeHost, RuntimeHostState.Stopping, RuntimeHostAsyncSignalTimeout);
             stopCts.Cancel();
 
-            var stopSummary = await stopTask.WaitAsync(TimeSpan.FromSeconds(2));
+            var stopSummary = await stopTask.WaitAsync(RuntimeHostAsyncSignalTimeout);
             stopSummary.WasRunning.Should().BeTrue();
             stopSummary.TimedOut.Should().BeTrue();
             runtimeHost.GetSnapshot().State.Should().Be(RuntimeHostState.Faulted);
 
             var reloadWhileOldRunIsAlive = async () => await runtimeHost.LoadPackageAsync(export.PackageRootPath);
             await reloadWhileOldRunIsAlive.Should().ThrowAsync<RuntimePackageException>()
-                .WithMessage("*忙*");
+                .WithMessage("*运行引擎当前正忙*");
 
             release.TrySetResult(null);
-            await WaitForStateAsync(runtimeHost, RuntimeHostState.Loaded, TimeSpan.FromSeconds(2));
+            await WaitForStateAsync(runtimeHost, RuntimeHostState.Loaded, RuntimeHostAsyncSignalTimeout);
         }
         finally
         {

@@ -1,13 +1,13 @@
-﻿/**
- * 宸ョ▼绠＄悊妯″潡
- * 璐熻矗宸ョ▼鐨勫垱寤恒€佹墦寮€銆佷繚瀛樸€佸垪琛ㄧ鐞?
+/**
+ * 工程管理模块
+ * 负责工程的创建、打开、保存、列表管理
  */
 
 import httpClient from '../../core/messaging/httpClient.js';
 import { createSignal } from '../../core/state/store.js';
 import { saveGlobalVariableSchema } from '../global-variables/globalVariableStore.js';
 
-// 宸ョ▼鐘舵€?
+// 工程状态
 const [getCurrentProject, setCurrentProject, subscribeProject] = createSignal(null);
 const [getProjectList, setProjectList, subscribeProjectList] = createSignal([]);
 const [getRecentProjects, setRecentProjects, subscribeRecentProjects] = createSignal([]);
@@ -63,7 +63,7 @@ class ProjectManager {
             return true;
         }
 
-        const shouldSave = window.confirm('褰撳墠宸ョ▼鏈夋湭淇濆瓨鐨勬洿鏀癸紝鏄惁鍏堜繚瀛橈紵');
+        const shouldSave = window.confirm('当前工程有未保存的更改，是否先保存？');
         if (shouldSave) {
             await this.saveProject();
         }
@@ -72,7 +72,7 @@ class ProjectManager {
     }
 
     /**
-     * 鑾峰彇宸ョ▼鍒楄〃
+     * 获取工程列表
      */
     async getProjectList() {
         try {
@@ -80,13 +80,13 @@ class ProjectManager {
             setProjectList(projects);
             return projects;
         } catch (error) {
-            console.error('[ProjectManager] 鑾峰彇宸ョ▼鍒楄〃澶辫触:', error);
+            console.error('[ProjectManager] 获取工程列表失败:', error);
             throw error;
         }
     }
 
     /**
-     * 鑾峰彇鏈€杩戞墦寮€鐨勫伐绋?
+     * 获取最近打开的工程
      */
     async getRecentProjects(count = 10) {
         try {
@@ -94,26 +94,26 @@ class ProjectManager {
             setRecentProjects(projects);
             return projects;
         } catch (error) {
-            console.error('[ProjectManager] 鑾峰彇鏈€杩戝伐绋嬪け璐?', error);
+            console.error('[ProjectManager] 获取最近工程失败:', error);
             throw error;
         }
     }
 
     /**
-     * 鎼滅储宸ョ▼
+     * 搜索工程
      */
     async searchProjects(keyword) {
         try {
             const projects = await httpClient.get(`/projects/search?keyword=${encodeURIComponent(keyword)}`);
             return projects;
         } catch (error) {
-            console.error('[ProjectManager] 鎼滅储宸ョ▼澶辫触:', error);
+            console.error('[ProjectManager] 搜索工程失败:', error);
             throw error;
         }
     }
 
     /**
-     * 鍒涘缓鏂板伐绋?
+     * 创建新工程
      */
     async createProject(name, description = '') {
         try {
@@ -131,10 +131,10 @@ class ProjectManager {
             this.updateStatusBar(project);
             this.rememberProjectInCaches(project);
             
-            console.log('[ProjectManager] 宸ョ▼鍒涘缓鎴愬姛:', project.id);
+            console.log('[ProjectManager] 工程创建成功:', project.id);
             return project;
         } catch (error) {
-            console.error('[ProjectManager] 鍒涘缓宸ョ▼澶辫触:', error);
+            console.error('[ProjectManager] 创建工程失败:', error);
             throw error;
         }
     }
@@ -154,10 +154,10 @@ class ProjectManager {
             this.updateStatusBar(project);
             this.rememberProjectInCaches(project);
 
-            console.log('[ProjectManager] 绀轰緥宸ョ▼鍒涘缓鎴愬姛:', project.id, '| mode:', mode);
+            console.log('[ProjectManager] 示例工程创建成功:', project.id, '| mode:', mode);
             return project;
         } catch (error) {
-            console.error('[ProjectManager] 鍒涘缓绀轰緥宸ョ▼澶辫触:', error);
+            console.error('[ProjectManager] 创建示例工程失败:', error);
             throw error;
         }
     }
@@ -166,13 +166,13 @@ class ProjectManager {
         try {
             return await httpClient.get('/demo/guide');
         } catch (error) {
-            console.error('[ProjectManager] 鑾峰彇绀轰緥宸ョ▼寮曞澶辫触:', error);
+            console.error('[ProjectManager] 获取示例工程引导失败:', error);
             throw error;
         }
     }
 
     /**
-     * 鎵撳紑宸ョ▼
+     * 打开工程
      */
     async openProject(projectId) {
         try {
@@ -188,7 +188,7 @@ class ProjectManager {
             await this.prepareForProjectSwitch();
             const project = await httpClient.get(`/projects/${projectId}`);
             if (requestId !== this.openProjectRequestId) {
-                console.warn('[ProjectManager] 蹇界暐杩囨湡鐨勫伐绋嬫墦寮€缁撴灉:', projectId);
+                console.warn('[ProjectManager] 忽略过期的工程打开结果:', projectId);
                 return null;
             }
             
@@ -197,19 +197,19 @@ class ProjectManager {
             setCurrentProject(project);
             this.unsavedChanges = false;
             
-            // 鏇存柊鐘舵€佹爮
+            // 更新状态栏
             this.updateStatusBar(project);
             
-            console.log('[ProjectManager] 宸ョ▼鎵撳紑鎴愬姛:', project.id);
+            console.log('[ProjectManager] 工程打开成功:', project.id);
             return project;
         } catch (error) {
-            console.error('[ProjectManager] 鎵撳紑宸ョ▼澶辫触:', error);
+            console.error('[ProjectManager] 打开工程失败:', error);
             throw error;
         }
     }
 
     /**
-     * 淇濆瓨宸ョ▼
+     * 保存工程
      */
     async saveProject(projectData = null) {
         if (!this.currentProject) {
@@ -257,15 +257,15 @@ class ProjectManager {
             this.updateStatusBar(this.currentProject);
             this.updateTitle();
 
-            console.log('[ProjectManager] 宸ョ▼淇濆瓨鎴愬姛:', targetProjectId);
+            console.log('[ProjectManager] 工程保存成功:', targetProjectId);
             return true;
         } catch (error) {
-            console.error('[ProjectManager] 淇濆瓨宸ョ▼澶辫触:', error);
+            console.error('[ProjectManager] 保存工程失败:', error);
             throw error;
         }
     }
     /**
-     * 鍒犻櫎宸ョ▼
+     * 删除工程
      */
     async deleteProject(projectId) {
         try {
@@ -274,22 +274,22 @@ class ProjectManager {
             }
             await httpClient.delete(`/projects/${projectId}`);
             
-            // 濡傛灉鍒犻櫎鐨勬槸褰撳墠宸ョ▼锛屾竻绌哄綋鍓嶅伐绋?
+            // 如果删除的是当前工程，清空当前工程
             if (this.currentProject && this.currentProject.id === projectId) {
                 await this.closeProject({ promptToSave: false });
             }
             this.forgetProjectFromCaches(projectId);
             
-            console.log('[ProjectManager] 宸ョ▼鍒犻櫎鎴愬姛:', projectId);
+            console.log('[ProjectManager] 工程删除成功:', projectId);
             return true;
         } catch (error) {
-            console.error('[ProjectManager] 鍒犻櫎宸ョ▼澶辫触:', error);
+            console.error('[ProjectManager] 删除工程失败:', error);
             throw error;
         }
     }
 
     /**
-     * 鍏抽棴褰撳墠宸ョ▼
+     * 关闭当前工程
      */
     async closeProject(options = {}) {
         const { promptToSave = true } = options;
@@ -310,7 +310,7 @@ class ProjectManager {
     }
 
     /**
-     * 鏇存柊褰撳墠宸ョ▼鏁版嵁
+     * 更新当前工程数据
      */
     updateProject(updates) {
         if (!this.currentProject) return;
@@ -327,7 +327,7 @@ class ProjectManager {
     }
 
     /**
-     * 鏇存柊娴佺▼
+     * 更新流程
      */
     updateFlow(flowData) {
         if (!this.currentProject) return;
@@ -375,14 +375,14 @@ class ProjectManager {
         return saved;
     }
     /**
-     * 妫€鏌ユ槸鍚︽湁鏈繚瀛樼殑鏇存敼
+     * 检查是否有未保存的更改
      */
     hasUnsavedChanges() {
         return this.unsavedChanges;
     }
 
     /**
-     * 鑾峰彇褰撳墠宸ョ▼
+     * 获取当前工程
      */
     getCurrentProject() {
         return this.currentProject;
@@ -398,7 +398,7 @@ class ProjectManager {
     }
 
     /**
-     * 鏇存柊鐘舵€佹爮
+     * 更新状态栏
      */
     updateStatusBar(project) {
         const projectNameEl = document.getElementById('project-name');
@@ -414,7 +414,7 @@ class ProjectManager {
     }
 
     /**
-     * 鏇存柊绐楀彛鏍囬
+     * 更新窗口标题
      */
     updateTitle() {
         const unsavedMark = this.unsavedChanges ? ' *' : '';
@@ -423,7 +423,7 @@ class ProjectManager {
     }
 
     /**
-     * 瀵煎嚭宸ョ▼
+     * 导出工程
      */
     async exportProject(projectId, format = 'json') {
         try {
@@ -438,10 +438,10 @@ class ProjectManager {
                     mimeType = 'application/json';
                     break;
                 default:
-                    throw new Error(`涓嶆敮鎸佺殑瀵煎嚭鏍煎紡: ${format}`);
+                    throw new Error(`不支持的导出格式: ${format}`);
             }
 
-            // 涓嬭浇鏂囦欢
+            // 下载文件
             const blob = new Blob([content], { type: mimeType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -454,26 +454,26 @@ class ProjectManager {
             
             return true;
         } catch (error) {
-            console.error('[ProjectManager] 瀵煎嚭宸ョ▼澶辫触:', error);
+            console.error('[ProjectManager] 导出工程失败:', error);
             throw error;
         }
     }
 
     /**
-     * 瀵煎叆宸ョ▼
+     * 导入工程
      */
     async importProject(file) {
         try {
             const content = await file.text();
             const projectData = JSON.parse(content);
             
-            // 鍒涘缓鏂板伐绋?
+            // 创建新工程
             const project = await this.createProject(
                 projectData.name || 'Imported Project',
                 projectData.description || ''
             );
 
-            // 瀵煎叆娴佺▼鏁版嵁
+            // 导入流程数据
             if (projectData.flow) {
                 await this.updateFlow(projectData.flow);
                 await this.saveProject();
@@ -481,7 +481,7 @@ class ProjectManager {
 
             return project;
         } catch (error) {
-            console.error('[ProjectManager] 瀵煎叆宸ョ▼澶辫触:', error);
+            console.error('[ProjectManager] 导入工程失败:', error);
             throw error;
         }
     }
@@ -521,7 +521,7 @@ function isProjectPayload(value) {
     );
 }
 
-// 鍒涘缓鍗曚緥
+// 创建单例
 const projectManager = new ProjectManager();
 
 export default projectManager;

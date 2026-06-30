@@ -118,10 +118,11 @@ public class ImageAcquisitionOperatorTests
 
             result.IsSuccess.Should().BeTrue(result.ErrorMessage);
             result.OutputData.Should().NotBeNull();
-            result.OutputData!.Should().ContainKey("Image");
-            result.OutputData["Width"].Should().Be(12);
-            result.OutputData["Height"].Should().Be(6);
-            result.OutputData["Source"].Should().Be("camera");
+            var outputData = result.OutputData!;
+            outputData.Should().ContainKey("Image");
+            outputData["Width"].Should().Be(12);
+            outputData["Height"].Should().Be(6);
+            outputData["Source"].Should().Be("camera");
             await cameraManager.Received(1).GetOrCreateByBindingAsync("cam-1");
             await camera.Received(1).AcquireSingleFrameAsync();
         }

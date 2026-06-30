@@ -2,8 +2,8 @@
 // 初始化菜单栏
 // 作者：蘅芜君
 
-using System.Windows.Forms;
 using System.Text.Json;
+using System.Windows.Forms;
 using ClearVision.Product.Desktop.Triggers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.WebView2.WinForms;

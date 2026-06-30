@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Reflection;
 using ClearVision.Product.Infrastructure.PointCloud;
 using ClearVision.Product.Infrastructure.PointCloud.Matching;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using OpenCvSharp;
 using Xunit;
@@ -10,6 +11,7 @@ using PointCloudModel = ClearVision.Product.Infrastructure.PointCloud.PointCloud
 
 namespace ClearVision.Product.Tests.PointCloud;
 
+[Collection(PointCloudMatchingTestCollections.PointCloudMatching)]
 public sealed class PPFMatcherTests
 {
     [Fact]

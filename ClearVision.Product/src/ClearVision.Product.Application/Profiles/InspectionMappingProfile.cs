@@ -2,10 +2,10 @@
 // AutoMapper 映射配置
 // 作者：蘅芜君
 
+using AutoMapper;
 using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Entities;
-using AutoMapper;
 
 namespace ClearVision.Product.Application.Profiles;
 

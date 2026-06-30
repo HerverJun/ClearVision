@@ -1,4 +1,4 @@
-﻿using ClearVision.PlcComm.Common;
+using ClearVision.PlcComm.Common;
 using ClearVision.PlcComm.Core;
 using HslCommunication.Profinet.Melsec;
 using Microsoft.Extensions.Logging;

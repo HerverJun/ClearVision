@@ -2,12 +2,12 @@
 // ExecuteInspection命令
 // 作者：蘅芜君
 
+using AutoMapper;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.Services;
-using AutoMapper;
 using MediatR;
 
 namespace ClearVision.Product.Application.Commands.Inspections;

@@ -41,9 +41,9 @@ public class LocalDeformableMatchingOperatorTests
         var inputs = TestHelpers.CreateImageInputs(image);
 
         var result = await _operator.ExecuteAsync(op, inputs);
-        // 娌℃湁妯℃澘搴旇杩斿洖澶辫触鎴栭檷绾х粨鏋?
-        result.IsSuccess.Should().BeTrue(); // 绠楀瓙鏈韩杩斿洖鎴愬姛锛屼絾鍖呭惈澶辫触淇℃伅
-        result.OutputData["IsMatch"].Should().Be(false);
+        // 没有模板时算子保持成功返回，但在输出中标记匹配失败。
+        result.IsSuccess.Should().BeTrue();
+        result.OutputData!["IsMatch"].Should().Be(false);
     }
 
     [Fact]
@@ -375,16 +375,16 @@ public class LocalDeformableMatchingOperatorTests
 
     private static ImageWrapper CreateFeatureRichImage()
     {
-        // 鍒涘缓鍖呭惈涓板瘜鐗瑰緛鐨勫浘鍍?
+        // 创建包含丰富特征的图像
         var mat = new Mat(400, 400, MatType.CV_8UC3, Scalar.Gray);
 
-        // 娣诲姞涓€浜涘嚑浣曞舰鐘朵互浜х敓鐗瑰緛
+        // 添加一些几何形状以产生特征
         Cv2.Rectangle(mat, new Rect(50, 50, 100, 100), Scalar.Black, -1);
         Cv2.Rectangle(mat, new Rect(200, 150, 120, 80), Scalar.White, -1);
         Cv2.Circle(mat, new Point(300, 300), 50, Scalar.Black, -1);
         Cv2.Circle(mat, new Point(150, 300), 30, Scalar.White, -1);
 
-        // 娣诲姞绾挎潯绾圭悊
+        // 添加线条纹理
         for (int i = 0; i < 8; i++)
         {
             Cv2.Line(mat, new Point(i * 50, 0), new Point(i * 50, 400), Scalar.DarkGray, 2);

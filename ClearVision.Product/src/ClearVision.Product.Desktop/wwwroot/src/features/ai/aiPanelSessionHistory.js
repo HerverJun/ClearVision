@@ -65,7 +65,7 @@ export const aiPanelSessionHistoryMixin = {
             list.innerHTML = '<div class="ai-history-empty">暂无历史记录</div>';
             return;
         }
-        
+
         list.innerHTML = rows.map(item => {
             const templateBadge = item.templateName
                 ? `<span class="history-template-badge">${this._escapeHtml(item.templateName)}</span>`

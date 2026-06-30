@@ -1,6 +1,6 @@
 /**
- * 涓诲簲鐢ㄥ叆鍙?- S4-006: 绔埌绔泦鎴?
- * Sprint 4: 鍓嶅悗绔泦鎴愪笌鐢ㄦ埛浣撻獙闂幆
+ * 主应用入口 - S4-006: 端到端集成
+ * Sprint 4: 前后端集成与用户体验闭环
  */
 
 import { Dialog } from './shared/components/dialog.js';
@@ -91,7 +91,7 @@ import projectManager, {
     subscribeProject
 } from './features/project/projectManager.js';
 
-// 鍏ㄥ眬鐘舵€?
+// 全局状态
 const [getCurrentView, setCurrentView, subscribeView] = createSignal('flow');
 const [getSelectedOperator, setSelectedOperator, subscribeSelectedOperator] = createSignal(null);
 const [getOperatorLibrary, setOperatorLibrary, subscribeOperatorLibrary] = createSignal([]);
@@ -2122,7 +2122,7 @@ function findOperatorDefinition(type) {
 /**
  * Encoding cleanup: previous comment text was unreadable.
  * Encoding cleanup: previous comment text was unreadable.
- * @param {Array} nodeParams - 鐢诲竷鑺傜偣淇濆瓨鐨勫弬鏁板€?
+ * @param {Array} nodeParams - 画布节点保存的参数值
  * Encoding cleanup: previous comment text was unreadable.
  */
 function mergeParameters(defParams, nodeParams) {
@@ -2137,7 +2137,7 @@ function mergeParameters(defParams, nodeParams) {
         
         const mergedParam = { 
             ...defP,
-            // 浼樺厛浣跨敤鑺傜偣淇濆瓨鐨勫€?(Value 鎴?value)
+            // 优先使用节点保存的值(Value 或 value)
             value: nodeP !== undefined ? (nodeP.value ?? nodeP.Value ?? nodeP.defaultValue ?? nodeP.DefaultValue) : defP.defaultValue
         };
         
@@ -2156,12 +2156,12 @@ async function importProjectFromJson(file) {
         const content = await file.text();
         const importData = JSON.parse(content);
         
-        // 楠岃瘉鏂囦欢鏍煎紡
+        // 验证文件格式
         if (!importData.project || !importData.project.flow) {
             throw new Error('无效的工程文件格式');
         }
         
-        // 纭瀵煎叆
+        // 确认导入
         const confirmed = confirm(`确定要导入工程 "${importData.project.name || '未命名'}" 吗？\n如果当前工程有未保存的更改，系统会先询问是否保存。`);
         if (!confirmed) return;
         
@@ -2170,7 +2170,7 @@ async function importProjectFromJson(file) {
         const importDesc = importData.project.description || '';
         const project = await projectManager.createProject(importName, importDesc);
         
-        // 鍔犺浇娴佺▼鍒扮敾甯?
+        // 加载流程到画布
         if (flowCanvas && importData.project.flow) {
             withProjectFlowSyncSuppressed(() => flowCanvas.deserialize(importData.project.flow));
             // Refresh project flow after import.
@@ -2224,11 +2224,11 @@ window.exportRuntimePackage = exportRuntimePackage;
 window.showProjectExportDialog = showProjectExportDialog;
 
 // ==========================================================================
-// 闃舵浜旓細鐘舵€佹爮鏇存柊鍔熻兘
+// 阶段五：状态栏更新功能
 // ==========================================================================
 
 /**
- * 鏇存柊鐘舵€佹爮鎸囨爣
+ * 更新状态栏指标
  */
 function updateStatusBar() {
     if (window.performance?.memory) {
@@ -2239,7 +2239,7 @@ function updateStatusBar() {
 }
 
 /**
- * FPS 璁℃暟鍣?
+ * FPS 计数器
  */
 let fpsCounter = {
     frames: 0,
@@ -2332,7 +2332,7 @@ function switchViewWithTransition(view) {
     
     if (currentView === view) return;
     
-    // 鑾峰彇褰撳墠鏄剧ず鐨勮鍥惧鍣?
+    // 获取当前显示的视图容器
     const currentContainer = document.getElementById(`${currentView}-view`) || 
                             document.getElementById(`${currentView}-editor`) ||
                             document.getElementById('flow-editor');
@@ -2345,7 +2345,7 @@ function switchViewWithTransition(view) {
             currentContainer.classList.remove('view-exit');
             currentContainer.classList.add('hidden');
             
-            // 鏄剧ず鏂拌鍥?
+    // 显示新视图
             switchView(view);
             
             const newContainer = document.getElementById(`${view}-view`) || 
@@ -2362,17 +2362,17 @@ function switchViewWithTransition(view) {
             }
         }, 300);
     } else {
-        // 鏃犲姩鐢荤洿鎺ュ垏鎹?
+        // 无动画直接切换
         switchView(view);
     }
 }
 
 // ==========================================================================
-// 闃舵浜旓細鍔犺浇楠ㄦ灦灞?
+// 阶段五：加载骨架层
 // ==========================================================================
 
 /**
- * 鏄剧ず鍔犺浇楠ㄦ灦灞?
+ * 显示加载骨架层
  */
 function showLoadingScreen() {
     if (document.getElementById('loading-screen')) {
@@ -2391,7 +2391,7 @@ function showLoadingScreen() {
 }
 
 /**
- * 闅愯棌鍔犺浇楠ㄦ灦灞?
+ * 隐藏加载骨架层
  */
 function hideLoadingScreen() {
     const loadingScreen = document.getElementById('loading-screen');
@@ -2402,11 +2402,11 @@ function hideLoadingScreen() {
 }
 
 // ==========================================================================
-// 闃舵浜旓細娆㈣繋/寮曞椤?
+// 阶段五：欢迎/引导页
 // ==========================================================================
 
 /**
- * 鏄剧ず娆㈣繋椤?
+ * 显示欢迎页
  */
 function showWelcomeScreen() {
     // 检查是否首次运行

@@ -1,9 +1,9 @@
-using ClearVision.Product.Core.DTOs;
-using ClearVision.Product.Infrastructure.AI.Agent;
-using FluentAssertions;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Infrastructure.AI.Agent;
+using FluentAssertions;
 using Xunit;
 
 namespace ClearVision.Product.Tests.AI;
@@ -156,7 +156,7 @@ public sealed class VisionAgentConsolidationTests
 
         questions.Select(q => q.Field).Should().BeEquivalentTo(allowed);
         questions.Any(q => q.Field == "inspection_object" || q.Field == "task_type").Should().BeFalse();
-        
+
         // fallback 只提供自由输入，不包含推荐占位选项。
         foreach (var q in questions)
         {
@@ -327,7 +327,10 @@ public sealed class VisionAgentConsolidationTests
     {
         var plan1 = new VisionAgentPlanModeResult
         {
-            PlanId = "p1", Goal = "goal", Intent = "intent", PlanContractVersion = "v2",
+            PlanId = "p1",
+            Goal = "goal",
+            Intent = "intent",
+            PlanContractVersion = "v2",
             ResolvedPlanFields = ["inspection_object", "task_type"],
             ConfirmedPlanAnswers = [
                 new() { Field = "image_source", Value = "camera" },
@@ -400,7 +403,9 @@ public sealed class VisionAgentConsolidationTests
     {
         var plan = new VisionAgentPlanModeResult
         {
-            PlanId = "lesion_plan", Goal = "病灶检测", Intent = "presence_absence",
+            PlanId = "lesion_plan",
+            Goal = "病灶检测",
+            Intent = "presence_absence",
             ResolvedPlanFields = ["inspection_object"], // object is resolved ("病灶")
             RemainingPlanFields = ["image_source", "task_type", "acceptance_criteria"],
             SemanticExtraction = new VisionAgentSemanticExtractionResult

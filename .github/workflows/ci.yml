@@ -46,11 +46,33 @@ jobs:
 
       - name: Secret Scan
         shell: pwsh
-        run: '& "./scripts/scan-secrets.ps1"'
+        run: |
+          $baseRef = if ("${{ github.event_name }}" -eq "pull_request") {
+            "${{ github.event.pull_request.base.sha }}"
+          } else {
+            "origin/main"
+          }
+          & "./scripts/scan-secrets.ps1" -BaseRef $baseRef
 
       - name: Text Encoding Scan
         shell: pwsh
-        run: '& "./scripts/check-text-encoding.ps1"'
+        run: |
+          $baseRef = if ("${{ github.event_name }}" -eq "pull_request") {
+            "${{ github.event.pull_request.base.sha }}"
+          } else {
+            "origin/main"
+          }
+          & "./scripts/check-text-encoding.ps1" -BaseRef $baseRef
+
+      - name: Diff Hygiene
+        shell: pwsh
+        run: |
+          $baseRef = if ("${{ github.event_name }}" -eq "pull_request") {
+            "${{ github.event.pull_request.base.sha }}"
+          } else {
+            "origin/main"
+          }
+          & "./scripts/check-diff-hygiene.ps1" -BaseRef $baseRef
 
       - name: Quality Report Size Scan
         shell: pwsh
@@ -422,6 +444,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -610,6 +634,10 @@ jobs:
 
       - name: Check Code Format
         run: dotnet format ${{ env.SOLUTION_PATH }} --verify-no-changes --verbosity diagnostic
+
+      - name: Diff Hygiene
+        shell: pwsh
+        run: '& "./scripts/check-diff-hygiene.ps1" -BaseRef "${{ github.event.pull_request.base.sha }}"'
 
       - name: Run Static Analysis
         run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -warnaserror

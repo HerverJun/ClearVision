@@ -31,8 +31,9 @@ public sealed class HandEyeCalibrationOperatorTests
 
         TranslationError(estimated, expectedCameraToTool).Should().BeLessThan(0.005);
         RotationErrorDegrees(estimated, expectedCameraToTool).Should().BeLessThan(0.5);
-        result.OutputData["CalibrationQuality"].Should().Be("good");
-        result.OutputData["HtmlReport"].Should().BeOfType<string>().Which.Should().Contain("Hand-Eye Calibration Validation Report");
+        var outputData = result.OutputData!;
+        outputData["CalibrationQuality"].Should().Be("good");
+        outputData["HtmlReport"].Should().BeOfType<string>().Which.Should().Contain("Hand-Eye Calibration Validation Report");
     }
 
     [Fact]
@@ -53,8 +54,9 @@ public sealed class HandEyeCalibrationOperatorTests
 
         TranslationError(estimated, expectedCameraToBase).Should().BeLessThan(0.005);
         RotationErrorDegrees(estimated, expectedCameraToBase).Should().BeLessThan(0.5);
-        result.OutputData["MatrixConvention"].Should().Be("CameraToBaseMatrix");
-        result.OutputData["CalibrationQuality"].Should().Be("good");
+        var outputData = result.OutputData!;
+        outputData["MatrixConvention"].Should().Be("CameraToBaseMatrix");
+        outputData["CalibrationQuality"].Should().Be("good");
     }
 
     [Fact]

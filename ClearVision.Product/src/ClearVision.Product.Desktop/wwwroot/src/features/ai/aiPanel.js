@@ -41,7 +41,7 @@ export class AiPanel {
         this.container = document.getElementById(containerId);
         this.sessionStorageKey = 'cv_ai_session_id';
         this.workspaceViewStorageKey = 'cv_ai_workspace_view_mode';
-        
+
         // 状态
         this.isGenerating = false;
         this.history = []; // { sessionId, lastMessage, updatedAtUtc, turnCount }
@@ -174,7 +174,7 @@ export class AiPanel {
         this._handleAttachmentReport = this._handleAttachmentReport.bind(this);
         this._handleCancelGenerate = this._handleCancelGenerate.bind(this);
         this._toggleHistoryPanel = this._toggleHistoryPanel.bind(this);
-        
+
         // 初始化
         this._init();
         if (typeof window !== 'undefined') {
@@ -188,7 +188,7 @@ export class AiPanel {
             console.error('[AiPanel] 容器未找到:', this.containerId);
             return;
         }
-        
+
         this.render();
         this._setupMessageListeners();
         this._setupCanvasStructureSync();
@@ -197,7 +197,7 @@ export class AiPanel {
         this._setupComposerLayoutSync();
         this._setupExamplesFolding();
     }
-    
+
     activate() {
         this._checkConnection();
         const mainContent = this.container.closest('.main-content');
@@ -217,7 +217,7 @@ export class AiPanel {
             }
         }
     }
-    
+
     async _handleNewConversation() {
         const flushed = (await this._flushWorkspaceSnapshotBeforeBoundary?.('new_conversation')) ?? true;
         if (!flushed) {
@@ -429,13 +429,13 @@ export class AiPanel {
                             <div class="ai-history-list" id="ai-history-list"></div>
                         </div>
                     </div>
-                    
+
                     <div class="ai-chat-container" id="ai-chat-container">
                         <div class="ai-message ai">
                             <div class="ai-bubble">您好！我是您的视觉工程助手。请描述您想要检测的缺陷，我将为您构建流水线。</div>
                         </div>
                     </div>
-                    
+
                     <div class="ai-input-section">
                         <div class="ai-agent-mode-bar">
                             <div>
@@ -574,7 +574,7 @@ export class AiPanel {
                             <div class="ai-prompt-trace" id="ai-result-prompt-trace"></div>
                         </div>
                     </div>
-                     
+
                         <div class="apply-container">
                             <button class="btn-apply-flow" id="ai-btn-apply" disabled>
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right:6px;">
@@ -588,7 +588,7 @@ export class AiPanel {
                 </aside>
             </div>
         `;
-        
+
         // 事件绑定
         const attachBtn = this.container.querySelector('#ai-btn-attach');
         const cancelBtn = this.container.querySelector('#ai-btn-cancel');
@@ -619,20 +619,20 @@ export class AiPanel {
             });
         });
         this._bindAgentDeveloperControls();
-        
+
         this.container.querySelectorAll('.ai-tag').forEach(tag => {
             tag.addEventListener('click', () => {
                 this._handleQuickExampleSelection(tag.dataset.text);
             });
         });
-        
+
         const aiInput = this.container.querySelector('#ai-input');
         aiInput.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'Enter') {
                 this._handleGenerate();
             }
         });
-        
+
         // 自动扩展高度
         aiInput.addEventListener('input', () => {
             aiInput.style.height = 'auto';
@@ -657,12 +657,12 @@ export class AiPanel {
         input.style.height = `${input.scrollHeight || 0}px`;
         return this._handleGenerate();
     }
-    
+
     _checkConnection() {
         const indicator = this.container.querySelector('#ai-conn-status');
         const dot = indicator?.querySelector('.status-dot');
         if (!dot) return;
-        
+
         httpClient.get('/health')
             .then(() => {
                 dot.className = 'status-dot connected';
@@ -671,7 +671,7 @@ export class AiPanel {
                 dot.className = 'status-dot disconnected';
             });
     }
-    
+
     _setupMessageListeners() {
         webMessageBridge.on('GenerateFlowProgress', (data) => this._updateProgress(data));
         webMessageBridge.on('GenerateFlowStreamChunk', (data) => this._handleStreamChunk(data));
@@ -684,7 +684,7 @@ export class AiPanel {
         webMessageBridge.on('GetAiSessionResult', (data) => this._handleGetAiSessionResult(data));
         webMessageBridge.on('DeleteAiSessionResult', (data) => this._handleDeleteAiSessionResult(data));
     }
-    
+
     _getCurrentFlowJson() {
         let baseFlow = null;
         if (this.currentResult && this.currentResult.flow && !this._isCurrentResultAppliedToCanvas()) {
@@ -761,9 +761,9 @@ export class AiPanel {
         // Progress messages drive the workbench state, but are intentionally
         // not rendered into each chat turn to keep the conversation focused.
     }
-    
+
     _showPhaseHint() {}
-    
+
     _handleStreamChunk(data) {
         const payload = data.payload || data;
         if (!this._shouldHandleGenerateRealtimePayload(payload)) {
@@ -772,7 +772,7 @@ export class AiPanel {
 
         const chunkType = payload.chunkType; // 'content' or legacy hidden thinking
         const content = payload.content || '';
-        
+
         if (!content) return;
 
         if (chunkType === 'thinking') {
@@ -812,7 +812,7 @@ export class AiPanel {
         if (!targetEl) return false;
         return (targetEl.scrollHeight - targetEl.scrollTop - targetEl.clientHeight) <= threshold;
     }
-    
+
     _normalizeIntent(intent) {
         if (!intent) return 'UNKNOWN';
         return intent.toUpperCase();
@@ -1065,7 +1065,7 @@ export class AiPanel {
         this.isCancellingGenerate = false;
         this._addMessage('system', `取消生成未生效: ${payload.errorMessage || payload.message || '未知错误'}`);
     }
-    
+
     _handleFirewallBlocked(data) {
         this._setGeneratingState(false);
         this._clearActiveRequestState();
@@ -1089,7 +1089,7 @@ export class AiPanel {
         chatContainer.appendChild(alert);
         this._scrollToBottom();
     }
-    
+
     _handleError(msg) {
         this._setGeneratingState(false);
         this._clearActiveRequestState();
@@ -1106,7 +1106,7 @@ export class AiPanel {
         }
         this._addMessage('system', `❌ 系统错误: ${msg}`);
     }
-    
+
     _displayResult(data, options = {}) {
         const {
             appendChatMessage = false,
@@ -1819,12 +1819,12 @@ export class AiPanel {
         this._renderQueuedHintBanner();
         return hint;
     }
-    
+
     /**
      * 打字机效果：每次追加 chunkSize 个字符
      */
 
-    
+
     _setGeneratingState(busy) {
         this.isGenerating = busy;
         if (!busy) {
@@ -2195,7 +2195,7 @@ export class AiPanel {
             message: String(warning.message || warning.Message || '结果已生成，但本次会话尚未成功保存。')
         };
     }
-    
+
     _clearResultPane() {
         const briefCard = this.container.querySelector('#ai-result-requirement-brief-card');
         const brief = this.container.querySelector('#ai-result-requirement-brief');
@@ -2229,7 +2229,7 @@ export class AiPanel {
         this._streamBuffer = { thinking: '', content: '' };
         this._streamFlushPending = false;
     }
-    
+
     _scrollToBottom() {
         const container = this.container.querySelector('#ai-chat-container');
         if(container) container.scrollTop = container.scrollHeight;

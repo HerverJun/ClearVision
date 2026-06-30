@@ -4,9 +4,9 @@ using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using NSubstitute;
-using ClearVision.Product.Tests.TestSupport;
 
 namespace ClearVision.Product.Tests.Services;
 

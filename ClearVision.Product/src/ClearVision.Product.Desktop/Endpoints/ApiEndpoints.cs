@@ -1,6 +1,6 @@
-﻿// ApiEndpoints.cs
-// API 绔偣閰嶇疆
-// 浣滆€咃細铇呰姕鍚?
+// ApiEndpoints.cs
+// API 端点配置
+// 作者：蘅芜君
 
 using System.Linq;
 using System.Text.Json;
@@ -31,7 +31,7 @@ using OpenCvSharp;
 namespace ClearVision.Product.Desktop.Endpoints;
 
 /// <summary>
-/// API 绔偣閰嶇疆
+/// API 端点配置
 /// </summary>
 public static class ApiEndpoints
 {
@@ -39,22 +39,22 @@ public static class ApiEndpoints
 
     public static IEndpointRouteBuilder MapVisionApiEndpoints(this IEndpointRouteBuilder app)
     {
-        // 鍋ュ悍妫€鏌?
+        // 健康检查
         app.MapGet("/api/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTime.UtcNow }));
 
-        // 宸ョ▼鐩稿叧绔偣
+        // 工程相关端点
         MapProjectEndpoints(app);
 
-        // 妫€娴嬬浉鍏崇鐐?
+        // 检测相关端点
         MapInspectionEndpoints(app);
 
-        // 绠楀瓙搴撶鐐?
+        // 算子库端点
         MapOperatorEndpoints(app);
 
-        // 銆怭hase 3銆戣妭鐐归瑙堢鐐癸紙澶嶇敤璋冭瘯缂撳瓨鏈哄埗锛?
+        // 【Phase 3】节点预览端点（复用调试缓存机制）
         app.MapPreviewNodeEndpoints();
 
-        // 鍥惧儚鐩稿叧绔偣
+        // 图像相关端点
         MapImageEndpoints(app);
 
         return app;
@@ -109,28 +109,28 @@ public static class ApiEndpoints
 
     private static void MapProjectEndpoints(IEndpointRouteBuilder app)
     {
-        // 鑾峰彇宸ョ▼鍒楄〃
+        // 获取工程列表
         app.MapGet("/api/projects", async (ProjectService service) =>
         {
             var projects = await service.GetAllAsync();
             return Results.Ok(projects);
         });
 
-        // 鑾峰彇鏈€杩戞墦寮€鐨勫伐绋?
+        // 获取最近打开的工程
         app.MapGet("/api/projects/recent", async (ProjectService service, int count = 10) =>
         {
             var projects = await service.GetRecentlyOpenedAsync(count);
             return Results.Ok(projects);
         });
 
-        // 鎼滅储宸ョ▼
+        // 搜索工程
         app.MapGet("/api/projects/search", async (ProjectService service, string keyword) =>
         {
             var projects = await service.SearchAsync(keyword);
             return Results.Ok(projects);
         });
 
-        // 鑾峰彇宸ョ▼璇︽儏
+        // 获取工程详情
         app.MapGet("/api/projects/{id:guid}", async (Guid id, ProjectService service) =>
         {
             try
@@ -144,7 +144,7 @@ public static class ApiEndpoints
             }
         });
 
-        // 鍒涘缓宸ョ▼
+        // 创建工程
         app.MapPost("/api/projects", async (CreateProjectRequest request, ProjectService service) =>
         {
             try
@@ -158,7 +158,7 @@ public static class ApiEndpoints
             }
         });
 
-        // 鏇存柊宸ョ▼
+        // 更新工程
         app.MapPut("/api/projects/{id:guid}", async (
             Guid id,
             UpdateProjectRequest request,
@@ -185,7 +185,7 @@ public static class ApiEndpoints
             }
         });
 
-        // 鍒犻櫎宸ョ▼
+        // 删除工程
         app.MapDelete("/api/projects/{id:guid}", async (
             Guid id,
             ProjectService service,
@@ -208,7 +208,7 @@ public static class ApiEndpoints
             }
         });
 
-        // 鏇存柊娴佺▼
+        // 更新流程
         app.MapPut("/api/projects/{id:guid}/flow", async (
             Guid id,
             UpdateFlowRequest request,
@@ -223,15 +223,15 @@ public static class ApiEndpoints
 
             try
             {
-                // 浣跨敤 ProjectService 澶勭悊鏇存柊锛屽畠鐜板湪浣跨敤鏂囦欢瀛樺偍
-                // 杩欑鏂瑰紡瀹屽叏缁曡繃浜?EF Core 鐨勫鏉傜姸鎬佺鐞嗗拰 Table Splitting 闂
+                // 使用 ProjectService 处理更新，它现在使用文件存储
+                // 这种方式完全绕过了 EF Core 的复杂状态管理和 Table Splitting 问题
                 await service.UpdateFlowAsync(id, request);
 
-                return Results.Ok(new { Message = "娴佺▼宸叉洿鏂?(File Based)", OperatorCount = request.Operators.Count, ConnectionCount = request.Connections.Count });
+                return Results.Ok(new { Message = "流程已更新 (File Based)", OperatorCount = request.Operators.Count, ConnectionCount = request.Connections.Count });
             }
             catch (Exception ex)
             {
-                // 鏃ュ織宸茬敱鍏ㄥ眬寮傚父涓棿浠惰褰?
+                // 日志已由全局异常中间件记录
                 return ToBadRequest(ex);
             }
         });
@@ -548,7 +548,7 @@ public static class ApiEndpoints
 
     private static void MapInspectionEndpoints(IEndpointRouteBuilder app)
     {
-        // 鎵ц妫€娴?
+        // 执行检测
         app.MapPost("/api/inspection/execute", async (ExecuteInspectionRequest request, Core.Services.IInspectionService service) =>
         {
             try
@@ -570,10 +570,10 @@ public static class ApiEndpoints
                 }
                 else
                 {
-                    // 銆愬叧閿慨澶嶃€戝鏋滃墠绔彁渚涗簡娴佺▼鏁版嵁锛屽垯杞崲骞朵娇鐢?
-                    // 杩欑‘淇濆墠绔紪杈戠殑鍙傛暟鍊艰兘姝ｇ‘浼犻€掑埌鍚庣鎵ц
+                    // 【关键修复】如果前端提供了流程数据，则转换并使用
+                    // 这确保前端编辑的参数值能正确传递到后端执行
                     OperatorFlow? flow = request.FlowData?.ToEntity();
-                    // 鍓嶇娴佺▼鏁版嵁宸查€氳繃鏃ュ織涓棿浠惰褰?
+                    // 前端流程数据已通过日志中间件记录
 
                     var result = await service.ExecuteSingleAsync(request.ProjectId, (byte[])null!, flow);
                     return Results.Ok(ToInspectionExecutionResponse(result));
@@ -594,7 +594,7 @@ public static class ApiEndpoints
             }
         });
 
-        // 鑾峰彇妫€娴嬪巻鍙?
+        // 获取检测历史
         app.MapGet("/api/inspection/history/{projectId:guid}", async (
         Guid projectId,
         Core.Services.IInspectionService service,
@@ -609,7 +609,7 @@ public static class ApiEndpoints
             return Results.Ok(ToInspectionHistoryListResponse(results));
         });
 
-        // 鑾峰彇缁熻淇℃伅
+        // 获取统计信息
         app.MapGet("/api/inspection/statistics/{projectId:guid}", async (
         Guid projectId,
         Core.Services.IInspectionService service,
@@ -622,7 +622,7 @@ public static class ApiEndpoints
             return Results.Ok(statistics);
         });
 
-        // 銆愮浜屼紭鍏堢骇銆戝惎鍔ㄥ疄鏃舵娴?
+        // 【第二优先级】启动实时检测
         app.MapPost("/api/inspection/realtime/start", async (
             StartRealtimeInspectionRequest request,
             Core.Services.IInspectionService service,
@@ -631,13 +631,13 @@ public static class ApiEndpoints
         {
             try
             {
-                // 鏍规嵁杩愯妯″紡閫夋嫨鍚姩鏂瑰紡
+                // 根据运行模式选择启动方式
                 var runMode = request.RunMode?.ToLower() ?? "camera";
                 var requestFlow = request.FlowData?.ToEntity();
 
                 if (runMode == "flow" && requestFlow != null)
                 {
-                    // 娴佺▼椹卞姩妯″紡
+                    // 流程驱动模式
                     await service.StartRealtimeInspectionFlowAsync(
                         request.ProjectId,
                         requestFlow,
@@ -647,7 +647,7 @@ public static class ApiEndpoints
 
                     return Results.Ok(new
                     {
-                        Message = "瀹炴椂妫€娴嬪凡鍚姩 (娴佺▼椹卞姩妯″紡)",
+                        Message = "实时检测已启动 (流程驱动模式)",
                         ProjectId = request.ProjectId,
                         RunMode = "flow",
                         CameraId = request.CameraId
@@ -655,7 +655,7 @@ public static class ApiEndpoints
                 }
                 else if (requestFlow?.Operators?.Count > 0)
                 {
-                    // 鐩告満椹卞姩妯″紡涔熷繀椤讳娇鐢ㄥ墠绔綋鍓嶆祦绋嬶紝閬垮厤鐢诲竷鍙傛暟鏇存柊鍚庝粛鎵ц鎸佷箙鍖栨棫娴佺▼銆?
+                    // 相机驱动模式也必须使用前端当前流程，避免画布参数更新后仍执行持久化旧流程。
                     await service.StartRealtimeInspectionFlowAsync(
                         request.ProjectId,
                         requestFlow,
@@ -665,7 +665,7 @@ public static class ApiEndpoints
 
                     return Results.Ok(new
                     {
-                        Message = "瀹炴椂妫€娴嬪凡鍚姩 (鐩告満椹卞姩妯″紡)",
+                        Message = "实时检测已启动 (相机驱动模式)",
                         ProjectId = request.ProjectId,
                         RunMode = "camera",
                         CameraId = request.CameraId
@@ -673,7 +673,7 @@ public static class ApiEndpoints
                 }
                 else
                 {
-                    // 鐩告満椹卞姩妯″紡
+                    // 相机驱动模式
                     await service.StartRealtimeInspectionAsync(
                         request.ProjectId,
                         request.CameraId,
@@ -682,7 +682,7 @@ public static class ApiEndpoints
 
                     return Results.Ok(new
                     {
-                        Message = "瀹炴椂妫€娴嬪凡鍚姩 (鐩告満椹卞姩妯″紡)",
+                        Message = "实时检测已启动 (相机驱动模式)",
                         ProjectId = request.ProjectId,
                         RunMode = "camera",
                         CameraId = request.CameraId
@@ -704,7 +704,7 @@ public static class ApiEndpoints
             }
         });
 
-        // 銆愮浜屼紭鍏堢骇銆戝仠姝㈠疄鏃舵娴?
+        // 【第二优先级】停止实时检测
         app.MapPost("/api/inspection/realtime/stop", async (
             StopRealtimeInspectionRequest request,
             Core.Services.IInspectionService service) =>
@@ -714,7 +714,7 @@ public static class ApiEndpoints
                 await service.StopRealtimeInspectionAsync(request.ProjectId);
                 return Results.Ok(new
                 {
-                    Message = "瀹炴椂妫€娴嬪凡鍋滄",
+                    Message = "实时检测已停止",
                     ProjectId = request.ProjectId
                 });
             }
@@ -843,7 +843,7 @@ public static class ApiEndpoints
 
     private static void MapOperatorEndpoints(IEndpointRouteBuilder app)
     {
-        // 鑾峰彇绠楀瓙搴?
+        // 获取算子库
         app.MapGet("/api/operators/library", (IOperatorFactory factory) =>
         {
             var metadata = factory
@@ -852,21 +852,21 @@ public static class ApiEndpoints
             return Results.Ok(metadata);
         });
 
-        // 鑾峰彇鏀寔鐨勭畻瀛愮被鍨?
+        // 获取支持的算子类型
         app.MapGet("/api/operators/types", (IOperatorFactory factory) =>
         {
             var types = factory.GetSupportedOperatorTypes();
             return Results.Ok(types);
         });
 
-        // 鑾峰彇绠楀瓙鍏冩暟鎹?
+        // 获取算子元数据
         app.MapGet("/api/operators/{type}/metadata", (Core.Enums.OperatorType type, IOperatorFactory factory) =>
         {
             var metadata = factory.GetMetadata(type);
             return metadata != null ? Results.Ok(metadata) : Results.NotFound();
         });
 
-        // 鑾峰彇娴佺▼妯℃澘鍒楄〃
+        // 获取流程模板列表
         app.MapGet("/api/templates", async (
             IFlowTemplateService templateService,
             string? industry,
@@ -876,7 +876,7 @@ public static class ApiEndpoints
             return Results.Ok(templates);
         });
 
-        // 鑾峰彇鍗曚釜娴佺▼妯℃澘璇︽儏
+        // 获取单个流程模板详情
         app.MapGet("/api/templates/{id:guid}", async (
             Guid id,
             IFlowTemplateService templateService,
@@ -886,7 +886,7 @@ public static class ApiEndpoints
             return template != null ? Results.Ok(template) : Results.NotFound();
         });
 
-        // 鍒涘缓娴佺▼妯℃澘
+        // 创建流程模板
         app.MapPost("/api/templates", async (
             TemplateUpsertRequest request,
             IFlowTemplateService templateService,
@@ -916,7 +916,7 @@ public static class ApiEndpoints
             return Results.Created($"/api/templates/{created.Id}", created);
         });
 
-        // 鏇存柊娴佺▼妯℃澘
+        // 更新流程模板
         app.MapPut("/api/templates/{id:guid}", async (
             Guid id,
             TemplateUpsertRequest request,
@@ -947,7 +947,7 @@ public static class ApiEndpoints
             return updated != null ? Results.Ok(updated) : Results.NotFound();
         });
 
-        // 鎺ㄨ崘绠楀瓙鍙傛暟
+        // 推荐算子参数
         app.MapPost("/api/operators/{type}/recommend-parameters", (
             Core.Enums.OperatorType type,
             OperatorParameterRecommendationRequest request,
@@ -969,7 +969,7 @@ public static class ApiEndpoints
             }
         });
 
-        // 鍗曠畻瀛愯皟鍙傞瑙?
+        // 单算子调参预览
         app.MapPost("/api/operators/{type}/preview", async (
             Core.Enums.OperatorType type,
             OperatorPreviewRequest request,
@@ -1127,7 +1127,7 @@ public static class ApiEndpoints
 
     private static void MapImageEndpoints(IEndpointRouteBuilder app)
     {
-        // 涓婁紶鍥惧儚
+        // 上传图像
         app.MapPost("/api/images/upload", async (UploadImageRequest request, IImageCacheRepository cache) =>
         {
             try
@@ -1150,7 +1150,7 @@ public static class ApiEndpoints
             }
         });
 
-        // 鑾峰彇鍥惧儚
+        // 获取图像
         app.MapGet("/api/images/{id:guid}", async (Guid id, IImageCacheRepository cache) =>
         {
             var imageData = await cache.GetAsync(id);

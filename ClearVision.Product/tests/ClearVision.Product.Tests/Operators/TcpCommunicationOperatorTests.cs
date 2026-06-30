@@ -7,10 +7,10 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using ClearVision.Product.Tests.Runtime;
 
 namespace ClearVision.Product.Tests.Operators;
 
@@ -173,8 +173,9 @@ public class TcpCommunicationOperatorTests
     private static string GetResponse(OperatorExecutionOutput result)
     {
         result.OutputData.Should().NotBeNull();
-        result.OutputData!.Should().ContainKey("Response");
-        return result.OutputData["Response"].Should().BeOfType<string>().Subject;
+        var outputData = result.OutputData!;
+        outputData.Should().ContainKey("Response");
+        return outputData["Response"].Should().BeOfType<string>().Subject;
     }
 
     private static string ToResponse(string request)

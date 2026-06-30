@@ -30,6 +30,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -105,5 +107,12 @@ jobs:
         working-directory: ${{ env.UI_TEST_DIR }}
         run: npm run test:agent-ui-contract
 
-      - name: Check whitespace
-        run: git diff --check
+      - name: Diff Hygiene
+        shell: pwsh
+        run: |
+          $baseRef = if ("${{ github.event_name }}" -eq "pull_request") {
+            "${{ github.event.pull_request.base.sha }}"
+          } else {
+            "origin/main"
+          }
+          & "./scripts/check-diff-hygiene.ps1" -BaseRef $baseRef

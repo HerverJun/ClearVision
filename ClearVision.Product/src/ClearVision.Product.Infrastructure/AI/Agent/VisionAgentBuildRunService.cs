@@ -1,9 +1,9 @@
-using ClearVision.Product.Core.DTOs;
-using ClearVision.Product.Core.Services;
-using ClearVision.Product.Infrastructure.AI.AgentRun;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using ClearVision.Product.Core.DTOs;
+using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 

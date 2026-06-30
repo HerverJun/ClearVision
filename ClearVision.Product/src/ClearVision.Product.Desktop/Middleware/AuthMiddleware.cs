@@ -2,6 +2,7 @@
 // 用户会话信息（简化版）
 // 作者：蘅芜君
 
+using System.Security.Claims;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Desktop.Station;
@@ -10,7 +11,6 @@ using ClearVision.Product.Runtime.Abstractions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Security.Claims;
 
 namespace ClearVision.Product.Desktop.Middleware;
 

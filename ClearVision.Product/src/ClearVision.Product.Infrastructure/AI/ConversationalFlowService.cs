@@ -1225,7 +1225,9 @@ public class ConversationalFlowService : IConversationalFlowService
                 LoggerExtensions.LogError(_logger, ex, "Failed to persist conversation session store. Path={StoragePath}", _storagePath);
             if (!string.IsNullOrWhiteSpace(tempPath) && File.Exists(tempPath))
             {
-                try { File.Delete(tempPath); } catch (IOException) { }
+                try
+                { File.Delete(tempPath); }
+                catch (IOException) { }
             }
         }
 

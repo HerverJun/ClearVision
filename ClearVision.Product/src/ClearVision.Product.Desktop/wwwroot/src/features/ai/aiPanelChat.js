@@ -20,7 +20,7 @@ export const aiPanelChatMixin = {
         msg.className = `ai-message ${role}`;
 
         const safeText = this._escapeHtml(text);
-        
+
         if (role === 'ai') {
             msg.innerHTML = `<div class="ai-bubble">${safeText}</div>`;
         } else if (role === 'user') {
@@ -28,7 +28,7 @@ export const aiPanelChatMixin = {
         } else {
             msg.innerHTML = `<div class="system-bubble">${safeText}</div>`;
         }
-        
+
         container.appendChild(msg);
         this._scrollToBottom();
         return msg;

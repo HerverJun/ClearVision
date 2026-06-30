@@ -677,14 +677,14 @@ public class GenerateFlowMessageHandlerTests
         var generationService = Substitute.For<IAiFlowGenerationService>();
         var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<GenerateFlowMessageHandler>>();
         var buildRunService = new CapturingBuildRunService(command => new AiFlowGenerationResult
-                {
-                    Success = true,
-                    CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
-                    GenerationMode = "build_from_plan_entry_reached",
-                    Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() },
-                    PlanId = command.Request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
-                    PlanHash = command.Request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty
-                });
+        {
+            Success = true,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusCompleted,
+            GenerationMode = "build_from_plan_entry_reached",
+            Flow = new { operators = Array.Empty<object>(), connections = Array.Empty<object>() },
+            PlanId = command.Request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
+            PlanHash = command.Request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty
+        });
         var streamService = new AgentRunEventStreamService();
         var handler = new GenerateFlowMessageHandler(generationService, logger, buildRunService, streamService);
         var messages = new List<(string Type, string Payload)>();
@@ -758,23 +758,23 @@ public class GenerateFlowMessageHandlerTests
             ContractVersion = VisionAgentPlanContractVersions.V2
         };
         var buildRunService = new CapturingBuildRunService(command => new AiFlowGenerationResult
+        {
+            Success = false,
+            CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
+            FailureType = AiFlowGenerationResult.FailureTypeClarificationRequired,
+            ClarificationRequired = true,
+            BuildReadiness = readiness,
+            BlockingClarificationFields = ["image_source", "acceptance_criteria"],
+            RequirementMaturity = new AiRequirementMaturityResult
             {
-                Success = false,
-                CompletionStatus = AiFlowGenerationResult.CompletionStatusClarificationRequired,
-                FailureType = AiFlowGenerationResult.FailureTypeClarificationRequired,
-                ClarificationRequired = true,
-                BuildReadiness = readiness,
-                BlockingClarificationFields = ["image_source", "acceptance_criteria"],
-                RequirementMaturity = new AiRequirementMaturityResult
-                {
-                    CanPlan = true,
-                    CanBuild = false,
-                    MissingFields = ["image_source", "acceptance_criteria"],
-                    PublicReason = "Need canonical fields before Build."
-                },
-                PlanId = command.Request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
-                PlanHash = command.Request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty
-            });
+                CanPlan = true,
+                CanBuild = false,
+                MissingFields = ["image_source", "acceptance_criteria"],
+                PublicReason = "Need canonical fields before Build."
+            },
+            PlanId = command.Request.BuildFromPlan?.PlanSnapshot?.PlanId ?? string.Empty,
+            PlanHash = command.Request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty
+        });
         var streamService = new AgentRunEventStreamService();
         var handler = new GenerateFlowMessageHandler(generationService, logger, buildRunService, streamService);
         string? createdRunId = null;

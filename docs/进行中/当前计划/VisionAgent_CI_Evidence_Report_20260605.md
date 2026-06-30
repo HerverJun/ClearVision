@@ -90,7 +90,7 @@ CI artifact 内三个 JSON 报告必须满足：
 ## Dogfood Result Summary
 
 - Human dogfood result：`docs/进行中/当前计划/VisionAgent_Dogfood_Result_20260605_Human.md`。
-- 截图证据：`.codex_tmp/dogfood/DF-01.png` 至 `.codex_tmp/dogfood/DF-14.png`，另含 `.codex_tmp/dogfood/DF-13-undo.png`。
+- 截图证据：PR/Actions 截图附件 `DF-01.png` 至 PR/Actions 截图附件 `DF-14.png`，另含 PR/Actions 截图附件 `DF-13-undo.png`。
 - 关键覆盖：左右布局、Camera/File 参数互斥、中文算子类型显示、RuntimePreview 未授权 pendingAction、RuntimePreview 授权 offline metadata、workflow draft 应用到画布、撤销应用。
 - 结果：无阻断问题。
 

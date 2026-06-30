@@ -6,7 +6,7 @@
 - 执行时间：2026-06-05
 - 执行方式：半自动 dogfood。以 UI contract、后端 rule parity、executable business benchmark、mock planner autonomy benchmark、permission negative benchmark、shadow eval sample report 和源码契约检查作为证据。
 - 结论：首轮覆盖项全部通过；未发现阻断发布问题。
-- 后续优化：建议在下一轮补充真实浏览器人工截图到 `.codex_tmp/dogfood/`，用于设计走查归档；这不是本轮发布阻断。
+- 后续优化：建议在下一轮补充真实浏览器人工截图到 PR/Actions 截图附件包，用于设计走查归档；这不是本轮发布阻断。
 
 ## 失败分级
 

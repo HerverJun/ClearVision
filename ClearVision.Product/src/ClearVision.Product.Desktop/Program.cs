@@ -243,146 +243,146 @@ static class Program
     static void StartWebServer()
     {
         var builder = WebApplication.CreateBuilder();
-            builder.Configuration.AddJsonFile(
-                StationSettingsPaths.GetStudioCommunicationSettingsPath(),
-                optional: true,
-                reloadOnChange: false);
-            builder.Services.AddSingleton<IValidateOptions<StationIngressOptions>, StationIngressOptionsValidator>();
-            builder.Services.AddSingleton<IValidateOptions<AiGenerationOptions>, AiGenerationOptionsValidator>();
-            builder.Services.AddOptions<StationIngressOptions>()
-                .Bind(builder.Configuration.GetSection(StationIngressOptions.SectionName))
-                .ValidateOnStart();
-            builder.Services.AddOptions<AiGenerationOptions>()
-                .Bind(builder.Configuration.GetSection(AiGenerationOptions.SectionName))
-                .ValidateOnStart();
-            var stationIngressOptions = builder.Configuration
-                .GetSection(StationIngressOptions.SectionName)
-                .Get<StationIngressOptions>()
-                ?? new StationIngressOptions();
-            var ingressListenMode = ResolveStationIngressListenMode(stationIngressOptions);
-            _webPort = ResolveWebPort(stationIngressOptions);
+        builder.Configuration.AddJsonFile(
+            StationSettingsPaths.GetStudioCommunicationSettingsPath(),
+            optional: true,
+            reloadOnChange: false);
+        builder.Services.AddSingleton<IValidateOptions<StationIngressOptions>, StationIngressOptionsValidator>();
+        builder.Services.AddSingleton<IValidateOptions<AiGenerationOptions>, AiGenerationOptionsValidator>();
+        builder.Services.AddOptions<StationIngressOptions>()
+            .Bind(builder.Configuration.GetSection(StationIngressOptions.SectionName))
+            .ValidateOnStart();
+        builder.Services.AddOptions<AiGenerationOptions>()
+            .Bind(builder.Configuration.GetSection(AiGenerationOptions.SectionName))
+            .ValidateOnStart();
+        var stationIngressOptions = builder.Configuration
+            .GetSection(StationIngressOptions.SectionName)
+            .Get<StationIngressOptions>()
+            ?? new StationIngressOptions();
+        var ingressListenMode = ResolveStationIngressListenMode(stationIngressOptions);
+        _webPort = ResolveWebPort(stationIngressOptions);
 
-            builder.Services.AddAiFlowGeneration(builder.Configuration);
-            builder.Services.AddVisionServices(builder.Configuration);
-            builder.Services.AddOpenTelemetry()
-                .ConfigureResource(resource => resource
-                    .AddService(
-                        serviceName: "ClearVision.Desktop",
-                        serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown")
-                    .AddAttributes(new[]
-                    {
+        builder.Services.AddAiFlowGeneration(builder.Configuration);
+        builder.Services.AddVisionServices(builder.Configuration);
+        builder.Services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource
+                .AddService(
+                    serviceName: "ClearVision.Desktop",
+                    serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown")
+                .AddAttributes(new[]
+                {
                         new KeyValuePair<string, object>("deployment.environment", builder.Environment.EnvironmentName),
                         new KeyValuePair<string, object>("runtime.host", "desktop")
-                    }))
-                .WithMetrics(metrics => metrics
-                    .AddMeter(InspectionMetrics.MeterName)
-                    .AddConsoleExporter());
-            builder.Services.AddScoped<RuntimePackageExporter>();
-            builder.Services.AddScoped<RuntimePackageValidator>();
-            builder.Services.AddScoped<RuntimePackageLoader>();
-            builder.Services.AddSingleton<RuntimeResultNormalizer>();
-            builder.Services.AddSingleton<WebMessageHandler>();
-            builder.Services.AddSingleton<StationIngressAuthService>();
-            builder.Services.AddSingleton<StationCommunicationSettingsStore>();
-            builder.Services.AddSingleton<StationRegistryService>();
-            builder.Services.AddSingleton<StationCentralStore>();
-            builder.Services.AddSingleton<StationPackageStore>();
-            builder.Services.AddSingleton<VisionDatabaseMaintenanceService>();
-            builder.Services.AddSignalR();
-            builder.Services.ConfigureHttpJsonOptions(options =>
+                }))
+            .WithMetrics(metrics => metrics
+                .AddMeter(InspectionMetrics.MeterName)
+                .AddConsoleExporter());
+        builder.Services.AddScoped<RuntimePackageExporter>();
+        builder.Services.AddScoped<RuntimePackageValidator>();
+        builder.Services.AddScoped<RuntimePackageLoader>();
+        builder.Services.AddSingleton<RuntimeResultNormalizer>();
+        builder.Services.AddSingleton<WebMessageHandler>();
+        builder.Services.AddSingleton<StationIngressAuthService>();
+        builder.Services.AddSingleton<StationCommunicationSettingsStore>();
+        builder.Services.AddSingleton<StationRegistryService>();
+        builder.Services.AddSingleton<StationCentralStore>();
+        builder.Services.AddSingleton<StationPackageStore>();
+        builder.Services.AddSingleton<VisionDatabaseMaintenanceService>();
+        builder.Services.AddSignalR();
+        builder.Services.ConfigureHttpJsonOptions(options =>
+        {
+            options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+            options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(allowIntegerValues: true));
+        });
+
+        builder.Services.AddCors(options =>
+        {
+            options.AddDefaultPolicy(policy =>
             {
-                options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
-                options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(allowIntegerValues: true));
+                policy
+                    .SetIsOriginAllowed(origin => IsAllowedApiOrigin(origin, _webPort))
+                    .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+                    .WithHeaders("Authorization", "Content-Type", "Last-Event-ID", "X-Auth-Token", "X-Requested-With", "X-ClearVision-Station-Token");
             });
+        });
 
-            builder.Services.AddCors(options =>
+        builder.WebHost.ConfigureKestrel(options =>
+        {
+            if (ingressListenMode == StationIngressListenMode.Lan)
             {
-                options.AddDefaultPolicy(policy =>
-                {
-                    policy
-                        .SetIsOriginAllowed(origin => IsAllowedApiOrigin(origin, _webPort))
-                        .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                        .WithHeaders("Authorization", "Content-Type", "Last-Event-ID", "X-Auth-Token", "X-Requested-With", "X-ClearVision-Station-Token");
-                });
-            });
-
-            builder.WebHost.ConfigureKestrel(options =>
-            {
-                if (ingressListenMode == StationIngressListenMode.Lan)
-                {
-                    options.ListenAnyIP(_webPort);
-                }
-                else
-                {
-                    options.ListenLocalhost(_webPort);
-                }
-            });
-
-            var app = builder.Build();
-            app.UseMiddleware<StationIngressIsolationMiddleware>();
-
-            using (var scope = app.Services.CreateScope())
-            {
-                var services = scope.ServiceProvider;
-                InitializeVisionDatabase(services);
-                services.GetRequiredService<ProjectSaveCoordinator>()
-                    .RunStartupRecoveryAsync()
-                    .GetAwaiter()
-                    .GetResult();
-
-                var cameraManager = services.GetRequiredService<ClearVision.Product.Core.Cameras.ICameraManager>();
-                var configService = services.GetRequiredService<ClearVision.Product.Core.Interfaces.IConfigurationService>();
-                var config = configService.LoadAsync().Result;
-                cameraManager.LoadBindings(config.Cameras, config.ActiveCameraId);
-                services.GetRequiredService<SerialPhotoelectricTriggerInputService>()
-                    .ConfigureBindings(config.Cameras);
+                options.ListenAnyIP(_webPort);
             }
-
-            var wwwrootPath = DesktopWebRootResolver.Resolve();
-            if (Directory.Exists(wwwrootPath))
+            else
             {
-                var provider = new PhysicalFileProvider(wwwrootPath);
-                app.UseDefaultFiles(new DefaultFilesOptions
-                {
-                    FileProvider = provider,
-                    DefaultFileNames = new List<string> { "index.html" }
-                });
+                options.ListenLocalhost(_webPort);
+            }
+        });
 
-                var staticFileOptions = new StaticFileOptions { FileProvider = provider };
+        var app = builder.Build();
+        app.UseMiddleware<StationIngressIsolationMiddleware>();
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var services = scope.ServiceProvider;
+            InitializeVisionDatabase(services);
+            services.GetRequiredService<ProjectSaveCoordinator>()
+                .RunStartupRecoveryAsync()
+                .GetAwaiter()
+                .GetResult();
+
+            var cameraManager = services.GetRequiredService<ClearVision.Product.Core.Cameras.ICameraManager>();
+            var configService = services.GetRequiredService<ClearVision.Product.Core.Interfaces.IConfigurationService>();
+            var config = configService.LoadAsync().Result;
+            cameraManager.LoadBindings(config.Cameras, config.ActiveCameraId);
+            services.GetRequiredService<SerialPhotoelectricTriggerInputService>()
+                .ConfigureBindings(config.Cameras);
+        }
+
+        var wwwrootPath = DesktopWebRootResolver.Resolve();
+        if (Directory.Exists(wwwrootPath))
+        {
+            var provider = new PhysicalFileProvider(wwwrootPath);
+            app.UseDefaultFiles(new DefaultFilesOptions
+            {
+                FileProvider = provider,
+                DefaultFileNames = new List<string> { "index.html" }
+            });
+
+            var staticFileOptions = new StaticFileOptions { FileProvider = provider };
 #if DEBUG
-                staticFileOptions.OnPrepareResponse = context =>
-                {
-                    context.Context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
-                    context.Context.Response.Headers.Pragma = "no-cache";
-                    context.Context.Response.Headers.Expires = "0";
-                };
+            staticFileOptions.OnPrepareResponse = context =>
+            {
+                context.Context.Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+                context.Context.Response.Headers.Pragma = "no-cache";
+                context.Context.Response.Headers.Expires = "0";
+            };
 #endif
-                app.UseStaticFiles(staticFileOptions);
-                Debug.WriteLine($"静态资源目录: {wwwrootPath}");
-            }
+            app.UseStaticFiles(staticFileOptions);
+            Debug.WriteLine($"静态资源目录: {wwwrootPath}");
+        }
 
-            app.UseCors();
-            app.UseMiddleware<AuthMiddleware>();
+        app.UseCors();
+        app.UseMiddleware<AuthMiddleware>();
 
-            app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Port = _webPort }));
-            app.MapHub<StationHub>(StationSyncContractDefaults.HubPath);
-            app.MapAuthEndpoints();
-            app.MapUserEndpoints();
-            app.MapVisionApiEndpoints();
-            app.MapSettingsEndpoints();
-            app.MapAgentRunEndpoints();
-            app.MapPlcEndpoints();
-            app.MapStationCommunicationEndpoints();
-            app.MapStationEndpoints();
-            app.MapDemoEndpoints();
-            app.MapAnalysisEndpoints();
-            app.MapAutoTuneEndpoints();
-            app.MapInspectionEventEndpoints();
+        app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Port = _webPort }));
+        app.MapHub<StationHub>(StationSyncContractDefaults.HubPath);
+        app.MapAuthEndpoints();
+        app.MapUserEndpoints();
+        app.MapVisionApiEndpoints();
+        app.MapSettingsEndpoints();
+        app.MapAgentRunEndpoints();
+        app.MapPlcEndpoints();
+        app.MapStationCommunicationEndpoints();
+        app.MapStationEndpoints();
+        app.MapDemoEndpoints();
+        app.MapAnalysisEndpoints();
+        app.MapAutoTuneEndpoints();
+        app.MapInspectionEventEndpoints();
 
-            // Start Kestrel before loading the desktop UI so WebView2 does not
-            // race the embedded backend on slower industrial PCs.
-            app.StartAsync().GetAwaiter().GetResult();
-            _host = app;
+        // Start Kestrel before loading the desktop UI so WebView2 does not
+        // race the embedded backend on slower industrial PCs.
+        app.StartAsync().GetAwaiter().GetResult();
+        _host = app;
 
         Debug.WriteLine($"Web服务器已启动: http://localhost:{_webPort}");
     }

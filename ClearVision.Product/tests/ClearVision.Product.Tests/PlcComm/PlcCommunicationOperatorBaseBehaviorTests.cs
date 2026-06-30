@@ -211,9 +211,9 @@ public class PlcCommunicationOperatorBaseBehaviorTests
         public int WriteTimeout { get; set; }
         public ReconnectPolicy ReconnectPolicy { get; set; } = new();
         public IByteTransform ByteTransform { get; }
-        public event EventHandler<ConnectionEventArgs>? Connected;
-        public event EventHandler<DisconnectionEventArgs>? Disconnected;
-        public event EventHandler<PlcErrorEventArgs>? ErrorOccurred;
+        public event EventHandler<ConnectionEventArgs>? Connected { add { } remove { } }
+        public event EventHandler<DisconnectionEventArgs>? Disconnected { add { } remove { } }
+        public event EventHandler<PlcErrorEventArgs>? ErrorOccurred { add { } remove { } }
 
         public Task<bool> ConnectAsync(CancellationToken ct = default) => Task.FromResult(true);
         public Task DisconnectAsync() => Task.CompletedTask;

@@ -159,14 +159,15 @@ public static class UserEndpoints
     /// <summary>
     /// 检查当前用户是否为 Admin
     /// </summary>
-    private static async Task<bool> IsAdminAsync(HttpContext context)
+    private static Task<bool> IsAdminAsync(HttpContext context)
     {
         // 从 Items 中获取当前用户信息（由 AuthMiddleware 注入）
         if (context.Items.TryGetValue("CurrentUser", out var userObj) && userObj is UserSession user)
         {
-            return user.Role == UserRole.Admin.ToString();
+            return Task.FromResult(user.Role == UserRole.Admin.ToString());
         }
-        return false;
+
+        return Task.FromResult(false);
     }
 }
 

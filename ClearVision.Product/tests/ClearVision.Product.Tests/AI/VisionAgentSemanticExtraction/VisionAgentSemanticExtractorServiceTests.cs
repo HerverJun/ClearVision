@@ -45,25 +45,25 @@ public sealed class VisionAgentSemanticExtractorServiceTests
         var service = CreateService(_ => $"""
             ```json
             {JsonSerializer.Serialize(new
-            {
-                isVisionRequest = true,
-                intent = "new_flow",
-                taskType = "attribute_classification",
-                confidence = 0.92,
-                taskTypeConfidence = 0.88,
-                inspectionObject = "草莓",
-                targetAttribute = "成熟度/熟透",
-                imageSource = "相机",
-                okCondition = "熟透则 OK",
-                ngCondition = "否则 NG",
-                suggestedRoute = "属性分类 / OK-NG 判别路线",
-                canPlanCandidate = true,
-                canBuildCandidate = true,
-                objectSignals = new[] { "草莓" },
-                taskSignals = new[] { "成熟度" },
-                missingFields = Array.Empty<string>(),
-                clarificationQuestions = Array.Empty<string>()
-            })}
+        {
+            isVisionRequest = true,
+            intent = "new_flow",
+            taskType = "attribute_classification",
+            confidence = 0.92,
+            taskTypeConfidence = 0.88,
+            inspectionObject = "草莓",
+            targetAttribute = "成熟度/熟透",
+            imageSource = "相机",
+            okCondition = "熟透则 OK",
+            ngCondition = "否则 NG",
+            suggestedRoute = "属性分类 / OK-NG 判别路线",
+            canPlanCandidate = true,
+            canBuildCandidate = true,
+            objectSignals = new[] { "草莓" },
+            taskSignals = new[] { "成熟度" },
+            missingFields = Array.Empty<string>(),
+            clarificationQuestions = Array.Empty<string>()
+        })}
             ```
             """);
 

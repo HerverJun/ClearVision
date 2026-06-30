@@ -504,14 +504,14 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         // Encoding cleanup: previous comment text was unreadable.
         _variableContext.IncrementCycleCount();
-        _logger.LogDebug("[FlowExecution] 寰幆璁℃暟: {CycleCount}", _variableContext.CycleCount);
+        _logger.LogDebug("[FlowExecution] 循环计数: {CycleCount}", _variableContext.CycleCount);
 
         // Each ExecuteFlowAsync call owns its own FlowExecutionResult instance.
         var result = new FlowExecutionResult();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         ConcurrentDictionary<Guid, Dictionary<string, object>>? operatorOutputs = null;
 
-        // 鍒涘缓閾炬帴鐨?CancellationTokenSource
+        // 创建链接的 CancellationTokenSource
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _executionCancellations[flow.Id] = cts;
 
@@ -525,7 +525,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             var executionLayers = CreateProjectVariableExecutionLayers(plan, projectVariableContext, executionOrder);
             var inputPreparationIndex = plan.CreateInputPreparationIndex();
 
-            // 鍒濆鍖栨墽琛岀姸鎬?
+            // 初始化执行状态
             var status = new FlowExecutionStatus
             {
                 FlowId = flow.Id,
@@ -535,10 +535,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             };
             _executionStatuses[flow.Id] = status;
 
-            // 瀛樺偍姣忎釜绠楀瓙鐨勮緭鍑?- 浣跨敤 ConcurrentDictionary 鏀寔骞惰鎵ц
+            // 存储每个算子的输出 - 使用 ConcurrentDictionary 支持并行执行
             operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
 
-            // 璁剧疆鍒濆杈撳叆鏁版嵁
+            // 设置初始输入数据
             if (inputData != null)
             {
                 ApplyInitialInputRefCounts(inputData, executionOrder, inputPreparationIndex);
@@ -609,7 +609,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         }
         finally
         {
-            // 娓呯悊 CancellationTokenSource
+            // 清理 CancellationTokenSource
             if (_executionCancellations.TryRemove(flow.Id, out var removedCts))
             {
                 removedCts.Dispose();
@@ -743,11 +743,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 continue;
             }
 
-            // 鏇存柊褰撳墠鎵ц鐘舵€?
+            // 更新当前执行状态
             status.CurrentOperatorId = op.Id;
             status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
-            // 鍑嗗杈撳叆鏁版嵁
+            // 准备输入数据
             var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
             if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
             {
@@ -759,7 +759,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     ErrorMessage = targetBindingError
                 });
                 result.IsSuccess = false;
-                result.ErrorMessage = $"绠楀瓙 '{op.Name}' 鎵ц澶辫触: {targetBindingError}";
+                result.ErrorMessage = $"算子 '{op.Name}' 执行失败: {targetBindingError}";
                 break;
             }
 
@@ -789,7 +789,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     ErrorMessage = sourceBindingError
                 });
                 result.IsSuccess = false;
-                result.ErrorMessage = $"绠楀瓙 '{op.Name}' 鎵ц澶辫触: {sourceBindingError}";
+                result.ErrorMessage = $"算子 '{op.Name}' 执行失败: {sourceBindingError}";
                 break;
             }
 
@@ -968,7 +968,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
     }
 
     /// <summary>
-    /// 骞惰鎵ц娴佺▼ - 鎸夊眰绾у苟琛屾墽琛屾棤渚濊禆鐨勭畻瀛?
+    /// 并行执行流程 - 按层级并行执行无依赖的算子
     /// </summary>
     private async Task ExecuteFlowParallelAsync(
         FlowExecutionPlan plan,
@@ -989,7 +989,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             if (failed || cancellationToken.IsCancellationRequested)
                 break;
 
-            // 鏇存柊鐘舵€?
+            // 更新状态
             status.CurrentOperatorId = layer.First().Id;
             status.ProgressPercentage = (double)completedOperators.Count / executionOrder.Count * 100;
 
@@ -1316,7 +1316,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
         try
         {
-            // 涓虹畻瀛愭墽琛屾坊鍔犲叏灞€瓒呮椂淇濇姢
+            // 为算子执行添加全局超时保护
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(DefaultOperatorTimeoutMs));
 
@@ -1442,7 +1442,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         var hasInputOperator = false;
         var hasOutputOperator = false;
 
-        // 楠岃瘉姣忎釜绠楀瓙鐨勫弬鏁?
+        // 验证每个算子的参数
         foreach (var op in flow.Operators)
         {
             hasInputOperator |= op.Type == OperatorType.ImageAcquisition;
@@ -1763,7 +1763,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
 
     /// <summary>
     // Encoding cleanup: previous comment text was unreadable.
-    /// 鐢ㄤ簬鍐冲畾 ImageWrapper 鐨勫紩鐢ㄨ鏁板垵濮嬪€笺€?
+    /// 用于决定 ImageWrapper 的引用计数初始值。
     /// </summary>
     private static Dictionary<(Guid OperatorId, Guid PortId), int> AnalyzeFanOutDegrees(
         IReadOnlyCollection<OperatorConnection> connections)
@@ -2176,7 +2176,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         _debugOptions[options.DebugSessionId] = options;
         TouchDebugSession(options.DebugSessionId);
 
-        // 鍒涘缓閾炬帴鐨?CancellationTokenSource
+        // 创建链接的 CancellationTokenSource
         var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _executionCancellations[flow.Id] = cts;
 
@@ -2187,7 +2187,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             var executionOrder = CreateProjectVariableExecutionOrder(plan, _projectVariableContextAccessor.Current);
             var inputPreparationIndex = plan.CreateInputPreparationIndex();
 
-            // 鍒濆鍖栨墽琛岀姸鎬?
+            // 初始化执行状态
             var status = new FlowExecutionStatus
             {
                 FlowId = flow.Id,
@@ -2197,10 +2197,10 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             };
             _executionStatuses[flow.Id] = status;
 
-            // 瀛樺偍姣忎釜绠楀瓙鐨勮緭鍑?
+            // 存储每个算子的输出
             operatorOutputs = new ConcurrentDictionary<Guid, Dictionary<string, object>>();
 
-            // 璁剧疆鍒濆杈撳叆鏁版嵁
+            // 设置初始输入数据
             if (inputData != null)
             {
                 ApplyInitialInputRefCounts(inputData, executionOrder, inputPreparationIndex);
@@ -2271,11 +2271,11 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     continue;
                 }
 
-                // 鏇存柊褰撳墠鎵ц鐘舵€?
+                // 更新当前执行状态
                 status.CurrentOperatorId = op.Id;
                 status.ProgressPercentage = (double)completedCount / executionOrder.Count * 100;
 
-                // 鍑嗗杈撳叆鏁版嵁
+                // 准备输入数据
                 var inputs = PrepareOperatorInputs(flow, op, operatorOutputs, inputPreparationIndex);
                 if (!TryApplyProjectVariableTargetBindings(op, inputs, out var targetBindingError))
                 {
@@ -2392,7 +2392,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     break;
                 }
 
-                // 淇濆瓨杈撳嚭
+                // 保存输出
                 var outputs = opResult.OutputData ?? new Dictionary<string, object>();
                 operatorOutputs[op.Id] = outputs;
                 ApplyFanOutRefCounts(op, outputs, plan.FanOutDegrees, plan.Topology);

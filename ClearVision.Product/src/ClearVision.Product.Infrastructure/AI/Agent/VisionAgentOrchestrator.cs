@@ -868,7 +868,8 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
         var rawConfirmed = request.ConfirmedPlanAnswers ?? [];
         var normalizedConfirmed = new List<VisionAgentPlanAnswer>();
         var groupedAnswers = rawConfirmed
-            .Select(a => {
+            .Select(a =>
+            {
                 var normField = VisionAgentPlanFieldPolicy.NormalizeField(a.Field);
                 return a with { Field = normField };
             })
@@ -2018,34 +2019,46 @@ public sealed class VisionAgentOrchestrator : IVisionAgentOrchestrator
 
     private static int GetOriginPriority(string? origin)
     {
-        if (string.IsNullOrWhiteSpace(origin)) return 99;
+        if (string.IsNullOrWhiteSpace(origin))
+            return 99;
         var clean = origin.Trim().ToLowerInvariant();
-        if (clean == "explicit_user_text" || clean == "explicit_user_selection" || clean == "user_explicit") return 1;
-        if (clean == "resource_bound") return 2;
-        if (clean == "model_inferred") return 3;
-        if (clean == "accepted_recommended_default" || clean == "accepted_default") return 4;
+        if (clean == "explicit_user_text" || clean == "explicit_user_selection" || clean == "user_explicit")
+            return 1;
+        if (clean == "resource_bound")
+            return 2;
+        if (clean == "model_inferred")
+            return 3;
+        if (clean == "accepted_recommended_default" || clean == "accepted_default")
+            return 4;
         return 5;
     }
 
     private static IEnumerable<string> GetSemanticConfirmedFields(VisionAgentSemanticExtractionResult? semantic)
     {
-        if (semantic == null) yield break;
-        if (!string.IsNullOrWhiteSpace(semantic.InspectionObject)) yield return VisionAgentPlanAnswerFields.InspectionObject;
-        if (!string.IsNullOrWhiteSpace(semantic.TaskType) && 
-            !string.Equals(semantic.TaskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) && 
+        if (semantic == null)
+            yield break;
+        if (!string.IsNullOrWhiteSpace(semantic.InspectionObject))
+            yield return VisionAgentPlanAnswerFields.InspectionObject;
+        if (!string.IsNullOrWhiteSpace(semantic.TaskType) &&
+            !string.Equals(semantic.TaskType, AiVisionTaskTypes.Unknown, StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(semantic.TaskType, AiVisionTaskTypes.AbstractGoal, StringComparison.OrdinalIgnoreCase))
         {
             yield return VisionAgentPlanAnswerFields.TaskType;
         }
-        if (!string.IsNullOrWhiteSpace(semantic.ImageSource)) yield return VisionAgentPlanAnswerFields.ImageSource;
+        if (!string.IsNullOrWhiteSpace(semantic.ImageSource))
+            yield return VisionAgentPlanAnswerFields.ImageSource;
         if (!string.IsNullOrWhiteSpace(semantic.OkCondition) || !string.IsNullOrWhiteSpace(semantic.NgCondition))
         {
             yield return VisionAgentPlanAnswerFields.AcceptanceCriteria;
         }
-        if (!string.IsNullOrWhiteSpace(semantic.OutputTarget)) yield return VisionAgentPlanAnswerFields.OutputTarget;
-        if (!string.IsNullOrWhiteSpace(semantic.TargetAttribute)) yield return VisionAgentPlanAnswerFields.TargetAttribute;
-        if (!string.IsNullOrWhiteSpace(semantic.DefectType)) yield return VisionAgentPlanAnswerFields.DefectType;
-        if (!string.IsNullOrWhiteSpace(semantic.MeasurementTarget)) yield return VisionAgentPlanAnswerFields.MeasurementTarget;
+        if (!string.IsNullOrWhiteSpace(semantic.OutputTarget))
+            yield return VisionAgentPlanAnswerFields.OutputTarget;
+        if (!string.IsNullOrWhiteSpace(semantic.TargetAttribute))
+            yield return VisionAgentPlanAnswerFields.TargetAttribute;
+        if (!string.IsNullOrWhiteSpace(semantic.DefectType))
+            yield return VisionAgentPlanAnswerFields.DefectType;
+        if (!string.IsNullOrWhiteSpace(semantic.MeasurementTarget))
+            yield return VisionAgentPlanAnswerFields.MeasurementTarget;
     }
 
     private static IEnumerable<string> GetMaturityConfirmedFields(AiRequirementMaturityResult maturity)

@@ -192,7 +192,7 @@ public class AiConfigStoreTests : IDisposable
         var secondModel = new AiModelConfig { Id = "test2", IsActive = false };
         store.Add(secondModel);
 
-        Assert.True(store.GetById(defaultModel.Id).IsActive);
+        Assert.True(store.GetById(defaultModel.Id)!.IsActive);
 
         // Act
         store.Delete(defaultModel.Id);
@@ -256,9 +256,9 @@ public class AiConfigStoreTests : IDisposable
         store.SetActive("B");
 
         // Assert
-        Assert.False(store.GetById(defaultModel.Id).IsActive);
-        Assert.False(store.GetById("A").IsActive);
-        Assert.True(store.GetById("B").IsActive);
+        Assert.False(store.GetById(defaultModel.Id)!.IsActive);
+        Assert.False(store.GetById("A")!.IsActive);
+        Assert.True(store.GetById("B")!.IsActive);
     }
 
     [Fact]
@@ -268,13 +268,13 @@ public class AiConfigStoreTests : IDisposable
         var model = new AiModelConfig { Id = "test3", ApiKey = "RealSecretKey" };
         store.Add(model);
 
-        var updateReq = new AiModelConfig { ApiKey = null, Name = "Updated Name" };
+        var updateReq = new AiModelConfig { ApiKey = null!, Name = "Updated Name" };
 
         // Act
         var updated = store.Update("test3", updateReq);
 
         // Assert
-        Assert.Equal("Updated Name", updated.Name);
+        Assert.Equal("Updated Name", updated!.Name);
         Assert.Equal("RealSecretKey", updated.ApiKey); // Old key preserved
     }
 
@@ -291,7 +291,7 @@ public class AiConfigStoreTests : IDisposable
         var updated = store.Update("test4", updateReq);
 
         // Assert
-        Assert.Equal("RealSecretKey", updated.ApiKey); // Old key preserved
+        Assert.Equal("RealSecretKey", updated!.ApiKey); // Old key preserved
     }
 
     [Fact]

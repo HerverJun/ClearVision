@@ -20,6 +20,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
 public class WebMessageHandlerTests
 {
     [Fact]
@@ -72,7 +73,7 @@ public class WebMessageHandlerTests
                 Payload = payload
             });
 
-            response.Success.Should().BeTrue();
+            response.Success.Should().BeTrue(response.Error);
             var savedFlow = await flowStorage.LoadFlowJsonAsync(project.Id);
             savedFlow.Should().Contain("ResultOutput").And.Contain("MainFlow");
             (await flowStorage.LoadMetadataAsync(project.Id))!.PersistenceRevision.Should().Be(1);

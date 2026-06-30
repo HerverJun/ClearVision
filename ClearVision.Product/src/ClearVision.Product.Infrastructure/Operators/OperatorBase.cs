@@ -1,5 +1,5 @@
 // OperatorBase.cs
-// 绠楀瓙鎵ц鍣ㄦ娊璞″熀绫?- 鎻愪緵缁熶竴鐨勫弬鏁拌幏鍙栥€佽緭鍏ユ鏌ャ€佹棩蹇楄褰曞拰鎵ц璁℃椂鍔熻兘
+// 算子执行器抽象基类 - 提供统一的参数获取、输入检查、日志记录和执行计时功能
 // Encoding cleanup: previous comment text was unreadable.
 
 using System.Diagnostics;
@@ -14,8 +14,8 @@ using OpenCvSharp;
 namespace ClearVision.Product.Infrastructure.Operators;
 
 /// <summary>
-/// 绠楀瓙鎵ц鍣ㄦ娊璞″熀绫?
-/// 鎻愪緵缁熶竴鐨勫弬鏁拌幏鍙栥€佽緭鍏ユ鏌ャ€佹棩蹇楄褰曞拰鎵ц璁℃椂鍔熻兘
+/// 算子执行器抽象基类
+/// 提供统一的参数获取、输入检查、日志记录和执行计时功能
 /// </summary>
 public abstract class OperatorBase : IOperatorExecutor
 {
@@ -23,7 +23,7 @@ public abstract class OperatorBase : IOperatorExecutor
     private static readonly ConditionalWeakTable<Operator, ParameterLookupCache> ParameterLookupCaches = new();
 
     /// <summary>
-    /// 鏃ュ織璁板綍鍣?
+    /// 日志记录器
     /// </summary>
     protected readonly ILogger Logger;
 
@@ -33,9 +33,9 @@ public abstract class OperatorBase : IOperatorExecutor
     public abstract OperatorType OperatorType { get; }
 
     /// <summary>
-    /// 鏋勯€犲嚱鏁?
+    /// 构造函数
     /// </summary>
-    /// <param name="logger">鏃ュ織璁板綍鍣?/param>
+    /// <param name="logger">日志记录器</param>
     protected OperatorBase(ILogger logger)
     {
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -45,8 +45,8 @@ public abstract class OperatorBase : IOperatorExecutor
     // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
     /// <param name="operator">算子实体</param>
-    /// <param name="inputs">杈撳叆鏁版嵁</param>
-    /// <param name="cancellationToken">鍙栨秷浠ょ墝</param>
+    /// <param name="inputs">输入数据</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>执行结果</returns>
     public async Task<OperatorExecutionOutput> ExecuteAsync(
         Operator @operator,
@@ -131,7 +131,7 @@ public abstract class OperatorBase : IOperatorExecutor
         }
         finally
         {
-            // Sprint 1 Task 1.1: 閲婃斁杈撳叆涓殑 ImageWrapper 寮曠敤
+            // Sprint 1 Task 1.1: 释放输入中的 ImageWrapper 引用
             if (inputs != null)
             {
                 // Encoding cleanup: previous comment text was unreadable.
@@ -151,8 +151,8 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 执行算子核心逻辑（子类实现）
     /// </summary>
     /// <param name="operator">算子实体</param>
-    /// <param name="inputs">杈撳叆鏁版嵁</param>
-    /// <param name="cancellationToken">鍙栨秷浠ょ墝</param>
+    /// <param name="inputs">输入数据</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>执行结果</returns>
     protected abstract Task<OperatorExecutionOutput> ExecuteCoreAsync(
         Operator @operator,
@@ -163,19 +163,19 @@ public abstract class OperatorBase : IOperatorExecutor
     /// 验证算子参数（子类实现）
     /// </summary>
     /// <param name="operator">算子实体</param>
-    /// <returns>楠岃瘉缁撴灉</returns>
+    /// <returns>验证结果</returns>
     public abstract ValidationResult ValidateParameters(Operator @operator);
 
-    #region 鍙傛暟鑾峰彇鏂规硶
+    #region 参数获取方法
 
     /// <summary>
     // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
-    /// <typeparam name="T">鐩爣绫诲瀷</typeparam>
+    /// <typeparam name="T">目标类型</typeparam>
     /// <param name="operator">算子实体</param>
     // Encoding cleanup: previous comment text was unreadable.
-    /// <param name="defaultValue">榛樿鍊?/param>
-    /// <returns>鍙傛暟鍊?/returns>
+    /// <param name="defaultValue">默认值</param>
+    /// <returns>参数值</returns>
     protected T GetParam<T>(Operator @operator, string paramName, T defaultValue)
     {
         var param = FindParameter(@operator, paramName);
@@ -187,7 +187,7 @@ public abstract class OperatorBase : IOperatorExecutor
 
         try
         {
-            // 澶勭悊 System.Text.Json 鍙嶅簭鍒楀寲鐨?JsonElement
+            // 处理 System.Text.Json 反序列化的 JsonElement
             if (rawValue is System.Text.Json.JsonElement jsonElement)
             {
                 var converted = ConvertJsonElement<T>(jsonElement, defaultValue);
@@ -237,26 +237,26 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 鑾峰彇瀛楃涓插弬鏁?
+    /// 获取字符串参数
     /// </summary>
     /// <param name="operator">算子实体</param>
     // Encoding cleanup: previous comment text was unreadable.
-    /// <param name="defaultValue">榛樿鍊?/param>
-    /// <returns>鍙傛暟鍊?/returns>
+    /// <param name="defaultValue">默认值</param>
+    /// <returns>参数值</returns>
     protected string GetStringParam(Operator @operator, string paramName, string defaultValue = "")
     {
         return GetParam(@operator, paramName, defaultValue);
     }
 
     /// <summary>
-    /// 鑾峰彇鏁村瀷鍙傛暟
+    /// 获取整型参数
     /// </summary>
     /// <param name="operator">算子实体</param>
     // Encoding cleanup: previous comment text was unreadable.
-    /// <param name="defaultValue">榛樿鍊?/param>
+    /// <param name="defaultValue">默认值</param>
     // Encoding cleanup: previous comment text was unreadable.
     // Encoding cleanup: previous comment text was unreadable.
-    /// <returns>鍙傛暟鍊?/returns>
+    /// <returns>参数值</returns>
     protected int GetIntParam(Operator @operator, string paramName, int defaultValue, int? min = null, int? max = null)
     {
         var value = GetParam(@operator, paramName, defaultValue);
@@ -270,14 +270,14 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 鑾峰彇鍙岀簿搴︽诞鐐瑰弬鏁?
+    /// 获取双精度浮点参数
     /// </summary>
     /// <param name="operator">算子实体</param>
     // Encoding cleanup: previous comment text was unreadable.
-    /// <param name="defaultValue">榛樿鍊?/param>
+    /// <param name="defaultValue">默认值</param>
     // Encoding cleanup: previous comment text was unreadable.
     // Encoding cleanup: previous comment text was unreadable.
-    /// <returns>鍙傛暟鍊?/returns>
+    /// <returns>参数值</returns>
     protected double GetDoubleParam(Operator @operator, string paramName, double defaultValue, double? min = null, double? max = null)
     {
         var value = GetParam(@operator, paramName, defaultValue);
@@ -291,14 +291,14 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 鑾峰彇鍗曠簿搴︽诞鐐瑰弬鏁?
+    /// 获取单精度浮点参数
     /// </summary>
     /// <param name="operator">算子实体</param>
     // Encoding cleanup: previous comment text was unreadable.
-    /// <param name="defaultValue">榛樿鍊?/param>
+    /// <param name="defaultValue">默认值</param>
     // Encoding cleanup: previous comment text was unreadable.
     // Encoding cleanup: previous comment text was unreadable.
-    /// <returns>鍙傛暟鍊?/returns>
+    /// <returns>参数值</returns>
     protected float GetFloatParam(Operator @operator, string paramName, float defaultValue, float? min = null, float? max = null)
     {
         var value = GetParam(@operator, paramName, defaultValue);
@@ -312,12 +312,12 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 鑾峰彇甯冨皵鍙傛暟
+    /// 获取布尔参数
     /// </summary>
     /// <param name="operator">算子实体</param>
     // Encoding cleanup: previous comment text was unreadable.
-    /// <param name="defaultValue">榛樿鍊?/param>
-    /// <returns>鍙傛暟鍊?/returns>
+    /// <param name="defaultValue">默认值</param>
+    /// <returns>参数值</returns>
     protected bool GetBoolParam(Operator @operator, string paramName, bool defaultValue)
     {
         return GetParam(@operator, paramName, defaultValue);
@@ -325,16 +325,16 @@ public abstract class OperatorBase : IOperatorExecutor
 
     #endregion
 
-    #region 杈撳叆澶勭悊鏂规硶
+    #region 输入处理方法
 
     /// <summary>
     // Encoding cleanup: previous comment text was unreadable.
     // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
-    /// <param name="inputs">杈撳叆瀛楀吀</param>
+    /// <param name="inputs">输入字典</param>
     /// <param name="key">图像键名，默认为 "Image"</param>
-    /// <param name="image">杈撳嚭鍥惧儚鍖呰鍣?/param>
-    /// <returns>鏄惁鎴愬姛鑾峰彇</returns>
+    /// <param name="image">输出图像包装器</param>
+    /// <returns>是否成功获取</returns>
     protected bool TryGetInputImage(Dictionary<string, object>? inputs, string key, out ImageWrapper? image)
     {
         image = null;
@@ -371,22 +371,22 @@ public abstract class OperatorBase : IOperatorExecutor
     /// <summary>
     // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
-    /// <param name="inputs">杈撳叆瀛楀吀</param>
-    /// <param name="image">杈撳嚭鍥惧儚鍖呰鍣?/param>
-    /// <returns>鏄惁鎴愬姛鑾峰彇</returns>
+    /// <param name="inputs">输入字典</param>
+    /// <param name="image">输出图像包装器</param>
+    /// <returns>是否成功获取</returns>
     protected bool TryGetInputImage(Dictionary<string, object>? inputs, out ImageWrapper? image)
     {
         return TryGetInputImage(inputs, "Image", out image);
     }
 
     /// <summary>
-    /// 鑾峰彇杈撳叆鍊?
+    /// 获取输入值
     /// </summary>
-    /// <typeparam name="T">鐩爣绫诲瀷</typeparam>
-    /// <param name="inputs">杈撳叆瀛楀吀</param>
-    /// <param name="key">閿悕</param>
-    /// <param name="value">杈撳嚭鍊?/param>
-    /// <returns>鏄惁鎴愬姛鑾峰彇</returns>
+    /// <typeparam name="T">目标类型</typeparam>
+    /// <param name="inputs">输入字典</param>
+    /// <param name="key">键名</param>
+    /// <param name="value">输出值</param>
+    /// <returns>是否成功获取</returns>
     protected bool TryGetInputValue<T>(Dictionary<string, object>? inputs, string key, out T? value)
     {
         value = default;
@@ -415,13 +415,13 @@ public abstract class OperatorBase : IOperatorExecutor
 
     #endregion
 
-    #region 杈撳嚭澶勭悊鏂规硶 (P0: ImageWrapper闆舵嫹璐濊緭鍑?
+    #region 输出处理方法 (P0: ImageWrapper 零拷贝输出)
 
     /// <summary>
     // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
-    /// <param name="mat">杈撳嚭鍥惧儚Mat</param>
-    /// <param name="additionalData">闄勫姞鏁版嵁</param>
+    /// <param name="mat">输出图像Mat</param>
+    /// <param name="additionalData">附加数据</param>
     /// <returns>输出字典，包含ImageWrapper</returns>
     protected Dictionary<string, object> CreateImageOutput(Mat mat, Dictionary<string, object>? additionalData = null)
     {
@@ -480,10 +480,10 @@ public abstract class OperatorBase : IOperatorExecutor
     /// <summary>
     // Encoding cleanup: previous comment text was unreadable.
     /// </summary>
-    /// <param name="mat">杈撳嚭鍥惧儚Mat</param>
+    /// <param name="mat">输出图像Mat</param>
     // Encoding cleanup: previous comment text was unreadable.
-    /// <param name="additionalData">闄勫姞鏁版嵁</param>
-    /// <returns>杈撳嚭瀛楀吀</returns>
+    /// <param name="additionalData">附加数据</param>
+    /// <returns>输出字典</returns>
     protected Dictionary<string, object> CreateImageOutput(Mat mat, bool useZeroCopy, Dictionary<string, object>? additionalData = null)
     {
         var output = new Dictionary<string, object>();
@@ -517,7 +517,7 @@ public abstract class OperatorBase : IOperatorExecutor
 
     #endregion
 
-    #region 杈呭姪鏂规硶
+    #region 辅助方法
 
     protected static Position CreatePosition(double x, double y)
     {
@@ -568,7 +568,7 @@ public abstract class OperatorBase : IOperatorExecutor
     }
 
     /// <summary>
-    /// 杞崲 JsonElement 涓虹洰鏍囩被鍨?
+    /// 转换 JsonElement 为目标类型
     /// </summary>
     private static Parameter? FindParameter(Operator @operator, string paramName)
     {

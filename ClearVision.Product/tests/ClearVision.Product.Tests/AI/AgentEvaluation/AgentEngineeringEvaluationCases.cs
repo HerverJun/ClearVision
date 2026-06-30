@@ -1,4 +1,4 @@
-﻿
+
 namespace ClearVision.Product.Tests.AI.AgentEvaluation;
 
 internal static class AgentEngineeringEvaluationCases

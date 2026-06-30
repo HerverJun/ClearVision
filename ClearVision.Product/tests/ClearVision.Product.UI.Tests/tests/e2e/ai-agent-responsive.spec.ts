@@ -88,8 +88,8 @@ async function mockAgentRunBuild(page: Page, runId: string, payloads: any[]): Pr
       status: 200,
       contentType: 'text/event-stream',
       body: [
-        'event: run.completed',
-        `data: {"runId":"${runId}","sequence":2,"eventType":"run.completed","stage":"run","status":"completed","payload":{"status":"completed","flow":{"operators":[]},"buildResult":{"applyGate":{"canvasApplyReady":false,"blocked":true}},"metadataOnly":true}}`,
+        'event: run.started',
+        `data: {"runId":"${runId}","sequence":2,"eventType":"run.started","stage":"run","status":"running","payload":{"metadataOnly":true}}`,
         '',
         '',
       ].join('\n'),

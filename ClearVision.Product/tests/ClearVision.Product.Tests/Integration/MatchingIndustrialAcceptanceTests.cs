@@ -5,6 +5,7 @@ using ClearVision.Product.Core.ValueObjects;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.PointCloud;
 using ClearVision.Product.Tests.Operators;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenCvSharp;
@@ -12,6 +13,7 @@ using Xunit;
 
 namespace ClearVision.Product.Tests.Integration;
 
+[Collection(PointCloudMatchingTestCollections.PointCloudMatching)]
 public sealed class MatchingIndustrialAcceptanceTests
 {
     [Fact]

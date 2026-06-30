@@ -305,20 +305,20 @@ public sealed class VisionAgentRuntimePreviewGovernanceTests
     }
 
     [Fact]
-    public void SimulationTool_ShouldReturnReportAndNoRealResources()
+    public async Task SimulationTool_ShouldReturnReportAndNoRealResources()
     {
         var config = PilotConfig();
         var context = Context(config);
         var tool = new RuntimePreviewSimulateMetadataSessionTool();
 
-        var result = tool.ExecuteAsync(
+        var result = await tool.ExecuteAsync(
             context,
             Args(new
             {
                 flow = ValidFlow(),
                 runtimePreviewConsent = true
             }),
-            CancellationToken.None).GetAwaiter().GetResult();
+            CancellationToken.None);
 
         result.Success.Should().BeTrue();
         var raw = JsonSerializer.Serialize(result.Data);

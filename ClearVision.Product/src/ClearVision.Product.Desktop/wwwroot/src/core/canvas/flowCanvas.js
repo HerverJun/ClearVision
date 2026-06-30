@@ -1,5 +1,5 @@
 /**
- * 鐠嬪啳鐦鈧崗绛圭窗姒涙顓婚崗鎶芥４閵嗗倸绱戦崥顖氭倵 serialize/deserialize 娴兼碍澧﹂崡鎷岊嚊缂佸棙妫╄箛妞尖偓?
+ * Encoding cleanup: previous comment text was unreadable.
  * 闂団偓鐟曚焦甯撻弻銉︽闁俺绻?`window.__FLOW_CANVAS_DEBUG__ = true` 閹存牔鎱ㄩ弨瑙勵劃鐢悂鍣洪崥顖滄暏閵?
  */
 const DEBUG_FLOW_CANVAS = false;
@@ -8,24 +8,24 @@ function flowDebugEnabled() {
 }
 
 /**
- * 缁旑垰褰涚猾璇茬€锋０婊嗗閺勭姴鐨犵悰?(濡€虫健缁狙冪埗闁插骏绱濋幓鎰扮彯閸忕厧顔愰幀?
+ * Encoding cleanup: previous comment text was unreadable.
  */
 const PORT_TYPE_COLORS = {
-    'Image':           '#52c41a',  // 缂佽儻澹?- 閸ユ儳鍎?
-    'String':          '#1890ff',  // 閽冩繆澹?- 鐎涙顑佹稉?
+    'Image':           '#52c41a', // Encoding cleanup: previous comment text was unreadable.
+    'String':          '#1890ff', // Encoding cleanup: previous comment text was unreadable.
     'Integer':         '#fa8c16',  // Encoding cleanup: previous comment text was unreadable.
     'Float':           '#fa8c16',  // 濮楁瑨澹?- 濞搭喚鍋?
-    'Boolean':         '#f5222d',  // 缁俱垼澹?- 鐢啫鐨甸崐?
-    'Point':           '#eb2f96',  // 缁澹?- 閸ф劖鐖?
-    'Rectangle':       '#eb2f96',  // 缁澹?- 閻晛鑸?
-    'Contour':         '#722ed1',  // 缁鳖偉澹?- 鏉烆喖绮?閸栧搫鐓?
-    'PointList':       '#eb2f96',  // 缁澹?- 閻愮懓鍨悰?(Sprint 1.2)
-    'DetectionResult': '#13c2c2',  // 闂堟帟澹?- 濡偓濞村绮ㄩ弸?(Sprint 1.2)
-    'DetectionList':   '#13c2c2',  // 闂堟帟澹?- 濡偓濞村鍨悰?(Sprint 1.2)
+    'Boolean':         '#f5222d', // Encoding cleanup: previous comment text was unreadable.
+    'Point':           '#eb2f96', // Encoding cleanup: previous comment text was unreadable.
+    'Rectangle':       '#eb2f96', // Encoding cleanup: previous comment text was unreadable.
+    'Contour':         '#722ed1', // Encoding cleanup: previous comment text was unreadable.
+    'PointList':       '#eb2f96', // Encoding cleanup: previous comment text was unreadable.
+    'DetectionResult': '#13c2c2', // Encoding cleanup: previous comment text was unreadable.
+    'DetectionList':   '#13c2c2', // Encoding cleanup: previous comment text was unreadable.
     'CircleData':      '#2f54eb',  // Encoding cleanup: previous comment text was unreadable.
-    'LineData':        '#2f54eb',  // 闂堟稖鎽?- 閻╁鍤庨弫鐗堝祦 (Sprint 1.2)
-    'Any':             '#bfbfbf',  // 閻忔媽澹?- 娴犵粯鍓?
-    // 鍏煎鏋氫妇鏁板瓧鍊?
+    'LineData':        '#2f54eb', // Encoding cleanup: previous comment text was unreadable.
+    'Any':             '#bfbfbf', // Encoding cleanup: previous comment text was unreadable.
+    // Encoding cleanup: previous comment text was unreadable.
     0: '#52c41a',
     1: '#fa8c16', 2: '#fa8c16', 3: '#f5222d',
     4: '#1890ff', 5: '#eb2f96', 6: '#eb2f96', 7: '#722ed1',
@@ -34,7 +34,7 @@ const PORT_TYPE_COLORS = {
 };
 
 /**
- * 闁矮淇婄猾鑽ょ暬鐎涙劗琚崹瀣肠閸?- Sprint 4 Task 4.3 鐎瑰鍙忛幓鎰仛
+ * Encoding cleanup: previous comment text was unreadable.
  */
 const COMM_OPERATOR_TYPES = new Set([
     'HttpRequest', 'MqttPublish', 'ModbusCommunication',
@@ -49,9 +49,9 @@ const LEGACY_OPERATOR_TYPE_ALIASES = {
     'ModbusRtuCommunication': 'ModbusCommunication'
 };
 
-const PORT_HIT_RADIUS_PX = 12;       // 绔彛灞忓箷鍛戒腑鍗婂緞
+const PORT_HIT_RADIUS_PX = 12;       // 端口屏幕命中半径
 const CONNECTION_HIT_RADIUS_PX = 10; // Encoding cleanup: previous comment text was unreadable.
-const CONNECTION_HIT_SAMPLES = 16;   // 鐠愭繂顢ｇ亸鏃€娲哥痪鍧楀櫚閺嶉鍋ｉ弫?
+const CONNECTION_HIT_SAMPLES = 16;   // 璐濆灏旀洸绾块噰鏍风偣鏁?
 const NODE_DEFAULT_WIDTH = 140;
 const NODE_MIN_HEIGHT = 60;
 const NODE_HEADER_HEIGHT = 24;
@@ -86,25 +86,25 @@ class FlowCanvas {
         this._logicalWidth = 0;
         this._logicalHeight = 0;
 
-        // 閻㈣绔风€靛綊缍堟稉搴ｅ仯闂冧絻鍎楅弲顖濐啎缂?
+        // Encoding cleanup: previous comment text was unreadable.
         this.gridSize = 20;
         this.gridColor = 'rgba(48, 71, 62, 0.16)';
         this.gridDotRadius = 1.05;
 
-        // 浜嬩欢鍥炶皟
+        // 事件回调
         this.onNodeSelected = null;
         this.onConnectionCreated = null;
         this.onSelectionDeleteRequested = null;
         this.onNodeDuplicateRequested = null;
         this.onNodeDisabledToggleRequested = null;
 
-        // 鏉╃偟鍤庨悩鑸碘偓浣侯吀閻?
+        // Encoding cleanup: previous comment text was unreadable.
         this.isConnecting = false;
         this.connectingFrom = null;  // { nodeId, portIndex, isOutput }
         this.mousePosition = { x: 0, y: 0 };
         this.hoveredPort = null;  // { nodeId, portIndex, isOutput }
 
-        // 娴滃娆㈡径鍕倞閸ｃ劌绱╅悽顭掔礄閻劋绨柨鈧В浣规缁夊娅庨敍?
+        // Encoding cleanup: previous comment text was unreadable.
         this._resizeHandler = this.resize.bind(this);
         this._mouseDownHandler = this.handleMouseDown.bind(this);
         this._mouseMoveHandler = this.handleMouseMove.bind(this);
@@ -116,13 +116,13 @@ class FlowCanvas {
         this._visibilityHandler = this.handleVisibilityChange.bind(this);
         this._drawFrameBound = this._drawFrame.bind(this);
 
-        // 濞撳弶鐓嬬拫鍐ㄥ閻樿埖鈧緤绱欓懘蹇旂垼鐠?+ 閸楁洑绔?RAF閿?
+        // Encoding cleanup: previous comment text was unreadable.
         this._animationFrameId = null;
-        this._dirty = true;          // 閺勵垰鎯侀棁鈧憰渚€鍣哥紒?
-        this._lastFrameTime = 0;     // 娑撳﹣绔寸敮褎妞傞梻瀛樺煈閿涘瞼鏁ゆ禍?dt 閹恒劏绻橀崝銊ф暰
-        this._isPaused = false;      // 妞ょ敻娼伴梾鎰閺冭埖娈忛崑?
+        this._dirty = true; // Encoding cleanup: previous comment text was unreadable.
+        this._lastFrameTime = 0; // Encoding cleanup: previous comment text was unreadable.
+        this._isPaused = false;      // 椤甸潰闅愯棌鏃舵殏鍋?
 
-        // ResizeObserver 娑撳氦濡ù?
+        // ResizeObserver 涓庤妭娴?
         this._resizeObserver = null;
         this._resizeRafId = null;
 
@@ -132,13 +132,13 @@ class FlowCanvas {
         // Encoding cleanup: previous comment text was unreadable.
         this._connectionById = new Map();
         this._connectionsByOutputPort = new Map();  // key=portKey -> Set<connection>
-        this._connectionByInputPort = new Map();    // key=portKey -> connection閿涘牐绶崗銉ь伂閸欙絼绮庨崗浣筋啅 1 閺夆槄绱?
+        this._connectionByInputPort = new Map(); // Encoding cleanup: previous comment text was unreadable.
 
-        // 缁帒鐡欑划鍓т紥缂傛挸鐡ㄩ敍鍫ヤ缉閸忓秵鐦＄敮?createRadialGradient閿?
+        // Encoding cleanup: previous comment text was unreadable.
         this._particleSprite = null;
         this._particleSpriteSize = 0;
 
-        // ForEach 鐎涙劕娴橀懞鍌滃仯閺佹媽袙閺嬫劗绱︾€?
+        // Encoding cleanup: previous comment text was unreadable.
         this._subGraphNodeCountCache = new WeakMap();
         this._nodesBoundsCache = null;
         this._nodesBoundsDirty = true;
@@ -150,7 +150,7 @@ class FlowCanvas {
         this._minimapToggleHandler = null;
         this._minimapCollapsed = false;
 
-        // 鍙抽敭鑿滃崟
+        // 右键菜单
         this.contextMenu = null;
         this._clickOutsideHandler = this.hideContextMenu.bind(this);
 
@@ -158,12 +158,12 @@ class FlowCanvas {
     }
 
     /**
-     * 閸掓繂顫愰崠鏍暰鐢?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     initialize() {
         this.resize();
 
-        // 娴ｈ法鏁?ResizeObserver 閺囧じ鍞?window.resize閿涙稓鏁?RAF 閸氬牆鎶氶敍宀勬Щ濮濄垺瀚嬮幏鐣岀崶閸欙綀绻涚紒顓⌒曢崣?
+        // Encoding cleanup: previous comment text was unreadable.
         const ResizeObserverCtor = window.ResizeObserver;
         if (ResizeObserverCtor) {
             this._resizeObserver = new ResizeObserverCtor(entries => {
@@ -184,7 +184,7 @@ class FlowCanvas {
             window.addEventListener('resize', this._resizeHandler);
         }
 
-        // 缂佹垵鐣炬禍瀣╂
+        // 绑定事件
         this.canvas.addEventListener('mousedown', this._mouseDownHandler);
         this.canvas.addEventListener('mousemove', this._mouseMoveHandler);
         this.canvas.addEventListener('mouseup', this._mouseUpHandler);
@@ -195,10 +195,10 @@ class FlowCanvas {
 
         document.addEventListener('visibilitychange', this._visibilityHandler);
 
-        // 閸氼垰濮╁〒鍙夌厠閿涘牐顕Ч鍌欑濞嗭繝鍣哥紒姗堢礉閸氬海鐢婚弽瑙勫祦閼村繑鐖ｇ拋?閸斻劎鏁鹃悩鑸碘偓浣稿枀鐎规碍妲搁崥锔炬埛缂?RAF閿?
+        // Encoding cleanup: previous comment text was unreadable.
         this.invalidate();
 
-        // 閸掓繂顫愰崠鏍х毈閸︽澘娴?
+        // Encoding cleanup: previous comment text was unreadable.
         this.initMinimap();
     }
 
@@ -219,7 +219,7 @@ class FlowCanvas {
     }
 
     /**
-     * 闁库偓濮ｄ胶鏁剧敮鍐跨礉濞撳懐鎮婇幍鈧張澶夌皑娴犲墎娲冮崥顒€鎷伴崝銊ф暰瀵邦亞骞?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     destroy() {
         if (this._animationFrameId !== null) {
@@ -282,9 +282,9 @@ class FlowCanvas {
 
     /**
      * Encoding cleanup: previous comment text was unreadable.
-     * - canvas.width/height閿涘潌acking store閿涘濞囬悽?dpr 閺€鎯с亣
-     * - canvas.style.width/height 娣囨繃瀵?CSS 閸嶅繒绀?
-     * - ctx.setTransform(dpr,0,0,dpr,0,0) 鐠佲晜澧嶉張澶岀帛閸掕泛娼楅弽鍥﹀▏閻劑鈧槒绶崓蹇曠
+     * - canvas.width/height锛坆acking store锛変娇鐢?dpr 鏀惧ぇ
+     * Encoding cleanup: previous comment text was unreadable.
+     * - ctx.setTransform(dpr,0,0,dpr,0,0) 让所有绘制坐标使用逻辑像素
      */
     resize() {
         const container = this.canvas.parentElement;
@@ -314,7 +314,7 @@ class FlowCanvas {
     }
 
     /**
-     * 閻㈢喐鍨歎UID
+     * 生成UUID
      */
     generateUUID() {
         if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -327,7 +327,7 @@ class FlowCanvas {
     }
 
     /**
-     * 濞ｈ濮為懞鍌滃仯
+     * 添加节点
      */
     addNode(type, x, y, config = {}) {
         const canonicalType = this.normalizeOperatorType(type);
@@ -365,7 +365,7 @@ class FlowCanvas {
 
     /**
      * Encoding cleanup: previous comment text was unreadable.
-     * 缁崵绮洪懞鍌滃仯 (_systemNode) 閸欐ぞ绻氶幎銈忕礉娑撳秴褰查崚鐘绘珟閵?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     removeNode(nodeId) {
         const node = this.nodes.get(nodeId);
@@ -401,7 +401,7 @@ class FlowCanvas {
     }
 
     /**
-     * 濞ｈ濮炴潻鐐村复
+     * 添加连接
      */
     addConnection(sourceId, sourcePort, targetId, targetPort) {
         const validationError = this.getConnectionValidationError(sourceId, sourcePort, targetId, targetPort);
@@ -555,7 +555,7 @@ class FlowCanvas {
                 x: this.offset.x,
                 y: this.offset.y
             },
-            // 闁槒绶崓蹇曠閿涘湑SS 閸嶅繒绀岄敍澶涚礉娓氬じ绨☉鍫ｅ瀭閼板懏瀵?getBoundingClientRect 缁涘鐜€佃鐦?
+            // Encoding cleanup: previous comment text was unreadable.
             canvasWidth: this._logicalWidth,
             canvasHeight: this._logicalHeight,
             flowRevision: this.flowRevision
@@ -568,7 +568,7 @@ class FlowCanvas {
             return null;
         }
 
-        // 鏉╂柨娲栭柅鏄忕帆閸嶅繒绀岄崸鎰垼閿涘奔绗?nodePreviewOverlay 缁涘鐔€娴?CSS 鐎圭懓娅掔亸鍝勵嚟閻ㄥ嫰鈧槒绶穱婵囧瘮娑撯偓閼?
+        // Encoding cleanup: previous comment text was unreadable.
         return {
             x: (node.x - this.offset.x) * this.scale,
             y: (node.y - this.offset.y) * this.scale,
@@ -671,7 +671,7 @@ class FlowCanvas {
         const startX = Math.floor(this.offset.x / dotStep) * dotStep;
         const startY = Math.floor(this.offset.y / dotStep) * dotStep;
 
-        // 閸欘垵顫嬮崠鍝勭厵娴ｈ法鏁ら柅鏄忕帆鐏忓搫顕敍宀勪缉閸?DPR 鐎佃壈鍤ч柌宥咁槻缂佹ê鍩?
+        // Encoding cleanup: previous comment text was unreadable.
         const visibleWidth = width / this.scale;
         const visibleHeight = height / this.scale;
 
@@ -700,7 +700,7 @@ class FlowCanvas {
 
     /**
      * 缂佹ê鍩楅懞鍌滃仯 - 闂冭埖顔岄崶娑橆杻瀵櫣澧?
-     * 濞撴劕褰夋繅顐㈠帠 + 閸ョ偓鐖?+ 閻樿埖鈧礁褰傞崗澶嬫櫏閺?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     drawNode(node) {
         const x = (node.x - this.offset.x) * this.scale;
@@ -709,17 +709,17 @@ class FlowCanvas {
         const h = node.height * this.scale;
         const isSelected = this.selectedNode === node.id;
 
-        // === ForEach 鐎圭懓娅掗懞鍌滃仯閸掋倕鐣?===
+        // Encoding cleanup: previous comment text was unreadable.
         const isForEach = node.type === 'ForEach';
         const ioMode = isForEach ? (node.parameters?.find(p => p.name === 'IoMode' || p.Name === 'IoMode')?.value || 'Parallel') : null;
         const isSequential = ioMode === 'Sequential';
 
-        // 閺嶈宓侀悩鑸碘偓浣界殶閺佺绔熷鍡涱杹閼规彃鎷伴崣鎴濆帨閺佸牊鐏?
+        // Encoding cleanup: previous comment text was unreadable.
         let borderColor = isSelected ? node.color : 'rgba(255, 255, 255, 0.1)';
         let borderWidth = isSelected ? 3 : 1;
         let glowColor = null;
 
-        // === Sprint 4 Task 4.3: 鐎瑰鍙忛幓鎰仛鐏?===
+        // Encoding cleanup: previous comment text was unreadable.
         const isCommunicationOp = COMM_OPERATOR_TYPES.has(node.type);
         const hasFileParam = node.parameters && node.parameters.some(
             p => p.dataType === 'file' && p.value
@@ -736,17 +736,17 @@ class FlowCanvas {
             borderColor = '#e74c3c';
             glowColor = 'rgba(231, 76, 60, 0.5)';
         } else if (isForEach && isSequential) {
-            // ForEach Sequential 濡€崇础閿涙碍顭堕懝鑼剁珶濡?
+            // Encoding cleanup: previous comment text was unreadable.
             borderColor = '#fa8c16';
             borderWidth = 2;
             glowColor = 'rgba(250, 140, 22, 0.3)';
         } else if (isForEach) {
-            // ForEach Parallel 濡€崇础閿涙岸娼氶懝鑼舵珓缁捐儻绔熷?
+            // ForEach Parallel 妯″紡锛氶潚鑹茶櫄绾胯竟妗?
             borderColor = '#13c2c2';
             borderWidth = 2;
             glowColor = 'rgba(19, 194, 194, 0.2)';
         } else if (isCommunicationOp) {
-            // 闁矮淇婄粻妤€鐡欓敍姘卞閼硅尪顒熼幋鎺曠珶濡?
+            // Encoding cleanup: previous comment text was unreadable.
             borderColor = '#f5222d';
             borderWidth = 2;
             glowColor = 'rgba(245, 34, 45, 0.3)';
@@ -772,7 +772,7 @@ class FlowCanvas {
             this.ctx.shadowOffsetY = 2;
         }
 
-        // 閼哄倻鍋ｉ懗灞炬珯 - 濞撴劕褰夋繅顐㈠帠
+        // 节点背景 - 渐变填充
         const gradient = this.ctx.createLinearGradient(x, y, x, y + h);
         gradient.addColorStop(0, isSelected ? 'rgba(45, 74, 94, 0.9)' : 'rgba(26, 58, 82, 0.8)');
         gradient.addColorStop(1, isSelected ? 'rgba(26, 58, 82, 0.95)' : 'rgba(13, 27, 42, 0.9)');
@@ -781,24 +781,24 @@ class FlowCanvas {
         this.ctx.strokeStyle = borderColor;
         this.ctx.lineWidth = borderWidth;
 
-        // ForEach 閼哄倻鍋ｆ担璺ㄦ暏閾忔氨鍤庢潏瑙勵攱
+        // ForEach 节点使用虚线边框
         if (isForEach) {
             this.ctx.setLineDash([6, 4]);
         }
 
-        // 缂佹ê鍩楅崷鍡氼潡閻晛鑸?
+        // Encoding cleanup: previous comment text was unreadable.
         this.roundRect(x, y, w, h, 8);
         this.ctx.fill();
         this.ctx.stroke();
 
-        // 閹垹顦茬€圭偟鍤?
+        // Encoding cleanup: previous comment text was unreadable.
         if (isForEach) {
             this.ctx.setLineDash([]);
         }
 
         this.ctx.restore();
 
-        // 閺嶅洭顣介弽?- 濞撴劕褰?
+        // Encoding cleanup: previous comment text was unreadable.
         const headerGradient = this.ctx.createLinearGradient(x, y, x + w, y);
         headerGradient.addColorStop(0, node.color);
         headerGradient.addColorStop(1, this.adjustColor(node.color, -20));
@@ -806,7 +806,7 @@ class FlowCanvas {
         this.roundRect(x, y, w, 24 * this.scale, { tl: 8, tr: 8, bl: 0, br: 0 });
         this.ctx.fill();
 
-        // 閸ョ偓鐖?
+        // Encoding cleanup: previous comment text was unreadable.
         if (node.iconPath) {
             const targetSize = 16 * this.scale;
             const scaleFactor = targetSize / 24; // ViewBox 24x24
@@ -826,7 +826,7 @@ class FlowCanvas {
             this.ctx.fillText(node.icon, x + 8 * this.scale, y + 12 * this.scale);
         }
 
-        // 閺嶅洭顣介弬鍥х摟
+        // 标题文字
         this.ctx.fillStyle = '#ffffff';
         this.ctx.font = `bold ${11 * this.scale}px sans-serif`;
         this.ctx.textAlign = 'left';
@@ -834,7 +834,7 @@ class FlowCanvas {
         const titleX = (node.icon || node.iconPath) ? x + 28 * this.scale : x + 10 * this.scale;
         this.ctx.fillText(node.title, titleX, y + 12 * this.scale);
 
-        // === ForEach IoMode 閺嶅洨顒?===
+        // Encoding cleanup: previous comment text was unreadable.
         if (isForEach && ioMode) {
             const ioLabel = isSequential ? 'SEQ' : 'PAR';
             const labelColor = isSequential ? '#fa8c16' : '#13c2c2';
@@ -873,13 +873,13 @@ class FlowCanvas {
             this.drawStatusIndicator(x + w - 12 * this.scale, indicatorY, node.status);
         }
 
-        // 缂佹ê鍩楃粩顖氬經
+        // 绘制端口
         this.drawGlobalVariableBadges(node, x, y, w);
         this.drawPorts(node, x, y, w, h);
 
-        // === Sprint 4 Task 4.3: 缂佹ê鍩楃€瑰鍙忛弽鍥唶 ===
+        // === Sprint 4 Task 4.3: 绘制安全标记 ===
         if (isCommunicationOp) {
-            // 闁矮淇婄粻妤€鐡欓敍姘礁娑撳﹨顫楃紒妯哄煑 閳?閸ョ偓鐖?
+            // Encoding cleanup: previous comment text was unreadable.
             this.ctx.fillStyle = '#f5222d';
             this.ctx.font = `bold ${14 * this.scale}px sans-serif`;
             this.ctx.textAlign = 'right';
@@ -948,10 +948,10 @@ class FlowCanvas {
     }
 
     /**
-     * 缂佹ê鍩楅悩鑸碘偓浣瑰瘹缁€鍝勬珤
-     * @param {number} x - 娑擃厼绺綳閸ф劖鐖?
-     * @param {number} y - 娑擃厼绺綴閸ф劖鐖?
-     * @param {string} status - 閻樿埖鈧?
+     * 绘制状态指示器
+     * Encoding cleanup: previous comment text was unreadable.
+     * Encoding cleanup: previous comment text was unreadable.
+     * Encoding cleanup: previous comment text was unreadable.
      */
     drawStatusIndicator(x, y, status) {
         const radius = 6 * this.scale;
@@ -963,7 +963,7 @@ class FlowCanvas {
             case 'running':
                 this.ctx.fillStyle = '#1890ff';
                 this.ctx.fill();
-                // 缂佹ê鍩楅弮瀣祮閻ㄥ嫯绻樻惔锔惧箚
+                // 绘制旋转的进度环
                 this.ctx.beginPath();
                 this.ctx.arc(x, y, radius + 2 * this.scale, 0, Math.PI * 2);
                 this.ctx.strokeStyle = 'rgba(24, 144, 255, 0.5)';
@@ -973,7 +973,7 @@ class FlowCanvas {
             case 'success':
                 this.ctx.fillStyle = '#52c41a';
                 this.ctx.fill();
-                // 缂佹ê鍩楃€电懓瀣€
+                // 绘制对勾
                 this.ctx.strokeStyle = '#ffffff';
                 this.ctx.lineWidth = 2 * this.scale;
                 this.ctx.beginPath();
@@ -985,7 +985,7 @@ class FlowCanvas {
             case 'error':
                 this.ctx.fillStyle = '#f5222d';
                 this.ctx.fill();
-                // 缂佹ê鍩梄
+                // 绘制X
                 this.ctx.strokeStyle = '#ffffff';
                 this.ctx.lineWidth = 2 * this.scale;
                 this.ctx.beginPath();
@@ -999,12 +999,12 @@ class FlowCanvas {
     }
 
     /**
-     * 缂佹ê鍩楃粩顖氬經
+     * 绘制端口
      */
     drawPorts(node, x, y, w, h) {
         const portRadius = 5 * this.scale;
         
-        // 濞撳弶鐓嬫潏鎾冲弳缁旑垰褰?- 閸ㄥ倻娲块崸鍥у瀻
+        // Encoding cleanup: previous comment text was unreadable.
         node.inputs.forEach((input, index) => {
             const portY = this.getPortYInScreen(y, h, index, node.inputs.length);
             const color = PORT_TYPE_COLORS[input.type] || PORT_TYPE_COLORS['Any'];
@@ -1017,7 +1017,7 @@ class FlowCanvas {
             this.ctx.lineWidth = 1;
             this.ctx.stroke();
 
-            // 缂佹ê鍩楃猾璇茬€烽崥?(闂堢姾绻庣粩顖氬經閻ㄥ嫬鐨弽鍥╊劮)
+            // Encoding cleanup: previous comment text was unreadable.
             if (this.scale > 0.8) {
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
                 this.ctx.font = `${8 * this.scale}px sans-serif`;
@@ -1027,7 +1027,7 @@ class FlowCanvas {
             }
         });
         
-        // 濞撳弶鐓嬫潏鎾冲毉缁旑垰褰?- 閸ㄥ倻娲块崸鍥у瀻
+        // Encoding cleanup: previous comment text was unreadable.
         node.outputs.forEach((output, index) => {
             const portY = this.getPortYInScreen(y, h, index, node.outputs.length);
             const color = PORT_TYPE_COLORS[output.type] || PORT_TYPE_COLORS['Any'];
@@ -1040,7 +1040,7 @@ class FlowCanvas {
             this.ctx.lineWidth = 1;
             this.ctx.stroke();
 
-            // 缂佹ê鍩楃猾璇茬€烽崥?
+            // 缁樺埗绫诲瀷鍚?
             if (this.scale > 0.8) {
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
                 this.ctx.font = `${8 * this.scale}px sans-serif`;
@@ -1098,7 +1098,7 @@ class FlowCanvas {
     }
 
     /**
-     * 濡偓濞村绱堕弽鍥︾秴缂冾喗妲搁崥锕€婀粩顖氬經娑?
+     * Encoding cleanup: previous comment text was unreadable.
      * Encoding cleanup: previous comment text was unreadable.
      * Encoding cleanup: previous comment text was unreadable.
      * @returns {{nodeId: string, portIndex: number, isOutput: boolean}|null}
@@ -1106,7 +1106,7 @@ class FlowCanvas {
     getPortAt(x, y) {
         const screenX = (x - this.offset.x) * this.scale;
         const screenY = (y - this.offset.y) * this.scale;
-        const hitRadiusSq = (PORT_HIT_RADIUS_PX * this.scale) ** 2; // 娴ｈ法鏁ょ捄婵堫瀲楠炶櫕鏌熼敍宀勪缉閸?Math.sqrt
+        const hitRadiusSq = (PORT_HIT_RADIUS_PX * this.scale) ** 2; // Encoding cleanup: previous comment text was unreadable.
 
         for (const [nodeId, node] of this.nodes) {
             const nodeScreenX = (node.x - this.offset.x) * this.scale;
@@ -1114,7 +1114,7 @@ class FlowCanvas {
             const w = node.width * this.scale;
             const h = node.height * this.scale;
 
-            // 濡偓濞村绶崗銉ь伂閸?(閸ㄥ倻娲块崚鍡楃)
+            // Encoding cleanup: previous comment text was unreadable.
             for (let i = 0; i < node.inputs.length; i++) {
                 const portY = this.getPortYInScreen(nodeScreenY, h, i, node.inputs.length);
                 const dx = screenX - nodeScreenX;
@@ -1124,7 +1124,7 @@ class FlowCanvas {
                 }
             }
 
-            // 濡偓濞村绶崙铏诡伂閸?(閸ㄥ倻娲块崚鍡楃)
+            // Encoding cleanup: previous comment text was unreadable.
             for (let i = 0; i < node.outputs.length; i++) {
                 const portY = this.getPortYInScreen(nodeScreenY, h, i, node.outputs.length);
                 const dx = screenX - (nodeScreenX + w);
@@ -1156,7 +1156,7 @@ class FlowCanvas {
     }
 
     /**
-     * 閼惧嘲褰囬幐鍥х暰缁旑垰褰涙稉濠勬畱閹碘偓閺堝绻涢幒銉礄閻劋绨潏鎾冲毉缁旑垰褰涢敍?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     getConnectionsAtPort(nodeId, portIndex, isOutput) {
         if (isOutput) {
@@ -1168,9 +1168,9 @@ class FlowCanvas {
     }
 
     /**
-     * 瀵偓婵鍨卞楦跨箾閹?
-     * @param {string} nodeId - 璧峰鑺傜偣ID
-     * @param {number} portIndex - 鐠у嘲顫愮粩顖氬經缁便垹绱?
+     * Encoding cleanup: previous comment text was unreadable.
+     * @param {string} nodeId - 起始节点ID
+     * Encoding cleanup: previous comment text was unreadable.
      */
     startConnection(nodeId, portIndex) {
         this.isConnecting = true;
@@ -1183,9 +1183,9 @@ class FlowCanvas {
     }
 
     /**
-     * 鐎瑰本鍨氭潻鐐村复閸掓稑缂?
-     * @param {string} nodeId - 閻╊喗鐖ｉ懞鍌滃仯ID
-     * @param {number} portIndex - 閻╊喗鐖ｇ粩顖氬經缁便垹绱?
+     * Encoding cleanup: previous comment text was unreadable.
+     * @param {string} nodeId - 目标节点ID
+     * Encoding cleanup: previous comment text was unreadable.
      */
     finishConnection(nodeId, portIndex) {
         if (!this.isConnecting || !this.connectingFrom) return;
@@ -1279,10 +1279,10 @@ class FlowCanvas {
     }
 
     /**
-     * 濡偓閺屻儳琚崹瀣悑鐎硅鈧?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     checkTypeCompatibility(sourceType, targetType) {
-        // 閺嬫矮濡囨潪顒佸床閺勭姴鐨?(閸忕厧顔愰弫鏉跨摟閸滃苯鐡х粭锔胯)
+        // Encoding cleanup: previous comment text was unreadable.
         const normalize = (t) => {
             if (t === 'Any' || t === 99) return 'Any';
             if (t === 'Image' || t === 0) return 'Image';
@@ -1343,7 +1343,7 @@ class FlowCanvas {
 
     /**
      * Encoding cleanup: previous comment text was unreadable.
-     * @param {string} connectionId - 鏉╃偞甯碔D
+     * @param {string} connectionId - 连接ID
      */
     removeConnection(connectionId) {
         const connection = this._connectionById.get(connectionId);
@@ -1361,7 +1361,7 @@ class FlowCanvas {
     }
 
     /**
-     * 缂佹ê鍩楁稉瀛樻鏉╃偟鍤庨敍鍫熷珛閹峰€熺箖缁嬪鑵戦敍?
+     * 缁樺埗涓存椂杩炵嚎锛堟嫋鎷借繃绋嬩腑锛?
      */
     drawTempConnection() {
         if (!this.isConnecting || !this.connectingFrom) return;
@@ -1380,7 +1380,7 @@ class FlowCanvas {
         const endX = (this.mousePosition.x - this.offset.x) * this.scale;
         const endY = (this.mousePosition.y - this.offset.y) * this.scale;
 
-        // 缂佹ê鍩楅搹姘卞殠
+        // 绘制虚线
         this.ctx.beginPath();
         this.ctx.moveTo(startPos.x, startPos.y);
 
@@ -1401,7 +1401,7 @@ class FlowCanvas {
     }
 
     /**
-     * 缂佹ê鍩楁潻鐐村复缁?- 闂冭埖顔岄崶娑橆杻瀵櫣澧楅敍灞界敨閺佺増宓佸ù浣稿З缁帒鐡欓崝銊ф暰
+     * Encoding cleanup: previous comment text was unreadable.
      */
     drawConnection(connection, dt) {
         const sourceNode = this.nodes.get(connection.source);
@@ -1409,7 +1409,7 @@ class FlowCanvas {
 
         if (!sourceNode || !targetNode) return;
 
-        // 閵嗘劒鎱ㄥ锝冣偓鎴滃▏閻?getPortPosition 娴犮儲鏁幐浣哥€惄鏉戝瀻鐢?
+        // Encoding cleanup: previous comment text was unreadable.
         const start = this.getPortPosition(connection.source, connection.sourcePort, true);
         const end = this.getPortPosition(connection.target, connection.targetPort, false);
 
@@ -1431,7 +1431,7 @@ class FlowCanvas {
             end.x, end.y
         );
 
-        // 閺嶈宓佹潻鐐村复閻樿埖鈧浇顔曠純顔界壉瀵?
+        // Encoding cleanup: previous comment text was unreadable.
         if (connection.status === 'active') {
             this.ctx.strokeStyle = '#34c759';
             this.ctx.shadowColor = 'rgba(46, 204, 113, 0.5)';
@@ -1450,7 +1450,7 @@ class FlowCanvas {
         this.ctx.stroke();
         this.ctx.restore();
 
-        // 缂佹ê鍩楅弫鐗堝祦濞翠礁濮╃划鎺戠摍閸斻劎鏁?
+        // Encoding cleanup: previous comment text was unreadable.
         if (connection.status === 'active' || connection.status === 'flowing') {
             this.drawFlowParticles(start.x, start.y, controlPoint1X, start.y,
                                    controlPoint2X, end.y, end.x, end.y, connection, dt);
@@ -1459,10 +1459,10 @@ class FlowCanvas {
     
     /**
      * 缂佹ê鍩楅弫鐗堝祦濞翠礁濮╃划鎺戠摍 - 闂冭埖顔岄崶娑橆杻瀵?
-     * @param {number} dt - 鐠烘繀绗傛稉鈧敮褏娈戝В顐ゎ潡閺佸府绱濋悽銊ょ艾閸╄桨绨弮鍫曟？閻ㄥ嫬閽╁鎴炲腹鏉?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     drawFlowParticles(startX, startY, cp1x, cp1y, cp2x, cp2y, endX, endY, connection, dt) {
-        // 鍒濆鍖栫矑瀛愮郴缁?
+        // Encoding cleanup: previous comment text was unreadable.
         if (!connection.particles) {
             connection.particles = [];
             for (let i = 0; i < 5; i++) {
@@ -1473,7 +1473,7 @@ class FlowCanvas {
             }
         }
 
-        // 缂傛挸鐡ㄧ划鎺戠摍閸欐垵鍘滅划鍓т紥閿涘牊瀵滆ぐ鎾冲 scale 閸欘亜鍨卞杞扮濞嗏槄绱?
+        // Encoding cleanup: previous comment text was unreadable.
         const spriteRadius = 6 * this.scale;
         const spriteKey = `particle_${spriteRadius.toFixed(1)}`;
         if (!this._particleSprite || this._particleSprite.key !== spriteKey) {
@@ -1492,14 +1492,14 @@ class FlowCanvas {
         }
 
         const sprite = this._particleSprite;
-        const timeScale = dt / 16; // 娴?60fps 娑撳搫鐔€閸戝棗缍婃稉鈧崠?
+        const timeScale = dt / 16; // Encoding cleanup: previous comment text was unreadable.
 
         connection.particles.forEach(particle => {
-            // 閵嗘劒鎱ㄦ径宥冣偓鎴濈唨娴?dt 閹恒劏绻橀敍宀勪缉閸忓秴鎶氶悳鍥ㄥ皾閸斻劌顕遍懛鎾偓鐔峰娑撳秴娼?
+            // Encoding cleanup: previous comment text was unreadable.
             particle.t += particle.speed * timeScale;
             if (particle.t > 1) particle.t = 0;
 
-            // 鐠侊紕鐣荤拹婵嗩敚鐏忔梹娲哥痪澶哥瑐閻ㄥ嫮鍋?
+            // Encoding cleanup: previous comment text was unreadable.
             const t = particle.t;
             const mt = 1 - t;
             const x = mt * mt * mt * startX +
@@ -1511,18 +1511,18 @@ class FlowCanvas {
                      3 * mt * t * t * cp2y +
                      t * t * t * endY;
 
-            // 缂佹ê鍩楃紓鎾崇摠閻ㄥ嫬褰傞崗澶岀煈鐎?
+            // Encoding cleanup: previous comment text was unreadable.
             this.ctx.drawImage(sprite.canvas, x - sprite.size / 2, y - sprite.size / 2, sprite.size, sprite.size);
         });
     }
 
     /**
-     * 缂佹ê鍩楅崷鍡氼潡閻晛鑸?
+     * Encoding cleanup: previous comment text was unreadable.
      * @param {number} x
      * @param {number} y
      * @param {number} w
      * @param {number} h
-     * @param {number|{tl?:number,tr?:number,bl?:number,br?:number}} r 閸楀﹤绶為敍灞藉讲缂佺喍绔存导鐘插弳閹存牗瀵滅憴鎺戝瀻閸掝偅瀵氱€?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     roundRect(x, y, w, h, r) {
         let tl;
@@ -1540,7 +1540,7 @@ class FlowCanvas {
             tl = tr = br = bl = 0;
         }
 
-        // 闂勬劕鍩楅崡濠傜窞閿涘矂妲诲?w/h 鏉堝啫鐨弮璺哄毉閻滈姘﹂崣?
+        // 闄愬埗鍗婂緞锛岄槻姝?w/h 杈冨皬鏃跺嚭鐜颁氦鍙?
         const maxR = Math.min(w, h) / 2;
         tl = Math.min(tl, maxR);
         tr = Math.min(tr, maxR);
@@ -1561,7 +1561,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鐠囬攱鐪伴柌宥囩帛閿涙碍鐖ｇ拋鎵暰鐢啩璐熼懘蹇ョ礉楠炴儼鐨熸惔锔跨濞?RAF閵?
+     * Encoding cleanup: previous comment text was unreadable.
      * Encoding cleanup: previous comment text was unreadable.
      */
     invalidate() {
@@ -1570,9 +1570,9 @@ class FlowCanvas {
     }
 
     /**
-     * 閸忕厧顔愰崗銉ュ經閿涙氨鐡戞禒铚傜艾 invalidate()閵?
      * Encoding cleanup: previous comment text was unreadable.
-     * 娴ｅ棔绗夐崘宥呭灡瀵ょ儤妫ら梽鎰儕閻滎垬鈧?
+     * Encoding cleanup: previous comment text was unreadable.
+     * Encoding cleanup: previous comment text was unreadable.
      */
     render() {
         this.invalidate();
@@ -1607,7 +1607,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鐟欏棗褰涚憗浣稿閿涙艾鍨介弬顓″Ν閻愯妲搁崥锕€婀ぐ鎾冲閸欘垵顫嬮崠鍝勭厵閸愬拑绱欓崥顐＄閻愬湱绱﹂崘璇х礆閵?
+     * Encoding cleanup: previous comment text was unreadable.
      * @private
      */
     _isNodeInViewport(node) {
@@ -1615,7 +1615,7 @@ class FlowCanvas {
         const vh = this._logicalHeight / this.scale;
         const vx = this.offset.x;
         const vy = this.offset.y;
-        // 閻?100px 缂傛挸鍟块敍宀勪缉閸忓秷绔熺紓妯款梿閸掑洨鐛婇崗鈧?
+        // Encoding cleanup: previous comment text was unreadable.
         return node.x + node.width >= vx - 100 && node.x <= vx + vw + 100 &&
                node.y + node.height >= vy - 100 && node.y <= vy + vh + 100;
     }
@@ -1631,7 +1631,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鐎圭偤妾紒妯哄煑娑撯偓鐢佲偓鍌氬枀鐎规碍妲搁崥锔炬埛缂?RAF 瀵邦亞骞嗛妴?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     _drawFrame(now) {
         this._animationFrameId = null;
@@ -1644,37 +1644,37 @@ class FlowCanvas {
         const dt = this._lastFrameTime > 0 ? Math.max(0, timestamp - this._lastFrameTime) : 16;
         this._lastFrameTime = timestamp;
 
-        // 濞撳懐鈹栭悽璇茬閿涘牓鈧槒绶崓蹇曠閿?
+        // Encoding cleanup: previous comment text was unreadable.
         this.ctx.clearRect(0, 0, this._logicalWidth, this._logicalHeight);
 
-        // 缂佹ê鍩楃純鎴炵壐
+        // 绘制网格
         this.drawGrid();
 
-        // 缂佹ê鍩楁潻鐐村复缁惧尅绱檇t 閻劋绨划鎺戠摍閸斻劎鏁鹃敍?
+        // 绘制连接线（dt 用于粒子动画）
         for (const conn of this.connections) {
             if (this._isConnectionVisible(conn)) {
                 this.drawConnection(conn, dt);
             }
         }
 
-        // 缂佹ê鍩楁稉瀛樻鏉╃偟鍤?
+        // 绘制临时连接线
         if (this.isConnecting) {
             this.drawTempConnection();
         }
 
-        // 缂佹ê鍩楅懞鍌滃仯閿涘牐顫嬮崣锝堫梿閸擃亷绱?
+        // 绘制可见节点
         for (const node of this.nodes.values()) {
             if (this._isNodeInViewport(node)) {
                 this.drawNode(node);
             }
         }
 
-        // 缂佹ê鍩楅幃顒€浠犵粩顖氬經妤傛ü瀵?
+        // Encoding cleanup: previous comment text was unreadable.
         if (this.hoveredPort && !this.isConnecting) {
             this.drawPortHighlight(this.hoveredPort);
         }
 
-        // 缂佹ê鍩楃亸蹇撴勾閸?
+        // Encoding cleanup: previous comment text was unreadable.
         this.drawMinimap();
 
         this._dirty = false;
@@ -1692,7 +1692,7 @@ class FlowCanvas {
      */
     normalizePortType(type) {
         if (!type) return 'Any';
-        // 婵″倹鐏夐崥搴ｎ伂娴肩姾绻冮弶銉ф畱閺勵垱鐏囨稉鐐殶鐎涙绱濋崚娆庣箽閹镐椒绗夐崣姗堢礉閸氬海顏?JsonStringEnumConverter 閸欘垯浜掔憴锝嗙€?
+        // Encoding cleanup: previous comment text was unreadable.
         if (typeof type === 'number') return type;
         
         const map = {
@@ -1717,11 +1717,11 @@ class FlowCanvas {
 
     /**
      * Encoding cleanup: previous comment text was unreadable.
-     * 閸氬海顏?Program.cs 闁板秶鐤?JsonNamingPolicy.CamelCase閿涘本澧嶆禒銉ョ箑妞よ濞囬悽銊ョ毈妞圭厧鍢?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     serialize() {
-        // 閵嗘劒鎱ㄦ径宥冣偓鎴濆帥绾喕绻氶幍鈧張澶庡Ν閻愬湱娈戠粩顖氬經闁姤婀佺粙鍐茬暰閻?ID
-        // 鏉╂瑦鐗?operators 閸?connections 闁垝绱版担璺ㄦ暏閻╃鎮撻惃?ID
+        // Encoding cleanup: previous comment text was unreadable.
+        // Encoding cleanup: previous comment text was unreadable.
         for (const node of this.nodes.values()) {
             if (node.inputs) {
                 for (const port of node.inputs) {
@@ -1747,14 +1747,14 @@ class FlowCanvas {
             x: node.x,
             y: node.y,
             inputPorts: (node.inputs || []).map(p => ({
-                id: p.id || p.Id || this.generateUUID(), // 閵嗘劒鎱ㄦ径宥冣偓鎴濇倱閺冭埖顥呴弻銉ャ亣鐏忓繐鍟?
+                id: p.id || p.Id || this.generateUUID(), // Encoding cleanup: previous comment text was unreadable.
                 name: p.name,
                 dataType: this.normalizePortType(p.type), // PortDataType enum
                 direction: 0, // Input
                 isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false)
             })),
             outputPorts: (node.outputs || []).map(p => ({
-                id: p.id || p.Id || this.generateUUID(), // 閵嗘劒鎱ㄦ径宥冣偓鎴濇倱閺冭埖顥呴弻銉ャ亣鐏忓繐鍟?
+                id: p.id || p.Id || this.generateUUID(), // Encoding cleanup: previous comment text was unreadable.
                 name: p.name,
                 dataType: this.normalizePortType(p.type),
                 direction: 1, // Output
@@ -1786,7 +1786,7 @@ class FlowCanvas {
 
         const connections = this.connections
             .filter(conn => {
-                // 鏉╁洦鎶ら幒澶嬫￥閺佸牏娈戞潻鐐村复閿涘澃ource 閹?target 娑撹櫣鈹栭妴涔絥defined 閹存牜鈹朑UID閿?
+                // Encoding cleanup: previous comment text was unreadable.
                 const isValidSource = conn.source && conn.source !== '00000000-0000-0000-0000-000000000000';
                 const isValidTarget = conn.target && conn.target !== '00000000-0000-0000-0000-000000000000';
                 if (!isValidSource || !isValidTarget) {
@@ -1798,7 +1798,7 @@ class FlowCanvas {
                 const sourceNode = this.nodes.get(conn.source);
                 const targetNode = this.nodes.get(conn.target);
 
-                // 閵嗘劒鎱ㄦ径宥冣偓鎴炲潑閸旂姷顏崣锝囧偍瀵洝绔熼悾灞绢梾閺屻儻绱濋獮璺烘倱閺冭埖顥呴弻?id/Id 鐏炵偞鈧?
+                // Encoding cleanup: previous comment text was unreadable.
                 let sourcePortId = null;
                 let targetPortId = null;
 
@@ -1840,9 +1840,9 @@ class FlowCanvas {
                     targetPortId: targetPortId
                 };
             })
-            .filter(conn => conn !== null); // 鏉╁洦鎶ら幒澶嬫￥閺佸牏娈戞潻鐐村复
+            .filter(conn => conn !== null); // 过滤掉无效的连接
 
-        // UpdateFlowRequest 閺堢喐婀滈惃鍕波閺?(camelCase 娴兼俺顫﹂崥搴ｎ伂閼奉亜濮╅弰鐘茬殸)
+        // Encoding cleanup: previous comment text was unreadable.
         const result = {
             operators: operators,
             connections: connections
@@ -1858,16 +1858,16 @@ class FlowCanvas {
     }
 
     /**
-     * 閸欏秴绨崚妤€瀵插ù浣衡柤閺佺増宓?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     deserialize(data) {
         if (!data) return;
         this.clear(true);
 
-        // 閺€顖涘瘮婢舵氨顫掑畵灞筋殰缂佹挻鐎?(閸氬海顏?DTO 閸欘垵鍏橀崠鍛邦棅閸?project.flow 娑?
+        // Encoding cleanup: previous comment text was unreadable.
         const flowData = data.project?.flow || data.flow || data;
 
-        // 婢跺嫮鎮婇崚妤勩€冪仦鐐粹偓?(妞圭厧鍢?鐢洘鏌夐崡?閺冄呭 nodes 闁?
+        // Encoding cleanup: previous comment text was unreadable.
         const operators = flowData.operators || flowData.Operators || flowData.nodes || [];
         const connections = flowData.connections || flowData.Connections || [];
 
@@ -1877,12 +1877,12 @@ class FlowCanvas {
 
         if (operators) {
             operators.forEach(op => {
-                // 闁倿鍘ら崥搴ｎ伂 DTO (PascalCase) 閹存牕澧犵粩?(camelCase)
+                // 閫傞厤鍚庣 DTO (PascalCase) 鎴栧墠绔?(camelCase)
                 const id = op.id ?? op.Id;
                 const type = this.normalizeOperatorType(op.type ?? op.Type);
                 const title = op.name ?? op.Name ?? op.title ?? type;
 
-                // 閵嗘劒鎱ㄦ径宥冣偓鎴炵垼閸戝棗瀵茬粩顖氬經閺佺増宓侀敍宀€绮烘稉鈧担璺ㄦ暏鐏忓繐鍟撶仦鐐粹偓褍鎮曢敍鍧昫/name/type閿?
+                // Encoding cleanup: previous comment text was unreadable.
                 const normalizePort = (p) => ({
                     id: p.id || p.Id || this.generateUUID(),
                     name: p.name || p.Name,
@@ -1958,7 +1958,7 @@ class FlowCanvas {
                     targetPort: targetPortIndex
                 };
             }).filter(conn => {
-                // 鏉╁洦鎶ら幒澶嬫￥閺佸牏娈戞潻鐐村复閿涘澃ource 閹?target 娑撹櫣鈹栭妴涔絥defined 閹存牜鈹朑UID閿?
+                // Encoding cleanup: previous comment text was unreadable.
                 const isValidSource = conn.source && conn.source !== '00000000-0000-0000-0000-000000000000';
                 const isValidTarget = conn.target && conn.target !== '00000000-0000-0000-0000-000000000000';
                 if (!isValidSource || !isValidTarget) {
@@ -1967,7 +1967,7 @@ class FlowCanvas {
                 return isValidSource && isValidTarget;
             });
 
-            // 閸欏秴绨崚妤€瀵查崥搴＄箑妞ゅ鍣稿楦跨箾缁捐法鍌ㄥ鏇礉閸氾箑鍨崥搴ｇ敾 O(1) 閺屻儴顕楁径杈ㄦ櫏
+            // 反序列化后必须重建连线索引，否则后续 O(1) 查询失效
             this._rebuildConnectionIndex();
         }
 
@@ -1976,21 +1976,21 @@ class FlowCanvas {
     }
 
     /**
-     * 缂佹ê鍩楃粩顖氬經妤傛ü瀵掗弫鍫熺亯
+     * 绘制端口高亮效果
      * @param {{nodeId: string, portIndex: number, isOutput: boolean, hasConnection: boolean}} port
      */
     drawPortHighlight(port) {
         const pos = this.getPortPosition(port.nodeId, port.portIndex, port.isOutput);
         if (!pos) return;
 
-        // 缂佹ê鍩楁妯瑰瘨閸﹀棛骞?
+        // Encoding cleanup: previous comment text was unreadable.
         this.ctx.beginPath();
         this.ctx.arc(pos.x, pos.y, 8 * this.scale, 0, Math.PI * 2);
         this.ctx.strokeStyle = port.isOutput ? '#1890ff' : '#52c41a';
         this.ctx.lineWidth = 2 * this.scale;
         this.ctx.stroke();
 
-        // 缂佹ê鍩楅崣鎴濆帨閺佸牊鐏?
+        // Encoding cleanup: previous comment text was unreadable.
         this.ctx.beginPath();
         this.ctx.arc(pos.x, pos.y, 12 * this.scale, 0, Math.PI * 2);
         this.ctx.fillStyle = port.isOutput
@@ -1998,12 +1998,12 @@ class FlowCanvas {
             : 'rgba(82, 196, 26, 0.2)';
         this.ctx.fill();
 
-        // 閵嗘劖鏌婃晶鐐偓鎴濐洤閺嬫粎顏崣锝呭嚒鏉╃偞甯撮敍宀€绮崚鑸垫焽瀵偓閹稿洨銇?
+        // Encoding cleanup: previous comment text was unreadable.
         if (port.hasConnection) {
-            // 缂佹ê鍩楃痪銏ｅ閾忔氨鍤庨崷鍡欏箚鐞涖劎銇氶崣顖涙焽瀵偓
+            // 绘制红色虚线圆环表示可断开
             this.ctx.beginPath();
             this.ctx.arc(pos.x, pos.y, 14 * this.scale, 0, Math.PI * 2);
-            this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.6)'; // 缁俱垼澹婇崡濠団偓蹇旀
+            this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.6)'; // 红色半透明
             this.ctx.lineWidth = 2 * this.scale;
             this.ctx.setLineDash([4 * this.scale, 2 * this.scale]);
             this.ctx.stroke();
@@ -2012,25 +2012,25 @@ class FlowCanvas {
     }
 
     /**
-     * 婢跺嫮鎮婃Η鐘崇垼閹稿绗?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     handleMouseDown(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) / this.scale + this.offset.x;
         const y = (e.clientY - rect.top) / this.scale + this.offset.y;
 
-        // 閺囧瓨鏌婃Η鐘崇垼娴ｅ秶鐤?
+        // Encoding cleanup: previous comment text was unreadable.
         this.mousePosition = { x, y };
 
-        // 妫ｆ牕鍘涘Λ鈧ù瀣Ц閸氾妇鍋ｉ崙璁崇啊缁旑垰褰?
+        // Encoding cleanup: previous comment text was unreadable.
         const port = this.getPortAt(x, y);
         if (port) {
             if (port.isOutput) {
-                // 閵嗘劖鏌婃晶鐐偓鎴烆梾閺屻儴绶崙铏诡伂閸欙絾妲搁崥锕€鍑￠張澶庣箾閹?
+                // Encoding cleanup: previous comment text was unreadable.
                 const existingConns = this.getConnectionsAtPort(port.nodeId, port.portIndex, true);
                 
                 if (existingConns.length > 0) {
-                    // 閺傤厼绱戠拠銉ь伂閸欙絿娈戦幍鈧張澶庣箾閹?
+                    // Encoding cleanup: previous comment text was unreadable.
                     existingConns.forEach(conn => {
                         this.removeConnection(conn.id);
                     });
@@ -2049,15 +2049,15 @@ class FlowCanvas {
                 }
                 return;
             } else if (this.isConnecting) {
-                // 娴犲氦绶崗銉ь伂閸欙絽鐣幋鎰箾缁?
+                // Encoding cleanup: previous comment text was unreadable.
                 this.finishConnection(port.nodeId, port.portIndex);
                 return;
             } else {
-                // 閵嗘劖鏌婃晶鐐偓鎴犲仯閸戞槒绶崗銉ь伂閸欙絾妞傚Λ鈧弻銉︽Ц閸氾箑鍑￠張澶庣箾閹?
+                // Encoding cleanup: previous comment text was unreadable.
                 const existingConn = this.getConnectionAtPort(port.nodeId, port.portIndex, false);
                 
                 if (existingConn) {
-                    // 閺傤厼绱戠拠銉ㄧ翻閸忋儳顏崣锝囨畱鏉╃偞甯?
+                    // Encoding cleanup: previous comment text was unreadable.
                     this.removeConnection(existingConn.id);
                     if (window.showToast) {
                         window.showToast('连接已断开', 'info');
@@ -2070,24 +2070,24 @@ class FlowCanvas {
             }
         }
 
-        // 婵″倹鐏夐崷銊ㄧ箾缁捐法濮搁幀浣风稻閻愮懓鍤禍鍡欌敄閻ц棄顦╅敍灞藉絿濞戝牐绻涚痪?
+        // 濡傛灉鍦ㄨ繛绾跨姸鎬佷絾鐐瑰嚮浜嗙┖鐧藉锛屽彇娑堣繛绾?
         if (this.isConnecting) {
             this.cancelConnection();
             return;
         }
 
-        // 閺屻儲澹橀悙鐟板毊閻ㄥ嫯濡悙?
+        // 鏌ユ壘鐐瑰嚮鐨勮妭鐐?
         for (const [id, node] of this.nodes) {
             if (x >= node.x && x <= node.x + node.width &&
                 y >= node.y && y <= node.y + node.height) {
                 this.selectedNode = id;
-                // 娴犲懎涔忛柨顔兼儙閸斻劏濡悙瑙勫珛閹锋枻绱濋柆鍨帳閸欐娊鏁懣婊冨礋閺堢喖妫跨憴锕€褰傞幇蹇擃樆閹锋牗瀚?
+                // Encoding cleanup: previous comment text was unreadable.
                 if (e.button === 0) {
                     this.draggedNode = id;
                     this.dragOffset = { x: x - node.x, y: y - node.y };
                 }
 
-                // 鐟欙箑褰傞懞鍌滃仯闁鑵戦崶鐐剁殶
+                // 触发节点选中回调
                 if (this.onNodeSelected) {
                     this.onNodeSelected(node);
                 }
@@ -2099,7 +2099,7 @@ class FlowCanvas {
 
         this.selectedNode = null;
 
-        // 鐟欙箑褰傞崣鏍ㄧХ闁鑵戦崶鐐剁殶
+        // 触发取消选中回调
         if (this.onNodeSelected) {
             this.onNodeSelected(null);
         }
@@ -2108,19 +2108,19 @@ class FlowCanvas {
     }
 
     /**
-     * 婢跺嫮鎮婇崣灞藉毊娴滃娆㈤敍鍫滃瘜鐟曚胶鏁ゆ禍搴＄摍閸ユ儳鐫嶅鈧粵澶愮彯缁狙傛唉娴滄帪绱?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     handleDoubleClick(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) / this.scale + this.offset.x;
         const y = (e.clientY - rect.top) / this.scale + this.offset.y;
 
-        // 閺屻儲澹橀崣灞藉毊閻ㄥ嫯濡悙?
+        // 鏌ユ壘鍙屽嚮鐨勮妭鐐?
         for (const [id, node] of this.nodes) {
             if (x >= node.x && x <= node.x + node.width &&
                 y >= node.y && y <= node.y + node.height) {
                 
-                // 瑙﹀彂鍙屽嚮浜嬩欢鍥炶皟
+                // 触发双击事件回调
                 if (this.onNodeDoubleClicked) {
                     this.onNodeDoubleClicked(node);
                 }
@@ -2130,7 +2130,7 @@ class FlowCanvas {
     }
 
     /**
-     * 婢跺嫮鎮婃Η鐘崇垼缁夎濮?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     handleMouseMove(e) {
         const rect = this.canvas.getBoundingClientRect();
@@ -2206,7 +2206,7 @@ class FlowCanvas {
     }
 
     /**
-     * 婢跺嫮鎮婂姘崇枂缂傗晜鏂?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     handleWheel(e) {
         e.preventDefault();
@@ -2220,7 +2220,7 @@ class FlowCanvas {
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
             
-            // 浠ラ紶鏍囦负涓績缂╂斁
+            // 以鼠标为中心缩放
             this.offset.x += mouseX / this.scale - mouseX / newScale;
             this.offset.y += mouseY / this.scale - mouseY / newScale;
             this.scale = newScale;
@@ -2230,17 +2230,17 @@ class FlowCanvas {
     }
 
     /**
-     * 濞撳懐鈹栭悽璇茬
+     * 清空画布
      */
     /**
-     * 濡偓濞村绱堕弽鍥︾秴缂冾喗妲搁崥锕€婀潻鐐村复缁惧じ绗?
      * Encoding cleanup: previous comment text was unreadable.
      * Encoding cleanup: previous comment text was unreadable.
-     * @param {Object} connection - 鏉╃偞甯寸痪鍨嚠鐠?
+     * Encoding cleanup: previous comment text was unreadable.
+     * Encoding cleanup: previous comment text was unreadable.
      * @returns {boolean}
      */
     isPointOnConnection(x, y, connection) {
-        // 娴ｈ法鏁?getPortPosition 閼惧嘲绶遍崙鍡欌€樼粩顖氬經娴ｅ秶鐤嗛敍宀冣偓灞肩瑝閺勵垳鏁ら懞鍌滃仯娑擃厼绺炬潻鎴滄妧
+        // Encoding cleanup: previous comment text was unreadable.
         const start = this.getPortPosition(connection.source, connection.sourcePort, true);
         const end = this.getPortPosition(connection.target, connection.targetPort, false);
 
@@ -2285,7 +2285,7 @@ class FlowCanvas {
      * @returns {Object|null}
      */
     getConnectionAt(x, y) {
-        // 閸婃帒绨柆宥呭坊閿涘奔绱崗鍫モ偓澶嬪閺堚偓娑撳﹪娼伴惃鍕箾閹恒儳鍤?
+        // Encoding cleanup: previous comment text was unreadable.
         for (let i = this.connections.length - 1; i >= 0; i--) {
             if (this.isPointOnConnection(x, y, this.connections[i])) {
                 return this.connections[i];
@@ -2295,10 +2295,10 @@ class FlowCanvas {
     }
 
     /**
-     * 婢跺嫮鎮婇崣鎶芥暛閼挎粌宕?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     /**
-     * 婢跺嫮鎮婇柨顔炬磸娴滃娆?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     handleKeyDown(e) {
         if (e.target.tagName === 'INPUT' ||
@@ -2345,11 +2345,11 @@ class FlowCanvas {
     }
 
     // ==========================================================================
-    // 闂冭埖顔岄崶娑橆杻瀵尨绱伴崣鎶芥暛閼挎粌宕熼崝鐔诲厴
+    // 阶段四增强：右键菜单功能
     // ==========================================================================
 
     /**
-     * 澶勭悊鍙抽敭鑿滃崟浜嬩欢
+     * 处理右键菜单事件
      */
     handleContextMenu(e) {
         e.preventDefault();
@@ -2389,7 +2389,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鏄剧ず鑺傜偣鍙抽敭鑿滃崟
+     * 显示节点右键菜单
      */
     showNodeContextMenu(x, y, nodeId) {
         this.hideContextMenu();
@@ -2471,7 +2471,7 @@ class FlowCanvas {
     }
 
     /**
-     * 濞撳懐鈹栭悽璇茬
+     * 清空画布
      */
     requestSelectionDelete(reason = 'unknown') {
         if (typeof this.onSelectionDeleteRequested === 'function') {
@@ -2541,7 +2541,7 @@ class FlowCanvas {
     }
 
     /**
-     * 鏉╂劘顢戦崡鏇氶嚋閼哄倻鍋?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     runNode(nodeId) {
         if (flowDebugEnabled()) {
@@ -2568,7 +2568,7 @@ class FlowCanvas {
     }
 
     /**
-     * 澶嶅埗鑺傜偣
+     * 复制节点
      */
     duplicateNode(nodeId) {
         const node = this.nodes.get(nodeId);
@@ -2594,14 +2594,14 @@ class FlowCanvas {
     }
 
     /**
-     * 閸掔娀娅庨懞鍌滃仯閿涘牆褰搁柨顔垮綅閸楁洖寮?API 閸忕厧顔愰崗銉ュ經閿涘鈧倸顫欓幍妯肩舶 removeNode 娴犮儰绻氶悾?_systemNode 娣囨繃濮㈡稉搴ｅ偍瀵洖鎮撳銉ｂ偓?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     deleteNode(nodeId) {
         return this.removeNode(nodeId);
     }
 
     /**
-     * 鍒囨崲鑺傜偣绂佺敤鐘舵€?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     toggleNodeDisabled(nodeId) {
         const node = this.nodes.get(nodeId);
@@ -2616,7 +2616,7 @@ class FlowCanvas {
     }
 
     /**
-     * 閺勫墽銇氶懞鍌滃仯鐢喖濮?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     showNodeHelp(node) {
         const metadata = window.operatorLibraryPanel?.metadataByType?.get?.(node.type)
@@ -2653,7 +2653,7 @@ class FlowCanvas {
     // ==========================================================================
 
     /**
-     * 閸掓繂顫愰崠鏍х毈閸︽澘娴?
+     * Encoding cleanup: previous comment text was unreadable.
      */
     initMinimap() {
         if (this.minimap) return;

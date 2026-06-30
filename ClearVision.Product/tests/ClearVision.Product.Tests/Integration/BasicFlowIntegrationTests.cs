@@ -37,9 +37,10 @@ public class BasicFlowIntegrationTests
         // 5. Assert - Blur
         blurResult.IsSuccess.Should().BeTrue();
         blurResult.OutputData.Should().ContainKey("Image");
+        var blurOutput = blurResult.OutputData!;
 
         // 6. Act - Threshold
-        var threshInputs = new Dictionary<string, object> { { "Image", blurResult.OutputData["Image"] } };
+        var threshInputs = new Dictionary<string, object> { { "Image", blurOutput["Image"] } };
         var threshResult = await threshExecutor.ExecuteAsync(threshOp, threshInputs, CancellationToken.None);
 
         // 7. Assert - Threshold

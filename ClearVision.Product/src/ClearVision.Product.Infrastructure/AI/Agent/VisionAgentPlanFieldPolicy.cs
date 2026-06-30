@@ -132,9 +132,9 @@ public static class VisionAgentPlanFieldPolicy
         {
             return (string.Empty, string.Empty);
         }
-        
+
         var clean = acceptance.Trim();
-        if (clean.Contains("OK:", StringComparison.OrdinalIgnoreCase) && 
+        if (clean.Contains("OK:", StringComparison.OrdinalIgnoreCase) &&
             clean.Contains("NG:", StringComparison.OrdinalIgnoreCase))
         {
             var okIdx = clean.IndexOf("OK:", StringComparison.OrdinalIgnoreCase);

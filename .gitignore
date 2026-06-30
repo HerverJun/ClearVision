@@ -124,6 +124,8 @@ docs/templates/temp.md
 test_zxing.cs
 tools/virtual-plc/modbus/.venv/
 tools/virtual-plc/modbus/.vendor/
+/.codex_tmp/
+/.tmp/
 /.tmp/localdeform-debug/
 /.tmp/dotnet-cli-home/
 /.tmp/dotnet-install.ps1

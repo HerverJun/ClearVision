@@ -1,6 +1,6 @@
+using System.Text.RegularExpressions;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI.Tools;
-using System.Text.RegularExpressions;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;
 

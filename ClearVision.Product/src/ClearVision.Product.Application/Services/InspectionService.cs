@@ -632,36 +632,36 @@ public class InspectionService : IInspectionService
             : await _projectSaveCoordinator.AcquireProjectAccessAsync(projectId);
         await using (access)
         {
-        if (HasExecutableFlow(flow))
-        {
-            _logger.LogInformation(
-                "[InspectionService] 使用前端提供的流程数据执行检测 (算子数: {OperatorCount})",
-                flow!.Operators.Count);
-            return (flow, null);
-        }
+            if (HasExecutableFlow(flow))
+            {
+                _logger.LogInformation(
+                    "[InspectionService] 使用前端提供的流程数据执行检测 (算子数: {OperatorCount})",
+                    flow!.Operators.Count);
+                return (flow, null);
+            }
 
-        var project = await _projectRepository.GetWithFlowAsync(projectId);
-        if (project == null)
-        {
-            throw new ProjectNotFoundException(projectId);
-        }
+            var project = await _projectRepository.GetWithFlowAsync(projectId);
+            if (project == null)
+            {
+                throw new ProjectNotFoundException(projectId);
+            }
 
-        var fileFlow = await LoadFlowFromStorageAsync(projectId);
-        if (HasExecutableFlow(project.Flow) && !HasExecutableFlow(fileFlow))
-        {
-            return (project.Flow, project.GlobalVariables);
-        }
+            var fileFlow = await LoadFlowFromStorageAsync(projectId);
+            if (HasExecutableFlow(project.Flow) && !HasExecutableFlow(fileFlow))
+            {
+                return (project.Flow, project.GlobalVariables);
+            }
 
-        if (HasExecutableFlow(fileFlow))
-        {
-            _logger.LogWarning(
-                "[InspectionService] 项目 {ProjectId} 数据库流程为空，已回退到 ProjectFlows 文件流程 (算子数: {OperatorCount})",
-                projectId,
-                fileFlow!.Operators.Count);
-            return (fileFlow!, project.GlobalVariables);
-        }
+            if (HasExecutableFlow(fileFlow))
+            {
+                _logger.LogWarning(
+                    "[InspectionService] 项目 {ProjectId} 数据库流程为空，已回退到 ProjectFlows 文件流程 (算子数: {OperatorCount})",
+                    projectId,
+                    fileFlow!.Operators.Count);
+                return (fileFlow!, project.GlobalVariables);
+            }
 
-        throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
+            throw new InvalidOperationException($"Project {projectId} does not contain an executable flow.");
         }
     }
 

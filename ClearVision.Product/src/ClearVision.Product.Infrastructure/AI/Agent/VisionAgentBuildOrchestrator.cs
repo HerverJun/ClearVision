@@ -1,5 +1,5 @@
-using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.AI.Tools;
+using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI.AgentRun;
 
 namespace ClearVision.Product.Infrastructure.AI.Agent;

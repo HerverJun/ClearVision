@@ -723,7 +723,7 @@ public class PreviewNodeEndpointsTests
             TargetNodeId = targetNodeId,
             InputImageBase64 = Convert.ToBase64String(new byte[] { 9, 9, 9 }),
             FlowData = CreateUpdateFlowRequest(
-                CreateOperatorDto(targetNodeId, "鍥惧儚閲囬泦", OperatorType.ImageAcquisition, outputPorts: [targetOutput]))
+                CreateOperatorDto(targetNodeId, "图像采集", OperatorType.ImageAcquisition, outputPorts: [targetOutput]))
         });
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
@@ -778,8 +778,9 @@ public class PreviewNodeEndpointsTests
 
         response.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
         capturedInput.Should().NotBeNull();
-        capturedInput!.Should().ContainKey("Image");
-        ((byte[])capturedInput["Image"]).Should().Equal(new byte[] { 7, 8, 9 });
+        var input = capturedInput!;
+        input.Should().ContainKey("Image");
+        ((byte[])input["Image"]).Should().Equal(new byte[] { 7, 8, 9 });
     }
 
     [Fact]

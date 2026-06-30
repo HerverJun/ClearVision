@@ -7,6 +7,7 @@ using ClearVision.Product.Infrastructure.Memory;
 using ClearVision.Product.Infrastructure.Operators;
 using ClearVision.Product.Infrastructure.PointCloud;
 using ClearVision.Product.Tests.Operators;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenCvSharp;
@@ -15,6 +16,7 @@ using PointCloudModel = ClearVision.Product.Infrastructure.PointCloud.PointCloud
 
 namespace ClearVision.Product.Tests.Integration;
 
+[Collection(PointCloudMatchingTestCollections.PointCloudMatching)]
 public sealed class Week11_PointCloudFlowIntegrationTests
 {
     [Fact]

@@ -163,39 +163,39 @@ public sealed class OperatorKnowledgeRetriever : IOperatorKnowledgeRetriever
             .Where(item => explicitlyRequestsPlatformNms || item.Type != OperatorType.BoxNms)
             .Take(takeCount)
             .Select(item => new OperatorKnowledgeCard
-        {
-            OperatorType = item.Type.ToString(),
-            DisplayName = item.DisplayName,
-            Category = item.Category,
-            Aliases = [item.DisplayName, item.Type.ToString()],
-            Inputs = item.InputPorts.Select(port => new OperatorKnowledgePort
             {
-                Name = port.Name,
-                DisplayName = port.DisplayName,
-                DataType = port.DataType.ToString(),
-                IsRequired = port.IsRequired,
-                Description = port.Description
-            }).ToList(),
-            Outputs = item.OutputPorts.Select(port => new OperatorKnowledgePort
-            {
-                Name = port.Name,
-                DisplayName = port.DisplayName,
-                DataType = port.DataType.ToString(),
-                IsRequired = port.IsRequired,
-                Description = port.Description
-            }).ToList(),
-            Parameters = item.Parameters.Select(parameter => new OperatorKnowledgeParameter
-            {
-                Name = parameter.Name,
-                DisplayName = parameter.DisplayName,
-                DataType = parameter.DataType,
-                Description = parameter.Description,
-                DefaultValue = parameter.DefaultValue?.ToString(),
-                MinValue = parameter.MinValue?.ToString(),
-                MaxValue = parameter.MaxValue?.ToString(),
-                IsRequired = parameter.IsRequired
-            }).ToList()
-        }).ToList();
+                OperatorType = item.Type.ToString(),
+                DisplayName = item.DisplayName,
+                Category = item.Category,
+                Aliases = [item.DisplayName, item.Type.ToString()],
+                Inputs = item.InputPorts.Select(port => new OperatorKnowledgePort
+                {
+                    Name = port.Name,
+                    DisplayName = port.DisplayName,
+                    DataType = port.DataType.ToString(),
+                    IsRequired = port.IsRequired,
+                    Description = port.Description
+                }).ToList(),
+                Outputs = item.OutputPorts.Select(port => new OperatorKnowledgePort
+                {
+                    Name = port.Name,
+                    DisplayName = port.DisplayName,
+                    DataType = port.DataType.ToString(),
+                    IsRequired = port.IsRequired,
+                    Description = port.Description
+                }).ToList(),
+                Parameters = item.Parameters.Select(parameter => new OperatorKnowledgeParameter
+                {
+                    Name = parameter.Name,
+                    DisplayName = parameter.DisplayName,
+                    DataType = parameter.DataType,
+                    Description = parameter.Description,
+                    DefaultValue = parameter.DefaultValue?.ToString(),
+                    MinValue = parameter.MinValue?.ToString(),
+                    MaxValue = parameter.MaxValue?.ToString(),
+                    IsRequired = parameter.IsRequired
+                }).ToList()
+            }).ToList();
 
         return new OperatorKnowledgeSlice
         {

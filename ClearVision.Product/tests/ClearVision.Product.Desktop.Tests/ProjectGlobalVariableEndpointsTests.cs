@@ -26,6 +26,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Desktop.Tests;
 
+[Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
 public sealed class ProjectGlobalVariableEndpointsTests
 {
     [Fact]

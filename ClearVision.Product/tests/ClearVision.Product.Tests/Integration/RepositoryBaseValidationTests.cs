@@ -1,6 +1,6 @@
+using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
-using ClearVision.Product.Application.Services;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Repositories;
 using ClearVision.Product.Infrastructure.Services;

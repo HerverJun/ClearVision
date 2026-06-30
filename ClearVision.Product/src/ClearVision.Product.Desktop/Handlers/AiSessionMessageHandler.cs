@@ -3,8 +3,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using ConversationSessionSummary = ClearVision.Product.Infrastructure.AI.ConversationSessionSummary;
 using ConversationSessionDeleteStatus = ClearVision.Product.Infrastructure.AI.ConversationSessionDeleteStatus;
+using ConversationSessionSummary = ClearVision.Product.Infrastructure.AI.ConversationSessionSummary;
 using IConversationalFlowService = ClearVision.Product.Infrastructure.AI.IConversationalFlowService;
 using MicrosoftLogger = Microsoft.Extensions.Logging.ILogger<ClearVision.Product.Desktop.Handlers.AiSessionMessageHandler>;
 

@@ -2,10 +2,10 @@
 // UpdateFlow命令
 // 作者：蘅芜君
 
+using AutoMapper;
 using ClearVision.Product.Application.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
-using AutoMapper;
 using MediatR;
 
 namespace ClearVision.Product.Application.Commands.Projects;

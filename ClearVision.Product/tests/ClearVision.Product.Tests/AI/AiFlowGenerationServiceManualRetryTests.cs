@@ -1,5 +1,5 @@
-using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Application.DTOs;
+using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Services;

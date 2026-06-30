@@ -1,5 +1,5 @@
-using FluentAssertions;
 using System.Runtime.CompilerServices;
+using FluentAssertions;
 
 namespace ClearVision.Product.Desktop.Tests;
 

@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -148,7 +148,7 @@ test('global variable drafts validate type, range, duplicate names and serialize
   const draft = store.createVariableDraft(null, 2);
   Object.assign(draft, {
     name: 'judge.expected_count',
-    displayName: '閲嶅鍚嶇О',
+    displayName: '重复名称',
     description: 'desc',
     valueType: 'Int64',
     initialValueText: '11',
@@ -173,7 +173,7 @@ test('global variable drafts validate type, range, duplicate names and serialize
   assert.equal(result.ok, true);
   assert.equal(result.variable.id, draft.id);
   assert.equal(result.variable.name, 'judge.actual_count');
-  assert.equal(result.variable.displayName, '閲嶅鍚嶇О');
+  assert.equal(result.variable.displayName, '重复名称');
   assert.equal(result.variable.description, 'desc');
   assert.equal(result.variable.valueType, 'Int64');
   assert.equal(result.variable.initialValue, '8');
@@ -426,7 +426,7 @@ test('global variable panel saves edited schema, keeps id and preserves dirty dr
     initialValueText: '6',
     minText: '0',
     maxText: '20',
-    displayName: '鐩爣鏁伴噺'
+    displayName: '目标数量'
   };
   panel.renderDialog = () => {};
   panel.render = () => {};
@@ -434,10 +434,10 @@ test('global variable panel saves edited schema, keeps id and preserves dirty dr
   const saved = await panel.save();
   assert.equal(saved, true);
   assert.equal(savedBodies[0].variables[0].id, 'var-count');
-  assert.equal(savedBodies[0].variables[0].displayName, '鐩爣鏁伴噺');
+  assert.equal(savedBodies[0].variables[0].displayName, '目标数量');
   assert.equal(savedBodies[0].variables[0].initialValue, '6');
   assert.equal(Object.hasOwn(savedBodies[0], 'flow'), false);
-  assert.equal(projectManager.currentProject.globalVariables.variables[0].displayName, '鐩爣鏁伴噺');
+  assert.equal(projectManager.currentProject.globalVariables.variables[0].displayName, '目标数量');
 
   global.fetch = async (url, options = {}) => {
     if (String(url).match(/\/projects\/[^/]+\/global-variables$/) && options.method === 'PUT') {
@@ -797,7 +797,7 @@ test('property panel binding control is Chinese, filters incompatible variables 
   project.globalVariables.variables.push({
     id: 'var-flag',
     name: 'judge.flag',
-    displayName: '鏍囧織',
+    displayName: '标志',
     valueType: 'Boolean',
     initialValue: false
   });
@@ -812,7 +812,7 @@ test('property panel binding control is Chinese, filters incompatible variables 
   assert.match(html, /参数来源/);
   assert.match(html, /固定值/);
   assert.match(html, /期望数量/);
-  assert.doesNotMatch(html, /鏍囧織/);
+  assert.doesNotMatch(html, /标志/);
 
   let externalSchema = null;
   serviceRegistry.register('globalVariablePanel', {

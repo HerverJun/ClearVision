@@ -8,9 +8,9 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Core.Operators;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using ClearVision.Product.Tests.Runtime;
 
 namespace ClearVision.Product.Tests.Operators;
 
@@ -200,9 +200,9 @@ public class PlcCommunicationOperatorBaseConcurrencyTests
         public ReconnectPolicy ReconnectPolicy { get; set; } = new();
         public IByteTransform ByteTransform { get; } = BigEndianTransform.Instance;
 
-        public event EventHandler<ConnectionEventArgs>? Connected;
-        public event EventHandler<DisconnectionEventArgs>? Disconnected;
-        public event EventHandler<PlcErrorEventArgs>? ErrorOccurred;
+        public event EventHandler<ConnectionEventArgs>? Connected { add { } remove { } }
+        public event EventHandler<DisconnectionEventArgs>? Disconnected { add { } remove { } }
+        public event EventHandler<PlcErrorEventArgs>? ErrorOccurred { add { } remove { } }
 
         public async Task<bool> ConnectAsync(CancellationToken ct = default)
         {

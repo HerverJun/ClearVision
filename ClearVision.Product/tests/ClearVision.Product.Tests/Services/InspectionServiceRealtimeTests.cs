@@ -7,13 +7,13 @@ using ClearVision.Product.Core.Services;
 using ClearVision.Product.Infrastructure.Events;
 using ClearVision.Product.Infrastructure.Metrics;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.Core;
-using ClearVision.Product.Tests.Runtime;
 
 namespace ClearVision.Product.Tests.Services;
 

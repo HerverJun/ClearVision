@@ -527,8 +527,9 @@ public class Phase42MeasurementAndSignalOperatorTests
         result.IsSuccess.Should().BeTrue();
         result.OutputData.Should().ContainKey("UnwrappedPhase");
         result.OutputData.Should().ContainKey("Quality");
+        var outputData = result.OutputData!;
 
-        using var unwrappedWrapper = result.OutputData["UnwrappedPhase"].Should().BeOfType<ImageWrapper>().Subject;
+        using var unwrappedWrapper = outputData["UnwrappedPhase"].Should().BeOfType<ImageWrapper>().Subject;
         using var unwrapped = unwrappedWrapper.GetMat();
 
         var mae = 0.0;
@@ -656,7 +657,7 @@ public class Phase42MeasurementAndSignalOperatorTests
 
             result.IsSuccess.Should().BeTrue();
             result.OutputData.Should().ContainKey("Image");
-            result.OutputData["Operation"].Should().Be(operation);
+            result.OutputData!["Operation"].Should().Be(operation);
         }
     }
 

@@ -1,7 +1,7 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Net;
 using ClearVision.Product.Contracts.Messages;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Infrastructure.AI.Runtime;
@@ -1422,7 +1422,7 @@ public sealed class VisionAgentPlanPromptComposer
         AppendSemanticContext(semanticContext, semantic);
         semanticContext.AppendLine("[maturity_summary]");
         AppendMaturityContext(semanticContext, ruleBaseline.RequirementMaturity);
-        
+
         semanticContext.AppendLine("[confirmed_plan_answers]");
         foreach (var answer in request.ConfirmedPlanAnswers ?? [])
         {

@@ -18,6 +18,7 @@ public class ProjectServiceTests
     [Fact]
     public async Task ListSearchAndRecent_ShouldSkipRecoveryRequiredProjectAndReturnHealthyProjects()
     {
+        var root = CreateTempPath();
         ProjectSaveCoordinator.ResetStaticStateForTests();
         try
         {
@@ -33,11 +34,10 @@ public class ProjectServiceTests
             repository.GetAllAsync().Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
             repository.SearchAsync("project").Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
             repository.GetRecentlyOpenedAsync(10).Returns(Task.FromResult<IEnumerable<Project>>([badProject, healthyProject]));
-            repository
-                .When(item => item.UpdateAsync(badProject))
-                .Do(_ => throw new InvalidOperationException("db failed"));
+            repository.UpdateAsync(Arg.Any<Project>()).Returns(Task.CompletedTask);
             storage.LoadFlowJsonAsync(Arg.Any<Guid>()).Returns(Task.FromResult<string?>(null));
-            var coordinator = new ProjectSaveCoordinator(repository, storage);
+            var failure = new ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint.AfterProjectApply, failAlways: true);
+            var coordinator = new ProjectSaveCoordinator(repository, storage, transactionRoot: root, failureInjector: failure);
             var service = new ProjectService(repository, storage, factory, null, null, coordinator);
             await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.SaveExistingProjectAsync(new ProjectSaveRequest(
                 badProject,
@@ -64,6 +64,7 @@ public class ProjectServiceTests
         finally
         {
             ProjectSaveCoordinator.ResetStaticStateForTests();
+            DeleteDirectoryIfExists(root);
         }
     }
 
@@ -549,6 +550,41 @@ public class ProjectServiceTests
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVision.ProjectServiceTests.VariableState", Guid.NewGuid().ToString("N"));
         return new RegistryScope(root);
+    }
+
+    private static string CreateTempPath() =>
+        Path.Combine(Path.GetTempPath(), "ClearVision.ProjectServiceTests", Guid.NewGuid().ToString("N"));
+
+    private static void DeleteDirectoryIfExists(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Directory.Delete(path, recursive: true);
+        }
+    }
+
+    private sealed class ThrowingProjectSaveFailureInjector : IProjectSaveFailureInjector
+    {
+        private readonly ProjectSaveFailurePoint _point;
+        private readonly bool _failAlways;
+        private bool _hasFailed;
+
+        public ThrowingProjectSaveFailureInjector(ProjectSaveFailurePoint point, bool failAlways)
+        {
+            _point = point;
+            _failAlways = failAlways;
+        }
+
+        public Task OnPointAsync(ProjectSaveFailurePoint point, ProjectSaveManifest manifest)
+        {
+            if (point == _point && (_failAlways || !_hasFailed))
+            {
+                _hasFailed = true;
+                throw new InvalidOperationException($"injected failure at {point}");
+            }
+
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RegistryScope : IDisposable

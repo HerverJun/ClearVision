@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using ClearVision.Product.Core.DTOs;
 using ClearVision.Product.Core.Services;
@@ -872,7 +872,7 @@ public static class AgentRunEndpoints
                 {
                     sessionId = request.SessionId,
                     metadataOnly = true
-            });
+                });
             object? persistenceWarning = null;
             VisionAgentWorkspaceSnapshot? finalWorkspaceSnapshot = null;
             ConversationPersistenceStatus? finalPersistenceStatus = null;
@@ -933,7 +933,7 @@ public static class AgentRunEndpoints
                     sessionId = request.SessionId,
                     error = ex.Message,
                     metadataOnly = true
-            });
+                });
             object? persistenceWarning = null;
             VisionAgentWorkspaceSnapshot? finalWorkspaceSnapshot = null;
             ConversationPersistenceStatus? finalPersistenceStatus = null;

@@ -1,5 +1,5 @@
-using System.Threading.Channels;
 using System.Text.Json;
+using System.Threading.Channels;
 using ClearVision.Product.Application.Analysis;
 using ClearVision.Product.Application.Services;
 using ClearVision.Product.Core.Cameras;
