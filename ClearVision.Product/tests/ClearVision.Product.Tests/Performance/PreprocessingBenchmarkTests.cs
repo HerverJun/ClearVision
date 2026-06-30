@@ -175,7 +175,7 @@ public class PreprocessingBenchmarkTests
 
     private static Mat LoadBenchmarkSample()
     {
-        var sample = Cv2.ImRead(
+        var sample = PreprocessingTestSupport.ReadImage(
             PreprocessingTestSupport.ResolveWorkspacePath("线序检测", "unnamed.jpg"),
             ImreadModes.Color);
         sample.Empty().Should().BeFalse();

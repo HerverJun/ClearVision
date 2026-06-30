@@ -222,8 +222,8 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
             return cached;
         }
 
-        // Load template image.
-        using var template = Cv2.ImRead(templatePath, ImreadModes.Color);
+        // Decode from bytes so Windows runners do not depend on the process ANSI code page for template paths.
+        using var template = ReadImage(templatePath, ImreadModes.Color);
         if (template.Empty())
             return null;
 
@@ -363,5 +363,18 @@ public abstract class FeatureMatchOperatorBase : OperatorBase
         using var stream = File.OpenRead(templatePath);
         var hash = SHA256.HashData(stream);
         return Convert.ToHexString(hash);
+    }
+
+    protected static Mat ReadImage(string path, ImreadModes mode)
+    {
+        var bytes = File.ReadAllBytes(path);
+        return Cv2.ImDecode(bytes, mode);
+    }
+
+    protected static string ToOpenCvOverlayText(string text)
+    {
+        return text.All(c => c >= 0x20 && c <= 0x7e)
+            ? text
+            : "See FailureReason";
     }
 }

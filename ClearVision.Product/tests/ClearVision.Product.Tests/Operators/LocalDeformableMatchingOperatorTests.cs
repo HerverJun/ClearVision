@@ -235,7 +235,7 @@ public class LocalDeformableMatchingOperatorTests
     public void ValidateParameters_WithInvalidMinScore_ShouldBeInvalid()
     {
         var op = new Operator("LocalDeformableMatching", OperatorType.LocalDeformableMatching, 0, 0);
-        op.Parameters.Add(TestHelpers.CreateParameter("MinMatchScore", -0.1)); // 鏃犳晥鍊?
+        op.Parameters.Add(TestHelpers.CreateParameter("MinMatchScore", -0.1)); // 无效值
 
         _operator.ValidateParameters(op).IsValid.Should().BeFalse();
     }
@@ -244,7 +244,7 @@ public class LocalDeformableMatchingOperatorTests
     public void ValidateParameters_WithInvalidPyramidLevels_ShouldBeInvalid()
     {
         var op = new Operator("LocalDeformableMatching", OperatorType.LocalDeformableMatching, 0, 0);
-        op.Parameters.Add(TestHelpers.CreateParameter("PyramidLevels", 0)); // 浣庝簬鏈€灏忓€?
+        op.Parameters.Add(TestHelpers.CreateParameter("PyramidLevels", 0)); // 低于最小值
 
         _operator.ValidateParameters(op).IsValid.Should().BeFalse();
     }
@@ -253,7 +253,7 @@ public class LocalDeformableMatchingOperatorTests
     public void ValidateParameters_WithTooHighPyramidLevels_ShouldBeInvalid()
     {
         var op = new Operator("LocalDeformableMatching", OperatorType.LocalDeformableMatching, 0, 0);
-        op.Parameters.Add(TestHelpers.CreateParameter("PyramidLevels", 10)); // 瓒呰繃鏈€澶у€?
+        op.Parameters.Add(TestHelpers.CreateParameter("PyramidLevels", 10)); // 超过最大值
 
         _operator.ValidateParameters(op).IsValid.Should().BeFalse();
     }

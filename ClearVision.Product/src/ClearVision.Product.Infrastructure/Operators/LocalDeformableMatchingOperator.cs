@@ -100,7 +100,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
         var nmsThreshold = GetDoubleParam(@operator, "NmsThreshold", 0.35, 0.0, 1.0);
         var parallelCandidates = GetBoolParam(@operator, "ParallelCandidates", true);
 
-        // 鑾峰彇鍥惧儚
+        // 获取图像
         if (!TryGetInputImage(inputs, "Image", out var imageWrapper) || imageWrapper == null)
         {
             return Task.FromResult(OperatorExecutionOutput.Failure("Input image is required."));
@@ -677,7 +677,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
                     Cv2.CvtColor(currentImage, gray, ColorConversionCodes.BGR2GRAY);
                 }
 
-                // 鎻愬彇鐗瑰緛
+                // 提取特征
                 using var orb = ORB.Create(1000, 1.2f, 8);
                 KeyPoint[] keypoints;
                 var descriptors = new Mat();
@@ -744,7 +744,7 @@ public class LocalDeformableMatchingOperator : OperatorBase
             {
                 var px = (float)(x * stepX);
                 var py = (float)(y * stepY);
-                // 杈圭晫澶勭悊
+                // 边界处理
                 if (x == gridSize - 1)
                     px = width;
                 if (y == gridSize - 1)
