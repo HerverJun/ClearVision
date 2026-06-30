@@ -614,6 +614,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -639,7 +641,13 @@ jobs:
 
       - name: Diff Hygiene
         shell: pwsh
-        run: '& "./scripts/check-diff-hygiene.ps1" -BaseRef "${{ github.event.pull_request.base.sha }}"'
+        run: |
+          $baseRef = if ("${{ github.event_name }}" -eq "pull_request") {
+            "${{ github.event.pull_request.base.sha }}"
+          } else {
+            "origin/main"
+          }
+          & "./scripts/check-diff-hygiene.ps1" -BaseRef $baseRef
 
       - name: Run Static Analysis
         run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore -warnaserror
