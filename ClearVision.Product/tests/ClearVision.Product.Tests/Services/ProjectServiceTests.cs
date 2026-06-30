@@ -13,6 +13,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.Services;
 
+[Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
 public class ProjectServiceTests
 {
     [Fact]

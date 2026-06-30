@@ -4,6 +4,7 @@ using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Repositories;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ using NSubstitute;
 
 namespace ClearVision.Product.Tests.Integration;
 
+[Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
 public sealed class RepositoryBaseValidationTests : IDisposable
 {
     private readonly SqliteConnection _connection;

@@ -9,10 +9,12 @@ using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Interfaces;
 using ClearVision.Product.Core.ProjectVariables;
 using ClearVision.Product.Infrastructure.Services;
+using ClearVision.Product.Tests.TestSupport;
 using FluentAssertions;
 
 namespace ClearVision.Product.Tests.Services;
 
+[Collection(ProjectSaveCoordinatorTestCollections.ProjectSaveCoordinatorState)]
 public sealed class ProjectSaveCoordinatorTests
 {
     [Fact]

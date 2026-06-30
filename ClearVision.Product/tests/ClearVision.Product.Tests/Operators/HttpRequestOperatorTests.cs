@@ -5,12 +5,14 @@ using System.Text;
 using ClearVision.Product.Core.Entities;
 using ClearVision.Product.Core.Enums;
 using ClearVision.Product.Infrastructure.Operators;
+using ClearVision.Product.Tests.Runtime;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace ClearVision.Product.Tests.Operators;
 
+[Collection(RuntimeConcurrencyCollection.Name)]
 public class HttpRequestOperatorTests
 {
     private readonly HttpRequestOperator _operator;
@@ -64,7 +66,7 @@ public class HttpRequestOperatorTests
 
         var request = await serverTask.WaitAsync(TimeSpan.FromSeconds(10));
 
-        result.IsSuccess.Should().BeTrue();
+        result.IsSuccess.Should().BeTrue("operator returned {0}", result.ErrorMessage);
         result.OutputData.Should().NotBeNull();
         result.OutputData!["StatusCode"].Should().Be(200);
         result.OutputData["IsSuccess"].Should().Be(true);
