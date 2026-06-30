@@ -112,6 +112,11 @@ static class Program
                 .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
+            if (_host == null)
+            {
+                return;
+            }
+
             var mainForm = new MainForm();
             System.Windows.Forms.Application.Run(mainForm);
 
@@ -119,7 +124,11 @@ static class Program
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Application Error: {ex}");
+            MessageBox.Show(
+                $"ClearVision 启动失败，已退出：{ex.Message}",
+                "ClearVision 启动失败",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
         finally
         {
@@ -233,9 +242,7 @@ static class Program
 
     static void StartWebServer()
     {
-        try
-        {
-            var builder = WebApplication.CreateBuilder();
+        var builder = WebApplication.CreateBuilder();
             builder.Configuration.AddJsonFile(
                 StationSettingsPaths.GetStudioCommunicationSettingsPath(),
                 optional: true,
@@ -255,8 +262,8 @@ static class Program
             var ingressListenMode = ResolveStationIngressListenMode(stationIngressOptions);
             _webPort = ResolveWebPort(stationIngressOptions);
 
-            builder.Services.AddVisionServices(builder.Configuration);
             builder.Services.AddAiFlowGeneration(builder.Configuration);
+            builder.Services.AddVisionServices(builder.Configuration);
             builder.Services.AddOpenTelemetry()
                 .ConfigureResource(resource => resource
                     .AddService(
@@ -377,12 +384,7 @@ static class Program
             app.StartAsync().GetAwaiter().GetResult();
             _host = app;
 
-            Debug.WriteLine($"Web服务器已启动: http://localhost:{_webPort}");
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"启动Web服务器失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
+        Debug.WriteLine($"Web服务器已启动: http://localhost:{_webPort}");
     }
 
     private static void InitializeVisionDatabase(IServiceProvider services)

@@ -995,6 +995,9 @@ public static class AgentRunEndpoints
     {
         return new
         {
+            runKind = request.BuildFromPlan == null
+                ? VisionAgentRunKindResolver.Unknown
+                : VisionAgentRunKindResolver.Build,
             mode = request.Mode ?? request.BuildFromPlan?.BuildIntent ?? "auto",
             useVisionAgentGenerateFlow = request.UseVisionAgentGenerateFlow ?? true,
             agentGenerateFlowMode = request.AgentGenerateFlowMode ?? AiAgentGenerateFlowModes.Scripted,
@@ -1013,6 +1016,7 @@ public static class AgentRunEndpoints
     {
         return new
         {
+            runKind = VisionAgentRunKindResolver.Plan,
             mode = "plan",
             sessionId = request.SessionId,
             hasCurrentFlowSnapshot = !string.IsNullOrWhiteSpace(request.CurrentFlowSnapshot),

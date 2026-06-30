@@ -15,7 +15,8 @@ public enum VisionAgentBuildProjectionBeginStatus
 {
     Started,
     AlreadyProjected,
-    InProgress
+    InProgress,
+    MetadataConflict
 }
 
 public sealed record VisionAgentBuildProjectionBeginResult(
@@ -65,6 +66,11 @@ public interface IVisionAgentBuildProjectionJournal
         long? expectedWorkspaceRevision = null,
         string identity = "",
         string hostInstanceId = "");
+
+    VisionAgentBuildProjectionCheckpoint? TryGetLatest(
+        string runId,
+        long terminalSequence,
+        string terminalType);
 
     void MarkProjected(
         string runId,
@@ -146,6 +152,20 @@ public sealed class VisionAgentBuildProjectionJournal : IVisionAgentBuildProject
                 sessionId = boundSessionId;
             }
 
+            if (_latestByProjectionKey.TryGetValue(projectionKey, out var latestForMetadata) &&
+                HasMetadataConflict(
+                    latestForMetadata,
+                    sessionId,
+                    terminalMutationId,
+                    payloadFingerprint,
+                    expectedWorkspaceRevision,
+                    identity))
+            {
+                return new VisionAgentBuildProjectionBeginResult(
+                    VisionAgentBuildProjectionBeginStatus.MetadataConflict,
+                    latestForMetadata);
+            }
+
             if (_latestByProjectionKey.TryGetValue(projectionKey, out var latest) &&
                 string.Equals(latest.Status, VisionAgentBuildProjectionStatuses.Projected, StringComparison.OrdinalIgnoreCase))
             {
@@ -184,6 +204,27 @@ public sealed class VisionAgentBuildProjectionJournal : IVisionAgentBuildProject
             return new VisionAgentBuildProjectionBeginResult(
                 VisionAgentBuildProjectionBeginStatus.Started,
                 checkpoint);
+        }
+    }
+
+    public VisionAgentBuildProjectionCheckpoint? TryGetLatest(
+        string runId,
+        long terminalSequence,
+        string terminalType)
+    {
+        var terminalKey = TerminalKey(runId, terminalSequence, terminalType);
+        lock (_gate)
+        {
+            if (!_sessionByTerminalKey.TryGetValue(terminalKey, out var sessionId))
+            {
+                return null;
+            }
+
+            return _latestByProjectionKey.TryGetValue(
+                ProjectionKey(runId, sessionId, terminalSequence, terminalType),
+                out var latest)
+                ? latest
+                : null;
         }
     }
 
@@ -375,5 +416,31 @@ public sealed class VisionAgentBuildProjectionJournal : IVisionAgentBuildProject
         string terminalType)
     {
         return $"{runId.Trim()}:{terminalSequence}:{terminalType.Trim()}";
+    }
+
+    private static bool HasMetadataConflict(
+        VisionAgentBuildProjectionCheckpoint latest,
+        string sessionId,
+        string terminalMutationId,
+        string payloadFingerprint,
+        long? expectedWorkspaceRevision,
+        string identity)
+    {
+        return IsDifferent(latest.SessionId, sessionId) ||
+               IsDifferent(latest.TerminalMutationId, terminalMutationId) ||
+               IsDifferent(latest.PayloadFingerprint, payloadFingerprint) ||
+               IsDifferent(latest.Identity, identity) ||
+               (latest.ExpectedWorkspaceRevision.HasValue &&
+                expectedWorkspaceRevision.HasValue &&
+                latest.ExpectedWorkspaceRevision.Value != expectedWorkspaceRevision.Value);
+    }
+
+    private static bool IsDifferent(string existing, string candidate)
+    {
+        var normalizedExisting = existing?.Trim() ?? string.Empty;
+        var normalizedCandidate = candidate?.Trim() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(normalizedExisting) &&
+               !string.IsNullOrWhiteSpace(normalizedCandidate) &&
+               !string.Equals(normalizedExisting, normalizedCandidate, StringComparison.Ordinal);
     }
 }

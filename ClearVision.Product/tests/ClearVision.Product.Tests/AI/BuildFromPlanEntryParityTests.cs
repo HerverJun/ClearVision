@@ -198,15 +198,37 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
     public async Task StartupReconciliation_ShouldProjectUnfinishedTerminalOnce()
     {
         using var harness = CreateHarness();
-        var run = harness.Stream.CreateRun("startup recovery", new { sessionId = "session-startup", metadataOnly = true });
+        var run = harness.Stream.CreateRun("startup recovery", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId = "session-startup",
+            metadataOnly = true
+        });
         var request = BuildRequest(BuildPlan()) with
         {
             AgentRunId = run.RunId,
             SessionId = "session-startup"
         };
+        var association = harness.RunService.PrepareBuildAssociation(
+            BuildCommand.FromGenerationRequest(
+                request,
+                run.RunId,
+                $"req-{run.RunId}",
+                BuildCommandTransports.AgentRun,
+                persistResult: false));
+        association.Success.Should().BeTrue();
+        var associationRevision = association.Revision;
+        var submittedFingerprint = association.Snapshot!.SubmittedBuildFingerprint;
         var result = SuccessResult(request);
         harness.Stream.Complete(run.RunId, "done", new
         {
+            runKind = VisionAgentRunKindResolver.Build,
+            associationWorkspaceRevision = associationRevision,
+            submittedBuildFingerprint = submittedFingerprint,
+            planId = request.BuildFromPlan!.PlanId,
+            planHash = request.BuildFromPlan.PlanHash,
+            answerSetFingerprint = result.BuildResult!.AnswerSetFingerprint,
+            buildIdentity = $"{request.BuildFromPlan.PlanId}:{request.BuildFromPlan.PlanHash}:{result.BuildResult.AnswerSetFingerprint}:{submittedFingerprint}",
             status = result.CompletionStatus,
             sessionId = request.SessionId,
             flow = result.Flow,
@@ -214,7 +236,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             buildReadiness = result.BuildReadiness,
             metadataOnly = true
         }).Should().NotBeNull();
-        harness.Conversation.GetSession("session-startup").Should().BeNull();
+        harness.Conversation.GetSession("session-startup")!.History.Should().BeEmpty();
 
         var services = new ServiceCollection();
         services.AddSingleton<IVisionAgentBuildTerminalProjector>(
@@ -236,6 +258,7 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         checkpoint.TerminalMutationId.Should().StartWith("build-terminal:build:");
         checkpoint.PayloadFingerprint.Should().StartWith("sha256:");
         checkpoint.Identity.Should().NotBeNullOrWhiteSpace();
+        checkpoint.ExpectedWorkspaceRevision.Should().Be(associationRevision);
         await reconciler.ReconcileAsync(CancellationToken.None);
 
         harness.Conversation.GetSession("session-startup")!.History.Should().HaveCount(1);
@@ -243,6 +266,94 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
             .Single(item => item.RunId == run.RunId)
             .Status.Should()
             .Be(VisionAgentBuildProjectionStatuses.Projected);
+    }
+
+    [Fact]
+    public async Task StartupReconciliation_ShouldNotProjectPlanTerminalAsBuild()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("plan terminal", new
+        {
+            runKind = VisionAgentRunKindResolver.Plan,
+            mode = "plan",
+            sessionId = "session-plan-terminal",
+            metadataOnly = true
+        });
+        harness.Stream.Append(run.RunId, new AgentRunEventDraft
+        {
+            EventType = AgentRunEventTypes.PlanCompleted,
+            Stage = "plan",
+            Title = "Plan ready",
+            Summary = "Plan completed.",
+            Status = AgentRunEventStatuses.Completed,
+            Payload = new
+            {
+                sessionId = "session-plan-terminal",
+                planResult = BuildPlan(),
+                metadataOnly = true
+            }
+        });
+        harness.Stream.Complete(run.RunId, "plan done", new
+        {
+            runKind = VisionAgentRunKindResolver.Plan,
+            mode = "plan",
+            sessionId = "session-plan-terminal",
+            metadataOnly = true
+        }).Should().NotBeNull();
+
+        await CreateBuildReconciler(harness).ReconcileAsync(CancellationToken.None);
+
+        harness.Conversation.GetSession("session-plan-terminal").Should().BeNull();
+        harness.Journal.LoadCheckpoints().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task StartupReconciliation_BuildTerminalMissingBasis_ShouldWriteConflictOnceWithoutProjection()
+    {
+        using var harness = CreateHarness();
+        var run = harness.Stream.CreateRun("missing basis", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            sessionId = "session-missing-basis",
+            metadataOnly = true
+        });
+        var request = BuildRequest(BuildPlan()) with
+        {
+            AgentRunId = run.RunId,
+            SessionId = "session-missing-basis"
+        };
+        harness.RunService.PrepareBuildAssociation(
+            BuildCommand.FromGenerationRequest(
+                request,
+                run.RunId,
+                $"req-{run.RunId}",
+                BuildCommandTransports.AgentRun,
+                persistResult: false)).Success.Should().BeTrue();
+        var result = SuccessResult(request);
+        harness.Stream.Complete(run.RunId, "done", new
+        {
+            runKind = VisionAgentRunKindResolver.Build,
+            status = result.CompletionStatus,
+            sessionId = request.SessionId,
+            flow = result.Flow,
+            buildResult = result.BuildResult,
+            buildReadiness = result.BuildReadiness,
+            metadataOnly = true
+        }).Should().NotBeNull();
+
+        var reconciler = CreateBuildReconciler(harness);
+        await reconciler.ReconcileAsync(CancellationToken.None);
+        var session = harness.Conversation.GetSession("session-missing-basis")!;
+        var revision = session.WorkspaceSnapshot!.Revision;
+
+        session.History.Should().BeEmpty();
+        session.WorkspaceSnapshot.LifecycleState.Should().Be("recovery_conflict");
+        harness.Journal.LoadCheckpoints().Should().BeEmpty();
+
+        await reconciler.ReconcileAsync(CancellationToken.None);
+
+        harness.Conversation.GetSession("session-missing-basis")!.WorkspaceSnapshot!.Revision.Should().Be(revision);
+        harness.Conversation.GetSession("session-missing-basis")!.History.Should().BeEmpty();
     }
 
     [Fact]
@@ -469,6 +580,36 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         checkpoint.PublicErrorMessage.Should().Be("public failure");
     }
 
+    [Fact]
+    public void JournalBegin_WhenCheckpointMetadataDrifts_ShouldReturnMetadataConflict()
+    {
+        using var harness = CreateHarness();
+        harness.Journal.Begin(
+            "ar_metadata",
+            "session-metadata",
+            4,
+            AgentRunEventTypes.RunCompleted,
+            "mutation:first",
+            "sha256:first",
+            10,
+            "identity:first").Status.Should().Be(VisionAgentBuildProjectionBeginStatus.Started);
+
+        var conflict = harness.Journal.Begin(
+            "ar_metadata",
+            "session-metadata",
+            4,
+            AgentRunEventTypes.RunCompleted,
+            "mutation:first",
+            "sha256:second",
+            10,
+            "identity:first");
+
+        conflict.Status.Should().Be(VisionAgentBuildProjectionBeginStatus.MetadataConflict);
+        conflict.Checkpoint!.PayloadFingerprint.Should().Be("sha256:first");
+        harness.Journal.LoadCheckpoints().Single(item => item.RunId == "ar_metadata")
+            .PayloadFingerprint.Should().Be("sha256:first");
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_tempRoot))
@@ -510,12 +651,29 @@ public sealed class BuildFromPlanEntryParityTests : IDisposable
         return new BuildHarness(directory, redactor, store, stream, journal, conversation, projector, runService);
     }
 
+    private static VisionAgentBuildProjectionReconciliationService CreateBuildReconciler(BuildHarness harness)
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IVisionAgentBuildTerminalProjector>(
+            new VisionAgentBuildTerminalProjector(
+                harness.Conversation,
+                harness.Journal,
+                Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildTerminalProjector>>()));
+        var provider = services.BuildServiceProvider();
+        return new VisionAgentBuildProjectionReconciliationService(
+            harness.Store,
+            new AgentRunEventStreamService(harness.Store, harness.Redactor),
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            Substitute.For<Microsoft.Extensions.Logging.ILogger<VisionAgentBuildProjectionReconciliationService>>());
+    }
+
     private static async Task<EntryResult> RunAgentRunEntryAsync(
         BuildHarness harness,
         AiFlowGenerationRequest request)
     {
         var create = harness.Stream.CreateRun(request.Description, new
         {
+            runKind = VisionAgentRunKindResolver.Build,
             sessionId = request.SessionId,
             planId = request.BuildFromPlan?.PlanId ?? string.Empty,
             planHash = request.BuildFromPlan?.PlanHash ?? request.BuildFromPlan?.PlanSnapshot?.PlanHash ?? string.Empty,

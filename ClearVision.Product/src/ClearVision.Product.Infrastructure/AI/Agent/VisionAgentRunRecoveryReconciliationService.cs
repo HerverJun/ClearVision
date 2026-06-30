@@ -32,32 +32,33 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
 
     public Task ReconcileAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            var runIds = _eventStore.LoadSummaries()
-                .Select(summary => summary.RunId)
-                .Concat(_eventStore.LoadEvents().Select(evt => evt.RunId))
-                .Where(runId => !string.IsNullOrWhiteSpace(runId))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(runId => runId, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+        var runIds = _eventStore.LoadSummaries()
+            .Select(summary => summary.RunId)
+            .Concat(_eventStore.LoadEvents().Select(evt => evt.RunId))
+            .Where(runId => !string.IsNullOrWhiteSpace(runId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(runId => runId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-            foreach (var runId in runIds)
+        foreach (var runId in runIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 ReconcileRun(runId);
             }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            // Host shutdown.
-        }
-        catch (Exception ex)
-        {
-            Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
-                _logger,
-                ex,
-                "Vision Agent startup recovery reconciliation failed.");
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
+                    _logger,
+                    ex,
+                    "Vision Agent startup recovery skipped a bad run record. RunId={RunId}",
+                    runId);
+            }
         }
 
         return Task.CompletedTask;
@@ -75,7 +76,13 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
             .OrderBy(evt => evt.Sequence)
             .LastOrDefault(IsRunTerminalEvent);
         var intent = replay.Summary.TerminalIntent;
-        var runType = FirstNonBlank(intent?.RunType, InferRunType(replay));
+        var runKind = VisionAgentRunKindResolver.Resolve(replay);
+        if (runKind == VisionAgentRunKind.Unknown)
+        {
+            return;
+        }
+
+        var runType = VisionAgentRunKindResolver.ToWireValue(runKind);
         var sessionId = FirstNonBlank(
             intent?.SessionId,
             ResolveSessionIdFromEvents(replay),
@@ -496,21 +503,6 @@ public sealed class VisionAgentRunRecoveryReconciliationService : IHostedService
         }
 
         return string.Empty;
-    }
-
-    private static string InferRunType(AgentRunReplayResult replay)
-    {
-        if (replay.Events.Any(evt =>
-                string.Equals(evt.EventType, AgentRunEventTypes.PlanCreated, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(evt.EventType, AgentRunEventTypes.PlanStarted, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(evt.EventType, AgentRunEventTypes.PlanCompleted, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(evt.EventType, AgentRunEventTypes.PlanCancelled, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(evt.EventType, AgentRunEventTypes.PlanFailed, StringComparison.OrdinalIgnoreCase)))
-        {
-            return "plan";
-        }
-
-        return "build";
     }
 
     private static AgentRunEvent? FindPlanEvidenceEvent(AgentRunReplayResult replay, string? status)

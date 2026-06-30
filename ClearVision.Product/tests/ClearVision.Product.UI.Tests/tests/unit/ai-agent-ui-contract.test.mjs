@@ -9347,7 +9347,12 @@ test('repository naming guard blocks legacy package names and NuGet package arti
       continue;
     }
 
-    const text = fs.readFileSync(path.resolve(repoRoot, file), 'utf8');
+    const absolutePath = path.resolve(repoRoot, file);
+    if (!fs.existsSync(absolutePath)) {
+      continue;
+    }
+
+    const text = fs.readFileSync(absolutePath, 'utf8');
     for (const fragment of forbiddenFragments) {
       if (text.includes(fragment)) {
         legacyHits.push(`${file}: ${fragment}`);

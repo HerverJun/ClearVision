@@ -1,4 +1,6 @@
 using ClearVision.Product.Core.Services;
+using ClearVision.Product.Infrastructure.AI;
+using ClearVision.Product.Infrastructure.AI.Agent;
 using ClearVision.Product.Infrastructure.Data;
 using ClearVision.Product.Infrastructure.Services;
 using FluentAssertions;
@@ -72,6 +74,28 @@ public class DependencyInjectionTests
     }
 
     [Fact]
+    public void DesktopServiceRegistration_ShouldStartVisionAgentRecoveryBeforeOtherHostedServices()
+    {
+        var services = CreateServiceCollection();
+        var configuration = new ConfigurationBuilder().Build();
+
+        services.AddAiFlowGeneration(configuration);
+        services.AddVisionServices(configuration);
+
+        var hostedTypes = services
+            .Where(descriptor => descriptor.ServiceType == typeof(IHostedService))
+            .Select(HostedServiceTypeName)
+            .ToList();
+        var runRecoveryIndex = hostedTypes.IndexOf(typeof(VisionAgentRunRecoveryReconciliationService).FullName!);
+        var buildRecoveryIndex = hostedTypes.IndexOf(typeof(VisionAgentBuildProjectionReconciliationService).FullName!);
+        var projectRecoveryIndex = hostedTypes.IndexOf(typeof(ProjectSaveRecoveryHostedService).FullName!);
+
+        runRecoveryIndex.Should().BeGreaterThanOrEqualTo(0);
+        buildRecoveryIndex.Should().BeGreaterThan(runRecoveryIndex);
+        projectRecoveryIndex.Should().BeGreaterThan(buildRecoveryIndex);
+    }
+
+    [Fact]
     public void ResolveVisionDatabasePath_MigratesMostRecentLegacyDatabase_ToDefaultLocation()
     {
         var root = Path.Combine(Path.GetTempPath(), "ClearVisionTests", Guid.NewGuid().ToString("N"));
@@ -108,5 +132,17 @@ public class DependencyInjectionTests
         services.AddLogging();
         services.AddSingleton(lifetime);
         return services;
+    }
+
+    private static string HostedServiceTypeName(ServiceDescriptor descriptor)
+    {
+        if (descriptor.ImplementationType != null)
+        {
+            return descriptor.ImplementationType.FullName ?? descriptor.ImplementationType.Name;
+        }
+
+        return descriptor.ImplementationInstance?.GetType().FullName ??
+               descriptor.ImplementationFactory?.Method.ReturnType.FullName ??
+               string.Empty;
     }
 }

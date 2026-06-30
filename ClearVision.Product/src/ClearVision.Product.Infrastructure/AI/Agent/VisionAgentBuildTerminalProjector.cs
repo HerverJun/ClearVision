@@ -13,7 +13,8 @@ public sealed record VisionAgentBuildTerminalProjection(
     string Transport,
     AiFlowGenerationRequest Request,
     AiFlowGenerationResult Result,
-    AgentRunEvent TerminalEvent);
+    AgentRunEvent TerminalEvent,
+    bool Recovered = false);
 
 public interface IVisionAgentBuildTerminalProjector
 {
@@ -60,21 +61,41 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             return false;
         }
 
+        var terminalSource = TryGetTerminalSource(projection.TerminalEvent);
         var proposedSessionId = NormalizeProjectionSessionId(
             runId,
             FirstNonBlank(
                 projection.Request.SessionId,
                 projection.Result.SessionId,
-                TryReadString(TryGetTerminalSource(projection.TerminalEvent), "sessionId")));
+                TryReadString(terminalSource, "sessionId")));
         var sessionId = _journal.ResolveSessionId(
             runId,
             projection.TerminalEvent.Sequence,
             projection.TerminalEvent.EventType,
             proposedSessionId);
-        var session = _conversationalFlowService.GetOrCreateSession(sessionId);
+        var session = projection.Recovered
+            ? _conversationalFlowService.GetSession(sessionId)
+            : _conversationalFlowService.GetOrCreateSession(sessionId);
+        if (session == null)
+        {
+            return false;
+        }
+
         projection.Result.SessionId = session.SessionId;
         var result = projection.Result;
         var terminal = projection.TerminalEvent;
+        var basis = BuildProjectionBasis(terminalSource, result, projection.Request);
+        if (projection.Recovered && !HasCompleteTerminalProjectionBasis(terminalSource))
+        {
+            MarkRecoveryConflict(
+                session.SessionId,
+                runId,
+                NormalizeTerminalStatusFromEvent(terminal),
+                "terminal_projection_basis_missing",
+                session.WorkspaceSnapshot);
+            return false;
+        }
+
         var assistantMessage = FirstNonBlank(
             terminal.Summary,
             result.Success ? result.AiExplanation : result.ErrorMessage,
@@ -119,7 +140,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         var assistantTurnId = $"build:{runId}:terminal:{terminal.Sequence}:assistant";
         var workspaceUpdate = new VisionAgentWorkspaceSnapshotUpdate
         {
-            ExpectedRevision = session.WorkspaceSnapshot?.Revision,
+            ExpectedRevision = basis.AssociationWorkspaceRevision ?? session.WorkspaceSnapshot?.Revision,
             LifecycleState = result.Success
                 ? "build_completed"
                 : (string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase)
@@ -137,7 +158,7 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
                     ? AgentRunEventStatuses.Cancelled
                     : AgentRunEventStatuses.Failed),
             BuildTerminalSequence = terminal.Sequence,
-            SubmittedBuildFingerprint = FirstNonBlank(result.AnswerSetFingerprint, result.PlanHash, projection.Request.BuildFromPlan?.PlanHash)
+            SubmittedBuildFingerprint = basis.SubmittedBuildFingerprint
         };
         var projectionRequest = new VisionAgentTerminalProjectionRequest
         {
@@ -155,6 +176,20 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         var projectionMutationId = ConversationalFlowService.BuildTerminalProjectionMutationId(
             assistantTurnId,
             projectionFingerprint);
+        if (projection.Recovered &&
+            workspaceUpdate.ExpectedRevision.HasValue &&
+            session.WorkspaceSnapshot?.Revision != workspaceUpdate.ExpectedRevision.Value &&
+            !HasMatchingWorkspaceReceipt(session, projectionMutationId, projectionFingerprint))
+        {
+            MarkRecoveryConflict(
+                session.SessionId,
+                runId,
+                NormalizeTerminalStatusFromEvent(terminal),
+                "workspace_revision_drift",
+                session.WorkspaceSnapshot);
+            return false;
+        }
+
         var begin = _journal.Begin(
             runId,
             sessionId,
@@ -163,8 +198,19 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             projectionMutationId,
             projectionFingerprint,
             workspaceUpdate.ExpectedRevision,
-            FirstNonBlank(result.AnswerSetFingerprint, result.PlanHash, projection.Request.BuildFromPlan?.PlanHash),
+            basis.BuildIdentity,
             string.Empty);
+        if (begin.Status == VisionAgentBuildProjectionBeginStatus.MetadataConflict)
+        {
+            MarkRecoveryConflict(
+                session.SessionId,
+                runId,
+                NormalizeTerminalStatusFromEvent(terminal),
+                "projection_checkpoint_metadata_conflict",
+                session.WorkspaceSnapshot);
+            return false;
+        }
+
         if (begin.Status != VisionAgentBuildProjectionBeginStatus.Started)
         {
             return false;
@@ -175,6 +221,24 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             var projectionResult = _conversationalFlowService.ProjectBuildTerminal(projectionRequest);
             if (!projectionResult.Success)
             {
+                if (projection.Recovered && projectionResult.Conflict)
+                {
+                    MarkRecoveryConflict(
+                        session.SessionId,
+                        runId,
+                        NormalizeTerminalStatusFromEvent(terminal),
+                        projectionResult.ErrorCode,
+                        session.WorkspaceSnapshot);
+                    return false;
+                }
+
+                if (projection.Recovered && !projectionResult.PersistenceStatus.PrimaryStoreSaved)
+                {
+                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(projectionResult.PublicMessage)
+                        ? "Vision Agent Build recovery could not persist conversation state."
+                        : projectionResult.PublicMessage);
+                }
+
                 _journal.MarkFailed(
                     runId,
                     session.SessionId,
@@ -195,6 +259,11 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         }
         catch (Exception ex)
         {
+            if (projection.Recovered)
+            {
+                throw;
+            }
+
             _journal.MarkFailed(
                 runId,
                 sessionId,
@@ -214,6 +283,10 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
     public bool ProjectRecovered(AgentRunReplayResult replay)
     {
         ArgumentNullException.ThrowIfNull(replay);
+        if (VisionAgentRunKindResolver.Resolve(replay) != VisionAgentRunKind.Build)
+        {
+            return false;
+        }
 
         var terminal = replay.Events
             .OrderBy(evt => evt.Sequence)
@@ -238,7 +311,122 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
             BuildCommandTransports.AgentRun,
             request,
             result,
-            terminal));
+            terminal,
+            Recovered: true));
+    }
+
+    private ProjectionBasis BuildProjectionBasis(
+        JsonElement? terminalSource,
+        AiFlowGenerationResult result,
+        AiFlowGenerationRequest request)
+    {
+        var planId = FirstNonBlank(
+            TryReadString(terminalSource, "planId"),
+            result.PlanId,
+            result.BuildResult?.PlanId,
+            request.BuildFromPlan?.PlanId,
+            request.BuildFromPlan?.PlanSnapshot?.PlanId);
+        var planHash = FirstNonBlank(
+            TryReadString(terminalSource, "planHash"),
+            result.PlanHash,
+            result.BuildResult?.PlanHash,
+            request.BuildFromPlan?.PlanHash,
+            request.BuildFromPlan?.PlanSnapshot?.PlanHash);
+        var answerSetFingerprint = FirstNonBlank(
+            TryReadString(terminalSource, "answerSetFingerprint"),
+            result.AnswerSetFingerprint,
+            result.BuildResult?.AnswerSetFingerprint);
+        var submittedBuildFingerprint = FirstNonBlank(
+            TryReadString(terminalSource, "submittedBuildFingerprint"),
+            answerSetFingerprint,
+            planHash);
+        var buildIdentity = FirstNonBlank(
+            TryReadString(terminalSource, "buildIdentity"),
+            BuildBuildIdentity(planId, planHash, answerSetFingerprint, submittedBuildFingerprint));
+
+        return new ProjectionBasis(
+            TryReadLong(terminalSource, "associationWorkspaceRevision"),
+            submittedBuildFingerprint,
+            buildIdentity);
+    }
+
+    private static bool HasCompleteTerminalProjectionBasis(JsonElement? terminalSource)
+    {
+        return TryReadLong(terminalSource, "associationWorkspaceRevision").HasValue &&
+               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "submittedBuildFingerprint")) &&
+               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "planId")) &&
+               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "planHash")) &&
+               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "answerSetFingerprint")) &&
+               !string.IsNullOrWhiteSpace(TryReadString(terminalSource, "buildIdentity"));
+    }
+
+    private static bool HasMatchingWorkspaceReceipt(
+        ConversationSession session,
+        string mutationId,
+        string payloadFingerprint)
+    {
+        return !string.IsNullOrWhiteSpace(mutationId) &&
+               !string.IsNullOrWhiteSpace(payloadFingerprint) &&
+               session.MutationReceipts.Any(receipt =>
+                   string.Equals(receipt.MutationId, mutationId, StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(receipt.PayloadFingerprint, payloadFingerprint, StringComparison.Ordinal));
+    }
+
+    private void MarkRecoveryConflict(
+        string sessionId,
+        string runId,
+        string terminalStatus,
+        string conflictCode,
+        VisionAgentWorkspaceSnapshot? workspace)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId) || workspace == null)
+        {
+            return;
+        }
+
+        _conversationalFlowService.TryUpdateWorkspaceSnapshot(sessionId, new VisionAgentWorkspaceSnapshotUpdate
+        {
+            ExpectedRevision = workspace.Revision,
+            ClientMutationId = $"recovery-conflict:{runId}",
+            LifecycleState = "recovery_conflict"
+        });
+
+        Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
+            _logger,
+            "Vision Agent Build recovery conflict. RunId={RunId}, SessionId={SessionId}, TerminalStatus={TerminalStatus}, ConflictCode={ConflictCode}",
+            runId,
+            sessionId,
+            terminalStatus,
+            conflictCode);
+    }
+
+    private static string BuildBuildIdentity(
+        string planId,
+        string planHash,
+        string answerSetFingerprint,
+        string submittedBuildFingerprint)
+    {
+        return string.Join(
+            ":",
+            new[]
+            {
+                SanitizeIdentityToken(planId),
+                SanitizeIdentityToken(planHash),
+                SanitizeIdentityToken(answerSetFingerprint),
+                SanitizeIdentityToken(submittedBuildFingerprint)
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string SanitizeIdentityToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            string.Empty,
+            value.Trim().Where(ch => char.IsLetterOrDigit(ch) || ch is ':' or '_' or '-' or '.'));
     }
 
     private static AiFlowGenerationRequest BuildRecoveredRequest(
@@ -421,6 +609,38 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
         };
     }
 
+    private static long? TryReadLong(JsonElement? source, string propertyName)
+    {
+        if (source == null || !TryGetProperty(source.Value, propertyName, out var property))
+        {
+            return null;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.Number when property.TryGetInt64(out var value) => value,
+            JsonValueKind.String when long.TryParse(property.GetString(), out var value) => value,
+            _ => null
+        };
+    }
+
+    private static string NormalizeTerminalStatusFromEvent(AgentRunEvent terminal)
+    {
+        if (string.Equals(terminal.EventType, AgentRunEventTypes.RunCancelled, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(terminal.Status, AgentRunEventStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunEventStatuses.Cancelled;
+        }
+
+        if (string.Equals(terminal.EventType, AgentRunEventTypes.RunCompleted, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(terminal.Status, AgentRunEventStatuses.Completed, StringComparison.OrdinalIgnoreCase))
+        {
+            return AgentRunEventStatuses.Completed;
+        }
+
+        return AgentRunEventStatuses.Failed;
+    }
+
     private static bool TryGetProperty(JsonElement source, string propertyName, out JsonElement property)
     {
         if (source.ValueKind == JsonValueKind.Object)
@@ -465,4 +685,9 @@ public sealed class VisionAgentBuildTerminalProjector : IVisionAgentBuildTermina
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
     }
+
+    private sealed record ProjectionBasis(
+        long? AssociationWorkspaceRevision,
+        string SubmittedBuildFingerprint,
+        string BuildIdentity);
 }

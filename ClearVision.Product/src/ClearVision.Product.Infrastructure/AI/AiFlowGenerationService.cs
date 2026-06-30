@@ -967,6 +967,7 @@ public class AiFlowGenerationService : IAiFlowGenerationService
                 request.Description,
                 new
                 {
+                    runKind = VisionAgentRunKindResolver.Build,
                     mode = request.Mode.ToWireValue(),
                     useVisionAgentGenerateFlow = true,
                     agentGenerateFlowMode = request.AgentGenerateFlowMode,

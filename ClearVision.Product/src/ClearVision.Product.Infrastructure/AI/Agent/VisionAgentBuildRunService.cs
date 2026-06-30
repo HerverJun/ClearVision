@@ -95,6 +95,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             RunId = runId,
             PersistResult = false
         };
+        var projectionBasis = ResolveBuildAssociationProjectionBasis(runCommand, request);
         if (!runCommand.BuildAssociationPrepared)
         {
             var association = PrepareBuildAssociation(runCommand);
@@ -106,12 +107,16 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
                         runId,
                         result.ErrorMessage ?? "Build 创建失败，会话状态未保存。",
                         result.FailureSummary?.RepairTarget ?? "请确认 Plan 状态后重新构建。",
-                        BuildFailurePayload(result, request)),
+                        BuildFailurePayload(result, request, projectionBasis, runId)),
                     runId);
                 return new VisionAgentBuildRunResult(
                     BuildOutcome(runCommand, request, result, projected: false),
                     terminal);
             }
+
+            projectionBasis = BuildAssociationProjectionBasis.FromAssociation(
+                association,
+                ComputeSubmittedBuildFingerprint(request));
         }
         using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -124,12 +129,18 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
                 runCommand,
                 request,
                 outcome,
-                linkedCancellation.IsCancellationRequested);
+                linkedCancellation.IsCancellationRequested,
+                projectionBasis);
         }
         catch (OperationCanceledException)
         {
             var result = BuildCancelledProjectionResult(request, null);
-            var terminal = TerminalOrReplay(_streamService.Cancel(runId), runId);
+            var terminal = TerminalOrReplay(
+                _streamService.Cancel(
+                    runId,
+                    "Vision Agent BuildFromPlan was cancelled.",
+                    BuildFailurePayload(result, request, projectionBasis, runId)),
+                runId);
             var projected = ProjectTerminal(runCommand, request, result, terminal);
             return new VisionAgentBuildRunResult(
                 BuildOutcome(runCommand, request, result, projected),
@@ -148,7 +159,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
                     runId,
                     "Vision Agent BuildFromPlan failed before completion.",
                     "Review backend logs and retry after fixing the BuildFromPlan failure.",
-                    BuildFailurePayload(result, request)),
+                    BuildFailurePayload(result, request, projectionBasis, runId)),
                 runId);
             var projected = ProjectTerminal(runCommand, request, result, terminal);
             return new VisionAgentBuildRunResult(
@@ -161,11 +172,12 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         BuildCommand command,
         AiFlowGenerationRequest request,
         CanonicalBuildOutcome outcome,
-        bool cancellationRequested)
+        bool cancellationRequested,
+        BuildAssociationProjectionBasis projectionBasis)
     {
         var result = outcome.Result;
         var runId = FirstNonBlank(command.RunId, request.AgentRunId);
-        var terminal = AppendTerminal(runId, request, result, cancellationRequested);
+        var terminal = AppendTerminal(runId, request, result, cancellationRequested, projectionBasis);
         var projectionResult = AlignResultWithTerminal(request, result, terminal);
         var projected = ProjectTerminal(command, request, projectionResult, terminal);
         return new VisionAgentBuildRunResult(
@@ -177,12 +189,18 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
         string runId,
         AiFlowGenerationRequest request,
         AiFlowGenerationResult result,
-        bool cancellationRequested)
+        bool cancellationRequested,
+        BuildAssociationProjectionBasis projectionBasis)
     {
         if (cancellationRequested ||
             string.Equals(result.CompletionStatus, AiFlowGenerationResult.CompletionStatusCancelled, StringComparison.OrdinalIgnoreCase))
         {
-            return TerminalOrReplay(_streamService.Cancel(runId), runId);
+            return TerminalOrReplay(
+                _streamService.Cancel(
+                    runId,
+                    "Vision Agent BuildFromPlan was cancelled.",
+                    BuildFailurePayload(result, request, projectionBasis, runId)),
+                runId);
         }
 
         if (result.Success)
@@ -191,7 +209,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
                 _streamService.Complete(
                     runId,
                     "Vision Agent completed the metadata-only workflow draft build.",
-                    BuildSuccessPayload(result, request, runId)),
+                    BuildSuccessPayload(result, request, runId, projectionBasis)),
                 runId);
         }
 
@@ -201,7 +219,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
                 result.ErrorMessage ?? result.FailureSummary?.Message ?? "Vision Agent BuildFromPlan failed.",
                 result.FailureSummary?.RepairTarget ??
                 "Review public diagnostics, fill missing metadata, or resolve blocking intent before retrying.",
-                BuildFailurePayload(result, request)),
+                BuildFailurePayload(result, request, projectionBasis, runId)),
             runId);
     }
 
@@ -260,10 +278,19 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
     private static object BuildSuccessPayload(
         AiFlowGenerationResult result,
         AiFlowGenerationRequest request,
-        string runId)
+        string runId,
+        BuildAssociationProjectionBasis projectionBasis)
     {
+        var terminalBasis = BuildTerminalBasis(result, request, projectionBasis);
         return new
         {
+            runKind = VisionAgentRunKindResolver.Build,
+            associationWorkspaceRevision = terminalBasis.AssociationWorkspaceRevision,
+            submittedBuildFingerprint = terminalBasis.SubmittedBuildFingerprint,
+            planId = terminalBasis.PlanId,
+            planHash = terminalBasis.PlanHash,
+            answerSetFingerprint = terminalBasis.AnswerSetFingerprint,
+            buildIdentity = terminalBasis.BuildIdentity,
             status = result.CompletionStatus,
             sessionId = FirstNonBlank(result.SessionId, request.SessionId),
             generationMode = result.GenerationMode,
@@ -284,10 +311,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             toolTrace = result.ToolTrace,
             buildResult = result.BuildResult,
             buildReadiness = result.BuildReadiness,
-            planId = ResolveResultPlanId(result, request.BuildFromPlan),
-            planHash = ResolveResultPlanHash(result, request.BuildFromPlan),
             contractVersion = result.ContractVersion,
-            answerSetFingerprint = result.AnswerSetFingerprint,
             requestedMode = result.RequestedMode,
             effectiveMode = result.EffectiveMode,
             toolLoopEntered = result.ToolLoopEntered,
@@ -322,10 +346,20 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
 
     private static object BuildFailurePayload(
         AiFlowGenerationResult result,
-        AiFlowGenerationRequest request)
+        AiFlowGenerationRequest request,
+        BuildAssociationProjectionBasis projectionBasis,
+        string runId)
     {
+        var terminalBasis = BuildTerminalBasis(result, request, projectionBasis);
         return new
         {
+            runKind = VisionAgentRunKindResolver.Build,
+            associationWorkspaceRevision = terminalBasis.AssociationWorkspaceRevision,
+            submittedBuildFingerprint = terminalBasis.SubmittedBuildFingerprint,
+            planId = terminalBasis.PlanId,
+            planHash = terminalBasis.PlanHash,
+            answerSetFingerprint = terminalBasis.AnswerSetFingerprint,
+            buildIdentity = terminalBasis.BuildIdentity,
             status = result.CompletionStatus,
             sessionId = FirstNonBlank(result.SessionId, request.SessionId),
             failureType = result.FailureType,
@@ -333,10 +367,7 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             failureSummary = result.FailureSummary,
             diagnostics = result.LastAttemptDiagnostics,
             buildReadiness = result.BuildReadiness,
-            planId = ResolveResultPlanId(result, request.BuildFromPlan),
-            planHash = ResolveResultPlanHash(result, request.BuildFromPlan),
             contractVersion = result.ContractVersion,
-            answerSetFingerprint = result.AnswerSetFingerprint,
             requestedMode = result.RequestedMode,
             effectiveMode = result.EffectiveMode,
             toolLoopEntered = result.ToolLoopEntered,
@@ -401,6 +432,89 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
             plcOutputPolicy = build?.PlcOutputPolicy ?? string.Empty,
             metadataOnly = true
         };
+    }
+
+    private BuildAssociationProjectionBasis ResolveBuildAssociationProjectionBasis(
+        BuildCommand command,
+        AiFlowGenerationRequest request)
+    {
+        var runId = FirstNonBlank(command.RunId, request.AgentRunId);
+        var sessionId = request.SessionId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(runId) || string.IsNullOrWhiteSpace(sessionId))
+        {
+            return BuildAssociationProjectionBasis.Empty;
+        }
+
+        var workspace = _conversationService.GetSession(sessionId)?.WorkspaceSnapshot;
+        if (workspace == null ||
+            !string.Equals(workspace.BuildRunId, runId, StringComparison.OrdinalIgnoreCase))
+        {
+            return BuildAssociationProjectionBasis.Empty;
+        }
+
+        return new BuildAssociationProjectionBasis(
+            workspace.Revision,
+            FirstNonBlank(workspace.SubmittedBuildFingerprint, ComputeSubmittedBuildFingerprint(request)));
+    }
+
+    private static BuildTerminalProjectionBasis BuildTerminalBasis(
+        AiFlowGenerationResult result,
+        AiFlowGenerationRequest request,
+        BuildAssociationProjectionBasis projectionBasis)
+    {
+        var planId = ResolveResultPlanId(result, request.BuildFromPlan);
+        var planHash = ResolveResultPlanHash(result, request.BuildFromPlan);
+        var answerSetFingerprint = FirstNonBlank(
+            result.AnswerSetFingerprint,
+            result.BuildResult?.AnswerSetFingerprint,
+            request.BuildFromPlan?.PlanHash,
+            request.BuildFromPlan?.PlanSnapshot?.PlanHash);
+        var submittedBuildFingerprint = FirstNonBlank(
+            projectionBasis.SubmittedBuildFingerprint,
+            answerSetFingerprint,
+            planHash);
+        var buildIdentity = BuildBuildIdentity(
+            planId,
+            planHash,
+            answerSetFingerprint,
+            submittedBuildFingerprint);
+
+        return new BuildTerminalProjectionBasis(
+            projectionBasis.AssociationWorkspaceRevision,
+            submittedBuildFingerprint,
+            planId,
+            planHash,
+            answerSetFingerprint,
+            buildIdentity);
+    }
+
+    private static string BuildBuildIdentity(
+        string planId,
+        string planHash,
+        string answerSetFingerprint,
+        string submittedBuildFingerprint)
+    {
+        return string.Join(
+            ":",
+            new[]
+            {
+                SanitizeIdentityToken(planId),
+                SanitizeIdentityToken(planHash),
+                SanitizeIdentityToken(answerSetFingerprint),
+                SanitizeIdentityToken(submittedBuildFingerprint)
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static string SanitizeIdentityToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            string.Empty,
+            value.Trim().Where(ch => char.IsLetterOrDigit(ch) || ch is ':' or '_' or '-' or '.'));
     }
 
     private static CanonicalBuildOutcome BuildOutcome(
@@ -575,4 +689,28 @@ public sealed class VisionAgentBuildRunService : IVisionAgentBuildRunService
     {
         return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
     }
+
+    private sealed record BuildAssociationProjectionBasis(
+        long? AssociationWorkspaceRevision,
+        string SubmittedBuildFingerprint)
+    {
+        public static BuildAssociationProjectionBasis Empty { get; } = new(null, string.Empty);
+
+        public static BuildAssociationProjectionBasis FromAssociation(
+            VisionAgentWorkspaceSnapshotMutationResult association,
+            string submittedBuildFingerprint)
+        {
+            return new BuildAssociationProjectionBasis(
+                association.Snapshot?.Revision,
+                FirstNonBlank(association.Snapshot?.SubmittedBuildFingerprint, submittedBuildFingerprint));
+        }
+    }
+
+    private sealed record BuildTerminalProjectionBasis(
+        long? AssociationWorkspaceRevision,
+        string SubmittedBuildFingerprint,
+        string PlanId,
+        string PlanHash,
+        string AnswerSetFingerprint,
+        string BuildIdentity);
 }

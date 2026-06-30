@@ -9,7 +9,6 @@ public sealed class VisionAgentBuildProjectionReconciliationService : IHostedSer
     private readonly AgentRunEventStore _eventStore;
     private readonly IAgentRunEventStreamService _streamService;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly Microsoft.Extensions.Logging.ILogger<VisionAgentBuildProjectionReconciliationService> _logger;
 
     public VisionAgentBuildProjectionReconciliationService(
         AgentRunEventStore eventStore,
@@ -20,7 +19,6 @@ public sealed class VisionAgentBuildProjectionReconciliationService : IHostedSer
         _eventStore = eventStore;
         _streamService = streamService;
         _scopeFactory = scopeFactory;
-        _logger = logger;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -32,46 +30,33 @@ public sealed class VisionAgentBuildProjectionReconciliationService : IHostedSer
 
     public Task ReconcileAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            var terminalRunIds = _eventStore.LoadEvents()
-                .Where(IsTerminalEvent)
-                .GroupBy(evt => evt.RunId, StringComparer.OrdinalIgnoreCase)
-                .Select(group => group
-                    .OrderByDescending(evt => evt.Sequence)
-                    .First()
-                    .RunId)
-                .ToList();
+        var terminalRunIds = _eventStore.LoadEvents()
+            .Where(IsTerminalEvent)
+            .GroupBy(evt => evt.RunId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(evt => evt.Sequence)
+                .First()
+                .RunId)
+            .ToList();
 
-            if (terminalRunIds.Count == 0)
+        if (terminalRunIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var projector = scope.ServiceProvider.GetRequiredService<IVisionAgentBuildTerminalProjector>();
+        foreach (var runId in terminalRunIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var replay = _streamService.ReplayRaw(runId);
+            if (replay == null ||
+                VisionAgentRunKindResolver.Resolve(replay) != VisionAgentRunKind.Build)
             {
-                return Task.CompletedTask;
+                continue;
             }
 
-            using var scope = _scopeFactory.CreateScope();
-            var projector = scope.ServiceProvider.GetRequiredService<IVisionAgentBuildTerminalProjector>();
-            foreach (var runId in terminalRunIds)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var replay = _streamService.ReplayRaw(runId);
-                if (replay == null)
-                {
-                    continue;
-                }
-
-                projector.ProjectRecovered(replay);
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            // Host shutdown.
-        }
-        catch (Exception ex)
-        {
-            Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(
-                _logger,
-                ex,
-                "Vision Agent Build terminal projection reconciliation failed.");
+            projector.ProjectRecovered(replay);
         }
 
         return Task.CompletedTask;

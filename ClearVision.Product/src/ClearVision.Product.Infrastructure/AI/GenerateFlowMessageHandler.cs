@@ -241,6 +241,7 @@ public class GenerateFlowMessageHandler
 
         var createResult = _agentRunStreamService.CreateRun(request.Description, new
         {
+            runKind = VisionAgentRunKindResolver.Build,
             mode = request.Mode.ToWireValue(),
             useVisionAgentGenerateFlow = true,
             agentGenerateFlowMode = request.AgentGenerateFlowMode,
