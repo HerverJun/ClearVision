@@ -1,6 +1,6 @@
 // FlowExecutionService.cs
 // 流程执行服务实现
-// Encoding cleanup: previous comment text was unreadable.
+// 负责流程调度、调试缓存和图像生命周期管理。
 
 using System.Collections;
 using System.Collections.Concurrent;
@@ -71,6 +71,16 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         OperatorType.StereoCalibration,
         OperatorType.HandEyeCalibration
     ];
+
+    private static string SanitizeLogValue(object? value)
+    {
+        var text = Convert.ToString(value, CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(text)
+            ? string.Empty
+            : text.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
+
     private readonly ConcurrentDictionary<Guid, FlowExecutionStatus> _executionStatuses = new();
     private readonly Dictionary<OperatorType, IOperatorExecutor> _executors;
     private readonly ILogger<FlowExecutionService> _logger;
@@ -1356,7 +1366,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 op.MarkExecutionFailed(opResult.ErrorMessage ?? "未知错误");
                 _logger.LogOperatorExecution(op.Id, op.Name, opStopwatch.ElapsedMilliseconds, false);
                 _logger.LogError("算子执行失败: {OperatorName} ({OperatorId}), 错误: {ErrorMessage}",
-                    op.Name, op.Id, opResult.ErrorMessage);
+                    SanitizeLogValue(op.Name), SanitizeLogValue(op.Id), SanitizeLogValue(opResult.ErrorMessage));
 
                 return new OperatorExecutionResult
                 {
@@ -1372,7 +1382,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         {
             opStopwatch.Stop();
             op.MarkExecutionFailed($"Operator timed out ({DefaultOperatorTimeoutMs / 1000}s)");
-            _logger.LogError("算子执行超时: {OperatorName} ({OperatorId})", op.Name, op.Id);
+            _logger.LogError("算子执行超时: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
 
             return new OperatorExecutionResult
             {
@@ -1387,7 +1397,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         {
             opStopwatch.Stop();
             op.MarkExecutionFailed("Operator execution was canceled.");
-            _logger.LogWarning("算子执行被取消: {OperatorName} ({OperatorId})", op.Name, op.Id);
+            _logger.LogWarning("算子执行被取消: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
 
             return CreateCanceledOperatorResult(op, opStopwatch.ElapsedMilliseconds);
         }
@@ -1395,7 +1405,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
         {
             opStopwatch.Stop();
             op.MarkExecutionFailed(ex.Message);
-            _logger.LogError(ex, "算子执行异常: {OperatorName} ({OperatorId})", op.Name, op.Id);
+            _logger.LogError(ex, "算子执行异常: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
 
             return new OperatorExecutionResult
             {
@@ -1819,7 +1829,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
             }
 
             _logger.LogDebug("[FlowExecution] Set ref count: Operator={OperatorName}, Port={PortName}, FanOut={FanOut}, RefCount={RefCount}",
-                op.Name, portName, fanOut, img.RefCount);
+                SanitizeLogValue(op.Name), SanitizeLogValue(portName), fanOut, img.RefCount);
         }
     }
 
@@ -1999,9 +2009,9 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                                 {
                                     _logger.LogDebug(
                                         "[FlowExecution] Skip implicit fallback key '{Key}' from {SourceOperator} to {TargetOperator} to avoid hidden ImageWrapper propagation.",
-                                        kvp.Key,
-                                        sourceOperator?.Name ?? connection.SourceOperatorId.ToString(),
-                                        op.Name);
+                                        SanitizeLogValue(kvp.Key),
+                                        SanitizeLogValue(sourceOperator?.Name ?? connection.SourceOperatorId.ToString()),
+                                        SanitizeLogValue(op.Name));
                                     continue;
                                 }
 
@@ -2225,7 +2235,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     pausedOperatorId = op.Id;
                     result.BreakpointHit = true;
                     result.PausedOperatorId = pausedOperatorId;
-                    _logger.LogInformation("[调试] 命中断点: {OperatorName} ({OperatorId})", op.Name, op.Id);
+                    _logger.LogInformation("[调试] 命中断点: {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
 
                     if (options.StepMode)
                     {
@@ -2352,7 +2362,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                     {
                         pausedOperatorId = op.Id;
                         result.PausedOperatorId = pausedOperatorId;
-                        _logger.LogInformation("[Debug] Reused cached output and paused at breakpoint operator {OperatorName} ({OperatorId})", op.Name, op.Id);
+                        _logger.LogInformation("[Debug] Reused cached output and paused at breakpoint operator {OperatorName} ({OperatorId})", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
                         break;
                     }
 
@@ -2425,7 +2435,7 @@ public class FlowExecutionService : IFlowExecutionService, IDisposable
                 {
                     pausedOperatorId = op.Id;
                     result.PausedOperatorId = pausedOperatorId;
-                    _logger.LogInformation("[Debug] Reached breakpoint operator: {OperatorName} ({OperatorId}), stopping execution.", op.Name, op.Id);
+                    _logger.LogInformation("[Debug] Reached breakpoint operator: {OperatorName} ({OperatorId}), stopping execution.", SanitizeLogValue(op.Name), SanitizeLogValue(op.Id));
                     break;
                 }
             }

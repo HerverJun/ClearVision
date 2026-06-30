@@ -29,6 +29,14 @@ public class AiConfigStore
         PropertyNameCaseInsensitive = true
     };
 
+    private static string SanitizeLogValue(string? value)
+    {
+        return string.IsNullOrEmpty(value)
+            ? string.Empty
+            : value.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
+
     public AiConfigStore(IOptions<AiGenerationOptions> initialOptions, Microsoft.Extensions.Logging.ILogger<AiConfigStore> logger)
         : this(initialOptions, logger, AppContext.BaseDirectory)
     {
@@ -110,7 +118,7 @@ public class AiConfigStore
         }
 
         Save();
-        _logger.LogInformation("[AiConfigStore] 新增模型: {Name} ({Id})", model.Name, model.Id);
+        _logger.LogInformation("[AiConfigStore] 新增模型: {Name} ({Id})", SanitizeLogValue(model.Name), SanitizeLogValue(model.Id));
         return model;
     }
 
@@ -139,7 +147,7 @@ public class AiConfigStore
         }
 
         Save();
-        _logger.LogInformation("[AiConfigStore] 更新模型: {Name} ({Id})", updated.Name ?? string.Empty, id);
+        _logger.LogInformation("[AiConfigStore] 更新模型: {Name} ({Id})", SanitizeLogValue(updated.Name), SanitizeLogValue(id));
         return GetById(id);
     }
 
@@ -161,7 +169,7 @@ public class AiConfigStore
         }
 
         Save();
-        _logger.LogInformation("[AiConfigStore] 删除模型: {Id}", id);
+        _logger.LogInformation("[AiConfigStore] 删除模型: {Id}", SanitizeLogValue(id));
         return true;
     }
 
@@ -180,7 +188,7 @@ public class AiConfigStore
         }
 
         Save();
-        _logger.LogInformation("[AiConfigStore] 激活模型切换为: {Id}", id);
+        _logger.LogInformation("[AiConfigStore] 激活模型切换为: {Id}", SanitizeLogValue(id));
         return true;
     }
 
@@ -222,7 +230,7 @@ public class AiConfigStore
         }
 
         Save();
-        _logger.LogInformation("[AiConfigStore] Set default model role {Role}: {Id}", normalizedRole, id);
+        _logger.LogInformation("[AiConfigStore] Set default model role {Role}: {Id}", SanitizeLogValue(normalizedRole), SanitizeLogValue(id));
         return true;
     }
 

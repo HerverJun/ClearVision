@@ -73,8 +73,8 @@ public class LocalDeformableMatchingOperatorTests
     public async Task ExecuteAsync_WithSameImageAsTemplate_ShouldMatch()
     {
         var op = new Operator("LocalDeformableMatching", OperatorType.LocalDeformableMatching, 0, 0);
-        op.Parameters.Add(TestHelpers.CreateParameter("MinMatchScore", 0.3)); // 闄嶄綆闃堝€间互渚挎祴璇?
-        op.Parameters.Add(TestHelpers.CreateParameter("PyramidLevels", 2)); // 鍑忓皯灞傛暟浠ュ姞蹇祴璇?
+        op.Parameters.Add(TestHelpers.CreateParameter("MinMatchScore", 0.3)); // 降低阈值以便测试
+        op.Parameters.Add(TestHelpers.CreateParameter("PyramidLevels", 2)); // 减少层数以加快测试
 
         using var image = CreateFeatureRichImage();
         var inputs = TestHelpers.CreateImageInputs(image);

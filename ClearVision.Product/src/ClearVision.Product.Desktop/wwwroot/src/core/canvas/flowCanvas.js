@@ -1,6 +1,6 @@
 /**
- * Encoding cleanup: previous comment text was unreadable.
- * 闂団偓鐟曚焦甯撻弻銉︽闁俺绻?`window.__FLOW_CANVAS_DEBUG__ = true` 閹存牔鎱ㄩ弨瑙勵劃鐢悂鍣洪崥顖滄暏閵?
+ * Flow canvas rendering and interaction controller.
+ * Set `window.__FLOW_CANVAS_DEBUG__ = true` to enable debug logging.
  */
 const DEBUG_FLOW_CANVAS = false;
 function flowDebugEnabled() {
@@ -8,24 +8,24 @@ function flowDebugEnabled() {
 }
 
 /**
- * Encoding cleanup: previous comment text was unreadable.
+ * 端口数据类型颜色。
  */
 const PORT_TYPE_COLORS = {
-    'Image':           '#52c41a', // Encoding cleanup: previous comment text was unreadable.
-    'String':          '#1890ff', // Encoding cleanup: previous comment text was unreadable.
-    'Integer':         '#fa8c16',  // Encoding cleanup: previous comment text was unreadable.
-    'Float':           '#fa8c16',  // 濮楁瑨澹?- 濞搭喚鍋?
-    'Boolean':         '#f5222d', // Encoding cleanup: previous comment text was unreadable.
-    'Point':           '#eb2f96', // Encoding cleanup: previous comment text was unreadable.
-    'Rectangle':       '#eb2f96', // Encoding cleanup: previous comment text was unreadable.
-    'Contour':         '#722ed1', // Encoding cleanup: previous comment text was unreadable.
-    'PointList':       '#eb2f96', // Encoding cleanup: previous comment text was unreadable.
-    'DetectionResult': '#13c2c2', // Encoding cleanup: previous comment text was unreadable.
-    'DetectionList':   '#13c2c2', // Encoding cleanup: previous comment text was unreadable.
-    'CircleData':      '#2f54eb',  // Encoding cleanup: previous comment text was unreadable.
-    'LineData':        '#2f54eb', // Encoding cleanup: previous comment text was unreadable.
-    'Any':             '#bfbfbf', // Encoding cleanup: previous comment text was unreadable.
-    // Encoding cleanup: previous comment text was unreadable.
+    'Image':           '#52c41a', // 图像
+    'String':          '#1890ff', // 字符串
+    'Integer':         '#fa8c16',  // 整数
+    'Float':           '#fa8c16',  // 浮点数
+    'Boolean':         '#f5222d', // 布尔值
+    'Point':           '#eb2f96', // 点
+    'Rectangle':       '#eb2f96', // 矩形
+    'Contour':         '#722ed1', // 轮廓
+    'PointList':       '#eb2f96', // 点集
+    'DetectionResult': '#13c2c2', // 检测结果
+    'DetectionList':   '#13c2c2', // 检测结果列表
+    'CircleData':      '#2f54eb',  // 圆数据
+    'LineData':        '#2f54eb', // 线数据
+    'Any':             '#bfbfbf', // 任意类型
+    // 兼容后端枚举值。
     0: '#52c41a',
     1: '#fa8c16', 2: '#fa8c16', 3: '#f5222d',
     4: '#1890ff', 5: '#eb2f96', 6: '#eb2f96', 7: '#722ed1',
@@ -50,8 +50,8 @@ const LEGACY_OPERATOR_TYPE_ALIASES = {
 };
 
 const PORT_HIT_RADIUS_PX = 12;       // 端口屏幕命中半径
-const CONNECTION_HIT_RADIUS_PX = 10; // Encoding cleanup: previous comment text was unreadable.
-const CONNECTION_HIT_SAMPLES = 16;   // 璐濆灏旀洸绾块噰鏍风偣鏁?
+const CONNECTION_HIT_RADIUS_PX = 10; // 连接线命中半径
+const CONNECTION_HIT_SAMPLES = 16;   // 连接线命中采样点数
 const NODE_DEFAULT_WIDTH = 140;
 const NODE_MIN_HEIGHT = 60;
 const NODE_HEADER_HEIGHT = 24;
@@ -81,12 +81,12 @@ class FlowCanvas {
         this.structureStateListeners = new Set();
         this.globalVariableSchema = { sourceBindings: [], targetBindings: [] };
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 画布像素尺寸。
         this._dpr = 1;
         this._logicalWidth = 0;
         this._logicalHeight = 0;
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 背景网格样式。
         this.gridSize = 20;
         this.gridColor = 'rgba(48, 71, 62, 0.16)';
         this.gridDotRadius = 1.05;
@@ -98,13 +98,13 @@ class FlowCanvas {
         this.onNodeDuplicateRequested = null;
         this.onNodeDisabledToggleRequested = null;
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 连线交互状态。
         this.isConnecting = false;
         this.connectingFrom = null;  // { nodeId, portIndex, isOutput }
         this.mousePosition = { x: 0, y: 0 };
         this.hoveredPort = null;  // { nodeId, portIndex, isOutput }
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // DOM 事件处理器。
         this._resizeHandler = this.resize.bind(this);
         this._mouseDownHandler = this.handleMouseDown.bind(this);
         this._mouseMoveHandler = this.handleMouseMove.bind(this);
@@ -116,25 +116,25 @@ class FlowCanvas {
         this._visibilityHandler = this.handleVisibilityChange.bind(this);
         this._drawFrameBound = this._drawFrame.bind(this);
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 绘制调度状态。
         this._animationFrameId = null;
-        this._dirty = true; // Encoding cleanup: previous comment text was unreadable.
-        this._lastFrameTime = 0; // Encoding cleanup: previous comment text was unreadable.
-        this._isPaused = false;      // 椤甸潰闅愯棌鏃舵殏鍋?
+        this._dirty = true; // 初始需要绘制
+        this._lastFrameTime = 0; // 上一帧时间
+        this._isPaused = false;      // 页面隐藏时暂停绘制
 
-        // ResizeObserver 涓庤妭娴?
+        // ResizeObserver 防抖状态。
         this._resizeObserver = null;
         this._resizeRafId = null;
 
-        // 闁鑵戦惃鍕箾閹?
+        // 当前选中的连线。
         this.selectedConnection = null;
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 连线索引。
         this._connectionById = new Map();
         this._connectionsByOutputPort = new Map();  // key=portKey -> Set<connection>
-        this._connectionByInputPort = new Map(); // Encoding cleanup: previous comment text was unreadable.
+        this._connectionByInputPort = new Map(); // key=portKey -> connection
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 流动粒子精灵缓存。
         this._particleSprite = null;
         this._particleSpriteSize = 0;
 
@@ -281,9 +281,9 @@ class FlowCanvas {
     }
 
     /**
-     * Encoding cleanup: previous comment text was unreadable.
-     * - canvas.width/height锛坆acking store锛変娇鐢?dpr 鏀惧ぇ
-     * Encoding cleanup: previous comment text was unreadable.
+     * 根据 devicePixelRatio 调整画布 backing store。
+     * - canvas.width/height 使用 dpr 放大 backing store。
+     * - canvas.style.width/height 保持 CSS 像素尺寸。
      * - ctx.setTransform(dpr,0,0,dpr,0,0) 让所有绘制坐标使用逻辑像素
      */
     resize() {
@@ -637,7 +637,7 @@ class FlowCanvas {
         });
 
         this.notifyViewStateChanged();
-        // Encoding cleanup: previous comment text was unreadable.
+        // 子图节点数量缓存。
         this._subGraphNodeCountCache = new WeakMap();
     }
 
@@ -655,7 +655,7 @@ class FlowCanvas {
     }
 
     /**
-     * 缂佹ê鍩楅悙褰掓█閼冲本娅?
+     * 绘制背景网格。
      */
     drawGrid() {
         const width = this._logicalWidth;
@@ -671,7 +671,7 @@ class FlowCanvas {
         const startX = Math.floor(this.offset.x / dotStep) * dotStep;
         const startY = Math.floor(this.offset.y / dotStep) * dotStep;
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 计算当前视口可见区域。
         const visibleWidth = width / this.scale;
         const visibleHeight = height / this.scale;
 
@@ -699,8 +699,8 @@ class FlowCanvas {
     }
 
     /**
-     * 缂佹ê鍩楅懞鍌滃仯 - 闂冭埖顔岄崶娑橆杻瀵櫣澧?
-     * Encoding cleanup: previous comment text was unreadable.
+     * 绘制节点主体、端口和状态边框。
+     * 包含 ForEach、通信和文件参数的特殊高亮。
      */
     drawNode(node) {
         const x = (node.x - this.offset.x) * this.scale;
@@ -709,17 +709,17 @@ class FlowCanvas {
         const h = node.height * this.scale;
         const isSelected = this.selectedNode === node.id;
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 识别 ForEach 运行模式。
         const isForEach = node.type === 'ForEach';
         const ioMode = isForEach ? (node.parameters?.find(p => p.name === 'IoMode' || p.Name === 'IoMode')?.value || 'Parallel') : null;
         const isSequential = ioMode === 'Sequential';
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 默认边框样式。
         let borderColor = isSelected ? node.color : 'rgba(255, 255, 255, 0.1)';
         let borderWidth = isSelected ? 3 : 1;
         let glowColor = null;
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 特殊类型高亮。
         const isCommunicationOp = COMM_OPERATOR_TYPES.has(node.type);
         const hasFileParam = node.parameters && node.parameters.some(
             p => p.dataType === 'file' && p.value
@@ -736,22 +736,22 @@ class FlowCanvas {
             borderColor = '#e74c3c';
             glowColor = 'rgba(231, 76, 60, 0.5)';
         } else if (isForEach && isSequential) {
-            // Encoding cleanup: previous comment text was unreadable.
+            // ForEach Sequential 模式：橙色边框。
             borderColor = '#fa8c16';
             borderWidth = 2;
             glowColor = 'rgba(250, 140, 22, 0.3)';
         } else if (isForEach) {
-            // ForEach Parallel 妯″紡锛氶潚鑹茶櫄绾胯竟妗?
+            // ForEach Parallel 模式：青色边框。
             borderColor = '#13c2c2';
             borderWidth = 2;
             glowColor = 'rgba(19, 194, 194, 0.2)';
         } else if (isCommunicationOp) {
-            // Encoding cleanup: previous comment text was unreadable.
+            // 通信算子：红色边框。
             borderColor = '#f5222d';
             borderWidth = 2;
             glowColor = 'rgba(245, 34, 45, 0.3)';
         } else if (hasFileParam) {
-            // Encoding cleanup: previous comment text was unreadable.
+            // 已配置文件参数：橙色边框。
             borderColor = '#fa8c16';
             borderWidth = 2;
         } else if (isSelected) {
@@ -1017,7 +1017,7 @@ class FlowCanvas {
             this.ctx.lineWidth = 1;
             this.ctx.stroke();
 
-            // Encoding cleanup: previous comment text was unreadable.
+            // 绘制输入端口标签。
             if (this.scale > 0.8) {
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
                 this.ctx.font = `${8 * this.scale}px sans-serif`;
@@ -1027,7 +1027,7 @@ class FlowCanvas {
             }
         });
         
-        // Encoding cleanup: previous comment text was unreadable.
+        // 绘制输出端口。
         node.outputs.forEach((output, index) => {
             const portY = this.getPortYInScreen(y, h, index, node.outputs.length);
             const color = PORT_TYPE_COLORS[output.type] || PORT_TYPE_COLORS['Any'];
@@ -1040,7 +1040,7 @@ class FlowCanvas {
             this.ctx.lineWidth = 1;
             this.ctx.stroke();
 
-            // 缁樺埗绫诲瀷鍚?
+            // 绘制输出端口标签。
             if (this.scale > 0.8) {
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
                 this.ctx.font = `${8 * this.scale}px sans-serif`;
@@ -1275,14 +1275,14 @@ class FlowCanvas {
         this.isConnecting = false;
         this.connectingFrom = null;
         this.canvas.style.cursor = 'default';
-        this.invalidate(); // 鍒锋柊浠ユ竻闄ら珮浜?
+        this.invalidate(); // 刷新以清除连线预览
     }
 
     /**
-     * Encoding cleanup: previous comment text was unreadable.
+     * 检查端口类型兼容性。
      */
     checkTypeCompatibility(sourceType, targetType) {
-        // Encoding cleanup: previous comment text was unreadable.
+        // 将等价类型归一化后再比较。
         const normalize = (t) => {
             if (t === 'Any' || t === 99) return 'Any';
             if (t === 'Image' || t === 0) return 'Image';
@@ -1305,7 +1305,7 @@ class FlowCanvas {
     }
 
     /**
-     * Encoding cleanup: previous comment text was unreadable.
+     * 高亮当前连线可连接的端口。
      */
     highlightCompatiblePorts() {
         if (!this.isConnecting || !this.connectingFrom) return;
@@ -1342,7 +1342,7 @@ class FlowCanvas {
     }
 
     /**
-     * Encoding cleanup: previous comment text was unreadable.
+     * 删除指定连线。
      * @param {string} connectionId - 连接ID
      */
     removeConnection(connectionId) {
@@ -1361,7 +1361,7 @@ class FlowCanvas {
     }
 
     /**
-     * 缁樺埗涓存椂杩炵嚎锛堟嫋鎷借繃绋嬩腑锛?
+     * 绘制拖拽过程中的临时连线。
      */
     drawTempConnection() {
         if (!this.isConnecting || !this.connectingFrom) return;
@@ -1450,7 +1450,7 @@ class FlowCanvas {
         this.ctx.stroke();
         this.ctx.restore();
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 连线流动时绘制粒子动画。
         if (connection.status === 'active' || connection.status === 'flowing') {
             this.drawFlowParticles(start.x, start.y, controlPoint1X, start.y,
                                    controlPoint2X, end.y, end.x, end.y, connection, dt);
@@ -1458,11 +1458,11 @@ class FlowCanvas {
     }
     
     /**
-     * 缂佹ê鍩楅弫鐗堝祦濞翠礁濮╃划鎺戠摍 - 闂冭埖顔岄崶娑橆杻瀵?
-     * Encoding cleanup: previous comment text was unreadable.
+     * 绘制连线粒子动画。
+     * 使用离屏精灵减少每帧渐变绘制开销。
      */
     drawFlowParticles(startX, startY, cp1x, cp1y, cp2x, cp2y, endX, endY, connection, dt) {
-        // Encoding cleanup: previous comment text was unreadable.
+        // 初始化粒子。
         if (!connection.particles) {
             connection.particles = [];
             for (let i = 0; i < 5; i++) {
@@ -1473,7 +1473,7 @@ class FlowCanvas {
             }
         }
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 缓存粒子精灵。
         const spriteRadius = 6 * this.scale;
         const spriteKey = `particle_${spriteRadius.toFixed(1)}`;
         if (!this._particleSprite || this._particleSprite.key !== spriteKey) {
@@ -1492,14 +1492,14 @@ class FlowCanvas {
         }
 
         const sprite = this._particleSprite;
-        const timeScale = dt / 16; // Encoding cleanup: previous comment text was unreadable.
+        const timeScale = dt / 16; // 按 60fps 基准缩放速度
 
         connection.particles.forEach(particle => {
-            // Encoding cleanup: previous comment text was unreadable.
+            // 更新粒子位置。
             particle.t += particle.speed * timeScale;
             if (particle.t > 1) particle.t = 0;
 
-            // Encoding cleanup: previous comment text was unreadable.
+            // 计算三次贝塞尔曲线上的点。
             const t = particle.t;
             const mt = 1 - t;
             const x = mt * mt * mt * startX +
@@ -1511,18 +1511,18 @@ class FlowCanvas {
                      3 * mt * t * t * cp2y +
                      t * t * t * endY;
 
-            // Encoding cleanup: previous comment text was unreadable.
+            // 绘制粒子精灵。
             this.ctx.drawImage(sprite.canvas, x - sprite.size / 2, y - sprite.size / 2, sprite.size, sprite.size);
         });
     }
 
     /**
-     * Encoding cleanup: previous comment text was unreadable.
+     * 绘制圆角矩形路径。
      * @param {number} x
      * @param {number} y
      * @param {number} w
      * @param {number} h
-     * Encoding cleanup: previous comment text was unreadable.
+     * r 可为统一半径或四角半径对象。
      */
     roundRect(x, y, w, h, r) {
         let tl;
@@ -1540,7 +1540,7 @@ class FlowCanvas {
             tl = tr = br = bl = 0;
         }
 
-        // 闄愬埗鍗婂緞锛岄槻姝?w/h 杈冨皬鏃跺嚭鐜颁氦鍙?
+        // 限制半径，防止 w/h 较小时出现交叉。
         const maxR = Math.min(w, h) / 2;
         tl = Math.min(tl, maxR);
         tr = Math.min(tr, maxR);
@@ -1858,16 +1858,16 @@ class FlowCanvas {
     }
 
     /**
-     * Encoding cleanup: previous comment text was unreadable.
+     * 反序列化流程数据到画布。
      */
     deserialize(data) {
         if (!data) return;
         this.clear(true);
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 兼容项目包装结构和直接流程结构。
         const flowData = data.project?.flow || data.flow || data;
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 兼容后端 DTO 和前端节点命名。
         const operators = flowData.operators || flowData.Operators || flowData.nodes || [];
         const connections = flowData.connections || flowData.Connections || [];
 
@@ -1877,20 +1877,20 @@ class FlowCanvas {
 
         if (operators) {
             operators.forEach(op => {
-                // 閫傞厤鍚庣 DTO (PascalCase) 鎴栧墠绔?(camelCase)
+                // 兼容后端 DTO (PascalCase) 和前端数据 (camelCase)。
                 const id = op.id ?? op.Id;
                 const type = this.normalizeOperatorType(op.type ?? op.Type);
                 const title = op.name ?? op.Name ?? op.title ?? type;
 
-                // Encoding cleanup: previous comment text was unreadable.
-                const normalizePort = (p) => ({
-                    id: p.id || p.Id || this.generateUUID(),
-                    name: p.name || p.Name,
-                    displayName: p.displayName || p.DisplayName || p.name || p.Name,
-                    description: p.description || p.Description || '',
-                    type: p.type || p.Type || p.dataType || p.DataType || 0,
-                    dataType: p.dataType || p.DataType || p.type || p.Type || 0,
-                    isRequired: Boolean(p.isRequired ?? p.IsRequired ?? false)
+                // 归一化端口数据。
+                const normalizePort = (port) => ({
+                    id: port.id || port.Id || this.generateUUID(),
+                    name: port.name || port.Name,
+                    displayName: port.displayName || port.DisplayName || port.name || port.Name,
+                    description: port.description || port.Description || '',
+                    type: port.type || port.Type || port.dataType || port.DataType || 0,
+                    dataType: port.dataType || port.DataType || port.type || port.Type || 0,
+                    isRequired: Boolean(port.isRequired ?? port.IsRequired ?? false)
                 });
 
                 const inputs = (op.inputPorts || op.InputPorts || op.inputs || []).map(normalizePort);
@@ -1925,7 +1925,7 @@ class FlowCanvas {
 
         if (connections) {
             this.connections = connections.map(conn => {
-                // Adapt backend DTO (PascalCase) or frontend (camelCase)
+                // 兼容后端 DTO (PascalCase) 和前端数据 (camelCase)。
                 const id = conn.id || conn.Id;
                 const sourceId = conn.sourceOperatorId || conn.SourceOperatorId || conn.source;
                 const targetId = conn.targetOperatorId || conn.TargetOperatorId || conn.target;
@@ -1939,14 +1939,14 @@ class FlowCanvas {
                 let sourcePortIndex = conn.sourcePort ?? 0;
                 let targetPortIndex = conn.targetPort ?? 0;
 
-                // Find index by Port ID if available (Backend/DTO usually provides IDs)
+                // 有 Port ID 时优先按 ID 找索引，兼容后端 DTO。
                 if (sourcePortId && sourceNode && sourceNode.outputs) {
-                    const idx = sourceNode.outputs.findIndex(p => (p.id === sourcePortId) || (p.Id === sourcePortId));
+                    const idx = sourceNode.outputs.findIndex(port => (port.id === sourcePortId) || (port.Id === sourcePortId));
                     if (idx !== -1) sourcePortIndex = idx;
                 }
 
                 if (targetPortId && targetNode && targetNode.inputs) {
-                    const idx = targetNode.inputs.findIndex(p => (p.id === targetPortId) || (p.Id === targetPortId));
+                    const idx = targetNode.inputs.findIndex(port => (port.id === targetPortId) || (port.Id === targetPortId));
                     if (idx !== -1) targetPortIndex = idx;
                 }
 
@@ -1958,7 +1958,7 @@ class FlowCanvas {
                     targetPort: targetPortIndex
                 };
             }).filter(conn => {
-                // Encoding cleanup: previous comment text was unreadable.
+                // 跳过无效连接。
                 const isValidSource = conn.source && conn.source !== '00000000-0000-0000-0000-000000000000';
                 const isValidTarget = conn.target && conn.target !== '00000000-0000-0000-0000-000000000000';
                 if (!isValidSource || !isValidTarget) {
@@ -1967,7 +1967,7 @@ class FlowCanvas {
                 return isValidSource && isValidTarget;
             });
 
-            // 反序列化后必须重建连线索引，否则后续 O(1) 查询失效
+            // 反序列化后必须重建连线索引，否则后续 O(1) 查询失效。
             this._rebuildConnectionIndex();
         }
 
@@ -1976,21 +1976,21 @@ class FlowCanvas {
     }
 
     /**
-     * 绘制端口高亮效果
+     * 绘制端口高亮效果。
      * @param {{nodeId: string, portIndex: number, isOutput: boolean, hasConnection: boolean}} port
      */
     drawPortHighlight(port) {
         const pos = this.getPortPosition(port.nodeId, port.portIndex, port.isOutput);
         if (!pos) return;
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 外圈描边。
         this.ctx.beginPath();
         this.ctx.arc(pos.x, pos.y, 8 * this.scale, 0, Math.PI * 2);
         this.ctx.strokeStyle = port.isOutput ? '#1890ff' : '#52c41a';
         this.ctx.lineWidth = 2 * this.scale;
         this.ctx.stroke();
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 半透明填充。
         this.ctx.beginPath();
         this.ctx.arc(pos.x, pos.y, 12 * this.scale, 0, Math.PI * 2);
         this.ctx.fillStyle = port.isOutput
@@ -1998,12 +1998,11 @@ class FlowCanvas {
             : 'rgba(82, 196, 26, 0.2)';
         this.ctx.fill();
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 已连接端口使用红色虚线环提示可断开。
         if (port.hasConnection) {
-            // 绘制红色虚线圆环表示可断开
             this.ctx.beginPath();
             this.ctx.arc(pos.x, pos.y, 14 * this.scale, 0, Math.PI * 2);
-            this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.6)'; // 红色半透明
+            this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.6)';
             this.ctx.lineWidth = 2 * this.scale;
             this.ctx.setLineDash([4 * this.scale, 2 * this.scale]);
             this.ctx.stroke();
@@ -2012,25 +2011,25 @@ class FlowCanvas {
     }
 
     /**
-     * Encoding cleanup: previous comment text was unreadable.
+     * 处理鼠标按下事件。
      */
     handleMouseDown(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) / this.scale + this.offset.x;
         const y = (e.clientY - rect.top) / this.scale + this.offset.y;
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 记录当前鼠标位置。
         this.mousePosition = { x, y };
 
-        // Encoding cleanup: previous comment text was unreadable.
+        // 优先处理端口点击。
         const port = this.getPortAt(x, y);
         if (port) {
             if (port.isOutput) {
-                // Encoding cleanup: previous comment text was unreadable.
+                // 点击输出端口时，先断开已有输出连线。
                 const existingConns = this.getConnectionsAtPort(port.nodeId, port.portIndex, true);
-                
+
                 if (existingConns.length > 0) {
-                    // Encoding cleanup: previous comment text was unreadable.
+                    // 移除该输出端口已有连线。
                     existingConns.forEach(conn => {
                         this.removeConnection(conn.id);
                     });
@@ -2044,20 +2043,20 @@ class FlowCanvas {
                         console.log('[FlowCanvas] Removed existing connections:', existingConns.map(c => c.id));
                     }
                 } else {
-                    // 濞屸剝婀佹潻鐐村复閿涘奔绮犳潏鎾冲毉缁旑垰褰涘鈧慨瀣箾缁?
+                    // 没有现有连线时开始创建新连线。
                     this.startConnection(port.nodeId, port.portIndex);
                 }
                 return;
             } else if (this.isConnecting) {
-                // Encoding cleanup: previous comment text was unreadable.
+                // 正在连线时点击输入端口，完成连接。
                 this.finishConnection(port.nodeId, port.portIndex);
                 return;
             } else {
-                // Encoding cleanup: previous comment text was unreadable.
+                // 点击已连接输入端口时断开连接。
                 const existingConn = this.getConnectionAtPort(port.nodeId, port.portIndex, false);
-                
+
                 if (existingConn) {
-                    // Encoding cleanup: previous comment text was unreadable.
+                    // 移除输入端口现有连线。
                     this.removeConnection(existingConn.id);
                     if (window.showToast) {
                         window.showToast('连接已断开', 'info');
@@ -2070,24 +2069,24 @@ class FlowCanvas {
             }
         }
 
-        // 濡傛灉鍦ㄨ繛绾跨姸鎬佷絾鐐瑰嚮浜嗙┖鐧藉锛屽彇娑堣繛绾?
+        // 连线状态下点击空白区域时取消连线。
         if (this.isConnecting) {
             this.cancelConnection();
             return;
         }
 
-        // 鏌ユ壘鐐瑰嚮鐨勮妭鐐?
+        // 查找点击的节点。
         for (const [id, node] of this.nodes) {
             if (x >= node.x && x <= node.x + node.width &&
                 y >= node.y && y <= node.y + node.height) {
                 this.selectedNode = id;
-                // Encoding cleanup: previous comment text was unreadable.
+                // 左键点击节点时准备拖拽。
                 if (e.button === 0) {
                     this.draggedNode = id;
                     this.dragOffset = { x: x - node.x, y: y - node.y };
                 }
 
-                // 触发节点选中回调
+                // 触发节点选中回调。
                 if (this.onNodeSelected) {
                     this.onNodeSelected(node);
                 }
@@ -2099,7 +2098,7 @@ class FlowCanvas {
 
         this.selectedNode = null;
 
-        // 触发取消选中回调
+        // 触发取消选中回调。
         if (this.onNodeSelected) {
             this.onNodeSelected(null);
         }
@@ -2108,19 +2107,18 @@ class FlowCanvas {
     }
 
     /**
-     * Encoding cleanup: previous comment text was unreadable.
+     * 处理节点双击事件。
      */
     handleDoubleClick(e) {
         const rect = this.canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) / this.scale + this.offset.x;
         const y = (e.clientY - rect.top) / this.scale + this.offset.y;
 
-        // 鏌ユ壘鍙屽嚮鐨勮妭鐐?
+        // 查找双击的节点。
         for (const [id, node] of this.nodes) {
             if (x >= node.x && x <= node.x + node.width &&
                 y >= node.y && y <= node.y + node.height) {
-                
-                // 触发双击事件回调
+                // 触发双击事件回调。
                 if (this.onNodeDoubleClicked) {
                     this.onNodeDoubleClicked(node);
                 }
@@ -2128,7 +2126,6 @@ class FlowCanvas {
             }
         }
     }
-
     /**
      * Encoding cleanup: previous comment text was unreadable.
      */

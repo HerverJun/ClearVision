@@ -39,6 +39,15 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
     private const string TraceabilityFieldName = "Traceability";
     private static readonly JsonSerializerOptions FlowHashJsonOptions = new() { WriteIndented = false };
 
+    private static string SanitizeLogValue(object? value)
+    {
+        var text = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(text)
+            ? string.Empty
+            : text.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IInspectionRuntimeCoordinator _coordinator;
     private readonly IInspectionEventBus _eventBus;
@@ -697,7 +706,7 @@ public class InspectionWorker : IHostedService, IInspectionWorker, IAsyncDisposa
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[InspectionWorker] Failed to release idle camera stream after realtime loop stopped. CameraId={CameraId}", releaseCameraId);
+            _logger.LogWarning(ex, "[InspectionWorker] Failed to release idle camera stream after realtime loop stopped. CameraId={CameraId}", SanitizeLogValue(releaseCameraId));
         }
     }
 

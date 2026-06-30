@@ -7244,7 +7244,7 @@ test('AgentRun tool_call events render LLM requested tool cards', async () => {
   assert.equal(turn.toolsSection.hidden, false);
   assert.match(turn.toolsBody.innerHTML, /inspect_current_flow/);
   assert.match(turn.toolsBody.innerHTML, /runtime_package_precheck/);
-  assert.match(turn.toolsBody.innerHTML, /宸查樆鏂?|blocked|warning/);
+  assert.match(turn.toolsBody.innerHTML, /已阻断|blocked|warning/);
 });
 
 test('AgentRun tool_loop draft rejected releases generating state', async () => {

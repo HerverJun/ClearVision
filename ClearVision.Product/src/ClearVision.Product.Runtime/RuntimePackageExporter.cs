@@ -25,6 +25,15 @@ public sealed class RuntimePackageExporter
         "credential"
     ];
 
+    private static string SanitizeLogValue(object? value)
+    {
+        var text = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(text)
+            ? string.Empty
+            : text.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
+
     private static readonly HashSet<string> FileLikeParameterTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "file",
@@ -197,9 +206,9 @@ public sealed class RuntimePackageExporter
 
         _logger.LogInformation(
             "Exported runtime package {PackageId} for project {ProjectId} to {PackageRoot}",
-            manifest.PackageId,
-            project.Id,
-            packageRoot);
+            SanitizeLogValue(manifest.PackageId),
+            SanitizeLogValue(project.Id),
+            SanitizeLogValue(packageRoot));
 
         return new RuntimePackageExportResult
         {

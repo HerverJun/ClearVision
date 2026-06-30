@@ -23,6 +23,15 @@ public sealed class ContinuousInspectionWorker
     private static readonly TimeSpan CameraStreamRestartDelay = TimeSpan.FromMilliseconds(500);
     private readonly ILogger _logger;
 
+    private static string SanitizeLogValue(object? value)
+    {
+        var text = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(text)
+            ? string.Empty
+            : text.Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal);
+    }
+
     public ContinuousInspectionWorker(ILogger logger)
     {
         _logger = logger;
@@ -184,7 +193,7 @@ public sealed class ContinuousInspectionWorker
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
-                            _logger.LogError(ex, "[ContinuousInspection] Pipeline frame collection and scheduling failed. CameraId={CameraId}, TrackId={TrackId}", cameraId, item.TrackId);
+                            _logger.LogError(ex, "[ContinuousInspection] Pipeline frame collection and scheduling failed. CameraId={CameraId}, TrackId={TrackId}", SanitizeLogValue(cameraId), SanitizeLogValue(item.TrackId));
                         }
                     }
                 }
@@ -203,7 +212,7 @@ public sealed class ContinuousInspectionWorker
                     {
                         _logger.LogInformation(
                             "[ContinuousInspection] Loop stopped by configuration change. CameraId={CameraId}, PreviousMode={PreviousMode}, CurrentMode={CurrentMode}",
-                            cameraId,
+                            SanitizeLogValue(cameraId),
                             mode,
                             currentMode);
                         return;
@@ -245,7 +254,7 @@ public sealed class ContinuousInspectionWorker
                 _logger.LogWarning(
                     ex,
                     "[ContinuousInspection] Shared camera stream faulted; releasing lease and restarting. CameraId={CameraId}, Mode={Mode}",
-                    cameraId,
+                    SanitizeLogValue(cameraId),
                     mode);
             }
             finally
@@ -267,7 +276,7 @@ public sealed class ContinuousInspectionWorker
                     : "[ContinuousInspection] Loop stopped. CameraId={CameraId}, Mode={Mode}, Frames={Frames}, Signals={Signals}, Tracks={Tracks}, Scheduled={Scheduled}, Completed={Completed}, Decisions={Decisions}, AvgLatencyMs={AvgLatencyMs:F1}";
                 _logger.LogInformation(
                     logMessage,
-                    cameraId,
+                    SanitizeLogValue(cameraId),
                     mode,
                     snapshot.FramesReceived,
                     snapshot.ArrivalSignals,
