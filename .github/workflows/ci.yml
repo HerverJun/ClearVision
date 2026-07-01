@@ -30,6 +30,7 @@ env:
   OPERATOR_SMOKE_TEST_PROJECT: ClearVision.OperatorLibrary/tests/ClearVision.OperatorLibrary.SmokeTests/ClearVision.OperatorLibrary.SmokeTests.csproj
   OPERATOR_BENCHMARK_PROJECT: quality/tools/OperatorPerformanceBenchmarkRunner/OperatorPerformanceBenchmarkRunner.csproj
   OPERATOR_PACKAGE_DIR: ClearVision.OperatorLibrary/nupkg
+  FRONTEND_V2_DIR: ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2
   PUBLISH_DIR: ./publish
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
@@ -111,6 +112,27 @@ jobs:
           path: |
             ./算子资料/算子目录.json
             ./算子资料/算子目录.md
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+            ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/package-lock.json
+
+      - name: Install FrontendV2 Dependencies
+        working-directory: ${{ env.FRONTEND_V2_DIR }}
+        run: npm ci
+
+      - name: Run FrontendV2 Quality Gates
+        working-directory: ${{ env.FRONTEND_V2_DIR }}
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run build
 
       - name: Build (Debug)
         run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Debug --no-restore
@@ -317,13 +339,6 @@ jobs:
           path: |
             artifacts/operator-performance-benchmark.json
             artifacts/operator-performance-benchmark.md
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
 
       - name: Install UI Test Dependencies
         working-directory: ClearVision.Product/tests/ClearVision.Product.UI.Tests
@@ -540,6 +555,23 @@ jobs:
 
       - name: Restore Dependencies
         run: dotnet restore ${{ env.SOLUTION_PATH }} --locked-mode
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            ClearVision.Product/tests/ClearVision.Product.UI.Tests/package-lock.json
+            ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/package-lock.json
+
+      - name: Install FrontendV2 Dependencies
+        working-directory: ${{ env.FRONTEND_V2_DIR }}
+        run: npm ci
+
+      - name: Build FrontendV2
+        working-directory: ${{ env.FRONTEND_V2_DIR }}
+        run: npm run build
 
       - name: Get Version
         id: version

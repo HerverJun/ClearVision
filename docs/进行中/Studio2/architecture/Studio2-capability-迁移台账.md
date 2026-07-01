@@ -14,6 +14,7 @@
 - V2 typed API 必须包裹现有 `httpClient`，不得重做 auth、端口发现和网络错误策略。
 - Project、Flow、GlobalVariables 的正式保存仍经 `ProjectService + ProjectSaveCoordinator`。
 - Pinia、DOM、localStorage 只能作为投影或编辑草稿，不得作为正式业务权威。
+- G02A 的 V2 源码目录为 `ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/`；发布资产目录为 `wwwroot/v2/`；不得把 Vue/TypeScript/package/node_modules 放入旧 `wwwroot/src`。
 
 ## capability 台账
 
@@ -48,5 +49,5 @@
 ## 非阻断技术债
 
 - G01 只登记 Feature Flag，不实现 runtime flag、配置文件或发布包切换。
-- `FrontendV2` 尚不存在，自动守卫当前只验证受控 scope 为空时的明确行为，并在未来目录出现后扫描 V2 文件。
+- G02A 只建立 FrontendV2 构建底座和发布资产链路，不挂载 Vue root，不实现 runtime flag。
 - 后续 Goal 若选择不同 V2 目录，必须先更新 ADR、台账和 `Studio2ArchitectureGuardTests` 的受控 scope。

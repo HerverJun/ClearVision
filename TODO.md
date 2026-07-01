@@ -42,8 +42,8 @@
 
 ## 3. 当前执行项
 
-- 当前 Goal：`G02A`
-- 当前卡片：`docs/进行中/Studio2/goals/G02A.md`
+- 当前 Goal：`G02B`
+- 当前卡片：`docs/进行中/Studio2/goals/G02B.md`
 - 当前阶段：`Foundation`
 - 总状态：`READY`
 - 审计参考 SHA：`f4d392e2147adf175a2f8faa7d7c09b3d906ba8a`
@@ -78,8 +78,8 @@
 |---|---|---|---|---|---|---|
 | G00 | Foundation | 归档旧阶段并冻结可复现基线 | DONE | 无 | `docs/进行中/Studio2/goals/G00.md` | `3481d5a35f47bbf1f58c3f042cff6a679e720e0c` |
 | G01 | Foundation | ADR、状态权威与迁移白名单 | DONE | G00 | `docs/进行中/Studio2/goals/G01.md` | 见 G01 完成提交与最终报告 |
-| G02A | Foundation | FrontendV2 构建与发布底座 | READY | G01 | `docs/进行中/Studio2/goals/G02A.md` |  |
-| G02B | Foundation | V2 挂载、HostBridge 与现有通信适配 | LOCKED | G02A | `docs/进行中/Studio2/goals/G02B.md` |  |
+| G02A | Foundation | FrontendV2 构建与发布底座 | DONE | G01 | `docs/进行中/Studio2/goals/G02A.md` | 见 G02A 完成提交与最终报告 |
+| G02B | Foundation | V2 挂载、HostBridge 与现有通信适配 | READY | G02A | `docs/进行中/Studio2/goals/G02B.md` |  |
 | G03 | Foundation | Workspace Shell MVP | LOCKED | G02B | `docs/进行中/Studio2/goals/G03.md` |  |
 | G04A | Foundation | V2 Flow 编辑端口与本地 stale 防护 | LOCKED | G03 | `docs/进行中/Studio2/goals/G04A.md` |  |
 | G04B | Foundation | V2 单请求工程保存与持久化身份 | LOCKED | G04A | `docs/进行中/Studio2/goals/G04B.md` |  |
@@ -155,6 +155,7 @@
 
 | 日期 | Goal | Initial SHA | Final SHA | 测试/CI | 结论 |
 |---|---|---|---|---|---|
+| 2026-07-01 | G02A | `ff9a9430c0eb84e9b9f8e88beac9140c987bd4e8` | 见 G02A 完成提交与最终报告 | FrontendV2 npm ci/lint/typecheck/unit/build PASS；Desktop build PASS；Desktop publish PASS；Studio2 + BuildFromPlan architecture guard PASS；发布内容审计 PASS；完整 CI NOT RUN | 建立 `Desktop/FrontendV2` 独立 Vue 3/TypeScript/Vite/Pinia 构建底座，MSBuild/CI 复制发布资产到 `wwwroot/v2/`；下一项为 G02B。 |
 | 2026-07-01 | G01 | `789e9ec643390f5a79c68cfa6c4b401c1a679be3` | 见 G01 完成提交与最终报告 | Desktop.Tests build PASS；Studio2ArchitectureGuardTests + BuildFromPlanArchitectureGuardTests targeted PASS；链接/编码/diff hygiene 待提交前验证；完整 CI NOT RUN | 建立 Studio 2.0 架构 ADR、capability 迁移白名单、Feature Flag 台账和最小自动架构守卫；下一项为 G02A。 |
 | 2026-07-01 | G00 | `58c7569958f3bf8ab627f5c5b76ff0a77cc86914` | `3481d5a35f47bbf1f58c3f042cff6a679e720e0c` | Desktop build PASS；Product/Desktop targeted tests PASS；services regression PASS；UI unit PASS；链接/编码/diff hygiene PASS | Vision Agent 恢复治理阶段归档，Studio 2.0 基线冻结；下一项为 G01。 |
 

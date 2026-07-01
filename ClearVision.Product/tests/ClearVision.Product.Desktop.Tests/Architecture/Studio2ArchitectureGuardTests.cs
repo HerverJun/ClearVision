@@ -8,12 +8,8 @@ public sealed class Studio2ArchitectureGuardTests
 {
     private static readonly string Root = FindRepositoryRoot();
 
-    private static readonly string[] FrontendV2Roots =
-    [
-        "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/FrontendV2",
-        "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/frontend-v2",
-        "ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/studio2"
-    ];
+    private const string FrontendV2SourceRoot =
+        "ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src";
 
     [Fact]
     public void FrontendV2_ShouldReuseExistingEventBusAndServiceRegistry()
@@ -59,6 +55,10 @@ public sealed class Studio2ArchitectureGuardTests
             text.Should().NotMatchRegex(@"\bnew\s+HttpClient\s*\(", relativePath);
             text.Should().NotMatchRegex(@"\blocalStorage\s*\.\s*setItem\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|globalVariables|global-variables|variables)", relativePath);
             text.Should().NotMatchRegex(@"\bindexedDB\s*\.\s*open\s*\(\s*['""`](?:cv[_-])?(?:project|flow|agent|globalVariables|global-variables|variables)", relativePath);
+            text.Should().NotMatchRegex(@"\bAgentRun\b", relativePath);
+            text.Should().NotContain("agent-run", relativePath);
+            text.Should().NotContain("HostBridge", relativePath);
+            text.Should().NotContain("chrome.webview", relativePath);
         }
     }
 
@@ -92,17 +92,14 @@ public sealed class Studio2ArchitectureGuardTests
 
     private static IReadOnlyList<string> EnumerateFrontendV2SourceFiles()
     {
-        var files = FrontendV2Roots
-            .Select(path => Path.Combine(Root, path))
-            .Where(Directory.Exists)
-            .SelectMany(path => Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories))
+        var root = Path.Combine(Root, FrontendV2SourceRoot);
+        Directory.Exists(root).Should().BeTrue("G02A creates the real FrontendV2 source root.");
+
+        var files = Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
             .Where(IsFrontendSourceFile)
             .ToList();
 
-        if (files.Count == 0)
-        {
-            files.Should().BeEmpty("FrontendV2 is not created in G01; this guard becomes active when a scoped V2 directory exists.");
-        }
+        files.Should().NotBeEmpty("G02A must make the Studio 2.0 guard scan real V2 source files.");
 
         return files;
     }

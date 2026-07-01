@@ -86,6 +86,63 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <FrontendV2Root>$(MSBuildThisFileDirectory)FrontendV2\</FrontendV2Root>
+    <FrontendV2IntermediateDist>$(MSBuildThisFileDirectory)$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\FrontendV2\dist</FrontendV2IntermediateDist>
+    <SkipFrontendV2Build Condition="'$(SkipFrontendV2Build)' == ''">false</SkipFrontendV2Build>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="FrontendV2\**\*" />
+    <None Remove="FrontendV2\**\*" />
+  </ItemGroup>
+
+  <Target Name="BuildFrontendV2"
+          BeforeTargets="BeforeBuild"
+          Condition="Exists('$(FrontendV2Root)package.json')">
+    <Message Importance="high"
+             Text="Building FrontendV2 assets into $(FrontendV2IntermediateDist)" />
+    <RemoveDir Directories="$(FrontendV2IntermediateDist)"
+               Condition="'$(SkipFrontendV2Build)' != 'true'" />
+    <Exec WorkingDirectory="$(FrontendV2Root)"
+          Command="npm ci"
+          Condition="'$(SkipFrontendV2Build)' != 'true'" />
+    <Exec WorkingDirectory="$(FrontendV2Root)"
+          Command="npm run build -- --outDir &quot;$(FrontendV2IntermediateDist)&quot; --emptyOutDir"
+          Condition="'$(SkipFrontendV2Build)' != 'true'" />
+    <Error Condition="'$(SkipFrontendV2Build)' == 'true' and !Exists('$(FrontendV2IntermediateDist)\index.html')"
+           Text="SkipFrontendV2Build=true requires existing FrontendV2 assets at $(FrontendV2IntermediateDist)." />
+  </Target>
+
+  <Target Name="CollectFrontendV2DistAssets"
+          DependsOnTargets="BuildFrontendV2"
+          Condition="Exists('$(FrontendV2IntermediateDist)')">
+    <ItemGroup>
+      <FrontendV2DistAsset Include="$(FrontendV2IntermediateDist)\**\*" />
+    </ItemGroup>
+    <Error Condition="'@(FrontendV2DistAsset)' == ''"
+           Text="FrontendV2 build produced no assets in $(FrontendV2IntermediateDist)." />
+  </Target>
+
+  <Target Name="CopyFrontendV2AssetsToOutput"
+          AfterTargets="AfterBuild"
+          DependsOnTargets="CollectFrontendV2DistAssets">
+    <RemoveDir Directories="$(OutDir)wwwroot\v2" />
+    <Copy SourceFiles="@(FrontendV2DistAsset)"
+          DestinationFiles="@(FrontendV2DistAsset->'$(OutDir)wwwroot\v2\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyFrontendV2AssetsToPublish"
+          AfterTargets="Publish"
+          DependsOnTargets="CollectFrontendV2DistAssets"
+          Condition="'$(PublishDir)' != ''">
+    <RemoveDir Directories="$(PublishDir)wwwroot\v2" />
+    <Copy SourceFiles="@(FrontendV2DistAsset)"
+          DestinationFiles="@(FrontendV2DistAsset->'$(PublishDir)wwwroot\v2\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <PropertyGroup>
     <HuaraySdkPath>$(MSBuildThisFileDirectory)..\..\lib\HuaraySDK\x64\</HuaraySdkPath>
   </PropertyGroup>
 

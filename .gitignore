@@ -47,6 +47,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 **/test-results/
+*.tsbuildinfo
+/ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/dist/
+/ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/.vite/
 
 # Logs and diagnostics
 *.log

@@ -10,7 +10,7 @@
 
 G00 已冻结 Vision Agent 恢复治理阶段，并在 `docs/进行中/Studio2/状态权威与恢复边界.md` 中确认 AgentRun、EventStore、Projection Journal、Workspace Snapshot、Project/Flow/GlobalVariables 与 `ProjectSaveCoordinator` 的既有权威。本 ADR 将这些边界转成 Studio 2.0 后续开发必须遵守的单一架构决策，防止后续 Goal 在前端、保存链路、执行链路或图像渲染侧形成第二套业务权威。
 
-本 ADR 不新增运行时行为，不创建 `FrontendV2`，不修改生产代码。G02A 及后续 Goal 在引入 V2 文件时，必须先满足本 ADR 与配套迁移台账。
+本 ADR 不新增运行时行为，不挂载 `FrontendV2`，不修改生产代码。G02A 及后续 Goal 在引入 V2 文件时，必须先满足本 ADR 与配套迁移台账。
 
 ## 决策
 
@@ -40,14 +40,12 @@ G00 已冻结 Vision Agent 恢复治理阶段，并在 `docs/进行中/Studio2/�
 
 ## V2 范围和架构守卫
 
-G01 的自动守卫只检查明确的 Studio 2.0/V2 范围：
+G02A 后的自动守卫只检查明确的 Studio 2.0/V2 范围：
 
-- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/FrontendV2`
-- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/frontend-v2`
-- `ClearVision.Product/src/ClearVision.Product.Desktop/wwwroot/src/studio2`
+- `ClearVision.Product/src/ClearVision.Product.Desktop/FrontendV2/src`
 - `ClearVision.Product/src/ClearVision.Product.Station`
 
-`FrontendV2` 当前尚不存在时，守卫应明确进入“无 V2 文件可扫描”的通过分支。G02A 若选择其他目录，必须先更新本 ADR 和 `Studio2ArchitectureGuardTests` 的受控 scope，再添加 V2 代码。
+`FrontendV2` 源码必须位于 `wwwroot` 外，构建产物由 Desktop `.csproj` 复制到输出和发布目录的 `wwwroot/v2/`。G02A 完成后，守卫必须扫描真实 V2 源文件，不得继续以空 scope 通过。后续若选择其他 V2 源目录，必须先更新本 ADR 和 `Studio2ArchitectureGuardTests` 的受控 scope，再添加 V2 代码。
 
 守卫必须防止：
 
